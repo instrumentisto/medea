@@ -148,7 +148,6 @@ impl Default for AudioMediaTracksSettings {
     }
 }
 
-// TODO: move to utils
 /// Detects if video track captured from display searching
 /// [specific fields][1] in its settings. Only works in Chrome atm.
 ///
@@ -178,12 +177,12 @@ fn satisfies_track(track: &SysMediaStreamTrack, kind: TransceiverKind) -> bool {
 }
 
 #[derive(Clone, Debug)]
-pub struct VideoTrackConstraintsNew<C> {
+pub struct VideoTrackConstraints<C> {
     constraints: Option<C>,
     is_enabled: bool,
 }
 
-impl<C> Default for VideoTrackConstraintsNew<C>
+impl<C> Default for VideoTrackConstraints<C>
 where
     C: Default,
 {
@@ -195,7 +194,7 @@ where
     }
 }
 
-impl<C> VideoTrackConstraintsNew<C> {
+impl<C> VideoTrackConstraints<C> {
     pub fn is_enabled(&self) -> bool {
         self.is_enabled
     }
@@ -205,7 +204,7 @@ impl<C> VideoTrackConstraintsNew<C> {
         self.constraints = Some(cons);
     }
 
-    fn clear(&mut self) {
+    fn unconstrain(&mut self) {
         self.constraints.take();
     }
 
@@ -219,7 +218,7 @@ impl<C> VideoTrackConstraintsNew<C> {
     }
 }
 
-impl VideoTrackConstraintsNew<DeviceVideoTrackConstraints> {
+impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
     /// Returns `true` if provided [`SysMediaStreamTrack`] satisfies device
     /// [`MediaSource`] from this [`VideoTrackConstraints`].
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
@@ -231,7 +230,7 @@ impl VideoTrackConstraintsNew<DeviceVideoTrackConstraints> {
     }
 }
 
-impl VideoTrackConstraintsNew<DisplayVideoTrackConstraints> {
+impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         self.constraints
             .as_ref()
@@ -252,17 +251,17 @@ pub struct MediaStreamSettings {
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
     audio: AudioMediaTracksSettings,
 
-    device_video: VideoTrackConstraintsNew<DeviceVideoTrackConstraints>,
+    device_video: VideoTrackConstraints<DeviceVideoTrackConstraints>,
 
-    display_video: VideoTrackConstraintsNew<DisplayVideoTrackConstraints>,
+    display_video: VideoTrackConstraints<DisplayVideoTrackConstraints>,
 }
 
 impl Default for MediaStreamSettings {
     fn default() -> Self {
         Self {
             audio: AudioMediaTracksSettings::default(),
-            device_video: VideoTrackConstraintsNew::default(),
-            display_video: VideoTrackConstraintsNew::default(),
+            device_video: VideoTrackConstraints::default(),
+            display_video: VideoTrackConstraints::default(),
         }
     }
 }
@@ -277,11 +276,11 @@ impl MediaStreamSettings {
                 constraints: AudioTrackConstraints::default(),
                 is_enabled: false,
             },
-            display_video: VideoTrackConstraintsNew {
+            display_video: VideoTrackConstraints {
                 is_enabled: false,
                 constraints: None,
             },
-            device_video: VideoTrackConstraintsNew {
+            device_video: VideoTrackConstraints {
                 is_enabled: false,
                 constraints: None,
             },
@@ -328,10 +327,10 @@ impl MediaStreamSettings {
     {
         let track = track.as_ref();
         if self.device_video.satisfies(track.as_ref()) {
-            self.device_video.clear();
+            self.device_video.unconstrain();
             true
         } else if self.display_video.satisfies(track.as_ref()) {
-            self.display_video.clear();
+            self.display_video.unconstrain();
             true
         } else {
             false

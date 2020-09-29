@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    collections::HashMap,
     ops::Deref as _,
     rc::{Rc, Weak},
 };
@@ -37,8 +38,6 @@ use crate::{
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
-use js_sys::Atomics::wait;
-use std::collections::HashMap;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -358,9 +357,10 @@ impl RoomHandle {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
         future_to_promise(async move {
-            // TODO: MEEH return error from here to JS side (don't forget about
-            // tracerr).
-            inner?.set_local_media_settings(settings).await.unwrap();
+            inner?
+                .set_local_media_settings(settings)
+                .await
+                .map_err(|e| JasonError::from(e))?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -717,75 +717,92 @@ impl InnerRoom {
         kind: TransceiverKind,
         direction: TrackDirection,
     ) -> Result<(), Traced<RoomError>> {
-        let mute_tracks = self
+        let mut mute_states_backup = HashMap::new();
+        let mute_tracks: HashMap<_, _> = self
             .peers
             .get_all()
             .into_iter()
             .map(|peer| {
-                (
-                    peer.id(),
-                    peer.get_transceivers_sides(kind, direction)
-                        .into_iter()
-                        .map(|transceiver| {
-                            (
-                                transceiver.track_id(),
-                                StableMuteState::from(is_muted),
-                            )
-                        })
-                        .collect(),
-                )
+                let mut trnscvrs_backup_mute_states = HashMap::new();
+                let new_mute_states = peer
+                    .get_transceivers_sides(kind, direction)
+                    .into_iter()
+                    .filter(|transceiver| transceiver.is_can_be_constrained())
+                    .map(|transceiver| {
+                        let backup_stable_mute_state =
+                            match transceiver.mute_state() {
+                                MuteState::Stable(stable) => stable,
+                                MuteState::Transition(transition) => {
+                                    transition.intended()
+                                }
+                            };
+                        trnscvrs_backup_mute_states.insert(
+                            transceiver.track_id(),
+                            backup_stable_mute_state,
+                        );
+                        (transceiver.track_id(), is_muted)
+                    })
+                    .collect();
+                mute_states_backup
+                    .insert(peer.id(), trnscvrs_backup_mute_states);
+                (peer.id(), new_mute_states)
             })
             .collect();
-        self.update_mute_states(mute_tracks).await
+
+        let update_result = self.update_mute_states(mute_tracks).await;
+        if update_result.is_err() {
+            self.update_mute_states(mute_states_backup).await?;
+        }
+
+        update_result
     }
 
-    async fn update_mute_states(
+    async fn update_mute_states<M>(
         &self,
-        new_mute_states: HashMap<PeerId, HashMap<TrackId, StableMuteState>>,
-    ) -> Result<(), Traced<RoomError>> {
-        let waits: Vec<_> = new_mute_states
-            .into_iter()
-            .filter_map(|(peer_id, mute_states)| {
-                self.peers.get(peer_id).map(|peer| (peer, mute_states))
-            })
-            .map(|(peer, mute_state)| {
-                let mut processed_trnscvrs: Vec<Rc<dyn TransceiverSide>> =
-                    Vec::new();
-                let peer_id = peer.id();
-                let mut waits = Vec::new();
-                let mut track_patches = Vec::new();
-                mute_state
-                    .into_iter()
-                    .filter_map(move |(track_id, desired_state)| {
-                        peer.get_transceiver_side_by_id(track_id)
-                            .map(|trnsvr| (trnsvr, desired_state))
-                    })
-                    .filter_map(|(sender, new_mute_state)| {
-                        match sender.mute_state() {
-                            MuteState::Transition(transition) => Some((
-                                sender,
-                                new_mute_state,
-                                transition.intended() != new_mute_state,
-                            )),
-                            MuteState::Stable(stable) => {
-                                if stable == new_mute_state {
-                                    None
-                                } else {
-                                    Some((sender, new_mute_state, true))
+        new_mute_states: HashMap<PeerId, HashMap<TrackId, M>>,
+    ) -> Result<(), Traced<RoomError>>
+    where
+        M: Into<StableMuteState>,
+    {
+        future::try_join_all(
+            new_mute_states
+                .into_iter()
+                .filter_map(|(peer_id, mute_states)| {
+                    self.peers.get(peer_id).map(|peer| (peer, mute_states))
+                })
+                .map(|(peer, mute_state)| {
+                    let peer_id = peer.id();
+                    let mut transitions_futs = Vec::new();
+                    let mut tracks_patches = Vec::new();
+                    mute_state
+                        .into_iter()
+                        .filter_map(move |(track_id, is_muted)| {
+                            peer.get_transceiver_side_by_id(track_id)
+                                .map(|trnsvr| (trnsvr, is_muted.into()))
+                        })
+                        .filter_map(|(sender, new_mute_state)| {
+                            match sender.mute_state() {
+                                MuteState::Transition(transition) => Some((
+                                    sender,
+                                    new_mute_state,
+                                    transition.intended() != new_mute_state,
+                                )),
+                                MuteState::Stable(stable) => {
+                                    if stable == new_mute_state {
+                                        None
+                                    } else {
+                                        Some((sender, new_mute_state, true))
+                                    }
                                 }
                             }
-                        }
-                    })
-                    .for_each(|(sender, new_mute_state, should_update)| {
-                        if sender
-                            .mute_state_transition_to(new_mute_state)
-                            .is_ok()
-                        {
-                            waits.push(
+                        })
+                        .map(|(sender, new_mute_state, should_be_patched)| {
+                            sender.mute_state_transition_to(new_mute_state)?;
+                            transitions_futs.push(
                                 sender.when_mute_state_stable(new_mute_state),
                             );
-                            if should_update {
-                                track_patches.push(TrackPatchCommand {
+                            if should_be_patched {
+                                tracks_patches.push(TrackPatchCommand {
                                     id: sender.track_id(),
                                     is_muted: Some(
                                         new_mute_state
@@ -793,21 +810,24 @@ impl InnerRoom {
                                     ),
                                 });
                             }
-                        }
+
+                            Ok(())
+                        })
+                        .collect::<Result<(), _>>()
+                        .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+
+                    self.rpc.send_command(Command::UpdateTracks {
+                        peer_id,
+                        tracks_patches,
                     });
 
-                self.rpc.send_command(Command::UpdateTracks {
-                    peer_id,
-                    tracks_patches: track_patches,
-                });
-
-                future::try_join_all(waits)
-            })
-            .collect();
-
-        future::try_join_all(waits)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
+                    Ok(future::try_join_all(transitions_futs))
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(tracerr::map_from_and_wrap!())?,
+        )
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
 
@@ -857,16 +877,8 @@ impl InnerRoom {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
-                Ok(constrained_tracks) => {
-                    mute_states_update.insert(
-                        peer.id(),
-                        constrained_tracks
-                            .into_iter()
-                            .map(|(track_id, is_muted)| {
-                                (track_id, StableMuteState::from(is_muted))
-                            })
-                            .collect(),
-                    );
+                Ok(new_mute_states) => {
+                    mute_states_update.insert(peer.id(), new_mute_states);
                 }
                 Err(err) => {
                     self.on_failed_local_media.call(JasonError::from(err));
