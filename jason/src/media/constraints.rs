@@ -18,10 +18,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{
-    peer::{StableMuteState, TransceiverKind},
-    utils::get_property_by_name,
-};
+use crate::{peer::TransceiverKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
@@ -66,11 +63,13 @@ impl LocalTracksConstraints {
         self.0.borrow_mut().is_enabled(kind)
     }
 
+    /// Returns `true` if display video is constrained.
     #[inline]
     pub fn is_display_video_constrained(&self) -> bool {
         self.0.borrow().is_display_constrained()
     }
 
+    /// Returns `true` if device video is constrained.
     #[inline]
     pub fn is_device_video_constrained(&self) -> bool {
         self.0.borrow().is_device_constrained()
@@ -331,10 +330,12 @@ impl MediaStreamSettings {
         }
     }
 
+    /// Returns `true` if [`MediaStreamSettings::device_video`] is constrained.
     pub fn is_device_constrained(&self) -> bool {
         self.device_video.is_constrained()
     }
 
+    /// Returns `true` if [`MediaStreamSettings::display_video`] is constrained.
     pub fn is_display_constrained(&self) -> bool {
         self.display_video.is_constrained()
     }
@@ -345,10 +346,20 @@ impl MediaStreamSettings {
         &self.audio.constraints
     }
 
+    /// Returns reference to [`DisplayVideoTrackConstraints`] from this
+    /// [`MediaStreamSettings`].
+    ///
+    /// Returns `None` if [`DisplayVideoTrackConstraints`] is unconstrained.
+    #[inline]
     pub fn get_display_video(&self) -> Option<&DisplayVideoTrackConstraints> {
         self.display_video.constraints.as_ref()
     }
 
+    /// Returns reference to [`DeviceVideoTrackConstraints`] from this
+    /// [`MediaStreamSettings`].
+    ///
+    /// Returns `None` if [`DeviceVideoTrackConstraints`] is unconstrained.
+    #[inline]
     pub fn get_device_video(&self) -> Option<&DeviceVideoTrackConstraints> {
         self.device_video.constraints.as_ref()
     }
@@ -390,12 +401,14 @@ impl MediaStreamSettings {
         self.audio.is_enabled
     }
 
-    // TODO: remove
+    /// Returns `true` if [`DeviceVideoMediaStreamSettings`] are currently
+    /// constrained and enabled.
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.is_enabled()
     }
 
-    // TODO: remove
+    /// Returns `true` if [`DisplayVideoMediaStreamSettings`] are currently
+    /// constrained and enabled.
     pub fn is_display_video_enabled(&self) -> bool {
         self.display_video.is_enabled()
     }
@@ -467,8 +480,6 @@ pub enum MultiSourceTracksConstraints {
 /// `{Some, Any}` => `Device`
 impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
     fn from(constraints: MediaStreamSettings) -> Self {
-        use MultiSourceTracksConstraints as C;
-
         let is_device_video_enabled = constraints.is_device_video_enabled();
         let is_display_video_enabled = constraints.is_display_video_enabled();
         let is_device_audio_enabled = constraints.is_audio_enabled();
@@ -860,6 +871,10 @@ impl DeviceVideoTrackConstraints {
         self.is_required
     }
 
+    /// Checks if provided [MediaStreamTrack][1] satisfies
+    /// [`DeviceVideoTrackConstraints`] contained.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         satisfies_track(track, TransceiverKind::Video)
             && ConstrainString::satisfies(&self.device_id, track)
@@ -867,6 +882,9 @@ impl DeviceVideoTrackConstraints {
             && !guess_is_from_display(&track)
     }
 
+    /// Merges this [`DeviceVideoTrackConstraints`] with `another` one , meaning
+    /// that if some constraint is not set on this one, then it will be applied
+    /// from `another`.
     pub fn merge(&mut self, another: DeviceVideoTrackConstraints) {
         if self.device_id.is_none() && another.device_id.is_some() {
             self.device_id = another.device_id;
@@ -920,17 +938,28 @@ pub struct DisplayVideoTrackConstraints {
 }
 
 impl DisplayVideoTrackConstraints {
+    /// Checks if provided [MediaStreamTrack][1] satisfies
+    /// [`DisplayVideoTrackConstraints`] contained.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         satisfies_track(track, TransceiverKind::Video)
             && guess_is_from_display(&track)
     }
 
+    /// Merges this [`DisplayVideoTrackConstraints`] with `another` one ,
+    /// meaning that if some constraint is not set on this one, then it will
+    /// be applied from `another`.
     pub fn merge(&mut self, another: Self) {
         if !self.is_required && another.is_required {
             self.is_required = another.is_required;
         }
     }
 
+    /// Returns importance of this [`DisplayVideoTrackConstraints`].
+    ///
+    /// If this [`DisplayVideoTrackConstraints`] is important then without this
+    /// [`DisplayVideoTrackConstraints`] call session can't be started.
     pub fn is_required(&self) -> bool {
         self.is_required
     }

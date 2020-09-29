@@ -9,7 +9,6 @@ use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::MediaType;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
@@ -33,7 +32,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::peer::media::mute_state::MuteState::Stable;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -415,6 +413,10 @@ impl MediaConnections {
         out
     }
 
+    /// Returns [`Rc`] to [`TransceiverSide`] with a provided [`TrackId`].
+    ///
+    /// Returns `None` if [`TransceiverSide`] with a provided [`TrackId`]
+    /// doesn't exists in this [`MediaConnections`].
     pub fn get_transceiver_side_by_id(
         &self,
         track_id: TrackId,
@@ -450,15 +452,16 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let mute_state = if send_constraints.is_enabled(&track.media_type) {
-                        StableMuteState::Unmuted
-                    } else if is_required {
-                        return Err(tracerr::new!(
+                    let mute_state =
+                        if send_constraints.is_enabled(&track.media_type) {
+                            StableMuteState::Unmuted
+                        } else if is_required {
+                            return Err(tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         ));
-                    } else {
-                        StableMuteState::Muted
-                    };
+                        } else {
+                            StableMuteState::Muted
+                        };
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,
                         track_id: track.id,

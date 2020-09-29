@@ -283,6 +283,8 @@ impl TryFrom<TracksRequest> for SimpleTracksRequest {
         } else if value.display_video.len() > 1 {
             // TODO: rename err
             return Err(TooManyVideoTracks);
+        } else if value.audio.len() > 1 {
+            return Err(TooManyAudioTracks);
         } else if value.device_video.is_empty()
             && value.display_video.is_empty()
             && value.audio.is_empty()

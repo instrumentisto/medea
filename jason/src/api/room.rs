@@ -9,7 +9,7 @@ use std::{
 
 use async_trait::async_trait;
 use derive_more::Display;
-use futures::{channel::mpsc, future, future::Either, StreamExt as _};
+use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
@@ -28,9 +28,9 @@ use crate::{
         RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, Muteable, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
-        TrackDirection, TransceiverKind, TransceiverSide,
+        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
+        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
+        TrackDirection, TransceiverKind,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
