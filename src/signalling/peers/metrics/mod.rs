@@ -13,10 +13,7 @@ mod connection_failure_detector;
 mod flowing_detector;
 mod quality_meter;
 
-use std::{
-    cell::RefCell, collections::HashMap, fmt::Debug, rc::Rc, sync::Arc,
-    time::Duration,
-};
+use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc, time::Duration};
 
 use chrono::{DateTime, Utc};
 use futures::{
@@ -25,7 +22,7 @@ use futures::{
 };
 use medea_client_api_proto::{
     stats::RtcStat, ConnectionQualityScore, MemberId, PeerConnectionState,
-    PeerId, TrackId,
+    PeerId,
 };
 use medea_macro::dispatchable;
 

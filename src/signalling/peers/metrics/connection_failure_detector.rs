@@ -3,9 +3,7 @@
 use std::collections::HashMap;
 
 use futures::stream::LocalBoxStream;
-use medea_client_api_proto::{
-    stats::RtcStat, PeerConnectionState, PeerId, TrackId,
-};
+use medea_client_api_proto::{stats::RtcStat, PeerConnectionState, PeerId};
 
 use crate::{
     log::prelude::*, media::PeerStateMachine,

@@ -383,6 +383,7 @@ mod disable_recv_tracks {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
+                            is_display: false,
                         }),
                     },
                     Track {
@@ -984,6 +985,7 @@ mod rpc_close_reason_on_room_drop {
 }
 
 /// Tests for [`TrackPatch`] generation in [`Room`].
+// #[cfg(feature = "disable")]
 mod patches_generation {
 
     use futures::StreamExt;
@@ -1029,6 +1031,7 @@ mod patches_generation {
                 id: video_track_id,
                 media_type: MediaType::Video(VideoSettings {
                     is_required: false,
+                    is_display: false,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
@@ -1038,7 +1041,8 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let mut local_stream = MediaStreamSettings::new();
+            let mut local_stream = MediaStreamSettings::default();
+            local_stream.set_track_enabled(false, TransceiverKind::Video);
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,

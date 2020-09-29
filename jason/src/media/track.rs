@@ -151,6 +151,12 @@ impl MediaStreamTrack {
         Clone::clone(&self.0.track)
     }
 
+    /// Returns is this [`MediaStreamTrack`] enabled.
+    #[wasm_bindgen(js_name = enabled)]
+    pub fn js_enabled(&self) -> bool {
+        self.0.enabled.get()
+    }
+
     /// Sets callback, which will be invoked when this [`MediaStreamTrack`] will
     /// be enabled.
     pub fn on_enabled(&self, callback: js_sys::Function) {

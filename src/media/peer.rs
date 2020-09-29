@@ -1083,7 +1083,10 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Video(VideoSettings { is_required: true }),
+                MediaType::Video(VideoSettings {
+                    is_required: true,
+                    is_display: false,
+                }),
             );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
@@ -1101,7 +1104,10 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Video(VideoSettings { is_required: true }),
+                MediaType::Video(VideoSettings {
+                    is_required: true,
+                    is_display: false,
+                }),
             );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
@@ -1112,7 +1118,10 @@ pub mod tests {
     fn media_track(track_id: u32) -> Rc<MediaTrack> {
         Rc::new(MediaTrack::new(
             TrackId(track_id),
-            MediaType::Video(VideoSettings { is_required: true }),
+            MediaType::Video(VideoSettings {
+                is_required: true,
+                is_display: false,
+            }),
         ))
     }
 

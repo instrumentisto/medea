@@ -21,7 +21,6 @@ use medea_client_api_proto::{
         RtcStatsType, StatId,
     },
     MediaType as MediaTypeProto, MemberId, PeerConnectionState, PeerId,
-    TrackId,
 };
 
 use crate::{

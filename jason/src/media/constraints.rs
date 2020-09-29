@@ -8,7 +8,7 @@ use std::{
 use derive_more::AsRef;
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
-    MediaType,
+    MediaType, VideoSettings,
 };
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -577,6 +577,22 @@ impl VideoSource {
     }
 }
 
+impl From<VideoSettings> for VideoSource {
+    fn from(settings: VideoSettings) -> Self {
+        if settings.is_display {
+            VideoSource::Display(DisplayVideoTrackConstraints {
+                is_required: settings.is_required,
+            })
+        } else {
+            VideoSource::Device(DeviceVideoTrackConstraints {
+                device_id: None,
+                facing_mode: None,
+                is_required: settings.is_required,
+            })
+        }
+    }
+}
+
 /// Wrapper around [MediaTrackConstraints][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#media-track-constraints
@@ -616,29 +632,19 @@ impl TrackConstraints {
     pub fn is_display_video(&self) -> bool {
         matches!(self, Self::Video(VideoSource::Display(_)))
     }
+
+    /// Returns `true` if this [`TrackConstraints`]'s media should be received
+    /// from `getUserMedia`.
+    pub fn is_device_video(&self) -> bool {
+        matches!(self, Self::Video(VideoSource::Device(_)))
+    }
 }
 
 impl From<ProtoTrackConstraints> for TrackConstraints {
     fn from(caps: ProtoTrackConstraints) -> Self {
         match caps {
             ProtoTrackConstraints::Audio(audio) => Self::Audio(audio.into()),
-            ProtoTrackConstraints::Video(video) => {
-                if video.is_display {
-                    Self::Video(VideoSource::Display(
-                        DisplayVideoTrackConstraints {
-                            is_required: video.is_required,
-                        },
-                    ))
-                } else {
-                    Self::Video(VideoSource::Device(
-                        DeviceVideoTrackConstraints {
-                            device_id: None,
-                            facing_mode: None,
-                            is_required: video.is_required,
-                        },
-                    ))
-                }
-            }
+            ProtoTrackConstraints::Video(video) => Self::Video(video.into()),
         }
     }
 }

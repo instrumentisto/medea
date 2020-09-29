@@ -40,7 +40,7 @@ async fn video_constraints_satisfies() {
     let track = tracks.pop().unwrap().0;
 
     assert!(track.kind() == TrackKind::Video);
-    assert!(VideoSource::from(track_constraints).satisfies(&track));
+    assert!(track_constraints.satisfies(track.as_ref()));
 }
 
 // 1. Get device id of non default audio device from enumerate_devices();
@@ -98,7 +98,7 @@ async fn both_constraints_satisfies() {
 
     let tracks = media_manager.get_tracks(constraints.clone()).await.unwrap();
 
-    let video_constraints = constraints.get_video().clone();
+    let video_constraints = constraints.get_device_video().clone().unwrap();
     let audio_constraints = constraints.get_audio().clone();
 
     assert_eq!(tracks.len(), 2);
@@ -117,7 +117,7 @@ async fn both_constraints_satisfies() {
     assert!(audio_constraints.satisfies(&audio_track));
 
     assert!(video_track.kind() == TrackKind::Video);
-    assert!(video_constraints.satisfies(&video_track));
+    assert!(video_constraints.satisfies(video_track.as_ref()));
 }
 
 // 1. Get device id of non default audio and video device from
@@ -350,13 +350,23 @@ async fn multi_source_media_stream_constraints_build6() {
     };
 }
 
+fn get_device_video_track_constraints() -> DeviceVideoTrackConstraints {
+    match VideoSource::from(VideoSettings {
+        is_required: true,
+        is_display: false,
+    }) {
+        VideoSource::Device(device) => device,
+        _ => unreachable!(),
+    }
+}
+
 // Make sure that MediaStreamConstraints{audio:true, video:any} =>
 // Device({audio:true, video:true})
 #[wasm_bindgen_test]
 async fn multi_source_media_stream_constraints_build7() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
-    constraints.video(VideoSource::from(VideoSettings { is_required: true }));
+    constraints.device_video(get_device_video_track_constraints());
 
     let constraints: Option<MultiSourceTracksConstraints> = constraints.into();
 
@@ -381,7 +391,7 @@ async fn multi_source_media_stream_constraints_build7() {
 #[wasm_bindgen_test]
 async fn multi_source_media_stream_constraints_build8() {
     let mut constraints = MediaStreamSettings::new();
-    constraints.video(VideoSource::from(VideoSettings { is_required: true }));
+    constraints.device_video(get_device_video_track_constraints());
 
     let constraints: Option<MultiSourceTracksConstraints> = constraints.into();
 

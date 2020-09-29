@@ -13,7 +13,7 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamStats, RtcRemoteInboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    ConnectionQualityScore, MemberId, PeerConnectionState, PeerId, TrackId,
+    ConnectionQualityScore, MemberId, PeerConnectionState, PeerId,
 };
 
 use crate::{

@@ -269,8 +269,10 @@ impl TransceiverSide for Sender {
     fn is_transitable(&self) -> bool {
         if self.caps.is_display_video() {
             self.send_constraints.is_display_video_constrained()
-        } else {
+        } else if self.caps.is_device_video() {
             self.send_constraints.is_device_video_constrained()
+        } else {
+            true
         }
     }
 }

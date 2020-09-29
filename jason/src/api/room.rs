@@ -753,8 +753,16 @@ impl InnerRoom {
             .collect();
 
         let update_result = self.update_mute_states(mute_tracks).await;
-        if update_result.is_err() {
-            self.update_mute_states(mute_states_backup).await?;
+        if let Err(e) = &update_result {
+            match e.as_ref() {
+                RoomError::MediaConnections(err) => match err {
+                    MediaConnectionsError::CannotDisableRequiredSender => {
+                        self.update_mute_states(mute_states_backup).await?;
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
         }
 
         update_result
