@@ -66,16 +66,6 @@ impl LocalTracksConstraints {
         self.0.borrow_mut().is_enabled(kind)
     }
 
-    pub fn is_media_type_constrained(&self, media_type: &MediaType) -> bool {
-        match &media_type {
-            MediaType::Video(video) => {
-                (video.is_display && self.is_display_video_constrained())
-                    || (!video.is_display && self.is_device_video_constrained())
-            }
-            MediaType::Audio(_) => true,
-        }
-    }
-
     #[inline]
     pub fn is_display_video_constrained(&self) -> bool {
         self.0.borrow().is_display_constrained()
@@ -207,9 +197,12 @@ where
     }
 }
 
-impl<C> VideoTrackConstraints<C> where C: std::fmt::Debug {
+impl<C> VideoTrackConstraints<C>
+where
+    C: std::fmt::Debug,
+{
     pub fn is_enabled(&self) -> bool {
-        self.is_enabled
+        self.is_enabled && self.is_constrained()
     }
 
     pub fn set(&mut self, cons: C) {
@@ -225,9 +218,7 @@ impl<C> VideoTrackConstraints<C> where C: std::fmt::Debug {
     }
 
     fn constrain(&mut self, other: Self) {
-        log::debug!("Constrain before: {:?}", self);
         self.constraints = other.constraints;
-        log::debug!("Constrain after: {:?}", self);
     }
 }
 
@@ -237,7 +228,7 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         self.constraints
             .as_ref()
-            .filter(|_| self.is_enabled)
+            .filter(|_| self.is_enabled())
             .map(|device| device.satisfies(track))
             .unwrap_or(false)
     }
@@ -247,7 +238,7 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         self.constraints
             .as_ref()
-            .filter(|_| self.is_enabled)
+            .filter(|_| self.is_enabled())
             .map(|display| display.satisfies(track))
             .unwrap_or(false)
     }
@@ -401,12 +392,12 @@ impl MediaStreamSettings {
 
     // TODO: remove
     pub fn is_device_video_enabled(&self) -> bool {
-        self.device_video.is_enabled && self.is_device_constrained()
+        self.device_video.is_enabled()
     }
 
     // TODO: remove
     pub fn is_display_video_enabled(&self) -> bool {
-        self.display_video.is_enabled && self.is_display_constrained()
+        self.display_video.is_enabled()
     }
 
     /// Indicates whether the given [`MediaType`] is enabled in this

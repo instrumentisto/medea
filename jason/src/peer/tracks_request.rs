@@ -217,8 +217,7 @@ impl SimpleTracksRequest {
             }
         }
         if let Some((_, device_video_caps)) = &self.device_video {
-            if !other.is_device_video_enabled()
-            {
+            if !other.is_device_video_enabled() {
                 if device_video_caps.is_required() {
                     // TODO: rename err
                     return Err(tracerr::new!(
@@ -230,8 +229,7 @@ impl SimpleTracksRequest {
             }
         }
         if let Some((_, display_video_caps)) = &self.display_video {
-            if !other.is_display_video_enabled()
-            {
+            if !other.is_display_video_enabled() {
                 if display_video_caps.is_required() {
                     // TODO: rename err
                     return Err(tracerr::new!(

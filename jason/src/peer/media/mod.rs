@@ -450,18 +450,13 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let is_enabled =
-                        send_constraints.is_enabled(&track.media_type);
-                    let is_constrained = send_constraints
-                        .is_media_type_constrained(&track.media_type);
-                    let mute_state = if is_enabled && is_constrained {
+                    let mute_state = if send_constraints.is_enabled(&track.media_type) {
                         StableMuteState::Unmuted
                     } else if is_required {
                         return Err(tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         ));
                     } else {
-                        log::debug!("Enabled: {}; constrained: {}", is_enabled, is_constrained);
                         StableMuteState::Muted
                     };
                     let sndr = SenderBuilder {
