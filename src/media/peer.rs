@@ -1001,7 +1001,7 @@ impl<'a> PeerChangesScheduler<'a> {
             let track_screenshare = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
-                    is_required: video_settings.publish_policy.is_required(),
+                    is_required: false,
                     is_display: true,
                 }),
             ));
