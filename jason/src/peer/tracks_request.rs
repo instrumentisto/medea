@@ -25,9 +25,17 @@ pub enum TracksRequestError {
     #[display(fmt = "only one audio track is allowed in SimpleTracksRequest")]
     TooManyAudioTracks,
 
-    /// [`TracksRequest`] contains multiple [`VideoTrackConstraints`].
-    #[display(fmt = "only one video track is allowed in SimpleTracksRequest")]
-    TooManyVideoTracks,
+    /// [`TracksRequest`] contains multiple [`DeviceVideoTrackConstraints`].
+    #[display(
+        fmt = "only one device video track is allowed in SimpleTracksRequest"
+    )]
+    TooManyDeviceVideoTracks,
+
+    /// [`TracksRequest`] contains multiple [`DisplayVideoTrackConstraints`].
+    #[display(
+        fmt = "only one display video track is allowed in SimpleTracksRequest"
+    )]
+    TooManyDisplayVideoTracks,
 
     /// [`TracksRequest`] contains no track constraints at all.
     #[display(fmt = "SimpleTracksRequest should have at least one track")]
@@ -238,8 +246,6 @@ impl SimpleTracksRequest {
                 } else {
                     self.display_video.take();
                 }
-            } else {
-                log::debug!("WTF??????????????????? other: {:?}", other);
             }
         }
 
@@ -251,7 +257,7 @@ impl SimpleTracksRequest {
         if other.is_display_video_enabled() {
             if let Some((_, display_video)) = self.display_video.as_mut() {
                 if let Some(other_display_video) = other.get_display_video() {
-                    display_video.merge(other_display_video.clone());
+                    display_video.merge(other_display_video);
                 }
             }
         }
@@ -274,15 +280,14 @@ impl TryFrom<TracksRequest> for SimpleTracksRequest {
         value: TracksRequest,
     ) -> std::result::Result<Self, Self::Error> {
         use TracksRequestError::{
-            NoTracks, TooManyAudioTracks, TooManyVideoTracks,
+            NoTracks, TooManyAudioTracks, TooManyDeviceVideoTracks,
+            TooManyDisplayVideoTracks,
         };
 
         if value.device_video.len() > 1 {
-            // TODO: rename err
-            return Err(TooManyVideoTracks);
+            return Err(TooManyDeviceVideoTracks);
         } else if value.display_video.len() > 1 {
-            // TODO: rename err
-            return Err(TooManyVideoTracks);
+            return Err(TooManyDisplayVideoTracks);
         } else if value.audio.len() > 1 {
             return Err(TooManyAudioTracks);
         } else if value.device_video.is_empty()

@@ -360,7 +360,7 @@ impl RoomHandle {
             inner?
                 .set_local_media_settings(settings)
                 .await
-                .map_err(|e| JasonError::from(e))?;
+                .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -753,21 +753,17 @@ impl InnerRoom {
             .collect();
 
         let update_result = self.update_mute_states(mute_tracks).await;
-        if let Err(e) = &update_result {
-            match e.as_ref() {
-                RoomError::MediaConnections(err) => match err {
-                    MediaConnectionsError::CannotDisableRequiredSender => {
-                        self.update_mute_states(mute_states_backup).await?;
-                    }
-                    _ => (),
-                },
-                _ => (),
-            }
+        if let Err(RoomError::MediaConnections(
+            MediaConnectionsError::CannotDisableRequiredSender,
+        )) = &update_result.as_ref().map_err(AsRef::as_ref)
+        {
+            self.update_mute_states(mute_states_backup).await?;
         }
 
         update_result
     }
 
+    #[allow(clippy::filter_map)]
     async fn update_mute_states(
         &self,
         desired_mute_states: HashMap<PeerId, HashMap<TrackId, StableMuteState>>,

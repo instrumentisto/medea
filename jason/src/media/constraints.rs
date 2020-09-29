@@ -228,8 +228,7 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
         self.constraints
             .as_ref()
             .filter(|_| self.is_enabled())
-            .map(|device| device.satisfies(track))
-            .unwrap_or(false)
+            .map_or(false, |device| device.satisfies(track))
     }
 }
 
@@ -238,8 +237,7 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
         self.constraints
             .as_ref()
             .filter(|_| self.is_enabled())
-            .map(|display| display.satisfies(track))
-            .unwrap_or(false)
+            .map_or(false, |display| display.satisfies(track))
     }
 }
 
@@ -948,6 +946,7 @@ impl DisplayVideoTrackConstraints {
     /// [`DisplayVideoTrackConstraints`] contained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[allow(clippy::unused_self)]
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         satisfies_track(track, TransceiverKind::Video)
             && guess_is_from_display(&track)
@@ -956,7 +955,7 @@ impl DisplayVideoTrackConstraints {
     /// Merges this [`DisplayVideoTrackConstraints`] with `another` one ,
     /// meaning that if some constraint is not set on this one, then it will
     /// be applied from `another`.
-    pub fn merge(&mut self, another: Self) {
+    pub fn merge(&mut self, another: &Self) {
         if !self.is_required && another.is_required {
             self.is_required = another.is_required;
         }
