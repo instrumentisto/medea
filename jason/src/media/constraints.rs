@@ -207,13 +207,12 @@ where
     }
 }
 
-impl<C> VideoTrackConstraints<C> {
+impl<C> VideoTrackConstraints<C> where C: std::fmt::Debug {
     pub fn is_enabled(&self) -> bool {
         self.is_enabled
     }
 
     pub fn set(&mut self, cons: C) {
-        self.is_enabled = true;
         self.constraints = Some(cons);
     }
 
@@ -226,8 +225,9 @@ impl<C> VideoTrackConstraints<C> {
     }
 
     fn constrain(&mut self, other: Self) {
-        self.is_enabled &= other.is_enabled;
+        log::debug!("Constrain before: {:?}", self);
         self.constraints = other.constraints;
+        log::debug!("Constrain after: {:?}", self);
     }
 }
 
@@ -290,24 +290,14 @@ impl MediaStreamSettings {
                 is_enabled: false,
             },
             display_video: VideoTrackConstraints {
-                is_enabled: false,
+                is_enabled: true,
                 constraints: None,
             },
             device_video: VideoTrackConstraints {
-                is_enabled: false,
+                is_enabled: true,
                 constraints: None,
             },
         }
-    }
-
-    /// Returns `true` if video from device can be published.
-    fn is_device_enabled(&self) -> bool {
-        self.device_video.is_enabled()
-    }
-
-    /// Returns `true` if video from display can be published.
-    fn is_display_enabled(&self) -> bool {
-        self.display_video.is_enabled()
     }
 
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
@@ -409,27 +399,14 @@ impl MediaStreamSettings {
         self.audio.is_enabled
     }
 
-    /// Indicates whether video is enabled in this [`MediaStreamSettings`].
-    #[inline]
-    pub fn is_video_enabled(&self) -> bool {
-        self.device_video.is_enabled() || self.display_video.is_enabled()
-    }
-
-    pub fn is_video_source_enabled(&self, video_source: &VideoSource) -> bool {
-        match video_source {
-            VideoSource::Display(_) => self.display_video.is_enabled,
-            VideoSource::Device(_) => self.device_video.is_enabled,
-        }
-    }
-
     // TODO: remove
     pub fn is_device_video_enabled(&self) -> bool {
-        self.device_video.is_enabled
+        self.device_video.is_enabled && self.is_device_constrained()
     }
 
     // TODO: remove
     pub fn is_display_video_enabled(&self) -> bool {
-        self.display_video.is_enabled
+        self.display_video.is_enabled && self.is_display_constrained()
     }
 
     /// Indicates whether the given [`MediaType`] is enabled in this

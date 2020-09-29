@@ -461,6 +461,7 @@ impl MediaConnections {
                             MediaConnectionsError::CannotDisableRequiredSender
                         ));
                     } else {
+                        log::debug!("Enabled: {}; constrained: {}", is_enabled, is_constrained);
                         StableMuteState::Muted
                     };
                     let sndr = SenderBuilder {

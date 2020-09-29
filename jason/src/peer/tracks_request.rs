@@ -218,7 +218,6 @@ impl SimpleTracksRequest {
         }
         if let Some((_, device_video_caps)) = &self.device_video {
             if !other.is_device_video_enabled()
-                && !other.is_device_constrained()
             {
                 if device_video_caps.is_required() {
                     // TODO: rename err
@@ -232,7 +231,6 @@ impl SimpleTracksRequest {
         }
         if let Some((_, display_video_caps)) = &self.display_video {
             if !other.is_display_video_enabled()
-                && !other.is_display_constrained()
             {
                 if display_video_caps.is_required() {
                     // TODO: rename err
@@ -242,6 +240,8 @@ impl SimpleTracksRequest {
                 } else {
                     self.display_video.take();
                 }
+            } else {
+                log::debug!("WTF??????????????????? other: {:?}", other);
             }
         }
 
