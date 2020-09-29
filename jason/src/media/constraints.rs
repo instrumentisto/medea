@@ -18,7 +18,10 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{peer::TransceiverKind, utils::get_property_by_name};
+use crate::{
+    peer::{StableMuteState, TransceiverKind},
+    utils::get_property_by_name,
+};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
@@ -61,6 +64,16 @@ impl LocalTracksConstraints {
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow_mut().is_enabled(kind)
+    }
+
+    pub fn is_media_type_constrained(&self, media_type: &MediaType) -> bool {
+        match &media_type {
+            MediaType::Video(video) => {
+                (video.is_display && self.is_display_video_constrained())
+                    || (!video.is_display && self.is_device_video_constrained())
+            }
+            MediaType::Audio(_) => true,
+        }
     }
 
     #[inline]
@@ -351,6 +364,14 @@ impl MediaStreamSettings {
         &self.audio.constraints
     }
 
+    pub fn get_display_video(&self) -> Option<&DisplayVideoTrackConstraints> {
+        self.display_video.constraints.as_ref()
+    }
+
+    pub fn get_device_video(&self) -> Option<&DeviceVideoTrackConstraints> {
+        self.device_video.constraints.as_ref()
+    }
+
     /// Enables or disables audio or video type in this [`MediaStreamSettings`].
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
@@ -394,10 +415,19 @@ impl MediaStreamSettings {
         self.device_video.is_enabled() || self.display_video.is_enabled()
     }
 
+    pub fn is_video_source_enabled(&self, video_source: &VideoSource) -> bool {
+        match video_source {
+            VideoSource::Display(_) => self.display_video.is_enabled,
+            VideoSource::Device(_) => self.device_video.is_enabled,
+        }
+    }
+
+    // TODO: remove
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.is_enabled
     }
 
+    // TODO: remove
     pub fn is_display_video_enabled(&self) -> bool {
         self.display_video.is_enabled
     }
@@ -868,6 +898,18 @@ impl DeviceVideoTrackConstraints {
             && ConstrainString::satisfies(&self.facing_mode, track)
             && !guess_is_from_display(&track)
     }
+
+    pub fn merge(&mut self, another: DeviceVideoTrackConstraints) {
+        if self.device_id.is_none() && another.device_id.is_some() {
+            self.device_id = another.device_id;
+        }
+        if self.facing_mode.is_none() && another.facing_mode.is_none() {
+            self.facing_mode = another.facing_mode;
+        }
+        if !self.is_required && another.is_required {
+            self.is_required = another.is_required;
+        }
+    }
 }
 
 /// Constraints applicable to video tracks that are sourced from screen-capture.
@@ -913,6 +955,16 @@ impl DisplayVideoTrackConstraints {
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         satisfies_track(track, TransceiverKind::Video)
             && guess_is_from_display(&track)
+    }
+
+    pub fn merge(&mut self, another: Self) {
+        if !self.is_required && another.is_required {
+            self.is_required = another.is_required;
+        }
+    }
+
+    pub fn is_required(&self) -> bool {
+        self.is_required
     }
 }
 

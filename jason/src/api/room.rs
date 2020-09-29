@@ -727,7 +727,7 @@ impl InnerRoom {
                 let new_mute_states = peer
                     .get_transceivers_sides(kind, direction)
                     .into_iter()
-                    .filter(|transceiver| transceiver.is_can_be_constrained())
+                    .filter(|transceiver| transceiver.is_transitable())
                     .map(|transceiver| {
                         let backup_stable_mute_state =
                             match transceiver.mute_state() {
@@ -740,7 +740,10 @@ impl InnerRoom {
                             transceiver.track_id(),
                             backup_stable_mute_state,
                         );
-                        (transceiver.track_id(), is_muted)
+                        (
+                            transceiver.track_id(),
+                            StableMuteState::from(is_muted),
+                        )
                     })
                     .collect();
                 mute_states_backup
@@ -757,62 +760,75 @@ impl InnerRoom {
         update_result
     }
 
-    async fn update_mute_states<M>(
+    async fn update_mute_states(
         &self,
-        new_mute_states: HashMap<PeerId, HashMap<TrackId, M>>,
-    ) -> Result<(), Traced<RoomError>>
-    where
-        M: Into<StableMuteState>,
-    {
+        desired_mute_states: HashMap<PeerId, HashMap<TrackId, StableMuteState>>,
+    ) -> Result<(), Traced<RoomError>> {
         future::try_join_all(
-            new_mute_states
+            desired_mute_states
                 .into_iter()
-                .filter_map(|(peer_id, mute_states)| {
-                    self.peers.get(peer_id).map(|peer| (peer, mute_states))
+                .filter_map(|(peer_id, desired_mute_states)| {
+                    self.peers
+                        .get(peer_id)
+                        .map(|peer| (peer, desired_mute_states))
                 })
-                .map(|(peer, mute_state)| {
+                .map(|(peer, desired_mute_states)| {
                     let peer_id = peer.id();
                     let mut transitions_futs = Vec::new();
                     let mut tracks_patches = Vec::new();
-                    mute_state
+                    desired_mute_states
                         .into_iter()
-                        .filter_map(move |(track_id, is_muted)| {
+                        .filter_map(move |(track_id, desired_mute_state)| {
                             peer.get_transceiver_side_by_id(track_id)
-                                .map(|trnsvr| (trnsvr, is_muted.into()))
+                                .map(|trnscvr| (trnscvr, desired_mute_state))
                         })
-                        .filter_map(|(sender, new_mute_state)| {
-                            match sender.mute_state() {
+                        .filter_map(|(trnscvr, desired_mute_state)| {
+                            match trnscvr.mute_state() {
                                 MuteState::Transition(transition) => Some((
-                                    sender,
-                                    new_mute_state,
-                                    transition.intended() != new_mute_state,
+                                    trnscvr,
+                                    desired_mute_state,
+                                    transition.intended() != desired_mute_state,
                                 )),
                                 MuteState::Stable(stable) => {
-                                    if stable == new_mute_state {
+                                    if stable == desired_mute_state {
                                         None
                                     } else {
-                                        Some((sender, new_mute_state, true))
+                                        Some((
+                                            trnscvr,
+                                            desired_mute_state,
+                                            true,
+                                        ))
                                     }
                                 }
                             }
                         })
-                        .map(|(sender, new_mute_state, should_be_patched)| {
-                            sender.mute_state_transition_to(new_mute_state)?;
-                            transitions_futs.push(
-                                sender.when_mute_state_stable(new_mute_state),
-                            );
-                            if should_be_patched {
-                                tracks_patches.push(TrackPatchCommand {
-                                    id: sender.track_id(),
-                                    is_muted: Some(
-                                        new_mute_state
-                                            == StableMuteState::Muted,
+                        .map(
+                            |(
+                                trnscvr,
+                                desired_mute_state,
+                                should_be_patched,
+                            )| {
+                                trnscvr.mute_state_transition_to(
+                                    desired_mute_state,
+                                )?;
+                                transitions_futs.push(
+                                    trnscvr.when_mute_state_stable(
+                                        desired_mute_state,
                                     ),
-                                });
-                            }
+                                );
+                                if should_be_patched {
+                                    tracks_patches.push(TrackPatchCommand {
+                                        id: trnscvr.track_id(),
+                                        is_muted: Some(
+                                            desired_mute_state
+                                                == StableMuteState::Muted,
+                                        ),
+                                    });
+                                }
 
-                            Ok(())
-                        })
+                                Ok(())
+                            },
+                        )
                         .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
 
@@ -860,7 +876,7 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Update [`MuteState`] of the unconstrained [`Sender`]s.
+    /// Updates [`MuteState`] of the unconstrained [`Sender`]s.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf

@@ -669,7 +669,9 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub async fn update_local_stream(&self) -> Result<HashMap<TrackId, bool>> {
+    pub async fn update_local_stream(
+        &self,
+    ) -> Result<HashMap<TrackId, StableMuteState>> {
         if let Some(request) = self.media_connections.get_tracks_request() {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
@@ -691,7 +693,7 @@ impl PeerConnection {
                 )
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let constrained_tracks = self
+            let new_mute_states = self
                 .media_connections
                 .insert_local_tracks(&peer_tracks)
                 .await
@@ -705,15 +707,10 @@ impl PeerConnection {
                 }
             }
 
-            Ok(constrained_tracks)
+            Ok(new_mute_states)
         } else {
             Ok(HashMap::new())
         }
-    }
-
-    /// Lookups [`Sender`] by [`TrackId`].
-    pub fn get_sender_by_id(&self, track_id: TrackId) -> Option<Rc<Sender>> {
-        self.media_connections.get_sender_by_id(track_id)
     }
 
     pub fn get_transceiver_side_by_id(

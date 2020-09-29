@@ -33,6 +33,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use crate::peer::media::mute_state::MuteState::Stable;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -47,7 +48,7 @@ pub trait TransceiverSide: Muteable {
 
     /// Returns `true` if [`MediaStreamTrack`] currently can be obtained for
     /// this [`TransceiverSide`].
-    fn is_can_be_constrained(&self) -> bool;
+    fn is_transitable(&self) -> bool;
 }
 
 /// Default functions for dealing with [`MuteStateController`] for objects that
@@ -297,14 +298,6 @@ impl MediaConnections {
             .get_transceivers_by_direction_and_kind(direction, kind)
     }
 
-    pub fn get_senders(&self, track_ids: Vec<TrackId>) -> Vec<Rc<Sender>> {
-        let inner = self.0.borrow();
-        track_ids
-            .iter()
-            .filter_map(|track_id| inner.senders.get(track_id).cloned())
-            .collect()
-    }
-
     /// Returns `true` if all [`TransceiverSide`]s with provided
     /// [`TransceiverKind`] and [`TrackDirection`] is in provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
@@ -318,7 +311,7 @@ impl MediaConnections {
             .borrow()
             .get_transceivers_by_direction_and_kind(direction, kind);
         for transceiver in transceivers {
-            if !transceiver.is_can_be_constrained() {
+            if !transceiver.is_transitable() {
                 continue;
             }
             if transceiver.mute_state() != mute_state.into() {
@@ -457,40 +450,19 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let mute_state;
-                    if send_constraints.is_enabled(&track.media_type) {
-                        match &track.media_type {
-                            MediaType::Video(video) => {
-                                if video.is_display {
-                                    if send_constraints
-                                        .is_display_video_constrained()
-                                    {
-                                        mute_state = StableMuteState::Unmuted;
-                                    } else {
-                                        mute_state = StableMuteState::Muted;
-                                    }
-                                } else {
-                                    if send_constraints
-                                        .is_device_video_constrained()
-                                    {
-                                        mute_state = StableMuteState::Unmuted;
-                                    } else {
-                                        mute_state = StableMuteState::Muted;
-                                    }
-                                }
-                            }
-                            MediaType::Audio(_) => {
-                                mute_state = StableMuteState::Unmuted;
-                            }
-                        }
+                    let is_enabled =
+                        send_constraints.is_enabled(&track.media_type);
+                    let is_constrained = send_constraints
+                        .is_media_type_constrained(&track.media_type);
+                    let mute_state = if is_enabled && is_constrained {
+                        StableMuteState::Unmuted
                     } else if is_required {
-                        use MediaConnectionsError as Error;
                         return Err(tracerr::new!(
-                            Error::CannotDisableRequiredSender
+                            MediaConnectionsError::CannotDisableRequiredSender
                         ));
                     } else {
-                        mute_state = StableMuteState::Muted;
-                    }
+                        StableMuteState::Muted
+                    };
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,
                         track_id: track.id,
@@ -584,16 +556,17 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
-    ) -> Result<HashMap<TrackId, bool>> {
+    ) -> Result<HashMap<TrackId, StableMuteState>> {
         let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
-        let mut constrained_tracks = HashMap::new();
+        let mut new_mute_states = HashMap::new();
         for sender in inner.senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
-                    constrained_tracks.insert(sender.track_id(), false);
+                    new_mute_states
+                        .insert(sender.track_id(), StableMuteState::Unmuted);
                     sender_and_track.push((sender, track));
                 } else {
                     return Err(tracerr::new!(
@@ -605,7 +578,8 @@ impl MediaConnections {
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
-                constrained_tracks.insert(sender.track_id(), true);
+                new_mute_states
+                    .insert(sender.track_id(), StableMuteState::Muted);
             }
         }
 
@@ -618,7 +592,7 @@ impl MediaConnections {
         ))
         .await?;
 
-        Ok(constrained_tracks)
+        Ok(new_mute_states)
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to the

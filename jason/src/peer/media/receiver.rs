@@ -101,9 +101,6 @@ impl Receiver {
         if self.transceiver.borrow().is_none() {
             return false;
         }
-        if self.track.borrow().is_none() {
-            return false;
-        }
         match self.transceiver_direction.get() {
             TransceiverDirection::Sendonly | TransceiverDirection::Inactive => {
                 false
@@ -253,7 +250,7 @@ impl TransceiverSide for Receiver {
         self.mid.borrow().clone()
     }
 
-    fn is_can_be_constrained(&self) -> bool {
+    fn is_transitable(&self) -> bool {
         true
     }
 }

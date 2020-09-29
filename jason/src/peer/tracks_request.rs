@@ -14,6 +14,7 @@ use crate::{
         TrackConstraints, TrackKind, VideoSource,
     },
     utils::{JsCaused, JsError},
+    DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
 };
 
 /// Errors that may occur when validating [`TracksRequest`] or
@@ -67,7 +68,8 @@ type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 #[derive(Debug, Default)]
 pub struct TracksRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
-    video: HashMap<TrackId, VideoSource>,
+    device_video: HashMap<TrackId, DeviceVideoTrackConstraints>,
+    display_video: HashMap<TrackId, DisplayVideoTrackConstraints>,
 }
 
 impl TracksRequest {
@@ -81,9 +83,14 @@ impl TracksRequest {
             TrackConstraints::Audio(audio) => {
                 self.audio.insert(track_id, audio);
             }
-            TrackConstraints::Video(video) => {
-                self.video.insert(track_id, video);
-            }
+            TrackConstraints::Video(video) => match video {
+                VideoSource::Device(device) => {
+                    self.device_video.insert(track_id, device);
+                }
+                VideoSource::Display(display) => {
+                    self.display_video.insert(track_id, display);
+                }
+            },
         }
     }
 }
@@ -93,7 +100,8 @@ impl TracksRequest {
 #[derive(Debug)]
 pub struct SimpleTracksRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
-    video: Vec<(TrackId, Option<VideoSource>)>,
+    display_video: Option<(TrackId, DisplayVideoTrackConstraints)>,
+    device_video: Option<(TrackId, DeviceVideoTrackConstraints)>,
 }
 
 impl SimpleTracksRequest {
@@ -123,11 +131,23 @@ impl SimpleTracksRequest {
 
         let mut parsed_tracks = HashMap::new();
 
-        let (video_tracks, audio_tracks): (Vec<_>, Vec<_>) =
-            tracks.into_iter().partition(|track| match track.kind() {
-                TrackKind::Audio { .. } => false,
-                TrackKind::Video { .. } => true,
-            });
+        let mut display_video_tracks = Vec::new();
+        let mut device_video_tracks = Vec::new();
+        let mut audio_tracks = Vec::new();
+        for track in tracks {
+            match track.kind() {
+                TrackKind::Audio => {
+                    audio_tracks.push(track);
+                }
+                TrackKind::Video => {
+                    if track.is_display() {
+                        display_video_tracks.push(track);
+                    } else {
+                        device_video_tracks.push(track);
+                    }
+                }
+            }
+        }
 
         if let Some((id, audio)) = &self.audio {
             if let Some(track) = audio_tracks.into_iter().next() {
@@ -138,23 +158,24 @@ impl SimpleTracksRequest {
                 }
             }
         }
-        let mut cons: HashMap<_, _> =
-            self.video.iter().map(|(id, video)| (id, video)).collect();
-        for track in video_tracks {
-            let mut id_to_remove = None;
-            for (id, video) in &cons {
-                if let Some(video) = video {
-                    if video.satisfies(track.as_ref()) {
-                        parsed_tracks.insert(**id, track);
-                        id_to_remove = Some(**id);
-                        break;
-                    }
+        if let Some((id, device_video)) = &self.device_video {
+            if let Some(track) = device_video_tracks.into_iter().next() {
+                if device_video.satisfies(track.as_ref()) {
+                    parsed_tracks.insert(*id, track);
+                } else {
+                    // TODO: rename err
+                    return Err(tracerr::new!(InvalidVideoTrack));
                 }
             }
-            if let Some(id_to_remove) = id_to_remove {
-                cons.remove(&id_to_remove);
-            } else {
-                return Err(tracerr::new!(InvalidVideoTrack));
+        }
+        if let Some((id, display_video)) = &self.display_video {
+            if let Some(track) = display_video_tracks.into_iter().next() {
+                if display_video.satisfies(track.as_ref()) {
+                    parsed_tracks.insert(*id, track);
+                } else {
+                    // TODO: rename err
+                    return Err(tracerr::new!(InvalidVideoTrack));
+                }
             }
         }
 
@@ -184,23 +205,6 @@ impl SimpleTracksRequest {
     ) -> Result<()> {
         let other = other.into();
 
-        let mut remove_me = false;
-        for (_, video_caps) in &self.video {
-            if !other.is_video_enabled() {
-                if let Some(video_caps) = video_caps {
-                    if video_caps.is_required() {
-                        return Err(tracerr::new!(
-                            TracksRequestError::ExpectedVideoTracks
-                        ));
-                    } else {
-                        remove_me |= true;
-                    }
-                }
-            }
-        }
-        if remove_me {
-            self.video.drain(..);
-        }
         if let Some((_, audio_caps)) = &self.audio {
             if !other.is_audio_enabled() {
                 if audio_caps.is_required() {
@@ -212,24 +216,51 @@ impl SimpleTracksRequest {
                 }
             }
         }
+        if let Some((_, device_video_caps)) = &self.device_video {
+            if !other.is_device_video_enabled()
+                && !other.is_device_constrained()
+            {
+                if device_video_caps.is_required() {
+                    // TODO: rename err
+                    return Err(tracerr::new!(
+                        TracksRequestError::ExpectedVideoTracks
+                    ));
+                } else {
+                    self.device_video.take();
+                }
+            }
+        }
+        if let Some((_, display_video_caps)) = &self.display_video {
+            if !other.is_display_video_enabled()
+                && !other.is_display_constrained()
+            {
+                if display_video_caps.is_required() {
+                    // TODO: rename err
+                    return Err(tracerr::new!(
+                        TracksRequestError::ExpectedVideoTracks
+                    ));
+                } else {
+                    self.display_video.take();
+                }
+            }
+        }
 
         if other.is_audio_enabled() {
             if let Some((_, audio)) = self.audio.as_mut() {
                 audio.merge(other.get_audio().clone());
             }
         }
-        if other.is_video_enabled() {
-            for (_, video) in &mut self.video {
-                if let Some(video_cons) = video {
-                    let is_fit = match video_cons {
-                        VideoSource::Device(_) => other.is_device_constrained(),
-                        VideoSource::Display(_) => {
-                            other.is_display_constrained()
-                        }
-                    };
-                    if !is_fit {
-                        video.take();
-                    }
+        if other.is_display_video_enabled() {
+            if let Some((_, display_video)) = self.display_video.as_mut() {
+                if let Some(other_display_video) = other.get_display_video() {
+                    display_video.merge(other_display_video.clone());
+                }
+            }
+        }
+        if other.is_device_video_enabled() {
+            if let Some((_, device_video)) = self.device_video.as_mut() {
+                if let Some(other_device_video) = other.get_device_video() {
+                    device_video.merge(other_device_video.clone());
                 }
             }
         }
@@ -248,24 +279,34 @@ impl TryFrom<TracksRequest> for SimpleTracksRequest {
             NoTracks, TooManyAudioTracks, TooManyVideoTracks,
         };
 
-        if value.video.len() > 2 {
+        if value.device_video.len() > 1 {
+            // TODO: rename err
             return Err(TooManyVideoTracks);
-        } else if value.audio.len() > 1 {
-            return Err(TooManyAudioTracks);
-        } else if value.video.is_empty() && value.audio.is_empty() {
+        } else if value.display_video.len() > 1 {
+            // TODO: rename err
+            return Err(TooManyVideoTracks);
+        } else if value.device_video.is_empty()
+            && value.display_video.is_empty()
+            && value.audio.is_empty()
+        {
             return Err(NoTracks);
         }
 
         let mut req = Self {
             audio: None,
-            video: Vec::new(),
+            device_video: None,
+            display_video: None,
         };
         for (id, audio) in value.audio {
             req.audio.replace((id, audio));
         }
-        for (id, video) in value.video {
-            req.video.push((id, Some(video)));
+        for (id, device) in value.device_video {
+            req.device_video.replace((id, device));
         }
+        for (id, display) in value.display_video {
+            req.display_video.replace((id, display));
+        }
+
         Ok(req)
     }
 }
@@ -277,15 +318,11 @@ impl From<&SimpleTracksRequest> for MediaStreamSettings {
         if let Some((_, audio)) = &request.audio {
             constraints.audio(audio.clone());
         }
-        for (_, video) in &request.video {
-            if let Some(video) = video {
-                if let VideoSource::Device(device_video) = video {
-                    constraints.device_video(device_video.clone());
-                }
-                if let VideoSource::Display(display_video) = video {
-                    constraints.display_video(display_video.clone());
-                }
-            }
+        if let Some((_, device_video)) = &request.device_video {
+            constraints.device_video(device_video.clone());
+        }
+        if let Some((_, display_video)) = &request.display_video {
+            constraints.display_video(display_video.clone());
         }
 
         constraints
