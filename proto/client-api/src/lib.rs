@@ -897,7 +897,10 @@ mod test {
         );
     }
 
-    fn assert_ser_de<'a, T>(obj: T, expected: &str) where T: Serialize + Deserialize<'a> + PartialEq + Debug {
+    fn assert_ser_de<'a, T>(obj: T, expected: &str)
+    where
+        T: Serialize + Deserialize<'a> + PartialEq + Debug,
+    {
         let serialized = serde_json::to_string(&obj).unwrap();
         let parsed: T = serde_json::from_str::<T>(serialized.as_str()).unwrap();
 
@@ -910,9 +913,11 @@ mod test {
     #[test]
     fn join_room() {
         assert_ser_de(
-            ClientMsg::JoinRoom((RoomId::from("room1"),
-                                MemberId::from("member1"),
-                                Token::from("token1"))),
+            ClientMsg::JoinRoom((
+                RoomId::from("room1"),
+                MemberId::from("member1"),
+                Token::from("token1"),
+            )),
             "{\"room_id\":\"room123\",\"token\":\"token123\"}",
         )
     }

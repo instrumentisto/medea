@@ -1,6 +1,6 @@
 //! Reconnection for [`RpcClient`].
 
-use std::rc::Weak;
+use std::{rc::Weak, time::Duration};
 
 use derive_more::Display;
 use js_sys::Promise;
@@ -8,8 +8,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::RpcClient,
-    utils::{JsCaused, JsError},
+    rpc::{BackoffDelayer, RpcSession},
+    utils::{delay_for, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 /// Error which indicates that [`RpcClient`]'s (which this [`ReconnectHandle`]
@@ -23,12 +23,12 @@ struct NoTokenError;
 /// This handle will be provided into `Room.on_connection_loss` callback.
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectHandle(Weak<dyn RpcClient>);
+pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
 impl ReconnectHandle {
     /// Instantiates new [`ReconnectHandle`] from the given [`RpcClient`]
     /// reference.
-    pub fn new(rpc: Weak<dyn RpcClient>) -> Self {
+    pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
     }
 }
@@ -41,22 +41,17 @@ impl ReconnectHandle {
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
-        // let rpc = Clone::clone(&self.0);
-        // future_to_promise(async move {
-        //     delay_for(Duration::from_millis(u64::from(delay_ms)).into()).
-        // await;
-        //
-        //     let rpc = upgrade_or_detached!(rpc, JsValue)?;
-        //     let token = rpc
-        //         .get_token()
-        //         .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
-        //     rpc.connect(token)
-        //         .await
-        //         .map_err(|e| JsValue::from(JasonError::from(e)))?;
-        //
-        //     Ok(JsValue::UNDEFINED)
-        // })
-        unimplemented!()
+        let rpc = Clone::clone(&self.0);
+        future_to_promise(async move {
+            delay_for(Duration::from_millis(u64::from(delay_ms)).into()).await;
+
+            let rpc = upgrade_or_detached!(rpc, JsValue)?;
+            rpc.reconnect()
+                .await
+                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+
+            Ok(JsValue::UNDEFINED)
+        })
     }
 
     /// Tries to reconnect [`RpcClient`] in a loop with a growing backoff delay.
@@ -82,29 +77,23 @@ impl ReconnectHandle {
         multiplier: f32,
         max_delay: u32,
     ) -> Promise {
-        // let rpc = self.0.clone();
-        // future_to_promise(async move {
-        //     let token = upgrade_or_detached!(rpc, JsValue)?
-        //         .get_token()
-        //         .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
-        //
-        //     let mut backoff_delayer = BackoffDelayer::new(
-        //         Duration::from_millis(u64::from(starting_delay_ms)).into(),
-        //         multiplier,
-        //         Duration::from_millis(u64::from(max_delay)).into(),
-        //     );
-        //     backoff_delayer.delay().await;
-        //     while upgrade_or_detached!(rpc, JsValue)?
-        //         .connect(token.clone())
-        //         .await
-        //         .is_err()
-        //     {
-        //         backoff_delayer.delay().await;
-        //     }
-        //
-        //     Ok(JsValue::UNDEFINED)
-        // })
+        let rpc = self.0.clone();
+        future_to_promise(async move {
+            let mut backoff_delayer = BackoffDelayer::new(
+                Duration::from_millis(u64::from(starting_delay_ms)).into(),
+                multiplier,
+                Duration::from_millis(u64::from(max_delay)).into(),
+            );
+            backoff_delayer.delay().await;
+            while upgrade_or_detached!(rpc, JsValue)?
+                .reconnect()
+                .await
+                .is_err()
+            {
+                backoff_delayer.delay().await;
+            }
 
-        future_to_promise(async { Ok(JsValue::UNDEFINED) })
+            Ok(JsValue::UNDEFINED)
+        })
     }
 }

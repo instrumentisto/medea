@@ -736,7 +736,7 @@ mod tests {
     use std::{collections::HashSet, time::Duration};
 
     use futures::{channel::mpsc, future, Stream, StreamExt as _};
-    use medea_client_api_proto::{TrackUpdate, Token};
+    use medea_client_api_proto::{Token, TrackUpdate};
     use tokio::time::timeout;
 
     use crate::{

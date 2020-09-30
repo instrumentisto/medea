@@ -17,7 +17,7 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
 use medea_jason::rpc::{
-    websocket::MockRpcTransport, ClientDisconnect, CloseMsg, RpcClient,
+    websocket::MockRpcTransport, ClientDisconnect, CloseMsg, RpcSession,
     RpcTransport, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;

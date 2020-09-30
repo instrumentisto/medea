@@ -24,9 +24,7 @@ use medea_client_api_proto::{
 
 use crate::{
     api::{
-        client::rpc_connection::{
-            ClosedReason, EventMessage, RpcConnection, RpcConnectionSettings,
-        },
+        client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
         RpcServer,
     },
     log::prelude::*,
@@ -715,12 +713,12 @@ mod test {
     //     assert!(
     //         Instant::now().duration_since(start) > Duration::from_millis(99)
     //     );
-    //     assert!(Instant::now().duration_since(start) < Duration::from_secs(2));
-    //     assert_eq!(item, close_frame);
+    //     assert!(Instant::now().duration_since(start) <
+    // Duration::from_secs(2));     assert_eq!(item, close_frame);
     // }
     //
-    // // Make sure that WsSession redirects all Commands it receives to RpcServer.
-    // #[actix_rt::test]
+    // // Make sure that WsSession redirects all Commands it receives to
+    // RpcServer. #[actix_rt::test]
     // async fn passes_commands_to_rpc_server() {
     //     lazy_static::lazy_static! {
     //         static ref CHAN: SharedUnbounded<Command> = {
@@ -775,8 +773,8 @@ mod test {
     //         .await
     //         .unwrap();
     //     client
-    //         .send(Message::Continuation(Item::FirstText(command.slice(0..10))))
-    //         .await
+    //         .send(Message::Continuation(Item::FirstText(command.slice(0..
+    // 10))))         .await
     //         .unwrap();
     //     client
     //         .send(Message::Continuation(Item::Last(
@@ -785,12 +783,12 @@ mod test {
     //         .await
     //         .unwrap();
     //     client
-    //         .send(Message::Continuation(Item::FirstText(command.slice(0..10))))
-    //         .await
+    //         .send(Message::Continuation(Item::FirstText(command.slice(0..
+    // 10))))         .await
     //         .unwrap();
     //     client
-    //         .send(Message::Continuation(Item::Continue(command.slice(10..20))))
-    //         .await
+    //         .send(Message::Continuation(Item::Continue(command.slice(10..
+    // 20))))         .await
     //         .unwrap();
     //     client
     //         .send(Message::Continuation(Item::Last(
@@ -834,9 +832,9 @@ mod test {
     //         rpc_server.expect_connection_established().return_once(
     //             |_, connection| {
     //                 let _ =
-    //                     CHAN.0.lock().unwrap().take().unwrap().send(connection);
-    //                 future::ok(()).boxed_local()
-    //             },
+    //
+    // CHAN.0.lock().unwrap().take().unwrap().send(connection);
+    // future::ok(()).boxed_local()             },
     //         );
     //         rpc_server
     //             .expect_connection_closed()
@@ -890,9 +888,9 @@ mod test {
     //         rpc_server.expect_connection_established().return_once(
     //             |_, connection| {
     //                 let _ =
-    //                     CHAN.0.lock().unwrap().take().unwrap().send(connection);
-    //                 async { Ok(()) }.boxed_local()
-    //             },
+    //
+    // CHAN.0.lock().unwrap().take().unwrap().send(connection);
+    // async { Ok(()) }.boxed_local()             },
     //         );
     //         rpc_server
     //             .expect_connection_closed()
@@ -919,7 +917,8 @@ mod test {
     //
     //     let item = client.skip(2).next().await.unwrap().unwrap();
     //
-    //     let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
+    //     let event =
+    // "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
     //                  sdp_answer\":\"sdp_answer\"}}";
     //
     //     assert_eq!(item, Frame::Text(event.into()));

@@ -8,11 +8,8 @@ use std::fmt::Debug;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Command, MemberId, Token};
 
-use crate::{
-    api::client::rpc_connection::{
-        ClosedReason, RpcConnection, RpcConnectionSettings,
-    },
-    signalling::room::RoomError,
+use crate::api::client::rpc_connection::{
+    ClosedReason, RpcConnection, RpcConnectionSettings,
 };
 
 /// Server side of Medea RPC protocol.
