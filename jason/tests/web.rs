@@ -87,10 +87,7 @@ use medea_client_api_proto::{
     VideoSettings,
 };
 use medea_jason::{
-    media::{
-        LocalTracksConstraints, MediaManager, MediaStreamTrack,
-        VideoTrackConstraints,
-    },
+    media::{LocalTracksConstraints, MediaManager, MediaStreamTrack},
     peer::TransceiverKind,
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
@@ -174,6 +171,7 @@ pub fn get_test_tracks(
             },
             media_type: MediaType::Video(VideoSettings {
                 is_required: is_video_required,
+                is_display: false,
             }),
         },
     )
@@ -199,7 +197,10 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
                 sender: "bob".into(),
                 mid: Some("mid1".to_string()),
             },
-            media_type: MediaType::Video(VideoSettings { is_required: false }),
+            media_type: MediaType::Video(VideoSettings {
+                is_required: false,
+                is_display: false,
+            }),
         },
     )
 }
@@ -226,7 +227,7 @@ fn media_stream_settings(
         settings.audio(AudioTrackConstraints::default());
     }
     if is_video_enabled {
-        settings.video(VideoTrackConstraints::default());
+        settings.device_video(DeviceVideoTrackConstraints::default());
     }
 
     settings

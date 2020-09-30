@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    collections::HashMap,
     convert::TryFrom,
     rc::{Rc, Weak},
 };
@@ -88,7 +89,7 @@ pub struct MediaManager(Rc<InnerMediaManager>);
 #[derive(Default)]
 struct InnerMediaManager {
     /// Obtained tracks storage
-    tracks: Rc<RefCell<Vec<WeakMediaStreamTrack>>>,
+    tracks: Rc<RefCell<HashMap<String, WeakMediaStreamTrack>>>,
 }
 
 impl InnerMediaManager {
@@ -203,14 +204,14 @@ impl InnerMediaManager {
         // cleanup weak links
         self.tracks
             .borrow_mut()
-            .retain(WeakMediaStreamTrack::can_be_upgraded);
+            .retain(|_, track| track.can_be_upgraded());
 
         let mut tracks = Vec::new();
         let storage: Vec<_> = self
             .tracks
             .borrow()
             .iter()
-            .map(|track| track.upgrade().unwrap())
+            .map(|(_, track)| track.upgrade().unwrap())
             .collect();
 
         if caps.is_audio_enabled() {
@@ -225,17 +226,14 @@ impl InnerMediaManager {
             }
         }
 
-        if caps.is_video_enabled() {
-            let track = storage
+        tracks.extend(
+            storage
                 .iter()
-                .find(|track| caps.get_video().satisfies(track.as_ref()))
-                .cloned();
-
-            if let Some(track) = track {
-                caps.toggle_publish_video(false);
-                tracks.push(track);
-            }
-        }
+                .filter(|track| {
+                    caps.unconstrain_if_satisfies_video(track.as_ref())
+                })
+                .cloned(),
+        );
 
         tracks
     }
@@ -276,8 +274,10 @@ impl InnerMediaManager {
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-            .inspect(|track| storage.push(track.downgrade()))
+            .map(|tr| MediaStreamTrack::new(tr.unwrap(), false))
+            .inspect(|track| {
+                storage.insert(track.id(), track.downgrade());
+            })
             .collect();
 
         Ok(tracks)
@@ -320,8 +320,10 @@ impl InnerMediaManager {
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-            .inspect(|track| storage.push(track.downgrade()))
+            .map(|tr| MediaStreamTrack::new(tr.unwrap(), true))
+            .inspect(|track| {
+                storage.insert(track.id(), track.downgrade());
+            })
             .collect();
 
         Ok(tracks)

@@ -177,7 +177,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalTracks");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local tracks: provided multiple video MediaStreamTracks"
+            "Invalid local tracks: provided multiple device video \
+             MediaStreamTracks"
         );
     });
     let (audio_track, video_track) = get_test_required_tracks();
@@ -383,6 +384,7 @@ mod disable_recv_tracks {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
+                            is_display: false,
                         }),
                     },
                     Track {
@@ -1029,6 +1031,7 @@ mod patches_generation {
                 id: video_track_id,
                 media_type: MediaType::Video(VideoSettings {
                     is_required: false,
+                    is_display: false,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
@@ -1038,7 +1041,8 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let mut local_stream = MediaStreamSettings::new();
+            let mut local_stream = MediaStreamSettings::default();
+            local_stream.set_track_enabled(false, TransceiverKind::Video);
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,

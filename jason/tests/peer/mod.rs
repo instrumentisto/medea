@@ -609,6 +609,7 @@ impl InterconnectedPeers {
                 },
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
+                    is_display: false,
                 }),
             },
         ]
@@ -635,6 +636,7 @@ impl InterconnectedPeers {
                 },
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
+                    is_display: false,
                 }),
             },
         ]
@@ -985,6 +987,7 @@ async fn new_remote_track() {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
+                            is_display: false,
                         }),
                     },
                 ],

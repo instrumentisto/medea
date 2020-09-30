@@ -603,6 +603,12 @@ pub struct VideoSettings {
     ///
     /// If `false` then video may be not published.
     pub is_required: bool,
+
+    /// Flag which indicates that this video should be obtained from the user
+    /// screen.
+    ///
+    /// If `false` then this should be obtained video from the user camera.
+    pub is_display: bool,
 }
 
 /// Estimated connection quality.
