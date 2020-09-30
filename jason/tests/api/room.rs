@@ -20,13 +20,13 @@ use medea_jason::{
     utils::JasonError,
     DeviceVideoTrackConstraints,
 };
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
 use crate::{
     delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
-    wait_and_check_test_result, MockNavigator,
+    wait_and_check_test_result, yield_now, MockNavigator,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -986,7 +986,6 @@ mod rpc_close_reason_on_room_drop {
 }
 
 /// Tests for [`TrackPatch`] generation in [`Room`].
-// #[cfg(feature = "disable")]
 mod patches_generation {
 
     use futures::StreamExt;
@@ -1271,4 +1270,56 @@ async fn remote_mute_unmute_video() {
     assert!(!peer.is_recv_video_enabled());
     assert!(JsFuture::from(handle.unmute_remote_video()).await.is_ok());
     assert!(peer.is_recv_video_enabled());
+}
+
+#[wasm_bindgen_test]
+async fn set_local_media_stream_settings_updates_mute_state() {
+    let (event_tx, event_rx) = mpsc::unbounded();
+    let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+    let room_handle = room.new_handle();
+    room_handle
+        .on_failed_local_media(js_sys::Function::new_no_args(""))
+        .unwrap();
+    JsFuture::from(
+        room_handle
+            .set_local_media_settings(&media_stream_settings(true, false)),
+    )
+    .await
+    .unwrap();
+
+    let (audio_track, video_track) = get_test_unrequired_tracks();
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+    delay_for(10).await;
+
+    spawn_local(async move {
+        JsFuture::from(
+            room_handle
+                .set_local_media_settings(&media_stream_settings(true, true)),
+        )
+        .await
+        .unwrap_err();
+    });
+    delay_for(10).await;
+
+    while let Some(update_tracks_cmd) = commands_rx.next().await {
+        if let Command::UpdateTracks {
+            peer_id,
+            mut tracks_patches,
+        } = update_tracks_cmd
+        {
+            assert_eq!(peer_id, PeerId(1));
+            let track_patch = tracks_patches.pop().unwrap();
+            assert_eq!(track_patch.is_muted, Some(false));
+            assert!(tracks_patches.is_empty());
+            break;
+        }
+    }
 }

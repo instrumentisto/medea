@@ -5,6 +5,7 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
+use crate::is_firefox;
 use medea_client_api_proto::VideoSettings;
 use medea_jason::{
     media::{
@@ -482,4 +483,61 @@ fn build_constraints(
         constraints.device_video(track_constraints);
     }
     constraints
+}
+
+#[wasm_bindgen_test]
+async fn simultaneous_device_and_display() {
+    if is_firefox() {
+        return;
+    }
+    let audio_device = audio_devices().await.unwrap().pop().unwrap();
+    let video_device = video_devices().await.unwrap().pop().unwrap();
+
+    let constraints = {
+        let mut constraints = MediaStreamSettings::new();
+
+        let mut audio_constraints = AudioTrackConstraints::new();
+        audio_constraints.device_id(audio_device.device_id());
+
+        let mut video_constraints = DeviceVideoTrackConstraints::new();
+        video_constraints.device_id(video_device.device_id());
+
+        constraints.audio(audio_constraints);
+        constraints.device_video(video_constraints);
+        constraints.display_video(DisplayVideoTrackConstraints::new());
+
+        constraints
+    };
+    let media_manager = MediaManager::default();
+
+    let tracks = media_manager.get_tracks(constraints.clone()).await.unwrap();
+
+    let device_video_constraints =
+        constraints.get_device_video().clone().unwrap();
+    let display_video_constraints =
+        constraints.get_display_video().clone().unwrap();
+    let audio_constraints = constraints.get_audio().clone();
+
+    assert_eq!(tracks.len(), 3);
+
+    let (mut audio, mut video): (Vec<_>, Vec<_>) = tracks
+        .into_iter()
+        .partition(|(track, _)| match track.kind() {
+            TrackKind::Audio => true,
+            TrackKind::Video => false,
+        });
+
+    let audio_track = audio.pop().unwrap().0;
+    assert!(audio_track.kind() == TrackKind::Audio);
+    assert!(audio_constraints.satisfies(&audio_track));
+
+    let display_video_track = video.pop().unwrap().0;
+    assert!(display_video_track.kind() == TrackKind::Video);
+    assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
+    assert!(display_video_track.is_display());
+
+    let device_video_track = video.pop().unwrap().0;
+    assert!(device_video_track.kind() == TrackKind::Video);
+    assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
+    assert!(!device_video_track.is_display());
 }
