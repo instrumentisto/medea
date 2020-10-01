@@ -57,7 +57,7 @@ All user visible changes to this project will be documented in this file. This p
 - `ConnectionQualityUpdated` event ([#132]);
 - `TrackPatchEvent` and `TrackPatchCommand` types ([#127]);
 - `IceRestart` variant to `TrackUpdate` ([#138]);
-- `is_display` field to `VideoSettings` type ([#145]).
+- `source_kind` field to `VideoSettings` type ([#145]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58

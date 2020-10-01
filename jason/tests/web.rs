@@ -83,8 +83,8 @@ mod utils;
 use futures::{channel::oneshot, future::Either, Future};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, MemberId, Track, TrackId,
-    VideoSettings,
+    AudioSettings, Direction, MediaSourceKind, MediaType, MemberId, Track,
+    TrackId, VideoSettings,
 };
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, MediaStreamTrack},
@@ -171,7 +171,7 @@ pub fn get_test_tracks(
             },
             media_type: MediaType::Video(VideoSettings {
                 is_required: is_video_required,
-                is_display: false,
+                source_kind: MediaSourceKind::Device,
             }),
         },
     )
@@ -199,7 +199,7 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
             },
             media_type: MediaType::Video(VideoSettings {
                 is_required: false,
-                is_display: false,
+                source_kind: MediaSourceKind::Device,
             }),
         },
     )

@@ -9,6 +9,7 @@ use std::{
 
 use derive_more::Display;
 use js_sys::Promise;
+use medea_client_api_proto::MediaSourceKind;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
@@ -274,7 +275,9 @@ impl InnerMediaManager {
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::new(tr.unwrap(), false))
+            .map(|track| {
+                MediaStreamTrack::new(track.unwrap(), MediaSourceKind::Device)
+            })
             .inspect(|track| {
                 storage.insert(track.id(), track.downgrade());
             })
@@ -320,7 +323,9 @@ impl InnerMediaManager {
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::new(tr.unwrap(), true))
+            .map(|tr| {
+                MediaStreamTrack::new(tr.unwrap(), MediaSourceKind::Display)
+            })
             .inspect(|track| {
                 storage.insert(track.id(), track.downgrade());
             })

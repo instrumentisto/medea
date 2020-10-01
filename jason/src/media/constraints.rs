@@ -7,8 +7,8 @@ use std::{
 
 use derive_more::AsRef;
 use medea_client_api_proto::{
-    AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
-    MediaType, VideoSettings,
+    AudioSettings as ProtoAudioConstraints, MediaSourceKind,
+    MediaType as ProtoTrackConstraints, MediaType, VideoSettings,
 };
 use wasm_bindgen::prelude::*;
 use web_sys::{
@@ -23,66 +23,6 @@ use crate::{peer::TransceiverKind, utils::get_property_by_name};
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
 pub struct LocalTracksConstraints(Rc<RefCell<MediaStreamSettings>>);
-
-impl LocalTracksConstraints {
-    /// Returns new [`LocalStreamConstraints`] with default values.
-    #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
-    /// [`MediaStreamSettings`].
-    #[inline]
-    pub fn constrain(&self, other: MediaStreamSettings) {
-        self.0.borrow_mut().constrain(other)
-    }
-
-    /// Clones underlying [`MediaStreamSettings`].
-    #[inline]
-    pub fn inner(&self) -> MediaStreamSettings {
-        self.0.borrow().clone()
-    }
-
-    /// Enables or disables audio or video type in underlying
-    /// [`MediaStreamSettings`].
-    ///
-    /// Doesn't do anything if no [`MediaStreamSettings`] was set.
-    ///
-    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
-    /// of media won't be published.
-    #[inline]
-    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
-        self.0.borrow_mut().set_track_enabled(enabled, kind);
-    }
-
-    /// Indicates whether provided [`MediaType`] is enabled in the underlying
-    /// [`MediaStreamSettings`].
-    #[inline]
-    pub fn is_enabled(&self, kind: &MediaType) -> bool {
-        self.0.borrow_mut().is_enabled(kind)
-    }
-
-    /// Returns `true` if display video is constrained.
-    #[inline]
-    pub fn is_display_video_constrained(&self) -> bool {
-        self.0.borrow().is_display_constrained()
-    }
-
-    /// Returns `true` if device video is constrained.
-    #[inline]
-    pub fn is_device_video_constrained(&self) -> bool {
-        self.0.borrow().is_device_constrained()
-    }
-}
-
-#[cfg(feature = "mockable")]
-impl From<MediaStreamSettings> for LocalTracksConstraints {
-    #[inline]
-    fn from(from: MediaStreamSettings) -> Self {
-        Self(Rc::new(RefCell::new(from)))
-    }
-}
 
 /// Constraints to the media received from remote. Used to disable or enable
 /// media receiving.
@@ -129,6 +69,54 @@ impl RecvConstraints {
     }
 }
 
+#[cfg(feature = "mockable")]
+impl From<MediaStreamSettings> for LocalTracksConstraints {
+    #[inline]
+    fn from(from: MediaStreamSettings) -> Self {
+        Self(Rc::new(RefCell::new(from)))
+    }
+}
+
+impl LocalTracksConstraints {
+    /// Returns new [`LocalStreamConstraints`] with default values.
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
+    /// [`MediaStreamSettings`].
+    #[inline]
+    pub fn constrain(&self, other: MediaStreamSettings) {
+        self.0.borrow_mut().constrain(other)
+    }
+
+    /// Clones underlying [`MediaStreamSettings`].
+    #[inline]
+    pub fn inner(&self) -> MediaStreamSettings {
+        self.0.borrow().clone()
+    }
+
+    /// Enables or disables audio or video type in underlying
+    /// [`MediaStreamSettings`].
+    ///
+    /// Doesn't do anything if no [`MediaStreamSettings`] was set.
+    ///
+    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
+    /// of media won't be published.
+    #[inline]
+    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
+        self.0.borrow_mut().set_track_enabled(enabled, kind);
+    }
+
+    /// Indicates whether provided [`MediaType`] is enabled in the underlying
+    /// [`MediaStreamSettings`].
+    #[inline]
+    pub fn is_enabled(&self, kind: &MediaType) -> bool {
+        self.0.borrow_mut().is_enabled(kind)
+    }
+}
+
 /// [MediaStreamConstraints][1] for the audio media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
@@ -152,33 +140,12 @@ impl Default for AudioMediaTracksSettings {
     }
 }
 
-/// Detects if video track captured from display searching
-/// [specific fields][1] in its settings. Only works in Chrome atm.
-///
-/// [1]: https://tinyurl.com/ufx7mcw
-fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {
-    let settings = track.get_settings();
-
-    let has_display_surface =
-        get_property_by_name(&settings, "displaySurface", |val| {
-            val.as_string()
-        })
-        .is_some();
-
-    if has_display_surface {
-        true
-    } else {
-        get_property_by_name(&settings, "logicalSurface", |val| val.as_string())
-            .is_some()
-    }
-}
-
 /// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies
 /// any constraints with a provided [`TransceiverKind`].
 #[inline]
 fn satisfies_track(track: &SysMediaStreamTrack, kind: TransceiverKind) -> bool {
     track.kind() == kind.as_str()
-        || track.ready_state() != MediaStreamTrackState::Live
+        && track.ready_state() == MediaStreamTrackState::Live
 }
 
 /// [MediaStreamConstraints][1] for the video media type.
@@ -372,18 +339,6 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Returns `true` if [`MediaStreamSettings::device_video`] is constrained.
-    #[inline]
-    pub fn is_device_constrained(&self) -> bool {
-        self.device_video.is_constrained()
-    }
-
-    /// Returns `true` if [`MediaStreamSettings::display_video`] is constrained.
-    #[inline]
-    pub fn is_display_constrained(&self) -> bool {
-        self.display_video.is_constrained()
-    }
-
     /// Returns only audio constraints.
     #[inline]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
@@ -464,13 +419,10 @@ impl MediaStreamSettings {
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         match kind {
-            MediaType::Video(video) => {
-                if video.is_display {
-                    self.display_video.is_enabled()
-                } else {
-                    self.device_video.is_enabled()
-                }
-            }
+            MediaType::Video(video) => match video.source_kind {
+                MediaSourceKind::Device => self.device_video.is_enabled(),
+                MediaSourceKind::Display => self.display_video.is_enabled(),
+            },
             MediaType::Audio(_) => self.audio.is_enabled,
         }
     }
@@ -618,16 +570,19 @@ impl VideoSource {
 
 impl From<VideoSettings> for VideoSource {
     fn from(settings: VideoSettings) -> Self {
-        if settings.is_display {
-            VideoSource::Display(DisplayVideoTrackConstraints {
-                is_required: settings.is_required,
-            })
-        } else {
-            VideoSource::Device(DeviceVideoTrackConstraints {
-                device_id: None,
-                facing_mode: None,
-                is_required: settings.is_required,
-            })
+        match settings.source_kind {
+            MediaSourceKind::Device => {
+                VideoSource::Device(DeviceVideoTrackConstraints {
+                    device_id: None,
+                    facing_mode: None,
+                    is_required: settings.is_required,
+                })
+            }
+            MediaSourceKind::Display => {
+                VideoSource::Display(DisplayVideoTrackConstraints {
+                    is_required: settings.is_required,
+                })
+            }
         }
     }
 }
@@ -666,18 +621,17 @@ impl TrackConstraints {
         }
     }
 
-    /// Returns `true` if this [`TrackConstraints`]'s media should be received
-    /// from `getDisplayMedia`.
-    #[inline]
-    pub fn is_display_video(&self) -> bool {
-        matches!(self, Self::Video(VideoSource::Display(_)))
-    }
-
-    /// Returns `true` if this [`TrackConstraints`]'s media should be received
-    /// from `getUserMedia`.
-    #[inline]
-    pub fn is_device_video(&self) -> bool {
-        matches!(self, Self::Video(VideoSource::Device(_)))
+    /// Returns this [`TrackConstraints`] media source kind.
+    pub fn media_source_kind(&self) -> MediaSourceKind {
+        match &self {
+            TrackConstraints::Audio(_) => MediaSourceKind::Device,
+            TrackConstraints::Video(VideoSource::Device(_)) => {
+                MediaSourceKind::Device
+            }
+            TrackConstraints::Video(VideoSource::Display(_)) => {
+                MediaSourceKind::Display
+            }
+        }
     }
 }
 
@@ -1025,6 +979,27 @@ impl DisplayVideoTrackConstraints {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+/// Detects if video track captured from display searching
+/// [specific fields][1] in its settings. Only works in Chrome atm.
+///
+/// [1]: https://tinyurl.com/ufx7mcw
+fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {
+    let settings = track.get_settings();
+
+    let has_display_surface =
+        get_property_by_name(&settings, "displaySurface", |val| {
+            val.as_string()
+        })
+        .is_some();
+
+    if has_display_surface {
+        true
+    } else {
+        get_property_by_name(&settings, "logicalSurface", |val| val.as_string())
+            .is_some()
     }
 }
 

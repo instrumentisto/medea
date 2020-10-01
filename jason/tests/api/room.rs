@@ -346,7 +346,8 @@ async fn error_join_room_without_on_connection_loss_callback() {
 
 mod disable_recv_tracks {
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, MemberId, VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, MemberId,
+        VideoSettings,
     };
 
     use super::*;
@@ -384,7 +385,7 @@ mod disable_recv_tracks {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
-                            is_display: false,
+                            source_kind: MediaSourceKind::Device,
                         }),
                     },
                     Track {
@@ -990,8 +991,8 @@ mod patches_generation {
 
     use futures::StreamExt;
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatchCommand,
-        VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
+        TrackPatchCommand, VideoSettings,
     };
     use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
@@ -1031,7 +1032,7 @@ mod patches_generation {
                 id: video_track_id,
                 media_type: MediaType::Video(VideoSettings {
                     is_required: false,
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),

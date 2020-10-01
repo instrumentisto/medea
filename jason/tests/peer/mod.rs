@@ -15,8 +15,8 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStats, TrackStatsKind,
     },
-    AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
-    Track, TrackId, TrackPatchEvent, VideoSettings,
+    AudioSettings, Direction, IceConnectionState, MediaSourceKind, MediaType,
+    MemberId, PeerId, Track, TrackId, TrackPatchEvent, VideoSettings,
 };
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints, TrackKind},
@@ -609,7 +609,7 @@ impl InterconnectedPeers {
                 },
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
             },
         ]
@@ -636,7 +636,7 @@ impl InterconnectedPeers {
                 },
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
             },
         ]
@@ -987,7 +987,7 @@ async fn new_remote_track() {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
-                            is_display: false,
+                            source_kind: MediaSourceKind::Device,
                         }),
                     },
                 ],
