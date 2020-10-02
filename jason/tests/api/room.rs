@@ -177,7 +177,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         cb_assert_eq!(&err.name(), "InvalidLocalTracks");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local tracks: provided multiple video MediaStreamTracks"
+            "Invalid local tracks: provided multiple device video \
+             MediaStreamTracks"
         );
     });
     let (audio_track, video_track) = get_test_required_tracks();
@@ -345,7 +346,8 @@ async fn error_join_room_without_on_connection_loss_callback() {
 
 mod disable_recv_tracks {
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, MemberId, VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, MemberId,
+        VideoSettings,
     };
 
     use super::*;
@@ -383,6 +385,7 @@ mod disable_recv_tracks {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
+                            source_kind: MediaSourceKind::Device,
                         }),
                     },
                     Track {
@@ -988,8 +991,8 @@ mod patches_generation {
 
     use futures::StreamExt;
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatchCommand,
-        VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
+        TrackPatchCommand, VideoSettings,
     };
     use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
@@ -1029,6 +1032,7 @@ mod patches_generation {
                 id: video_track_id,
                 media_type: MediaType::Video(VideoSettings {
                     is_required: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
@@ -1038,7 +1042,8 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let mut local_stream = MediaStreamSettings::new();
+            let mut local_stream = MediaStreamSettings::default();
+            local_stream.set_track_enabled(false, TransceiverKind::Video);
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,

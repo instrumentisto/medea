@@ -603,6 +603,23 @@ pub struct VideoSettings {
     ///
     /// If `false` then video may be not published.
     pub is_required: bool,
+
+    /// Source kind of this [`VideoSettings`] media.
+    pub source_kind: MediaSourceKind,
+}
+
+/// Media source kind.
+#[cfg_attr(feature = "medea", derive(Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Copy, Display)]
+pub enum MediaSourceKind {
+    /// Media is sourced by some media device (webcam or microphone).
+    #[display(fmt = "device")]
+    Device,
+
+    /// Media is obtained with screen-capture.
+    #[display(fmt = "display")]
+    Display,
 }
 
 /// Estimated connection quality.

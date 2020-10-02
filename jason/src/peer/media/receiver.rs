@@ -125,7 +125,8 @@ impl Receiver {
             }
         }
 
-        let new_track = MediaStreamTrack::from(new_track);
+        let new_track =
+            MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
         transceiver.set_direction(self.transceiver_direction.get().into());
         new_track.set_enabled(self.is_not_muted());

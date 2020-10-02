@@ -424,17 +424,16 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let mute_state;
-                    if send_constraints.is_enabled(&track.media_type) {
-                        mute_state = StableMuteState::Unmuted;
-                    } else if is_required {
-                        use MediaConnectionsError as Error;
-                        return Err(tracerr::new!(
-                            Error::CannotDisableRequiredSender
+                    let mute_state =
+                        if send_constraints.is_enabled(&track.media_type) {
+                            StableMuteState::Unmuted
+                        } else if is_required {
+                            return Err(tracerr::new!(
+                            MediaConnectionsError::CannotDisableRequiredSender
                         ));
-                    } else {
-                        mute_state = StableMuteState::Muted;
-                    }
+                        } else {
+                            StableMuteState::Muted
+                        };
                     let sndr = SenderBuilder {
                         peer_id: inner.peer_id,
                         track_id: track.id,

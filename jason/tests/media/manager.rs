@@ -136,7 +136,7 @@ async fn same_track_for_same_constraints() {
     let (track1, track1_is_new) = tracks.pop().unwrap();
 
     assert!(track1_is_new);
-    assert!(track1.kind() == TrackKind::Audio);
+    assert_eq!(track1.kind(), TrackKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
     // second request, same track, no additional getUserMedia requests
@@ -148,7 +148,7 @@ async fn same_track_for_same_constraints() {
 
     assert!(!track2_is_new);
     assert_eq!(track1.id(), track2.id());
-    assert!(track2.kind() == TrackKind::Audio);
+    assert_eq!(track2.kind(), TrackKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 }
 
@@ -175,7 +175,7 @@ async fn new_track_if_previous_dropped() {
     assert_eq!(tracks.len(), 1);
     let (track1, track1_is_new) = tracks.pop().unwrap();
 
-    assert!(track1.kind() == TrackKind::Audio);
+    assert_eq!(track1.kind(), TrackKind::Audio);
     assert!(track1_is_new);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
@@ -189,7 +189,7 @@ async fn new_track_if_previous_dropped() {
 
     assert!(track2_is_new);
     assert_ne!(track2.id(), track1_id);
-    assert!(track2.kind() == TrackKind::Audio);
+    assert_eq!(track2.kind(), TrackKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
 
     mock_navigator.stop();
