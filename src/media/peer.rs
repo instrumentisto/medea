@@ -59,9 +59,9 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, MemberId, PeerId as Id,
-    PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent, TrackUpdate,
-    VideoSettings,
+    AudioSettings, Direction, IceServer, MediaSourceKind, MediaType, MemberId,
+    PeerId as Id, PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent,
+    TrackUpdate, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -991,7 +991,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: video_settings.publish_policy.is_required(),
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
             ));
             self.add_sender(Rc::clone(&camera_video_track));
@@ -1002,7 +1002,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: false,
-                    is_display: true,
+                    source_kind: MediaSourceKind::Display,
                 }),
             ));
             self.add_sender(Rc::clone(&display_video_track));
@@ -1085,7 +1085,7 @@ pub mod tests {
                 track_id,
                 MediaType::Video(VideoSettings {
                     is_required: true,
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
             );
             peer.context.senders.insert(track_id, Rc::new(track));
@@ -1106,7 +1106,7 @@ pub mod tests {
                 track_id,
                 MediaType::Video(VideoSettings {
                     is_required: true,
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
             );
             peer.context.receivers.insert(track_id, Rc::new(track));
@@ -1120,7 +1120,7 @@ pub mod tests {
             TrackId(track_id),
             MediaType::Video(VideoSettings {
                 is_required: true,
-                is_display: false,
+                source_kind: MediaSourceKind::Device,
             }),
         ))
     }

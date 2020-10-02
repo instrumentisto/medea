@@ -45,7 +45,7 @@ pub trait TransceiverSide: Muteable {
     fn mid(&self) -> Option<String>;
 
     /// Returns `true` if this [`TransceiverKind`] currently can be
-    /// mutes/unmuted without [`LocalMediaStreamConstraints`] updating.
+    /// muted/unmuted without [`LocalMediaStreamConstraints`] updating.
     fn is_transitable(&self) -> bool;
 }
 

@@ -1354,7 +1354,7 @@ pub struct RtcIceCandidateStats {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-pub enum MediaSourceKind {
+pub enum MediaKind {
     /// Fields when `kind` is `video`.
     Video {
         /// Width (in pixels) of the last frame originating from the source.
@@ -1408,7 +1408,7 @@ pub struct MediaSourceStats {
 
     /// Fields which should be in the [`RtcStat`] based on `kind`.
     #[serde(flatten)]
-    pub kind: MediaSourceKind,
+    pub kind: MediaKind,
 }
 
 #[cfg(feature = "extended-stats")]

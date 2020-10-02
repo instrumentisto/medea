@@ -395,7 +395,7 @@ async function updateLocalVideo(stream) {
     }
     let mediaStream = new MediaStream();
     mediaStream.addTrack(track.get_track());
-    if (track.is_display()) {
+    if (track.media_source_kind() === 'display') {
       let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
       if (displayVideoEl === undefined) {
         displayVideoEl = document.createElement('video');
@@ -612,7 +612,7 @@ window.onload = async function() {
 
       connection.on_remote_track_added((track) => {
         if (track.kind() === 'video') {
-          if (track.is_display()) {
+          if (track.media_source_kind() === 'display') {
             let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
             if (displayVideoEl === undefined) {
               displayVideoEl = document.createElement('video');

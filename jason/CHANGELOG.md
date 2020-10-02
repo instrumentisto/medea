@@ -43,7 +43,7 @@ All user visible changes to this project will be documented in this file. This p
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`;
-        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#144]);
+        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145]);
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
         - `MediaTrack.on_enabled` and `MediaTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
@@ -52,8 +52,8 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.mute_remote_audio`;
             - `Room.unmute_remote_audio`;
             - `Room.mute_remote_video`;
-            - `Room.unmute_remote_video`;
-        - `MediaTrack.is_display` function ([#144]).
+            - `Room.unmute_remote_video`.
+        - `MediaTrack.media_source_kind` function ([#145]).
     - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
@@ -106,7 +106,7 @@ All user visible changes to this project will be documented in this file. This p
 [#137]: /../../pull/137
 [#138]: /../../pull/138
 [#143]: /../../pull/143
-[#144]: /../../pull/144
+[#145]: /../../pull/145
 
 
 

@@ -1,12 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::JsFuture;
-use wasm_bindgen_test::*;
-use web_sys::{MediaDeviceInfo, MediaDeviceKind};
-
-use crate::is_firefox;
-use medea_client_api_proto::VideoSettings;
+use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
     media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints, MediaManager,
@@ -16,6 +10,12 @@ use medea_jason::{
     utils::{get_property_by_name, window},
     DisplayVideoTrackConstraints,
 };
+use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_test::*;
+use web_sys::{MediaDeviceInfo, MediaDeviceKind};
+
+use crate::is_firefox;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -40,7 +40,7 @@ async fn video_constraints_satisfies() {
 
     let track = tracks.pop().unwrap().0;
 
-    assert!(track.kind() == TrackKind::Video);
+    assert_eq!(track.kind(), TrackKind::Video);
     assert!(track_constraints.satisfies(track.as_ref()));
 }
 
@@ -65,7 +65,7 @@ async fn audio_constraints_satisfies() {
 
     let track = tracks.pop().unwrap().0;
 
-    assert!(track.kind() == TrackKind::Audio);
+    assert_eq!(track.kind(), TrackKind::Audio);
     assert!(track_constraints.satisfies(&track));
 }
 
@@ -114,10 +114,10 @@ async fn both_constraints_satisfies() {
     let audio_track = audio.pop().unwrap().0;
     let video_track = video.pop().unwrap().0;
 
-    assert!(audio_track.kind() == TrackKind::Audio);
+    assert_eq!(audio_track.kind(), TrackKind::Audio);
     assert!(audio_constraints.satisfies(&audio_track));
 
-    assert!(video_track.kind() == TrackKind::Video);
+    assert_eq!(video_track.kind(), TrackKind::Video);
     assert!(video_constraints.satisfies(video_track.as_ref()));
 }
 
@@ -354,7 +354,7 @@ async fn multi_source_media_stream_constraints_build6() {
 fn get_device_video_track_constraints() -> DeviceVideoTrackConstraints {
     match VideoSource::from(VideoSettings {
         is_required: true,
-        is_display: false,
+        source_kind: MediaSourceKind::Device,
     }) {
         VideoSource::Device(device) => device,
         _ => unreachable!(),
@@ -485,6 +485,7 @@ fn build_constraints(
     constraints
 }
 
+/// Tests that simultaneous device and display constraining works.
 #[wasm_bindgen_test]
 async fn simultaneous_device_and_display() {
     if is_firefox() {
@@ -534,10 +535,10 @@ async fn simultaneous_device_and_display() {
     let display_video_track = video.pop().unwrap().0;
     assert!(display_video_track.kind() == TrackKind::Video);
     assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
-    assert!(display_video_track.is_display());
+    assert_eq!(&display_video_track.js_media_source_kind(), "display");
 
     let device_video_track = video.pop().unwrap().0;
     assert!(device_video_track.kind() == TrackKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
-    assert!(!device_video_track.is_display());
+    assert_eq!(&device_video_track.js_media_source_kind(), "device");
 }

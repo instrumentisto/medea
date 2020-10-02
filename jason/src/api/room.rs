@@ -767,7 +767,7 @@ impl InnerRoom {
         update_result
     }
 
-    /// Update [`MuteState`]s of the [`TransceiverSide`] with a provided
+    /// Updates [`MuteState`]s of the [`TransceiverSide`] with a provided
     /// [`PeerId`] and [`TrackId`] to a provided [`StableMuteState`]s.
     #[allow(clippy::filter_map)]
     async fn update_mute_states(
@@ -841,11 +841,12 @@ impl InnerRoom {
                         )
                         .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
-
-                    self.rpc.send_command(Command::UpdateTracks {
-                        peer_id,
-                        tracks_patches,
-                    });
+                    if !tracks_patches.is_empty() {
+                        self.rpc.send_command(Command::UpdateTracks {
+                            peer_id,
+                            tracks_patches,
+                        });
+                    }
 
                     Ok(future::try_join_all(transitions_futs))
                 })

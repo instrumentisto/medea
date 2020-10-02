@@ -346,7 +346,8 @@ async fn error_join_room_without_on_connection_loss_callback() {
 
 mod disable_recv_tracks {
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, MemberId, VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, MemberId,
+        VideoSettings,
     };
 
     use super::*;
@@ -384,7 +385,7 @@ mod disable_recv_tracks {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
-                            is_display: false,
+                            source_kind: MediaSourceKind::Device,
                         }),
                     },
                     Track {
@@ -990,8 +991,8 @@ mod patches_generation {
 
     use futures::StreamExt;
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatchCommand,
-        VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
+        TrackPatchCommand, VideoSettings,
     };
     use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
@@ -1031,7 +1032,7 @@ mod patches_generation {
                 id: video_track_id,
                 media_type: MediaType::Video(VideoSettings {
                     is_required: false,
-                    is_display: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
@@ -1272,6 +1273,8 @@ async fn remote_mute_unmute_video() {
     assert!(peer.is_recv_video_enabled());
 }
 
+/// Tests that calling [`RoomHandle::set_local_media_settings`] updates needed
+/// [`MuteState`]s of the [`Sender`]s.
 #[wasm_bindgen_test]
 async fn set_local_media_stream_settings_updates_mute_state() {
     let (event_tx, event_rx) = mpsc::unbounded();
@@ -1307,7 +1310,7 @@ async fn set_local_media_stream_settings_updates_mute_state() {
         .await
         .unwrap_err();
     });
-    delay_for(10).await;
+    yield_now().await;
 
     while let Some(update_tracks_cmd) = commands_rx.next().await {
         if let Command::UpdateTracks {

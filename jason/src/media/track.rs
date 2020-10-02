@@ -6,6 +6,7 @@ use std::rc::{Rc, Weak};
 
 use derive_more::Display;
 use futures::StreamExt;
+use medea_client_api_proto::MediaSourceKind;
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -35,7 +36,7 @@ struct InnerMediaStreamTrack {
 
     /// Flag which indicates that this [`MediaStreamTrack`] was received from
     /// `getDisplayMedia`.
-    is_display: bool,
+    media_source_kind: MediaSourceKind,
 
     /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
     on_enabled: Callback0,
@@ -63,7 +64,7 @@ pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 impl MediaStreamTrack {
     /// Creates new [`MediaStreamTrack`], spawns listener for
     /// [`InnerMediaStreamTrack::enabled`] state changes.
-    pub fn new<T>(track: T, is_display: bool) -> Self
+    pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
     where
         SysMediaStreamTrack: From<T>,
     {
@@ -72,7 +73,7 @@ impl MediaStreamTrack {
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
-            is_display,
+            media_source_kind,
             track,
         }));
 
@@ -141,6 +142,12 @@ impl MediaStreamTrack {
     pub fn downgrade(&self) -> WeakMediaStreamTrack {
         WeakMediaStreamTrack(Rc::downgrade(&self.0))
     }
+
+    /// Returns this [`MediaStreamTrack`] media source kind.
+    #[inline]
+    pub fn media_source_kind(&self) -> MediaSourceKind {
+        self.0.media_source_kind
+    }
 }
 
 #[wasm_bindgen(js_class = MediaTrack)]
@@ -176,10 +183,14 @@ impl MediaStreamTrack {
         self.kind().to_string()
     }
 
-    /// Returns `true` if this [`MediaStreamTrack`] was received from
-    /// `getDisplayMedia`.
-    pub fn is_display(&self) -> bool {
-        self.0.is_display
+    /// Returns a [`String`] set to `device` if track is sourced from some
+    /// device (webcam/microphone) and to `display`, if track is captured via
+    /// [MediaDevices.getDisplayMedia()][1].
+    ///
+    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[wasm_bindgen(js_name = media_source_kind)]
+    pub fn js_media_source_kind(&self) -> String {
+        self.0.media_source_kind.to_string()
     }
 }
 
