@@ -6,6 +6,7 @@ use std::rc::{Rc, Weak};
 
 use derive_more::Display;
 use futures::StreamExt;
+use medea_client_api_proto::MediaSourceKind;
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -13,23 +14,18 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::utils::Callback0;
 
-/// Weak reference to [MediaStreamTrack][1].
+/// [MediaStreamTrack.kind][1] representation.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
+pub enum TrackKind {
+    /// Audio track.
+    #[display(fmt = "audio")]
+    Audio,
 
-impl WeakMediaStreamTrack {
-    /// Tries to upgrade this weak reference to a strong one.
-    #[inline]
-    pub fn upgrade(&self) -> Option<MediaStreamTrack> {
-        self.0.upgrade().map(MediaStreamTrack)
-    }
-
-    /// Checks whether this weak reference can be upgraded to a strong one.
-    #[inline]
-    pub fn can_be_upgraded(&self) -> bool {
-        self.0.strong_count() > 0
-    }
+    /// Video track.
+    #[display(fmt = "video")]
+    Video,
 }
 
 /// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
@@ -37,6 +33,10 @@ impl WeakMediaStreamTrack {
 struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
+
+    /// Flag which indicates that this [`MediaStreamTrack`] was received from
+    /// `getDisplayMedia`.
+    media_source_kind: MediaSourceKind,
 
     /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
     on_enabled: Callback0,
@@ -62,6 +62,45 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
+    /// Creates new [`MediaStreamTrack`], spawns listener for
+    /// [`InnerMediaStreamTrack::enabled`] state changes.
+    pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
+    where
+        SysMediaStreamTrack: From<T>,
+    {
+        let track = SysMediaStreamTrack::from(track);
+        let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+            enabled: ObservableCell::new(track.enabled()),
+            on_enabled: Callback0::default(),
+            on_disabled: Callback0::default(),
+            media_source_kind,
+            track,
+        }));
+
+        let mut track_enabled_state_changes =
+            track.enabled().subscribe().skip(1);
+        spawn_local({
+            let weak_inner = Rc::downgrade(&track.0);
+            async move {
+                while let Some(enabled) =
+                    track_enabled_state_changes.next().await
+                {
+                    if let Some(track) = weak_inner.upgrade() {
+                        if enabled {
+                            track.on_enabled.call();
+                        } else {
+                            track.on_disabled.call();
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
+
+        track
+    }
+
     /// Returns `true` if this [`MediaStreamTrack`] is enabled.
     #[inline]
     pub fn enabled(&self) -> &ObservableCell<bool> {
@@ -103,6 +142,12 @@ impl MediaStreamTrack {
     pub fn downgrade(&self) -> WeakMediaStreamTrack {
         WeakMediaStreamTrack(Rc::downgrade(&self.0))
     }
+
+    /// Returns this [`MediaStreamTrack`] media source kind.
+    #[inline]
+    pub fn media_source_kind(&self) -> MediaSourceKind {
+        self.0.media_source_kind
+    }
 }
 
 #[wasm_bindgen(js_class = MediaTrack)]
@@ -137,57 +182,15 @@ impl MediaStreamTrack {
     pub fn js_kind(&self) -> String {
         self.kind().to_string()
     }
-}
 
-/// [MediaStreamTrack.kind][1] representation.
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
-pub enum TrackKind {
-    /// Audio track.
-    #[display(fmt = "audio")]
-    Audio,
-
-    /// Video track.
-    #[display(fmt = "video")]
-    Video,
-}
-
-impl<T> From<T> for MediaStreamTrack
-where
-    SysMediaStreamTrack: From<T>,
-{
-    fn from(track: T) -> Self {
-        let track = SysMediaStreamTrack::from(track);
-        let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            enabled: ObservableCell::new(track.enabled()),
-            on_enabled: Callback0::default(),
-            on_disabled: Callback0::default(),
-            track,
-        }));
-
-        let mut track_enabled_state_changes =
-            track.enabled().subscribe().skip(1);
-        spawn_local({
-            let weak_inner = Rc::downgrade(&track.0);
-            async move {
-                while let Some(enabled) =
-                    track_enabled_state_changes.next().await
-                {
-                    if let Some(track) = weak_inner.upgrade() {
-                        if enabled {
-                            track.on_enabled.call();
-                        } else {
-                            track.on_disabled.call();
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
-        });
-
-        track
+    /// Returns a [`String`] set to `device` if track is sourced from some
+    /// device (webcam/microphone) and to `display`, if track is captured via
+    /// [MediaDevices.getDisplayMedia()][1].
+    ///
+    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[wasm_bindgen(js_name = media_source_kind)]
+    pub fn js_media_source_kind(&self) -> String {
+        self.0.media_source_kind.to_string()
     }
 }
 
@@ -205,5 +208,24 @@ impl Drop for MediaStreamTrack {
         if Rc::strong_count(&self.0) == 1 {
             self.0.track.stop();
         }
+    }
+}
+
+/// Weak reference to [MediaStreamTrack][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
+
+impl WeakMediaStreamTrack {
+    /// Tries to upgrade this weak reference to a strong one.
+    #[inline]
+    pub fn upgrade(&self) -> Option<MediaStreamTrack> {
+        self.0.upgrade().map(MediaStreamTrack)
+    }
+
+    /// Checks whether this weak reference can be upgraded to a strong one.
+    #[inline]
+    pub fn can_be_upgraded(&self) -> bool {
+        self.0.strong_count() > 0
     }
 }

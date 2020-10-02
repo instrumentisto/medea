@@ -59,9 +59,9 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceServer, MediaType, MemberId, PeerId as Id,
-    PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent, TrackUpdate,
-    VideoSettings,
+    AudioSettings, Direction, IceServer, MediaSourceKind, MediaType, MemberId,
+    PeerId as Id, PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent,
+    TrackUpdate, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -991,6 +991,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: video_settings.publish_policy.is_required(),
+                    source_kind: MediaSourceKind::Device,
                 }),
             ));
             self.add_sender(Rc::clone(&track_video));
@@ -1071,7 +1072,10 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Video(VideoSettings { is_required: true }),
+                MediaType::Video(VideoSettings {
+                    is_required: true,
+                    source_kind: MediaSourceKind::Device,
+                }),
             );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
@@ -1089,7 +1093,10 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Video(VideoSettings { is_required: true }),
+                MediaType::Video(VideoSettings {
+                    is_required: true,
+                    source_kind: MediaSourceKind::Device,
+                }),
             );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
@@ -1100,7 +1107,10 @@ pub mod tests {
     fn media_track(track_id: u32) -> Rc<MediaTrack> {
         Rc::new(MediaTrack::new(
             TrackId(track_id),
-            MediaType::Video(VideoSettings { is_required: true }),
+            MediaType::Video(VideoSettings {
+                is_required: true,
+                source_kind: MediaSourceKind::Device,
+            }),
         ))
     }
 
