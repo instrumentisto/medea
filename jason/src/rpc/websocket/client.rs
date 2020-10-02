@@ -8,7 +8,7 @@ use futures::{
 };
 use medea_client_api_proto::{
     ClientMsg, CloseReason as CloseByServerReason, Command, Event, MemberId,
-    RoomId, RpcSettings, ServerMsg,
+    RoomId, RpcSettings, ServerMsg, Token,
 };
 use medea_reactive::ObservableCell;
 use serde::Serialize;
@@ -177,6 +177,27 @@ impl WebSocketRpcClient {
         Self(Inner::new(rpc_transport_factory))
     }
 
+    pub fn authorize(
+        &self,
+        room_id: RoomId,
+        member_id: MemberId,
+        token: Token,
+    ) {
+        let inner = self.0.borrow();
+        if let Some(sock) = &inner.sock {
+            sock.send(&ClientMsg::JoinRoom((room_id, member_id, token)))
+                .unwrap();
+        }
+    }
+
+    pub fn leave_room(&self, room_id: RoomId, member_id: MemberId) {
+        let inner = self.0.borrow();
+        if let Some(sock) = &inner.sock {
+            sock.send(&ClientMsg::LeaveRoom((room_id, member_id)))
+                .unwrap();
+        }
+    }
+
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
     /// subs about connection loss.
     fn handle_connection_loss(&self, closed_state_reason: ClosedStateReason) {
@@ -227,6 +248,7 @@ impl WebSocketRpcClient {
 
     /// Handles [`ServerMsg`]s from a remote server.
     fn on_transport_message(&self, msg: ServerMsg) {
+        log::debug!("Transport message: {:?}", msg);
         let msg = match msg {
             ServerMsg::Event { room_id, event } => {
                 Some(RpcEvent::Event { room_id, event })

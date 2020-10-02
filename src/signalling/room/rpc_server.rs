@@ -112,6 +112,7 @@ impl RpcServer for Addr<Room> {
         member_id: MemberId,
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()> {
+        debug!("LEAVE");
         self.send(RpcConnectionClosed { member_id, reason })
             .map(|res| {
                 if let Err(e) = res {
@@ -232,6 +233,7 @@ impl Handler<RpcConnectionClosed> for Room {
     /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
     /// [1]: crate::signalling::participants::ParticipantService
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
+        debug!("YEP LEAVE");
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason

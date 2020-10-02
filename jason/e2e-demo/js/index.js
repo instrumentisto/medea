@@ -407,7 +407,7 @@ async function updateLocalVideo(stream) {
 }
 
 window.onload = async function() {
-  if (window.asd) {
+  if (window === window.top) {
     return;
   }
 
@@ -458,7 +458,6 @@ window.onload = async function() {
     );
 
     try {
-      console.error(constraints);
       localTracks = await jason.media_manager().init_local_tracks(constraints)
     } catch (e) {
       console.error(e);
@@ -693,6 +692,7 @@ window.onload = async function() {
     });
 
     room.on_close(async function (on_closed) {
+      alert("CLOOOOOOOOOOOSE");
       let videos = document.getElementsByClassName('remote-videos')[0];
       while (videos.firstChild) {
         videos.firstChild.remove();
@@ -821,7 +821,8 @@ window.onload = async function() {
 
   try {
     closeApp.addEventListener('click', () => {
-      jason.dispose();
+      jason.dispose_room(roomId);
+      // jason.dispose();
     });
 
     usernameInput.value = faker.name.firstName();

@@ -10,12 +10,7 @@ use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
-use medea_client_api_proto::{
-    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
-    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
-    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatchCommand, TrackUpdate,
-};
+use medea_client_api_proto::{Command, ConnectionQualityScore, Direction, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatchCommand, TrackUpdate, RoomId};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -223,6 +218,7 @@ impl RoomHandle {
             )));
         }
 
+        inner.id.borrow_mut().replace(room_id.clone());
         Rc::clone(&inner.rpc)
             .connect(url, room_id.clone(), member_id, token)
             .await
@@ -460,6 +456,22 @@ impl RoomHandle {
             Ok(JsValue::UNDEFINED)
         })
     }
+
+    pub fn id(&self) -> Result<Option<String>, JsValue> {
+        let inner = upgrade_or_detached!(self.0, JasonError)?;
+
+        let id = inner.id.borrow().as_ref().map(|id| id.0.clone());
+        Ok(id)
+    }
+}
+
+#[derive(Clone)]
+pub struct WeakRoom(Weak<InnerRoom>);
+
+impl WeakRoom {
+    pub fn upgrade(&self) -> Option<Room> {
+        self.0.upgrade().map(Room)
+    }
 }
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
@@ -555,6 +567,14 @@ impl Room {
         Self(room)
     }
 
+    pub fn downgrade(&self) -> WeakRoom {
+        WeakRoom(Rc::downgrade(&self.0))
+    }
+
+    pub fn id(&self) -> Option<RoomId> {
+        self.0.id.borrow().clone()
+    }
+
     /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
     ///
     /// Supposed that this function will trigger [`Drop`] implementation of
@@ -567,6 +587,10 @@ impl Room {
     /// may check count of pointers to [`InnerRoom`] with
     /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
+        self.0.set_close_reason(reason);
+    }
+
+    pub fn set_close_reason(&self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
 
@@ -593,10 +617,18 @@ impl Room {
     }
 }
 
+impl Drop for Room {
+    fn drop(&mut self) {
+        log::debug!("Room refs count: {}", Rc::strong_count(&self.0));
+    }
+}
+
 /// Actual data of a [`Room`].
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
+    id: RefCell<Option<RoomId>>,
+
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
@@ -649,6 +681,7 @@ impl InnerRoom {
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         Self {
+            id: RefCell::default(),
             rpc,
             send_constraints: LocalTracksConstraints::default(),
             recv_constraints: Rc::new(RecvConstraints::default()),

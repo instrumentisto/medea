@@ -5,7 +5,7 @@ use derive_more::From;
 use medea_client_api_proto::{Command, Event, MemberId, RoomId, Token};
 
 use crate::rpc::{
-    ClientDisconnect, CloseReason, RpcClientError, RpcSession,
+    ClientDisconnect, CloseReason, ReconnectHandle, RpcClientError, RpcSession,
     WebSocketRpcClient,
 };
 
@@ -27,17 +27,22 @@ struct ConnectionInfo {
     token: Token,
 }
 
-#[derive(Clone, Debug, PartialEq, From)]
+#[derive(Clone, Copy, Debug, PartialEq, From)]
 struct IsReconnected(bool);
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum SessionState {
     Connecting,
     Open(IsReconnected),
     Closed,
 }
 
+use futures::channel::mpsc;
+
 pub struct Session {
     client: Rc<WebSocketRpcClient>,
+    on_event: RefCell<Option<mpsc::UnboundedSender<Event>>>,
+    on_normal_close: RefCell<Option<mpsc::UnboundedSender<CloseReason>>>,
     credentials: RefCell<Option<ConnectionInfo>>,
     state: ObservableCell<SessionState>,
 }
@@ -46,6 +51,8 @@ impl Session {
     pub fn new(client: Rc<WebSocketRpcClient>) -> Self {
         Self {
             client,
+            on_event: RefCell::new(None),
+            on_normal_close: RefCell::new(None),
             credentials: RefCell::new(None),
             state: ObservableCell::new(SessionState::Closed),
         }
@@ -54,7 +61,16 @@ impl Session {
 
 impl Session {
     async fn connect_session(&self) -> Result<(), Traced<RpcClientError>> {
-        unimplemented!()
+        if let Some(credentials) = self.credentials.borrow().as_ref() {
+            self.client.clone().connect(credentials.url.clone()).await?;
+            self.client.authorize(
+                credentials.room_id.clone(),
+                credentials.member_id.clone(),
+                credentials.token.clone(),
+            );
+        }
+
+        Ok(())
     }
 }
 
@@ -78,7 +94,9 @@ impl RpcSession for Session {
 
     async fn reconnect(self: Rc<Self>) -> Result<(), Traced<RpcClientError>> {
         if let Some(credentials) = self.credentials.borrow().as_ref() {
-            Rc::clone(&self.client).connect(credentials.url.clone()).await?;
+            Rc::clone(&self.client)
+                .connect(credentials.url.clone())
+                .await?;
             self.connect_session().await
         } else {
             log::error!("Tried to send command before connecting");
@@ -121,6 +139,13 @@ impl RpcSession for Session {
     }
 
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
+        if let Some(credentials) = self.credentials.borrow().as_ref() {
+            log::debug!("LEAVE ROOM");
+            self.client.leave_room(
+                credentials.room_id.clone(),
+                credentials.member_id.clone(),
+            );
+        }
         self.client.set_close_reason(close_reason)
     }
 
@@ -129,6 +154,15 @@ impl RpcSession for Session {
     }
 
     fn on_reconnected(&self) -> LocalBoxStream<'static, ()> {
-        unimplemented!()
+        self.state
+            .subscribe()
+            .filter_map(|state| async move {
+                if state == SessionState::Open(IsReconnected(true)) {
+                    Some(())
+                } else {
+                    None
+                }
+            })
+            .boxed_local()
     }
 }

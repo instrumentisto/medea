@@ -24,7 +24,9 @@ use medea_client_api_proto::{
 
 use crate::{
     api::{
-        client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
+        client::rpc_connection::{
+            ClosedReason, EventMessage, RpcConnection, RpcConnectionSettings,
+        },
         RpcServer,
     },
     log::prelude::*,
@@ -118,19 +120,36 @@ impl WsSession {
                 if let Some((member_id, room)) = self.sessions.get(&room_id) {
                     room.send_command(member_id.clone(), command);
                 } else {
-                    // TODO: send leave room, close if no
-                    //       sessions
-                    unimplemented!()
+                    self.send_left_room(ctx, room_id, CloseReason::Finished);
+                    if self.sessions.is_empty() {
+                        ctx.stop();
+                    }
                 }
             }
             Ok(ClientMsg::JoinRoom((room_id, member_id, token))) => {
                 self.handle_join_room(ctx, room_id, member_id, token);
+            }
+            Ok(ClientMsg::LeaveRoom((room_id, member_id))) => {
+                debug!("LEAVE ROOM");
+                self.handle_leave_room(ctx, room_id, member_id, ClosedReason::Closed {
+                    normal: true,
+                });
             }
             Err(err) => error!(
                 "{}: Error [{:?}] parsing client message: [{}]",
                 self, err, &text,
             ),
         }
+    }
+
+    fn update_rpc_settings(&mut self, new_settings: RpcConnectionSettings) {
+        if new_settings.idle_timeout < self.idle_timeout {
+            self.idle_timeout = new_settings.idle_timeout;
+        }
+        if new_settings.ping_interval < self.ping_interval {
+            self.ping_interval = new_settings.ping_interval;
+        }
+        // TODO: maybe we need to restart IDLE watchdog and pinger
     }
 
     fn handle_join_room(
@@ -148,28 +167,37 @@ impl WsSession {
                     Box::new(ctx.address()),
                 )
                 .into_actor(self)
-                .map(|result, this, ctx| {
-                    match result {
-                        Ok(_) => {
-                            // TODO: dont ignore RpcConnectionSettings
-                            //       update
-                            this.sessions.insert(
-                                room_id.clone(),
-                                (member_id.clone(), Box::new(room)),
-                            );
-                            this.auth_timeout_handle.take();
-                            this.send_join_room(ctx, room_id, member_id);
-                        }
-                        Err(_) => this.send_left_room(
-                            ctx,
-                            room_id,
-                            CloseReason::InternalError,
-                        ),
+                .map(|result, this, ctx| match result {
+                    Ok(settings) => {
+                        this.update_rpc_settings(settings);
+                        this.sessions.insert(
+                            room_id.clone(),
+                            (member_id.clone(), Box::new(room)),
+                        );
+                        this.auth_timeout_handle.take();
+                        this.send_join_room(ctx, room_id, member_id);
                     }
+                    Err(_) => this.send_left_room(
+                        ctx,
+                        room_id,
+                        CloseReason::InternalError,
+                    ),
                 })
                 .wait(ctx);
         } else {
             self.send_left_room(ctx, room_id, CloseReason::Rejected)
+        }
+    }
+
+    fn handle_leave_room(
+        &self,
+        ctx: &mut ws::WebsocketContext<Self>,
+        room_id: RoomId,
+        member_id: MemberId,
+        reason: ClosedReason,
+    ) {
+        if let Some(room) = self.rooms.get(&room_id) {
+            ctx.spawn(room.connection_closed(member_id, reason).into_actor(self));
         }
     }
 
@@ -256,11 +284,14 @@ impl WsSession {
     fn close_in_place(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
-        reason: Close,
+        reason: CloseDescription,
     ) {
         debug!("{}: Closing WsSession", self);
         self.close_reason = Some(InnerCloseReason::ByServer);
-        ctx.close(Some(reason.0));
+        ctx.close(Some(ws::CloseReason {
+            code: ws::CloseCode::Normal,
+            description: Some(serde_json::to_string(&reason).unwrap()),
+        }));
         ctx.stop();
     }
 
@@ -284,9 +315,7 @@ impl WsSession {
 
                 this.close_in_place(
                     ctx,
-                    Close::with_normal_code(&CloseDescription::new(
-                        CloseReason::Idle,
-                    )),
+                    CloseDescription::new(CloseReason::Idle),
                 );
             }
         });
@@ -377,9 +406,7 @@ impl Actor for WsSession {
             if this.sessions.is_empty() {
                 this.close_in_place(
                     ctx,
-                    Close::with_normal_code(&CloseDescription::new(
-                        CloseReason::Rejected,
-                    )),
+                    CloseDescription::new(CloseReason::Rejected),
                 );
             }
         });
@@ -421,10 +448,13 @@ impl RpcConnection for Addr<WsSession> {
     /// [Close]:https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
+        room_id: RoomId,
         close_description: CloseDescription,
     ) -> LocalBoxFuture<'static, ()> {
-        let close_result =
-            self.send(Close::with_normal_code(&close_description));
+        let close_result = self.send(CloseRoom {
+            room_id,
+            close_description,
+        });
         async {
             if let Err(err) = close_result.await {
                 match err {
@@ -448,28 +478,36 @@ impl RpcConnection for Addr<WsSession> {
     }
 }
 
-/// Message for closing [`WsSession`].
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Close(ws::CloseReason);
+pub struct CloseRoom {
+    room_id: RoomId,
+    close_description: CloseDescription,
+}
 
-impl Close {
-    /// Creates [`Close`] message with [`ws::CloseCode::Normal`] and provided
-    /// [`CloseDescription`] as serialized description.
-    fn with_normal_code(description: &CloseDescription) -> Self {
-        Self(ws::CloseReason {
-            code: ws::CloseCode::Normal,
-            description: Some(serde_json::to_string(&description).unwrap()),
-        })
+impl CloseRoom {
+    pub fn new(room_id: RoomId, close_description: CloseDescription) -> Self {
+        Self {
+            room_id,
+            close_description,
+        }
     }
 }
 
-impl Handler<Close> for WsSession {
+impl Handler<CloseRoom> for WsSession {
     type Result = ();
 
-    /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
-    fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
-        self.close_in_place(ctx, close);
+    fn handle(
+        &mut self,
+        msg: CloseRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if self.sessions.remove(&msg.room_id).is_some() {
+            self.send_left_room(ctx, msg.room_id, CloseReason::Finished);
+            if self.sessions.is_empty() {
+                self.close_in_place(ctx, msg.close_description);
+            }
+        }
     }
 }
 
@@ -516,9 +554,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 error!("{}: StreamHandler Error: {:?}", self, err);
                 self.close_in_place(
                     ctx,
-                    Close::with_normal_code(&CloseDescription {
+                    CloseDescription {
                         reason: CloseReason::InternalError,
-                    }),
+                    },
                 );
             }
         };

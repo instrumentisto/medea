@@ -25,6 +25,8 @@ pub use self::{
     room::Room,
     room::RoomHandle,
 };
+use medea_client_api_proto::RoomId;
+use crate::rpc::CloseReason;
 
 /// General library interface.
 ///
@@ -80,6 +82,17 @@ impl Jason {
         self.0.borrow().media_manager.new_handle()
     }
 
+    pub fn dispose_room(&self, room_id: String) {
+        self.0.borrow_mut().rooms.retain(|room| {
+            if room.id().map(|id| id.0 == room_id).unwrap_or(false) {
+                room.set_close_reason(ClientDisconnect::RoomClosed.into());
+                false
+            } else {
+                true
+            }
+        });
+    }
+
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,
     /// streams etc.) respectively. All objects related to this [`Jason`] API
     /// object will be detached (you will still hold them, but unable to use).
@@ -98,15 +111,20 @@ impl Jason {
         )));
         let room = Room::new(Rc::clone(&rpc), peer_repository);
 
-        let room_clone = room.clone();
+        let weak_room = room.downgrade();
         let inner = self.0.clone();
         spawn_local(rpc.on_normal_close().map(move |res| {
+            let room = if let Some(room) = weak_room.upgrade() {
+                room
+            } else {
+                return;
+            };
             let reason = res.unwrap_or_else(|_| {
                 ClientDisconnect::RpcClientUnexpectedlyDropped.into()
             });
             let mut inner = inner.borrow_mut();
             let index =
-                inner.rooms.iter().position(|room| room_clone.ptr_eq(room));
+                inner.rooms.iter().position(|r| r.ptr_eq(&room));
             if let Some(index) = index {
                 inner.rooms.remove(index).close(reason);
             }

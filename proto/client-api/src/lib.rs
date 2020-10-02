@@ -141,6 +141,8 @@ pub enum ClientMsg {
     },
 
     JoinRoom((RoomId, MemberId, Token)),
+
+    LeaveRoom((RoomId, MemberId)),
 }
 
 /// RPC settings of `Client` received from `Media Server`.

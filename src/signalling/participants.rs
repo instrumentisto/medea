@@ -232,7 +232,10 @@ impl ParticipantService {
             self.insert_connection(member_id, conn);
             Box::pin(
                 connection
-                    .close(CloseDescription::new(CloseReason::Reconnected))
+                    .close(
+                        self.room_id.clone(),
+                        CloseDescription::new(CloseReason::Reconnected),
+                    )
                     .map(move |_| Ok(member)),
             )
         } else {
@@ -304,16 +307,16 @@ impl ParticipantService {
             ctx.cancel_future(handle);
         });
 
+        let room_id = self.room_id.clone();
         // closing all RpcConnection's
         let close_rpc_connections =
             future::join_all(self.connections.drain().fold(
                 Vec::new(),
                 |mut futs, (_, mut connection)| {
-                    futs.push(
-                        connection.close(CloseDescription::new(
-                            CloseReason::Finished,
-                        )),
-                    );
+                    futs.push(connection.close(
+                        room_id.clone(),
+                        CloseDescription::new(CloseReason::Finished),
+                    ));
                     futs
                 },
             ));
@@ -346,9 +349,10 @@ impl ParticipantService {
         }
 
         if let Some(mut conn) = self.connections.remove(member_id) {
-            wrap_future::<_, Room>(
-                conn.close(CloseDescription::new(CloseReason::Evicted)),
-            )
+            wrap_future::<_, Room>(conn.close(
+                self.room_id.clone(),
+                CloseDescription::new(CloseReason::Evicted),
+            ))
             .spawn(ctx);
         }
     }

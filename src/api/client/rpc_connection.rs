@@ -54,6 +54,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
+        room_id: RoomId,
         close_description: CloseDescription,
     ) -> LocalBoxFuture<'static, ()>;
 
