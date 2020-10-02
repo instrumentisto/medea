@@ -122,26 +122,19 @@ impl SimpleTracksRequest {
     ///
     /// # Errors
     ///
-    /// Errors with [`TracksRequestError::InvalidAudioTrack`] if some audio
-    /// track from provided [`MediaStream`] not satisfies
-    /// contained constrains.
-    ///
-    /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if provided
-    /// [`HashMap`] doesn't have expected audio track.
-    ///
-    /// Errors with [`TracksRequestError::InvalidVideoTrack`] if some
-    /// device video track from provided [`HashMap`] not satisfies
-    /// contained constrains.
-    ///
-    /// Errors with [`TracksRequestError::ExpectedDeviceVideoTracks`] if
-    /// provided [`HashMap`] doesn't have expected device video track.
-    ///
-    /// Errors with [`TracksRequestError::InvalidVideoTrack`] if some
-    /// display video track from provided [`HashMap`] not satisfies
-    /// contained constrains.
-    ///
-    /// Errors with [`TracksRequestError::ExpectedDisplayVideoTracks`] if
-    /// provided [`HashMap`] doesn't have expected display video track.
+    /// - [`TracksRequestError::InvalidAudioTrack`] when some audio track from
+    ///   the provided [`MediaStream`] not satisfies contained constrains.
+    /// - [`TracksRequestError::ExpectedAudioTracks`] when the provided
+    ///   [`HashMap`] doesn't have the expected audio track.
+    /// - [`TracksRequestError::InvalidVideoTrack`] when some device video track
+    ///   from the provided [`HashMap`] doesn't satisfy contained constrains.
+    /// - [`TracksRequestError::ExpectedDeviceVideoTracks`] when the provided
+    ///   [`HashMap`] doesn't have the expected device video track.
+    /// - [`TracksRequestError::InvalidVideoTrack`] when some display video
+    ///   track from the provided [`HashMap`] doesn't satisfy contained
+    ///   constrains.
+    /// - [`TracksRequestError::ExpectedDisplayVideoTracks`] when the provided
+    ///   [`HashMap`] doesn't have the expected display video track.
     pub fn parse_tracks(
         &self,
         tracks: Vec<MediaStreamTrack>,
@@ -208,20 +201,18 @@ impl SimpleTracksRequest {
     ///
     /// # Errors
     ///
-    /// Errors with [`TracksRequestError::ExpectedAudioTracks`] if
-    /// [`SimpleTracksRequest`] contains [`AudioTrackConstraints`], but provided
-    /// [`MediaStreamSettings`] doesn't and this [`AudioTrackConstraints`] are
-    /// important.
-    ///
-    /// Errors with [`TracksRequestError::ExpectedDeviceVideoTracks`] if
-    /// [`SimpleTracksRequest`] contains [`DeviceVideoTrackConstraints`], but
-    /// provided [`MediaStreamSettings`] doesn't and this
-    /// [`DeviceVideoTrackConstraints`] are important.
-    ///
-    /// Errors with [`TracksRequestError::ExpectedDisplayVideoTracks`] if
-    /// [`SimpleTracksRequest`] contains [`DisplayVideoTrackConstraints`], but
-    /// provided [`MediaStreamSettings`] doesn't and this
-    /// [`DisplayVideoTrackConstraints`] are important.
+    /// - [`TracksRequestError::ExpectedAudioTracks`] when
+    ///   [`SimpleTracksRequest`] contains [`AudioTrackConstraints`], but the
+    ///   provided [`MediaStreamSettings`] doesn't and these
+    ///   [`AudioTrackConstraints`] are important.
+    /// - [`TracksRequestError::ExpectedDeviceVideoTracks`] when
+    ///   [`SimpleTracksRequest`] contains [`DeviceVideoTrackConstraints`], but
+    ///   the provided [`MediaStreamSettings`] doesn't and these
+    ///   [`DeviceVideoTrackConstraints`] are important.
+    /// - [`TracksRequestError::ExpectedDisplayVideoTracks`] when
+    ///   [`SimpleTracksRequest`] contains [`DisplayVideoTrackConstraints`], but
+    ///   the provided [`MediaStreamSettings`] doesn't and these
+    ///   [`DisplayVideoTrackConstraints`] are important.
     pub fn merge<T: Into<MediaStreamSettings>>(
         &mut self,
         other: T,

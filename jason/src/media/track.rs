@@ -184,8 +184,8 @@ impl MediaStreamTrack {
     }
 
     /// Returns a [`String`] set to `device` if track is sourced from some
-    /// device (webcam/microphone) and to `display`, if track is captured
-    /// via [MediaDevices.getDisplayMedia()][1].
+    /// device (webcam/microphone) and to `display`, if track is captured via
+    /// [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[wasm_bindgen(js_name = media_source_kind)]

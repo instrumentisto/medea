@@ -604,8 +604,7 @@ pub struct VideoSettings {
     /// If `false` then video may be not published.
     pub is_required: bool,
 
-    /// Whether media is sourced by some device (webcam) or captured from user
-    /// display.
+    /// Source kind of this [`VideoSettings`] media.
     pub source_kind: MediaSourceKind,
 }
 
@@ -617,6 +616,7 @@ pub enum MediaSourceKind {
     /// Media is sourced by some media device (webcam or microphone).
     #[display(fmt = "device")]
     Device,
+
     /// Media is obtained with screen-capture.
     #[display(fmt = "display")]
     Display,

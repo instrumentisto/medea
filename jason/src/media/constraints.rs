@@ -140,8 +140,8 @@ impl Default for AudioMediaTracksSettings {
     }
 }
 
-/// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies
-/// any constraints with a provided [`TransceiverKind`].
+/// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies any
+/// constraints with a provided [`TransceiverKind`].
 #[inline]
 fn satisfies_track(track: &SysMediaStreamTrack, kind: TransceiverKind) -> bool {
     track.kind() == kind.as_str()
@@ -155,7 +155,7 @@ fn satisfies_track(track: &SysMediaStreamTrack, kind: TransceiverKind) -> bool {
 pub struct VideoTrackConstraints<C> {
     /// Constraints applicable to video tracks.
     ///
-    /// If `None` then this kind of video (device or display) is disabled by
+    /// If [`None`] then this kind of video (device or display) is disabled by
     /// [`MediaStreamSettings`].
     constraints: Option<C>,
 
@@ -168,10 +168,7 @@ pub struct VideoTrackConstraints<C> {
     is_enabled: bool,
 }
 
-impl<C> Default for VideoTrackConstraints<C>
-where
-    C: Default,
-{
+impl<C: Default> Default for VideoTrackConstraints<C> {
     fn default() -> Self {
         Self {
             constraints: Some(C::default()),
@@ -182,33 +179,33 @@ where
 
 impl<C> VideoTrackConstraints<C> {
     /// Returns `true` if this [`VideoTrackConstraints`] are enabled by the
-    /// [`Room`] and constrained with [`VideoTrackConstraints::
-    /// constraints`].
+    /// [`Room`] and constrained with [`VideoTrackConstraints::constraints`].
     #[inline]
     fn is_enabled(&self) -> bool {
         self.is_enabled && self.is_constrained()
     }
 
-    /// Sets [`VideoTrackConstraints::constraints`] to the provided `cons`.
+    /// Sets these [`VideoTrackConstraints::constraints`] to the provided
+    /// `cons`.
     #[inline]
     fn set(&mut self, cons: C) {
         self.constraints = Some(cons);
     }
 
-    /// Resets [`VideoTrackConstraints::constraints`] to `None`.
+    /// Resets these [`VideoTrackConstraints::constraints`] to [`None`].
     #[inline]
     fn unconstrain(&mut self) {
         self.constraints.take();
     }
 
-    /// Returns `true` if [`VideoTrackConstraints::constraints`] is set to
-    /// `Some` value.
+    /// Returns `true` if these [`VideoTrackConstraints::constraints`] are set
+    /// to [`Some`] value.
     #[inline]
     fn is_constrained(&self) -> bool {
         self.constraints.is_some()
     }
 
-    /// Constraints this [`VideoTrackConstraints`] with a provided `other`
+    /// Constraints these [`VideoTrackConstraints`] with a provided `other`
     /// [`VideoTrackConstraints`].
     #[inline]
     fn constrain(&mut self, other: Self) {
@@ -217,7 +214,7 @@ impl<C> VideoTrackConstraints<C> {
 }
 
 impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
-    /// Returns `true` if provided [`SysMediaStreamTrack`] satisfies device
+    /// Returns `true` if the provided [`SysMediaStreamTrack`] satisfies device
     /// [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
@@ -230,7 +227,7 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
 }
 
 impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
-    /// Returns `true` if provided [`SysMediaStreamTrack`] satisfies device
+    /// Returns `true` if the provided [`SysMediaStreamTrack`] satisfies device
     /// [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
@@ -246,7 +243,7 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct MediaStreamSettings {
     /// [MediaStreamConstraints][1] for the audio media type.
     ///
@@ -262,16 +259,6 @@ pub struct MediaStreamSettings {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
     display_video: VideoTrackConstraints<DisplayVideoTrackConstraints>,
-}
-
-impl Default for MediaStreamSettings {
-    fn default() -> Self {
-        Self {
-            audio: AudioMediaTracksSettings::default(),
-            device_video: VideoTrackConstraints::default(),
-            display_video: VideoTrackConstraints::default(),
-        }
-    }
 }
 
 #[wasm_bindgen]
@@ -348,7 +335,7 @@ impl MediaStreamSettings {
     /// Returns reference to [`DisplayVideoTrackConstraints`] from this
     /// [`MediaStreamSettings`].
     ///
-    /// Returns `None` if [`DisplayVideoTrackConstraints`] is unconstrained.
+    /// Returns [`None`] if [`DisplayVideoTrackConstraints`] is unconstrained.
     #[inline]
     pub fn get_display_video(&self) -> Option<&DisplayVideoTrackConstraints> {
         self.display_video.constraints.as_ref()
@@ -357,7 +344,7 @@ impl MediaStreamSettings {
     /// Returns reference to [`DeviceVideoTrackConstraints`] from this
     /// [`MediaStreamSettings`].
     ///
-    /// Returns `None` if [`DeviceVideoTrackConstraints`] is unconstrained.
+    /// Returns [`None`] if [`DeviceVideoTrackConstraints`] is unconstrained.
     #[inline]
     pub fn get_device_video(&self) -> Option<&DeviceVideoTrackConstraints> {
         self.device_video.constraints.as_ref()
@@ -554,8 +541,7 @@ impl VideoSource {
         }
     }
 
-    /// Checks if provided [MediaStreamTrack][1] satisfies this
-    /// [`VideoSource`].
+    /// Checks if provided [MediaStreamTrack][1] satisfies this [`VideoSource`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
@@ -948,14 +934,16 @@ impl DisplayVideoTrackConstraints {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[allow(clippy::unused_self)]
+    #[inline]
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         satisfies_track(track, TransceiverKind::Video)
             && guess_is_from_display(&track)
     }
 
-    /// Merges this [`DisplayVideoTrackConstraints`] with `another` one ,
-    /// meaning that if some constraint is not set on this one, then it will
-    /// be applied from `another`.
+    /// Merges this [`DisplayVideoTrackConstraints`] with `another` one,
+    /// meaning that if some constraint is not set on this one, then it will be
+    /// applied from `another`.
+    #[inline]
     pub fn merge(&mut self, another: &Self) {
         if !self.is_required && another.is_required {
             self.is_required = another.is_required;
@@ -982,10 +970,10 @@ impl DisplayVideoTrackConstraints {
     }
 }
 
-/// Detects if video track captured from display searching
-/// [specific fields][1] in its settings. Only works in Chrome atm.
+/// Detects if video track captured from display searching [specific fields][1]
+/// in its settings. Only works in Chrome atm.
 ///
-/// [1]: https://tinyurl.com/ufx7mcw
+/// [1]: https://w3.org/TR/screen-capture/#extensions-to-mediatracksettings
 fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {
     let settings = track.get_settings();
 

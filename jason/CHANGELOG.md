@@ -52,7 +52,7 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.mute_remote_audio`;
             - `Room.unmute_remote_audio`;
             - `Room.mute_remote_video`;
-            - `Room.unmute_remote_video`;
+            - `Room.unmute_remote_video`.
         - `MediaTrack.media_source_kind` function ([#145]).
     - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
