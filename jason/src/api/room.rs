@@ -10,7 +10,12 @@ use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::Either, StreamExt as _};
 use js_sys::Promise;
-use medea_client_api_proto::{Command, ConnectionQualityScore, Direction, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId, TrackPatchCommand, TrackUpdate, RoomId};
+use medea_client_api_proto::{
+    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, RoomId, Track,
+    TrackId, TrackPatchCommand, TrackUpdate,
+};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};

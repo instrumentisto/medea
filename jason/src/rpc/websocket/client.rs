@@ -248,7 +248,6 @@ impl WebSocketRpcClient {
 
     /// Handles [`ServerMsg`]s from a remote server.
     fn on_transport_message(&self, msg: ServerMsg) {
-        log::debug!("Transport message: {:?}", msg);
         let msg = match msg {
             ServerMsg::Event { room_id, event } => {
                 Some(RpcEvent::Event { room_id, event })
@@ -390,7 +389,7 @@ impl WebSocketRpcClient {
             }
         });
 
-        self.0.borrow_mut().sock.replace(transport).is_some();
+        self.0.borrow_mut().sock.replace(transport);
         self.0.borrow().state.set(ClientState::Open);
 
         Ok(())

@@ -25,8 +25,6 @@ pub use self::{
     room::Room,
     room::RoomHandle,
 };
-use medea_client_api_proto::RoomId;
-use crate::rpc::CloseReason;
 
 /// General library interface.
 ///
@@ -123,8 +121,7 @@ impl Jason {
                 ClientDisconnect::RpcClientUnexpectedlyDropped.into()
             });
             let mut inner = inner.borrow_mut();
-            let index =
-                inner.rooms.iter().position(|r| r.ptr_eq(&room));
+            let index = inner.rooms.iter().position(|r| r.ptr_eq(&room));
             if let Some(index) = index {
                 inner.rooms.remove(index).close(reason);
             }

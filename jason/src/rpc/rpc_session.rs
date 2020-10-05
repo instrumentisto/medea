@@ -1,11 +1,11 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use async_trait::async_trait;
 use derive_more::From;
 use medea_client_api_proto::{Command, Event, MemberId, RoomId, Token};
 
 use crate::rpc::{
-    ClientDisconnect, CloseReason, ReconnectHandle, RpcClientError, RpcSession,
+    ClientDisconnect, CloseReason, RpcClientError, RpcSession,
     WebSocketRpcClient,
 };
 
@@ -18,7 +18,7 @@ use futures::{
     StreamExt,
 };
 use medea_reactive::ObservableCell;
-use wasm_bindgen::__rt::core::cell::RefCell;
+use std::cell::Cell;
 
 struct ConnectionInfo {
     url: Url,
@@ -37,24 +37,20 @@ enum SessionState {
     Closed,
 }
 
-use futures::channel::mpsc;
-
 pub struct Session {
     client: Rc<WebSocketRpcClient>,
-    on_event: RefCell<Option<mpsc::UnboundedSender<Event>>>,
-    on_normal_close: RefCell<Option<mpsc::UnboundedSender<CloseReason>>>,
     credentials: RefCell<Option<ConnectionInfo>>,
     state: ObservableCell<SessionState>,
+    initialy_connected: Cell<bool>,
 }
 
 impl Session {
     pub fn new(client: Rc<WebSocketRpcClient>) -> Self {
         Self {
             client,
-            on_event: RefCell::new(None),
-            on_normal_close: RefCell::new(None),
             credentials: RefCell::new(None),
             state: ObservableCell::new(SessionState::Closed),
+            initialy_connected: Cell::new(false),
         }
     }
 }
@@ -62,12 +58,22 @@ impl Session {
 impl Session {
     async fn connect_session(&self) -> Result<(), Traced<RpcClientError>> {
         if let Some(credentials) = self.credentials.borrow().as_ref() {
-            self.client.clone().connect(credentials.url.clone()).await?;
+            self.state.set(SessionState::Connecting);
+            self.client
+                .clone()
+                .connect(credentials.url.clone())
+                .await
+                .map_err(|e| {
+                    self.state.set(SessionState::Closed);
+                    e
+                })?;
             self.client.authorize(
                 credentials.room_id.clone(),
                 credentials.member_id.clone(),
                 credentials.token.clone(),
             );
+            use futures::StreamExt as _;
+            self.state.subscribe().filter(|s| futures::future::ready(matches!(s, SessionState::Open(_)))).next().await;
         }
 
         Ok(())
@@ -116,6 +122,17 @@ impl RpcSession for Session {
                         } else {
                             None
                         }
+                    }
+                    (
+                        Some(credentials),
+                        RpcEvent::JoinedRoom { room_id, member_id },
+                    ) => {
+                        if credentials.room_id == room_id
+                            && credentials.member_id == member_id
+                        {
+                            this.state.set(SessionState::Open(this.initialy_connected.get().into()));
+                        }
+                        None
                     }
                     _ => None,
                 }
