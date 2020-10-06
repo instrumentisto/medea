@@ -185,15 +185,19 @@ impl WebSocketRpcClient {
     ) {
         let inner = self.0.borrow();
         if let Some(sock) = &inner.sock {
-            sock.send(&ClientMsg::JoinRoom((room_id, member_id, token)))
-                .unwrap();
+            sock.send(&ClientMsg::JoinRoom {
+                room_id,
+                member_id,
+                token,
+            })
+            .unwrap();
         }
     }
 
     pub fn leave_room(&self, room_id: RoomId, member_id: MemberId) {
         let inner = self.0.borrow();
         if let Some(sock) = &inner.sock {
-            sock.send(&ClientMsg::LeaveRoom((room_id, member_id)))
+            sock.send(&ClientMsg::LeaveRoom { room_id, member_id })
                 .unwrap();
         }
     }

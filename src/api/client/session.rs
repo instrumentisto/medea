@@ -126,10 +126,14 @@ impl WsSession {
                     }
                 }
             }
-            Ok(ClientMsg::JoinRoom((room_id, member_id, token))) => {
+            Ok(ClientMsg::JoinRoom {
+                room_id,
+                member_id,
+                token,
+            }) => {
                 self.handle_join_room(ctx, room_id, member_id, token);
             }
-            Ok(ClientMsg::LeaveRoom((room_id, member_id))) => {
+            Ok(ClientMsg::LeaveRoom { room_id, member_id }) => {
                 self.handle_leave_room(
                     ctx,
                     room_id,

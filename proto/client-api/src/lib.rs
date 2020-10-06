@@ -135,14 +135,18 @@ pub enum ClientMsg {
     Pong(u32),
 
     /// Request of `Client` to change the state on `Media Server`.
-    Command {
+    Command { room_id: RoomId, command: Command },
+
+    JoinRoom {
         room_id: RoomId,
-        command: Command,
+        member_id: MemberId,
+        token: Token,
     },
 
-    JoinRoom((RoomId, MemberId, Token)),
-
-    LeaveRoom((RoomId, MemberId)),
+    LeaveRoom {
+        room_id: RoomId,
+        member_id: MemberId,
+    },
 }
 
 /// RPC settings of `Client` received from `Media Server`.
