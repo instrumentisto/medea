@@ -32,6 +32,7 @@ pub use self::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, FacingMode, MediaStreamSettings,
     },
+    peer::SourceType,
 };
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

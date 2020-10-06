@@ -434,7 +434,10 @@ mod disable_recv_tracks {
 
 /// Tests disabling tracks publishing.
 mod disable_send_tracks {
-    use medea_jason::peer::{StableMuteState, TrackDirection, TransceiverKind};
+    use medea_jason::{
+        peer::{StableMuteState, TrackDirection, TransceiverKind},
+        SourceType,
+    };
 
     use super::*;
 
@@ -466,9 +469,9 @@ mod disable_send_tracks {
         .await;
 
         let handle = room.new_handle();
-        assert!(JsFuture::from(handle.mute_video()).await.is_ok());
+        assert!(JsFuture::from(handle.mute_video(None)).await.is_ok());
         assert!(!peer.is_send_video_enabled());
-        assert!(JsFuture::from(handle.unmute_video()).await.is_ok());
+        assert!(JsFuture::from(handle.unmute_video(None)).await.is_ok());
         assert!(peer.is_send_video_enabled());
     }
 
@@ -505,6 +508,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Muted
         ));
     }
@@ -532,8 +536,8 @@ mod disable_send_tracks {
 
         let handle = room.new_handle();
         let (first, second) = futures::future::join(
-            JsFuture::from(handle.mute_video()),
-            JsFuture::from(handle.mute_video()),
+            JsFuture::from(handle.mute_video(None)),
+            JsFuture::from(handle.mute_video(None)),
         )
         .await;
         first.unwrap();
@@ -542,6 +546,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Muted
         ));
     }
@@ -572,6 +577,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Unmuted
         ));
 
@@ -587,6 +593,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Unmuted
         ));
     }
@@ -617,13 +624,14 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Unmuted
         ));
 
         let handle = room.new_handle();
         let (mute_video_result, unmute_video_result) = futures::future::join(
-            JsFuture::from(handle.mute_video()),
-            JsFuture::from(handle.unmute_video()),
+            JsFuture::from(handle.mute_video(None)),
+            JsFuture::from(handle.unmute_video(None)),
         )
         .await;
         mute_video_result.unwrap_err();
@@ -632,6 +640,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Video,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Unmuted
         ));
     }
@@ -662,6 +671,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Unmuted
         ));
 
@@ -671,6 +681,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Muted
         ));
 
@@ -685,6 +696,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             TransceiverKind::Audio,
             TrackDirection::Send,
+            SourceType::Both,
             StableMuteState::Unmuted
         ));
     }
@@ -750,7 +762,7 @@ mod disable_send_tracks {
         .await
         .unwrap();
 
-        JsFuture::from(room.new_handle().mute_video())
+        JsFuture::from(room.new_handle().mute_video(None))
             .await
             .unwrap();
 
@@ -994,7 +1006,7 @@ mod patches_generation {
         AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
         TrackPatchCommand, VideoSettings,
     };
-    use medea_jason::media::RecvConstraints;
+    use medea_jason::{media::RecvConstraints, SourceType};
     use wasm_bindgen_futures::spawn_local;
 
     use crate::timeout;
@@ -1043,10 +1055,15 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_enabled(false, TransceiverKind::Video);
+            local_stream.set_track_enabled(
+                false,
+                TransceiverKind::Video,
+                SourceType::Both,
+            );
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,
+                SourceType::Both,
             );
             let peer = PeerConnection::new(
                 peer_id,

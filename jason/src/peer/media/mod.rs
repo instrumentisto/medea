@@ -12,6 +12,7 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
+use wasm_bindgen::prelude::*;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
@@ -127,6 +128,39 @@ pub trait Muteable {
     }
 }
 
+/// Media source type.
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug)]
+pub enum SourceType {
+    /// Type of media which was received from `getUserMedia` request.
+    Device,
+
+    /// Type of media which was received from `getDisplayMedia` request.
+    Display,
+
+    /// Both [`SourceType::Device`] and [`SourceType::Display`].
+    Both,
+}
+
+impl PartialEq for SourceType {
+    /// Returns `true` if this [`SourceType`] equals to the `another` or any of
+    /// the comparable [`SourceType`]s are [`SourceType::Both`].
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            SourceType::Device => {
+                matches!(other, SourceType::Device | SourceType::Both)
+            }
+            SourceType::Display => {
+                matches!(other, SourceType::Display | SourceType::Both)
+            }
+            SourceType::Both => matches!(
+                other,
+                SourceType::Display | SourceType::Device | SourceType::Both
+            ),
+        }
+    }
+}
+
 /// Direction of the `MediaTrack`.
 #[derive(Debug, Clone, Copy)]
 pub enum TrackDirection {
@@ -226,12 +260,16 @@ struct InnerMediaConnections {
 }
 
 impl InnerMediaConnections {
-    /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`].
-    fn iter_senders_with_kind(
+    /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`]
+    /// and [`SourceType`].
+    fn iter_senders_with_kind_and_source_type(
         &self,
         kind: TransceiverKind,
+        source_type: SourceType,
     ) -> impl Iterator<Item = &Rc<Sender>> {
-        self.senders.values().filter(move |s| s.kind() == kind)
+        self.senders
+            .values()
+            .filter(move |s| s.kind() == kind && s.source_type() == source_type)
     }
 
     /// Returns [`Iterator`] over [`Receiver`]s with provided
@@ -243,16 +281,17 @@ impl InnerMediaConnections {
         self.receivers.values().filter(move |s| s.kind() == kind)
     }
 
-    /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`] and
-    /// [`TransceiverKind`].
+    /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],
+    /// [`TransceiverKind`] and [`SourceType`].
     fn get_transceivers_by_direction_and_kind(
         &self,
         direction: TrackDirection,
         kind: TransceiverKind,
+        source_type: SourceType,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         match direction {
             TrackDirection::Send => self
-                .iter_senders_with_kind(kind)
+                .iter_senders_with_kind_and_source_type(kind, source_type)
                 .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
@@ -285,29 +324,37 @@ impl MediaConnections {
     }
 
     /// Returns all [`Sender`]s and [`Receiver`]s from this [`MediaConnections`]
-    /// with provided [`TransceiverKind`] and [`TrackDirection`].
+    /// with provided [`TransceiverKind`], [`TrackDirection`] and
+    /// [`SourceType`].
     pub fn get_transceivers_sides(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
+        source_type: SourceType,
     ) -> Vec<Rc<dyn TransceiverSide>> {
-        self.0
-            .borrow()
-            .get_transceivers_by_direction_and_kind(direction, kind)
+        self.0.borrow().get_transceivers_by_direction_and_kind(
+            direction,
+            kind,
+            source_type,
+        )
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`TransceiverKind`] and [`TrackDirection`] is in provided [`MuteState`].
+    /// [`TransceiverKind`], [`TrackDirection`] and [`SourceType`] is in
+    /// provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
+        source_type: SourceType,
         mute_state: StableMuteState,
     ) -> bool {
-        let transceivers = self
-            .0
-            .borrow()
-            .get_transceivers_by_direction_and_kind(direction, kind);
+        let transceivers =
+            self.0.borrow().get_transceivers_by_direction_and_kind(
+                direction,
+                kind,
+                source_type,
+            );
         for transceiver in transceivers {
             if !transceiver.is_transitable() {
                 continue;
@@ -322,20 +369,28 @@ impl MediaConnections {
 
     /// Returns `true` if all [`Sender`]s with
     /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
-            .iter_senders_with_kind(TransceiverKind::Audio)
+            .iter_senders_with_kind_and_source_type(
+                TransceiverKind::Audio,
+                SourceType::Both,
+            )
             .find(|s| s.is_muted())
             .is_none()
     }
 
     /// Returns `true` if all [`Sender`]s with
     /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
-            .iter_senders_with_kind(TransceiverKind::Video)
+            .iter_senders_with_kind_and_source_type(
+                TransceiverKind::Video,
+                SourceType::Both,
+            )
             .find(|s| s.is_muted())
             .is_none()
     }
@@ -667,5 +722,23 @@ impl MediaConnections {
         self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.reset_mute_state_transition_timeout());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests that [`SourceType`] comparing works correctly.
+    #[test]
+    fn source_type_eq() {
+        assert_eq!(SourceType::Device, SourceType::Both);
+        assert_eq!(SourceType::Display, SourceType::Both);
+        assert_eq!(SourceType::Both, SourceType::Both);
+        assert_eq!(SourceType::Both, SourceType::Device);
+        assert_eq!(SourceType::Both, SourceType::Display);
+
+        assert!(!(SourceType::Display == SourceType::Device));
+        assert!(!(SourceType::Device == SourceType::Display));
     }
 }

@@ -18,7 +18,10 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{peer::TransceiverKind, utils::get_property_by_name};
+use crate::{
+    peer::{SourceType, TransceiverKind},
+    utils::get_property_by_name,
+};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
@@ -105,8 +108,15 @@ impl LocalTracksConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
-        self.0.borrow_mut().set_track_enabled(enabled, kind);
+    pub fn set_enabled(
+        &self,
+        enabled: bool,
+        kind: TransceiverKind,
+        source_type: SourceType,
+    ) {
+        self.0
+            .borrow_mut()
+            .set_track_enabled(enabled, kind, source_type);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -379,13 +389,18 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_track_enabled(&mut self, enabled: bool, kind: TransceiverKind) {
+    pub fn set_track_enabled(
+        &mut self,
+        enabled: bool,
+        kind: TransceiverKind,
+        source_type: SourceType,
+    ) {
         match kind {
             TransceiverKind::Audio => {
                 self.toggle_publish_audio(enabled);
             }
             TransceiverKind::Video => {
-                self.toggle_publish_video(enabled);
+                self.toggle_publish_video(enabled, source_type);
             }
         }
     }
@@ -397,12 +412,20 @@ impl MediaStreamSettings {
         self.audio.is_enabled = is_enabled;
     }
 
-    /// Sets the all underlying [`VideoTrackConstraints::is_enabled`] (device
-    /// and display) to the given value.
+    /// Sets underlying [`VideoTrackConstraints::is_enabled`] based on provided
+    /// [`SourceType`] to the given value.
     #[inline]
-    pub fn toggle_publish_video(&mut self, is_enabled: bool) {
-        self.display_video.is_enabled = is_enabled;
-        self.device_video.is_enabled = is_enabled;
+    pub fn toggle_publish_video(
+        &mut self,
+        is_enabled: bool,
+        source_type: SourceType,
+    ) {
+        if source_type == SourceType::Display {
+            self.display_video.is_enabled = is_enabled;
+        }
+        if source_type == SourceType::Device {
+            self.device_video.is_enabled = is_enabled;
+        }
     }
 
     /// Indicates whether audio is enabled in this [`MediaStreamSettings`].
@@ -655,6 +678,17 @@ impl TrackConstraints {
             TrackConstraints::Video(VideoSource::Display(_)) => {
                 MediaSourceKind::Display
             }
+        }
+    }
+
+    /// Returns [`SourceType`] based on this [`TrackConstraints`].
+    pub fn source_type(&self) -> SourceType {
+        match &self {
+            TrackConstraints::Audio(_) => SourceType::Device,
+            TrackConstraints::Video(video) => match video {
+                VideoSource::Display(_) => SourceType::Display,
+                VideoSource::Device(_) => SourceType::Device,
+            },
         }
     }
 }

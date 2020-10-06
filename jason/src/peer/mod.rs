@@ -47,8 +47,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
-        TrackDirection, TransceiverSide,
+        MuteStateTransition, Muteable, Receiver, Sender, SourceType,
+        StableMuteState, TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -402,17 +402,22 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with a provided
-    /// [`TransceiverKind`] and [`TrackDirection`] is in the provided
-    /// [`StableMuteState`].
+    /// [`TransceiverKind`], [`TrackDirection`] and [`SourceType`] is in the
+    /// provided [`StableMuteState`].
     #[inline]
     pub fn is_all_transceiver_sides_in_mute_state(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
+        source_type: SourceType,
         mute_state: StableMuteState,
     ) -> bool {
-        self.media_connections
-            .is_all_tracks_in_mute_state(kind, direction, mute_state)
+        self.media_connections.is_all_tracks_in_mute_state(
+            kind,
+            direction,
+            source_type,
+            mute_state,
+        )
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
@@ -515,11 +520,13 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
+    #[cfg(feature = "mockable")]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()
     }
 
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
+    #[cfg(feature = "mockable")]
     pub fn is_send_video_enabled(&self) -> bool {
         self.media_connections.is_send_video_enabled()
     }
@@ -535,15 +542,19 @@ impl PeerConnection {
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
-    /// provided [`TransceiverKind`] and [`TrackDirection`].
+    /// provided [`TransceiverKind`], [`TrackDirection`] and [`SourceType`].
     #[inline]
     pub fn get_transceivers_sides(
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
+        source_type: SourceType,
     ) -> Vec<Rc<dyn TransceiverSide>> {
-        self.media_connections
-            .get_transceivers_sides(kind, direction)
+        self.media_connections.get_transceivers_sides(
+            kind,
+            direction,
+            source_type,
+        )
     }
 
     /// Track id to mid relations of all send tracks of this

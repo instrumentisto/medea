@@ -15,7 +15,7 @@ use crate::{
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
         media::TransceiverSide,
-        PeerEvent,
+        PeerEvent, SourceType,
     },
 };
 
@@ -207,6 +207,11 @@ impl Sender {
         {
             self.set_transceiver_direction(TransceiverDirection::Sendonly);
         }
+    }
+
+    /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
+    pub fn source_type(&self) -> SourceType {
+        self.caps.source_type()
     }
 
     /// Checks whether general mute state of the [`Sender`] is in

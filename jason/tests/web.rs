@@ -91,6 +91,7 @@ use medea_jason::{
     peer::TransceiverKind,
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
+    SourceType,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -142,8 +143,16 @@ pub fn get_media_stream_settings(
     video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.set_track_enabled(audio_enabled, TransceiverKind::Audio);
-    settings.set_track_enabled(video_enabled, TransceiverKind::Video);
+    settings.set_track_enabled(
+        audio_enabled,
+        TransceiverKind::Audio,
+        SourceType::Both,
+    );
+    settings.set_track_enabled(
+        video_enabled,
+        TransceiverKind::Video,
+        SourceType::Both,
+    );
 
     settings
 }
