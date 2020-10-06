@@ -130,7 +130,7 @@ pub trait Muteable {
 
 /// Media source type.
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq)]
 pub enum SourceType {
     /// Type of media which was received from `getUserMedia` request.
     Device,
@@ -738,7 +738,7 @@ mod tests {
         assert_eq!(SourceType::Both, SourceType::Device);
         assert_eq!(SourceType::Both, SourceType::Display);
 
-        assert!(!(SourceType::Display == SourceType::Device));
-        assert!(!(SourceType::Device == SourceType::Display));
+        assert_ne!(SourceType::Display, SourceType::Device);
+        assert_ne!(SourceType::Device, SourceType::Display);
     }
 }
