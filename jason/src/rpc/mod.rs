@@ -4,7 +4,7 @@ mod backoff_delayer;
 mod heartbeat;
 mod reconnect_handle;
 mod rpc_session;
-mod websocket;
+pub mod websocket;
 
 use std::rc::Rc;
 

@@ -16,7 +16,7 @@ use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaManager, MediaStreamSettings},
     peer::{MockPeerRepository, PeerConnection, Repository, TransceiverKind},
-    rpc::MockRpcClient,
+    rpc::MockRpcSession,
     utils::JasonError,
     DeviceVideoTrackConstraints,
 };
@@ -26,7 +26,7 @@ use wasm_bindgen_test::*;
 use crate::{
     delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
-    wait_and_check_test_result, MockNavigator,
+    wait_and_check_test_result, MockNavigator, TEST_ROOM_URL,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -35,10 +35,9 @@ fn get_test_room(
     events: BoxStream<'static, Event>,
 ) -> (Room, UnboundedReceiver<Command>) {
     let (tx, rx) = mpsc::unbounded();
-    let mut rpc = MockRpcClient::new();
+    let mut rpc = MockRpcSession::new();
 
     rpc.expect_subscribe().return_once(move || events);
-    rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
     rpc.expect_on_connection_loss()
         .return_once(|| stream::pending().boxed_local());
@@ -59,13 +58,12 @@ async fn get_test_room_and_exist_peer(
     video_track: Track,
     media_stream_settings: Option<MediaStreamSettings>,
 ) -> (Room, Rc<PeerConnection>) {
-    let mut rpc = MockRpcClient::new();
+    let mut rpc = MockRpcSession::new();
 
     let (event_tx, event_rx) = mpsc::unbounded();
 
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
-    rpc.expect_unsub().return_const(());
     rpc.expect_on_connection_loss()
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_on_reconnected()
@@ -302,7 +300,7 @@ async fn error_join_room_without_on_failed_stream_callback() {
         .on_connection_loss(js_sys::Function::new_no_args(""))
         .unwrap();
 
-    match room_handle.inner_join(String::from("token")).await {
+    match room_handle.inner_join(String::from(TEST_ROOM_URL)).await {
         Ok(_) => unreachable!(),
         Err(e) => {
             assert_eq!(e.name(), "CallbackNotSet");
@@ -331,7 +329,7 @@ async fn error_join_room_without_on_connection_loss_callback() {
         .on_failed_local_media(js_sys::Function::new_no_args(""))
         .unwrap();
 
-    match room_handle.inner_join(String::from("token")).await {
+    match room_handle.inner_join(String::from(TEST_ROOM_URL)).await {
         Ok(_) => unreachable!(),
         Err(e) => {
             assert_eq!(e.name(), "CallbackNotSet");
@@ -910,13 +908,12 @@ mod rpc_close_reason_on_room_drop {
     /// Returns [`Room`] and [`oneshot::Receiver`] which will be resolved
     /// with [`RpcClient`]'s close reason ([`ClientDisconnect`]).
     async fn get_client() -> (Room, oneshot::Receiver<ClientDisconnect>) {
-        let mut rpc = MockRpcClient::new();
+        let mut rpc = MockRpcSession::new();
 
         let (_event_tx, event_rx) = mpsc::unbounded();
         rpc.expect_subscribe()
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
-        rpc.expect_unsub().return_const(());
         rpc.expect_on_connection_loss()
             .return_once(|| stream::pending().boxed_local());
         rpc.expect_on_reconnected()
@@ -1071,14 +1068,13 @@ mod patches_generation {
         repo.expect_get()
             .returning_st(move |id| peers.get(&id).cloned());
 
-        let mut rpc = MockRpcClient::new();
+        let mut rpc = MockRpcSession::new();
         let (command_tx, command_rx) = mpsc::unbounded();
         rpc.expect_send_command().returning(move |command| {
             command_tx.unbounded_send(command).unwrap();
         });
         rpc.expect_subscribe()
             .return_once(move || Box::pin(futures::stream::pending()));
-        rpc.expect_unsub().return_once(|| ());
         rpc.expect_set_close_reason().return_once(|_| ());
         rpc.expect_on_connection_loss()
             .return_once(|| stream::pending().boxed_local());

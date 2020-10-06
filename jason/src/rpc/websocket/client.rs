@@ -122,7 +122,7 @@ struct Inner {
 
 /// Factory closure which creates [`RpcTransport`] for
 /// [`WebSocketRpcClient::establish_connection`] function.
-type RpcTransportFactory = Box<
+pub type RpcTransportFactory = Box<
     dyn Fn(
         Url,
     ) -> LocalBoxFuture<
@@ -149,7 +149,7 @@ impl Inner {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RpcEvent {
     JoinedRoom {
         room_id: RoomId,

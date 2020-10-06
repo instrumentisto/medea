@@ -130,10 +130,12 @@ impl WsSession {
                 self.handle_join_room(ctx, room_id, member_id, token);
             }
             Ok(ClientMsg::LeaveRoom((room_id, member_id))) => {
-                debug!("LEAVE ROOM");
-                self.handle_leave_room(ctx, room_id, member_id, ClosedReason::Closed {
-                    normal: true,
-                });
+                self.handle_leave_room(
+                    ctx,
+                    room_id,
+                    member_id,
+                    ClosedReason::Closed { normal: true },
+                );
             }
             Err(err) => error!(
                 "{}: Error [{:?}] parsing client message: [{}]",
@@ -143,12 +145,13 @@ impl WsSession {
     }
 
     fn update_rpc_settings(&mut self, new_settings: RpcConnectionSettings) {
-        if new_settings.idle_timeout < self.idle_timeout {
-            self.idle_timeout = new_settings.idle_timeout;
-        }
-        if new_settings.ping_interval < self.ping_interval {
-            self.ping_interval = new_settings.ping_interval;
-        }
+        // TODO: send settings update to the client.
+        // if new_settings.idle_timeout < self.idle_timeout {
+        //     self.idle_timeout = new_settings.idle_timeout;
+        // }
+        // if new_settings.ping_interval < self.ping_interval {
+        //     self.ping_interval = new_settings.ping_interval;
+        // }
         // TODO: maybe we need to restart IDLE watchdog and pinger
     }
 
@@ -197,7 +200,9 @@ impl WsSession {
         reason: ClosedReason,
     ) {
         if let Some(room) = self.rooms.get(&room_id) {
-            ctx.spawn(room.connection_closed(member_id, reason).into_actor(self));
+            ctx.spawn(
+                room.connection_closed(member_id, reason).into_actor(self),
+            );
         }
     }
 

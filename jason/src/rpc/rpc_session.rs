@@ -73,7 +73,13 @@ impl Session {
                 credentials.token.clone(),
             );
             use futures::StreamExt as _;
-            self.state.subscribe().filter(|s| futures::future::ready(matches!(s, SessionState::Open(_)))).next().await;
+            self.state
+                .subscribe()
+                .filter(|s| {
+                    futures::future::ready(matches!(s, SessionState::Open(_)))
+                })
+                .next()
+                .await;
         }
 
         Ok(())
@@ -111,11 +117,16 @@ impl RpcSession for Session {
     }
 
     fn subscribe(self: Rc<Self>) -> LocalBoxStream<'static, Event> {
-        let this = Rc::clone(&self);
+        let weak_this = Rc::downgrade(&self);
         Box::pin(self.client.subscribe().filter_map(move |event| {
-            let this = Rc::clone(&this);
+            let weak_this = weak_this.clone();
             async move {
-                match (this.credentials.borrow().as_ref(), event) {
+                let this = if let Some(this) = weak_this.upgrade() {
+                    this
+                } else {
+                    return None;
+                };
+                let x = match (this.credentials.borrow().as_ref(), event) {
                     (Some(credentials), RpcEvent::Event { room_id, event }) => {
                         if credentials.room_id == room_id {
                             Some(event)
@@ -130,12 +141,15 @@ impl RpcSession for Session {
                         if credentials.room_id == room_id
                             && credentials.member_id == member_id
                         {
-                            this.state.set(SessionState::Open(this.initialy_connected.get().into()));
+                            this.state.set(SessionState::Open(
+                                this.initialy_connected.get().into(),
+                            ));
                         }
                         None
                     }
                     _ => None,
-                }
+                };
+                x
             }
         }))
     }

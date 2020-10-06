@@ -25,6 +25,7 @@ pub use self::{
     room::Room,
     room::RoomHandle,
 };
+use crate::rpc::websocket::RpcTransportFactory;
 
 /// General library interface.
 ///
@@ -53,20 +54,14 @@ impl Jason {
         set_panic_hook();
         wasm_logger::init(wasm_logger::Config::default());
 
-        let rpc = Rc::new(WebSocketRpcClient::new(Box::new(|url| {
+        Self::with_rpc_factory(Box::new(|url| {
             Box::pin(async move {
                 let ws = WebSocketRpcTransport::new(url)
                     .await
                     .map_err(|e| tracerr::new!(e))?;
                 Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
             })
-        })));
-
-        Self(Rc::new(RefCell::new(Inner {
-            rpc,
-            rooms: Vec::new(),
-            media_manager: Rc::new(MediaManager::default()),
-        })))
+        }))
     }
 
     /// Returns [`RoomHandle`] for [`Room`].
@@ -102,18 +97,43 @@ impl Jason {
 }
 
 impl Jason {
+    pub fn with_rpc_factory(factory: RpcTransportFactory) -> Self {
+        let rpc = Rc::new(WebSocketRpcClient::new(factory));
+
+        Self(Rc::new(RefCell::new(Inner {
+            rpc,
+            rooms: Vec::new(),
+            media_manager: Rc::new(MediaManager::default()),
+        })))
+    }
+
+    #[cfg(feature = "mockable")]
+    pub fn with_rpc_client(rpc: Rc<WebSocketRpcClient>) -> Self {
+        Self(Rc::new(RefCell::new(Inner {
+            rpc,
+            rooms: Vec::new(),
+            media_manager: Rc::new(MediaManager::default()),
+        })))
+    }
+
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
-        let room = Room::new(Rc::clone(&rpc), peer_repository);
+        let on_normal_close = rpc.on_normal_close();
+        let room = Room::new(rpc, peer_repository);
 
         let weak_room = room.downgrade();
-        let inner = self.0.clone();
-        spawn_local(rpc.on_normal_close().map(move |res| {
+        let weak_inner = Rc::downgrade(&self.0);
+        spawn_local(on_normal_close.map(move |res| {
             let room = if let Some(room) = weak_room.upgrade() {
                 room
+            } else {
+                return;
+            };
+            let inner = if let Some(inner) = weak_inner.upgrade() {
+                inner
             } else {
                 return;
             };

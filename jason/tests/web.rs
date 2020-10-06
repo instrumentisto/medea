@@ -92,6 +92,7 @@ use medea_jason::{
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
+use url::Url;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -203,6 +204,12 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
             }),
         },
     )
+}
+
+const TEST_ROOM_URL: &str = "ws://example.com/room_id/member_id/token";
+
+pub fn join_room_url() -> Url {
+    Url::parse(TEST_ROOM_URL).unwrap()
 }
 
 /// Resolves after provided number of milliseconds.

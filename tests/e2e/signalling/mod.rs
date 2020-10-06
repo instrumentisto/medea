@@ -26,9 +26,10 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, NegotiationRole, PeerId,
-    RpcSettings, ServerMsg, Track, TrackId, TrackUpdate,
+    ClientMsg, Command, Event, IceCandidate, MemberId, NegotiationRole, PeerId,
+    RoomId, RpcSettings, ServerMsg, Token, Track, TrackId, TrackUpdate,
 };
+use url::Url;
 
 pub type MessageHandler =
     Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
@@ -50,6 +51,12 @@ pub enum ConnectionEvent {
 
 /// Medea client for testing purposes.
 pub struct TestMember {
+    room_id: RoomId,
+
+    member_id: MemberId,
+
+    token: Token,
+
     /// Writer to WebSocket.
     sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
 
@@ -84,16 +91,51 @@ pub struct TestMember {
     auto_negotiation: bool,
 }
 
+pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Token) {
+    let mut url = Url::parse(&url).unwrap();
+    url.set_fragment(None);
+    url.set_query(None);
+
+    let mut segments = url.path_segments().unwrap().rev();
+    let token = segments.next().unwrap().to_owned().into();
+    let member_id = segments.next().unwrap().to_owned().into();
+    let room_id = segments.next().unwrap().to_owned().into();
+    url.set_path("/ws");
+
+    (url, room_id, member_id, token)
+}
+
 impl TestMember {
     pub const DEFAULT_DEADLINE: Option<Duration> = Some(Duration::from_secs(5));
 
     /// Sends command to the server.
     fn send_command(&mut self, msg: Command) {
+        let room_id = self.room_id.clone();
         executor::block_on(async move {
-            let json = serde_json::to_string(&ClientMsg::Command(msg)).unwrap();
+            let json = serde_json::to_string(&ClientMsg::Command {
+                room_id,
+                command: msg,
+            })
+            .unwrap();
             self.sink.send(ws::Message::Text(json)).await.unwrap();
             self.sink.flush().await.unwrap();
         });
+    }
+
+    fn authorize(
+        &mut self,
+        room_id: RoomId,
+        member_id: MemberId,
+        token: Token,
+    ) {
+        executor::block_on(async move {
+            let json = serde_json::to_string(&ClientMsg::JoinRoom((
+                room_id, member_id, token,
+            )))
+            .unwrap();
+            self.sink.send(ws::Message::Text(json)).await.unwrap();
+            self.sink.flush().await.unwrap();
+        })
     }
 
     /// Sends pong to the server.
@@ -108,19 +150,24 @@ impl TestMember {
     /// Returns [`Future`] which will connect to the WebSocket and starts
     /// [`TestMember`] actor.
     pub async fn connect(
-        uri: &str,
+        url: &str,
         on_message: Option<MessageHandler>,
         on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
         auto_negotiation: bool,
     ) -> Addr<Self> {
-        let (_, framed) = awc::Client::new().ws(uri).connect().await.unwrap();
+        let (url, room_id, member_id, token) = parse_join_room_url(url);
+        let (_, framed) =
+            awc::Client::new().ws(url.as_str()).connect().await.unwrap();
 
         let (sink, stream) = framed.split();
 
         Self::create(move |ctx| {
             Self::add_stream(stream, ctx);
-            Self {
+            let mut this = Self {
+                room_id: room_id.clone(),
+                member_id: member_id.clone(),
+                token: token.clone(),
                 sink,
                 events: Vec::new(),
                 known_peers: HashSet::new(),
@@ -130,7 +177,10 @@ impl TestMember {
                 on_message,
                 on_connection_event,
                 auto_negotiation,
-            }
+            };
+            this.authorize(room_id, member_id, token);
+
+            this
         })
     }
 
@@ -256,7 +306,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
 
             match server_msg {
                 ServerMsg::Ping(id) => self.send_pong(id),
-                ServerMsg::Event(event) => {
+                ServerMsg::Event { room_id, event } => {
                     if self.auto_negotiation {
                         match &event {
                             Event::PeerCreated {
@@ -395,6 +445,14 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                         func(ConnectionEvent::SettingsReceived(settings))
                     };
                 }
+                ServerMsg::JoinedRoom {
+                    room_id: _,
+                    member_id: _,
+                } => {}
+                ServerMsg::LeftRoom {
+                    room_id: _,
+                    close_reason: _,
+                } => {}
             }
         }
     }
