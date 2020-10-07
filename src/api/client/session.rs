@@ -291,7 +291,7 @@ impl Actor for WsSession {
                     Ok(_) => {
                         // send RpcSettings
                         let rpc_settings_message =
-                            serde_json::to_string(&this.get_rpc_settings())
+                            serde_json::to_string(&ServerMsg::RpcSettings(this.get_rpc_settings()))
                                 .unwrap();
                         ctx.text(rpc_settings_message);
 
