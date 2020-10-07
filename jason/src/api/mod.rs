@@ -26,13 +26,6 @@ pub use self::{
     room::RoomHandle,
 };
 
-/// General library interface.
-///
-/// Responsible for managing shared transports, local media
-/// and room initialization.
-#[wasm_bindgen]
-pub struct Jason(Rc<RefCell<Inner>>);
-
 struct Inner {
     /// Connection with Medea media server. Only one [`RpcClient`] is supported
     /// atm.
@@ -46,6 +39,13 @@ struct Inner {
     /// [`Room`]s.
     media_manager: Rc<MediaManager>,
 }
+
+/// General library interface.
+///
+/// Responsible for managing shared transports, local media
+/// and room initialization.
+#[wasm_bindgen]
+pub struct Jason(Rc<RefCell<Inner>>);
 
 #[wasm_bindgen]
 impl Jason {
@@ -81,10 +81,10 @@ impl Jason {
     /// Drops [`Room`] with a provided ID.
     ///
     /// Sets [`Room`]'s close reason to [`ClientDisconnect::RoomClose`].
-    pub fn dispose_room(&self, room_id: String) {
+    pub fn dispose_room(&self, room_id: &str) {
         self.0.borrow_mut().rooms.retain(|room| {
             let should_be_closed =
-                room.id().map(|id| id.0 == room_id).unwrap_or(false);
+                room.id().map_or(false, |id| id.0 == room_id);
             if should_be_closed {
                 room.set_close_reason(ClientDisconnect::RoomClosed.into());
             }
@@ -146,5 +146,11 @@ impl Jason {
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle
+    }
+}
+
+impl Default for Jason {
+    fn default() -> Self {
+        Self::new()
     }
 }

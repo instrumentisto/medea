@@ -222,13 +222,13 @@ async fn room_dispose_works() {
         ClientMsg::JoinRoom { room_id: _, member_id: _, token: _ }
     ));
 
-    jason.dispose_room("room_id".to_string());
+    jason.dispose_room("room_id");
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
         ClientMsg::LeaveRoom { room_id: _, member_id: _ }
     ));
 
-    jason.dispose_room("another_room_id".to_string());
+    jason.dispose_room("another_room_id");
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
         ClientMsg::LeaveRoom { room_id: _, member_id: _ }

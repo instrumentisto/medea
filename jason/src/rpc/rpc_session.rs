@@ -9,7 +9,7 @@ use futures::{
     channel::{oneshot, oneshot::Canceled},
     future::LocalBoxFuture,
     stream::LocalBoxStream,
-    StreamExt,
+    StreamExt as _,
 };
 use medea_client_api_proto::{Command, Event};
 use medea_reactive::ObservableCell;
@@ -154,7 +154,6 @@ impl Session {
                 credentials.member_id.clone(),
                 credentials.token.clone(),
             );
-            use futures::StreamExt as _;
             self.state
                 .subscribe()
                 .filter(|s| {
@@ -194,11 +193,7 @@ impl RpcSession for Session {
         Box::pin(self.client.subscribe().filter_map(move |event| {
             let weak_this = weak_this.clone();
             async move {
-                let this = if let Some(this) = weak_this.upgrade() {
-                    this
-                } else {
-                    return None;
-                };
+                let this = weak_this.upgrade()?;
                 let x = match (this.credentials.borrow().as_ref(), event) {
                     (Some(credentials), RpcEvent::Event { room_id, event }) => {
                         if credentials.room_id == room_id {

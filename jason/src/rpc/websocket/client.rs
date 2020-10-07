@@ -455,7 +455,24 @@ impl WebSocketRpcClient {
             })
     }
 
-    /// Connects this [`WebSocketRpcClient`] to the provided [`ApiUrl`].
+    /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
+    ///
+    /// This function is also used for reconnection of this [`RpcClient`].
+    ///
+    /// If [`RpcClient`] is closed than this function will try to establish
+    /// new RPC connection.
+    ///
+    /// If [`RpcClient`] already in [`State::Connecting`] then this function
+    /// will not perform one more connection try. It will subsribe to
+    /// [`State`] changes and wait for first connection result. And based on
+    /// this result - this function will be resolved.
+    ///
+    /// If [`RpcClient`] already in [`State::Open`] then this function will be
+    /// instantly resolved.
+    ///
+    /// # Errors
+    ///
+    /// Errors if [`WebSocketRpcClient::establish_connection`] fails.
     pub async fn connect(
         self: Rc<Self>,
         url: ApiUrl,

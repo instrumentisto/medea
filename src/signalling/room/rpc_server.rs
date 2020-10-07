@@ -182,9 +182,10 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.member_id
         );
 
-        if let Some(_) = self
+        if self
             .members
             .get_member_by_id_and_credentials(&msg.member_id, &msg.token)
+            .is_some()
         {
             Box::pin(
                 self.members
@@ -240,7 +241,7 @@ impl Handler<RpcConnectionClosed> for Room {
         );
 
         self.members
-            .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
+            .connection_closed(msg.member_id.clone(), msg.reason, ctx);
 
         if let ClosedReason::Closed { normal } = msg.reason {
             if let Some(member) = self.members.get_member_by_id(&msg.member_id)

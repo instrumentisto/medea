@@ -1,3 +1,7 @@
+//! Implementation of the abstractions around [WebSocket] transport.
+//!
+//! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
+
 mod client;
 mod transport;
 

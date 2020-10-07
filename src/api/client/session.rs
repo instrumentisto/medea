@@ -100,7 +100,7 @@ impl WsSession {
         Self {
             id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
             rooms,
-            sessions: Default::default(),
+            sessions: HashMap::new(),
             idle_timeout,
             last_activity: Instant::now(),
             fragmentation_buffer: BytesMut::new(),
@@ -127,7 +127,7 @@ impl WsSession {
                 if let Some((member_id, room)) = self.sessions.get(&room_id) {
                     room.send_command(member_id.clone(), command);
                 } else {
-                    self.send_left_room(ctx, room_id, CloseReason::Finished);
+                    Self::send_left_room(ctx, room_id, CloseReason::Finished);
                     if self.sessions.is_empty() {
                         ctx.stop();
                     }
@@ -143,7 +143,7 @@ impl WsSession {
             Ok(ClientMsg::LeaveRoom { room_id, member_id }) => {
                 self.handle_leave_room(
                     ctx,
-                    room_id,
+                    &room_id,
                     member_id,
                     ClosedReason::Closed { normal: true },
                 );
@@ -156,13 +156,12 @@ impl WsSession {
     }
 
     fn update_rpc_settings(&mut self, new_settings: RpcConnectionSettings) {
-        // TODO: send settings update to the client.
-        // if new_settings.idle_timeout < self.idle_timeout {
-        //     self.idle_timeout = new_settings.idle_timeout;
-        // }
-        // if new_settings.ping_interval < self.ping_interval {
-        //     self.ping_interval = new_settings.ping_interval;
-        // }
+        if new_settings.idle_timeout < self.idle_timeout {
+            self.idle_timeout = new_settings.idle_timeout;
+        }
+        if new_settings.ping_interval < self.ping_interval {
+            self.ping_interval = new_settings.ping_interval;
+        }
         // TODO: maybe we need to restart IDLE watchdog and pinger
     }
 
@@ -186,9 +185,9 @@ impl WsSession {
                     this.sessions
                         .insert(room_id.clone(), (member_id.clone(), room));
                     this.auth_timeout_handle.take();
-                    this.send_join_room(ctx, room_id, member_id);
+                    Self::send_join_room(ctx, room_id, member_id);
                 }
-                Err(_) => this.send_left_room(
+                Err(_) => Self::send_left_room(
                     ctx,
                     room_id,
                     CloseReason::InternalError,
@@ -196,18 +195,18 @@ impl WsSession {
             })
             .wait(ctx);
         } else {
-            self.send_left_room(ctx, room_id, CloseReason::Rejected)
+            Self::send_left_room(ctx, room_id, CloseReason::Rejected)
         }
     }
 
     fn handle_leave_room(
         &self,
         ctx: &mut ws::WebsocketContext<Self>,
-        room_id: RoomId,
+        room_id: &RoomId,
         member_id: MemberId,
         reason: ClosedReason,
     ) {
-        if let Some(room) = self.rooms.get(&room_id) {
+        if let Some(room) = self.rooms.get(room_id) {
             ctx.spawn(
                 room.connection_closed(member_id, reason).into_actor(self),
             );
@@ -297,13 +296,13 @@ impl WsSession {
     fn close_in_place(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
-        reason: CloseDescription,
+        reason: &CloseDescription,
     ) {
         debug!("{}: Closing WsSession", self);
         self.close_reason = Some(InnerCloseReason::ByServer);
         ctx.close(Some(ws::CloseReason {
             code: ws::CloseCode::Normal,
-            description: Some(serde_json::to_string(&reason).unwrap()),
+            description: Some(serde_json::to_string(reason).unwrap()),
         }));
         ctx.stop();
     }
@@ -328,7 +327,7 @@ impl WsSession {
 
                 this.close_in_place(
                     ctx,
-                    CloseDescription::new(CloseReason::Idle),
+                    &CloseDescription::new(CloseReason::Idle),
                 );
             }
         });
@@ -353,7 +352,6 @@ impl WsSession {
     }
 
     fn send_join_room(
-        &self,
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         member_id: MemberId,
@@ -368,7 +366,6 @@ impl WsSession {
     }
 
     fn send_left_room(
-        &self,
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         close_reason: CloseReason,
@@ -419,7 +416,7 @@ impl Actor for WsSession {
             if this.sessions.is_empty() {
                 this.close_in_place(
                     ctx,
-                    CloseDescription::new(CloseReason::Rejected),
+                    &CloseDescription::new(CloseReason::Rejected),
                 );
             }
         });
@@ -516,9 +513,9 @@ impl Handler<CloseRoom> for WsSession {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if self.sessions.remove(&msg.room_id).is_some() {
-            self.send_left_room(ctx, msg.room_id, CloseReason::Finished);
+            Self::send_left_room(ctx, msg.room_id, CloseReason::Finished);
             if self.sessions.is_empty() {
-                self.close_in_place(ctx, msg.close_description);
+                self.close_in_place(ctx, &msg.close_description);
             }
         }
     }
@@ -567,7 +564,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 error!("{}: StreamHandler Error: {:?}", self, err);
                 self.close_in_place(
                     ctx,
-                    CloseDescription {
+                    &CloseDescription {
                         reason: CloseReason::InternalError,
                     },
                 );

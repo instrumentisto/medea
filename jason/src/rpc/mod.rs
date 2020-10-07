@@ -4,7 +4,7 @@ mod backoff_delayer;
 mod heartbeat;
 mod reconnect_handle;
 mod rpc_session;
-mod websocket;
+pub mod websocket;
 
 use std::str::FromStr;
 
@@ -19,6 +19,8 @@ use web_sys::CloseEvent;
 
 use crate::utils::{JsCaused, JsError};
 
+#[cfg(feature = "mockable")]
+pub use self::rpc_session::MockRpcSession;
 #[doc(inline)]
 pub use self::{
     backoff_delayer::BackoffDelayer,

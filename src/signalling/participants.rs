@@ -260,7 +260,7 @@ impl ParticipantService {
     pub fn connection_closed(
         &mut self,
         member_id: MemberId,
-        reason: &ClosedReason,
+        reason: ClosedReason,
         ctx: &mut Context<Room>,
     ) {
         let closed_at = Instant::now();
