@@ -45,7 +45,7 @@ fn get_test_room(
     rpc.expect_on_reconnected()
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_send_command().returning(move |command| {
-        tx.unbounded_send(command).unwrap();
+        let _ = tx.unbounded_send(command);
     });
 
     (
