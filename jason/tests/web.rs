@@ -89,6 +89,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, MediaStreamTrack},
     peer::TransceiverKind,
+    rpc::ApiUrl,
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
@@ -208,8 +209,8 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
 
 const TEST_ROOM_URL: &str = "ws://example.com/room_id/member_id/token";
 
-pub fn join_room_url() -> Url {
-    Url::parse(TEST_ROOM_URL).unwrap()
+pub fn join_room_url() -> ApiUrl {
+    Url::parse("ws://example.com/ws").unwrap().into()
 }
 
 /// Resolves after provided number of milliseconds.

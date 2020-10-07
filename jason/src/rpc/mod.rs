@@ -17,6 +17,7 @@ use medea_client_api_proto::{
     CloseDescription, CloseReason as CloseByServerReason, Command, Event,
     MemberId, RoomId, Token,
 };
+use std::str::FromStr;
 use tracerr::Traced;
 use url::Url;
 use web_sys::CloseEvent;
@@ -34,6 +35,99 @@ pub use self::{
         WebSocketRpcTransport,
     },
 };
+
+/// [`Url`] to which transport layer will connect.
+#[derive(Debug, Clone, From, PartialEq, Eq)]
+pub struct ApiUrl(Url);
+
+/// Information about [`RpcSession`] connection.
+pub struct ConnectionInfo {
+    /// [`Url`] to which transport layer will connect.
+    url: ApiUrl,
+
+    /// [`RoomId`] of the `Room` for which [`RpcSession`] is created.
+    room_id: RoomId,
+
+    /// [`MemberId`] of the `Member` for which [`RpcSession`] is created.
+    member_id: MemberId,
+
+    /// [`Token`] for connecting [`RpcSession`].
+    token: Token,
+}
+
+impl ConnectionInfo {
+    /// Returns [`Url`] to which transport layer will connect.
+    pub fn url(&self) -> &ApiUrl {
+        &self.url
+    }
+
+    /// Returns [`RoomId`] of the `Room` for which [`RpcSession`] is created.
+    pub fn room_id(&self) -> &RoomId {
+        &self.room_id
+    }
+
+    /// Returns [`MemberId`] of the `Member` for which [`RpcSession`] is
+    /// created.
+    pub fn member_id(&self) -> &MemberId {
+        &self.member_id
+    }
+
+    /// Returns [`Token`] for connecting [`RpcSession`].
+    pub fn token(&self) -> &Token {
+        &self.token
+    }
+}
+
+/// Errors which can occur while [`ConnectionInfo`] parsing from the [`str`].
+#[derive(Debug)]
+pub enum ConnectionInfoParseError {
+    UrlParse(url::ParseError),
+    FewSegments,
+}
+
+impl FromStr for ConnectionInfo {
+    type Err = Traced<ConnectionInfoParseError>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut url = Url::parse(s).map_err(|err| {
+            tracerr::new!(ConnectionInfoParseError::UrlParse(err))
+        })?;
+        url.set_fragment(None);
+        url.set_query(None);
+
+        macro_rules! few_segments_error {
+            () => {
+                || tracerr::new!(ConnectionInfoParseError::FewSegments)
+            };
+        }
+
+        let mut segments =
+            url.path_segments().ok_or_else(few_segments_error!())?.rev();
+        let token = segments
+            .next()
+            .ok_or_else(few_segments_error!())?
+            .to_owned()
+            .into();
+        let member_id = segments
+            .next()
+            .ok_or_else(few_segments_error!())?
+            .to_owned()
+            .into();
+        let room_id = segments
+            .next()
+            .ok_or_else(few_segments_error!())?
+            .to_owned()
+            .into();
+        url.set_path("/ws");
+
+        Ok(ConnectionInfo {
+            url: url.into(),
+            room_id,
+            member_id,
+            token,
+        })
+    }
+}
 
 /// Client to talk with server via Client API RPC.
 #[async_trait(?Send)]
@@ -55,10 +149,7 @@ pub trait RpcSession {
     /// instantly resolved.
     async fn connect(
         self: Rc<Self>,
-        url: Url,
-        room_id: RoomId,
-        member_id: MemberId,
-        token: Token,
+        connection_info: ConnectionInfo,
     ) -> Result<(), Traced<RpcClientError>>;
 
     async fn reconnect(self: Rc<Self>) -> Result<(), Traced<RpcClientError>>;
@@ -175,47 +266,6 @@ pub enum RpcClientError {
 
     #[display(fmt = "Could not parse URL: {}", _0)]
     UrlParsingError(String),
-}
-
-pub fn parse_join_room_url(
-    url: &str,
-) -> Result<(Url, RoomId, MemberId, Token), Traced<RpcClientError>> {
-    static SEGMENTS_PARSE_ERROR_FN: fn() -> Traced<RpcClientError> = || {
-        tracerr::new!(RpcClientError::UrlParsingError(
-            "URL path must end with 3 segments, e.g.: \
-             `/room_id/member_id/token`"
-                .to_owned()
-        ))
-    };
-
-    let mut url = Url::parse(&url).map_err(|err| {
-        tracerr::new!(RpcClientError::UrlParsingError(err.to_string()))
-    })?;
-    url.set_fragment(None);
-    url.set_query(None);
-
-    let mut segments = url
-        .path_segments()
-        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
-        .rev();
-    let token = segments
-        .next()
-        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
-        .to_owned()
-        .into();
-    let member_id = segments
-        .next()
-        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
-        .to_owned()
-        .into();
-    let room_id = segments
-        .next()
-        .ok_or_else(SEGMENTS_PARSE_ERROR_FN)?
-        .to_owned()
-        .into();
-    url.set_path("/ws");
-
-    Ok((url, room_id, member_id, token))
 }
 
 /// Connection with remote was closed.

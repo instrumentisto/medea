@@ -13,8 +13,8 @@ use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
     rpc::{
-        ClientDisconnect, RpcSession, RpcTransport, Session,
-        WebSocketRpcClient, WebSocketRpcTransport,
+        websocket::RpcTransportFactory, ClientDisconnect, RpcSession,
+        RpcTransport, Session, WebSocketRpcClient, WebSocketRpcTransport,
     },
     set_panic_hook,
 };
@@ -25,7 +25,6 @@ pub use self::{
     room::Room,
     room::RoomHandle,
 };
-use crate::rpc::websocket::RpcTransportFactory;
 
 /// General library interface.
 ///
@@ -38,8 +37,10 @@ struct Inner {
     /// Connection with Medea media server. Only one [`RpcClient`] is supported
     /// atm.
     rpc: Rc<WebSocketRpcClient>,
+
     /// [`Room`]s maintained by this [`Jason`] instance.
     rooms: Vec<Room>,
+
     /// [`Jason`]s [`MediaManager`]. It is shared across [`Room`]s since
     /// [`MediaManager`] contains media tracks that can be used by multiple
     /// [`Room`]s.
@@ -54,14 +55,16 @@ impl Jason {
         set_panic_hook();
         wasm_logger::init(wasm_logger::Config::default());
 
-        Self::with_rpc_factory(Box::new(|url| {
-            Box::pin(async move {
-                let ws = WebSocketRpcTransport::new(url)
-                    .await
-                    .map_err(|e| tracerr::new!(e))?;
-                Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
-            })
-        }))
+        Self::with_rpc_client(Rc::new(WebSocketRpcClient::new(Box::new(
+            |url| {
+                Box::pin(async move {
+                    let ws = WebSocketRpcTransport::new(url)
+                        .await
+                        .map_err(|e| tracerr::new!(e))?;
+                    Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
+                })
+            },
+        ))))
     }
 
     /// Returns [`RoomHandle`] for [`Room`].
@@ -75,6 +78,9 @@ impl Jason {
         self.0.borrow().media_manager.new_handle()
     }
 
+    /// Drops [`Room`] with a provided ID.
+    ///
+    /// Sets [`Room`]'s close reason to [`ClientDisconnect::RoomClose`].
     pub fn dispose_room(&self, room_id: String) {
         self.0.borrow_mut().rooms.retain(|room| {
             if room.id().map(|id| id.0 == room_id).unwrap_or(false) {
@@ -97,17 +103,6 @@ impl Jason {
 }
 
 impl Jason {
-    pub fn with_rpc_factory(factory: RpcTransportFactory) -> Self {
-        let rpc = Rc::new(WebSocketRpcClient::new(factory));
-
-        Self(Rc::new(RefCell::new(Inner {
-            rpc,
-            rooms: Vec::new(),
-            media_manager: Rc::new(MediaManager::default()),
-        })))
-    }
-
-    #[cfg(feature = "mockable")]
     pub fn with_rpc_client(rpc: Rc<WebSocketRpcClient>) -> Self {
         Self(Rc::new(RefCell::new(Inner {
             rpc,
@@ -127,27 +122,23 @@ impl Jason {
         let weak_room = room.downgrade();
         let weak_inner = Rc::downgrade(&self.0);
         spawn_local(on_normal_close.map(move |res| {
-            let room = if let Some(room) = weak_room.upgrade() {
-                room
-            } else {
-                return;
-            };
-            let inner = if let Some(inner) = weak_inner.upgrade() {
-                inner
-            } else {
-                return;
-            };
-            let reason = res.unwrap_or_else(|_| {
-                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
-            });
-            let mut inner = inner.borrow_mut();
-            let index = inner.rooms.iter().position(|r| r.ptr_eq(&room));
-            if let Some(index) = index {
-                inner.rooms.remove(index).close(reason);
-            }
-            if inner.rooms.is_empty() {
-                inner.media_manager = Rc::default();
-            }
+            (|| {
+                let room = weak_room.upgrade()?;
+                let inner = weak_inner.upgrade()?;
+                let reason = res.unwrap_or_else(|_| {
+                    ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+                });
+                let mut inner = inner.borrow_mut();
+                let index = inner.rooms.iter().position(|r| r.ptr_eq(&room));
+                if let Some(index) = index {
+                    inner.rooms.remove(index).close(reason);
+                }
+                if inner.rooms.is_empty() {
+                    inner.media_manager = Rc::default();
+                }
+
+                Some(())
+            })();
         }));
 
         let handle = room.new_handle();

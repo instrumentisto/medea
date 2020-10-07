@@ -129,9 +129,11 @@ impl TestMember {
         token: Token,
     ) {
         executor::block_on(async move {
-            let json = serde_json::to_string(&ClientMsg::JoinRoom((
-                room_id, member_id, token,
-            )))
+            let json = serde_json::to_string(&ClientMsg::JoinRoom {
+                room_id,
+                member_id,
+                token,
+            })
             .unwrap();
             self.sink.send(ws::Message::Text(json)).await.unwrap();
             self.sink.flush().await.unwrap();

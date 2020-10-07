@@ -19,8 +19,8 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     rpc::{
         websocket::transport::{RpcTransport, TransportError, TransportState},
-        CloseMsg, CloseReason, ClosedStateReason, Heartbeat, IdleTimeout,
-        PingInterval, RpcClientError,
+        ApiUrl, CloseMsg, CloseReason, ClosedStateReason, Heartbeat,
+        IdleTimeout, PingInterval, RpcClientError,
     },
     utils::JasonError,
 };
@@ -114,7 +114,7 @@ struct Inner {
     /// Token with which this [`RpcClient`] was connected.
     ///
     /// Will be `None` if this [`RpcClient`] was never connected to a sever.
-    url: Option<Url>,
+    url: Option<ApiUrl>,
 
     /// Current [`State`] of this [`RpcClient`].
     state: ObservableCell<ClientState>,
@@ -124,7 +124,7 @@ struct Inner {
 /// [`WebSocketRpcClient::establish_connection`] function.
 pub type RpcTransportFactory = Box<
     dyn Fn(
-        Url,
+        ApiUrl,
     ) -> LocalBoxFuture<
         'static,
         Result<Rc<dyn RpcTransport>, Traced<TransportError>>,
@@ -149,18 +149,35 @@ impl Inner {
     }
 }
 
+/// Events which can be thrown by [`WebSocketRpcClient`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RpcEvent {
+    /// Notification of the subscribers that [`WebSocketRpcClient`] is joined
+    /// `Room` on the Media Server.
     JoinedRoom {
+        /// [`RoomId`] of the joined `Room`.
         room_id: RoomId,
+
+        /// [`MemberId`] of the joined `Member`.
         member_id: MemberId,
     },
+
+    /// Notification of the subscribers that [`WebSocketRpcClient`] leaved
+    /// `Room` on the Media Server.
     LeftRoom {
+        /// [`RoomId`] of the leaved `Room`.
         room_id: RoomId,
+
+        /// Reason of the `Room` leaving.
         close_reason: CloseReason,
     },
+
+    /// [`WebSocketRpcClient`] received [`Event`] from the Media Server.
     Event {
+        /// [`RoomId`] of the `Room` for which this [`Event`] was received.
         room_id: RoomId,
+
+        /// Received [`Event`].
         event: Event,
     },
 }
@@ -177,6 +194,7 @@ impl WebSocketRpcClient {
         Self(Inner::new(rpc_transport_factory))
     }
 
+    /// Authorizes [`WebSocketRpcClient`] on the Media Server.
     pub fn authorize(
         &self,
         room_id: RoomId,
@@ -194,6 +212,7 @@ impl WebSocketRpcClient {
         }
     }
 
+    /// Leaves `Room` with a provided [`RoomId`].
     pub fn leave_room(&self, room_id: RoomId, member_id: MemberId) {
         let inner = self.0.borrow();
         if let Some(sock) = &inner.sock {
@@ -328,7 +347,7 @@ impl WebSocketRpcClient {
     /// Tries to establish [`RpcClient`] connection.
     async fn establish_connection(
         self: Rc<Self>,
-        url: Url,
+        url: ApiUrl,
     ) -> Result<(), Traced<RpcClientError>> {
         self.0.borrow_mut().url = Some(url.clone());
         self.0.borrow().state.set(ClientState::Connecting);
@@ -437,9 +456,10 @@ impl WebSocketRpcClient {
             })
     }
 
+    /// Connects this [`WebSocketRpcClient`] to the provided [`ApiUrl`].
     pub async fn connect(
         self: Rc<Self>,
-        url: Url,
+        url: ApiUrl,
     ) -> Result<(), Traced<RpcClientError>> {
         let current_url = self.0.borrow().url.clone();
         if let Some(current_url) = current_url {
@@ -460,6 +480,7 @@ impl WebSocketRpcClient {
         }
     }
 
+    /// Subscribes on this [`WebSocketRpcClient`]'s [`RpcEvent`]s.
     pub fn subscribe(&self) -> LocalBoxStream<'static, RpcEvent> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().subs.push(tx);
@@ -467,6 +488,7 @@ impl WebSocketRpcClient {
         Box::pin(rx)
     }
 
+    /// Sends [`Command`] for the provided [`RoomId`] to server.
     pub fn send_command(&self, room_id: RoomId, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
 
@@ -484,6 +506,13 @@ impl WebSocketRpcClient {
         }
     }
 
+    /// [`Future`] which will resolve on normal [`WebSocketRpcClient`]
+    /// connection closing.
+    ///
+    /// This [`Future`] wouldn't be resolved on abnormal closes. On
+    /// abnormal close [`RpcClient::on_connection_loss`] will be thrown.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn on_normal_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
@@ -492,12 +521,22 @@ impl WebSocketRpcClient {
         Box::pin(rx)
     }
 
+    /// Subscribe to connection loss events.
+    ///
+    /// Connection loss is any unexpected [`RpcTransport`] close. In case of
+    /// connection loss, JS side user should select reconnection strategy with
+    /// [`ReconnectHandle`] (or simply close [`Room`]).
+    ///
+    /// [`Room`]: crate::api::Room
+    /// [`Stream`]: futures::Stream
     pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_subs.push(tx);
         Box::pin(rx)
     }
 
+    /// Sets reason, that will be passed to underlying transport when this
+    /// client will be dropped.
     pub fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason
     }

@@ -10,8 +10,10 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn could_not_init_socket_err() {
     use TransportError::*;
 
-    match WebSocketRpcTransport::new(Url::parse("ws://0.0.0.0:60000").unwrap())
-        .await
+    match WebSocketRpcTransport::new(
+        Url::parse("ws://0.0.0.0:60000").unwrap().into(),
+    )
+    .await
     {
         Ok(_) => unreachable!(),
         Err(err) => match err.into_inner() {

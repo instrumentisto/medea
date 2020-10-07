@@ -215,23 +215,23 @@ async fn room_dispose_works() {
 
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::JoinRoom((_, _, _))
+        ClientMsg::JoinRoom { room_id: _, member_id: _, token: _ }
     ));
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::JoinRoom((_, _, _))
+        ClientMsg::JoinRoom { room_id: _, member_id: _, token: _ }
     ));
 
     jason.dispose_room("room_id".to_string());
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::LeaveRoom((_, _))
+        ClientMsg::LeaveRoom { room_id: _, member_id: _ }
     ));
 
     jason.dispose_room("another_room_id".to_string());
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::LeaveRoom((_, _))
+        ClientMsg::LeaveRoom { room_id: _, member_id: _ }
     ));
 
     jason.dispose();

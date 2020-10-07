@@ -5,8 +5,8 @@ use derive_more::From;
 use medea_client_api_proto::{Command, Event, MemberId, RoomId, Token};
 
 use crate::rpc::{
-    ClientDisconnect, CloseReason, RpcClientError, RpcSession,
-    WebSocketRpcClient,
+    ApiUrl, ClientDisconnect, CloseReason, ConnectionInfo, RpcClientError,
+    RpcSession, WebSocketRpcClient,
 };
 
 use tracerr::Traced;
@@ -19,13 +19,6 @@ use futures::{
 };
 use medea_reactive::ObservableCell;
 use std::cell::Cell;
-
-struct ConnectionInfo {
-    url: Url,
-    room_id: RoomId,
-    member_id: MemberId,
-    token: Token,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, From)]
 struct IsReconnected(bool);
@@ -61,7 +54,7 @@ impl Session {
             self.state.set(SessionState::Connecting);
             self.client
                 .clone()
-                .connect(credentials.url.clone())
+                .connect(credentials.url().clone())
                 .await
                 .map_err(|e| {
                     self.state.set(SessionState::Closed);
@@ -90,17 +83,9 @@ impl Session {
 impl RpcSession for Session {
     async fn connect(
         self: Rc<Self>,
-        url: Url,
-        room_id: RoomId,
-        member_id: MemberId,
-        token: Token,
+        connection_info: ConnectionInfo,
     ) -> Result<(), Traced<RpcClientError>> {
-        self.credentials.replace(Some(ConnectionInfo {
-            url,
-            room_id,
-            member_id,
-            token,
-        }));
+        self.credentials.replace(Some(connection_info));
         self.reconnect().await
     }
 
@@ -171,7 +156,6 @@ impl RpcSession for Session {
 
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         if let Some(credentials) = self.credentials.borrow().as_ref() {
-            log::debug!("LEAVE ROOM");
             self.client.leave_room(
                 credentials.room_id.clone(),
                 credentials.member_id.clone(),

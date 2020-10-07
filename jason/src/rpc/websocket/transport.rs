@@ -13,7 +13,7 @@ use url::Url;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{websocket::client::ClientDisconnect, CloseMsg},
+    rpc::{websocket::client::ClientDisconnect, ApiUrl, CloseMsg},
     utils::{
         EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
         JsonParseError,
@@ -251,8 +251,8 @@ impl WebSocketRpcTransport {
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
-    pub async fn new(url: Url) -> Result<Self> {
-        let socket = Rc::new(RefCell::new(InnerSocket::new(url.as_str())?));
+    pub async fn new(url: ApiUrl) -> Result<Self> {
+        let socket = Rc::new(RefCell::new(InnerSocket::new(url.0.as_str())?));
         {
             let mut socket_mut = socket.borrow_mut();
             let inner = Rc::clone(&socket);

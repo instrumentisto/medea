@@ -32,7 +32,7 @@ use crate::{
         TrackDirection, TransceiverKind, TransceiverSide,
     },
     rpc::{
-        parse_join_room_url, ClientDisconnect, CloseReason, ReconnectHandle,
+        ClientDisconnect, CloseReason, ConnectionInfo, ReconnectHandle,
         RpcClientError, RpcSession, TransportError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
@@ -208,8 +208,8 @@ impl RoomHandle {
     pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
-        let (url, room_id, member_id, token) =
-            parse_join_room_url(&url).unwrap();
+        // TODO: UNWRAP
+        let connection_info: ConnectionInfo = url.parse().unwrap();
 
         if !inner.on_failed_local_media.is_set() {
             return Err(JasonError::from(tracerr::new!(
@@ -223,9 +223,12 @@ impl RoomHandle {
             )));
         }
 
-        inner.id.borrow_mut().replace(room_id.clone());
+        inner
+            .id
+            .borrow_mut()
+            .replace(connection_info.room_id().clone());
         Rc::clone(&inner.rpc)
-            .connect(url, room_id.clone(), member_id, token)
+            .connect(connection_info)
             .await
             .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
 
@@ -261,6 +264,16 @@ impl RoomHandle {
 
 #[wasm_bindgen]
 impl RoomHandle {
+    /// Returns this [`Room`]'s ID.
+    ///
+    /// Return `Ok(None)` if this [`Room`] is currently uninitialized.
+    pub fn id(&self) -> Result<Option<String>, JsValue> {
+        let inner = upgrade_or_detached!(self.0, JasonError)?;
+
+        let id = inner.id.borrow().as_ref().map(|id| id.0.clone());
+        Ok(id)
+    }
+
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
     pub fn on_new_connection(
@@ -461,19 +474,16 @@ impl RoomHandle {
             Ok(JsValue::UNDEFINED)
         })
     }
-
-    pub fn id(&self) -> Result<Option<String>, JsValue> {
-        let inner = upgrade_or_detached!(self.0, JasonError)?;
-
-        let id = inner.id.borrow().as_ref().map(|id| id.0.clone());
-        Ok(id)
-    }
 }
 
+/// [`Weak`] reference upgradeable to the [`Room`].
 #[derive(Clone)]
 pub struct WeakRoom(Weak<InnerRoom>);
 
 impl WeakRoom {
+    /// Upgrades this [`WeakRoom`] to the [`Room`].
+    ///
+    /// Returns `None` if weak reference can't be upgraded.
     pub fn upgrade(&self) -> Option<Room> {
         self.0.upgrade().map(Room)
     }
@@ -487,7 +497,6 @@ impl WeakRoom {
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
 ///
 /// [`PeerConnection`]: crate::peer::PeerConnection
-#[derive(Clone)]
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
@@ -572,10 +581,14 @@ impl Room {
         Self(room)
     }
 
+    /// Downgrades this [`Room`] to the weak reference [`WeakRoom`].
     pub fn downgrade(&self) -> WeakRoom {
         WeakRoom(Rc::downgrade(&self.0))
     }
 
+    /// Returns [`RoomId`] of this [`Room`].
+    ///
+    /// Return `None` if this [`Room`] is currently uninitialized.
     pub fn id(&self) -> Option<RoomId> {
         self.0.id.borrow().clone()
     }
@@ -595,6 +608,7 @@ impl Room {
         self.0.set_close_reason(reason);
     }
 
+    /// Sets [`Room`]'s [`CloseReason`] to the provided value.
     pub fn set_close_reason(&self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
@@ -617,14 +631,9 @@ impl Room {
         self.0.peers.get(peer_id)
     }
 
+    /// Returns `true` if provided [`Room`] is the same [`Room`] reference.
     pub fn ptr_eq(&self, other: &Room) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-impl Drop for Room {
-    fn drop(&mut self) {
-        log::debug!("Room refs count: {}", Rc::strong_count(&self.0));
     }
 }
 
@@ -632,6 +641,9 @@ impl Drop for Room {
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
+    /// [`RoomId`] of this [`Room`].
+    ///
+    /// If `None` then this [`Room`] currently is uninitialized.
     id: RefCell<Option<RoomId>>,
 
     /// Client to talk with media server via Client API RPC.
