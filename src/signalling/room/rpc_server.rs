@@ -182,7 +182,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.member_id
         );
 
-        if let Some(member) = self
+        if let Some(_) = self
             .members
             .get_member_by_id_and_credentials(&msg.member_id, &msg.token)
         {

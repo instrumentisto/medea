@@ -25,7 +25,7 @@ use crate::{
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
 struct RequestParams {
-    /// ID of [`Room`] that WebSocket connection connects to.
+    /// ID of [`Room`] that WebSocket connection conne1cts to.
     room_id: RoomId,
 
     /// ID of [`Member`] that establishes WebSocket connection.
@@ -44,7 +44,7 @@ async fn ws_index(
 ) -> actix_web::Result<HttpResponse> {
     ws::start(
         WsSession::new(
-            state.rooms.clone(),
+            Box::new(state.rooms.clone()),
             state.config.idle_timeout,
             state.config.ping_interval,
         ),

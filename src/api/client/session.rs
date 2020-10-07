@@ -3,7 +3,7 @@
 use std::{
     collections::HashMap,
     convert::TryInto as _,
-    fmt::{Display, Error, Formatter},
+    fmt::{Debug, Display, Error, Formatter},
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
 };
@@ -30,8 +30,15 @@ use crate::{
         RpcServer,
     },
     log::prelude::*,
-    signalling::room_repo::RoomRepository,
 };
+
+#[cfg_attr(test, mockall::automock)]
+pub trait RpcServerRepository: Debug {
+    fn get(&self, room_id: &RoomId) -> Option<Box<dyn RpcServer>>;
+}
+
+#[cfg(test)]
+impl_debug_by_struct_name!(MockRpcServerRepository);
 
 /// Used to generate [`WsSession`] IDs.
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -53,7 +60,7 @@ pub struct WsSession {
     /// ID of [`WsSession`].
     id: u64,
 
-    rooms: RoomRepository,
+    rooms: Box<dyn RpcServerRepository>,
 
     sessions: HashMap<RoomId, (MemberId, Box<dyn RpcServer>)>,
 
@@ -86,7 +93,7 @@ pub struct WsSession {
 impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
     pub fn new(
-        rooms: RoomRepository,
+        rooms: Box<dyn RpcServerRepository>,
         idle_timeout: Duration,
         ping_interval: Duration,
     ) -> Self {
@@ -167,30 +174,27 @@ impl WsSession {
         token: Token,
     ) {
         if let Some(room) = self.rooms.get(&room_id) {
-            room.clone()
-                .connection_established(
-                    member_id.clone(),
-                    token,
-                    Box::new(ctx.address()),
-                )
-                .into_actor(self)
-                .map(|result, this, ctx| match result {
-                    Ok(settings) => {
-                        this.update_rpc_settings(settings);
-                        this.sessions.insert(
-                            room_id.clone(),
-                            (member_id.clone(), Box::new(room)),
-                        );
-                        this.auth_timeout_handle.take();
-                        this.send_join_room(ctx, room_id, member_id);
-                    }
-                    Err(_) => this.send_left_room(
-                        ctx,
-                        room_id,
-                        CloseReason::InternalError,
-                    ),
-                })
-                .wait(ctx);
+            room.connection_established(
+                member_id.clone(),
+                token,
+                Box::new(ctx.address()),
+            )
+            .into_actor(self)
+            .map(|result, this, ctx| match result {
+                Ok(settings) => {
+                    this.update_rpc_settings(settings);
+                    this.sessions
+                        .insert(room_id.clone(), (member_id.clone(), room));
+                    this.auth_timeout_handle.take();
+                    this.send_join_room(ctx, room_id, member_id);
+                }
+                Err(_) => this.send_left_room(
+                    ctx,
+                    room_id,
+                    CloseReason::InternalError,
+                ),
+            })
+            .wait(ctx);
         } else {
             self.send_left_room(ctx, room_id, CloseReason::Rejected)
         }
@@ -598,8 +602,8 @@ mod test {
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use bytes::{Buf, Bytes};
     use medea_client_api_proto::{
-        CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
-        MemberId, PeerId,
+        ClientMsg, CloseDescription, CloseReason as ProtoCloseReason, Command,
+        Event, IceCandidate, MemberId, PeerId, RpcSettings, ServerMsg,
     };
     use tokio::time::timeout;
 
@@ -612,16 +616,13 @@ mod test {
     };
 
     use crate::api::{
-        client::rpc_connection::{ClosedReason, RpcConnection},
+        client::rpc_connection::{
+            ClosedReason, RpcConnection, RpcConnectionSettings,
+        },
         MockRpcServer,
     };
 
-    use super::WsSession;
-    use crate::{
-        api::client::rpc_connection::RpcConnectionSettings,
-        signalling::{peers::PeersService, room_repo::RoomRepository},
-    };
-    use std::collections::HashMap;
+    use super::{MockRpcServerRepository, WsSession};
 
     type SharedOneshot<T> =
         (Mutex<Option<Sender<T>>>, Mutex<Option<Receiver<T>>>);
@@ -645,22 +646,27 @@ mod test {
     #[actix_rt::test]
     async fn close_if_rpc_established_failed() {
         fn factory() -> WsSession {
-            let member_id = MemberId::from("test_member");
-            let mut rpc_server = MockRpcServer::new();
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let member_id = MemberId::from("member_id");
+                let mut rpc_server = MockRpcServer::new();
 
-            let expected_member_id = member_id.clone();
-            // TODO: check RoomId too
-            rpc_server
-                .expect_connection_established()
-                .withf(move |member_id, _, _| *member_id == expected_member_id)
-                .return_once(|_, _, _| future::err(()).boxed_local());
-            rpc_server
-                .expect_connection_closed()
-                .returning(|_, _| future::ready(()).boxed_local());
-            let rooms_repo = RoomRepository::new(HashMap::new());
+                let expected_member_id = member_id.clone();
+                rpc_server
+                    .expect_connection_established()
+                    .withf(move |member_id, _, _| {
+                        *member_id == expected_member_id
+                    })
+                    .return_once(|_, _, _| future::err(()).boxed_local());
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
+
+                Some(Box::new(rpc_server))
+            });
 
             WsSession::new(
-                rooms_repo,
+                Box::new(rpc_server_repo),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
@@ -670,111 +676,193 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let item = client.skip(2).next().await.unwrap().unwrap();
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "room_id".into(),
+            member_id: "member_id".into(),
+            token: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
 
+        let mut client = client.skip(2);
+        let left_room_frame = client.next().await.unwrap().unwrap();
+        let expected_left_room_frame = Frame::Text(
+            serde_json::to_string(&ServerMsg::LeftRoom {
+                room_id: "room_id".into(),
+                close_reason:
+                    medea_client_api_proto::CloseReason::InternalError,
+            })
+            .unwrap()
+            .into(),
+        );
+        assert_eq!(left_room_frame, expected_left_room_frame);
+
+        let item = client.next().await.unwrap().unwrap();
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
             description: Some(String::from(r#"{"reason":"Rejected"}"#)),
         }));
-
         assert_eq!(item, close_frame);
     }
 
-    // #[actix_rt::test]
+    #[actix_rt::test]
     async fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from("test_member");
-            let mut rpc_server = MockRpcServer::new();
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let mut rpc_server = MockRpcServer::new();
 
-            rpc_server.expect_connection_established().return_once(
-                |_, _, _| {
-                    future::ok(RpcConnectionSettings {
-                        ping_interval: Duration::from_secs(10),
-                        idle_timeout: Duration::from_secs(10),
-                    })
-                    .boxed_local()
-                },
-            );
-            rpc_server
-                .expect_connection_closed()
-                .returning(|_, _| future::ready(()).boxed_local());
+                rpc_server.expect_connection_established().return_once(
+                    |_, _, _| {
+                        future::ok(RpcConnectionSettings {
+                            ping_interval: Duration::from_secs(10),
+                            idle_timeout: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
+
+                Some(Box::new(rpc_server))
+            });
 
             WsSession::new(
-                RoomRepository::new(HashMap::new()),
+                Box::new(rpc_server_repo),
                 Duration::from_secs(5),
                 Duration::from_millis(50),
             )
         });
 
         let mut client = serv.ws().await.unwrap();
+
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "room_id".into(),
+            member_id: "member_id".into(),
+            token: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
+
+        fn msg_to_text_frame(msg: &ServerMsg) -> Frame {
+            Frame::Text(serde_json::to_string(msg).unwrap().into())
+        }
+
+        // let mut client = client;
+        let item = client.next().await.unwrap().unwrap();
+        let expected_item =
+            msg_to_text_frame(&ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 5000,
+                ping_interval_ms: 50,
+            }));
+        assert_eq!(item, expected_item);
+
+        let item = client.next().await.unwrap().unwrap();
+        assert_eq!(item, msg_to_text_frame(&ServerMsg::Ping(0)));
+
         let item = client.next().await.unwrap().unwrap();
         assert_eq!(
             item,
-            Frame::Text(
-                String::from(
-                    r#"{"idle_timeout_ms":5000,"ping_interval_ms":50}"#
-                )
-                .into()
-            )
+            msg_to_text_frame(&ServerMsg::JoinedRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+            })
         );
 
         let item = client.next().await.unwrap().unwrap();
-        assert_eq!(item, Frame::Text(String::from(r#"{"ping":0}"#).into()));
-
-        let item = client.next().await.unwrap().unwrap();
-        assert_eq!(item, Frame::Text(String::from(r#"{"ping":1}"#).into()));
+        assert_eq!(item, msg_to_text_frame(&ServerMsg::Ping(1)));
     }
 
     // WsSession is dropped and WebSocket connection is closed if no pongs
     // received for idle_timeout.
-    // #[actix_rt::test]
+    #[actix_rt::test]
     async fn dropped_if_idle() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from("test_member");
-            let mut rpc_server = MockRpcServer::new();
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let expected_member_id = MemberId::from("member_id");
+                let mut rpc_server = MockRpcServer::new();
 
-            rpc_server.expect_connection_established().return_once(
-                |_, _, _| {
-                    future::ok(RpcConnectionSettings {
-                        ping_interval: Duration::from_secs(10),
-                        idle_timeout: Duration::from_secs(10),
+                rpc_server.expect_connection_established().return_once(
+                    |_, _, _| {
+                        future::ok(RpcConnectionSettings {
+                            ping_interval: Duration::from_secs(10),
+                            idle_timeout: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+
+                rpc_server
+                    .expect_connection_closed()
+                    .withf(move |member_id, reason| {
+                        *member_id == expected_member_id
+                            && *reason == ClosedReason::Lost
                     })
-                    .boxed_local()
-                },
-            );
+                    .return_once(|_, _| future::ready(()).boxed_local());
 
-            let expected_member_id = member_id.clone();
-            rpc_server
-                .expect_connection_closed()
-                .withf(move |member_id, reason| {
-                    *member_id == expected_member_id
-                        && *reason == ClosedReason::Lost
-                })
-                .return_once(|_, _| future::ready(()).boxed_local());
+                Some(Box::new(rpc_server))
+            });
 
             WsSession::new(
-                RoomRepository::new(HashMap::new()),
+                Box::new(rpc_server_repo),
                 Duration::from_millis(100),
                 Duration::from_secs(10),
             )
         });
 
-        let client = serv.ws().await.unwrap();
+        let mut client = serv.ws().await.unwrap();
+
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "room_id".into(),
+            member_id: "member_id".into(),
+            token: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
 
         let start = std::time::Instant::now();
 
-        let item = client.skip(2).next().await.unwrap().unwrap();
+        let item = client.skip(3).next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
             description: Some(String::from(r#"{"reason":"Idle"}"#)),
         }));
+        assert_eq!(item, close_frame);
 
         assert!(
             Instant::now().duration_since(start) > Duration::from_millis(99)
         );
         assert!(Instant::now().duration_since(start) < Duration::from_secs(2));
-        assert_eq!(item, close_frame);
     }
 
     // Make sure that WsSession redirects all Commands it receives to
@@ -788,48 +876,69 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from("test_member");
-            let mut rpc_server = MockRpcServer::new();
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let mut rpc_server = MockRpcServer::new();
 
-            rpc_server.expect_connection_established().return_once(
-                |_, _, _| {
-                    future::ok(RpcConnectionSettings {
-                        idle_timeout: Duration::from_secs(10),
-                        ping_interval: Duration::from_secs(10),
-                    })
-                    .boxed_local()
-                },
-            );
-            rpc_server
-                .expect_connection_closed()
-                .returning(|_, _| future::ready(()).boxed_local());
+                rpc_server.expect_connection_established().return_once(
+                    |_, _, _| {
+                        future::ok(RpcConnectionSettings {
+                            idle_timeout: Duration::from_secs(10),
+                            ping_interval: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
 
-            rpc_server.expect_send_command().returning(|_, command| {
-                CHAN.0.lock().unwrap().unbounded_send(command).unwrap();
+                rpc_server.expect_send_command().returning(|_, command| {
+                    CHAN.0.lock().unwrap().unbounded_send(command).unwrap();
+                });
+
+                Some(Box::new(rpc_server))
             });
 
-            let ws = WsSession::new(
-                RoomRepository::new(HashMap::new()),
+            WsSession::new(
+                Box::new(rpc_server_repo),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
-            );
+            )
         });
 
         let mut client = serv.ws().await.unwrap();
 
-        let command = Bytes::from(
-            r#"{
-                            "command":"SetIceCandidate",
-                                "data":{
-                                    "peer_id":15,
-                                    "candidate":{
-                                        "candidate":"asd",
-                                        "sdp_m_line_index":1,
-                                        "sdp_mid":"2"
-                                    }
-                                }
-                            }"#,
-        );
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "room_id".into(),
+            member_id: "member_id".into(),
+            token: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
+
+        let cmd = ClientMsg::Command {
+            room_id: "room_id".into(),
+            command: Command::SetIceCandidate {
+                peer_id: PeerId(15),
+                candidate: IceCandidate {
+                    candidate: "asd".to_string(),
+                    sdp_m_line_index: Some(1),
+                    sdp_mid: Some("2".to_string()),
+                },
+            },
+        };
+        let command = Bytes::from(serde_json::to_string(&cmd).unwrap());
+
         client
             .send(Message::Text(
                 std::str::from_utf8(command.bytes()).unwrap().to_owned(),
@@ -880,7 +989,7 @@ mod test {
 
     // WsSession is dropped and WebSocket connection is closed when
     // RpcConnection::close is called.
-    // #[actix_rt::test]
+    #[actix_rt::test]
     async fn close_when_rpc_connection_close() {
         lazy_static::lazy_static! {
             static ref CHAN: SharedOneshot<Box<dyn RpcConnection>> = {
@@ -890,32 +999,58 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from("test_member");
-            let mut rpc_server = MockRpcServer::new();
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let mut rpc_server = MockRpcServer::new();
 
-            rpc_server.expect_connection_established().return_once(
-                |_, _, connection| {
-                    let _ =
-                        CHAN.0.lock().unwrap().take().unwrap().send(connection);
-                    future::ok(RpcConnectionSettings {
-                        idle_timeout: Duration::from_secs(10),
-                        ping_interval: Duration::from_secs(10),
-                    })
-                    .boxed_local()
-                },
-            );
-            rpc_server
-                .expect_connection_closed()
-                .returning(|_, _| future::ready(()).boxed_local());
+                rpc_server.expect_connection_established().return_once(
+                    |_, _, connection| {
+                        let _ = CHAN
+                            .0
+                            .lock()
+                            .unwrap()
+                            .take()
+                            .unwrap()
+                            .send(connection);
+                        future::ok(RpcConnectionSettings {
+                            idle_timeout: Duration::from_secs(10),
+                            ping_interval: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
+
+                Some(Box::new(rpc_server))
+            });
 
             WsSession::new(
-                RoomRepository::new(HashMap::new()),
+                Box::new(rpc_server_repo),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         });
 
-        let client = serv.ws().await.unwrap();
+        let mut client = serv.ws().await.unwrap();
+
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "room_id".into(),
+            member_id: "member_id".into(),
+            token: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
 
         let mut rpc_connection: Box<dyn RpcConnection> =
             CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
@@ -928,8 +1063,19 @@ mod test {
                 },
             )
             .await;
+        let mut client = client.skip(3);
 
-        let item = client.skip(2).next().await.unwrap().unwrap();
+        let left_room_frame = client.next().await.unwrap().unwrap();
+        // TODO: Why Finished????????????????????????????
+        let correct_left_room_frame = Frame::Text(Bytes::from(
+            serde_json::to_string(&ServerMsg::LeftRoom {
+                room_id: "room_id".into(),
+                close_reason: medea_client_api_proto::CloseReason::Finished,
+            })
+            .unwrap(),
+        ));
+        assert_eq!(left_room_frame, correct_left_room_frame);
+        let item = client.next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
             code: CloseCode::Normal,
@@ -941,7 +1087,7 @@ mod test {
 
     // WsSession transmits Events to WebSocket client when
     // RpcConnection::send_event is called.
-    // #[actix_rt::test]
+    #[actix_rt::test]
     async fn send_text_message_when_rpc_connection_send_event() {
         lazy_static::lazy_static! {
             static ref CHAN: SharedOneshot<Box<dyn RpcConnection>> = {
@@ -951,31 +1097,57 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let mut rpc_server = MockRpcServer::new();
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let mut rpc_server = MockRpcServer::new();
 
-            rpc_server.expect_connection_established().return_once(
-                |_, _, connection| {
-                    let _ =
-                        CHAN.0.lock().unwrap().take().unwrap().send(connection);
-                    future::ok(RpcConnectionSettings {
-                        ping_interval: Duration::from_secs(10),
-                        idle_timeout: Duration::from_secs(10),
-                    })
-                    .boxed_local()
-                },
-            );
-            rpc_server
-                .expect_connection_closed()
-                .returning(|_, _| future::ready(()).boxed_local());
+                rpc_server.expect_connection_established().return_once(
+                    |_, _, connection| {
+                        let _ = CHAN
+                            .0
+                            .lock()
+                            .unwrap()
+                            .take()
+                            .unwrap()
+                            .send(connection);
+                        future::ok(RpcConnectionSettings {
+                            ping_interval: Duration::from_secs(10),
+                            idle_timeout: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
+
+                Some(Box::new(rpc_server))
+            });
 
             WsSession::new(
-                RoomRepository::new(HashMap::new()),
+                Box::new(rpc_server_repo),
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
         });
 
-        let client = serv.ws().await.unwrap();
+        let mut client = serv.ws().await.unwrap();
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "room_id".into(),
+            member_id: "member_id".into(),
+            token: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
 
         let rpc_connection: Box<dyn RpcConnection> =
             CHAN.1.lock().unwrap().take().unwrap().await.unwrap();
@@ -988,10 +1160,16 @@ mod test {
             },
         );
 
-        let item = client.skip(2).next().await.unwrap().unwrap();
+        let item = client.skip(3).next().await.unwrap().unwrap();
 
-        let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
-                     sdp_answer\":\"sdp_answer\"}}";
+        let event = serde_json::to_string(&ServerMsg::Event {
+            room_id: "room_id".into(),
+            event: Event::SdpAnswerMade {
+                peer_id: PeerId(77),
+                sdp_answer: "sdp_answer".to_string(),
+            },
+        })
+        .unwrap();
 
         assert_eq!(item, Frame::Text(event.into()));
     }

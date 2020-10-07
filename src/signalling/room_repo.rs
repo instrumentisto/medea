@@ -8,7 +8,10 @@ use std::{
 use actix::Addr;
 use medea_client_api_proto::RoomId;
 
-use crate::signalling::Room;
+use crate::{
+    api::{client::RpcServerRepository, RpcServer},
+    signalling::Room,
+};
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Debug, Default)]
@@ -48,5 +51,11 @@ impl RoomRepository {
     /// [`RoomId`].
     pub fn contains_room_with_id(&self, id: &RoomId) -> bool {
         self.rooms.lock().unwrap().contains_key(id)
+    }
+}
+
+impl RpcServerRepository for RoomRepository {
+    fn get(&self, room_id: &RoomId) -> Option<Box<dyn RpcServer>> {
+        self.get(room_id).map(|r| Box::new(r) as Box<dyn RpcServer>)
     }
 }
