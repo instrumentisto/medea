@@ -1,49 +1,138 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use async_trait::async_trait;
 use derive_more::From;
-use medea_client_api_proto::{Command, Event, MemberId, RoomId, Token};
-
-use crate::rpc::{
-    ApiUrl, ClientDisconnect, CloseReason, ConnectionInfo, RpcClientError,
-    RpcSession, WebSocketRpcClient,
-};
-
-use tracerr::Traced;
-use url::Url;
-
-use crate::rpc::websocket::RpcEvent;
 use futures::{
-    channel::oneshot::Canceled, future::LocalBoxFuture, stream::LocalBoxStream,
+    channel::{oneshot, oneshot::Canceled},
+    future::LocalBoxFuture,
+    stream::LocalBoxStream,
     StreamExt,
 };
+use medea_client_api_proto::{Command, Event};
 use medea_reactive::ObservableCell;
-use std::cell::Cell;
+use tracerr::Traced;
 
+use crate::rpc::{
+    websocket::RpcEvent, ClientDisconnect, CloseReason, ConnectionInfo,
+    RpcClientError, WebSocketRpcClient,
+};
+
+/// Flag which indicates that [`RpcSession`] is reconnected to the Media Server.
 #[derive(Clone, Copy, Debug, PartialEq, From)]
 struct IsReconnected(bool);
 
+/// [`RpcSession`] connection state.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum SessionState {
+    /// [`RpcSession`] connecting to the Media Server.
     Connecting,
+
+    /// Connection with the Media Server is opened.
     Open(IsReconnected),
+
+    /// Connection with the Media Server is closed.
     Closed,
 }
 
+/// Client to talk with server via Client API RPC.
+#[async_trait(?Send)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
+pub trait RpcSession {
+    /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
+    ///
+    /// This function is also used for reconnection of this [`RpcClient`].
+    ///
+    /// If [`RpcClient`] is closed than this function will try to establish
+    /// new RPC connection.
+    ///
+    /// If [`RpcClient`] already in [`State::Connecting`] then this function
+    /// will not perform one more connection try. It will subsribe to
+    /// [`State`] changes and wait for first connection result. And based on
+    /// this result - this function will be resolved.
+    ///
+    /// If [`RpcClient`] already in [`State::Open`] then this function will be
+    /// instantly resolved.
+    async fn connect(
+        self: Rc<Self>,
+        connection_info: ConnectionInfo,
+    ) -> Result<(), Traced<RpcClientError>>;
+
+    /// Tries to reconnect (or connect) this [`RpcSession`] to the Media Server.
+    async fn reconnect(self: Rc<Self>) -> Result<(), Traced<RpcClientError>>;
+
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+    ///
+    /// [`Stream`]: futures::Stream
+    fn subscribe(self: Rc<Self>) -> LocalBoxStream<'static, Event>;
+
+    /// Sends [`Command`] to server.
+    fn send_command(&self, command: Command);
+
+    /// [`Future`] which will resolve on normal [`RpcClient`] connection
+    /// closing.
+    ///
+    /// This [`Future`] wouldn't be resolved on abnormal closes. On
+    /// abnormal close [`RpcClient::on_connection_loss`] will be thrown.
+    ///
+    /// [`Future`]: std::future::Future
+    fn on_normal_close(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
+
+    /// Sets reason, that will be passed to underlying transport when this
+    /// client will be dropped.
+    fn set_close_reason(&self, close_reason: ClientDisconnect);
+
+    /// Subscribe to connection loss events.
+    ///
+    /// Connection loss is any unexpected [`RpcTransport`] close. In case of
+    /// connection loss, JS side user should select reconnection strategy with
+    /// [`ReconnectHandle`] (or simply close [`Room`]).
+    ///
+    /// [`Room`]: crate::api::Room
+    /// [`Stream`]: futures::Stream
+    fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
+
+    /// Subscribe to reconnected events.
+    ///
+    /// This will fire when connection to RPC server is reestablished after
+    /// connection loss.
+    fn on_reconnected(&self) -> LocalBoxStream<'static, ()>;
+}
+
+/// Client to talk with server via Client API RPC.
+///
+/// Responsible for [`Room`] authorization and closing.
 pub struct Session {
+    /// Client API RPC client to talk with server via [WebSocket].
+    ///
+    /// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
     client: Rc<WebSocketRpcClient>,
+
+    /// Information about [`Session`] connection.
+    ///
+    /// If `None` then this [`Session`] currently is uninitialized.
     credentials: RefCell<Option<ConnectionInfo>>,
+
+    /// [`Session`] connection state.
     state: ObservableCell<SessionState>,
-    initialy_connected: Cell<bool>,
+
+    /// Flag which indicates that this [`Session`] was initially connected.
+    initially_connected: Cell<bool>,
 }
 
 impl Session {
+    /// Returns new uninitialized [`Session`] with a provided
+    /// [`WebSocketRpcClient`].
     pub fn new(client: Rc<WebSocketRpcClient>) -> Self {
         Self {
             client,
             credentials: RefCell::new(None),
             state: ObservableCell::new(SessionState::Closed),
-            initialy_connected: Cell::new(false),
+            initially_connected: Cell::new(false),
         }
     }
 }
@@ -96,7 +185,6 @@ impl RpcSession for Session {
                 .await?;
             self.connect_session().await
         } else {
-            log::error!("Tried to send command before connecting");
             Err(tracerr::new!(RpcClientError::NoSocket))
         }
     }
@@ -127,7 +215,7 @@ impl RpcSession for Session {
                             && credentials.member_id == member_id
                         {
                             this.state.set(SessionState::Open(
-                                this.initialy_connected.get().into(),
+                                this.initially_connected.get().into(),
                             ));
                         }
                         None

@@ -4,20 +4,15 @@ mod backoff_delayer;
 mod heartbeat;
 mod reconnect_handle;
 mod rpc_session;
-pub mod websocket;
+mod websocket;
 
-use std::rc::Rc;
-
-use async_trait::async_trait;
-use derive_more::{Display, From};
-use futures::{
-    channel::oneshot, future::LocalBoxFuture, stream::LocalBoxStream,
-};
-use medea_client_api_proto::{
-    CloseDescription, CloseReason as CloseByServerReason, Command, Event,
-    MemberId, RoomId, Token,
-};
 use std::str::FromStr;
+
+use derive_more::{Display, From};
+use medea_client_api_proto::{
+    CloseDescription, CloseReason as CloseByServerReason, MemberId, RoomId,
+    Token,
+};
 use tracerr::Traced;
 use url::Url;
 use web_sys::CloseEvent;
@@ -29,7 +24,7 @@ pub use self::{
     backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
     reconnect_handle::ReconnectHandle,
-    rpc_session::Session,
+    rpc_session::{RpcSession, Session},
     websocket::{
         ClientDisconnect, RpcTransport, TransportError, WebSocketRpcClient,
         WebSocketRpcTransport,
@@ -81,7 +76,10 @@ impl ConnectionInfo {
 /// Errors which can occur while [`ConnectionInfo`] parsing from the [`str`].
 #[derive(Debug)]
 pub enum ConnectionInfoParseError {
+    /// [`Url::parse`] returned error.
     UrlParse(url::ParseError),
+
+    /// Provided URL doesn't have important segments.
     FewSegments,
 }
 
@@ -127,71 +125,6 @@ impl FromStr for ConnectionInfo {
             token,
         })
     }
-}
-
-/// Client to talk with server via Client API RPC.
-#[async_trait(?Send)]
-#[cfg_attr(feature = "mockable", mockall::automock)]
-pub trait RpcSession {
-    /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
-    ///
-    /// This function is also used for reconnection of this [`RpcClient`].
-    ///
-    /// If [`RpcClient`] is closed than this function will try to establish
-    /// new RPC connection.
-    ///
-    /// If [`RpcClient`] already in [`State::Connecting`] then this function
-    /// will not perform one more connection try. It will subsribe to
-    /// [`State`] changes and wait for first connection result. And based on
-    /// this result - this function will be resolved.
-    ///
-    /// If [`RpcClient`] already in [`State::Open`] then this function will be
-    /// instantly resolved.
-    async fn connect(
-        self: Rc<Self>,
-        connection_info: ConnectionInfo,
-    ) -> Result<(), Traced<RpcClientError>>;
-
-    async fn reconnect(self: Rc<Self>) -> Result<(), Traced<RpcClientError>>;
-
-    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    ///
-    /// [`Stream`]: futures::Stream
-    fn subscribe(self: Rc<Self>) -> LocalBoxStream<'static, Event>;
-
-    /// Sends [`Command`] to server.
-    fn send_command(&self, command: Command);
-
-    /// [`Future`] which will resolve on normal [`RpcClient`] connection
-    /// closing.
-    ///
-    /// This [`Future`] wouldn't be resolved on abnormal closes. On
-    /// abnormal close [`RpcClient::on_connection_loss`] will be thrown.
-    ///
-    /// [`Future`]: std::future::Future
-    fn on_normal_close(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
-
-    /// Sets reason, that will be passed to underlying transport when this
-    /// client will be dropped.
-    fn set_close_reason(&self, close_reason: ClientDisconnect);
-
-    /// Subscribe to connection loss events.
-    ///
-    /// Connection loss is any unexpected [`RpcTransport`] close. In case of
-    /// connection loss, JS side user should select reconnection strategy with
-    /// [`ReconnectHandle`] (or simply close [`Room`]).
-    ///
-    /// [`Room`]: crate::api::Room
-    /// [`Stream`]: futures::Stream
-    fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
-
-    /// Subscribe to reconnected events.
-    ///
-    /// This will fire when connection to RPC server is reestablished after
-    /// connection loss.
-    fn on_reconnected(&self) -> LocalBoxStream<'static, ()>;
 }
 
 /// Reasons of closing by client side and server side.
@@ -263,9 +196,6 @@ pub enum RpcClientError {
     /// Occurs if [`RpcClient::connect`] fails.
     #[display(fmt = "Connection failed. {:?}", _0)]
     ConnectionFailed(ClosedStateReason),
-
-    #[display(fmt = "Could not parse URL: {}", _0)]
-    UrlParsingError(String),
 }
 
 /// Connection with remote was closed.

@@ -9,7 +9,6 @@ use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use medea_reactive::ObservableCell;
 use tracerr::Traced;
-use url::Url;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{

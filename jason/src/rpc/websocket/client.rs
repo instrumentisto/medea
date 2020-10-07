@@ -13,7 +13,6 @@ use medea_client_api_proto::{
 use medea_reactive::ObservableCell;
 use serde::Serialize;
 use tracerr::Traced;
-use url::Url;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{

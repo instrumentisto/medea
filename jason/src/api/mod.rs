@@ -13,8 +13,8 @@ use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
     rpc::{
-        websocket::RpcTransportFactory, ClientDisconnect, RpcSession,
-        RpcTransport, Session, WebSocketRpcClient, WebSocketRpcTransport,
+        ClientDisconnect, RpcSession, RpcTransport, Session,
+        WebSocketRpcClient, WebSocketRpcTransport,
     },
     set_panic_hook,
 };
@@ -83,12 +83,13 @@ impl Jason {
     /// Sets [`Room`]'s close reason to [`ClientDisconnect::RoomClose`].
     pub fn dispose_room(&self, room_id: String) {
         self.0.borrow_mut().rooms.retain(|room| {
-            if room.id().map(|id| id.0 == room_id).unwrap_or(false) {
+            let should_be_closed =
+                room.id().map(|id| id.0 == room_id).unwrap_or(false);
+            if should_be_closed {
                 room.set_close_reason(ClientDisconnect::RoomClosed.into());
-                false
-            } else {
-                true
             }
+
+            !should_be_closed
         });
     }
 
@@ -103,6 +104,7 @@ impl Jason {
 }
 
 impl Jason {
+    /// Returns new [`Jason`] with a provided [`WebSocketRpcClient`].
     pub fn with_rpc_client(rpc: Rc<WebSocketRpcClient>) -> Self {
         Self(Rc::new(RefCell::new(Inner {
             rpc,
