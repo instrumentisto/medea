@@ -57,7 +57,8 @@ All user visible changes to this project will be documented in this file. This p
 - `ConnectionQualityUpdated` event ([#132]);
 - `TrackPatchEvent` and `TrackPatchCommand` types ([#127]);
 - `IceRestart` variant to `TrackUpdate` ([#138]);
-- `source_kind` field to `VideoSettings` type ([#145]).
+- `source_kind` field to `VideoSettings` type ([#145]);
+- `RoomId` and `Credentials` types ([#148]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -75,6 +76,7 @@ All user visible changes to this project will be documented in this file. This p
 [#127]: /../../pull/127
 [#138]: /../../pull/138
 [#145]: /../../pull/145
+[#148]: /../../pull/148
 
 
 
