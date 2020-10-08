@@ -17,14 +17,13 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RpcSettings,
-    ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RoomId,
+    RpcSettings, ServerMsg,
 };
 
 use crate::{
     api::{
         client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
-        control::RoomId,
         RpcServer,
     },
     log::prelude::*,
@@ -479,12 +478,6 @@ mod test {
     use actix_web::{test::TestServer, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use bytes::{Buf, Bytes};
-    use medea_client_api_proto::{
-        CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
-        MemberId, PeerId,
-    };
-    use tokio::time::timeout;
-
     use futures::{
         channel::{
             mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -492,10 +485,14 @@ mod test {
         },
         future, FutureExt as _, SinkExt as _, StreamExt as _,
     };
+    use medea_client_api_proto::{
+        CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
+        MemberId, PeerId, RoomId,
+    };
+    use tokio::time::timeout;
 
     use crate::api::{
         client::rpc_connection::{ClosedReason, RpcConnection},
-        control::RoomId,
         MockRpcServer,
     };
 

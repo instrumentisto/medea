@@ -4,8 +4,7 @@
 
 use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
-use derive_more::{Display, From};
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{Credentials, MemberId, RoomId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -19,13 +18,6 @@ use super::{
     RootElement, TryFromElementError,
 };
 
-/// ID of [`Room`].
-///
-/// [`Room`]: crate::signalling::room::Room
-#[derive(Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq)]
-#[from(forward)]
-pub struct Id(String);
-
 /// Element of [`Room`]'s [`Pipeline`].
 ///
 /// [`Room`]: crate::signalling::room::Room
@@ -36,7 +28,7 @@ pub enum RoomElement {
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
-        credentials: String,
+        credentials: Credentials,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
         #[serde(default, with = "humantime_serde")]

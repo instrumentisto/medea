@@ -16,7 +16,7 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use actix::Addr;
 use derive_more::Display;
 use failure::{Error, Fail};
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{MemberId, RoomId};
 use serde::Deserialize;
 
 use crate::{
@@ -37,7 +37,7 @@ pub use self::{
         Id as EndpointId,
     },
     member::MemberSpec,
-    room::{Id as RoomId, RoomElement, RoomSpec},
+    room::{RoomElement, RoomSpec},
 };
 
 /// Errors which may occur while deserializing protobuf spec.

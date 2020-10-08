@@ -6,8 +6,9 @@ use std::{
 };
 
 use actix::Addr;
+use medea_client_api_proto::RoomId;
 
-use crate::{api::control::RoomId, signalling::Room};
+use crate::signalling::Room;
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Debug, Default)]

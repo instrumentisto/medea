@@ -37,11 +37,9 @@ use actix::{
 };
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{PeerId, RoomId};
 
-use crate::{
-    api::control::RoomId, conf, log::prelude::*, utils::instant_into_utc,
-};
+use crate::{conf, log::prelude::*, utils::instant_into_utc};
 
 /// Subscriber of `Peer` traffic flowing changes.
 #[cfg_attr(test, mockall::automock)]

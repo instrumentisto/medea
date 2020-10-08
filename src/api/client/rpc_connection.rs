@@ -7,7 +7,9 @@ use std::{fmt, time::Duration};
 use actix::Message;
 use derive_more::{From, Into};
 use futures::future::LocalBoxFuture;
-use medea_client_api_proto::{CloseDescription, Command, Event, MemberId};
+use medea_client_api_proto::{
+    CloseDescription, Command, Credentials, Event, MemberId,
+};
 
 use crate::signalling::room::RoomError;
 
@@ -82,7 +84,7 @@ pub struct Authorize {
     pub member_id: MemberId,
 
     /// Credentials to authorize [`RpcConnection`] with.
-    pub credentials: String, // TODO: &str when futures will allow references
+    pub credentials: Credentials,
 }
 
 /// Error of authorization [`RpcConnection`] in [`Room`].

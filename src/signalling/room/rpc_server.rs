@@ -292,10 +292,12 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::collections::HashMap;
 
+    use medea_client_api_proto::RoomId;
+
     use super::*;
 
     use crate::{
-        api::control::{pipeline::Pipeline, MemberSpec, RoomId, RoomSpec},
+        api::control::{pipeline::Pipeline, MemberSpec, RoomSpec},
         conf::{self, Conf},
         media::peer::tests::dummy_negotiation_sub_mock,
         signalling::{
@@ -339,7 +341,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             None,
@@ -377,7 +379,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             None,

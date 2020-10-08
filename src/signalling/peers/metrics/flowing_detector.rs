@@ -20,14 +20,11 @@ use medea_client_api_proto::{
         RtcOutboundRtpStreamMediaType, RtcOutboundRtpStreamStats, RtcStat,
         RtcStatsType, StatId,
     },
-    MediaType as MediaTypeProto, MemberId, PeerConnectionState, PeerId,
+    MediaType as MediaTypeProto, MemberId, PeerConnectionState, PeerId, RoomId,
 };
 
 use crate::{
-    api::control::{
-        callback::{MediaDirection, MediaType},
-        RoomId,
-    },
+    api::control::callback::{MediaDirection, MediaType},
     log::prelude::*,
     media::{PeerStateMachine as Peer, PeerStateMachine},
     signalling::peers::{
