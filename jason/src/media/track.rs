@@ -4,7 +4,6 @@
 
 use std::rc::{Rc, Weak};
 
-use derive_more::Display;
 use futures::StreamExt;
 use medea_client_api_proto::MediaSourceKind;
 use medea_reactive::ObservableCell;
@@ -12,20 +11,35 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
-use crate::utils::Callback0;
+use crate::{media::MediaKind, utils::Callback0};
 
-/// [MediaStreamTrack.kind][1] representation.
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Display)]
-pub enum TrackKind {
-    /// Audio track.
-    #[display(fmt = "audio")]
-    Audio,
+/// Media source type.
+#[wasm_bindgen(js_name = MediaSourceKind)]
+#[derive(Clone, Copy, Debug)]
+pub enum JsMediaSourceKind {
+    /// Media is sourced from some media device (webcam or microphone).
+    Device,
 
-    /// Video track.
-    #[display(fmt = "video")]
-    Video,
+    /// Media is obtained with screen-capture.
+    Display,
+}
+
+impl From<JsMediaSourceKind> for MediaSourceKind {
+    fn from(val: JsMediaSourceKind) -> Self {
+        match val {
+            JsMediaSourceKind::Device => Self::Device,
+            JsMediaSourceKind::Display => Self::Display,
+        }
+    }
+}
+
+impl From<MediaSourceKind> for JsMediaSourceKind {
+    fn from(val: MediaSourceKind) -> Self {
+        match val {
+            MediaSourceKind::Device => Self::Device,
+            MediaSourceKind::Display => Self::Display,
+        }
+    }
 }
 
 /// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
@@ -34,8 +48,10 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    /// Flag which indicates that this [`MediaStreamTrack`] was received from
-    /// `getDisplayMedia`.
+    /// Underlying [`SysMediaStreamTrack`] kind.
+    kind: MediaKind,
+
+    /// Underlying [`SysMediaStreamTrack`] source kind.
     media_source_kind: MediaSourceKind,
 
     /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
@@ -69,11 +85,18 @@ impl MediaStreamTrack {
         SysMediaStreamTrack: From<T>,
     {
         let track = SysMediaStreamTrack::from(track);
+        let kind = match track.kind().as_ref() {
+            "audio" => MediaKind::Audio,
+            "video" => MediaKind::Video,
+            _ => unreachable!(),
+        };
+
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
             media_source_kind,
+            kind,
             track,
         }));
 
@@ -127,12 +150,8 @@ impl MediaStreamTrack {
 
     /// Returns track kind (audio/video).
     #[inline]
-    pub fn kind(&self) -> TrackKind {
-        match self.0.track.kind().as_ref() {
-            "audio" => TrackKind::Audio,
-            "video" => TrackKind::Video,
-            _ => unreachable!(),
-        }
+    pub fn kind(&self) -> MediaKind {
+        self.0.kind
     }
 
     /// Creates weak reference to underlying [MediaStreamTrack][2].
@@ -179,8 +198,8 @@ impl MediaStreamTrack {
     /// Returns a [`String`] set to `audio` if the track is an audio track and
     /// to `video`, if it is a video track.
     #[wasm_bindgen(js_name = kind)]
-    pub fn js_kind(&self) -> String {
-        self.kind().to_string()
+    pub fn js_kind(&self) -> MediaKind {
+        self.kind()
     }
 
     /// Returns a [`String`] set to `device` if track is sourced from some
@@ -189,8 +208,8 @@ impl MediaStreamTrack {
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[wasm_bindgen(js_name = media_source_kind)]
-    pub fn js_media_source_kind(&self) -> String {
-        self.0.media_source_kind.to_string()
+    pub fn js_media_source_kind(&self) -> JsMediaSourceKind {
+        self.0.media_source_kind.into()
     }
 }
 

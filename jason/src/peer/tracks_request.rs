@@ -10,8 +10,8 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStreamSettings, MediaStreamTrack,
-        TrackConstraints, TrackKind, VideoSource,
+        AudioTrackConstraints, MediaKind, MediaStreamSettings,
+        MediaStreamTrack, TrackConstraints, VideoSource,
     },
     utils::{JsCaused, JsError},
     DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
@@ -148,10 +148,10 @@ impl SimpleTracksRequest {
         let mut audio_tracks = Vec::new();
         for track in tracks {
             match track.kind() {
-                TrackKind::Audio => {
+                MediaKind::Audio => {
                     audio_tracks.push(track);
                 }
-                TrackKind::Video => match track.media_source_kind() {
+                MediaKind::Video => match track.media_source_kind() {
                     MediaSourceKind::Device => {
                         device_video_tracks.push(track);
                     }

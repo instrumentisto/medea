@@ -5,7 +5,7 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use medea_jason::{
-    media::{MediaManager, TrackKind},
+    media::{MediaKind, MediaManager},
     AudioTrackConstraints, DeviceVideoTrackConstraints,
     DisplayVideoTrackConstraints, MediaStreamSettings,
 };
@@ -136,7 +136,7 @@ async fn same_track_for_same_constraints() {
     let (track1, track1_is_new) = tracks.pop().unwrap();
 
     assert!(track1_is_new);
-    assert_eq!(track1.kind(), TrackKind::Audio);
+    assert_eq!(track1.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
     // second request, same track, no additional getUserMedia requests
@@ -148,7 +148,7 @@ async fn same_track_for_same_constraints() {
 
     assert!(!track2_is_new);
     assert_eq!(track1.id(), track2.id());
-    assert_eq!(track2.kind(), TrackKind::Audio);
+    assert_eq!(track2.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 }
 
@@ -175,7 +175,7 @@ async fn new_track_if_previous_dropped() {
     assert_eq!(tracks.len(), 1);
     let (track1, track1_is_new) = tracks.pop().unwrap();
 
-    assert_eq!(track1.kind(), TrackKind::Audio);
+    assert_eq!(track1.kind(), MediaKind::Audio);
     assert!(track1_is_new);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
@@ -189,7 +189,7 @@ async fn new_track_if_previous_dropped() {
 
     assert!(track2_is_new);
     assert_ne!(track2.id(), track1_id);
-    assert_eq!(track2.kind(), TrackKind::Audio);
+    assert_eq!(track2.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
 
     mock_navigator.stop();
@@ -215,7 +215,7 @@ async fn request_audio_video_then_audio_then_video() {
     let tracks = media_manager.get_tracks(constraints).await.unwrap();
     let (mut audio_tracks, mut video_tracks): (Vec<_>, Vec<_>) = tracks
         .into_iter()
-        .partition(|(track, _)| track.kind() == TrackKind::Audio);
+        .partition(|(track, _)| track.kind() == MediaKind::Audio);
     assert_eq!(audio_tracks.len(), 1);
     assert_eq!(video_tracks.len(), 1);
 
@@ -278,7 +278,7 @@ async fn display_track_is_cached() {
 
     let (video_track, video_track_is_new) = tracks
         .into_iter()
-        .find(|(track, _)| track.kind() == TrackKind::Video)
+        .find(|(track, _)| track.kind() == MediaKind::Video)
         .unwrap();
     assert!(video_track_is_new);
 
