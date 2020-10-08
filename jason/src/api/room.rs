@@ -32,8 +32,9 @@ use crate::{
         TrackDirection, TransceiverKind, TransceiverSide,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ConnectionInfo, ReconnectHandle,
-        RpcClientError, RpcSession, TransportError,
+        ClientDisconnect, CloseReason, ConnectionInfo,
+        ConnectionInfoParseError, ReconnectHandle, RpcClientError, RpcSession,
+        TransportError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
@@ -208,8 +209,9 @@ impl RoomHandle {
     pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
-        // TODO: UNWRAP
-        let connection_info: ConnectionInfo = url.parse().unwrap();
+        let connection_info: ConnectionInfo = url.parse().map_err(
+            tracerr::map_from_and_wrap!(=> ConnectionInfoParseError),
+        )?;
 
         if !inner.on_failed_local_media.is_set() {
             return Err(JasonError::from(tracerr::new!(

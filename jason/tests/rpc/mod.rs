@@ -23,9 +23,9 @@ use medea_jason::rpc::{
 use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
+use medea_jason::rpc::websocket::{RpcEvent, TransportState};
 
 use crate::{delay_for, join_room_url, timeout};
-use medea_jason::rpc::websocket::{RpcEvent, TransportState};
 
 wasm_bindgen_test_configure!(run_in_browser);
 

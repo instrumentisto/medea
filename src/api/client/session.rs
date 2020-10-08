@@ -1063,7 +1063,6 @@ mod test {
         let mut client = client.skip(3);
 
         let left_room_frame = client.next().await.unwrap().unwrap();
-        // TODO: Why Finished????????????????????????????
         let correct_left_room_frame = Frame::Text(Bytes::from(
             serde_json::to_string(&ServerMsg::LeftRoom {
                 room_id: "room_id".into(),

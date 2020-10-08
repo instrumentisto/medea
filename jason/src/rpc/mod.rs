@@ -76,12 +76,14 @@ impl ConnectionInfo {
 }
 
 /// Errors which can occur while [`ConnectionInfo`] parsing from the [`str`].
-#[derive(Debug)]
+#[derive(Debug, JsCaused, Display)]
 pub enum ConnectionInfoParseError {
     /// [`Url::parse`] returned error.
+    #[display(fmt = "Failed to parse provided URL: {:?}", _0)]
     UrlParse(url::ParseError),
 
     /// Provided URL doesn't have important segments.
+    #[display(fmt = "Provided URL doesn't have important segments")]
     FewSegments,
 }
 
