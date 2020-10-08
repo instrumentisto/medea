@@ -65,12 +65,12 @@ pub struct PeerId(pub u32);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
 
-/// `Member` authentication token.
+/// `Member` credentials.
 #[derive(
     Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
 )]
 #[from(forward)]
-pub struct Token(pub String);
+pub struct Credentials(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -140,7 +140,7 @@ pub enum ClientMsg {
     JoinRoom {
         room_id: RoomId,
         member_id: MemberId,
-        token: Token,
+        credentials: Credentials,
     },
 
     LeaveRoom {

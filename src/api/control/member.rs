@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use medea_client_api_proto::{MemberId as Id, Token};
+use medea_client_api_proto::{Credentials, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
@@ -53,7 +53,7 @@ pub struct MemberSpec {
     pipeline: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
-    credentials: Token,
+    credentials: Credentials,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -95,7 +95,7 @@ impl MemberSpec {
     #[inline]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
-        credentials: Token,
+        credentials: Credentials,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
@@ -151,7 +151,7 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
-    pub fn credentials(&self) -> &Token {
+    pub fn credentials(&self) -> &Credentials {
         &self.credentials
     }
 
@@ -194,7 +194,7 @@ impl MemberSpec {
 /// [`MemberProto`] implemented for [`MemberSpec`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-fn generate_member_credentials() -> Token {
+fn generate_member_credentials() -> Credentials {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(CREDENTIALS_LEN)
@@ -230,7 +230,7 @@ impl TryFrom<proto::Member> for MemberSpec {
         let credentials = if member.credentials.is_empty() {
             generate_member_credentials()
         } else {
-            Token(member.credentials)
+            Credentials::from(member.credentials)
         };
 
         let on_leave = {

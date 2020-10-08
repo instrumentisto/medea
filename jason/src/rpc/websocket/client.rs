@@ -7,8 +7,8 @@ use futures::{
     stream::{LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    ClientMsg, CloseReason as CloseByServerReason, Command, Event, MemberId,
-    RoomId, RpcSettings, ServerMsg, Token,
+    ClientMsg, CloseReason as CloseByServerReason, Command, Credentials, Event,
+    MemberId, RoomId, RpcSettings, ServerMsg,
 };
 use medea_reactive::ObservableCell;
 use serde::Serialize;
@@ -110,7 +110,7 @@ struct Inner {
     /// on every [`WebSocketRpcClient::establish_connection`] call.
     rpc_transport_factory: RpcTransportFactory,
 
-    /// Token with which this [`RpcClient`] was connected.
+    /// URL to which [`RpcTransport`] will be connect.
     ///
     /// Will be `None` if this [`RpcClient`] was never connected to a sever.
     url: Option<ApiUrl>,
@@ -198,14 +198,14 @@ impl WebSocketRpcClient {
         &self,
         room_id: RoomId,
         member_id: MemberId,
-        token: Token,
+        credentials: Credentials,
     ) {
         let inner = self.0.borrow();
         if let Some(sock) = &inner.sock {
             sock.send(&ClientMsg::JoinRoom {
                 room_id,
                 member_id,
-                token,
+                credentials: credentials,
             })
             .unwrap();
         }

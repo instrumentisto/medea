@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
-use medea_client_api_proto::{MemberId, RoomId as Id, Token};
+use medea_client_api_proto::{Credentials, MemberId, RoomId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -28,7 +28,7 @@ pub enum RoomElement {
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
-        credentials: Token,
+        credentials: Credentials,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
         #[serde(default, with = "humantime_serde")]

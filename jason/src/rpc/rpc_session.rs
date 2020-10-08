@@ -152,7 +152,7 @@ impl Session {
             self.client.authorize(
                 credentials.room_id.clone(),
                 credentials.member_id.clone(),
-                credentials.token.clone(),
+                credentials.credentials.clone(),
             );
             self.state
                 .subscribe()

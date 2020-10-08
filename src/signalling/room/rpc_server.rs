@@ -7,7 +7,7 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{FutureExt as _, LocalBoxFuture};
-use medea_client_api_proto::{Command, MemberId, PeerId, Token};
+use medea_client_api_proto::{Command, Credentials, MemberId, PeerId};
 
 use crate::{
     api::{
@@ -84,12 +84,12 @@ impl RpcServer for Addr<Room> {
     fn connection_established(
         &self,
         member_id: MemberId,
-        token: Token,
+        credentials: Credentials,
         connection: Box<dyn RpcConnection>,
     ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>> {
         self.send(RpcConnectionEstablished {
             member_id,
-            token,
+            credentials,
             connection,
         })
         .map(|r| {
@@ -184,7 +184,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
         if self
             .members
-            .get_member_by_id_and_credentials(&msg.member_id, &msg.token)
+            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .is_some()
         {
             Box::pin(
@@ -287,6 +287,8 @@ impl Handler<RpcConnectionClosed> for Room {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+
+    use medea_client_api_proto::RoomId;
 
     use super::*;
 

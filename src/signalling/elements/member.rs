@@ -12,7 +12,7 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{MemberId, PeerId, RoomId, Token};
+use medea_client_api_proto::{Credentials, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -81,7 +81,7 @@ struct MemberInner {
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
-    credentials: Token,
+    credentials: Credentials,
 
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -111,7 +111,7 @@ impl Member {
     /// function.
     pub fn new(
         id: MemberId,
-        credentials: Token,
+        credentials: Credentials,
         room_id: RoomId,
         idle_timeout: Duration,
         reconnect_timeout: Duration,
@@ -301,7 +301,7 @@ impl Member {
     }
 
     /// Returns credentials of this [`Member`].
-    pub fn credentials(&self) -> Token {
+    pub fn credentials(&self) -> Credentials {
         self.0.borrow().credentials.clone()
     }
 
@@ -584,7 +584,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credentials: self.credentials().0,
+            credentials: self.credentials().to_string(),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())

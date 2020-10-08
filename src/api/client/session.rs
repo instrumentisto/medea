@@ -18,8 +18,8 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RoomId,
-    RpcSettings, ServerMsg, Token,
+    ClientMsg, CloseDescription, CloseReason, Credentials, Event, MemberId,
+    RoomId, RpcSettings, ServerMsg,
 };
 
 use crate::{
@@ -136,7 +136,7 @@ impl WsSession {
             Ok(ClientMsg::JoinRoom {
                 room_id,
                 member_id,
-                token,
+                credentials: token,
             }) => {
                 self.handle_join_room(ctx, room_id, member_id, token);
             }
@@ -170,12 +170,12 @@ impl WsSession {
         ctx: &mut ws::WebsocketContext<Self>,
         room_id: RoomId,
         member_id: MemberId,
-        token: Token,
+        credentials: Credentials,
     ) {
         if let Some(room) = self.rooms.get(&room_id) {
             room.connection_established(
                 member_id.clone(),
-                token,
+                credentials,
                 Box::new(ctx.address()),
             )
             .into_actor(self)
@@ -598,12 +598,6 @@ mod test {
     use actix_web::{test::TestServer, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use bytes::{Buf, Bytes};
-    use medea_client_api_proto::{
-        ClientMsg, CloseDescription, CloseReason as ProtoCloseReason, Command,
-        Event, IceCandidate, MemberId, PeerId, RpcSettings, ServerMsg,
-    };
-    use tokio::time::timeout;
-
     use futures::{
         channel::{
             mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -611,6 +605,11 @@ mod test {
         },
         future, FutureExt as _, SinkExt as _, StreamExt as _,
     };
+    use medea_client_api_proto::{
+        ClientMsg, CloseDescription, CloseReason as ProtoCloseReason, Command,
+        Event, IceCandidate, MemberId, PeerId, RpcSettings, ServerMsg,
+    };
+    use tokio::time::timeout;
 
     use crate::api::{
         client::rpc_connection::{
@@ -676,7 +675,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            token: "token".into(),
+            credentials: "token".into(),
         };
         client
             .send(Message::Text(
@@ -746,7 +745,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            token: "token".into(),
+            credentials: "token".into(),
         };
         client
             .send(Message::Text(
@@ -832,7 +831,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            token: "token".into(),
+            credentials: "token".into(),
         };
         client
             .send(Message::Text(
@@ -909,7 +908,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            token: "token".into(),
+            credentials: "token".into(),
         };
         client
             .send(Message::Text(
@@ -1035,7 +1034,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            token: "token".into(),
+            credentials: "token".into(),
         };
         client
             .send(Message::Text(
@@ -1131,7 +1130,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            token: "token".into(),
+            credentials: "token".into(),
         };
         client
             .send(Message::Text(

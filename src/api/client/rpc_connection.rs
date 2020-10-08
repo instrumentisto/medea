@@ -7,7 +7,7 @@ use std::{fmt, time::Duration};
 use actix::Message;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
-    CloseDescription, Command, Event, MemberId, RoomId, Token,
+    CloseDescription, Command, Credentials, Event, MemberId, RoomId,
 };
 
 use crate::signalling::room::RoomError;
@@ -89,7 +89,7 @@ pub struct RpcConnectionEstablished {
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
 
-    pub token: Token,
+    pub credentials: Credentials,
 
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,

@@ -17,7 +17,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    CloseDescription, CloseReason, Event, MemberId, RoomId, Token,
+    CloseDescription, CloseReason, Credentials, Event, MemberId, RoomId,
 };
 
 use crate::{
@@ -164,7 +164,7 @@ impl ParticipantService {
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
-        credentials: &Token,
+        credentials: &Credentials,
     ) -> Option<Member> {
         let member = self.get_member_by_id(member_id)?;
         if member.credentials() == *credentials {

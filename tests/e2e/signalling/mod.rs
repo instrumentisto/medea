@@ -26,8 +26,9 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, IceCandidate, MemberId, NegotiationRole, PeerId,
-    RoomId, RpcSettings, ServerMsg, Token, Track, TrackId, TrackUpdate,
+    ClientMsg, Command, Credentials, Event, IceCandidate, MemberId,
+    NegotiationRole, PeerId, RoomId, RpcSettings, ServerMsg, Track, TrackId,
+    TrackUpdate,
 };
 use url::Url;
 
@@ -55,7 +56,7 @@ pub struct TestMember {
 
     member_id: MemberId,
 
-    token: Token,
+    credentials: Credentials,
 
     /// Writer to WebSocket.
     sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
@@ -91,7 +92,7 @@ pub struct TestMember {
     auto_negotiation: bool,
 }
 
-pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Token) {
+pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Credentials) {
     let mut url = Url::parse(&url).unwrap();
     url.set_fragment(None);
     url.set_query(None);
@@ -126,13 +127,13 @@ impl TestMember {
         &mut self,
         room_id: RoomId,
         member_id: MemberId,
-        token: Token,
+        credentials: Credentials,
     ) {
         executor::block_on(async move {
             let json = serde_json::to_string(&ClientMsg::JoinRoom {
                 room_id,
                 member_id,
-                token,
+                credentials,
             })
             .unwrap();
             self.sink.send(ws::Message::Text(json)).await.unwrap();
@@ -169,7 +170,7 @@ impl TestMember {
             let mut this = Self {
                 room_id: room_id.clone(),
                 member_id: member_id.clone(),
-                token: token.clone(),
+                credentials: token.clone(),
                 sink,
                 events: Vec::new(),
                 known_peers: HashSet::new(),

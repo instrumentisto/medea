@@ -10,8 +10,8 @@ use std::str::FromStr;
 
 use derive_more::{Display, From};
 use medea_client_api_proto::{
-    CloseDescription, CloseReason as CloseByServerReason, MemberId, RoomId,
-    Token,
+    CloseDescription, CloseReason as CloseByServerReason, Credentials,
+    MemberId, RoomId,
 };
 use tracerr::Traced;
 use url::Url;
@@ -48,8 +48,8 @@ pub struct ConnectionInfo {
     /// [`MemberId`] of the `Member` for which [`RpcSession`] is created.
     member_id: MemberId,
 
-    /// [`Token`] for connecting [`RpcSession`].
-    token: Token,
+    /// [`Credentials`] for connecting [`RpcSession`].
+    credentials: Credentials,
 }
 
 impl ConnectionInfo {
@@ -69,9 +69,9 @@ impl ConnectionInfo {
         &self.member_id
     }
 
-    /// Returns [`Token`] for connecting [`RpcSession`].
-    pub fn token(&self) -> &Token {
-        &self.token
+    /// Returns [`Credentials`] for connecting [`RpcSession`].
+    pub fn credentials(&self) -> &Credentials {
+        &self.credentials
     }
 }
 
@@ -126,7 +126,7 @@ impl FromStr for ConnectionInfo {
             url: url.into(),
             room_id,
             member_id,
-            token,
+            credentials: token,
         })
     }
 }
