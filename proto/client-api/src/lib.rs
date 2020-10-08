@@ -25,11 +25,11 @@
 
 pub mod stats;
 
-use std::{collections::HashMap, convert::TryInto as _};
+use std::collections::HashMap;
 
 use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
 
@@ -648,87 +648,6 @@ pub enum ConnectionQualityScore {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn command() {
-        let mut mids = HashMap::new();
-        mids.insert(TrackId(0), String::from("1"));
-
-        let command = ClientMsg::Command(Command::MakeSdpOffer {
-            peer_id: PeerId(77),
-            sdp_offer: "offer".to_owned(),
-            mids,
-            transceivers_statuses: HashMap::new(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let command_str =
-            "{\
-                \"command\":\"MakeSdpOffer\",\
-                \"data\":{\
-                    \"peer_id\":77,\
-                    \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"},\
-                    \"transceivers_statuses\":{}\
-                }\
-            }";
-
-        assert_eq!(command_str, serde_json::to_string(&command).unwrap());
-        assert_eq!(
-            command,
-            serde_json::from_str(&serde_json::to_string(&command).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn ping() {
-        let ping = ServerMsg::Ping(15);
-        let ping_str = "{\"ping\":15}";
-
-        assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
-        assert_eq!(
-            ping,
-            serde_json::from_str(&serde_json::to_string(&ping).unwrap())
-                .unwrap()
-        )
-    }
-
-    #[test]
-    fn event() {
-        let event = ServerMsg::Event(Event::SdpAnswerMade {
-            peer_id: PeerId(45),
-            sdp_answer: "answer".to_owned(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let event_str =
-            "{\
-                \"event\":\"SdpAnswerMade\",\
-                \"data\":{\
-                    \"peer_id\":45,\
-                    \"sdp_answer\":\"answer\"\
-                }\
-            }";
-
-        assert_eq!(event_str, serde_json::to_string(&event).unwrap());
-        assert_eq!(
-            event,
-            serde_json::from_str(&serde_json::to_string(&event).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn pong() {
-        let pong = ClientMsg::Pong(5);
-        let pong_str = "{\"pong\":5}";
-
-        assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
-        assert_eq!(
-            pong,
-            serde_json::from_str(&serde_json::to_string(&pong).unwrap())
-                .unwrap()
-        )
-    }
 
     #[test]
     fn track_patch_merge() {
