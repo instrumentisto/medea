@@ -88,7 +88,7 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "msg", content = "data")]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -121,7 +121,7 @@ pub struct RpcSettings {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "msg", content = "data")]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
