@@ -16,11 +16,9 @@
       background: #f5f5f5;
     }
 
-    .remote-videos {
-      display: flex;
-      width: 100%;
-      margin-top: 30px;
-      justify-content: space-around;
+    .video video {
+      max-width: 600px;
+      margin-top: 10px;
     }
 
     .video {
@@ -43,6 +41,9 @@
     .local-video {
       float: left;
       width: auto;
+    }
+
+    .local-video video {
       height: 150px;
       max-width: 225px;
     }
@@ -108,7 +109,7 @@
     }
   </style>
 </head>
-<body >
+<body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <a class="navbar-brand">Medea</a>
     <button class="navbar-toggler"
@@ -196,12 +197,11 @@
     </div>
   </nav>
 
-  <div class="remote-videos">
+  <div class="remote-videos d-flex flex-row justify-content-center">
   </div>
 
   <div class="footer m-3">
-    <div class="local-video video">
-      <video id="local-video" muted autoplay width="100%" height="100%"></video>
+    <div id="local-video" class="local-video video">
     </div>
     <div class="mb-3">
       <button id="control__mute_audio_send" class="btn btn-secondary">Disable audio send</button>

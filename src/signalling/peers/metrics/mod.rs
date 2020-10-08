@@ -9,6 +9,7 @@
 //!
 //! Stores [`RtcStatsHandler`]s implementors.
 
+mod connection_failure_detector;
 mod flowing_detector;
 mod quality_meter;
 
@@ -20,7 +21,8 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    stats::RtcStat, ConnectionQualityScore, MemberId, PeerId,
+    stats::RtcStat, ConnectionQualityScore, MemberId, PeerConnectionState,
+    PeerId,
 };
 use medea_macro::dispatchable;
 
@@ -32,6 +34,7 @@ use crate::{
     media::PeerStateMachine,
     signalling::peers::{
         metrics::{
+            connection_failure_detector::ConnectionFailureDetector,
             flowing_detector::TrafficFlowDetector,
             quality_meter::QualityMeterStatsHandler,
         },
@@ -41,7 +44,7 @@ use crate::{
 
 /// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
 #[dispatchable]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PeersMetricsEvent {
     /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
     NoTrafficFlow {
@@ -71,6 +74,13 @@ pub enum PeersMetricsEvent {
         /// Actual [`ConnectionQualityScore`].
         quality_score: ConnectionQualityScore,
     },
+
+    /// One or more of the ICE transports on the connection is in the `failed`
+    /// state.
+    PeerConnectionFailed {
+        /// [`PeerId`] of `PeerConnection`.
+        peer_id: PeerId,
+    },
 }
 
 /// [`RtcStatsHandler`] performs [`RtcStat`]s analysis.
@@ -99,6 +109,14 @@ pub trait RtcStatsHandler: Debug {
     /// [`PeerMetricsService`] provides new [`RtcStat`]s for the
     /// [`RtcStatsHandler`].
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
+
+    /// [`PeerMetricService`] provides [`PeerConnectionState`] update for the
+    /// [`RtcStatsHandler`].
+    fn update_peer_connection_state(
+        &mut self,
+        peer_id: PeerId,
+        state: PeerConnectionState,
+    );
 
     /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
     ///
@@ -137,6 +155,7 @@ impl PeerMetricsService {
                 stats_ttl,
             )),
             Box::new(QualityMeterStatsHandler::new()),
+            Box::new(ConnectionFailureDetector::new()),
         ];
 
         Self { event_tx, handlers }
@@ -181,6 +200,18 @@ impl RtcStatsHandler for PeerMetricsService {
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         for handler in &mut self.handlers {
             handler.add_stats(peer_id, stats);
+        }
+    }
+
+    /// Calls [`RtcStatsHandler::update_peer_connection_state`] on the
+    /// registered [`RtcStatsHandler`]s,
+    fn update_peer_connection_state(
+        &mut self,
+        peer_id: PeerId,
+        state: PeerConnectionState,
+    ) {
+        for handler in &mut self.handlers {
+            handler.update_peer_connection_state(peer_id, state);
         }
     }
 

@@ -120,11 +120,11 @@ async fn get_test_room_and_exist_peer(
 /// Tests RoomHandle::set_local_media_settings before creating PeerConnection.
 /// Setup:
 ///     1. Create Room.
-///     2. Set `on_failed_local_stream` callback.
+///     2. Set `on_failed_local_media` callback.
 ///     3. Invoke `room_handle.set_local_media_settings` with one track.
 ///     4. Send `PeerCreated` to room wth two tracks
 /// Assertions:
-///     1. `on_failed_local_stream` callback was invoked.
+///     1. `on_failed_local_media` callback was invoked.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
@@ -132,14 +132,14 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let room_handle = room.new_handle();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "InvalidLocalStream");
+        cb_assert_eq!(&err.name(), "InvalidLocalTracks");
         cb_assert_eq!(
             err.message(),
-            "Invalid local stream: MuteState of Sender can\'t be transited \
+            "Invalid local tracks: MuteState of Sender can\'t be transited \
              into muted state, because this Sender is required."
         );
     });
-    room_handle.on_failed_local_stream(cb.into()).unwrap();
+    room_handle.on_failed_local_media(cb.into()).unwrap();
 
     let (audio_track, video_track) = get_test_required_tracks();
 
@@ -166,19 +166,19 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 /// Tests RoomHandle::set_local_media_settings for existing PeerConnection.
 /// Setup:
 ///     1. Create Room.
-///     2. Set `on_failed_local_stream` callback.
+///     2. Set `on_failed_local_media` callback.
 ///     3. Invoke `peer.get_offer` with two tracks.
 ///     4. Invoke `room_handle.set_local_media_settings` with only one track.
 /// Assertions:
-///     1. `on_failed_local_stream` was invoked.
+///     1. `on_failed_local_media` was invoked.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "InvalidLocalStream");
+        cb_assert_eq!(&err.name(), "InvalidLocalTracks");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local stream: provided MediaStream was expected to have \
-             single video track"
+            "Invalid local tracks: provided multiple device video \
+             MediaStreamTracks"
         );
     });
     let (audio_track, video_track) = get_test_required_tracks();
@@ -188,7 +188,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
     let room_handle = room.new_handle();
-    room_handle.on_failed_local_stream(cb.into()).unwrap();
+    room_handle.on_failed_local_media(cb.into()).unwrap();
     JsFuture::from(room_handle.set_local_media_settings(&constraints))
         .await
         .unwrap();
@@ -222,7 +222,7 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         }
 
         let room_handle = room.new_handle();
-        room_handle.on_failed_local_stream(closure.into()).unwrap();
+        room_handle.on_failed_local_media(closure.into()).unwrap();
         JsFuture::from(room_handle.set_local_media_settings(&constraints))
             .await
             .unwrap();
@@ -233,12 +233,12 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
             .map_err(|_| ())
     }
 
-    // on_failed_local_stream callback does not fire
+    // on_failed_local_media callback does not fire
     helper(true, false, true, false).await.unwrap_err();
     helper(false, true, false, true).await.unwrap_err();
     helper(false, false, false, false).await.unwrap_err();
 
-    // on_failed_local_stream callback fires
+    // on_failed_local_media callback fires
     helper(true, false, false, true).await.unwrap();
     helper(false, true, true, false).await.unwrap();
     helper(true, true, false, false).await.unwrap();
@@ -260,12 +260,12 @@ async fn error_get_local_stream_on_new_peer() {
         cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
         cb_assert_eq!(
             &err.message(),
-            "Failed to get local stream: MediaDevices.getUserMedia() failed: \
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
              Unknown JS error: error_get_local_stream_on_new_peer"
         );
     });
 
-    room_handle.on_failed_local_stream(cb.into()).unwrap();
+    room_handle.on_failed_local_media(cb.into()).unwrap();
 
     let mock_navigator = MockNavigator::new();
     mock_navigator
@@ -286,10 +286,10 @@ async fn error_get_local_stream_on_new_peer() {
         .await;
 }
 
-/// Tests `Room::join` if `on_failed_local_stream` callback was not set.
+/// Tests `Room::join` if `on_failed_local_media` callback was not set.
 /// Setup:
 ///     1. Create Room.
-///     2. DO NOT set `on_failed_local_stream` callback.
+///     2. DO NOT set `on_failed_local_media` callback.
 ///     3. Try join to Room.
 /// Assertions:
 ///     1. Room::join returns error.
@@ -308,7 +308,7 @@ async fn error_join_room_without_on_failed_stream_callback() {
             assert_eq!(e.name(), "CallbackNotSet");
             assert_eq!(
                 e.message(),
-                "`Room.on_failed_local_stream()` callback isn't set.",
+                "`Room.on_failed_local_media()` callback isn't set.",
             );
             assert!(!e.trace().is_empty());
         }
@@ -328,7 +328,7 @@ async fn error_join_room_without_on_connection_loss_callback() {
     let room_handle = room.new_handle();
 
     room_handle
-        .on_failed_local_stream(js_sys::Function::new_no_args(""))
+        .on_failed_local_media(js_sys::Function::new_no_args(""))
         .unwrap();
 
     match room_handle.inner_join(String::from("token")).await {
@@ -346,7 +346,8 @@ async fn error_join_room_without_on_connection_loss_callback() {
 
 mod disable_recv_tracks {
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, MemberId, VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, MemberId,
+        VideoSettings,
     };
 
     use super::*;
@@ -384,6 +385,7 @@ mod disable_recv_tracks {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
+                            source_kind: MediaSourceKind::Device,
                         }),
                     },
                     Track {
@@ -989,8 +991,8 @@ mod patches_generation {
 
     use futures::StreamExt;
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, TrackId, TrackPatchCommand,
-        VideoSettings,
+        AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
+        TrackPatchCommand, VideoSettings,
     };
     use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
@@ -1030,6 +1032,7 @@ mod patches_generation {
                 id: video_track_id,
                 media_type: MediaType::Video(VideoSettings {
                     is_required: false,
+                    source_kind: MediaSourceKind::Device,
                 }),
                 direction: Direction::Send {
                     receivers: Vec::new(),
@@ -1039,7 +1042,8 @@ mod patches_generation {
             let tracks = vec![audio_track, video_track];
             let peer_id = PeerId(i + 1);
 
-            let mut local_stream = MediaStreamSettings::new();
+            let mut local_stream = MediaStreamSettings::default();
+            local_stream.set_track_enabled(false, TransceiverKind::Video);
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 TransceiverKind::Audio,

@@ -83,14 +83,11 @@ mod utils;
 use futures::{channel::oneshot, future::Either, Future};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, MemberId, Track, TrackId,
-    VideoSettings,
+    AudioSettings, Direction, MediaSourceKind, MediaType, MemberId, Track,
+    TrackId, VideoSettings,
 };
 use medea_jason::{
-    media::{
-        LocalStreamConstraints, MediaManager, MediaStreamTrack,
-        VideoTrackConstraints,
-    },
+    media::{LocalTracksConstraints, MediaManager, MediaStreamTrack},
     peer::TransceiverKind,
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
@@ -174,6 +171,7 @@ pub fn get_test_tracks(
             },
             media_type: MediaType::Video(VideoSettings {
                 is_required: is_video_required,
+                source_kind: MediaSourceKind::Device,
             }),
         },
     )
@@ -199,7 +197,10 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
                 sender: "bob".into(),
                 mid: Some("mid1".to_string()),
             },
-            media_type: MediaType::Video(VideoSettings { is_required: false }),
+            media_type: MediaType::Video(VideoSettings {
+                is_required: false,
+                source_kind: MediaSourceKind::Device,
+            }),
         },
     )
 }
@@ -226,7 +227,7 @@ fn media_stream_settings(
         settings.audio(AudioTrackConstraints::default());
     }
     if is_video_enabled {
-        settings.video(VideoTrackConstraints::default());
+        settings.device_video(DeviceVideoTrackConstraints::default());
     }
 
     settings
@@ -235,8 +236,8 @@ fn media_stream_settings(
 fn local_constraints(
     is_audio_enabled: bool,
     is_video_enabled: bool,
-) -> LocalStreamConstraints {
-    let constraints = LocalStreamConstraints::new();
+) -> LocalTracksConstraints {
+    let constraints = LocalTracksConstraints::new();
     constraints
         .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
 
@@ -269,16 +270,16 @@ async fn get_video_track() -> MediaStreamTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
+    let stream = manager.get_tracks(settings).await.unwrap();
+    stream.into_iter().next().unwrap().0
 }
 
 async fn get_audio_track() -> MediaStreamTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
+    let stream = manager.get_tracks(settings).await.unwrap();
+    stream.into_iter().next().unwrap().0
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within

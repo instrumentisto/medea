@@ -5,17 +5,17 @@
 mod constraints;
 mod device_info;
 mod manager;
-mod stream;
+mod track;
 
 #[doc(inline)]
 pub use self::{
     constraints::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
-        DisplayVideoTrackConstraints, FacingMode, LocalStreamConstraints,
-        MediaStreamSettings, MultiSourceMediaStreamConstraints,
-        RecvConstraints, TrackConstraints, VideoTrackConstraints,
+        DisplayVideoTrackConstraints, FacingMode, LocalTracksConstraints,
+        MediaStreamSettings, MultiSourceTracksConstraints, RecvConstraints,
+        TrackConstraints, VideoSource,
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
-    stream::{MediaStream, MediaStreamTrack, TrackKind},
+    track::{MediaStreamTrack, TrackKind},
 };

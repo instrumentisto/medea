@@ -56,7 +56,7 @@ async fn only_one_strong_rpc_rc_exists() {
         })));
 
     let room = jason.inner_init_room(ws.clone());
-    room.on_failed_local_stream(Closure::once_into_js(|| {}).into())
+    room.on_failed_local_media(Closure::once_into_js(|| {}).into())
         .unwrap();
     room.on_connection_loss(Closure::once_into_js(|| {}).into())
         .unwrap();
@@ -95,7 +95,7 @@ async fn rpc_dropped_on_jason_dispose() {
         })));
 
     let room = jason.inner_init_room(ws);
-    room.on_failed_local_stream(Closure::once_into_js(|| {}).into())
+    room.on_failed_local_media(Closure::once_into_js(|| {}).into())
         .unwrap();
     room.on_connection_loss(Closure::once_into_js(|| {}).into())
         .unwrap();
@@ -135,7 +135,7 @@ async fn room_closes_on_rpc_transport_close() {
     })));
 
     let mut room = jason.inner_init_room(ws);
-    room.on_failed_local_stream(Closure::once_into_js(|| {}).into())
+    room.on_failed_local_media(Closure::once_into_js(|| {}).into())
         .unwrap();
     room.on_connection_loss(Closure::once_into_js(|| {}).into())
         .unwrap();

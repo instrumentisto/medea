@@ -1,7 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
 mod media;
-mod stream;
 
 use std::{pin::Pin, rc::Rc};
 
@@ -16,11 +15,11 @@ use medea_client_api_proto::{
         RtcInboundRtpStreamMediaType, RtcOutboundRtpStreamMediaType, RtcStat,
         RtcStatsType, StatId, TrackStats, TrackStatsKind,
     },
-    AudioSettings, Direction, IceConnectionState, MediaType, MemberId, PeerId,
-    Track, TrackId, TrackPatchEvent, VideoSettings,
+    AudioSettings, Direction, IceConnectionState, MediaSourceKind, MediaType,
+    MemberId, PeerId, Track, TrackId, TrackPatchEvent, VideoSettings,
 };
 use medea_jason::{
-    media::{LocalStreamConstraints, MediaManager, RecvConstraints, TrackKind},
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints, TrackKind},
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
         TransceiverKind,
@@ -178,7 +177,7 @@ async fn add_candidates_to_answerer_before_offer() {
         Vec::new(),
         Rc::clone(&manager),
         false,
-        LocalStreamConstraints::default(),
+        LocalTracksConstraints::default(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -189,7 +188,7 @@ async fn add_candidates_to_answerer_before_offer() {
         Vec::new(),
         manager,
         false,
-        LocalStreamConstraints::default(),
+        LocalTracksConstraints::default(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -219,7 +218,7 @@ async fn add_candidates_to_offerer_before_answer() {
             Vec::new(),
             Rc::clone(&manager),
             false,
-            LocalStreamConstraints::default(),
+            LocalTracksConstraints::default(),
             Rc::new(RecvConstraints::default()),
         )
         .unwrap(),
@@ -231,7 +230,7 @@ async fn add_candidates_to_offerer_before_answer() {
             Vec::new(),
             manager,
             false,
-            LocalStreamConstraints::default(),
+            LocalTracksConstraints::default(),
             Rc::new(RecvConstraints::default()),
         )
         .unwrap(),
@@ -262,7 +261,7 @@ async fn normal_exchange_of_candidates() {
         Vec::new(),
         Rc::clone(&manager),
         false,
-        LocalStreamConstraints::default(),
+        LocalTracksConstraints::default(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -272,7 +271,7 @@ async fn normal_exchange_of_candidates() {
         Vec::new(),
         manager,
         false,
-        LocalStreamConstraints::default(),
+        LocalTracksConstraints::default(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -318,7 +317,7 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
-            PeerEvent::NewLocalStream { .. } => {}
+            PeerEvent::NewLocalTrack { .. } => {}
             _ => unreachable!(),
         }
     }
@@ -346,8 +345,7 @@ async fn send_event_on_new_local_stream() {
 
     while let Some(event) = rx.next().await {
         match event {
-            PeerEvent::NewLocalStream { peer_id, .. } => {
-                assert_eq!(peer_id, id);
+            PeerEvent::NewLocalTrack { .. } => {
                 break;
             }
             _ => {}
@@ -370,7 +368,7 @@ async fn ice_connection_state_changed_is_emitted() {
         Vec::new(),
         Rc::clone(&manager),
         false,
-        LocalStreamConstraints::default(),
+        LocalTracksConstraints::default(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -380,7 +378,7 @@ async fn ice_connection_state_changed_is_emitted() {
         Vec::new(),
         manager,
         false,
-        LocalStreamConstraints::default(),
+        LocalTracksConstraints::default(),
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
@@ -611,6 +609,7 @@ impl InterconnectedPeers {
                 },
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
+                    source_kind: MediaSourceKind::Device,
                 }),
             },
         ]
@@ -637,6 +636,7 @@ impl InterconnectedPeers {
                 },
                 media_type: MediaType::Video(VideoSettings {
                     is_required: true,
+                    source_kind: MediaSourceKind::Device,
                 }),
             },
         ]
@@ -728,7 +728,7 @@ mod peer_stats_caching {
             Vec::new(),
             manager,
             false,
-            LocalStreamConstraints::default(),
+            LocalTracksConstraints::default(),
             Rc::new(RecvConstraints::default()),
         )
         .unwrap();
@@ -775,7 +775,7 @@ mod peer_stats_caching {
             Vec::new(),
             manager,
             false,
-            LocalStreamConstraints::default(),
+            LocalTracksConstraints::default(),
             Rc::new(RecvConstraints::default()),
         )
         .unwrap();
@@ -824,7 +824,7 @@ mod peer_stats_caching {
             Vec::new(),
             manager,
             false,
-            LocalStreamConstraints::default(),
+            LocalTracksConstraints::default(),
             Rc::new(RecvConstraints::default()),
         )
         .unwrap();
@@ -932,7 +932,7 @@ async fn new_remote_track() {
         let (tx2, mut rx2) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
 
-        let tx_caps = LocalStreamConstraints::default();
+        let tx_caps = LocalTracksConstraints::default();
         tx_caps.set_enabled(audio_tx_enabled, TransceiverKind::Audio);
         tx_caps.set_enabled(video_tx_enabled, TransceiverKind::Video);
         let sender_peer = PeerConnection::new(
@@ -955,7 +955,7 @@ async fn new_remote_track() {
             Vec::new(),
             manager,
             false,
-            LocalStreamConstraints::default(),
+            LocalTracksConstraints::default(),
             Rc::new(rcv_caps),
         )
         .unwrap();
@@ -987,6 +987,7 @@ async fn new_remote_track() {
                         },
                         media_type: MediaType::Video(VideoSettings {
                             is_required: true,
+                            source_kind: MediaSourceKind::Device,
                         }),
                     },
                 ],
@@ -1054,4 +1055,53 @@ async fn new_remote_track() {
             }
         );
     }
+}
+
+/// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
+/// `ice-ufrag` IDs will be updated in the SDP offer.
+#[wasm_bindgen_test]
+async fn ice_restart_works() {
+    fn get_ice_pwds(offer: &str) -> Vec<&str> {
+        offer
+            .lines()
+            .filter_map(|line| {
+                if line.contains("ice-pwd") {
+                    Some(line.split(':').skip(1).next().unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn get_ice_ufrags(offer: &str) -> Vec<&str> {
+        offer
+            .lines()
+            .filter_map(|line| {
+                if line.contains("ice-ufrag") {
+                    Some(line.split(':').skip(1).next().unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    let peers = InterconnectedPeers::new().await;
+    let sdp_offer_before = peers.first_peer.get_offer(vec![]).await.unwrap();
+    let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
+    let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
+    peers.first_peer.restart_ice();
+    let sdp_offer_after = peers.first_peer.get_offer(vec![]).await.unwrap();
+    let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
+    let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
+
+    ice_pwds_before
+        .into_iter()
+        .zip(ice_pwds_after.into_iter())
+        .for_each(|(before, after)| assert_ne!(before, after));
+    ice_ufrags_before
+        .into_iter()
+        .zip(ice_ufrags_after.into_iter())
+        .for_each(|(before, after)| assert_ne!(before, after));
 }
