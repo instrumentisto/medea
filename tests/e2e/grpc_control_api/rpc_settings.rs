@@ -23,7 +23,9 @@ use crate::{
 /// 4. Wait for connection drop because idle, and verify that diff between
 /// connection open and drop if >3 and <5.
 // TODO: currently this test fails because we don't implement RPC settings
-// updating. #[actix_rt::test]
+// updating.
+//
+// #[actix_rt::test]
 async fn rpc_settings_from_spec_works() {
     const ROOM_ID: &str = "rpc_settings_from_spec_works";
 

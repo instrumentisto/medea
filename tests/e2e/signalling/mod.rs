@@ -52,11 +52,8 @@ pub enum ConnectionEvent {
 
 /// Medea client for testing purposes.
 pub struct TestMember {
+    /// [`RoomId`] of [`Room`] to which this [`TestMember`] is connected.
     room_id: RoomId,
-
-    member_id: MemberId,
-
-    credentials: Credentials,
 
     /// Writer to WebSocket.
     sink: SplitSink<Framed<BoxedSocket, ws::Codec>, ws::Message>,
@@ -169,8 +166,6 @@ impl TestMember {
             Self::add_stream(stream, ctx);
             let mut this = Self {
                 room_id: room_id.clone(),
-                member_id: member_id.clone(),
-                credentials: token.clone(),
                 sink,
                 events: Vec::new(),
                 known_peers: HashSet::new(),
@@ -310,6 +305,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
             match server_msg {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event { room_id, event } => {
+                    assert_eq!(self.room_id, room_id);
                     if self.auto_negotiation {
                         match &event {
                             Event::PeerCreated {

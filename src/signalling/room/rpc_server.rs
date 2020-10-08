@@ -288,8 +288,6 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::collections::HashMap;
 
-    use medea_client_api_proto::RoomId;
-
     use super::*;
 
     use crate::{

@@ -32,8 +32,13 @@ use crate::{
     log::prelude::*,
 };
 
+/// Repository of the all [`RpcServer`]s registered on this Media Server.
 #[cfg_attr(test, mockall::automock)]
 pub trait RpcServerRepository: Debug {
+    /// Returns [`RpcServer`] with a provided [`RoomId`].
+    ///
+    /// Returns `None` if [`RpcServer`] with a provided [`RoomId`] doesn't
+    /// exists.
     fn get(&self, room_id: &RoomId) -> Option<Box<dyn RpcServer>>;
 }
 
@@ -42,6 +47,13 @@ impl_debug_by_struct_name!(MockRpcServerRepository);
 
 /// Used to generate [`WsSession`] IDs.
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+/// [`WsSession`] authentication timeout.
+///
+/// When this [`Duration`] will pass, [`WsSession`] will check that at least one
+/// success authorization was happened.
+#[cfg(not(test))]
+static AUTH_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(test)]
 static AUTH_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// [`WsSession`] closed reason.
@@ -60,8 +72,10 @@ pub struct WsSession {
     /// ID of [`WsSession`].
     id: u64,
 
-    rooms: Box<dyn RpcServerRepository>,
+    /// Repository of the all [`RpcServer`]s registered on this Media Server.
+    rpc_server_repo: Box<dyn RpcServerRepository>,
 
+    /// All sessions which this [`WsSession`] is serves.
     sessions: HashMap<RoomId, (MemberId, Box<dyn RpcServer>)>,
 
     /// Timeout of receiving any messages from client.
@@ -87,6 +101,7 @@ pub struct WsSession {
     /// `Actor::stopped()` for this [`WsSession`] is called.
     close_reason: Option<InnerCloseReason>,
 
+    /// [`SpawnHandle`] for the authentication checking task.
     auth_timeout_handle: Option<SpawnHandle>,
 }
 
@@ -99,7 +114,7 @@ impl WsSession {
     ) -> Self {
         Self {
             id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
-            rooms,
+            rpc_server_repo: rooms,
             sessions: HashMap::new(),
             idle_timeout,
             last_activity: Instant::now(),
@@ -155,6 +170,7 @@ impl WsSession {
         }
     }
 
+    /// Updates [`RpcConnectionSettings`] of this [`WsSession`].
     fn update_rpc_settings(&mut self, new_settings: RpcConnectionSettings) {
         if new_settings.idle_timeout < self.idle_timeout {
             self.idle_timeout = new_settings.idle_timeout;
@@ -165,6 +181,7 @@ impl WsSession {
         // TODO: maybe we need to restart IDLE watchdog and pinger
     }
 
+    /// Handler [`ClientMsg::JoinRoom`].
     fn handle_join_room(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
@@ -172,7 +189,7 @@ impl WsSession {
         member_id: MemberId,
         credentials: Credentials,
     ) {
-        if let Some(room) = self.rooms.get(&room_id) {
+        if let Some(room) = self.rpc_server_repo.get(&room_id) {
             room.connection_established(
                 member_id.clone(),
                 credentials,
@@ -199,6 +216,7 @@ impl WsSession {
         }
     }
 
+    /// Handles [`ClientMsg::LeftRoom`].
     fn handle_leave_room(
         &self,
         ctx: &mut ws::WebsocketContext<Self>,
@@ -206,7 +224,7 @@ impl WsSession {
         member_id: MemberId,
         reason: ClosedReason,
     ) {
-        if let Some(room) = self.rooms.get(room_id) {
+        if let Some(room) = self.rpc_server_repo.get(room_id) {
             ctx.spawn(
                 room.connection_closed(member_id, reason).into_actor(self),
             );
@@ -351,6 +369,7 @@ impl WsSession {
         self.last_ping_num += 1;
     }
 
+    /// Sends [`ServerMsg::JoinedRoom`] to the client.
     fn send_join_room(
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
@@ -365,6 +384,7 @@ impl WsSession {
         );
     }
 
+    /// Sends [`ServerMsg::LeftRoom`] to the client.
     fn send_left_room(
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
@@ -379,6 +399,7 @@ impl WsSession {
         );
     }
 
+    /// Sends current [`RpcSettings`] to the client.
     fn send_current_rpc_settings(&self, ctx: &mut <Self as Actor>::Context) {
         let rpc_settings = RpcSettings {
             idle_timeout_ms: self
@@ -488,20 +509,16 @@ impl RpcConnection for Addr<WsSession> {
     }
 }
 
+/// Message which indicates that [`WsSession`] should close connection for the
+/// provided [`RoomId`] with provided [`CloseDescription`] as close reason.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct CloseRoom {
+    /// [`RoomId`] of [`Room`] which should be closed.
     room_id: RoomId,
-    close_description: CloseDescription,
-}
 
-impl CloseRoom {
-    pub fn new(room_id: RoomId, close_description: CloseDescription) -> Self {
-        Self {
-            room_id,
-            close_description,
-        }
-    }
+    /// [`CloseDescription`] with which this [`Room`] should be closed.
+    close_description: CloseDescription,
 }
 
 impl Handler<CloseRoom> for WsSession {
@@ -588,7 +605,6 @@ impl Display for WsSession {
 
 #[cfg(test)]
 mod test {
-
     use std::{
         sync::Mutex,
         time::{Duration, Instant},
