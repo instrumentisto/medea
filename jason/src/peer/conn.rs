@@ -20,7 +20,7 @@ use web_sys::{
 };
 
 use crate::{
-    media::TrackConstraints,
+    media::{MediaKind, TrackConstraints},
     peer::stats::{RtcStats, RtcStatsError},
     utils::{
         get_property_by_name, EventListener, EventListenerBindError, JsCaused,
@@ -53,34 +53,11 @@ pub struct IceCandidate {
     pub sdp_mid: Option<String>,
 }
 
-/// Representation of [RTCRtpTransceiver][1]'s [kind][2].
-///
-/// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
-/// [2]: https://w3.org/TR/webrtc/#dfn-transceiver-kind
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TransceiverKind {
-    /// Audio transceiver.
-    Audio,
-
-    /// Video transceiver.
-    Video,
-}
-
-impl From<&TrackConstraints> for TransceiverKind {
+impl From<&TrackConstraints> for MediaKind {
     fn from(media_type: &TrackConstraints) -> Self {
         match media_type {
             TrackConstraints::Audio(_) => Self::Audio,
             TrackConstraints::Video(_) => Self::Video,
-        }
-    }
-}
-
-impl TransceiverKind {
-    /// Returns string representation of a [`TransceiverKind`].
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Audio => "audio",
-            Self::Video => "video",
         }
     }
 }
@@ -680,7 +657,7 @@ impl RtcPeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn add_transceiver(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TransceiverDirection,
     ) -> RtcRtpTransceiver {
         let mut init = RtcRtpTransceiverInit::new();
