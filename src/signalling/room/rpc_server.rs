@@ -234,7 +234,6 @@ impl Handler<RpcConnectionClosed> for Room {
     /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
     /// [1]: crate::signalling::participants::ParticipantService
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
-        debug!("YEP LEAVE");
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason

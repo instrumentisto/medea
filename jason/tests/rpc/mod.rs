@@ -18,9 +18,8 @@ use medea_client_api_proto::{
 };
 use medea_jason::rpc::{
     websocket::{MockRpcTransport, RpcEvent, TransportState},
-    ClientDisconnect, CloseMsg, RpcSession, RpcTransport, WebSocketRpcClient,
+    ClientDisconnect, CloseMsg, RpcTransport, WebSocketRpcClient,
 };
-use url::Url;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
@@ -179,7 +178,10 @@ async fn send_goes_to_transport() {
     spawn_local(async move {
         while let Some(msg) = on_send_rx.next().await {
             match msg {
-                ClientMsg::Command { room_id, command } => match command {
+                ClientMsg::Command {
+                    room_id: _,
+                    command,
+                } => match command {
                     Command::MakeSdpOffer {
                         peer_id,
                         sdp_offer,

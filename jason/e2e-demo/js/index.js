@@ -790,7 +790,7 @@ window.onload = async function() {
           muteVideoSend.textContent = "Enable video send";
         }
       } catch (e) {
-        console.error(e);
+        console.error(e.message());
       }
     });
     muteAudioRecv.addEventListener('click', async () => {

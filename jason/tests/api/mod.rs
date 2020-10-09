@@ -1,15 +1,13 @@
 mod connection;
 mod room;
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use futures::{
     channel::{mpsc, oneshot},
     stream, StreamExt,
 };
-use medea_client_api_proto::{
-    ClientMsg, CloseReason, Command, RpcSettings, ServerMsg,
-};
+use medea_client_api_proto::{ClientMsg, CloseReason, RpcSettings, ServerMsg};
 use medea_jason::{
     rpc::{
         websocket::{MockRpcTransport, TransportState},
@@ -22,8 +20,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
-use crate::{delay_for, timeout, yield_now, TEST_ROOM_URL};
-use std::cell::RefCell;
+use crate::{timeout, yield_now, TEST_ROOM_URL};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -262,7 +259,7 @@ async fn room_closes_on_rpc_transport_close() {
                         ]))
                     }
                 });
-                transport.expect_send().return_once(|cmd| Ok(()));
+                transport.expect_send().return_once(|_| Ok(()));
                 transport.expect_set_close_reason().return_once(|_| ());
                 transport
                     .expect_on_state_change()

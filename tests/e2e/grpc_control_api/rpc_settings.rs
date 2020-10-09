@@ -22,10 +22,7 @@ use crate::{
 ///
 /// 4. Wait for connection drop because idle, and verify that diff between
 /// connection open and drop if >3 and <5.
-// TODO: currently this test fails because we don't implement RPC settings
-// updating.
-//
-// #[actix_rt::test]
+#[actix_rt::test]
 async fn rpc_settings_from_spec_works() {
     const ROOM_ID: &str = "rpc_settings_from_spec_works";
 
@@ -37,7 +34,7 @@ async fn rpc_settings_from_spec_works() {
                 .id("member")
                 .credentials("test")
                 .ping_interval(Some(Duration::from_secs(10)))
-                .idle_timeout(Some(Duration::from_secs(3)))
+                .idle_timeout(Some(Duration::from_secs(1)))
                 .reconnect_timeout(Some(Duration::from_secs(0)))
                 .build()
                 .unwrap(),
@@ -61,8 +58,8 @@ async fn rpc_settings_from_spec_works() {
             ConnectionEvent::Stopped => {
                 let diff = Instant::now() - opened.unwrap();
 
-                assert!(diff > Duration::from_secs(3));
-                assert!(diff < Duration::from_secs(5));
+                assert!(diff > Duration::from_secs(1));
+                assert!(diff < Duration::from_secs(3));
 
                 test_end_tx.take().unwrap().send(()).unwrap();
             }

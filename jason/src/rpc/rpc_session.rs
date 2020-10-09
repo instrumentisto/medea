@@ -9,11 +9,12 @@ use futures::{
     channel::{oneshot, oneshot::Canceled},
     future::LocalBoxFuture,
     stream::LocalBoxStream,
-    StreamExt as _,
+    StreamExt,
 };
 use medea_client_api_proto::{Command, Event};
 use medea_reactive::ObservableCell;
 use tracerr::Traced;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::rpc::{
     websocket::RpcEvent, ClientDisconnect, CloseReason, ConnectionInfo,
@@ -127,19 +128,38 @@ pub struct Session {
 impl Session {
     /// Returns new uninitialized [`Session`] with a provided
     /// [`WebSocketRpcClient`].
-    pub fn new(client: Rc<WebSocketRpcClient>) -> Self {
-        Self {
+    pub fn new(client: Rc<WebSocketRpcClient>) -> Rc<Self> {
+        let this = Rc::new(Self {
             client,
             credentials: RefCell::new(None),
             state: ObservableCell::new(SessionState::Closed),
             initially_connected: Cell::new(false),
-        }
+        });
+        spawn_local({
+            let weak_this = Rc::downgrade(&this);
+            let mut client_on_connection_loss =
+                this.client.on_connection_loss();
+            async move {
+                while client_on_connection_loss.next().await.is_some() {
+                    if let Some(this) = weak_this.upgrade() {
+                        this.state.set(SessionState::Closed);
+                    } else {
+                        break;
+                    }
+                }
+            }
+        });
+
+        this
     }
 }
 
 impl Session {
     async fn connect_session(&self) -> Result<(), Traced<RpcClientError>> {
         if let Some(credentials) = self.credentials.borrow().as_ref() {
+            if self.state.get() != SessionState::Closed {
+                return Ok(());
+            }
             self.state.set(SessionState::Connecting);
             self.client
                 .clone()
@@ -248,7 +268,15 @@ impl RpcSession for Session {
     }
 
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
-        self.client.on_connection_loss()
+        self.state
+            .subscribe()
+            .skip(1)
+            .filter_map(|state| {
+                futures::future::ready(
+                    Some(()).filter(|_| matches!(state, SessionState::Closed)),
+                )
+            })
+            .boxed_local()
     }
 
     fn on_reconnected(&self) -> LocalBoxStream<'static, ()> {

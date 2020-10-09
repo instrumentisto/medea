@@ -118,13 +118,21 @@ pub enum ServerMsg {
     /// settings.
     RpcSettings(RpcSettings),
 
+    /// `Media Server` notifies `Client` that he joined `Room`.
     JoinedRoom {
+        /// ID of `Room` into which `Client` was joined.
         room_id: RoomId,
+
+        /// ID of `Member` which joined `Room`.
         member_id: MemberId,
     },
 
+    /// `Media Server` notifies `Client` that he left `Room`.
     LeftRoom {
+        /// ID of `Room` from which `Client` was left.
         room_id: RoomId,
+
+        /// [`CloseReason`] with which `Client` was left.
         close_reason: CloseReason,
     },
 }
@@ -141,14 +149,24 @@ pub enum ClientMsg {
     /// Request of `Client` to change the state on `Media Server`.
     Command { room_id: RoomId, command: Command },
 
+    /// Request of `Client` to join `Room`.
     JoinRoom {
+        /// ID of `Room` into which `Client` requests to join.
         room_id: RoomId,
+
+        /// ID of `Member` with which [`Credentials`] `Client` want to join.
         member_id: MemberId,
+
+        /// [`Credentials`] of `Client`'s `Member`.
         credentials: Credentials,
     },
 
+    /// Request of `Client` to leave `Room`.
     LeaveRoom {
+        /// ID of `Room` from which `Client` requests to left.
         room_id: RoomId,
+
+        /// ID of leaving `Member`.
         member_id: MemberId,
     },
 }

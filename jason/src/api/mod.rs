@@ -70,7 +70,7 @@ impl Jason {
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::clone(&self.0.borrow().rpc);
-        self.inner_init_room(Rc::new(Session::new(rpc)))
+        self.inner_init_room(Session::new(rpc))
     }
 
     /// Returns handle to [`MediaManager`].

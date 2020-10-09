@@ -193,6 +193,22 @@ impl WebSocketRpcClient {
         Self(Inner::new(rpc_transport_factory))
     }
 
+    /// Sends [`ClientMsg`] to the Media Server.
+    ///
+    /// If some error occurs while sending message, then it will be printed with
+    /// [`JasonError::print`].
+    fn send_msg(&self, msg: &ClientMsg) {
+        let inner = self.0.borrow();
+        if let Some(sock) = &inner.sock {
+            if let Err(e) = sock
+                .send(msg)
+                .map_err(tracerr::map_from_and_wrap!(=> TransportError))
+            {
+                JasonError::from(e).print();
+            }
+        }
+    }
+
     /// Authorizes [`WebSocketRpcClient`] on the Media Server.
     pub fn authorize(
         &self,
@@ -200,24 +216,16 @@ impl WebSocketRpcClient {
         member_id: MemberId,
         credentials: Credentials,
     ) {
-        let inner = self.0.borrow();
-        if let Some(sock) = &inner.sock {
-            sock.send(&ClientMsg::JoinRoom {
-                room_id,
-                member_id,
-                credentials: credentials,
-            })
-            .unwrap();
-        }
+        self.send_msg(&ClientMsg::JoinRoom {
+            room_id,
+            member_id,
+            credentials,
+        });
     }
 
     /// Leaves `Room` with a provided [`RoomId`].
     pub fn leave_room(&self, room_id: RoomId, member_id: MemberId) {
-        let inner = self.0.borrow();
-        if let Some(sock) = &inner.sock {
-            sock.send(&ClientMsg::LeaveRoom { room_id, member_id })
-                .unwrap();
-        }
+        self.send_msg(&ClientMsg::LeaveRoom { room_id, member_id });
     }
 
     /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]

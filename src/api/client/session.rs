@@ -103,6 +103,9 @@ pub struct WsSession {
 
     /// [`SpawnHandle`] for the authentication checking task.
     auth_timeout_handle: Option<SpawnHandle>,
+
+    /// [`SpawnHandle`] for the heartbeat task.
+    heartbeat_handle: Option<SpawnHandle>,
 }
 
 impl WsSession {
@@ -123,6 +126,7 @@ impl WsSession {
             ping_interval,
             close_reason: None,
             auth_timeout_handle: None,
+            heartbeat_handle: None,
         }
     }
 
@@ -171,14 +175,31 @@ impl WsSession {
     }
 
     /// Updates [`RpcConnectionSettings`] of this [`WsSession`].
-    fn update_rpc_settings(&mut self, new_settings: RpcConnectionSettings) {
+    ///
+    /// Update will be performed only if old settings are less then new one.
+    ///
+    /// Send [`ServerMsg::RpcSettings`] to the client if some settings was
+    /// updated.
+    ///
+    /// Restarts heartbeater with a new [`RpcConnectionSettings`].
+    fn update_rpc_settings(
+        &mut self,
+        new_settings: RpcConnectionSettings,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) {
+        let mut updated = false;
         if new_settings.idle_timeout < self.idle_timeout {
             self.idle_timeout = new_settings.idle_timeout;
+            updated = true;
         }
         if new_settings.ping_interval < self.ping_interval {
             self.ping_interval = new_settings.ping_interval;
+            updated = true;
         }
-        // TODO: maybe we need to restart IDLE watchdog and pinger
+        if updated {
+            self.send_current_rpc_settings(ctx);
+            self.start_heartbeat(ctx);
+        }
     }
 
     /// Handler [`ClientMsg::JoinRoom`].
@@ -198,10 +219,14 @@ impl WsSession {
             .into_actor(self)
             .map(|result, this, ctx| match result {
                 Ok(settings) => {
-                    this.update_rpc_settings(settings);
+                    this.update_rpc_settings(settings, ctx);
                     this.sessions
                         .insert(room_id.clone(), (member_id.clone(), room));
-                    this.auth_timeout_handle.take();
+                    if let Some(auth_timeout_handle) =
+                        this.auth_timeout_handle.take()
+                    {
+                        ctx.cancel_future(auth_timeout_handle);
+                    }
                     Self::send_join_room(ctx, room_id, member_id);
                 }
                 Err(_) => Self::send_left_room(
@@ -333,16 +358,6 @@ impl WsSession {
                 > this.idle_timeout
             {
                 info!("{}: WsSession is idle", this);
-
-                let session = std::mem::take(&mut this.sessions);
-                let close_all_session =
-                    session.into_iter().map(|(_, (member_id, room))| {
-                        room.connection_closed(member_id, ClosedReason::Lost)
-                    });
-                Arbiter::spawn(
-                    futures::future::join_all(close_all_session).map(|_| ()),
-                );
-
                 this.close_in_place(
                     ctx,
                     &CloseDescription::new(CloseReason::Idle),
@@ -354,10 +369,15 @@ impl WsSession {
     /// Sends [`ServerMsg::Ping`] immediately and starts ping send scheduler
     /// with `ping_interval`.
     fn start_heartbeat(&mut self, ctx: &mut <Self as Actor>::Context) {
-        self.send_ping(ctx);
-        ctx.run_interval(self.ping_interval, |this, ctx| {
-            this.send_ping(ctx);
-        });
+        if let Some(heartbeat_handle) = self.heartbeat_handle.take() {
+            ctx.cancel_future(heartbeat_handle);
+        } else {
+            self.send_ping(ctx);
+        }
+        self.heartbeat_handle =
+            Some(ctx.run_interval(self.ping_interval, |this, ctx| {
+                this.send_ping(ctx);
+            }));
     }
 
     /// Sends [`ServerMsg::Ping`] increasing ping counter.
