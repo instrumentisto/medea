@@ -87,8 +87,9 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-// TODO: should be properly shared between medea and jason
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "msg", content = "data")]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -120,8 +121,10 @@ pub struct RpcSettings {
     pub ping_interval_ms: u32,
 }
 
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 #[serde(tag = "msg", content = "data")]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
