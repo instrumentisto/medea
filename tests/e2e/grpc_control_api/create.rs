@@ -326,7 +326,7 @@ mod endpoint {
 
     #[actix_rt::test]
     #[named]
-    async fn cant_create_play_endpoint_when_no_pusblish_endpoints() {
+    async fn cant_create_play_endpoint_when_no_publish_endpoints() {
         let mut client = ControlClient::new().await;
 
         let create_room = RoomBuilder::default()

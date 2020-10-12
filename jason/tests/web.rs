@@ -8,7 +8,7 @@
 macro_rules! cb_assert_eq {
     ($a:expr, $b:expr) => {
         if $a != $b {
-            return Err(format!("{} != {}", $a, $b));
+            return Err(format!("{:?} != {:?}", $a, $b));
         }
     };
 }
@@ -87,8 +87,9 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
-    media::{LocalTracksConstraints, MediaManager, MediaStreamTrack},
-    peer::TransceiverKind,
+    media::{
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
+    },
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
@@ -142,8 +143,8 @@ pub fn get_media_stream_settings(
     video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.set_track_enabled(audio_enabled, TransceiverKind::Audio);
-    settings.set_track_enabled(video_enabled, TransceiverKind::Video);
+    settings.set_track_enabled(audio_enabled, MediaKind::Audio);
+    settings.set_track_enabled(video_enabled, MediaKind::Video);
 
     settings
 }

@@ -18,7 +18,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{peer::TransceiverKind, utils::get_property_by_name};
+use crate::{media::MediaKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
@@ -45,12 +45,12 @@ impl Default for RecvConstraints {
 
 impl RecvConstraints {
     /// Enables or disables audio or video receiving.
-    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
+    pub fn set_enabled(&self, enabled: bool, kind: MediaKind) {
         match kind {
-            TransceiverKind::Audio => {
+            MediaKind::Audio => {
                 self.is_audio_enabled.set(enabled);
             }
-            TransceiverKind::Video => {
+            MediaKind::Video => {
                 self.is_video_enabled.set(enabled);
             }
         }
@@ -105,7 +105,7 @@ impl LocalTracksConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_enabled(&self, enabled: bool, kind: TransceiverKind) {
+    pub fn set_enabled(&self, enabled: bool, kind: MediaKind) {
         self.0.borrow_mut().set_track_enabled(enabled, kind);
     }
 
@@ -141,9 +141,9 @@ impl Default for AudioMediaTracksSettings {
 }
 
 /// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies any
-/// constraints with a provided [`TransceiverKind`].
+/// constraints with a provided [`MediaKind`].
 #[inline]
-fn satisfies_track(track: &SysMediaStreamTrack, kind: TransceiverKind) -> bool {
+fn satisfies_track(track: &SysMediaStreamTrack, kind: MediaKind) -> bool {
     track.kind() == kind.as_str()
         && track.ready_state() == MediaStreamTrackState::Live
 }
@@ -355,12 +355,12 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_track_enabled(&mut self, enabled: bool, kind: TransceiverKind) {
+    pub fn set_track_enabled(&mut self, enabled: bool, kind: MediaKind) {
         match kind {
-            TransceiverKind::Audio => {
+            MediaKind::Audio => {
                 self.toggle_publish_audio(enabled);
             }
-            TransceiverKind::Video => {
+            MediaKind::Video => {
                 self.toggle_publish_video(enabled);
             }
         }
@@ -516,7 +516,7 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
     }
 }
 
-/// Constraints for the [`TransceiverKind::Video`] [`MediaStreamTrack`].
+/// Constraints for the [`MediaKind::Video`] [`MediaStreamTrack`].
 #[derive(Clone, Debug)]
 pub enum VideoSource {
     /// [`MediaStreamTrack`] should be received from the `getUserMedia`
@@ -675,7 +675,7 @@ impl AudioTrackConstraints {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
         let track = track.as_ref();
-        satisfies_track(track, TransceiverKind::Audio)
+        satisfies_track(track, MediaKind::Audio)
             && ConstrainString::satisfies(&self.device_id, track)
         // TODO returns Result<bool, Error>
     }
@@ -855,7 +855,7 @@ impl DeviceVideoTrackConstraints {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
-        satisfies_track(track, TransceiverKind::Video)
+        satisfies_track(track, MediaKind::Video)
             && ConstrainString::satisfies(&self.device_id, track)
             && ConstrainString::satisfies(&self.facing_mode, track)
             && !guess_is_from_display(&track)
@@ -936,7 +936,7 @@ impl DisplayVideoTrackConstraints {
     #[allow(clippy::unused_self)]
     #[inline]
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
-        satisfies_track(track, TransceiverKind::Video)
+        satisfies_track(track, MediaKind::Video)
             && guess_is_from_display(&track)
     }
 

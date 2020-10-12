@@ -130,17 +130,16 @@ impl WsSession {
     ) {
         debug!("{}: Received Close message: {:?}", self, reason);
         if self.close_reason.is_none() {
-            let closed_reason = if let Some(reason) = &reason {
-                if reason.code == CloseCode::Normal
-                    || reason.code == CloseCode::Away
-                {
-                    ClosedReason::Closed { normal: true }
-                } else {
-                    ClosedReason::Lost
-                }
-            } else {
-                ClosedReason::Lost
-            };
+            let closed_reason =
+                reason.as_ref().map_or(ClosedReason::Lost, |reason| {
+                    if reason.code == CloseCode::Normal
+                        || reason.code == CloseCode::Away
+                    {
+                        ClosedReason::Closed { normal: true }
+                    } else {
+                        ClosedReason::Lost
+                    }
+                });
 
             self.close_reason = Some(InnerCloseReason::ByClient(closed_reason));
             ctx.close(reason);

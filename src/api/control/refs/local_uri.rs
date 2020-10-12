@@ -186,6 +186,7 @@ impl StatefulLocalUri {
 impl TryFrom<String> for StatefulLocalUri {
     type Error = LocalUriParseError;
 
+    #[allow(clippy::option_if_let_else)]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);
