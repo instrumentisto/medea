@@ -334,23 +334,28 @@ impl Handler<CreateMemberInRoom> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.parent_fid.take_room_id();
-        let sid = self.get_sid(&room_id, &msg.id, msg.spec.credentials());
-        let mut sids = HashMap::new();
-        sids.insert(msg.id.to_string(), sid);
+        let id = msg.id;
+        let spec = msg.spec;
+        let sid = self.get_sid(&room_id, &id, spec.credentials());
 
-        if let Some(room) = self.room_repo.get(&room_id) {
-            let sending = room.send(CreateMember(msg.id, msg.spec));
-            async {
-                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(sids)
-            }
-            .boxed_local()
-        } else {
+        self.room_repo.get(&room_id).map_or(
             future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
                 room_id,
             )))
-            .boxed_local()
-        }
+            .boxed_local(),
+            |room| {
+                let id_clone = id.to_string();
+                room.send(CreateMember(id, spec))
+                    .map(|_| {
+                        Ok(hashmap! {
+                            id_clone => sid,
+                        })
+                    })
+                    .map_err(RoomServiceError::RoomMailboxErr)
+                    .err_into()
+                    .boxed_local()
+            },
+        )
     }
 }
 
@@ -383,17 +388,14 @@ impl Handler<CreateEndpointInRoom> for RoomService {
             )))
             .boxed_local(),
             |room| {
-                let sending = room.send(CreateEndpoint {
+                room.send(CreateEndpoint {
                     member_id,
                     endpoint_id,
                     spec,
-                });
-                async {
-                    sending
-                        .await
-                        .map_err(RoomServiceError::RoomMailboxErr)??;
-                    Ok(HashMap::new())
-                }
+                })
+                .map(|_| Ok(HashMap::new()))
+                .map_err(RoomServiceError::RoomMailboxErr)
+                .err_into()
                 .boxed_local()
             },
         )
@@ -411,7 +413,6 @@ pub struct Unvalidated;
 
 // Clippy lint show use_self errors for DeleteElements with generic state. This
 // is fix for it. This allow not works on function.
-#[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
     /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
     pub fn new() -> Self {
