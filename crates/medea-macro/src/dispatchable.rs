@@ -116,6 +116,7 @@ impl Item {
         let maybe_async_trait_macro = args.maybe_async_trait_macro();
         quote! {
             #[automatically_derived]
+            #[allow(clippy::needless_arbitrary_self_type)]
             #[doc = #trait_doc]
             #maybe_async_trait_macro
             pub trait #handler_trait_ident {

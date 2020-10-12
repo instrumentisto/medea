@@ -192,12 +192,13 @@ impl ParticipantService {
         member_id: MemberId,
         event: Event,
     ) -> Result<(), RoomError> {
-        if let Some(conn) = self.connections.get(&member_id) {
-            conn.send_event(event);
-            Ok(())
-        } else {
-            Err(RoomError::ConnectionNotExists(member_id))
-        }
+        self.connections.get(&member_id).map_or(
+            Err(RoomError::ConnectionNotExists(member_id)),
+            |conn| {
+                conn.send_event(event);
+                Ok(())
+            },
+        )
     }
 
     /// Saves provided [`RpcConnection`], registers [`IceUser`].
