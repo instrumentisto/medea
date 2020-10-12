@@ -439,7 +439,7 @@ mod disable_send_tracks {
     use medea_jason::{
         media::MediaKind,
         peer::{StableMuteState, TrackDirection},
-        SourceType
+        SourceType,
     };
 
     use super::*;

@@ -11,7 +11,9 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{LocalTracksConstraints, MediaStreamTrack, TrackConstraints, MediaKind},
+    media::{
+        LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
+    },
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection},
         media::TransceiverSide,

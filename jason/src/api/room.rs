@@ -30,7 +30,7 @@ use crate::{
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
         PeerEventHandler, PeerRepository, RtcStats, SourceType,
-        StableMuteState, TrackDirection, TransceiverKind, TransceiverSide
+        StableMuteState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,

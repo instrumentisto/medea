@@ -396,7 +396,7 @@ async function updateLocalVideo(stream) {
     }
     let mediaStream = new MediaStream();
     mediaStream.addTrack(track.get_track());
-    if (track.media_source_kind() === 'display') {
+    if (track.media_source_kind() === rust.MediaSourceKind.Display) {
       let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
       if (displayVideoEl === undefined) {
         displayVideoEl = document.createElement('video');
@@ -613,7 +613,7 @@ window.onload = async function() {
 
       connection.on_remote_track_added((track) => {
         if (track.kind() === rust.MediaKind.Video) {
-          if (track.media_source_kind() === 'display') {
+          if (track.media_source_kind() === rust.MediaSourceKind.Display) {
             let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
             if (displayVideoEl === undefined) {
               displayVideoEl = document.createElement('video');

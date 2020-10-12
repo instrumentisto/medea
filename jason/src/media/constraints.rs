@@ -18,7 +18,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{media::MediaKind, utils::get_property_by_name, peer::SourceType};
+use crate::{media::MediaKind, peer::SourceType, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
