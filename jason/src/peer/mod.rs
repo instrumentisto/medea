@@ -353,6 +353,7 @@ impl PeerConnection {
                     stat.stats.hash(&mut hasher);
                     let stat_hash = hasher.finish();
 
+                    #[allow(clippy::option_if_let_else)]
                     if let Some(last_hash) = stats_cache.get_mut(&stat.id) {
                         if *last_hash == stat_hash {
                             false

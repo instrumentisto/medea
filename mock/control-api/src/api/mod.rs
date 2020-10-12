@@ -329,17 +329,16 @@ impl From<proto::Response> for Response {
 
 impl From<proto::CreateResponse> for CreateResponse {
     fn from(resp: proto::CreateResponse) -> Self {
-        if let Some(error) = resp.error {
-            Self {
-                sids: None,
-                error: Some(error.into()),
-            }
-        } else {
+        resp.error.map_or(
             Self {
                 sids: Some(resp.sid),
                 error: None,
-            }
-        }
+            },
+            |e| Self {
+                sids: None,
+                error: Some(e.into()),
+            },
+        )
     }
 }
 
@@ -416,12 +415,7 @@ pub struct SingleGetResponse {
 
 impl From<proto::GetResponse> for SingleGetResponse {
     fn from(proto: proto::GetResponse) -> Self {
-        if let Some(error) = proto.error {
-            Self {
-                element: None,
-                error: Some(error.into()),
-            }
-        } else {
+        proto.error.map_or(
             Self {
                 error: None,
                 element: proto
@@ -429,7 +423,11 @@ impl From<proto::GetResponse> for SingleGetResponse {
                     .into_iter()
                     .map(|(_, e)| e.into())
                     .next(),
-            }
-        }
+            },
+            |e| Self {
+                element: None,
+                error: Some(e.into()),
+            },
+        )
     }
 }
