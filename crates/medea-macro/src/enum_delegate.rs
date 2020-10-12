@@ -56,10 +56,7 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> Result<TokenStream> {
         .sig
         .inputs
         .iter()
-        .filter(|i| match i {
-            syn::FnArg::Receiver(_) => true,
-            _ => false,
-        })
+        .filter(|i| matches!(i, syn::FnArg::Receiver(_)))
         .count();
     if selfs_count == 0 {
         return Err(Error::new(
