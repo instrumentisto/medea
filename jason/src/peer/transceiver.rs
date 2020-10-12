@@ -82,11 +82,6 @@ bitflags! {
         ///
         /// [1]: https://tinyurl.com/y2nlxpzf
         const RECV = 0b10;
-
-        /// [`sendrecv` direction][1] of transceiver.
-        ///
-        /// [1]: https://tinyurl.com/yywbvbzx
-        const SENDRECV = Self::SEND.bits | Self::RECV.bits;
     }
 }
 
@@ -98,7 +93,7 @@ impl From<RtcRtpTransceiverDirection> for TransceiverDirection {
             D::Sendonly => Self::SEND,
             D::Recvonly => Self::RECV,
             D::Inactive => Self::empty(),
-            D::Sendrecv => Self::SENDRECV,
+            D::Sendrecv => Self::SEND | Self::RECV,
             _ => unreachable!("unexpected transceiver direction"),
         }
     }
@@ -109,7 +104,7 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
     fn from(direction: TransceiverDirection) -> Self {
         use TransceiverDirection as D;
 
-        if direction.contains(D::SENDRECV) {
+        if direction.is_all() {
             Self::Sendrecv
         } else if direction.contains(D::RECV) {
             Self::Recvonly

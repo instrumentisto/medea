@@ -34,6 +34,7 @@ pub use self::{
 };
 use crate::peer::{transceiver::Transceiver, TransceiverDirection};
 use medea_client_api_proto::MediaSourceKind;
+use crate::media::MediaKind;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -42,6 +43,8 @@ pub trait TransceiverSide: Muteable {
 
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn kind(&self) -> TransceiverKind;
+
+    fn media_kind(&self) -> MediaKind;
 
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
@@ -309,11 +312,13 @@ impl InnerMediaConnections {
         self.get_or_create_transceiver(transceiver)
     }
 
-    fn get_transceiver_by_mid(&self, mid: &String) -> Option<Transceiver> {
-        self.transceivers
-            .iter()
-            .find(|t| t.mid().map_or(false, |m| &m == mid))
-            .cloned()
+    fn get_transceiver_by_mid(&mut self, mid: &String) -> Option<Transceiver> {
+        let transceiver = self.peer.get_transceiver_by_mid(mid)?;
+        Some(self.get_or_create_transceiver(transceiver))
+        // self.transceivers
+        //     .iter()
+        //     .find(|t| t.mid().map_or(false, |m| &m == mid))
+        //     .cloned()
     }
 }
 

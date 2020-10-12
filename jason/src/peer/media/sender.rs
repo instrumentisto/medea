@@ -27,6 +27,7 @@ use super::{
     MediaConnections, MediaConnectionsError, Muteable, Result,
 };
 use crate::peer::transceiver::Transceiver;
+use crate::media::MediaKind;
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -141,6 +142,7 @@ impl Sender {
             match mute_state {
                 StableMuteState::Unmuted => {
                     self.maybe_request_track();
+                    self.transceiver.enable(TransceiverDirection::SEND);
                 }
                 StableMuteState::Muted => {
                     self.transceiver.disable(TransceiverDirection::SEND);
@@ -251,6 +253,10 @@ impl TransceiverSide for Sender {
 
     fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
+    }
+
+    fn media_kind(&self) -> MediaKind {
+        self.caps.kind()
     }
 
     fn mid(&self) -> Option<String> {

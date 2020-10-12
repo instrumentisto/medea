@@ -22,6 +22,7 @@ use crate::{
 
 use super::mute_state::StableMuteState;
 use crate::peer::transceiver::Transceiver;
+use crate::media::MediaKind;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -76,11 +77,11 @@ impl Receiver {
             None => {
                 let mut transceiver = None;
                 for sender in media_connections.senders.values() {
-                    if sender.caps().kind() == caps.kind() {
+                    if sender.media_kind() == caps.kind() && sender.source_kind() == caps.media_source_kind() {
                         // TODO: skip transceivers that already used by other
                         //       Receivers
                         let mutual_transceiver = sender.transceiver();
-                        mutual_transceiver.enable(TransceiverDirection::RECV);
+                        mutual_transceiver.enable(transceiver_direction);
                         transceiver = Some(mutual_transceiver);
                         break;
                     }
@@ -141,6 +142,11 @@ impl Receiver {
         let new_track =
             MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
+        if self.is_not_muted() {
+            transceiver.enable(TransceiverDirection::RECV);
+        } else {
+            transceiver.disable(TransceiverDirection::RECV);
+        }
         new_track.set_enabled(self.is_not_muted());
 
         self.transceiver.replace(Some(transceiver));
@@ -203,7 +209,7 @@ impl Receiver {
                     if let Some(transceiver) =
                         self.transceiver.borrow().as_ref()
                     {
-                        transceiver.disable(TransceiverDirection::SEND);
+                        transceiver.disable(TransceiverDirection::RECV);
                     }
                 }
                 StableMuteState::Unmuted => {
@@ -213,7 +219,7 @@ impl Receiver {
                     if let Some(transceiver) =
                         self.transceiver.borrow().as_ref()
                     {
-                        transceiver.enable(TransceiverDirection::SEND);
+                        transceiver.enable(TransceiverDirection::RECV);
                     }
                 }
             }
@@ -244,6 +250,10 @@ impl TransceiverSide for Receiver {
     #[inline]
     fn kind(&self) -> TransceiverKind {
         TransceiverKind::from(&self.caps)
+    }
+
+    fn media_kind(&self) -> MediaKind {
+        self.caps.kind()
     }
 
     fn mid(&self) -> Option<String> {
