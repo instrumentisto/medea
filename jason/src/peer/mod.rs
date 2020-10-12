@@ -342,6 +342,7 @@ impl PeerConnection {
 
     /// Filters out already sent stats, and send new statss from
     /// provided [`RtcStats`].
+    #[allow(clippy::option_if_let_else)]
     pub fn send_peer_stats(&self, stats: RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
