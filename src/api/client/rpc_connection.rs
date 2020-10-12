@@ -8,7 +8,7 @@ use actix::Message;
 use derive_more::{From, Into};
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
-    CloseDescription, Command, Credentials, Event, MemberId,
+    CloseDescription, Command, Credential, Event, MemberId,
 };
 
 use crate::signalling::room::RoomError;
@@ -84,7 +84,7 @@ pub struct Authorize {
     pub member_id: MemberId,
 
     /// Credentials to authorize [`RpcConnection`] with.
-    pub credentials: Credentials,
+    pub credentials: Credential,
 }
 
 /// Error of authorization [`RpcConnection`] in [`Room`].

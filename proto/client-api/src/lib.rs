@@ -65,12 +65,12 @@ pub struct PeerId(pub u32);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
 
-/// `Member` credentials.
+/// Credential used for `Member` authentication.
 #[derive(
     Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
 )]
 #[from(forward)]
-pub struct Credentials(pub String);
+pub struct Credential(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]

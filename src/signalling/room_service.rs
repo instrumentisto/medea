@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{Credentials, MemberId, RoomId};
+use medea_client_api_proto::{Credential, MemberId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
@@ -190,7 +190,7 @@ impl RoomService {
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
-        credentials: &Credentials,
+        credentials: &Credential,
     ) -> String {
         format!(
             "{}/{}/{}/{}",

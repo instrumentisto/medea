@@ -58,7 +58,7 @@ All user visible changes to this project will be documented in this file. This p
 - `TrackPatchEvent` and `TrackPatchCommand` types ([#127]);
 - `IceRestart` variant to `TrackUpdate` ([#138]);
 - `source_kind` field to `VideoSettings` type ([#145]);
-- `RoomId` and `Credentials` types ([#148]).
+- `RoomId` and `Credential` types ([#148]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
