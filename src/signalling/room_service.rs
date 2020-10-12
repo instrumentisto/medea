@@ -321,7 +321,6 @@ pub struct CreateMemberInRoom {
 impl Handler<CreateMemberInRoom> for RoomService {
     type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
 
-    #[allow(clippy::option_if_let_else)]
     fn handle(
         &mut self,
         msg: CreateMemberInRoom,
@@ -332,21 +331,24 @@ impl Handler<CreateMemberInRoom> for RoomService {
         let spec = msg.spec;
         let sid = self.get_sid(&room_id, &id, spec.credentials());
 
-        if let Some(room) = self.room_repo.get(&room_id) {
-            async move {
-                let id_str = id.to_string();
-                room.send(CreateMember(id, spec))
-                    .await
-                    .map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(hashmap! {id_str => sid})
-            }
-            .boxed_local()
-        } else {
-            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
-                room_id,
-            )))
-            .boxed_local()
-        }
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
+            |room| {
+                async move {
+                    let id_str = id.to_string();
+                    room.send(CreateMember(id, spec))
+                        .await
+                        .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(hashmap! {id_str => sid})
+                }
+                .boxed_local()
+            },
+        )
     }
 }
 
