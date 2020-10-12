@@ -178,15 +178,9 @@ impl RoomService {
                 );
 
                 let room_repo = self.room_repo.clone();
-                let sending = room.send(Close);
-                async move {
-                    let res = sending.await;
-                    if res.is_ok() {
-                        room_repo.remove(&id);
-                    }
-                    res
-                }
-                .boxed_local()
+                room.send(Close)
+                    .inspect_ok(move |_| room_repo.remove(&id))
+                    .boxed_local()
             })
     }
 
