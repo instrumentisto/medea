@@ -6,31 +6,32 @@ use std::{
 };
 
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
+use medea_client_api_proto::{
+    MediaSourceKind, PeerId, TrackId, TrackPatchEvent,
+};
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{LocalTracksConstraints, MediaStreamTrack, TrackConstraints},
+    media::{
+        LocalTracksConstraints, MediaStreamTrack, TrackConstraints, VideoSource,
+    },
     peer::{
-        conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
-        media::TransceiverSide,
-        PeerEvent, SourceType,
+        conn::TransceiverKind, transceiver::TransceiverDirection, PeerEvent,
+        TransceiverSide,
     },
 };
 
 use super::{
     mute_state::{MuteStateController, StableMuteState},
-    MediaConnectionsError, Muteable, Result,
+    MediaConnections, MediaConnectionsError, Muteable, Result,
 };
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
-    pub peer_id: PeerId,
+    pub media_connections: &'a MediaConnections,
     pub track_id: TrackId,
     pub caps: TrackConstraints,
-    pub peer: &'a RtcPeerConnection,
-    pub peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     pub mid: Option<String>,
     pub mute_state: StableMuteState,
     pub is_required: bool,
@@ -43,22 +44,35 @@ impl<'a> SenderBuilder<'a> {
     /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
+        let media_connections = self.media_connections.0.borrow_mut();
         let kind = TransceiverKind::from(&self.caps);
-        let transceiver = match self.mid {
-            None => self
-                .peer
-                .add_transceiver(kind, TransceiverDirection::Inactive),
-            Some(mid) => self
-                .peer
-                .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                .map_err(tracerr::wrap!())?,
+        let (transceiver, transceiver_direction) = match self.mid {
+            None => (
+                media_connections
+                    .peer
+                    .add_transceiver(kind, TransceiverDirection::INACTIVE),
+                TransceiverDirection::INACTIVE,
+            ),
+            Some(mid) => {
+                let transceiver = media_connections
+                    .peer
+                    .get_transceiver_by_mid(&mid)
+                    .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
+                    .map_err(tracerr::wrap!())?;
+                let direction =
+                    TransceiverDirection::from(transceiver.direction())
+                        - TransceiverDirection::SEND;
+                transceiver.set_direction(direction.into());
+                (transceiver, direction)
+            }
         };
+
+        log::error!("Sender::build: {:?}", transceiver_direction);
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
-            peer_id: self.peer_id,
+            peer_id: media_connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             track: RefCell::new(None),
@@ -66,8 +80,7 @@ impl<'a> SenderBuilder<'a> {
             transceiver,
             mute_state: mute_state_observer,
             is_required: self.is_required,
-            transceiver_direction: Cell::new(TransceiverDirection::Inactive),
-            peer_events_sender: self.peer_events_sender,
+            peer_events_sender: media_connections.peer_events_sender.clone(),
             send_constraints: self.send_constraints,
         });
         spawn_local({
@@ -102,7 +115,6 @@ pub struct Sender {
     caps: TrackConstraints,
     track: RefCell<Option<MediaStreamTrack>>,
     transceiver: RtcRtpTransceiver,
-    transceiver_direction: Cell<TransceiverDirection>,
     mute_state: Rc<MuteStateController>,
     general_mute_state: Cell<StableMuteState>,
     is_required: bool,
@@ -119,12 +131,7 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
-        match self.transceiver_direction.get() {
-            TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {
-                false
-            }
-            TransceiverDirection::Sendonly => true,
-        }
+        self.mute_state.is_unmuted()
     }
 
     /// Updates [`Sender`]s general mute state based on the provided
@@ -145,8 +152,11 @@ impl Sender {
                     self.maybe_request_track();
                 }
                 StableMuteState::Muted => {
-                    self.set_transceiver_direction(
-                        TransceiverDirection::Inactive,
+                    let direction = TransceiverDirection::from(
+                        self.transceiver.direction(),
+                    );
+                    self.transceiver.set_direction(
+                        (direction - TransceiverDirection::SEND).into(),
                     );
                 }
             }
@@ -201,17 +211,23 @@ impl Sender {
     /// [`TransceiverDirection::Sendonly`] if this [`Receiver`]s general mute
     /// state is [`StableMuteState::Unmuted`].
     pub fn maybe_enable(&self) {
+        let direction =
+            TransceiverDirection::from(self.transceiver.direction());
         if self.is_general_unmuted()
-            && self.transceiver_direction.get()
-                != TransceiverDirection::Sendonly
+            && !direction.contains(TransceiverDirection::SEND)
         {
-            self.set_transceiver_direction(TransceiverDirection::Sendonly);
+            self.transceiver
+                .set_direction((direction | TransceiverDirection::SEND).into());
         }
     }
 
     /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
-    pub fn source_type(&self) -> SourceType {
-        self.caps.source_type()
+    pub fn source_kind(&self) -> MediaSourceKind {
+        self.caps.media_source_kind()
+    }
+
+    pub(super) fn transceiver(&self) -> RtcRtpTransceiver {
+        self.transceiver.clone()
     }
 
     /// Checks whether general mute state of the [`Sender`] is in
@@ -225,13 +241,6 @@ impl Sender {
     /// [`MuteState::Unmuted`].
     fn is_general_unmuted(&self) -> bool {
         self.general_mute_state.get() == StableMuteState::Unmuted
-    }
-
-    /// Sets provided [`TransceiverDirection`] of this [`Sender`]'s
-    /// [`RtcRtpTransceiver`].
-    fn set_transceiver_direction(&self, direction: TransceiverDirection) {
-        self.transceiver.set_direction(direction.into());
-        self.transceiver_direction.set(direction);
     }
 
     /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by
@@ -271,12 +280,14 @@ impl TransceiverSide for Sender {
     }
 
     fn is_transitable(&self) -> bool {
-        if self.caps.is_display_video() {
-            self.send_constraints.is_display_video_constrained()
-        } else if self.caps.is_device_video() {
-            self.send_constraints.is_device_video_constrained()
-        } else {
-            true
+        match &self.caps {
+            TrackConstraints::Video(VideoSource::Device(_)) => {
+                self.send_constraints.inner().get_device_video().is_some()
+            }
+            TrackConstraints::Video(VideoSource::Display(_)) => {
+                self.send_constraints.inner().get_display_video().is_some()
+            }
+            TrackConstraints::Audio(_) => true,
         }
     }
 }

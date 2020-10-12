@@ -12,7 +12,6 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
-use wasm_bindgen::prelude::*;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
@@ -33,6 +32,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use medea_client_api_proto::MediaSourceKind;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -125,39 +125,6 @@ pub trait Muteable {
     #[inline]
     fn is_unmuted(&self) -> bool {
         self.mute_state_controller().is_unmuted()
-    }
-}
-
-/// Media source type.
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Eq)]
-pub enum SourceType {
-    /// Type of media which was received from `getUserMedia` request.
-    Device,
-
-    /// Type of media which was received from `getDisplayMedia` request.
-    Display,
-
-    /// Both [`SourceType::Device`] and [`SourceType::Display`].
-    Both,
-}
-
-impl PartialEq for SourceType {
-    /// Returns `true` if this [`SourceType`] equals to the `another` or any of
-    /// the comparable [`SourceType`]s are [`SourceType::Both`].
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            SourceType::Device => {
-                matches!(other, SourceType::Device | SourceType::Both)
-            }
-            SourceType::Display => {
-                matches!(other, SourceType::Display | SourceType::Both)
-            }
-            SourceType::Both => matches!(
-                other,
-                SourceType::Display | SourceType::Device | SourceType::Both
-            ),
-        }
     }
 }
 
@@ -265,11 +232,15 @@ impl InnerMediaConnections {
     fn iter_senders_with_kind_and_source_type(
         &self,
         kind: TransceiverKind,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) -> impl Iterator<Item = &Rc<Sender>> {
         self.senders
             .values()
-            .filter(move |s| s.kind() == kind && s.source_type() == source_type)
+            .filter(move |sender| sender.kind() == kind)
+            .filter(move |sender| match source_kind {
+                None => true,
+                Some(source_kind) => sender.source_kind() == source_kind,
+            })
     }
 
     /// Returns [`Iterator`] over [`Receiver`]s with provided
@@ -287,11 +258,11 @@ impl InnerMediaConnections {
         &self,
         direction: TrackDirection,
         kind: TransceiverKind,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         match direction {
             TrackDirection::Send => self
-                .iter_senders_with_kind_and_source_type(kind, source_type)
+                .iter_senders_with_kind_and_source_type(kind, source_kind)
                 .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
@@ -330,12 +301,12 @@ impl MediaConnections {
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         self.0.borrow().get_transceivers_by_direction_and_kind(
             direction,
             kind,
-            source_type,
+            source_kind,
         )
     }
 
@@ -346,7 +317,7 @@ impl MediaConnections {
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
-        source_type: SourceType,
+        source_type: Option<MediaSourceKind>,
         mute_state: StableMuteState,
     ) -> bool {
         let transceivers =
@@ -502,7 +473,6 @@ impl MediaConnections {
         send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
-        let mut inner = self.0.borrow_mut();
         for track in tracks {
             let is_required = track.is_required();
             match track.direction {
@@ -518,11 +488,9 @@ impl MediaConnections {
                             StableMuteState::Muted
                         };
                     let sndr = SenderBuilder {
-                        peer_id: inner.peer_id,
+                        media_connections: self,
                         track_id: track.id,
                         caps: track.media_type.into(),
-                        peer: &inner.peer,
-                        peer_events_sender: inner.peer_events_sender.clone(),
                         mid,
                         mute_state,
                         is_required,
@@ -530,19 +498,18 @@ impl MediaConnections {
                     }
                     .build()
                     .map_err(tracerr::wrap!())?;
-                    inner.senders.insert(track.id, sndr);
+                    self.0.borrow_mut().senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Rc::new(Receiver::new(
+                        self,
                         track.id,
                         track.media_type.into(),
                         sender,
-                        &inner.peer,
                         mid,
-                        inner.peer_events_sender.clone(),
                         recv_constraints,
                     ));
-                    inner.receivers.insert(track.id, recv);
+                    self.0.borrow_mut().receivers.insert(track.id, recv);
                 }
             }
         }

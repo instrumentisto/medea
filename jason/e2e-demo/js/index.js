@@ -2,9 +2,10 @@ const controlDomain = 'http://127.0.0.1:8000';
 const controlUrl = controlDomain + '/control-api/';
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
+let rust;
 let roomId = window.location.hash.replace("#", "");
-let remote_videos = {};
 
+let remote_videos = {};
 let joinCallerButton = document.getElementById('connection-settings__connect');
 let usernameInput = document.getElementById('connection-settings__username');
 let usernameMenuButton = document.getElementById('username-menu-button');
@@ -390,12 +391,12 @@ async function startPublishing() {
 
 async function updateLocalVideo(stream) {
   for (const track of stream) {
-    if (track.kind() == 'audio') {
+    if (track.kind() === rust.MediaKind.Audio) {
       continue;
     }
     let mediaStream = new MediaStream();
     mediaStream.addTrack(track.get_track());
-    if (track.media_source_kind() === 'display') {
+    if (track.media_source_kind() === rust.MediaSourceKind.Display) {
       let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
       if (displayVideoEl === undefined) {
         displayVideoEl = document.createElement('video');
@@ -420,7 +421,7 @@ async function updateLocalVideo(stream) {
 }
 
 window.onload = async function() {
-  let rust = await import("../../pkg");
+  rust = await import("../../pkg");
   let jason = new rust.Jason();
   console.log(baseUrl);
   usernameInput.addEventListener('change', (e) => {
@@ -488,7 +489,7 @@ window.onload = async function() {
     let currentAudio = 'disable';
     let currentVideo = 'disable';
     for (const track of localTracks) {
-      if (track.kind() === 'video') {
+      if (track.kind() === rust.MediaKind.Video) {
         currentVideo = track.get_track().label || 'disable';
       } else {
         currentAudio = track.get_track().label || 'disable';
@@ -499,11 +500,11 @@ window.onload = async function() {
     for (const device_info of device_infos) {
       const option = document.createElement('option');
       option.value = device_info.device_id();
-      if (device_info.kind() === 'audio') {
+      if (device_info.kind() === rust.MediaKind.Audio) {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
         option.selected = option.text === currentAudio;
         audio_select.append(option);
-      } else if (device_info.kind() === 'video') {
+      } else if (device_info.kind() === rust.MediaKind.Video) {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
         option.selected = option.text === currentVideo;
         video_select.append(option);
@@ -611,8 +612,8 @@ window.onload = async function() {
       });
 
       connection.on_remote_track_added((track) => {
-        if (track.kind() === 'video') {
-          if (track.media_source_kind() === 'display') {
+        if (track.kind() === rust.MediaKind.Video) {
+          if (track.media_source_kind() === rust.MediaSourceKind.Display) {
             let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
             if (displayVideoEl === undefined) {
               displayVideoEl = document.createElement('video');
@@ -660,13 +661,9 @@ window.onload = async function() {
 
         track.on_enabled( () => {
           console.log(`Track enabled: ${track.kind()}`);
-          // console.log(`Has active audio: ${stream.has_active_audio()}`);
-          // console.log(`Has active video: ${stream.has_active_video()}`);
         });
         track.on_disabled( () => {
           console.log(`Track disabled: ${track.kind()}`);
-          // console.log(`Has active audio: ${stream.has_active_audio()}`);
-          // console.log(`Has active video: ${stream.has_active_video()}`);
         });
       });
 
@@ -784,7 +781,7 @@ window.onload = async function() {
           await room.mute_audio();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'audio' && track.ptr > 0) {
+              if (track.kind() === rust.MediaKind.Audio && track.ptr > 0) {
                 track.free();
               }
             }
@@ -809,7 +806,7 @@ window.onload = async function() {
           await room.mute_video();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'video' && track.ptr > 0) {
+              if (track.kind() === rust.MediaKind.Video && track.ptr > 0) {
                 track.free();
               }
             }

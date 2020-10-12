@@ -14,9 +14,9 @@ use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 use crate::{
     media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
-        conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        conn::TransceiverKind,
         media::{mute_state::MuteStateController, TransceiverSide},
-        Muteable, PeerEvent,
+        MediaConnections, Muteable, PeerEvent, TransceiverDirection,
     },
 };
 
@@ -32,7 +32,6 @@ pub struct Receiver {
     caps: TrackConstraints,
     sender_id: MemberId,
     transceiver: RefCell<Option<RtcRtpTransceiver>>,
-    transceiver_direction: Cell<TransceiverDirection>,
     mid: RefCell<Option<String>>,
     track: RefCell<Option<MediaStreamTrack>>,
     general_mute_state: Cell<StableMuteState>,
@@ -54,26 +53,51 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
     /// arrives.
     pub fn new(
+        media_connections: &MediaConnections,
         track_id: TrackId,
         caps: TrackConstraints,
         sender_id: MemberId,
-        peer: &RtcPeerConnection,
         mid: Option<String>,
-        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         recv_constraints: &RecvConstraints,
     ) -> Self {
+        let media_connections = media_connections.0.borrow_mut();
         let kind = TransceiverKind::from(&caps);
         let enabled = match kind {
             TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
             TransceiverKind::Video => recv_constraints.is_video_enabled(),
         };
         let transceiver_direction = if enabled {
-            TransceiverDirection::Recvonly
+            TransceiverDirection::RECV
         } else {
-            TransceiverDirection::Inactive
+            TransceiverDirection::INACTIVE
         };
-        let transceiver = match mid {
-            None => Some(peer.add_transceiver(kind, transceiver_direction)),
+        let transceiver: Option<RtcRtpTransceiver> = match mid {
+            None => {
+                let mut transceiver = None;
+                for sender in media_connections.senders.values() {
+                    if sender.caps().kind() == caps.kind() {
+                        // TODO: skip transceivers that already used by other
+                        //       Receivers
+                        let mutual_transceiver = sender.transceiver();
+                        let direction = TransceiverDirection::from(
+                            mutual_transceiver.direction(),
+                        );
+                        mutual_transceiver.set_direction(
+                            (direction | TransceiverDirection::RECV).into(),
+                        );
+                        transceiver = Some(mutual_transceiver);
+                        break;
+                    }
+                }
+
+                transceiver.or_else(|| {
+                    Some(
+                        media_connections
+                            .peer
+                            .add_transceiver(kind, transceiver_direction),
+                    )
+                })
+            }
             Some(_) => None,
         };
         Self {
@@ -81,7 +105,6 @@ impl Receiver {
             caps,
             sender_id,
             transceiver: RefCell::new(transceiver),
-            transceiver_direction: Cell::new(transceiver_direction),
             mid: RefCell::new(mid),
             track: RefCell::new(None),
             general_mute_state: Cell::new(StableMuteState::from(!enabled)),
@@ -89,7 +112,7 @@ impl Receiver {
             mute_state_controller: MuteStateController::new(
                 StableMuteState::from(!enabled),
             ),
-            peer_events_sender,
+            peer_events_sender: media_connections.peer_events_sender.clone(),
         }
     }
 
@@ -101,12 +124,7 @@ impl Receiver {
         if self.transceiver.borrow().is_none() {
             return false;
         }
-        match self.transceiver_direction.get() {
-            TransceiverDirection::Sendonly | TransceiverDirection::Inactive => {
-                false
-            }
-            TransceiverDirection::Recvonly => true,
-        }
+        true
     }
 
     /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -128,7 +146,6 @@ impl Receiver {
         let new_track =
             MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
-        transceiver.set_direction(self.transceiver_direction.get().into());
         new_track.set_enabled(self.is_not_muted());
 
         self.transceiver.replace(Some(transceiver));
@@ -176,17 +193,6 @@ impl Receiver {
         }
     }
 
-    /// Sets this [`Receiver`]'s [`TransceiverDirection`] to the provided.
-    ///
-    /// Tries to update underlying [`RtcRtpTransceiver`] direction if it is
-    /// present.
-    fn set_transceiver_direction(&self, direction: TransceiverDirection) {
-        self.transceiver_direction.set(direction);
-        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
-            transceiver.set_direction(direction.into());
-        }
-    }
-
     /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
     /// based on the provided [`StableMuteState`].
     ///
@@ -199,17 +205,29 @@ impl Receiver {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(false);
                     }
-                    self.set_transceiver_direction(
-                        TransceiverDirection::Inactive,
-                    );
+                    if let Some(transceiver) =
+                        self.transceiver.borrow().as_ref()
+                    {
+                        let direction =
+                            TransceiverDirection::from(transceiver.direction());
+                        transceiver.set_direction(
+                            (direction - TransceiverDirection::SEND).into(),
+                        );
+                    }
                 }
                 StableMuteState::Unmuted => {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(true);
                     }
-                    self.set_transceiver_direction(
-                        TransceiverDirection::Recvonly,
-                    );
+                    if let Some(transceiver) =
+                        self.transceiver.borrow().as_ref()
+                    {
+                        let direction =
+                            TransceiverDirection::from(transceiver.direction());
+                        transceiver.set_direction(
+                            (direction - TransceiverDirection::SEND).into(),
+                        );
+                    }
                 }
             }
             self.maybe_notify_track();

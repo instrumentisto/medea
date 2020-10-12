@@ -7,7 +7,7 @@ use futures::{
 use medea_client_api_proto::PeerId;
 use medea_jason::{
     api::{ConnectionHandle, Connections},
-    media::{MediaStreamTrack, TrackKind},
+    media::{MediaKind, MediaStreamTrack},
 };
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
@@ -45,7 +45,7 @@ async fn on_remote_track_added_fires() {
     let con_handle = con.new_handle();
 
     let (cb, test_result) = js_callback!(|track: MediaStreamTrack| {
-        cb_assert_eq!(track.kind(), TrackKind::Video);
+        cb_assert_eq!(track.kind(), MediaKind::Video);
     });
     con_handle.on_remote_track_added(cb.into()).unwrap();
 
@@ -71,7 +71,7 @@ async fn tracks_are_added_to_connection() {
 
     con.add_remote_track(get_video_track().await);
     let video_track = timeout(100, rx).await.unwrap().unwrap();
-    assert_eq!(video_track.kind(), TrackKind::Video);
+    assert_eq!(video_track.kind(), MediaKind::Video);
 
     let (tx, rx) = oneshot::channel();
     let closure = Closure::once_into_js(move |track: MediaStreamTrack| {
@@ -80,7 +80,7 @@ async fn tracks_are_added_to_connection() {
     con_handle.on_remote_track_added(closure.into()).unwrap();
     con.add_remote_track(get_audio_track().await);
     let audio_track = timeout(200, rx).await.unwrap().unwrap();
-    assert_eq!(audio_track.kind(), TrackKind::Audio);
+    assert_eq!(audio_track.kind(), MediaKind::Audio);
 }
 
 #[wasm_bindgen_test]

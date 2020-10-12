@@ -614,11 +614,9 @@ pub struct VideoSettings {
 #[derive(Clone, Copy, Display)]
 pub enum MediaSourceKind {
     /// Media is sourced by some media device (webcam or microphone).
-    #[display(fmt = "device")]
     Device,
 
     /// Media is obtained with screen-capture.
-    #[display(fmt = "display")]
     Display,
 }
 

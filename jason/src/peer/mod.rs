@@ -8,6 +8,7 @@ mod media;
 mod repo;
 mod stats;
 mod tracks_request;
+mod transceiver;
 
 use std::{
     cell::RefCell,
@@ -21,7 +22,8 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
+    MediaSourceKind, MemberId, PeerConnectionState, PeerId as Id, PeerId,
+    TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -43,16 +45,17 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
-        TransceiverDirection, TransceiverKind,
+        TransceiverKind,
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Receiver, Sender, SourceType,
-        StableMuteState, TrackDirection, TransceiverSide,
+        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
+        TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
+    transceiver::TransceiverDirection,
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -409,13 +412,13 @@ impl PeerConnection {
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections.is_all_tracks_in_mute_state(
             kind,
             direction,
-            source_type,
+            source_kind,
             mute_state,
         )
     }
@@ -548,12 +551,12 @@ impl PeerConnection {
         &self,
         kind: TransceiverKind,
         direction: TrackDirection,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         self.media_connections.get_transceivers_sides(
             kind,
             direction,
-            source_type,
+            source_kind,
         )
     }
 

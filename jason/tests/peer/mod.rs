@@ -19,7 +19,7 @@ use medea_client_api_proto::{
     MemberId, PeerId, Track, TrackId, TrackPatchEvent, VideoSettings,
 };
 use medea_jason::{
-    media::{LocalTracksConstraints, MediaManager, RecvConstraints, TrackKind},
+    media::{LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints},
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
         TransceiverKind,
@@ -930,7 +930,7 @@ async fn new_remote_track() {
         video_tx_enabled: bool,
         audio_rx_enabled: bool,
         video_rx_enabled: bool,
-    ) -> Result<FinalTrack, TrackKind> {
+    ) -> Result<FinalTrack, MediaKind> {
         let (tx1, _rx1) = mpsc::unbounded();
         let (tx2, mut rx2) = mpsc::unbounded();
         let manager = Rc::new(MediaManager::default());
@@ -1016,16 +1016,16 @@ async fn new_remote_track() {
                 Ok(Some(event)) => {
                     if let PeerEvent::NewRemoteTrack { track, .. } = event {
                         match track.kind() {
-                            TrackKind::Audio => {
+                            MediaKind::Audio => {
                                 if result.has_audio {
-                                    return Err(TrackKind::Audio);
+                                    return Err(MediaKind::Audio);
                                 } else {
                                     result.has_audio = true;
                                 }
                             }
-                            TrackKind::Video => {
+                            MediaKind::Video => {
                                 if result.has_video {
-                                    return Err(TrackKind::Video);
+                                    return Err(MediaKind::Video);
                                 } else {
                                     result.has_video = true;
                                 }
