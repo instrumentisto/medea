@@ -338,24 +338,21 @@ impl Handler<CreateMemberInRoom> for RoomService {
         let spec = msg.spec;
         let sid = self.get_sid(&room_id, &id, spec.credentials());
 
-        self.room_repo.get(&room_id).map_or(
+        if let Some(room) = self.room_repo.get(&room_id) {
+            async move {
+                let id_str = id.to_string();
+                room.send(CreateMember(id, spec))
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                Ok(hashmap! {id_str => sid})
+            }
+            .boxed_local()
+        } else {
             future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
                 room_id,
             )))
-            .boxed_local(),
-            |room| {
-                let id_str = id.to_string();
-                room.send(CreateMember(id, spec))
-                    .map_ok(|_| {
-                        hashmap! {
-                            id_str => sid,
-                        }
-                    })
-                    .map_err(RoomServiceError::RoomMailboxErr)
-                    .err_into()
-                    .boxed_local()
-            },
-        )
+            .boxed_local()
+        }
     }
 }
 
@@ -382,20 +379,24 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         let endpoint_id = msg.id;
         let spec = msg.spec;
 
-        self.room_repo.get(&room_id).map_or(
-            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
-                room_id,
-            )))
-            .boxed_local(),
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
             |room| {
-                room.send(CreateEndpoint {
-                    member_id,
-                    endpoint_id,
-                    spec,
-                })
-                .map_ok(|_| HashMap::new())
-                .map_err(RoomServiceError::RoomMailboxErr)
-                .err_into()
+                async move {
+                    room.send(CreateEndpoint {
+                        member_id,
+                        endpoint_id,
+                        spec,
+                    })
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(HashMap::new())
+                }
                 .boxed_local()
             },
         )
@@ -515,8 +516,8 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
 
-            self.room_repo.get(&room_id).map_or(
-                future::ok(()).boxed_local(),
+            self.room_repo.get(&room_id).map_or_else(
+                || future::ok(()).boxed_local(),
                 |room| {
                     room.send(Delete(deletes_from_room))
                         .map_ok(|_| ())
