@@ -21,6 +21,7 @@ use crate::{
 };
 
 use super::mute_state::StableMuteState;
+use crate::peer::transceiver::Transceiver;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -31,7 +32,7 @@ pub struct Receiver {
     track_id: TrackId,
     caps: TrackConstraints,
     sender_id: MemberId,
-    transceiver: RefCell<Option<RtcRtpTransceiver>>,
+    transceiver: RefCell<Option<Transceiver>>,
     mid: RefCell<Option<String>>,
     track: RefCell<Option<MediaStreamTrack>>,
     general_mute_state: Cell<StableMuteState>,
@@ -60,7 +61,7 @@ impl Receiver {
         mid: Option<String>,
         recv_constraints: &RecvConstraints,
     ) -> Self {
-        let media_connections = media_connections.0.borrow_mut();
+        let mut media_connections = media_connections.0.borrow_mut();
         let kind = TransceiverKind::from(&caps);
         let enabled = match kind {
             TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
@@ -69,9 +70,9 @@ impl Receiver {
         let transceiver_direction = if enabled {
             TransceiverDirection::RECV
         } else {
-            TransceiverDirection::INACTIVE
+            TransceiverDirection::empty()
         };
-        let transceiver: Option<RtcRtpTransceiver> = match mid {
+        let transceiver: Option<Transceiver> = match mid {
             None => {
                 let mut transceiver = None;
                 for sender in media_connections.senders.values() {
@@ -79,12 +80,7 @@ impl Receiver {
                         // TODO: skip transceivers that already used by other
                         //       Receivers
                         let mutual_transceiver = sender.transceiver();
-                        let direction = TransceiverDirection::from(
-                            mutual_transceiver.direction(),
-                        );
-                        mutual_transceiver.set_direction(
-                            (direction | TransceiverDirection::RECV).into(),
-                        );
+                        mutual_transceiver.enable(TransceiverDirection::RECV);
                         transceiver = Some(mutual_transceiver);
                         break;
                     }
@@ -93,7 +89,6 @@ impl Receiver {
                 transceiver.or_else(|| {
                     Some(
                         media_connections
-                            .peer
                             .add_transceiver(kind, transceiver_direction),
                     )
                 })
@@ -132,9 +127,9 @@ impl Receiver {
     ///
     /// Sets [`MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of this
     /// [`Receiver`].
-    pub fn set_remote_track(
+    pub(super) fn set_remote_track(
         &self,
-        transceiver: RtcRtpTransceiver,
+        transceiver: Transceiver,
         new_track: SysMediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
@@ -208,11 +203,7 @@ impl Receiver {
                     if let Some(transceiver) =
                         self.transceiver.borrow().as_ref()
                     {
-                        let direction =
-                            TransceiverDirection::from(transceiver.direction());
-                        transceiver.set_direction(
-                            (direction - TransceiverDirection::SEND).into(),
-                        );
+                        transceiver.disable(TransceiverDirection::SEND);
                     }
                 }
                 StableMuteState::Unmuted => {
@@ -222,11 +213,7 @@ impl Receiver {
                     if let Some(transceiver) =
                         self.transceiver.borrow().as_ref()
                     {
-                        let direction =
-                            TransceiverDirection::from(transceiver.direction());
-                        transceiver.set_direction(
-                            (direction - TransceiverDirection::SEND).into(),
-                        );
+                        transceiver.enable(TransceiverDirection::SEND);
                     }
                 }
             }
