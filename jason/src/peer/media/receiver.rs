@@ -12,9 +12,9 @@ use proto::TrackId;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
-    media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
+    media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
-        conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        conn::{RtcPeerConnection, TransceiverDirection},
         media::{mute_state::MuteStateController, TransceiverSide},
         Muteable, PeerEvent,
     },
@@ -62,10 +62,10 @@ impl Receiver {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         recv_constraints: &RecvConstraints,
     ) -> Self {
-        let kind = TransceiverKind::from(&caps);
+        let kind = MediaKind::from(&caps);
         let enabled = match kind {
-            TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
-            TransceiverKind::Video => recv_constraints.is_video_enabled(),
+            MediaKind::Audio => recv_constraints.is_audio_enabled(),
+            MediaKind::Video => recv_constraints.is_video_enabled(),
         };
         let transceiver_direction = if enabled {
             TransceiverDirection::Recvonly
@@ -237,8 +237,8 @@ impl TransceiverSide for Receiver {
     }
 
     #[inline]
-    fn kind(&self) -> TransceiverKind {
-        TransceiverKind::from(&self.caps)
+    fn kind(&self) -> MediaKind {
+        MediaKind::from(&self.caps)
     }
 
     fn mid(&self) -> Option<String> {

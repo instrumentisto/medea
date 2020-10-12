@@ -24,13 +24,13 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
-        LocalTracksConstraints, MediaStreamSettings, MediaStreamTrack,
-        RecvConstraints,
+        LocalTracksConstraints, MediaKind, MediaStreamSettings,
+        MediaStreamTrack, RecvConstraints,
     },
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
         PeerEventHandler, PeerRepository, RtcStats, SourceType,
-        StableMuteState, TrackDirection, TransceiverKind,
+        StableMuteState, TrackDirection, TransceiverKind, TransceiverSide
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -249,7 +249,7 @@ impl RoomHandle {
     async fn set_track_enabled(
         &self,
         enabled: bool,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
         source_type: SourceType,
     ) -> Result<(), JasonError> {
@@ -378,7 +378,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Send,
                 SourceType::Both,
             )
@@ -393,7 +393,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Send,
                 SourceType::Both,
             )
@@ -411,7 +411,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Send,
                 source_type.unwrap_or(SourceType::Both),
             )
@@ -429,7 +429,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Send,
                 source_type.unwrap_or(SourceType::Both),
             )
@@ -444,7 +444,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Recv,
                 SourceType::Both,
             )
@@ -459,7 +459,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Recv,
                 SourceType::Both,
             )
@@ -474,7 +474,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Recv,
                 SourceType::Both,
             )
@@ -489,7 +489,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Recv,
                 SourceType::Both,
             )
@@ -705,11 +705,11 @@ impl InnerRoom {
 
     /// Toggles [`InnerRoom::recv_constraints`] or
     /// [`InnerRoom::send_constraints`] mute status based on the provided
-    /// [`TrackDirection`], [`TransceiverKind`] and [`SourceType`].
+    /// [`TrackDirection`], [`MediaKind`] and [`SourceType`].
     fn toggle_enable_constraints(
         &self,
         enabled: bool,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
         source_type: SourceType,
     ) {
@@ -730,7 +730,7 @@ impl InnerRoom {
     }
 
     /// Toggles [`TransceiverSide`]s [`MuteState`] by provided
-    /// [`TransceiverKind`] in all [`PeerConnection`]s in this [`Room`].
+    /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
     /// Will fallback to the previous [`MuteState`]s if some [`TransceiverSide`]
     /// can't be muted because
@@ -741,7 +741,7 @@ impl InnerRoom {
     async fn toggle_mute(
         &self,
         is_muted: bool,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
         source_type: SourceType,
     ) -> Result<(), Traced<RoomError>> {
@@ -883,11 +883,11 @@ impl InnerRoom {
     }
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
-    /// [`TransceiverKind`] and [`SourceType`] of this [`Room`] are in the
+    /// [`MediaKind`] and [`SourceType`] of this [`Room`] are in the
     /// provided `mute_state`.
     pub fn is_all_peers_in_mute_state(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
         source_type: SourceType,
         mute_state: StableMuteState,

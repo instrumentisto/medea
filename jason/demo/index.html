@@ -15,6 +15,8 @@
       DeviceVideoTrackConstraints,
       DisplayVideoTrackConstraints,
       FacingMode,
+      MediaKind,
+      SourceType
     } from './js/medea_jason.js';
 
     const controlUrl = document.location.protocol + "//" +
@@ -198,7 +200,7 @@
       let currentAudio = 'disable';
       let currentVideo = 'disable';
       for (const track of localTracks) {
-        if (track.kind() === 'video') {
+        if (track.kind() === MediaKind.Video) {
           currentVideo = track.get_track().label || 'disable';
         } else {
           currentAudio = track.get_track().label || 'disable';
@@ -209,11 +211,11 @@
       for (const device_info of device_infos) {
         const option = document.createElement('option');
         option.value = device_info.device_id();
-        if (device_info.kind() === 'audio') {
+        if (device_info.kind() === MediaKind.Audio) {
           option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
           option.selected = option.text === currentAudio;
           audio_select.append(option);
-        } else if (device_info.kind() === 'video') {
+        } else if (device_info.kind() === MediaKind.Video) {
           option.text = device_info.label() || `Camera ${video_select.length + 1}`;
           option.selected = option.text === currentVideo;
           video_select.append(option);
@@ -313,7 +315,7 @@
 
     async function updateLocalVideo(stream) {
       for (const track of stream) {
-        if (track.kind() == 'audio') {
+        if (track.kind() === MediaKind.Audio) {
           continue;
         }
         let mediaStream = new MediaStream();
@@ -563,8 +565,8 @@
         });
 
         connection.on_remote_track_added((track) => {
-          if (track.kind() === 'video') {
-            if (track.media_source_kind() === 'display') {
+          if (track.kind() === MediaKind.Video) {
+            if (track.media_source_kind() === Source.Display) {
               let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
               if (displayVideoEl === undefined) {
                 displayVideoEl = document.createElement('video');
@@ -613,13 +615,9 @@
 
           track.on_enabled( () => {
             console.log(`Track enabled: ${track.kind()}`);
-            // console.log(`Has active audio: ${stream.has_active_audio()}`);
-            // console.log(`Has active video: ${stream.has_active_video()}`);
           });
           track.on_disabled( () => {
             console.log(`Track disabled: ${track.kind()}`);
-            // console.log(`Has active audio: ${stream.has_active_audio()}`);
-            // console.log(`Has active video: ${stream.has_active_video()}`);
           });
         });
 
@@ -666,7 +664,7 @@
           await room.mute_audio();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'audio' && track.ptr > 0) {
+              if (track.kind() === MediaKind.Audio && track.ptr > 0) {
                 track.free();
               }
             }
@@ -687,7 +685,7 @@
           await room.mute_video();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'video' && track.ptr > 0) {
+              if (track.kind() === MediaKind.Video && track.ptr > 0) {
                 track.free();
               }
             }

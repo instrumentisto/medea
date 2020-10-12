@@ -3,8 +3,8 @@
 use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
     media::{
-        AudioTrackConstraints, DeviceVideoTrackConstraints, MediaManager,
-        MediaStreamSettings, MultiSourceTracksConstraints, TrackKind,
+        AudioTrackConstraints, DeviceVideoTrackConstraints, MediaKind,
+        MediaManager, MediaStreamSettings, MultiSourceTracksConstraints,
         VideoSource,
     },
     utils::{get_property_by_name, window},
@@ -40,7 +40,7 @@ async fn video_constraints_satisfies() {
 
     let track = tracks.pop().unwrap().0;
 
-    assert_eq!(track.kind(), TrackKind::Video);
+    assert_eq!(track.kind(), MediaKind::Video);
     assert!(track_constraints.satisfies(track.as_ref()));
 }
 
@@ -65,7 +65,7 @@ async fn audio_constraints_satisfies() {
 
     let track = tracks.pop().unwrap().0;
 
-    assert_eq!(track.kind(), TrackKind::Audio);
+    assert_eq!(track.kind(), MediaKind::Audio);
     assert!(track_constraints.satisfies(&track));
 }
 
@@ -107,17 +107,17 @@ async fn both_constraints_satisfies() {
     let (mut audio, mut video): (Vec<_>, Vec<_>) = tracks
         .into_iter()
         .partition(|(track, _)| match track.kind() {
-            TrackKind::Audio => true,
-            TrackKind::Video => false,
+            MediaKind::Audio => true,
+            MediaKind::Video => false,
         });
 
     let audio_track = audio.pop().unwrap().0;
     let video_track = video.pop().unwrap().0;
 
-    assert_eq!(audio_track.kind(), TrackKind::Audio);
+    assert_eq!(audio_track.kind(), MediaKind::Audio);
     assert!(audio_constraints.satisfies(&audio_track));
 
-    assert_eq!(video_track.kind(), TrackKind::Video);
+    assert_eq!(video_track.kind(), MediaKind::Video);
     assert!(video_constraints.satisfies(video_track.as_ref()));
 }
 
@@ -144,24 +144,24 @@ async fn equal_constraints_produce_equal_streams() {
 
     let audio_track = &tracks
         .iter()
-        .find(|(track, _)| track.kind() == TrackKind::Audio)
+        .find(|(track, _)| track.kind() == MediaKind::Audio)
         .unwrap()
         .0;
     let some_audio_track = &another_tracks
         .iter()
-        .find(|(track, _)| track.kind() == TrackKind::Audio)
+        .find(|(track, _)| track.kind() == MediaKind::Audio)
         .unwrap()
         .0;
     assert_eq!(audio_track.id(), some_audio_track.id());
 
     let video_track = &tracks
         .iter()
-        .find(|(track, _)| track.kind() == TrackKind::Video)
+        .find(|(track, _)| track.kind() == MediaKind::Video)
         .unwrap()
         .0;
     let some_video_track = &another_tracks
         .iter()
-        .find(|(track, _)| track.kind() == TrackKind::Video)
+        .find(|(track, _)| track.kind() == MediaKind::Video)
         .unwrap()
         .0;
     assert_eq!(video_track.id(), some_video_track.id());
@@ -191,12 +191,12 @@ async fn different_constraints_produce_different_streams() {
 
         let audio_track = &tracks
             .iter()
-            .find(|(track, _)| track.kind() == TrackKind::Audio)
+            .find(|(track, _)| track.kind() == MediaKind::Audio)
             .unwrap()
             .0;
         let another_audio_track = &another_tracks
             .iter()
-            .find(|(track, _)| track.kind() == TrackKind::Audio)
+            .find(|(track, _)| track.kind() == MediaKind::Audio)
             .unwrap()
             .0;
         assert_ne!(audio_track.id(), another_audio_track.id());
