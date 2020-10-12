@@ -344,12 +344,12 @@ impl Handler<CreateMemberInRoom> for RoomService {
             )))
             .boxed_local(),
             |room| {
-                let id_clone = id.to_string();
+                let id_str = id.to_string();
                 room.send(CreateMember(id, spec))
-                    .map(|_| {
-                        Ok(hashmap! {
-                            id_clone => sid,
-                        })
+                    .map_ok(|_| {
+                        hashmap! {
+                            id_str => sid,
+                        }
                     })
                     .map_err(RoomServiceError::RoomMailboxErr)
                     .err_into()
@@ -393,7 +393,7 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                     endpoint_id,
                     spec,
                 })
-                .map(|_| Ok(HashMap::new()))
+                .map_ok(|_| HashMap::new())
                 .map_err(RoomServiceError::RoomMailboxErr)
                 .err_into()
                 .boxed_local()
@@ -518,14 +518,11 @@ impl Handler<DeleteElements<Validated>> for RoomService {
             self.room_repo.get(&room_id).map_or(
                 future::ok(()).boxed_local(),
                 |room| {
-                    let sending = room.send(Delete(deletes_from_room));
-                    async {
-                        sending
-                            .await
-                            .map_err(RoomServiceError::RoomMailboxErr)?;
-                        Ok(())
-                    }
-                    .boxed_local()
+                    room.send(Delete(deletes_from_room))
+                        .map_ok(|_| ())
+                        .map_err(RoomServiceError::RoomMailboxErr)
+                        .err_into()
+                        .boxed_local()
                 },
             )
         } else {
