@@ -77,10 +77,12 @@ bitflags! {
         ///
         /// [1]: https://tinyurl.com/y6y2ye97
         const SEND = 0b01;
+
         /// [`recvonly` direction][1] of transceiver.
         ///
         /// [1]: https://tinyurl.com/y2nlxpzf
         const RECV = 0b10;
+
         /// [`sendrecv` direction][1] of transceiver.
         ///
         /// [1]: https://tinyurl.com/yywbvbzx
@@ -107,12 +109,12 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
     fn from(direction: TransceiverDirection) -> Self {
         use TransceiverDirection as D;
 
-        if direction.contains(D::RECV) {
+        if direction.contains(D::SENDRECV) {
+            Self::Sendrecv
+        } else if direction.contains(D::RECV) {
             Self::Recvonly
         } else if direction.contains(D::SEND) {
             Self::Sendonly
-        } else if direction.contains(D::SENDRECV) {
-            Self::Sendrecv
         } else {
             Self::Inactive
         }
