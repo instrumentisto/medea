@@ -22,15 +22,12 @@ use futures::{
 };
 use medea_client_api_proto::{
     stats::RtcStat, ConnectionQualityScore, MemberId, PeerConnectionState,
-    PeerId,
+    PeerId, RoomId,
 };
 use medea_macro::dispatchable;
 
 use crate::{
-    api::control::{
-        callback::{MediaDirection, MediaType},
-        RoomId,
-    },
+    api::control::callback::{MediaDirection, MediaType},
     media::PeerStateMachine,
     signalling::peers::{
         metrics::{

@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{Credential, MemberId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
@@ -19,7 +19,7 @@ use crate::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
+        EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomSpec,
         TryFromElementError,
     },
     log::prelude::*,
@@ -190,7 +190,7 @@ impl RoomService {
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
-        credentials: &str,
+        credentials: &Credential,
     ) -> String {
         format!(
             "{}/{}/{}/{}",

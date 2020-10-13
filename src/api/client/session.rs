@@ -17,14 +17,13 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RpcSettings,
-    ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RoomId,
+    RpcSettings, ServerMsg,
 };
 
 use crate::{
     api::{
         client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
-        control::RoomId,
         RpcServer,
     },
     log::prelude::*,
@@ -288,10 +287,10 @@ impl Actor for WsSession {
             .then(move |result, this, ctx| {
                 match result {
                     Ok(_) => {
-                        // send RpcSettings
-                        let rpc_settings_message =
-                            serde_json::to_string(&this.get_rpc_settings())
-                                .unwrap();
+                        let rpc_settings_message = serde_json::to_string(
+                            &ServerMsg::RpcSettings(this.get_rpc_settings()),
+                        )
+                        .unwrap();
                         ctx.text(rpc_settings_message);
 
                         this.start_pinger(ctx);
@@ -478,12 +477,6 @@ mod test {
     use actix_web::{test::TestServer, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use bytes::{Buf, Bytes};
-    use medea_client_api_proto::{
-        CloseDescription, CloseReason as ProtoCloseReason, Command, Event,
-        MemberId, PeerId,
-    };
-    use tokio::time::timeout;
-
     use futures::{
         channel::{
             mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -491,10 +484,14 @@ mod test {
         },
         future, FutureExt as _, SinkExt as _, StreamExt as _,
     };
+    use medea_client_api_proto::{
+        ClientMsg, CloseDescription, CloseReason as ProtoCloseReason, Command,
+        Event, IceCandidate, MemberId, PeerId, RoomId, RpcSettings, ServerMsg,
+    };
+    use tokio::time::timeout;
 
     use crate::api::{
         client::rpc_connection::{ClosedReason, RpcConnection},
-        control::RoomId,
         MockRpcServer,
     };
 
@@ -506,6 +503,14 @@ mod test {
         Mutex<UnboundedSender<T>>,
         Mutex<Option<UnboundedReceiver<T>>>,
     );
+
+    fn server_msg_into_frame(msg: &ServerMsg) -> Frame {
+        Frame::Text(serde_json::to_string(msg).unwrap().into())
+    }
+
+    fn client_msg_into_bytes(msg: &ClientMsg) -> Bytes {
+        Bytes::from(serde_json::to_string(msg).unwrap())
+    }
 
     fn test_server(factory: fn() -> WsSession) -> TestServer {
         actix_web::test::start(move || {
@@ -522,7 +527,7 @@ mod test {
     #[actix_rt::test]
     async fn close_if_rpc_established_failed() {
         fn factory() -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             let expected_member_id = member_id.clone();
@@ -560,7 +565,7 @@ mod test {
     #[actix_rt::test]
     async fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -583,19 +588,17 @@ mod test {
         let item = client.next().await.unwrap().unwrap();
         assert_eq!(
             item,
-            Frame::Text(
-                String::from(
-                    r#"{"idle_timeout_ms":5000,"ping_interval_ms":50}"#
-                )
-                .into()
-            )
+            server_msg_into_frame(&ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 5000,
+                ping_interval_ms: 50,
+            }))
         );
 
         let item = client.next().await.unwrap().unwrap();
-        assert_eq!(item, Frame::Text(String::from(r#"{"ping":0}"#).into()));
+        assert_eq!(item, server_msg_into_frame(&ServerMsg::Ping(0)));
 
         let item = client.next().await.unwrap().unwrap();
-        assert_eq!(item, Frame::Text(String::from(r#"{"ping":1}"#).into()));
+        assert_eq!(item, server_msg_into_frame(&ServerMsg::Ping(1)));
     }
 
     // WsSession is dropped and WebSocket connection is closed if no pongs
@@ -603,7 +606,7 @@ mod test {
     #[actix_rt::test]
     async fn dropped_if_idle() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -657,7 +660,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -682,19 +685,16 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let command = Bytes::from(
-            r#"{
-                            "command":"SetIceCandidate",
-                                "data":{
-                                    "peer_id":15,
-                                    "candidate":{
-                                        "candidate":"asd",
-                                        "sdp_m_line_index":1,
-                                        "sdp_mid":"2"
-                                    }
-                                }
-                            }"#,
-        );
+        let command = client_msg_into_bytes(&ClientMsg::Command(
+            Command::SetIceCandidate {
+                peer_id: PeerId(15),
+                candidate: IceCandidate {
+                    candidate: "asd".to_string(),
+                    sdp_m_line_index: Some(1),
+                    sdp_mid: Some("2".to_string()),
+                },
+            },
+        ));
         client
             .send(Message::Text(
                 std::str::from_utf8(command.bytes()).unwrap().to_owned(),
@@ -755,7 +755,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server.expect_connection_established().return_once(
@@ -811,7 +811,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server.expect_connection_established().return_once(
@@ -845,10 +845,12 @@ mod test {
         });
 
         let item = client.skip(2).next().await.unwrap().unwrap();
-
-        let event = "{\"event\":\"SdpAnswerMade\",\"data\":{\"peer_id\":77,\"\
-                     sdp_answer\":\"sdp_answer\"}}";
-
-        assert_eq!(item, Frame::Text(event.into()));
+        assert_eq!(
+            item,
+            server_msg_into_frame(&ServerMsg::Event(Event::SdpAnswerMade {
+                peer_id: PeerId(77),
+                sdp_answer: "sdp_answer".to_string(),
+            }))
+        );
     }
 }

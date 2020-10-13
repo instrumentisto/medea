@@ -7,10 +7,10 @@ use std::{convert::TryFrom, fmt, string::ToString};
 
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{MemberId, RoomId};
 use url::Url;
 
-use crate::{api::control::RoomId, impls_for_stateful_refs};
+use crate::impls_for_stateful_refs;
 
 use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 
