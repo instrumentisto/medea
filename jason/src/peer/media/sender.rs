@@ -47,13 +47,10 @@ impl<'a> SenderBuilder<'a> {
         let transceiver = match self.mid {
             None => media_connections
                 .add_transceiver(kind, TransceiverDirection::empty()),
-            Some(mid) => {
-                let transceiver = media_connections
-                    .get_transceiver_by_mid(&mid)
-                    .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                    .map_err(tracerr::wrap!())?;
-                transceiver
-            }
+            Some(mid) => media_connections
+                .get_transceiver_by_mid(&mid)
+                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
+                .map_err(tracerr::wrap!())?,
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);

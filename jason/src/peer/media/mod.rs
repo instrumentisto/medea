@@ -312,7 +312,7 @@ impl InnerMediaConnections {
     }
 
     /// Lookups [`Transceiver`] by provided `mid`.
-    fn get_transceiver_by_mid(&self, mid: &String) -> Option<Transceiver> {
+    fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
     }
 }

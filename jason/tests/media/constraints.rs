@@ -16,6 +16,7 @@ use wasm_bindgen_test::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
 use crate::is_firefox;
+use medea_jason::media::JsMediaSourceKind;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -524,21 +525,27 @@ async fn simultaneous_device_and_display() {
     let (mut audio, mut video): (Vec<_>, Vec<_>) = tracks
         .into_iter()
         .partition(|(track, _)| match track.kind() {
-            TrackKind::Audio => true,
-            TrackKind::Video => false,
+            MediaKind::Audio => true,
+            MediaKind::Video => false,
         });
 
     let audio_track = audio.pop().unwrap().0;
-    assert!(audio_track.kind() == TrackKind::Audio);
+    assert_eq!(audio_track.kind(), MediaKind::Audio);
     assert!(audio_constraints.satisfies(&audio_track));
 
     let display_video_track = video.pop().unwrap().0;
-    assert!(display_video_track.kind() == TrackKind::Video);
+    assert_eq!(display_video_track.kind(), MediaKind::Video);
     assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
-    assert_eq!(&display_video_track.js_media_source_kind(), "display");
+    assert_eq!(
+        &display_video_track.js_media_source_kind(),
+        &JsMediaSourceKind::Display
+    );
 
     let device_video_track = video.pop().unwrap().0;
-    assert!(device_video_track.kind() == TrackKind::Video);
+    assert_eq!(device_video_track.kind(), MediaKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
-    assert_eq!(&device_video_track.js_media_source_kind(), "device");
+    assert_eq!(
+        &device_video_track.js_media_source_kind(),
+        &JsMediaSourceKind::Device
+    );
 }

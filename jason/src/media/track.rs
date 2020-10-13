@@ -15,6 +15,7 @@ use crate::{media::MediaKind, utils::Callback0};
 
 /// Media source type.
 #[wasm_bindgen(js_name = MediaSourceKind)]
+#[cfg_attr(feature = "mockable", derive(Eq, PartialEq))]
 #[derive(Clone, Copy, Debug)]
 pub enum JsMediaSourceKind {
     /// Media is sourced from some media device (webcam or microphone).

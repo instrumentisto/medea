@@ -76,12 +76,15 @@ impl Receiver {
                 media_connections
                     .senders
                     .values()
-                    .find(|s| s.caps().is_mutual(&caps))
-                    .map(|s| {
-                        let trnsvr = s.transceiver();
-                        trnsvr.enable(transceiver_direction);
+                    .find_map(|s| {
+                        if s.caps().is_mutual(&caps) {
+                            let trnsvr = s.transceiver();
+                            trnsvr.enable(transceiver_direction);
 
-                        trnsvr
+                            Some(trnsvr)
+                        } else {
+                            None
+                        }
                     })
                     .or_else(|| {
                         Some(
@@ -111,13 +114,13 @@ impl Receiver {
 
     /// Returns `true` if this [`Receiver`] is receives media data.
     pub fn is_receiving(&self) -> bool {
-        let is_muted = self.mute_state_controller.is_unmuted();
+        let is_unmuted = self.mute_state_controller.is_unmuted();
         let is_trnsvr_enabled =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
                 trnsvr.is_enabled(TransceiverDirection::RECV)
             });
 
-        is_muted && is_trnsvr_enabled
+        is_unmuted && is_trnsvr_enabled
     }
 
     /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
