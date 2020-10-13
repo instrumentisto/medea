@@ -41,7 +41,8 @@ All user visible changes to this project will be documented in this file. This p
     - `PeerConnection` renegotiation functionality ([#105]);
     - Calculate and send call quality score based on RTC stats ([#132]);
     - Muting/unmuting `MediaTrack`s by receiver ([#127]);
-    - Send `TrackUpdate::IceRestart` based on RTC stats analysis ([#138]).
+    - Send `TrackUpdate::IceRestart` based on RTC stats analysis ([#138]);
+    - Multiple `Room`s served by one RPC connection support ([#147]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -81,6 +82,7 @@ All user visible changes to this project will be documented in this file. This p
 [#132]: /../../pull/132
 [#135]: /../../pull/135
 [#138]: /../../pull/138
+[#147]: /../../pull/147
 
 
 

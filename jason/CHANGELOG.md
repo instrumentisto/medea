@@ -56,6 +56,8 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.mute_remote_video`;
             - `Room.unmute_remote_video`.
         - `MediaTrack.media_source_kind` function ([#145], [#146]).
+        - Multiple `Room`s management ([#147]):
+            - `Jason.dispose_room`.
     - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
@@ -110,6 +112,7 @@ All user visible changes to this project will be documented in this file. This p
 [#143]: /../../pull/143
 [#145]: /../../pull/145
 [#146]: /../../pull/146
+[#147]: /../../pull/147
 
 
 

@@ -58,7 +58,9 @@ All user visible changes to this project will be documented in this file. This p
 - `TrackPatchEvent` and `TrackPatchCommand` types ([#127]);
 - `IceRestart` variant to `TrackUpdate` ([#138]);
 - `source_kind` field to `VideoSettings` type ([#145]);
-- `RoomId` and `Credential` types ([#148]).
+- `RoomId` and `Credential` types ([#148]);
+- `JoinRoom` and `LeaveRoom` client messages ([#147]);
+- `JoinedRoom` and `LeftRoom` server messages ([#147]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -76,6 +78,7 @@ All user visible changes to this project will be documented in this file. This p
 [#127]: /../../pull/127
 [#138]: /../../pull/138
 [#145]: /../../pull/145
+[#147]: /../../pull/147
 [#148]: /../../pull/148
 
 
