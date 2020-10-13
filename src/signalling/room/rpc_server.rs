@@ -6,7 +6,7 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{FutureExt as _, LocalBoxFuture};
+use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{Command, MemberId, PeerId};
 
 use crate::{
@@ -25,6 +25,7 @@ use crate::{
 };
 
 use super::{ActFuture, Room};
+use futures::TryFutureExt;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
@@ -191,46 +192,59 @@ impl Handler<RpcConnectionEstablished> for Room {
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         info!(
             "RpcConnectionEstablished for Member [id = {}].",
             msg.member_id
         );
 
+        let maybe_send_on_join =
+            match self.members.get_member_by_id(&msg.member_id) {
+                Ok(member) => {
+                    future::Either::Left(member.get_on_join().map_or_else(
+                        || future::Either::Left(future::ok(())),
+                        |callback_url| {
+                            future::Either::Right({
+                                let callback_service = self.callbacks.clone();
+                                async move {
+                                    callback_service
+                                        .send(
+                                            callback_url,
+                                            member.get_fid().into(),
+                                            OnJoinEvent,
+                                        )
+                                        .await
+                                }.err_into()
+                            })
+                        },
+                    ))
+                }
+                Err(err) => future::Either::Right(future::err(err.into())),
+            };
+
         Box::pin(
-            self.members
-                .connection_established(ctx, msg.member_id, msg.connection)
+            maybe_send_on_join
                 .into_actor(self)
-                .then(|res, this, _| match res {
-                    Ok(member) => if let Some(callback_url) = member.get_on_join() {
-                        Either::Left(Either::Left(this.callbacks.send(
-                            callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
-                        ).into_actor(this).map(|res, this, _| res.map(|_| member))))
-                    } else {
-                        Either::Left(Either::Right(fut::ok(member)))
-                    },
-                    Err(err) => Either::Right(fut::err(err.into()))
+                .then(move |res: Result<(), RoomError>, this, ctx| match res {
+                    Ok(_) => Either::Left(
+                        this.members
+                            .connection_established(
+                                ctx,
+                                msg.member_id,
+                                msg.connection,
+                            )
+                            .err_into()
+                            .into_actor(this),
+                    ),
+                    Err(err) => Either::Right(fut::err(err)),
                 })
                 .then(|res, this, _| match res {
                     Ok(member) => Either::Left(
                         this.init_member_connections(&member)
-                            .map(|res, _, _| res.map(|_| member)),
+                            .map(|res, _, _| res.map(|_| ())),
                     ),
-                    Err(err) => Either::Right(fut::err(err.into())),
-                })
-                .map(|result, this, _| {
-                    let member = result?;
-                    if let Some(callback_url) = member.get_on_join() {
-                        this.callbacks.send(
-                            callback_url,
-                            member.get_fid().into(),
-                            OnJoinEvent,
-                        );
-                    };
-                    Ok(())
+                    Err(err) => Either::Right(fut::err(err)),
                 }),
         )
     }
@@ -260,8 +274,7 @@ impl Handler<RpcConnectionClosed> for Room {
             .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
 
         if let ClosedReason::Closed { normal } = msg.reason {
-            if let Some(member) = self.members.get_member_by_id(&msg.member_id)
-            {
+            if let Ok(member) = self.members.get_member_by_id(&msg.member_id) {
                 if let Some(on_leave_url) = member.get_on_leave() {
                     let reason = if normal {
                         OnLeaveReason::Disconnected
@@ -280,7 +293,6 @@ impl Handler<RpcConnectionClosed> for Room {
                      found.",
                     msg.member_id,
                 );
-                self.close_gracefully(ctx).spawn(ctx);
             }
 
             let removed_peers =
@@ -292,7 +304,7 @@ impl Handler<RpcConnectionClosed> for Room {
                 // to another participant fail,
                 // because connection already closed but we don't know about it
                 // because message in event loop.
-                self.member_peers_removed(peers_ids, peer_member_id, ctx)
+                self.member_peers_removed(peers_ids, peer_member_id)
                     .map(|_, _, _| ())
                     .spawn(ctx);
             }

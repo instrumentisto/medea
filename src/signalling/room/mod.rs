@@ -20,7 +20,7 @@ use medea_client_api_proto::{Event, MemberId, NegotiationRole, PeerId};
 use crate::{
     api::control::{
         callback::{
-            CallbackClientFactoryImpl, CallbackClientError, CallbackService,
+            CallbackClientError, CallbackClientFactoryImpl, CallbackService,
             OnLeaveEvent, OnLeaveReason,
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
@@ -310,47 +310,41 @@ impl Room {
         &mut self,
         peers_id: Vec<PeerId>,
         member_id: MemberId,
-        ctx: &mut Context<Self>,
     ) -> ActFuture<()> {
         info!(
             "Peers {:?} removed for member [id = {}].",
             peers_id, member_id
         );
-        if let Some(member) = self.members.get_member_by_id(&member_id) {
+        if let Ok(member) = self.members.get_member_by_id(&member_id) {
             member.peers_removed(&peers_id);
-        } else {
-            error!(
-                "Member [id = {}] for which received Event::PeersRemoved not \
-                 found. Closing room.",
-                member_id
-            );
-
-            return self.close_gracefully(ctx);
-        }
-        Box::pin(
-            fut::ready(self.send_peers_removed(member_id, peers_id)).then(
-                |err, this: &mut Room, ctx: &mut Context<Self>| {
-                    if let Err(e) = err {
-                        match e {
-                            RoomError::ConnectionNotExists(_)
-                            | RoomError::UnableToSendEvent(_) => {
-                                Box::pin(actix::fut::ready(()))
+            Box::pin(
+                fut::ready(self.send_peers_removed(member_id, peers_id)).then(
+                    |err, this: &mut Room, ctx: &mut Context<Self>| {
+                        if let Err(e) = err {
+                            match e {
+                                RoomError::ConnectionNotExists(_)
+                                | RoomError::UnableToSendEvent(_) => {
+                                    Box::pin(fut::ready(()))
+                                }
+                                _ => {
+                                    error!(
+                                        "Unexpected failed PeersEvent \
+                                         command, because {}. Room will be \
+                                         stopped.",
+                                        e
+                                    );
+                                    this.close_gracefully(ctx)
+                                }
                             }
-                            _ => {
-                                error!(
-                                    "Unexpected failed PeersEvent command, \
-                                     because {}. Room will be stopped.",
-                                    e
-                                );
-                                this.close_gracefully(ctx)
-                            }
+                        } else {
+                            Box::pin(fut::ready(()))
                         }
-                    } else {
-                        Box::pin(actix::fut::ready(()))
-                    }
-                },
-            ),
-        )
+                    },
+                ),
+            )
+        } else {
+            Box::pin(fut::ready(()))
+        }
     }
 
     /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified

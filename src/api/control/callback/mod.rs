@@ -13,10 +13,8 @@ use crate::api::control::refs::StatefulFid;
 
 #[doc(inline)]
 pub use self::{
-    service::{
-        CallbackService
-    },
-    clients::{CallbackClientFactoryImpl, CallbackClientError}
+    clients::{CallbackClientError, CallbackClientFactoryImpl},
+    service::CallbackService,
 };
 
 /// Event for `on_leave` `Member` callback.

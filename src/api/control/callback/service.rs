@@ -82,13 +82,19 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
     /// [`CallbackClient`] and waits for a response.
     ///
     /// Will use existing [`CallbackClient`] or create new.
+    ///
+    /// ## Errors
+    ///
+    /// With [`CallbackClientError`] if any errors happen during client creation
+    /// or request execution.
     pub async fn send<T: Into<CallbackEvent> + 'static>(
         &self,
         callback_url: CallbackUrl,
         fid: StatefulFid,
         event: T,
     ) -> Result<(), CallbackClientError> {
-        self.inner_send(CallbackRequest::new(fid, event.into()), callback_url).await
+        self.inner_send(CallbackRequest::new(fid, event.into()), callback_url)
+            .await
     }
 
     /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
@@ -170,9 +176,7 @@ mod tests {
             .map(|_| callback_service.clone())
             .map(|service| {
                 async move {
-                    service
-                        .inner_send(callback_request(), callback_url())
-                        .await
+                    service.inner_send(callback_request(), callback_url()).await
                 }
                 .boxed_local()
             })
