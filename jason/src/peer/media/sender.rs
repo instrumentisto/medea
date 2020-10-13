@@ -6,9 +6,7 @@ use std::{
 };
 
 use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{
-    MediaSourceKind, PeerId, TrackId, TrackPatchEvent,
-};
+use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -44,7 +42,7 @@ impl<'a> SenderBuilder<'a> {
     /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
-        let mut media_connections = self.media_connections.0.borrow_mut();
+        let media_connections = self.media_connections.0.borrow();
         let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
             None => media_connections
@@ -205,11 +203,7 @@ impl Sender {
         self.caps.source_type()
     }
 
-    /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
-    pub fn source_kind(&self) -> MediaSourceKind {
-        self.caps.media_source_kind()
-    }
-
+    /// Returns [`Transceiver`] of this [`Sender`].
     pub(super) fn transceiver(&self) -> Transceiver {
         self.transceiver.clone()
     }
@@ -255,10 +249,6 @@ impl TransceiverSide for Sender {
 
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
-    }
-
-    fn media_kind(&self) -> MediaKind {
-        self.caps.kind()
     }
 
     fn mid(&self) -> Option<String> {

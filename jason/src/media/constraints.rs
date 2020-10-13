@@ -679,7 +679,7 @@ impl TrackConstraints {
     }
 
     /// Returns [`MediaKind`] of this [`TrackConstraints`].
-    pub fn kind(&self) -> MediaKind {
+    fn media_kind(&self) -> MediaKind {
         match self {
             TrackConstraints::Audio(_) => MediaKind::Audio,
             TrackConstraints::Video(_) => MediaKind::Video,
@@ -695,6 +695,14 @@ impl TrackConstraints {
                 VideoSource::Device(_) => SourceType::Device,
             },
         }
+    }
+
+    /// Returns `true` if provided [`TrackConstraints`] is mutual to this
+    /// [`TrackConstraints`].
+    #[inline]
+    pub fn is_mutual(&self, another: &Self) -> bool {
+        self.media_kind() == another.media_kind()
+            && self.source_type() == another.source_type()
     }
 }
 

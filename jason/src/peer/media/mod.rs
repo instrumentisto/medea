@@ -41,10 +41,7 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn kind(&self) -> MediaKind;
 
-    /// Returns [`MediaKind`] of this [`TransceiverSide`].
-    fn media_kind(&self) -> MediaKind;
-
-    /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
+    /// Returns mid of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
 
     /// Returns `true` if this [`TransceiverKind`] currently can be
@@ -303,8 +300,9 @@ impl InnerMediaConnections {
         }
     }
 
+    /// Creates [`Transceiver`] and adds it to the [`RtcPeerConnection`].
     fn add_transceiver(
-        &mut self,
+        &self,
         kind: MediaKind,
         direction: TransceiverDirection,
     ) -> Transceiver {
@@ -313,7 +311,8 @@ impl InnerMediaConnections {
         Transceiver::from(transceiver)
     }
 
-    fn get_transceiver_by_mid(&mut self, mid: &String) -> Option<Transceiver> {
+    /// Lookups [`Transceiver`] by provided `mid`.
+    fn get_transceiver_by_mid(&self, mid: &String) -> Option<Transceiver> {
         self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
     }
 }
@@ -684,24 +683,23 @@ impl MediaConnections {
         track: SysMediaStreamTrack,
     ) -> Result<()> {
         let inner = self.0.borrow();
-        if let Some(mid) = transceiver.mid() {
-            let receiver = inner
-                .receivers
-                .values()
-                .find(|recv| {
-                    recv.mid().map_or(false, |recv_mid| recv_mid == mid)
-                })
-                .cloned();
+        let mid = transceiver.mid();
 
-            if let Some(receiver) = receiver {
+        mid.as_ref()
+            .and_then(|mid| {
+                inner.receivers.values().find(|recv| {
+                    recv.mid().map_or(false, |recv_mid| &recv_mid == mid)
+                })
+            })
+            .map(|recv| {
                 let transceiver = Transceiver::from(transceiver);
-                receiver.set_remote_track(transceiver, track);
-                return Ok(());
-            }
-        }
-        Err(tracerr::new!(
-            MediaConnectionsError::CouldNotInsertRemoteTrack(transceiver.mid())
-        ))
+                recv.set_remote_track(transceiver, track);
+            })
+            .ok_or_else(|| {
+                tracerr::new!(MediaConnectionsError::CouldNotInsertRemoteTrack(
+                    mid
+                ))
+            })
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].

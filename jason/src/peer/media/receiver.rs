@@ -60,7 +60,7 @@ impl Receiver {
         mid: Option<String>,
         recv_constraints: &RecvConstraints,
     ) -> Self {
-        let mut media_connections = media_connections.0.borrow_mut();
+        let media_connections = media_connections.0.borrow();
         let kind = MediaKind::from(&caps);
         let enabled = match kind {
             MediaKind::Audio => recv_constraints.is_audio_enabled(),
@@ -71,35 +71,28 @@ impl Receiver {
         } else {
             TransceiverDirection::empty()
         };
-        let transceiver: Option<Transceiver> = match mid {
-            None => {
-                let mut transceiver = None;
-                for sender in media_connections.senders.values() {
-                    if sender.media_kind() == caps.kind()
-                        && sender.source_kind() == caps.media_source_kind()
-                    {
-                        let mutual_transceiver = sender.transceiver();
-                        if transceiver_direction.is_empty() {
-                            mutual_transceiver
-                                .disable(TransceiverDirection::RECV);
-                        } else {
-                            mutual_transceiver
-                                .enable(TransceiverDirection::RECV);
-                        }
-                        transceiver = Some(mutual_transceiver);
-                        break;
-                    }
-                }
+        let transceiver = mid.as_ref().map_or_else(
+            || {
+                media_connections
+                    .senders
+                    .values()
+                    .find(|s| s.caps().is_mutual(&caps))
+                    .map(|s| {
+                        let trnsvr = s.transceiver();
+                        trnsvr.enable(transceiver_direction);
 
-                transceiver.or_else(|| {
-                    Some(
-                        media_connections
-                            .add_transceiver(kind, transceiver_direction),
-                    )
-                })
-            }
-            Some(_) => None,
-        };
+                        trnsvr
+                    })
+                    .or_else(|| {
+                        Some(
+                            media_connections
+                                .add_transceiver(kind, transceiver_direction),
+                        )
+                    })
+            },
+            |_| None,
+        );
+
         Self {
             track_id,
             caps,
@@ -118,15 +111,13 @@ impl Receiver {
 
     /// Returns `true` if this [`Receiver`] is receives media data.
     pub fn is_receiving(&self) -> bool {
-        if self.mute_state_controller.is_muted() {
-            return false;
-        }
+        let is_muted = self.mute_state_controller.is_unmuted();
+        let is_trnsvr_enabled =
+            self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
+                trnsvr.is_enabled(TransceiverDirection::RECV)
+            });
 
-        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
-            transceiver.is_enabled(TransceiverDirection::RECV)
-        } else {
-            return false;
-        }
+        is_muted && is_trnsvr_enabled
     }
 
     /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -134,7 +125,7 @@ impl Receiver {
     ///
     /// Sets [`MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of this
     /// [`Receiver`].
-    pub(super) fn set_remote_track(
+    pub fn set_remote_track(
         &self,
         transceiver: Transceiver,
         new_track: SysMediaStreamTrack,
@@ -256,10 +247,6 @@ impl TransceiverSide for Receiver {
     #[inline]
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
-    }
-
-    fn media_kind(&self) -> MediaKind {
-        self.caps.kind()
     }
 
     fn mid(&self) -> Option<String> {

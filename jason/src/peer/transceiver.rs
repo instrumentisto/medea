@@ -9,29 +9,36 @@ use web_sys::{
 };
 
 #[derive(Clone, From)]
-pub(super) struct Transceiver(RtcRtpTransceiver);
+pub struct Transceiver(RtcRtpTransceiver);
 
 impl Transceiver {
+    /// Returns current [`TransceiverDirection`] of this [`Transceiver`].
     fn current_direction(&self) -> TransceiverDirection {
         TransceiverDirection::from(self.0.direction())
     }
 
+    /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
     pub fn disable(&self, disabled_direction: TransceiverDirection) {
         self.0.set_direction(
             self.current_direction().disable(disabled_direction).into(),
         );
     }
 
+    /// Enables provided [`TransceiverDirection`] of this [`Transceiver`].
     pub fn enable(&self, enabled_direction: TransceiverDirection) {
         self.0.set_direction(
             self.current_direction().enable(enabled_direction).into(),
         );
     }
 
+    /// Returns `true` if provided [`TransceiverDirection`] if enabled for this
+    /// [`Transceiver`].
     pub fn is_enabled(&self, direction: TransceiverDirection) -> bool {
         self.current_direction().contains(direction)
     }
 
+    /// Replaces [`TransceiverDirection::SEND`] [`SysMediaStreamTrack`] of this
+    /// [`Transceiver`].
     pub async fn replace_sender_track(
         &self,
         new_track: Option<&SysMediaStreamTrack>,
@@ -39,6 +46,7 @@ impl Transceiver {
         JsFuture::from(self.0.sender().replace_track(new_track)).await
     }
 
+    /// Returns `mid` of this [`Transceiver`].
     pub fn mid(&self) -> Option<String> {
         self.0.mid()
     }
@@ -62,12 +70,16 @@ bitflags! {
 }
 
 impl TransceiverDirection {
-    fn disable(self, disabled_direction: Self) -> Self {
-        self - disabled_direction
-    }
-
+    /// Enables provided [`TransceiverDirection`] in this
+    /// [`TransceiverDirection`].
     fn enable(self, enabled_direction: Self) -> Self {
         self | enabled_direction
+    }
+
+    /// Disables provided [`TransceiverDirection`] in this
+    /// [`TransceiverDirection`].
+    fn disable(self, disabled_direction: Self) -> Self {
+        self - disabled_direction
     }
 }
 
