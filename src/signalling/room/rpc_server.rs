@@ -6,7 +6,9 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{self, FutureExt as _, LocalBoxFuture};
+use futures::future::{
+    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+};
 use medea_client_api_proto::{Command, MemberId, PeerId};
 
 use crate::{
@@ -25,7 +27,6 @@ use crate::{
 };
 
 use super::{ActFuture, Room};
-use futures::TryFutureExt;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
