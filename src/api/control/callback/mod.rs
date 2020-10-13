@@ -6,11 +6,18 @@ pub mod url;
 
 use actix::Message;
 use chrono::{DateTime, Utc};
-use clients::CallbackClientError;
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
+
+#[doc(inline)]
+pub use self::{
+    service::{
+        CallbackService
+    },
+    clients::{CallbackClientFactoryImpl, CallbackClientError}
+};
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]

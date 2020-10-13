@@ -41,7 +41,7 @@ impl<B> Clone for CallbackService<B> {
 }
 
 impl<B: CallbackClientFactory + 'static> CallbackService<B> {
-    async fn send_request(
+    async fn inner_send(
         &self,
         request: CallbackRequest,
         callback_url: CallbackUrl,
@@ -78,13 +78,24 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
         Ok(())
     }
 
-    /// Asynchronously sends [`CallbackEvent`] for provided [`StatefulFid`] to
-    /// [`CallbackClient`].
+    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
+    /// [`CallbackClient`] and waits for a response.
     ///
     /// Will use existing [`CallbackClient`] or create new.
-    // TODO: Add buffering and resending for failed 'Callback' sends.
-    //       https://github.com/instrumentisto/medea/issues/61
-    pub fn send_callback<T: Into<CallbackEvent> + 'static>(
+    pub async fn send<T: Into<CallbackEvent> + 'static>(
+        &self,
+        callback_url: CallbackUrl,
+        fid: StatefulFid,
+        event: T,
+    ) -> Result<(), CallbackClientError> {
+        self.inner_send(CallbackRequest::new(fid, event.into()), callback_url).await
+    }
+
+    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
+    /// [`CallbackClient`] ignoring any potential errors.
+    ///
+    /// Will use existing [`CallbackClient`] or create new.
+    pub fn do_send<T: Into<CallbackEvent> + 'static>(
         &self,
         callback_url: CallbackUrl,
         fid: StatefulFid,
@@ -92,8 +103,7 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
     ) {
         let this = self.clone();
         Arbiter::spawn(async move {
-            let req = CallbackRequest::new(fid, event.into());
-            if let Err(e) = this.send_request(req, callback_url).await {
+            if let Err(e) = this.send(callback_url, fid, event).await {
                 error!("Failed to send callback because {:?}.", e);
             }
         })
@@ -161,7 +171,7 @@ mod tests {
             .map(|service| {
                 async move {
                     service
-                        .send_request(callback_request(), callback_url())
+                        .inner_send(callback_request(), callback_url())
                         .await
                 }
                 .boxed_local()

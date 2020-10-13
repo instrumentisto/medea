@@ -20,7 +20,7 @@ use medea_client_api_proto::{Event, MemberId, NegotiationRole, PeerId};
 use crate::{
     api::control::{
         callback::{
-            clients::CallbackClientFactoryImpl, service::CallbackService,
+            CallbackClientFactoryImpl, CallbackClientError, CallbackService,
             OnLeaveEvent, OnLeaveReason,
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
@@ -106,6 +106,10 @@ pub enum RoomError {
     )]
     #[from(ignore)]
     PeerTrafficWatcherMailbox(MailboxError),
+
+    /// Failed to send callback via [`CallbackService`]
+    #[display(fmt = "CallbackClient errored in Room: {}", _0)]
+    CallbackClientError(CallbackClientError),
 }
 
 /// Possible states of [`Room`].
@@ -287,7 +291,7 @@ impl Room {
                 self.members.member_has_connection(&member.id())
             })
             .for_each(|(member, on_leave)| {
-                self.callbacks.send_callback(
+                self.callbacks.do_send(
                     on_leave,
                     member.get_fid().into(),
                     OnLeaveEvent::new(OnLeaveReason::ServerShutdown),

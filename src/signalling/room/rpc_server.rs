@@ -202,17 +202,29 @@ impl Handler<RpcConnectionEstablished> for Room {
             self.members
                 .connection_established(ctx, msg.member_id, msg.connection)
                 .into_actor(self)
-                .then(|res, room, _| match res {
+                .then(|res, this, _| match res {
+                    Ok(member) => if let Some(callback_url) = member.get_on_join() {
+                        Either::Left(Either::Left(this.callbacks.send(
+                            callback_url,
+                            member.get_fid().into(),
+                            OnJoinEvent,
+                        ).into_actor(this).map(|res, this, _| res.map(|_| member))))
+                    } else {
+                        Either::Left(Either::Right(fut::ok(member)))
+                    },
+                    Err(err) => Either::Right(fut::err(err.into()))
+                })
+                .then(|res, this, _| match res {
                     Ok(member) => Either::Left(
-                        room.init_member_connections(&member)
+                        this.init_member_connections(&member)
                             .map(|res, _, _| res.map(|_| member)),
                     ),
                     Err(err) => Either::Right(fut::err(err.into())),
                 })
-                .map(|result, room, _| {
+                .map(|result, this, _| {
                     let member = result?;
                     if let Some(callback_url) = member.get_on_join() {
-                        room.callbacks.send_callback(
+                        this.callbacks.send(
                             callback_url,
                             member.get_fid().into(),
                             OnJoinEvent,
@@ -256,7 +268,7 @@ impl Handler<RpcConnectionClosed> for Room {
                     } else {
                         OnLeaveReason::LostConnection
                     };
-                    self.callbacks.send_callback(
+                    self.callbacks.do_send(
                         on_leave_url,
                         member.get_fid().into(),
                         OnLeaveEvent::new(reason),
