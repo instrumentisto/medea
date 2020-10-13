@@ -15,6 +15,7 @@
       DeviceVideoTrackConstraints,
       DisplayVideoTrackConstraints,
       FacingMode,
+      MediaKind,
     } from './js/medea_jason.js';
 
     const controlUrl = document.location.protocol + "//" +
@@ -177,7 +178,7 @@
         url: controlUrl + roomId + '/' + memberId,
         data: {
           kind: 'Member',
-          credentials: 'test',
+          credential: 'test',
           pipeline: pipeline,
         },
       });
@@ -197,7 +198,7 @@
       let currentAudio = 'disable';
       let currentVideo = 'disable';
       for (const track of localTracks) {
-        if (track.kind() === 'video') {
+        if (track.kind() === MediaKind.Video) {
           currentVideo = track.get_track().label || 'disable';
         } else {
           currentAudio = track.get_track().label || 'disable';
@@ -208,11 +209,11 @@
       for (const device_info of device_infos) {
         const option = document.createElement('option');
         option.value = device_info.device_id();
-        if (device_info.kind() === 'audio') {
+        if (device_info.kind() === MediaKind.Audio) {
           option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
           option.selected = option.text === currentAudio;
           audio_select.append(option);
-        } else if (device_info.kind() === 'video') {
+        } else if (device_info.kind() === MediaKind.Video) {
           option.text = device_info.label() || `Camera ${video_select.length + 1}`;
           option.selected = option.text === currentVideo;
           video_select.append(option);
@@ -309,7 +310,7 @@
 
     async function updateLocalVideo(stream) {
       for (const track of stream) {
-        if (track.kind() == 'audio') {
+        if (track.kind() === MediaKind.Audio) {
           continue;
         }
         let mediaStream = new MediaStream();
@@ -545,7 +546,7 @@
         });
 
         connection.on_remote_track_added((track) => {
-          if (track.kind() === 'video') {
+          if (track.kind() === MediaKind.Video) {
               let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
               if (cameraVideoEl === undefined) {
                 cameraVideoEl = document.createElement('video');
@@ -627,7 +628,7 @@
           await room.mute_audio();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'audio' && track.ptr > 0) {
+              if (track.kind() === MediaKind.Audio && track.ptr > 0) {
                 track.free();
               }
             }
@@ -648,7 +649,7 @@
           await room.mute_video();
           for (const track of localTracks) {
             if (track.ptr > 0) {
-              if (track.kind() === 'video' && track.ptr > 0) {
+              if (track.kind() === MediaKind.Video && track.ptr > 0) {
                 track.free();
               }
             }

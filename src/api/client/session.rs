@@ -18,7 +18,7 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Credentials, Event, MemberId,
+    ClientMsg, CloseDescription, CloseReason, Credential, Event, MemberId,
     RoomId, RpcSettings, ServerMsg,
 };
 
@@ -155,7 +155,7 @@ impl WsSession {
             Ok(ClientMsg::JoinRoom {
                 room_id,
                 member_id,
-                credentials: token,
+                credential: token,
             }) => {
                 self.handle_join_room(ctx, room_id, member_id, token);
             }
@@ -208,12 +208,12 @@ impl WsSession {
         ctx: &mut ws::WebsocketContext<Self>,
         room_id: RoomId,
         member_id: MemberId,
-        credentials: Credentials,
+        credential: Credential,
     ) {
         if let Some(room) = self.rpc_server_repo.get(&room_id) {
             room.connection_established(
                 member_id.clone(),
-                credentials,
+                credential,
                 Box::new(ctx.address()),
             )
             .into_actor(self)
@@ -264,14 +264,15 @@ impl WsSession {
     ) {
         debug!("{}: Received Close message: {:?}", self, reason);
         if self.close_reason.is_none() {
-            let closed_reason = reason
-                .as_ref()
-                .filter(|reason| {
-                    reason.code == CloseCode::Normal
+            let closed_reason =
+                reason.as_ref().map_or(ClosedReason::Lost, |reason| {
+                    if reason.code == CloseCode::Normal
                         || reason.code == CloseCode::Away
-                })
-                .map_or(ClosedReason::Lost, |_| ClosedReason::Closed {
-                    normal: true,
+                    {
+                        ClosedReason::Closed { normal: true }
+                    } else {
+                        ClosedReason::Lost
+                    }
                 });
 
             self.close_reason = Some(InnerCloseReason::ByClient(closed_reason));
@@ -709,7 +710,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            credentials: "token".into(),
+            credential: "token".into(),
         };
         client
             .send(Message::Text(
@@ -779,7 +780,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            credentials: "token".into(),
+            credential: "token".into(),
         };
         client
             .send(Message::Text(
@@ -865,7 +866,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            credentials: "token".into(),
+            credential: "token".into(),
         };
         client
             .send(Message::Text(
@@ -942,7 +943,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            credentials: "token".into(),
+            credential: "token".into(),
         };
         client
             .send(Message::Text(
@@ -1068,7 +1069,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            credentials: "token".into(),
+            credential: "token".into(),
         };
         client
             .send(Message::Text(
@@ -1164,7 +1165,7 @@ mod test {
         let join_msg = ClientMsg::JoinRoom {
             room_id: "room_id".into(),
             member_id: "member_id".into(),
-            credentials: "token".into(),
+            credential: "token".into(),
         };
         client
             .send(Message::Text(

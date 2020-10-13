@@ -11,7 +11,7 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use futures::FutureExt as _;
-use medea_client_api_proto::{Credentials, MemberId, RoomId};
+use medea_client_api_proto::{Credential, MemberId, RoomId};
 use serde::Deserialize;
 
 use crate::{
@@ -32,7 +32,7 @@ struct RequestParams {
     member_id: MemberId,
 
     /// Credential of [`Member`] to authorize WebSocket connection with.
-    credentials: Credentials,
+    credential: Credential,
 }
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts

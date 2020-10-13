@@ -10,8 +10,8 @@ use std::str::FromStr;
 
 use derive_more::{Display, From};
 use medea_client_api_proto::{
-    CloseDescription, CloseReason as CloseByServerReason, Credentials,
-    MemberId, RoomId,
+    CloseDescription, CloseReason as CloseByServerReason, Credential, MemberId,
+    RoomId,
 };
 use tracerr::Traced;
 use url::Url;
@@ -48,8 +48,8 @@ pub struct ConnectionInfo {
     /// [`MemberId`] of the `Member` for which [`RpcSession`] is created.
     member_id: MemberId,
 
-    /// [`Credentials`] for connecting [`RpcSession`].
-    credentials: Credentials,
+    /// [`Credential`] for connecting [`RpcSession`].
+    credential: Credential,
 }
 
 impl ConnectionInfo {
@@ -69,9 +69,9 @@ impl ConnectionInfo {
         &self.member_id
     }
 
-    /// Returns [`Credentials`] for connecting [`RpcSession`].
-    pub fn credentials(&self) -> &Credentials {
-        &self.credentials
+    /// Returns [`Credential`] for connecting [`RpcSession`].
+    pub fn credential(&self) -> &Credential {
+        &self.credential
     }
 }
 
@@ -105,7 +105,7 @@ impl FromStr for ConnectionInfo {
 
         let mut segments =
             url.path_segments().ok_or_else(few_segments_error!())?.rev();
-        let token = segments
+        let credential = segments
             .next()
             .ok_or_else(few_segments_error!())?
             .to_owned()
@@ -126,7 +126,7 @@ impl FromStr for ConnectionInfo {
             url: url.into(),
             room_id,
             member_id,
-            credentials: token,
+            credential,
         })
     }
 }

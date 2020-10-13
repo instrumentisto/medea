@@ -334,9 +334,9 @@ impl From<proto::CreateResponse> for CreateResponse {
                 sids: Some(resp.sid),
                 error: None,
             },
-            |e| Self {
+            |error| Self {
                 sids: None,
-                error: Some(e.into()),
+                error: Some(error.into()),
             },
         )
     }
@@ -424,9 +424,9 @@ impl From<proto::GetResponse> for SingleGetResponse {
                     .map(|(_, e)| e.into())
                     .next(),
             },
-            |e| Self {
+            |error| Self {
                 element: None,
-                error: Some(e.into()),
+                error: Some(error.into()),
             },
         )
     }

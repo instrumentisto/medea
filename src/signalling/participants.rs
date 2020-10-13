@@ -17,7 +17,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    CloseDescription, CloseReason, Credentials, Event, MemberId, RoomId,
+    CloseDescription, CloseReason, Credential, Event, MemberId, RoomId,
 };
 
 use crate::{
@@ -164,10 +164,10 @@ impl ParticipantService {
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
-        credentials: &Credentials,
+        credential: &Credential,
     ) -> Option<Member> {
         let member = self.get_member_by_id(member_id)?;
-        if member.credentials() == *credentials {
+        if member.credential() == *credential {
             Some(member)
         } else {
             None
@@ -191,12 +191,13 @@ impl ParticipantService {
         member_id: MemberId,
         event: Event,
     ) -> Result<(), RoomError> {
-        if let Some(conn) = self.connections.get(&member_id) {
-            conn.send_event(self.room_id.clone(), event);
-            Ok(())
-        } else {
-            Err(RoomError::ConnectionNotExists(member_id))
-        }
+        self.connections.get(&member_id).map_or(
+            Err(RoomError::ConnectionNotExists(member_id)),
+            |conn| {
+                conn.send_event(self.room_id.clone(), event);
+                Ok(())
+            },
+        )
     }
 
     /// Saves provided [`RpcConnection`], registers [`IceUser`].
@@ -389,7 +390,7 @@ impl ParticipantService {
         }
         let signalling_member = Member::new(
             id.clone(),
-            spec.credentials().clone(),
+            spec.credential().clone(),
             self.room_id.clone(),
             spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
             spec.reconnect_timeout()

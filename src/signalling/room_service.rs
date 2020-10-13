@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{Credentials, MemberId, RoomId};
+use medea_client_api_proto::{Credential, MemberId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
@@ -168,26 +168,20 @@ impl RoomService {
         &self,
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
-        if let Some(room) = self.room_repo.get(&id) {
-            shutdown::unsubscribe(
-                &self.graceful_shutdown,
-                room.clone().recipient(),
-                shutdown::Priority(2),
-            );
+        self.room_repo
+            .get(&id)
+            .map_or(future::ok(()).boxed_local(), |room| {
+                shutdown::unsubscribe(
+                    &self.graceful_shutdown,
+                    room.clone().recipient(),
+                    shutdown::Priority(2),
+                );
 
-            let room_repo = self.room_repo.clone();
-            let sending = room.send(Close);
-            async move {
-                let res = sending.await;
-                if res.is_ok() {
-                    room_repo.remove(&id);
-                }
-                res
-            }
-            .boxed_local()
-        } else {
-            async { Ok(()) }.boxed_local()
-        }
+                let room_repo = self.room_repo.clone();
+                room.send(Close)
+                    .inspect_ok(move |_| room_repo.remove(&id))
+                    .boxed_local()
+            })
     }
 
     /// Returns [Control API] sid based on provided arguments and
@@ -196,11 +190,11 @@ impl RoomService {
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
-        credentials: &Credentials,
+        credential: &Credential,
     ) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.public_url, room_id, member_id, credentials
+            self.public_url, room_id, member_id, credential
         )
     }
 }
@@ -280,7 +274,7 @@ impl Handler<CreateRoom> for RoomService {
                     let uri = self.get_sid(
                         room_spec.id(),
                         &member_id,
-                        member.credentials(),
+                        member.credential(),
                     );
                     (member_id.clone().to_string(), uri)
                 })
@@ -333,23 +327,28 @@ impl Handler<CreateMemberInRoom> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.parent_fid.take_room_id();
-        let sid = self.get_sid(&room_id, &msg.id, msg.spec.credentials());
-        let mut sids = HashMap::new();
-        sids.insert(msg.id.to_string(), sid);
+        let id = msg.id;
+        let spec = msg.spec;
+        let sid = self.get_sid(&room_id, &id, spec.credential());
 
-        if let Some(room) = self.room_repo.get(&room_id) {
-            let sending = room.send(CreateMember(msg.id, msg.spec));
-            async {
-                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(sids)
-            }
-            .boxed_local()
-        } else {
-            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
-                room_id,
-            )))
-            .boxed_local()
-        }
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
+            |room| {
+                async move {
+                    let id_str = id.to_string();
+                    room.send(CreateMember(id, spec))
+                        .await
+                        .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(hashmap! {id_str => sid})
+                }
+                .boxed_local()
+            },
+        )
     }
 }
 
@@ -374,24 +373,29 @@ impl Handler<CreateEndpointInRoom> for RoomService {
     ) -> Self::Result {
         let (room_id, member_id) = msg.parent_fid.take_all();
         let endpoint_id = msg.id;
+        let spec = msg.spec;
 
-        if let Some(room) = self.room_repo.get(&room_id) {
-            let sending = room.send(CreateEndpoint {
-                member_id,
-                endpoint_id,
-                spec: msg.spec,
-            });
-            async {
-                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(HashMap::new())
-            }
-            .boxed_local()
-        } else {
-            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
-                room_id,
-            )))
-            .boxed_local()
-        }
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
+            |room| {
+                async move {
+                    room.send(CreateEndpoint {
+                        member_id,
+                        endpoint_id,
+                        spec,
+                    })
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(HashMap::new())
+                }
+                .boxed_local()
+            },
+        )
     }
 }
 
@@ -406,7 +410,6 @@ pub struct Unvalidated;
 
 // Clippy lint show use_self errors for DeleteElements with generic state. This
 // is fix for it. This allow not works on function.
-#[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
     /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
     pub fn new() -> Self {
@@ -509,16 +512,16 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
 
-            if let Some(room) = self.room_repo.get(&room_id) {
-                let sending = room.send(Delete(deletes_from_room));
-                async {
-                    sending.await.map_err(RoomServiceError::RoomMailboxErr)?;
-                    Ok(())
-                }
-                .boxed_local()
-            } else {
-                future::ok(()).boxed_local()
-            }
+            self.room_repo.get(&room_id).map_or_else(
+                || future::ok(()).boxed_local(),
+                |room| {
+                    room.send(Delete(deletes_from_room))
+                        .map_ok(|_| ())
+                        .map_err(RoomServiceError::RoomMailboxErr)
+                        .err_into()
+                        .boxed_local()
+                },
+            )
         } else {
             future::err(RoomServiceError::EmptyUrisList).boxed_local()
         }

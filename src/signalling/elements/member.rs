@@ -12,7 +12,7 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{Credentials, MemberId, PeerId, RoomId};
+use medea_client_api_proto::{Credential, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -80,8 +80,8 @@ struct MemberInner {
     /// All [`WebRtcPlayEndpoint`]s of this [`Member`].
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
-    /// Credentials for this [`Member`].
-    credentials: Credentials,
+    /// Credential for this [`Member`].
+    credential: Credential,
 
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -111,7 +111,7 @@ impl Member {
     /// function.
     pub fn new(
         id: MemberId,
-        credentials: Credentials,
+        credential: Credential,
         room_id: RoomId,
         idle_timeout: Duration,
         reconnect_timeout: Duration,
@@ -121,7 +121,7 @@ impl Member {
             id,
             srcs: HashMap::new(),
             sinks: HashMap::new(),
-            credentials,
+            credential,
             room_id,
             on_leave: None,
             on_join: None,
@@ -301,8 +301,8 @@ impl Member {
     }
 
     /// Returns credentials of this [`Member`].
-    pub fn credentials(&self) -> Credentials {
-        self.0.borrow().credentials.clone()
+    pub fn credential(&self) -> Credential {
+        self.0.borrow().credential.clone()
     }
 
     /// Returns all srcs of this [`Member`].
@@ -529,7 +529,7 @@ pub fn parse_members(
         .map(|(id, member)| {
             let new_member = Member::new(
                 id.clone(),
-                member.credentials().clone(),
+                member.credential().clone(),
                 room_spec.id.clone(),
                 member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
                 member
@@ -584,7 +584,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credentials: self.credentials().to_string(),
+            credentials: self.credential().to_string(),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())
@@ -632,7 +632,7 @@ mod tests {
               pipeline:
                 caller:
                   kind: Member
-                  credentials: test
+                  credential: test
                   spec:
                     pipeline:
                       publish:
@@ -641,7 +641,7 @@ mod tests {
                           p2p: Always
                 some-member:
                   kind: Member
-                  credentials: test
+                  credential: test
                   spec:
                     pipeline:
                       publish:
@@ -650,7 +650,7 @@ mod tests {
                           p2p: Always
                 responder:
                   kind: Member
-                  credentials: test
+                  credential: test
                   spec:
                     pipeline:
                       play:

@@ -11,9 +11,9 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaStreamTrack, TrackConstraints},
+    media::{MediaKind, MediaStreamTrack, TrackConstraints},
     peer::{
-        conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+        conn::{RtcPeerConnection, TransceiverDirection},
         media::TransceiverSide,
         PeerEvent,
     },
@@ -42,7 +42,7 @@ impl<'a> SenderBuilder<'a> {
     /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
-        let kind = TransceiverKind::from(&self.caps);
+        let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
             None => self
                 .peer
@@ -254,8 +254,8 @@ impl TransceiverSide for Sender {
         self.track_id
     }
 
-    fn kind(&self) -> TransceiverKind {
-        TransceiverKind::from(&self.caps)
+    fn kind(&self) -> MediaKind {
+        MediaKind::from(&self.caps)
     }
 
     fn mid(&self) -> Option<String> {

@@ -212,11 +212,11 @@ async fn room_dispose_works() {
 
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::JoinRoom { room_id: _, member_id: _, credentials: _ }
+        ClientMsg::JoinRoom { room_id: _, member_id: _, credential: _ }
     ));
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::JoinRoom { room_id: _, member_id: _, credentials: _ }
+        ClientMsg::JoinRoom { room_id: _, member_id: _, credential: _ }
     ));
 
     jason.dispose_room("room_id");

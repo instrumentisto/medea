@@ -29,7 +29,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
     media::{
-        LocalTracksConstraints, MediaManager, MediaManagerError,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
         MediaStreamTrack, RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
@@ -43,7 +43,7 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{
         IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
-        TransceiverDirection, TransceiverKind,
+        TransceiverDirection,
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
@@ -342,6 +342,7 @@ impl PeerConnection {
 
     /// Filters out already sent stats, and send new statss from
     /// provided [`RtcStats`].
+    #[allow(clippy::option_if_let_else)]
     pub fn send_peer_stats(&self, stats: RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
@@ -403,12 +404,12 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with a provided
-    /// [`TransceiverKind`] and [`TrackDirection`] is in the provided
+    /// [`MediaKind`] and [`TrackDirection`] is in the provided
     /// [`StableMuteState`].
     #[inline]
     pub fn is_all_transceiver_sides_in_mute_state(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
         mute_state: StableMuteState,
     ) -> bool {
@@ -536,11 +537,11 @@ impl PeerConnection {
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
-    /// provided [`TransceiverKind`] and [`TrackDirection`].
+    /// provided [`MediaKind`] and [`TrackDirection`].
     #[inline]
     pub fn get_transceivers_sides(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         self.media_connections

@@ -26,7 +26,7 @@ use awc::{
 };
 use futures::{executor, stream::SplitSink, SinkExt as _, StreamExt as _};
 use medea_client_api_proto::{
-    ClientMsg, Command, Credentials, Event, IceCandidate, MemberId,
+    ClientMsg, Command, Credential, Event, IceCandidate, MemberId,
     NegotiationRole, PeerId, RoomId, RpcSettings, ServerMsg, Track, TrackId,
     TrackUpdate,
 };
@@ -89,7 +89,7 @@ pub struct TestMember {
     auto_negotiation: bool,
 }
 
-pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Credentials) {
+pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Credential) {
     let mut url = Url::parse(&url).unwrap();
     url.set_fragment(None);
     url.set_query(None);
@@ -124,13 +124,13 @@ impl TestMember {
         &mut self,
         room_id: RoomId,
         member_id: MemberId,
-        credentials: Credentials,
+        credential: Credential,
     ) {
         executor::block_on(async move {
             let json = serde_json::to_string(&ClientMsg::JoinRoom {
                 room_id,
                 member_id,
-                credentials,
+                credential,
             })
             .unwrap();
             self.sink.send(ws::Message::Text(json)).await.unwrap();

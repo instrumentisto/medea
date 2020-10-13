@@ -7,7 +7,7 @@ use futures::{
     stream::{LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    ClientMsg, CloseReason as CloseByServerReason, Command, Credentials, Event,
+    ClientMsg, CloseReason as CloseByServerReason, Command, Credential, Event,
     MemberId, RoomId, RpcSettings, ServerMsg,
 };
 use medea_reactive::ObservableCell;
@@ -214,12 +214,12 @@ impl WebSocketRpcClient {
         &self,
         room_id: RoomId,
         member_id: MemberId,
-        credentials: Credentials,
+        credential: Credential,
     ) {
         self.send_msg(&ClientMsg::JoinRoom {
             room_id,
             member_id,
-            credentials,
+            credential,
         });
     }
 

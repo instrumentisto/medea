@@ -65,12 +65,12 @@ pub struct PeerId(pub u32);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
 
-/// `Member` credentials.
+/// Credential used for `Member` authentication.
 #[derive(
-    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
 )]
 #[from(forward)]
-pub struct Credentials(pub String);
+pub struct Credential(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -101,8 +101,9 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-// TODO: should be properly shared between medea and jason
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(tag = "msg", content = "data")]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -157,8 +158,8 @@ pub enum ClientMsg {
         /// ID of `Member` with which [`Credentials`] `Client` want to join.
         member_id: MemberId,
 
-        /// [`Credentials`] of `Client`'s `Member`.
-        credentials: Credentials,
+        /// [`Credential`] of `Client`'s `Member`.
+        credential: Credential,
     },
 
     /// Request of `Client` to leave `Room`.

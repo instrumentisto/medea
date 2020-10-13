@@ -6,7 +6,7 @@ pub mod control;
 use std::fmt::Debug;
 
 use futures::future::LocalBoxFuture;
-use medea_client_api_proto::{Command, Credentials, MemberId};
+use medea_client_api_proto::{Command, Credential, MemberId};
 
 use crate::api::client::rpc_connection::{
     ClosedReason, RpcConnection, RpcConnectionSettings,
@@ -23,7 +23,7 @@ pub trait RpcServer: Debug + Send {
     fn connection_established(
         &self,
         member_id: MemberId,
-        credentials: Credentials,
+        credential: Credential,
         connection: Box<dyn RpcConnection>,
     ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>>;
 
