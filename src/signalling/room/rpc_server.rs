@@ -215,7 +215,8 @@ impl Handler<RpcConnectionEstablished> for Room {
                                             OnJoinEvent,
                                         )
                                         .await
-                                }.err_into()
+                                }
+                                .err_into()
                             })
                         },
                     ))
