@@ -67,7 +67,7 @@ pub struct TrackId(pub u32);
 
 /// Credential used for `Member` authentication.
 #[derive(
-    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
 )]
 #[from(forward)]
 pub struct Credential(pub String);
