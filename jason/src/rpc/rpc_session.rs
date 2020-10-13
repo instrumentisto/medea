@@ -1,3 +1,5 @@
+//! RPC Client which manages authorization and messages routing.
+
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -42,19 +44,19 @@ enum SessionState {
 #[async_trait(?Send)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcSession {
-    /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
+    /// Tries to upgrade [`State`] of this [`RpcSession`] to [`State::Open`].
     ///
     /// This function is also used for reconnection of this [`RpcClient`].
     ///
-    /// If [`RpcClient`] is closed than this function will try to establish
+    /// If [`RpcSession`] is closed than this function will try to establish
     /// new RPC connection.
     ///
-    /// If [`RpcClient`] already in [`State::Connecting`] then this function
+    /// If [`RpcSession`] already in [`State::Connecting`] then this function
     /// will not perform one more connection try. It will subsribe to
     /// [`State`] changes and wait for first connection result. And based on
     /// this result - this function will be resolved.
     ///
-    /// If [`RpcClient`] already in [`State::Open`] then this function will be
+    /// If [`RpcSession`] already in [`State::Open`] then this function will be
     /// instantly resolved.
     async fn connect(
         self: Rc<Self>,
@@ -64,7 +66,7 @@ pub trait RpcSession {
     /// Tries to reconnect (or connect) this [`RpcSession`] to the Media Server.
     async fn reconnect(self: Rc<Self>) -> Result<(), Traced<RpcClientError>>;
 
-    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcSession`].
     ///
     /// [`Stream`]: futures::Stream
     fn subscribe(self: Rc<Self>) -> LocalBoxStream<'static, Event>;
@@ -72,11 +74,11 @@ pub trait RpcSession {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
-    /// [`Future`] which will resolve on normal [`RpcClient`] connection
+    /// [`Future`] which will resolve on normal [`RpcSession`] connection
     /// closing.
     ///
     /// This [`Future`] wouldn't be resolved on abnormal closes. On
-    /// abnormal close [`RpcClient::on_connection_loss`] will be thrown.
+    /// abnormal close [`RpcSession::on_connection_loss`] will be thrown.
     ///
     /// [`Future`]: std::future::Future
     fn on_normal_close(
@@ -155,6 +157,10 @@ impl Session {
 }
 
 impl Session {
+    /// Connects to the `Media Server` with a [`ConnectionInfo`] from this
+    /// [`Session`].
+    ///
+    /// No op if current [`SessionState`] is [`SessionState::Closed`].
     async fn connect_session(&self) -> Result<(), Traced<RpcClientError>> {
         if let Some(credentials) = self.credentials.borrow().as_ref() {
             if self.state.get() != SessionState::Closed {

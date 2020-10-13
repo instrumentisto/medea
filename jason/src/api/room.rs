@@ -111,7 +111,7 @@ enum RoomError {
     #[display(fmt = "Unable to init RPC transport: {}", _0)]
     InitRpcTransportFailed(#[js(cause)] TransportError),
 
-    /// Returned if [`RpcClient`] was unable to connect to RPC server.
+    /// Returned if [`WebSocketRpcClient`] was unable to connect to RPC server.
     #[display(fmt = "Unable to connect RPC server: {}", _0)]
     CouldNotConnectToServer(#[js(cause)] RpcClientError),
 
@@ -314,7 +314,7 @@ impl RoomHandle {
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
-    /// [`RpcClient`] connection loss.
+    /// [`WebSocketRpcClient`] connection loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -502,7 +502,7 @@ impl WeakRoom {
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
-    /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
+    /// Creates new [`Room`] and associates it with a provided [`RpcSession`].
     #[allow(clippy::mut_mut)]
     pub fn new(
         rpc: Rc<dyn RpcSession>,
@@ -676,7 +676,7 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_media: Rc<Callback1<JasonError>>,
 
-    /// Callback to be invoked when [`RpcClient`] loses connection.
+    /// Callback to be invoked when [`RpcSession`] loses connection.
     on_connection_loss: Callback1<ReconnectHandle>,
 
     /// JS callback which will be called when this [`Room`] will be closed.

@@ -102,7 +102,6 @@ impl Item {
                 );
 
                 quote! {
-                    #[allow(clippy::needless_arbitrary_self_type)]
                     #[doc = #doc]
                     #maybe_async fn #fn_name_ident(
                         #self_kind,

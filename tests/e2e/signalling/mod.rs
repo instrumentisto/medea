@@ -120,6 +120,8 @@ impl TestMember {
         });
     }
 
+    /// Authorizes this [`TestMember`] on `Media Server` with a provided
+    /// connection info.
     fn authorize(
         &mut self,
         room_id: RoomId,

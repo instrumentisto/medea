@@ -16,15 +16,15 @@ use crate::{
 #[derive(Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
 
-/// Idle timeout of [`RpcClient`].
+/// Idle timeout of [`WebSocketRpcClient`].
 ///
-/// [`RpcClient`]: super::RpcClient
+/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Debug, Copy, Clone)]
 pub struct IdleTimeout(pub JsDuration);
 
-/// Ping interval of [`RpcClient`].
+/// Ping interval of [`WebSocketRpcClient`].
 ///
-/// [`RpcClient`]: super::RpcClient
+/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Debug, Copy, Clone, Mul)]
 pub struct PingInterval(pub JsDuration);
 
@@ -33,10 +33,10 @@ struct Inner {
     /// [`RpcTransport`] which heartbeats.
     transport: Rc<dyn RpcTransport>,
 
-    /// Idle timeout of [`RpcClient`].
+    /// Idle timeout of [`WebSocketRpcClient`].
     idle_timeout: IdleTimeout,
 
-    /// Ping interval of [`RpcClient`].
+    /// Ping interval of [`WebSocketRpcClient`].
     ping_interval: PingInterval,
 
     /// [`Abort`] for [`Future`] which sends [`ClientMsg::Pong`] on

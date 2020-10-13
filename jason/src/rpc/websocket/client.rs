@@ -1,3 +1,5 @@
+//! Implementation of the WebSocket client.
+
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use derive_more::Display;
@@ -37,9 +39,9 @@ pub enum ClientDisconnect {
     /// [`Room`]: crate::api::Room
     RoomClosed,
 
-    /// [`RpcClient`] was unexpectedly dropped.
+    /// [`WebSocketRpcClient`] was unexpectedly dropped.
     ///
-    /// [`RpcClient`]: crate::rpc::RpcClient
+    /// [`WebSocketRpcClient`]: crate::rpc::WebSocketRpcClient
     RpcClientUnexpectedlyDropped,
 
     /// [`RpcTransport`] was unexpectedly dropped.
@@ -69,10 +71,11 @@ impl Into<CloseReason> for ClientDisconnect {
     }
 }
 
-/// State of [`RpcClient`] and [`RpcTransport`].
+/// State of [`WebSocketRpcClient`] and [`RpcTransport`].
 #[derive(Clone, Debug, PartialEq)]
 enum ClientState {
-    /// [`RpcClient`] is currently establishing connection to RPC server.
+    /// [`WebSocketRpcClient`] is currently establishing connection to RPC
+    /// server.
     Connecting,
     /// Connection with RPC Server is active.
     Open,
@@ -103,19 +106,21 @@ struct Inner {
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Senders for [`RpcClient::on_connection_loss`] subscribers.
+    /// Senders for [`WebSocketRpcClient::on_connection_loss`] subscribers.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
-    /// Closure which will create new [`RpcTransport`]s for this [`RpcClient`]
-    /// on every [`WebSocketRpcClient::establish_connection`] call.
+    /// Closure which will create new [`RpcTransport`]s for this
+    /// [`WebSocketRpcClient`] on every [`WebSocketRpcClient::
+    /// establish_connection`] call.
     rpc_transport_factory: RpcTransportFactory,
 
     /// URL to which [`RpcTransport`] will be connect.
     ///
-    /// Will be `None` if this [`RpcClient`] was never connected to a sever.
+    /// Will be `None` if this [`WebSocketRpcClient`] was never connected to a
+    /// sever.
     url: Option<ApiUrl>,
 
-    /// Current [`State`] of this [`RpcClient`].
+    /// Current [`State`] of this [`WebSocketRpcClient`].
     state: ObservableCell<ClientState>,
 }
 
@@ -228,8 +233,9 @@ impl WebSocketRpcClient {
         self.send_msg(&ClientMsg::LeaveRoom { room_id, member_id });
     }
 
-    /// Stops [`Heartbeat`] and notifies all [`RpcClient::on_connection_loss`]
-    /// subs about connection loss.
+    /// Stops [`Heartbeat`] and notifies all
+    /// [`WebSocketRpcClient::on_connection_loss`] subs about connection
+    /// loss.
     fn handle_connection_loss(&self, closed_state_reason: ClosedStateReason) {
         self.0
             .borrow()

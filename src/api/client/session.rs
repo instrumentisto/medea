@@ -176,9 +176,9 @@ impl WsSession {
 
     /// Updates [`RpcConnectionSettings`] of this [`WsSession`].
     ///
-    /// Update will be performed only if old settings are less then new one.
+    /// Updates will be performed only if old settings are less then new one.
     ///
-    /// Send [`ServerMsg::RpcSettings`] to the client if some settings was
+    /// Sends [`ServerMsg::RpcSettings`] to the client if some settings was
     /// updated.
     ///
     /// Restarts heartbeater with a new [`RpcConnectionSettings`].
@@ -202,7 +202,13 @@ impl WsSession {
         }
     }
 
-    /// Handler [`ClientMsg::JoinRoom`].
+    /// Handler for [`ClientMsg::JoinRoom`].
+    ///
+    /// Calls [`RpcServer::connection_established`], updates
+    /// [`RpcConnectionSettings`] with [`RpcConnectionSettings`] returned from
+    /// the [`RpcServer`].
+    ///
+    /// Sends [`ServerMsg::JoinedRoom`].
     fn handle_join_room(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
@@ -242,6 +248,9 @@ impl WsSession {
     }
 
     /// Handles [`ClientMsg::LeftRoom`].
+    ///
+    /// Sends [`RpcServer::connection_closed`] to the [`RpcServer`] from which
+    /// [`Member`] left.
     fn handle_leave_room(
         &self,
         ctx: &mut ws::WebsocketContext<Self>,

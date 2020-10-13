@@ -1,4 +1,4 @@
-//! Reconnection for [`RpcClient`].
+//! Reconnection for [`RpcSession`].
 
 use std::{rc::Weak, time::Duration};
 
@@ -12,7 +12,7 @@ use crate::{
     utils::{delay_for, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
-/// Error which indicates that [`RpcClient`]'s (which this [`ReconnectHandle`]
+/// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]
 /// tries to reconnect) token is `None`.
 #[derive(Debug, Display, JsCaused)]
 struct NoTokenError;
@@ -26,7 +26,7 @@ struct NoTokenError;
 pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
 impl ReconnectHandle {
-    /// Instantiates new [`ReconnectHandle`] from the given [`RpcClient`]
+    /// Instantiates new [`ReconnectHandle`] from the given [`RpcSesion`]
     /// reference.
     pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
@@ -37,7 +37,7 @@ impl ReconnectHandle {
 impl ReconnectHandle {
     /// Tries to reconnect after the provided delay in milliseconds.
     ///
-    /// If [`RpcClient`] is already reconnecting then new reconnection attempt
+    /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
@@ -54,7 +54,8 @@ impl ReconnectHandle {
         })
     }
 
-    /// Tries to reconnect [`RpcClient`] in a loop with a growing backoff delay.
+    /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
+    /// delay.
     ///
     /// The first attempt to reconnect is guaranteed to happen no earlier than
     /// `starting_delay_ms`.
@@ -65,7 +66,7 @@ impl ReconnectHandle {
     /// After each reconnection attempt, delay between reconnections will be
     /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
     ///
-    /// If [`RpcClient`] is already reconnecting then new reconnection attempt
+    /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     ///

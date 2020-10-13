@@ -89,6 +89,7 @@ pub struct RpcConnectionEstablished {
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
 
+    /// Credential of [`Member`] to authorize WebSocket connection with.
     pub credential: Credential,
 
     /// Established [`RpcConnection`].

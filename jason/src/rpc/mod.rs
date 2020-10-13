@@ -53,7 +53,7 @@ pub struct ConnectionInfo {
 }
 
 impl ConnectionInfo {
-    /// Returns [`Url`] to which transport layer will connect.
+    /// Returns [`ApiUrl`] to which transport layer will connect.
     pub fn url(&self) -> &ApiUrl {
         &self.url
     }
@@ -148,7 +148,7 @@ pub enum CloseReason {
     },
 }
 
-/// The reason of why [`RpcClient`]/[`RpcTransport`] went into
+/// The reason of why [`WebSocketRpcClient`]/[`RpcTransport`] went into
 /// [`State::Closed`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClosedStateReason {
@@ -166,8 +166,8 @@ pub enum ClosedStateReason {
     /// Indicates that connection with server has never been established.
     NeverConnected,
 
-    /// First received [`ServerMsg`] after [`RpcClient::connect`] is not
-    /// [`ServerMsg::RpcSettings`].
+    /// First received [`ServerMsg`] after [`WebSocketRpcClient::connect`] is
+    /// not [`ServerMsg::RpcSettings`].
     FirstServerMsgIsNotRpcSettings,
 
     /// Connection has been inactive for a while and thus considered idle
@@ -175,7 +175,7 @@ pub enum ClosedStateReason {
     Idle,
 }
 
-/// Errors that may occur in [`RpcClient`].
+/// Errors that may occur in [`WebSocketRpcClient`].
 #[derive(Debug, Display, From, JsCaused)]
 pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
@@ -197,7 +197,7 @@ pub enum RpcClientError {
     #[display(fmt = "RpcClient unexpectedly gone.")]
     RpcClientGone,
 
-    /// Occurs if [`RpcClient::connect`] fails.
+    /// Occurs if [`WebSocketRpcClient::connect`] fails.
     #[display(fmt = "Connection failed. {:?}", _0)]
     ConnectionFailed(ClosedStateReason),
 }

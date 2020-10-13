@@ -231,7 +231,7 @@ impl Into<proto::Member> for Member {
             pipeline,
             on_leave: self.on_leave.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
-            credentials: self.credentials.unwrap_or_default(),
+            credential: self.credentials.unwrap_or_default(),
             ping_interval: self.ping_interval.map(Into::into),
             idle_timeout: self.idle_timeout.map(Into::into),
             reconnect_timeout: self.reconnect_timeout.map(Into::into),

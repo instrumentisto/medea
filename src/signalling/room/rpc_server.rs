@@ -112,7 +112,6 @@ impl RpcServer for Addr<Room> {
         member_id: MemberId,
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()> {
-        debug!("LEAVE");
         self.send(RpcConnectionClosed { member_id, reason })
             .map(|res| {
                 if let Err(e) = res {
@@ -169,6 +168,8 @@ impl Handler<RpcConnectionEstablished> for Room {
     /// Saves new [`RpcConnection`] in [`ParticipantService`][1], initiates
     /// media establishment between members.
     /// Creates and interconnects all available `Member`'s `Peer`s.
+    ///
+    /// Returns [`RpcConnectionSettings`] of the connected `Member`.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     /// [1]: crate::signalling::participants::ParticipantService

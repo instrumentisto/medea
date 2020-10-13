@@ -27,8 +27,8 @@ pub use self::{
 };
 
 struct Inner {
-    /// Connection with Medea media server. Only one [`RpcClient`] is supported
-    /// atm.
+    /// Connection with `Media Server`. Only one [`WebSocketRpcClient`] is
+    /// supported atm.
     rpc: Rc<WebSocketRpcClient>,
 
     /// [`Room`]s maintained by this [`Jason`] instance.
