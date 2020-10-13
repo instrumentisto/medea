@@ -17,14 +17,13 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RpcSettings,
-    ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Event, MemberId, RoomId,
+    RpcSettings, ServerMsg,
 };
 
 use crate::{
     api::{
         client::rpc_connection::{ClosedReason, EventMessage, RpcConnection},
-        control::RoomId,
         RpcServer,
     },
     log::prelude::*,
@@ -478,12 +477,6 @@ mod test {
     use actix_web::{test::TestServer, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
     use bytes::{Buf, Bytes};
-    use medea_client_api_proto::{
-        ClientMsg, CloseDescription, CloseReason as ProtoCloseReason, Command,
-        Event, IceCandidate, MemberId, PeerId, RpcSettings, ServerMsg,
-    };
-    use tokio::time::timeout;
-
     use futures::{
         channel::{
             mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -491,10 +484,14 @@ mod test {
         },
         future, FutureExt as _, SinkExt as _, StreamExt as _,
     };
+    use medea_client_api_proto::{
+        ClientMsg, CloseDescription, CloseReason as ProtoCloseReason, Command,
+        Event, IceCandidate, MemberId, PeerId, RoomId, RpcSettings, ServerMsg,
+    };
+    use tokio::time::timeout;
 
     use crate::api::{
         client::rpc_connection::{ClosedReason, RpcConnection},
-        control::RoomId,
         MockRpcServer,
     };
 
@@ -530,7 +527,7 @@ mod test {
     #[actix_rt::test]
     async fn close_if_rpc_established_failed() {
         fn factory() -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             let expected_member_id = member_id.clone();
@@ -568,7 +565,7 @@ mod test {
     #[actix_rt::test]
     async fn sends_rpc_settings_and_pings() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -609,7 +606,7 @@ mod test {
     #[actix_rt::test]
     async fn dropped_if_idle() {
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -663,7 +660,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server
@@ -758,7 +755,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server.expect_connection_established().return_once(
@@ -814,7 +811,7 @@ mod test {
         }
 
         let mut serv = test_server(|| -> WsSession {
-            let member_id = MemberId::from(String::from("test_member"));
+            let member_id = MemberId::from("test_member");
             let mut rpc_server = MockRpcServer::new();
 
             rpc_server.expect_connection_established().return_once(

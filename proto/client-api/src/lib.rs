@@ -33,6 +33,13 @@ use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
 
+/// ID of `Room`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct RoomId(pub String);
+
 /// ID of `Member`.
 #[derive(
     Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
@@ -57,6 +64,13 @@ pub struct PeerId(pub u32);
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
+
+/// Credential used for `Member` authentication.
+#[derive(
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
+)]
+#[from(forward)]
+pub struct Credential(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]

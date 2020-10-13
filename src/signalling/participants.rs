@@ -16,7 +16,9 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, FutureExt as _, LocalBoxFuture};
-use medea_client_api_proto::{CloseDescription, CloseReason, Event, MemberId};
+use medea_client_api_proto::{
+    CloseDescription, CloseReason, Credential, Event, MemberId, RoomId,
+};
 
 use crate::{
     api::{
@@ -26,7 +28,7 @@ use crate::{
         },
         control::{
             refs::{Fid, ToEndpoint, ToMember},
-            MemberSpec, RoomId, RoomSpec,
+            MemberSpec, RoomSpec,
         },
     },
     conf::Rpc as RpcConf,
@@ -163,12 +165,12 @@ impl ParticipantService {
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
-        credentials: &str,
+        credentials: &Credential,
     ) -> Result<Member, AuthorizationError> {
         let member = self
             .get_member_by_id(member_id)
             .ok_or(AuthorizationError::MemberNotExists)?;
-        if member.credentials() == credentials {
+        if &member.credentials() == credentials {
             Ok(member)
         } else {
             Err(AuthorizationError::InvalidCredentials)
@@ -387,7 +389,7 @@ impl ParticipantService {
         }
         let signalling_member = Member::new(
             id.clone(),
-            spec.credentials().to_string(),
+            spec.credentials().clone(),
             self.room_id.clone(),
             spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
             spec.reconnect_timeout()
@@ -473,7 +475,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             None,
@@ -515,7 +517,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            String::from("w/e"),
+            "w/e".into(),
             None,
             None,
             Some(idle_timeout),

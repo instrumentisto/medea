@@ -12,7 +12,7 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{MemberId, PeerId};
+use medea_client_api_proto::{Credential, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -20,8 +20,8 @@ use crate::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
-        EndpointId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
-        WebRtcPlayId, WebRtcPublishId,
+        EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
+        WebRtcPublishId,
     },
     conf::Rpc as RpcConf,
     log::prelude::*,
@@ -81,7 +81,7 @@ struct MemberInner {
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
-    credentials: String,
+    credentials: Credential,
 
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -111,7 +111,7 @@ impl Member {
     /// function.
     pub fn new(
         id: MemberId,
-        credentials: String,
+        credentials: Credential,
         room_id: RoomId,
         idle_timeout: Duration,
         reconnect_timeout: Duration,
@@ -301,7 +301,7 @@ impl Member {
     }
 
     /// Returns credentials of this [`Member`].
-    pub fn credentials(&self) -> String {
+    pub fn credentials(&self) -> Credential {
         self.0.borrow().credentials.clone()
     }
 
@@ -529,7 +529,7 @@ pub fn parse_members(
         .map(|(id, member)| {
             let new_member = Member::new(
                 id.clone(),
-                member.credentials().to_string(),
+                member.credentials().clone(),
                 room_spec.id.clone(),
                 member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
                 member
@@ -584,7 +584,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credentials: self.credentials(),
+            credentials: self.credentials().to_string(),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())
