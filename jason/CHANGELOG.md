@@ -40,9 +40,11 @@ All user visible changes to this project will be documented in this file. This p
             - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
             - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
             - `FacingMode` enum ([#137]).
+        - `MediaKind` enum that provides `MediaTrack` and `InputDeviceInfo` kind ([#146]);
+        - `MediaSourceKind` enum that provides `MediaTrack` media source kind (`Device` or `Display`) ([#146]);
         - Room initialization ([#46]):
             - `Jason.init_room()`;
-            - `Room.join()`;
+            - `Room.join()`.
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145]);
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
@@ -53,7 +55,7 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.unmute_remote_audio`;
             - `Room.mute_remote_video`;
             - `Room.unmute_remote_video`.
-        - `MediaTrack.media_source_kind` function ([#145]).
+        - `MediaTrack.media_source_kind` function ([#145], [#146]).
     - Optional tracks support ([#106]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
@@ -107,6 +109,7 @@ All user visible changes to this project will be documented in this file. This p
 [#138]: /../../pull/138
 [#143]: /../../pull/143
 [#145]: /../../pull/145
+[#146]: /../../pull/146
 
 
 

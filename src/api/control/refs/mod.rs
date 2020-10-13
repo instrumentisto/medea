@@ -7,9 +7,9 @@ pub mod fid;
 pub mod local_uri;
 pub mod src_uri;
 
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{MemberId, RoomId};
 
-use super::{EndpointId, RoomId};
+use super::EndpointId;
 
 #[doc(inline)]
 pub use self::{

@@ -524,21 +524,21 @@ async fn simultaneous_device_and_display() {
     let (mut audio, mut video): (Vec<_>, Vec<_>) = tracks
         .into_iter()
         .partition(|(track, _)| match track.kind() {
-            MediaKind::Audio => true,
-            MediaKind::Video => false,
+            TrackKind::Audio => true,
+            TrackKind::Video => false,
         });
 
     let audio_track = audio.pop().unwrap().0;
-    assert_eq!(audio_track.kind(), MediaKind::Audio);
+    assert!(audio_track.kind() == TrackKind::Audio);
     assert!(audio_constraints.satisfies(&audio_track));
 
     let display_video_track = video.pop().unwrap().0;
-    assert_eq!(display_video_track.kind(), MediaKind::Video);
+    assert!(display_video_track.kind() == TrackKind::Video);
     assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
     assert_eq!(&display_video_track.js_media_source_kind(), "display");
 
     let device_video_track = video.pop().unwrap().0;
-    assert_eq!(device_video_track.kind(), MediaKind::Video);
+    assert!(device_video_track.kind() == TrackKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
     assert_eq!(&device_video_track.js_media_source_kind(), "device");
 }

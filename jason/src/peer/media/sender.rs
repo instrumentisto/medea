@@ -14,12 +14,11 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
-        VideoSource,
     },
     peer::{
-        conn::TransceiverKind,
+        media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
-        PeerEvent, TransceiverSide,
+        PeerEvent, SourceType,
     },
 };
 
@@ -46,7 +45,7 @@ impl<'a> SenderBuilder<'a> {
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
         let mut media_connections = self.media_connections.0.borrow_mut();
-        let kind = TransceiverKind::from(&self.caps);
+        let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
             None => media_connections
                 .add_transceiver(kind, TransceiverDirection::empty()),
@@ -121,7 +120,7 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
-        self.mute_state.is_unmuted()
+        self.transceiver.is_enabled(TransceiverDirection::SEND)
     }
 
     /// Updates [`Sender`]s general mute state based on the provided
@@ -202,6 +201,11 @@ impl Sender {
     }
 
     /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
+    pub fn source_type(&self) -> SourceType {
+        self.caps.source_type()
+    }
+
+    /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
     pub fn source_kind(&self) -> MediaSourceKind {
         self.caps.media_source_kind()
     }
@@ -249,8 +253,8 @@ impl TransceiverSide for Sender {
         self.track_id
     }
 
-    fn kind(&self) -> TransceiverKind {
-        TransceiverKind::from(&self.caps)
+    fn kind(&self) -> MediaKind {
+        MediaKind::from(&self.caps)
     }
 
     fn media_kind(&self) -> MediaKind {
@@ -262,14 +266,12 @@ impl TransceiverSide for Sender {
     }
 
     fn is_transitable(&self) -> bool {
-        match &self.caps {
-            TrackConstraints::Video(VideoSource::Device(_)) => {
-                self.send_constraints.inner().get_device_video().is_some()
-            }
-            TrackConstraints::Video(VideoSource::Display(_)) => {
-                self.send_constraints.inner().get_display_video().is_some()
-            }
-            TrackConstraints::Audio(_) => true,
+        if self.caps.is_display_video() {
+            self.send_constraints.is_display_video_constrained()
+        } else if self.caps.is_device_video() {
+            self.send_constraints.is_device_video_constrained()
+        } else {
+            true
         }
     }
 }

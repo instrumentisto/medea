@@ -22,8 +22,7 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MediaSourceKind, MemberId, PeerConnectionState, PeerId as Id, PeerId,
-    TrackId,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -31,7 +30,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
     media::{
-        LocalTracksConstraints, MediaManager, MediaManagerError,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
         MediaStreamTrack, RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
@@ -43,14 +42,11 @@ use crate::{
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
-    conn::{
-        IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
-        TransceiverKind,
-    },
+    conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
-        TrackDirection, TransceiverSide,
+        MuteStateTransition, Muteable, Receiver, Sender, SourceType,
+        StableMuteState, TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -345,6 +341,7 @@ impl PeerConnection {
 
     /// Filters out already sent stats, and send new statss from
     /// provided [`RtcStats`].
+    #[allow(clippy::option_if_let_else)]
     pub fn send_peer_stats(&self, stats: RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
         let stats = RtcStats(
@@ -405,20 +402,20 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with a provided
-    /// [`TransceiverKind`], [`TrackDirection`] and [`SourceType`] is in the
+    /// [`MediaKind`], [`TrackDirection`] and [`SourceType`] is in the
     /// provided [`StableMuteState`].
     #[inline]
     pub fn is_all_transceiver_sides_in_mute_state(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_kind: Option<MediaSourceKind>,
+        source_type: SourceType,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections.is_all_tracks_in_mute_state(
             kind,
             direction,
-            source_kind,
+            source_type,
             mute_state,
         )
     }
@@ -545,18 +542,18 @@ impl PeerConnection {
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
-    /// provided [`TransceiverKind`], [`TrackDirection`] and [`SourceType`].
+    /// provided [`MediaKind`], [`TrackDirection`] and [`SourceType`].
     #[inline]
     pub fn get_transceivers_sides(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_kind: Option<MediaSourceKind>,
+        source_type: SourceType,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         self.media_connections.get_transceivers_sides(
             kind,
             direction,
-            source_kind,
+            source_type,
         )
     }
 

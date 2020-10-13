@@ -16,11 +16,10 @@ use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
     stats::RtcStat, Incrementable, MemberId, PeerConnectionState, PeerId,
-    TrackId,
+    RoomId, TrackId,
 };
 
 use crate::{
-    api::control::RoomId,
     conf,
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, PeerStateMachine},
@@ -890,7 +889,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -898,7 +897,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -995,7 +994,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1003,7 +1002,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".to_string(),
+            "test".into(),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),

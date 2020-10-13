@@ -25,13 +25,20 @@
 
 pub mod stats;
 
-use std::{collections::HashMap, convert::TryInto as _};
+use std::collections::HashMap;
 
 use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
+
+/// ID of `Room`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct RoomId(pub String);
 
 /// ID of `Member`.
 #[derive(
@@ -57,6 +64,13 @@ pub struct PeerId(pub u32);
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
+
+/// Credential used for `Member` authentication.
+#[derive(
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
+)]
+#[from(forward)]
+pub struct Credential(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -87,8 +101,10 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-// TODO: should be properly shared between medea and jason
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(tag = "msg", content = "data")]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `ping` message that `Media Server` is expected to send to `Client`
@@ -119,8 +135,11 @@ pub struct RpcSettings {
     pub ping_interval_ms: u32,
 }
 
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(Clone, Debug)]
+#[serde(tag = "msg", content = "data")]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `pong` message that `Client` answers with to `Media Server` in response
@@ -614,9 +633,11 @@ pub struct VideoSettings {
 #[derive(Clone, Copy, Display)]
 pub enum MediaSourceKind {
     /// Media is sourced by some media device (webcam or microphone).
+    #[display(fmt = "device")]
     Device,
 
     /// Media is obtained with screen-capture.
+    #[display(fmt = "display")]
     Display,
 }
 
@@ -641,230 +662,9 @@ pub enum ConnectionQualityScore {
     High = 4,
 }
 
-#[cfg(feature = "jason")]
-impl Serialize for ClientMsg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        match self {
-            Self::Pong(n) => {
-                let mut ping = serializer.serialize_struct("pong", 1)?;
-                ping.serialize_field("pong", n)?;
-                ping.end()
-            }
-            Self::Command(command) => command.serialize(serializer),
-        }
-    }
-}
-
-#[cfg(feature = "medea")]
-impl<'de> Deserialize<'de> for ClientMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
-
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ClientMsg [{:?}]",
-                &ev,
-            ))
-        })?;
-
-        if let Some(v) = map.get("pong") {
-            let n = v
-                .as_u64()
-                .ok_or_else(|| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ClientMsg::Pong [{:?}]",
-                        &ev,
-                    ))
-                })?
-                .try_into()
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "ClientMsg::Pong overflows 32 bits: {}",
-                        e,
-                    ))
-                })?;
-
-            Ok(Self::Pong(n))
-        } else {
-            let command =
-                serde_json::from_value::<Command>(ev).map_err(|e| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ClientMsg::Command [{:?}]",
-                        e,
-                    ))
-                })?;
-            Ok(Self::Command(command))
-        }
-    }
-}
-
-#[cfg(feature = "medea")]
-impl Serialize for ServerMsg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        match self {
-            Self::Ping(n) => {
-                let mut ping = serializer.serialize_struct("ping", 1)?;
-                ping.serialize_field("ping", n)?;
-                ping.end()
-            }
-            Self::Event(command) => command.serialize(serializer),
-            Self::RpcSettings(rpc_settings) => {
-                rpc_settings.serialize(serializer)
-            }
-        }
-    }
-}
-
-#[cfg(feature = "jason")]
-impl<'de> Deserialize<'de> for ServerMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
-
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ServerMsg [{:?}]",
-                &ev,
-            ))
-        })?;
-
-        if let Some(v) = map.get("ping") {
-            let n = v
-                .as_u64()
-                .ok_or_else(|| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ServerMsg::Ping [{:?}]",
-                        &ev
-                    ))
-                })?
-                .try_into()
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "ServerMsg::Ping overflows 32 bits: {}",
-                        e,
-                    ))
-                })?;
-
-            Ok(Self::Ping(n))
-        } else {
-            let msg = serde_json::from_value::<Event>(ev.clone())
-                .map(Self::Event)
-                .or_else(move |_| {
-                    serde_json::from_value::<RpcSettings>(ev)
-                        .map(Self::RpcSettings)
-                })
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ServerMsg [{:?}]",
-                        e,
-                    ))
-                })?;
-            Ok(msg)
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn command() {
-        let mut mids = HashMap::new();
-        mids.insert(TrackId(0), String::from("1"));
-
-        let command = ClientMsg::Command(Command::MakeSdpOffer {
-            peer_id: PeerId(77),
-            sdp_offer: "offer".to_owned(),
-            mids,
-            transceivers_statuses: HashMap::new(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let command_str =
-            "{\
-                \"command\":\"MakeSdpOffer\",\
-                \"data\":{\
-                    \"peer_id\":77,\
-                    \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"},\
-                    \"transceivers_statuses\":{}\
-                }\
-            }";
-
-        assert_eq!(command_str, serde_json::to_string(&command).unwrap());
-        assert_eq!(
-            command,
-            serde_json::from_str(&serde_json::to_string(&command).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn ping() {
-        let ping = ServerMsg::Ping(15);
-        let ping_str = "{\"ping\":15}";
-
-        assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
-        assert_eq!(
-            ping,
-            serde_json::from_str(&serde_json::to_string(&ping).unwrap())
-                .unwrap()
-        )
-    }
-
-    #[test]
-    fn event() {
-        let event = ServerMsg::Event(Event::SdpAnswerMade {
-            peer_id: PeerId(45),
-            sdp_answer: "answer".to_owned(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let event_str =
-            "{\
-                \"event\":\"SdpAnswerMade\",\
-                \"data\":{\
-                    \"peer_id\":45,\
-                    \"sdp_answer\":\"answer\"\
-                }\
-            }";
-
-        assert_eq!(event_str, serde_json::to_string(&event).unwrap());
-        assert_eq!(
-            event,
-            serde_json::from_str(&serde_json::to_string(&event).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn pong() {
-        let pong = ClientMsg::Pong(5);
-        let pong_str = "{\"pong\":5}";
-
-        assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
-        assert_eq!(
-            pong,
-            serde_json::from_str(&serde_json::to_string(&pong).unwrap())
-                .unwrap()
-        )
-    }
 
     #[test]
     fn track_patch_merge() {

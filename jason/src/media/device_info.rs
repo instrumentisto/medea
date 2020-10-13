@@ -25,7 +25,7 @@ pub enum Error {
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 #[wasm_bindgen]
 pub struct InputDeviceInfo {
-    device_type: MediaKind,
+    media_kind: MediaKind,
 
     /// Actual underlying [MediaDeviceInfo][1] object.
     ///
@@ -58,7 +58,7 @@ impl InputDeviceInfo {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
     pub fn kind(&self) -> MediaKind {
-        self.device_type
+        self.media_kind
     }
 
     /// Returns label describing the represented device (for example
@@ -86,7 +86,7 @@ impl TryFrom<MediaDeviceInfo> for InputDeviceInfo {
 
     fn try_from(info: MediaDeviceInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            device_type: MediaKind::try_from(info.kind())?,
+            media_kind: MediaKind::try_from(info.kind())?,
             info,
         })
     }

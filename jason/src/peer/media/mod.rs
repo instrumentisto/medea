@@ -12,18 +12,18 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, PeerId, TrackId};
 use tracerr::Traced;
+use wasm_bindgen::prelude::*;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
-    media::{LocalTracksConstraints, MediaStreamTrack, RecvConstraints},
-    peer::PeerEvent,
+    media::{
+        LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
+    },
+    peer::{transceiver::Transceiver, PeerEvent, TransceiverDirection},
     utils::{JsCaused, JsError},
 };
 
-use super::{
-    conn::{RtcPeerConnection, TransceiverKind},
-    tracks_request::TracksRequest,
-};
+use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
 use self::{mute_state::MuteStateController, sender::SenderBuilder};
 
@@ -32,19 +32,14 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::{
-    media::MediaKind,
-    peer::{transceiver::Transceiver, TransceiverDirection},
-};
-use medea_client_api_proto::MediaSourceKind;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
 
-    /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
-    fn kind(&self) -> TransceiverKind;
+    /// Returns [`MediaKind`] of this [`TransceiverSide`].
+    fn kind(&self) -> MediaKind;
 
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn media_kind(&self) -> MediaKind;
@@ -132,6 +127,39 @@ pub trait Muteable {
     #[inline]
     fn is_unmuted(&self) -> bool {
         self.mute_state_controller().is_unmuted()
+    }
+}
+
+/// Media source type.
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, Eq)]
+pub enum SourceType {
+    /// Type of media which was received from `getUserMedia` request.
+    Device,
+
+    /// Type of media which was received from `getDisplayMedia` request.
+    Display,
+
+    /// Both [`SourceType::Device`] and [`SourceType::Display`].
+    Both,
+}
+
+impl PartialEq for SourceType {
+    /// Returns `true` if this [`SourceType`] equals to the `another` or any of
+    /// the comparable [`SourceType`]s are [`SourceType::Both`].
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            SourceType::Device => {
+                matches!(other, SourceType::Device | SourceType::Both)
+            }
+            SourceType::Display => {
+                matches!(other, SourceType::Display | SourceType::Both)
+            }
+            SourceType::Both => matches!(
+                other,
+                SourceType::Display | SourceType::Device | SourceType::Both
+            ),
+        }
     }
 }
 
@@ -234,42 +262,38 @@ struct InnerMediaConnections {
 }
 
 impl InnerMediaConnections {
-    /// Returns [`Iterator`] over [`Sender`]s with provided [`TransceiverKind`]
+    /// Returns [`Iterator`] over [`Sender`]s with provided [`MediaKind`]
     /// and [`SourceType`].
     fn iter_senders_with_kind_and_source_type(
         &self,
-        kind: TransceiverKind,
-        source_kind: Option<MediaSourceKind>,
+        kind: MediaKind,
+        source_type: SourceType,
     ) -> impl Iterator<Item = &Rc<Sender>> {
         self.senders
             .values()
-            .filter(move |sender| sender.kind() == kind)
-            .filter(move |sender| match source_kind {
-                None => true,
-                Some(source_kind) => sender.source_kind() == source_kind,
-            })
+            .filter(move |s| s.kind() == kind && s.source_type() == source_type)
     }
 
     /// Returns [`Iterator`] over [`Receiver`]s with provided
-    /// [`TransceiverKind`].
+    /// [`MediaKind`].
     fn iter_receivers_with_kind(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
     ) -> impl Iterator<Item = &Rc<Receiver>> {
         self.receivers.values().filter(move |s| s.kind() == kind)
     }
 
     /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],
-    /// [`TransceiverKind`] and [`SourceType`].
+    /// [`MediaKind`] and [`SourceType`].
     fn get_transceivers_by_direction_and_kind(
         &self,
         direction: TrackDirection,
-        kind: TransceiverKind,
-        source_kind: Option<MediaSourceKind>,
+        kind: MediaKind,
+        source_type: SourceType,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         match direction {
             TrackDirection::Send => self
-                .iter_senders_with_kind_and_source_type(kind, source_kind)
+                .iter_senders_with_kind_and_source_type(kind, source_type)
                 .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
@@ -281,7 +305,7 @@ impl InnerMediaConnections {
 
     fn add_transceiver(
         &mut self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TransceiverDirection,
     ) -> Transceiver {
         let transceiver = self.peer.add_transceiver(kind, direction);
@@ -316,29 +340,29 @@ impl MediaConnections {
     }
 
     /// Returns all [`Sender`]s and [`Receiver`]s from this [`MediaConnections`]
-    /// with provided [`TransceiverKind`], [`TrackDirection`] and
+    /// with provided [`MediaKind`], [`TrackDirection`] and
     /// [`SourceType`].
     pub fn get_transceivers_sides(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_kind: Option<MediaSourceKind>,
+        source_type: SourceType,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         self.0.borrow().get_transceivers_by_direction_and_kind(
             direction,
             kind,
-            source_kind,
+            source_type,
         )
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`TransceiverKind`], [`TrackDirection`] and [`SourceType`] is in
+    /// [`MediaKind`], [`TrackDirection`] and [`SourceType`] is in
     /// provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_type: Option<MediaSourceKind>,
+        source_type: SourceType,
         mute_state: StableMuteState,
     ) -> bool {
         let transceivers =
@@ -360,13 +384,13 @@ impl MediaConnections {
     }
 
     /// Returns `true` if all [`Sender`]s with
-    /// [`TransceiverKind::Audio`] are enabled or `false` otherwise.
+    /// [`MediaKind::Audio`] are enabled or `false` otherwise.
     #[cfg(feature = "mockable")]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
             .iter_senders_with_kind_and_source_type(
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 SourceType::Both,
             )
             .find(|s| s.is_muted())
@@ -374,35 +398,35 @@ impl MediaConnections {
     }
 
     /// Returns `true` if all [`Sender`]s with
-    /// [`TransceiverKind::Video`] are enabled or `false` otherwise.
+    /// [`MediaKind::Video`] are enabled or `false` otherwise.
     #[cfg(feature = "mockable")]
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
             .iter_senders_with_kind_and_source_type(
-                TransceiverKind::Video,
+                MediaKind::Video,
                 SourceType::Both,
             )
             .find(|s| s.is_muted())
             .is_none()
     }
 
-    /// Returns `true` if all [`Receiver`]s with [`TransceiverKind::Video`] are
+    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
     /// enabled or `false` otherwise.
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
             .borrow()
-            .iter_receivers_with_kind(TransceiverKind::Video)
+            .iter_receivers_with_kind(MediaKind::Video)
             .find(|s| s.is_muted())
             .is_none()
     }
 
-    /// Returns `true` if all [`Receiver`]s with [`TransceiverKind::Audio`] are
+    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Audio`] are
     /// enabled or `false` otherwise.
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
             .borrow()
-            .iter_receivers_with_kind(TransceiverKind::Audio)
+            .iter_receivers_with_kind(MediaKind::Audio)
             .find(|s| s.is_muted())
             .is_none()
     }
@@ -718,8 +742,6 @@ impl MediaConnections {
     }
 }
 
-// TODO: remove
-#[cfg(feature = "disabled")]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -34,3 +34,13 @@ pub enum MediaKind {
     /// Video track.
     Video,
 }
+
+impl MediaKind {
+    /// Returns string representation of a [`MediaKind`].
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Audio => "audio",
+            Self::Video => "video",
+        }
+    }
+}

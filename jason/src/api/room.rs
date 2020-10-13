@@ -13,9 +13,9 @@ use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
-    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
-    TrackId, TrackPatchCommand, TrackUpdate,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatchCommand, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -24,13 +24,13 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
-        JsMediaSourceKind, LocalTracksConstraints, MediaStreamSettings,
+        LocalTracksConstraints, MediaKind, MediaStreamSettings,
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
         MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
-        TrackDirection, TransceiverKind,
+        PeerEventHandler, PeerRepository, RtcStats, SourceType,
+        StableMuteState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -249,27 +249,27 @@ impl RoomHandle {
     async fn set_track_enabled(
         &self,
         enabled: bool,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_kind: Option<MediaSourceKind>,
+        source_type: SourceType,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.toggle_enable_constraints(enabled, kind, direction, source_kind);
+        inner.toggle_enable_constraints(enabled, kind, direction, source_type);
         while !inner.is_all_peers_in_mute_state(
             kind,
             direction,
-            source_kind,
+            source_type,
             StableMuteState::from(!enabled),
         ) {
             inner
-                .toggle_mute(!enabled, kind, direction, source_kind)
+                .toggle_mute(!enabled, kind, direction, source_type)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
                     inner.toggle_enable_constraints(
                         !enabled,
                         kind,
                         direction,
-                        source_kind,
+                        source_type,
                     );
                     tracerr::new!(e)
                 })?;
@@ -378,9 +378,9 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Send,
-                None,
+                SourceType::Both,
             )
             .await?;
             Ok(JsValue::UNDEFINED)
@@ -393,53 +393,45 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Send,
-                None,
+                SourceType::Both,
             )
             .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
-    /// Mutes outbound video from a provided [`MediaSourceType`] in this
-    /// [`Room`].
+    /// Mutes outbound video from a provided [`SourceType`] in this [`Room`].
     ///
-    /// If provided [`None`] `source_type` then [`MediaSourceType::Both`] will
-    /// be muted.
-    pub fn mute_video(
-        &self,
-        source_type: Option<JsMediaSourceKind>,
-    ) -> Promise {
+    /// If provided [`None`] `source_type` then [`SourceType::Both`] will be
+    /// muted.
+    pub fn mute_video(&self, source_type: Option<SourceType>) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Send,
-                source_type.map(Into::into),
+                source_type.unwrap_or(SourceType::Both),
             )
             .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
-    /// Unmutes outbound video from a provided [`MediaSourceType`] in this
-    /// [`Room`].
+    /// Unmutes outbound video from a provided [`SourceType`] in this [`Room`].
     ///
-    /// If provided [`None`] `source_type` then [`MediaSourceType::Both`] will
-    /// be unmuted.
-    pub fn unmute_video(
-        &self,
-        source_type: Option<JsMediaSourceKind>,
-    ) -> Promise {
+    /// If provided [`None`] `source_type` then [`SourceType::Both`] will be
+    /// unmuted.
+    pub fn unmute_video(&self, source_type: Option<SourceType>) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Send,
-                source_type.map(Into::into),
+                source_type.unwrap_or(SourceType::Both),
             )
             .await?;
             Ok(JsValue::UNDEFINED)
@@ -452,9 +444,9 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Recv,
-                None,
+                SourceType::Both,
             )
             .await?;
             Ok(JsValue::UNDEFINED)
@@ -467,9 +459,9 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 false,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Recv,
-                None,
+                SourceType::Both,
             )
             .await?;
             Ok(JsValue::UNDEFINED)
@@ -482,9 +474,9 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Audio,
+                MediaKind::Audio,
                 TrackDirection::Recv,
-                None,
+                SourceType::Both,
             )
             .await?;
             Ok(JsValue::UNDEFINED)
@@ -497,9 +489,9 @@ impl RoomHandle {
         future_to_promise(async move {
             this.set_track_enabled(
                 true,
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Recv,
-                None,
+                SourceType::Both,
             )
             .await?;
             Ok(JsValue::UNDEFINED)
@@ -713,13 +705,13 @@ impl InnerRoom {
 
     /// Toggles [`InnerRoom::recv_constraints`] or
     /// [`InnerRoom::send_constraints`] mute status based on the provided
-    /// [`TrackDirection`], [`TransceiverKind`] and [`MediaSourceType`].
+    /// [`TrackDirection`], [`MediaKind`] and [`SourceType`].
     fn toggle_enable_constraints(
         &self,
         enabled: bool,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_type: Option<MediaSourceKind>,
+        source_type: SourceType,
     ) {
         if let TrackDirection::Recv = direction {
             self.recv_constraints.set_enabled(enabled, kind);
@@ -738,7 +730,7 @@ impl InnerRoom {
     }
 
     /// Toggles [`TransceiverSide`]s [`MuteState`] by provided
-    /// [`TransceiverKind`] in all [`PeerConnection`]s in this [`Room`].
+    /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
     /// Will fallback to the previous [`MuteState`]s if some [`TransceiverSide`]
     /// can't be muted because
@@ -749,9 +741,9 @@ impl InnerRoom {
     async fn toggle_mute(
         &self,
         is_muted: bool,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_kind: Option<MediaSourceKind>,
+        source_type: SourceType,
     ) -> Result<(), Traced<RoomError>> {
         let mut mute_states_backup = HashMap::new();
         let mute_tracks: HashMap<_, _> = self
@@ -761,7 +753,7 @@ impl InnerRoom {
             .map(|peer| {
                 let mut trnscvrs_backup_mute_states = HashMap::new();
                 let new_mute_states = peer
-                    .get_transceivers_sides(kind, direction, source_kind)
+                    .get_transceivers_sides(kind, direction, source_type)
                     .into_iter()
                     .filter(|transceiver| transceiver.is_transitable())
                     .map(|transceiver| {
@@ -891,13 +883,13 @@ impl InnerRoom {
     }
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
-    /// [`TransceiverKind`] and [`MediaSourceType`] of this [`Room`] are in the
+    /// [`MediaKind`] and [`SourceType`] of this [`Room`] are in the
     /// provided `mute_state`.
     pub fn is_all_peers_in_mute_state(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TrackDirection,
-        source_type: Option<MediaSourceKind>,
+        source_type: SourceType,
         mute_state: StableMuteState,
     ) -> bool {
         self.peers
@@ -1161,9 +1153,12 @@ impl EventHandler for InnerRoom {
         partner_member_id: MemberId,
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
-        if let Some(conn) = self.connections.get(&partner_member_id) {
-            conn.update_quality_score(quality_score);
-        }
+        let conn = self
+            .connections
+            .get(&partner_member_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
+
+        conn.update_quality_score(quality_score);
 
         Ok(())
     }

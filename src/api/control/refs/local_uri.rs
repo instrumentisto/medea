@@ -7,10 +7,10 @@ use std::{convert::TryFrom, fmt, string::ToString};
 
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{MemberId, RoomId};
 use url::Url;
 
-use crate::{api::control::RoomId, impls_for_stateful_refs};
+use crate::impls_for_stateful_refs;
 
 use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 
@@ -186,6 +186,7 @@ impl StatefulLocalUri {
 impl TryFrom<String> for StatefulLocalUri {
     type Error = LocalUriParseError;
 
+    #[allow(clippy::option_if_let_else)]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);

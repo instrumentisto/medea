@@ -17,10 +17,10 @@ use crate::{media::MediaKind, utils::Callback0};
 #[wasm_bindgen(js_name = MediaSourceKind)]
 #[derive(Clone, Copy, Debug)]
 pub enum JsMediaSourceKind {
-    /// Type of media which was received with `getUserMedia` request.
+    /// Media is sourced from some media device (webcam or microphone).
     Device,
 
-    /// Type of media which was received with `getDisplayMedia` request.
+    /// Media is obtained with screen-capture.
     Display,
 }
 
@@ -48,8 +48,10 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    /// Flag which indicates that this [`MediaStreamTrack`] was received from
-    /// `getDisplayMedia`.
+    /// Underlying [`SysMediaStreamTrack`] kind.
+    kind: MediaKind,
+
+    /// Underlying [`SysMediaStreamTrack`] source kind.
     media_source_kind: MediaSourceKind,
 
     /// Callback to be invoked when this [`MediaStreamTrack`] is enabled.
@@ -83,11 +85,18 @@ impl MediaStreamTrack {
         SysMediaStreamTrack: From<T>,
     {
         let track = SysMediaStreamTrack::from(track);
+        let kind = match track.kind().as_ref() {
+            "audio" => MediaKind::Audio,
+            "video" => MediaKind::Video,
+            _ => unreachable!(),
+        };
+
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
             media_source_kind,
+            kind,
             track,
         }));
 
@@ -127,7 +136,7 @@ impl MediaStreamTrack {
     #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
-        // self.0.track.set_enabled(enabled);
+        self.0.track.set_enabled(enabled);
     }
 
     /// Returns [`id`][1] of underlying [MediaStreamTrack][2].
@@ -142,11 +151,7 @@ impl MediaStreamTrack {
     /// Returns track kind (audio/video).
     #[inline]
     pub fn kind(&self) -> MediaKind {
-        match self.0.track.kind().as_ref() {
-            "audio" => MediaKind::Audio,
-            "video" => MediaKind::Video,
-            _ => unreachable!(),
-        }
+        self.0.kind
     }
 
     /// Creates weak reference to underlying [MediaStreamTrack][2].

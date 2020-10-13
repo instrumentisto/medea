@@ -14,7 +14,6 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
-        conn::TransceiverKind,
         media::{mute_state::MuteStateController, TransceiverSide},
         transceiver::Transceiver,
         MediaConnections, Muteable, PeerEvent, TransceiverDirection,
@@ -62,10 +61,10 @@ impl Receiver {
         recv_constraints: &RecvConstraints,
     ) -> Self {
         let mut media_connections = media_connections.0.borrow_mut();
-        let kind = TransceiverKind::from(&caps);
+        let kind = MediaKind::from(&caps);
         let enabled = match kind {
-            TransceiverKind::Audio => recv_constraints.is_audio_enabled(),
-            TransceiverKind::Video => recv_constraints.is_video_enabled(),
+            MediaKind::Audio => recv_constraints.is_audio_enabled(),
+            MediaKind::Video => recv_constraints.is_video_enabled(),
         };
         let transceiver_direction = if enabled {
             TransceiverDirection::RECV
@@ -122,10 +121,12 @@ impl Receiver {
         if self.mute_state_controller.is_muted() {
             return false;
         }
-        if self.transceiver.borrow().is_none() {
+
+        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
+            transceiver.is_enabled(TransceiverDirection::RECV)
+        } else {
             return false;
         }
-        true
     }
 
     /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -253,8 +254,8 @@ impl TransceiverSide for Receiver {
     }
 
     #[inline]
-    fn kind(&self) -> TransceiverKind {
-        TransceiverKind::from(&self.caps)
+    fn kind(&self) -> MediaKind {
+        MediaKind::from(&self.caps)
     }
 
     fn media_kind(&self) -> MediaKind {

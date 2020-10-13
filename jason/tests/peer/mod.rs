@@ -22,7 +22,6 @@ use medea_jason::{
     media::{LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints},
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
-        TransceiverKind,
     },
     SourceType,
 };
@@ -885,14 +884,14 @@ async fn reset_transition_timers() {
 
     let all_unmuted = future::join_all(
         peer.get_transceivers_sides(
-            TransceiverKind::Audio,
+            MediaKind::Audio,
             TrackDirection::Send,
             SourceType::Both,
         )
         .into_iter()
         .chain(
             peer.get_transceivers_sides(
-                TransceiverKind::Video,
+                MediaKind::Video,
                 TrackDirection::Send,
                 SourceType::Both,
             )
@@ -938,12 +937,12 @@ async fn new_remote_track() {
         let tx_caps = LocalTracksConstraints::default();
         tx_caps.set_enabled(
             audio_tx_enabled,
-            TransceiverKind::Audio,
+            MediaKind::Audio,
             SourceType::Both,
         );
         tx_caps.set_enabled(
             video_tx_enabled,
-            TransceiverKind::Video,
+            MediaKind::Video,
             SourceType::Both,
         );
         let sender_peer = PeerConnection::new(
@@ -958,8 +957,8 @@ async fn new_remote_track() {
         .unwrap();
 
         let rcv_caps = RecvConstraints::default();
-        rcv_caps.set_enabled(audio_rx_enabled, TransceiverKind::Audio);
-        rcv_caps.set_enabled(video_rx_enabled, TransceiverKind::Video);
+        rcv_caps.set_enabled(audio_rx_enabled, MediaKind::Audio);
+        rcv_caps.set_enabled(video_rx_enabled, MediaKind::Video);
         let rcvr_peer = PeerConnection::new(
             PeerId(2),
             tx2,
