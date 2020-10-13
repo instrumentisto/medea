@@ -1,7 +1,6 @@
-use crate::media::MediaStreamTrack;
 use bitflags::bitflags;
+use derive_more::From;
 use medea_client_api_proto::Direction as DirectionProto;
-use std::{cell::Cell, rc::Rc};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -9,45 +8,23 @@ use web_sys::{
     RtcRtpTransceiverDirection,
 };
 
-#[derive(Clone)]
-pub(super) struct Transceiver(Rc<Inner>);
-
-struct Inner {
-    transceiver: RtcRtpTransceiver,
-    has_sender: Cell<bool>,
-    has_receiver: Cell<bool>,
-}
+#[derive(Clone, From)]
+pub(super) struct Transceiver(RtcRtpTransceiver);
 
 impl Transceiver {
-    pub fn new(transceiver: RtcRtpTransceiver) -> Self {
-        Self(Rc::new(Inner {
-            transceiver,
-            has_sender: Cell::new(false),
-            has_receiver: Cell::new(false),
-        }))
-    }
-
     fn current_direction(&self) -> TransceiverDirection {
-        TransceiverDirection::from(self.0.transceiver.direction())
-    }
-
-    pub fn has_sender(&self) -> bool {
-        self.0.has_sender.get()
-    }
-
-    pub fn has_receiver(&self) -> bool {
-        self.0.has_receiver.get()
+        TransceiverDirection::from(self.0.direction())
     }
 
     pub fn disable(&self, disabled_direction: TransceiverDirection) {
-        self.0.transceiver.set_direction(
-            (self.current_direction() - disabled_direction).into(),
+        self.0.set_direction(
+            self.current_direction().disable(disabled_direction).into(),
         );
     }
 
     pub fn enable(&self, enabled_direction: TransceiverDirection) {
-        self.0.transceiver.set_direction(
-            (self.current_direction() | enabled_direction).into(),
+        self.0.set_direction(
+            self.current_direction().enable(enabled_direction).into(),
         );
     }
 
@@ -59,12 +36,11 @@ impl Transceiver {
         &self,
         new_track: Option<&SysMediaStreamTrack>,
     ) -> Result<JsValue, JsValue> {
-        JsFuture::from(self.0.transceiver.sender().replace_track(new_track))
-            .await
+        JsFuture::from(self.0.sender().replace_track(new_track)).await
     }
 
     pub fn mid(&self) -> Option<String> {
-        self.0.transceiver.mid()
+        self.0.mid()
     }
 }
 
@@ -72,7 +48,7 @@ bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
     ///
     /// [1]:https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
-    pub struct TransceiverDirection: u32 {
+    pub struct TransceiverDirection: u8 {
         /// [`sendonly` direction][1] of transceiver.
         ///
         /// [1]: https://tinyurl.com/y6y2ye97
@@ -82,6 +58,16 @@ bitflags! {
         ///
         /// [1]: https://tinyurl.com/y2nlxpzf
         const RECV = 0b10;
+    }
+}
+
+impl TransceiverDirection {
+    fn disable(self, disabled_direction: Self) -> Self {
+        self - disabled_direction
+    }
+
+    fn enable(self, enabled_direction: Self) -> Self {
+        self | enabled_direction
     }
 }
 
@@ -122,6 +108,115 @@ impl From<&DirectionProto> for TransceiverDirection {
         match proto {
             DirectionProto::Recv { .. } => Self::RECV,
             DirectionProto::Send { .. } => Self::SEND,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn enable_works_correctly() {
+        for (init, enable_dir, result) in &[
+            (
+                TransceiverDirection::empty(),
+                TransceiverDirection::SEND,
+                TransceiverDirection::SEND,
+            ),
+            (
+                TransceiverDirection::empty(),
+                TransceiverDirection::RECV,
+                TransceiverDirection::RECV,
+            ),
+            (
+                TransceiverDirection::SEND,
+                TransceiverDirection::RECV,
+                TransceiverDirection::all(),
+            ),
+            (
+                TransceiverDirection::RECV,
+                TransceiverDirection::SEND,
+                TransceiverDirection::all(),
+            ),
+        ] {
+            assert_eq!(init.enable(*enable_dir), *result);
+        }
+    }
+
+    #[test]
+    fn disable_works_corretly() {
+        for (init, disable_dir, result) in &[
+            (
+                TransceiverDirection::SEND,
+                TransceiverDirection::SEND,
+                TransceiverDirection::empty(),
+            ),
+            (
+                TransceiverDirection::RECV,
+                TransceiverDirection::RECV,
+                TransceiverDirection::empty(),
+            ),
+            (
+                TransceiverDirection::all(),
+                TransceiverDirection::SEND,
+                TransceiverDirection::RECV,
+            ),
+            (
+                TransceiverDirection::all(),
+                TransceiverDirection::RECV,
+                TransceiverDirection::SEND,
+            ),
+        ] {
+            assert_eq!(init.disable(*disable_dir), *result);
+        }
+    }
+
+    #[test]
+    fn from_trnsvr_direction_to_sys() {
+        for (trnsv_dir, sys_dir) in &[
+            (
+                TransceiverDirection::SEND,
+                RtcRtpTransceiverDirection::Sendonly,
+            ),
+            (
+                TransceiverDirection::RECV,
+                RtcRtpTransceiverDirection::Recvonly,
+            ),
+            (
+                TransceiverDirection::all(),
+                RtcRtpTransceiverDirection::Sendrecv,
+            ),
+            (
+                TransceiverDirection::empty(),
+                RtcRtpTransceiverDirection::Inactive,
+            ),
+        ] {
+            assert_eq!(RtcRtpTransceiverDirection::from(*trnsv_dir), *sys_dir);
+        }
+    }
+
+    #[test]
+    fn from_sys_direction_to_trnsvr() {
+        for (sys_dir, trnsv_dir) in &[
+            (
+                RtcRtpTransceiverDirection::Sendonly,
+                TransceiverDirection::SEND,
+            ),
+            (
+                RtcRtpTransceiverDirection::Recvonly,
+                TransceiverDirection::RECV,
+            ),
+            (
+                RtcRtpTransceiverDirection::Sendrecv,
+                TransceiverDirection::all(),
+            ),
+            (
+                RtcRtpTransceiverDirection::Inactive,
+                TransceiverDirection::empty(),
+            ),
+        ] {
+            assert_eq!(TransceiverDirection::from(*sys_dir), *trnsv_dir);
         }
     }
 }

@@ -648,6 +648,7 @@ impl TrackConstraints {
         }
     }
 
+    /// Returns [`MediaKind`] of this [`TrackConstraints`].
     pub fn kind(&self) -> MediaKind {
         match self {
             TrackConstraints::Audio(_) => MediaKind::Audio,

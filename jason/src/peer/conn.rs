@@ -26,7 +26,6 @@ use crate::{
 };
 
 use super::{ice_server::RtcIceServers, TransceiverDirection};
-use crate::peer::transceiver::Transceiver;
 
 /// [RTCIceCandidate][1] representation.
 ///

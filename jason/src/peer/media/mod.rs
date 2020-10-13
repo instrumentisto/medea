@@ -32,9 +32,11 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::peer::{transceiver::Transceiver, TransceiverDirection};
+use crate::{
+    media::MediaKind,
+    peer::{transceiver::Transceiver, TransceiverDirection},
+};
 use medea_client_api_proto::MediaSourceKind;
-use crate::media::MediaKind;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -44,6 +46,7 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
     fn kind(&self) -> TransceiverKind;
 
+    /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn media_kind(&self) -> MediaKind;
 
     /// Returns [`TransceiverKind`] of this [`TransceiverSide`].
@@ -223,8 +226,6 @@ struct InnerMediaConnections {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    transceivers: Vec<Transceiver>,
-
     /// [`TrackId`] to its [`Sender`].
     senders: HashMap<TrackId, Rc<Sender>>,
 
@@ -278,30 +279,6 @@ impl InnerMediaConnections {
         }
     }
 
-    fn get_or_create_transceiver(
-        &mut self,
-        transceiver: RtcRtpTransceiver,
-    ) -> Transceiver {
-        if let Some(mid) = transceiver.mid() {
-            let trnsvr = self
-                .transceivers
-                .iter()
-                .find(|t| t.mid().map_or(false, |t_mid| t_mid == mid))
-                .cloned();
-            if let Some(transceiver) = trnsvr {
-                transceiver
-            } else {
-                let trnsvr = Transceiver::new(transceiver);
-                self.transceivers.push(trnsvr.clone());
-                trnsvr
-            }
-        } else {
-            let trnsvr = Transceiver::new(transceiver);
-            self.transceivers.push(trnsvr.clone());
-            trnsvr
-        }
-    }
-
     fn add_transceiver(
         &mut self,
         kind: TransceiverKind,
@@ -309,16 +286,11 @@ impl InnerMediaConnections {
     ) -> Transceiver {
         let transceiver = self.peer.add_transceiver(kind, direction);
 
-        self.get_or_create_transceiver(transceiver)
+        Transceiver::from(transceiver)
     }
 
     fn get_transceiver_by_mid(&mut self, mid: &String) -> Option<Transceiver> {
-        let transceiver = self.peer.get_transceiver_by_mid(mid)?;
-        Some(self.get_or_create_transceiver(transceiver))
-        // self.transceivers
-        //     .iter()
-        //     .find(|t| t.mid().map_or(false, |m| &m == mid))
-        //     .cloned()
+        self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
     }
 }
 
@@ -338,7 +310,6 @@ impl MediaConnections {
             peer_id,
             peer,
             peer_events_sender,
-            transceivers: Vec::new(),
             senders: HashMap::new(),
             receivers: HashMap::new(),
         }))
@@ -688,7 +659,7 @@ impl MediaConnections {
         transceiver: RtcRtpTransceiver,
         track: SysMediaStreamTrack,
     ) -> Result<()> {
-        let mut inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
         if let Some(mid) = transceiver.mid() {
             let receiver = inner
                 .receivers
@@ -699,7 +670,7 @@ impl MediaConnections {
                 .cloned();
 
             if let Some(receiver) = receiver {
-                let transceiver = inner.get_or_create_transceiver(transceiver);
+                let transceiver = Transceiver::from(transceiver);
                 receiver.set_remote_track(transceiver, track);
                 return Ok(());
             }
@@ -747,6 +718,8 @@ impl MediaConnections {
     }
 }
 
+// TODO: remove
+#[cfg(feature = "disabled")]
 #[cfg(test)]
 mod tests {
     use super::*;

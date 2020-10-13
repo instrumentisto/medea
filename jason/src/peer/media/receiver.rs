@@ -9,20 +9,19 @@ use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MemberId, TrackPatchEvent};
 use proto::TrackId;
-use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
+use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{
-    media::{MediaStreamTrack, RecvConstraints, TrackConstraints},
+    media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         conn::TransceiverKind,
         media::{mute_state::MuteStateController, TransceiverSide},
+        transceiver::Transceiver,
         MediaConnections, Muteable, PeerEvent, TransceiverDirection,
     },
 };
 
 use super::mute_state::StableMuteState;
-use crate::peer::transceiver::Transceiver;
-use crate::media::MediaKind;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -77,11 +76,17 @@ impl Receiver {
             None => {
                 let mut transceiver = None;
                 for sender in media_connections.senders.values() {
-                    if sender.media_kind() == caps.kind() && sender.source_kind() == caps.media_source_kind() {
-                        // TODO: skip transceivers that already used by other
-                        //       Receivers
+                    if sender.media_kind() == caps.kind()
+                        && sender.source_kind() == caps.media_source_kind()
+                    {
                         let mutual_transceiver = sender.transceiver();
-                        mutual_transceiver.enable(transceiver_direction);
+                        if transceiver_direction.is_empty() {
+                            mutual_transceiver
+                                .disable(TransceiverDirection::RECV);
+                        } else {
+                            mutual_transceiver
+                                .enable(TransceiverDirection::RECV);
+                        }
                         transceiver = Some(mutual_transceiver);
                         break;
                     }

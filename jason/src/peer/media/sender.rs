@@ -9,16 +9,17 @@ use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{
     MediaSourceKind, PeerId, TrackId, TrackPatchEvent,
 };
-use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::RtcRtpTransceiver;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
-        LocalTracksConstraints, MediaStreamTrack, TrackConstraints, VideoSource,
+        LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
+        VideoSource,
     },
     peer::{
-        conn::TransceiverKind, transceiver::TransceiverDirection, PeerEvent,
-        TransceiverSide,
+        conn::TransceiverKind,
+        transceiver::{Transceiver, TransceiverDirection},
+        PeerEvent, TransceiverSide,
     },
 };
 
@@ -26,8 +27,6 @@ use super::{
     mute_state::{MuteStateController, StableMuteState},
     MediaConnections, MediaConnectionsError, Muteable, Result,
 };
-use crate::peer::transceiver::Transceiver;
-use crate::media::MediaKind;
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -56,7 +55,6 @@ impl<'a> SenderBuilder<'a> {
                     .get_transceiver_by_mid(&mid)
                     .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
                     .map_err(tracerr::wrap!())?;
-                transceiver.disable(TransceiverDirection::SEND);
                 transceiver
             }
         };
