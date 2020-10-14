@@ -51,11 +51,11 @@ All user visible changes to this project will be documented in this file. This p
         - `MediaTrack.on_enabled` and `MediaTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
         - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
         - Muting/unmuting remote video/audio ([#127]):
-            - `Room.mute_remote_audio()`;
-            - `Room.unmute_remote_audio()`;
-            - `Room.mute_remote_video()`;
-            - `Room.unmute_remote_video()`.
-        - `MediaTrack.media_source_kind()` function ([#145], [#146]).
+            - `Room.mute_remote_audio`;
+            - `Room.unmute_remote_audio`;
+            - `Room.mute_remote_video`;
+            - `Room.unmute_remote_video`.
+        - `MediaTrack.media_source_kind` function ([#145], [#146]).
     - Optional tracks support ([#106]);
     - Simultaneous device and display video tracks publishing and receiving ([#144]);
     - `RtcIceTransportPolicy` configuration ([#79]).
@@ -109,7 +109,7 @@ All user visible changes to this project will be documented in this file. This p
 [#137]: /../../pull/137
 [#138]: /../../pull/138
 [#143]: /../../pull/143
-[#144]: /../../pull/145
+[#144]: /../../pull/144
 [#145]: /../../pull/145
 [#146]: /../../pull/146
 

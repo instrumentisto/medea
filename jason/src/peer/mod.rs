@@ -730,8 +730,8 @@ impl PeerConnection {
 
     /// Returns [`Rc`] to [`TransceiverSide`] with a provided [`TrackId`].
     ///
-    /// Returns `None` if [`TransceiverSide`] with a provided [`TrackId`]
-    /// doesn't exists in this [`PeerConnection`].
+    /// Returns [`None`] if [`TransceiverSide`] with a provided [`TrackId`]
+    /// doesn't exist in this [`PeerConnection`].
     pub fn get_transceiver_side_by_id(
         &self,
         track_id: TrackId,
