@@ -46,7 +46,7 @@ impl<'a> SenderBuilder<'a> {
         let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
             None => media_connections
-                .add_transceiver(kind, TransceiverDirection::empty()),
+                .add_transceiver(kind, TransceiverDirection::INACTIVE),
             Some(mid) => media_connections
                 .get_transceiver_by_mid(&mid)
                 .ok_or(MediaConnectionsError::TransceiverNotFound(mid))

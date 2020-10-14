@@ -69,7 +69,7 @@ impl Receiver {
         let transceiver_direction = if enabled {
             TransceiverDirection::RECV
         } else {
-            TransceiverDirection::empty()
+            TransceiverDirection::INACTIVE
         };
         let transceiver = mid.as_ref().map_or_else(
             || {

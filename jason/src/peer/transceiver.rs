@@ -56,20 +56,20 @@ impl Transceiver {
     }
 }
 
-// TODO: add INACTIVE variant.
 bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
     ///
     /// [`sendrecv` direction][2] can be represented by
     /// [`TransceiverDirection::all`] bitflag.
     ///
-    /// [`inactive` direction][3] can be represented by
-    /// [`TransceiverDirection::empty`] bitflag.
-    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
     /// [2]: https://tinyurl.com/yywbvbzx
-    /// [3]: https://tinyurl.com/y2zslyw2
     pub struct TransceiverDirection: u8 {
+        /// [`inactive` direction][1] of transceiver.
+        ///
+        /// [1]: https://tinyurl.com/y2zslyw2
+        const INACTIVE = 0b00;
+
         /// [`sendonly` direction][1] of transceiver.
         ///
         /// [1]: https://tinyurl.com/y6y2ye97
@@ -104,7 +104,7 @@ impl From<RtcRtpTransceiverDirection> for TransceiverDirection {
         match direction {
             D::Sendonly => Self::SEND,
             D::Recvonly => Self::RECV,
-            D::Inactive => Self::empty(),
+            D::Inactive => Self::INACTIVE,
             D::Sendrecv => Self::SEND | Self::RECV,
             _ => unreachable!("unexpected transceiver direction"),
         }
@@ -147,8 +147,8 @@ mod tests {
         use TransceiverDirection as D;
 
         for (init, enable_dir, result) in &[
-            (D::empty(), D::SEND, D::SEND),
-            (D::empty(), D::RECV, D::RECV),
+            (D::INACTIVE, D::SEND, D::SEND),
+            (D::INACTIVE, D::RECV, D::RECV),
             (D::SEND, D::RECV, D::all()),
             (D::RECV, D::SEND, D::all()),
         ] {
@@ -161,8 +161,8 @@ mod tests {
         use TransceiverDirection as D;
 
         for (init, disable_dir, result) in &[
-            (D::SEND, D::SEND, D::empty()),
-            (D::RECV, D::RECV, D::empty()),
+            (D::SEND, D::SEND, D::INACTIVE),
+            (D::RECV, D::RECV, D::INACTIVE),
             (D::all(), D::SEND, D::RECV),
             (D::all(), D::RECV, D::SEND),
         ] {
@@ -179,7 +179,7 @@ mod tests {
             (D::SEND, S::Sendonly),
             (D::RECV, S::Recvonly),
             (D::all(), S::Sendrecv),
-            (D::empty(), S::Inactive),
+            (D::INACTIVE, S::Inactive),
         ] {
             assert_eq!(S::from(*trnsv_dir), *sys_dir);
         }
@@ -194,7 +194,7 @@ mod tests {
             (S::Sendonly, D::SEND),
             (S::Recvonly, D::RECV),
             (S::Sendrecv, D::all()),
-            (S::Inactive, D::empty()),
+            (S::Inactive, D::INACTIVE),
         ] {
             assert_eq!(D::from(*sys_dir), *trnsv_dir);
         }
