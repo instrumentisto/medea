@@ -8,12 +8,11 @@ use std::{fmt, sync::Arc};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{PeerId, RoomId};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::RoomId,
     conf,
     media::IceUser,
     turn::{
