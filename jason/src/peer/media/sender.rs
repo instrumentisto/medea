@@ -13,11 +13,12 @@ use web_sys::RtcRtpTransceiver;
 use crate::{
     media::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
+        VideoSource,
     },
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection},
         media::TransceiverSide,
-        PeerEvent, SourceType,
+        PeerEvent,
     },
 };
 
@@ -50,11 +51,16 @@ impl<'a> SenderBuilder<'a> {
             None => self
                 .peer
                 .add_transceiver(kind, TransceiverDirection::Inactive),
-            Some(mid) => self
-                .peer
-                .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                .map_err(tracerr::wrap!())?,
+            Some(mid) => {
+                let transceiver = self
+                    .peer
+                    .get_transceiver_by_mid(&mid)
+                    .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
+                    .map_err(tracerr::wrap!())?;
+                transceiver
+                    .set_direction(TransceiverDirection::Inactive.into());
+                transceiver
+            }
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
@@ -211,11 +217,6 @@ impl Sender {
         }
     }
 
-    /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
-    pub fn source_type(&self) -> SourceType {
-        self.caps.source_type()
-    }
-
     /// Checks whether general mute state of the [`Sender`] is in
     /// [`StableMuteState::Muted`].
     #[cfg(feature = "mockable")]
@@ -273,12 +274,14 @@ impl TransceiverSide for Sender {
     }
 
     fn is_transitable(&self) -> bool {
-        if self.caps.is_display_video() {
-            self.send_constraints.is_display_video_constrained()
-        } else if self.caps.is_device_video() {
-            self.send_constraints.is_device_video_constrained()
-        } else {
-            true
+        match &self.caps {
+            TrackConstraints::Video(VideoSource::Device(_)) => {
+                self.send_constraints.inner().get_device_video().is_some()
+            }
+            TrackConstraints::Video(VideoSource::Display(_)) => {
+                self.send_constraints.inner().get_display_video().is_some()
+            }
+            TrackConstraints::Audio(_) => true,
         }
     }
 }

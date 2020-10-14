@@ -23,7 +23,6 @@ use medea_jason::{
     peer::{
         PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
     },
-    SourceType,
 };
 use wasm_bindgen_test::*;
 
@@ -886,14 +885,14 @@ async fn reset_transition_timers() {
         peer.get_transceivers_sides(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
         )
         .into_iter()
         .chain(
             peer.get_transceivers_sides(
                 MediaKind::Video,
                 TrackDirection::Send,
-                SourceType::Both,
+                None,
             )
             .into_iter(),
         )
@@ -935,16 +934,8 @@ async fn new_remote_track() {
         let manager = Rc::new(MediaManager::default());
 
         let tx_caps = LocalTracksConstraints::default();
-        tx_caps.set_enabled(
-            audio_tx_enabled,
-            MediaKind::Audio,
-            SourceType::Both,
-        );
-        tx_caps.set_enabled(
-            video_tx_enabled,
-            MediaKind::Video,
-            SourceType::Both,
-        );
+        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio, None);
+        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video, None);
         let sender_peer = PeerConnection::new(
             PeerId(1),
             tx1,

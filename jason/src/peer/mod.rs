@@ -21,7 +21,8 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
+    MediaSourceKind, MemberId, PeerConnectionState, PeerId as Id, PeerId,
+    TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -47,8 +48,8 @@ pub use self::{
     },
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Receiver, Sender, SourceType,
-        StableMuteState, TrackDirection, TransceiverSide,
+        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
+        TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -403,20 +404,20 @@ impl PeerConnection {
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with a provided
-    /// [`MediaKind`], [`TrackDirection`] and [`SourceType`] is in the
+    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in the
     /// provided [`StableMuteState`].
     #[inline]
     pub fn is_all_transceiver_sides_in_mute_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
         mute_state: StableMuteState,
     ) -> bool {
         self.media_connections.is_all_tracks_in_mute_state(
             kind,
             direction,
-            source_type,
+            source_kind,
             mute_state,
         )
     }
@@ -543,18 +544,18 @@ impl PeerConnection {
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
-    /// provided [`MediaKind`], [`TrackDirection`] and [`SourceType`].
+    /// provided [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`].
     #[inline]
     pub fn get_transceivers_sides(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         self.media_connections.get_transceivers_sides(
             kind,
             direction,
-            source_type,
+            source_kind,
         )
     }
 
@@ -707,7 +708,7 @@ impl PeerConnection {
                 )
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let new_mute_states = self
+            let mute_states_updates = self
                 .media_connections
                 .insert_local_tracks(&peer_tracks)
                 .await
@@ -721,7 +722,7 @@ impl PeerConnection {
                 }
             }
 
-            Ok(new_mute_states)
+            Ok(mute_states_updates)
         } else {
             Ok(HashMap::new())
         }

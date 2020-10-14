@@ -439,7 +439,6 @@ mod disable_send_tracks {
     use medea_jason::{
         media::MediaKind,
         peer::{StableMuteState, TrackDirection},
-        SourceType,
     };
 
     use super::*;
@@ -511,7 +510,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Muted
         ));
     }
@@ -549,7 +548,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Video,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Muted
         ));
     }
@@ -580,7 +579,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Unmuted
         ));
 
@@ -596,7 +595,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Unmuted
         ));
     }
@@ -627,7 +626,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Video,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Unmuted
         ));
 
@@ -643,7 +642,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Video,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Unmuted
         ));
     }
@@ -674,7 +673,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Unmuted
         ));
 
@@ -684,7 +683,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Muted
         ));
 
@@ -699,7 +698,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
-            SourceType::Both,
+            None,
             StableMuteState::Unmuted
         ));
     }
@@ -1009,7 +1008,7 @@ mod patches_generation {
         AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
         TrackPatchCommand, VideoSettings,
     };
-    use medea_jason::{media::RecvConstraints, SourceType};
+    use medea_jason::media::RecvConstraints;
     use wasm_bindgen_futures::spawn_local;
 
     use crate::timeout;
@@ -1058,15 +1057,11 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_enabled(
-                false,
-                MediaKind::Video,
-                SourceType::Both,
-            );
+            local_stream.set_track_enabled(false, MediaKind::Video, None);
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 MediaKind::Audio,
-                SourceType::Both,
+                None,
             );
             let peer = PeerConnection::new(
                 peer_id,

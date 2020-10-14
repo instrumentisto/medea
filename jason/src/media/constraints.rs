@@ -18,7 +18,7 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{media::MediaKind, peer::SourceType, utils::get_property_by_name};
+use crate::{media::MediaKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
@@ -109,11 +109,11 @@ impl LocalTracksConstraints {
         &self,
         enabled: bool,
         kind: MediaKind,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) {
         self.0
             .borrow_mut()
-            .set_track_enabled(enabled, kind, source_type);
+            .set_track_enabled(enabled, kind, source_kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -121,18 +121,6 @@ impl LocalTracksConstraints {
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow_mut().is_enabled(kind)
-    }
-
-    /// Returns `true` if display video is constrained.
-    #[inline]
-    pub fn is_display_video_constrained(&self) -> bool {
-        self.0.borrow().is_display_constrained()
-    }
-
-    /// Returns `true` if device video is constrained.
-    #[inline]
-    pub fn is_device_video_constrained(&self) -> bool {
-        self.0.borrow().is_device_constrained()
     }
 }
 
@@ -345,18 +333,6 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Returns `true` if [`MediaStreamSettings::device_video`] is constrained.
-    #[inline]
-    pub fn is_device_constrained(&self) -> bool {
-        self.device_video.is_constrained()
-    }
-
-    /// Returns `true` if [`MediaStreamSettings::display_video`] is constrained.
-    #[inline]
-    pub fn is_display_constrained(&self) -> bool {
-        self.display_video.is_constrained()
-    }
-
     /// Returns only audio constraints.
     #[inline]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
@@ -390,14 +366,14 @@ impl MediaStreamSettings {
         &mut self,
         enabled: bool,
         kind: MediaKind,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) {
         match kind {
             MediaKind::Audio => {
                 self.toggle_publish_audio(enabled);
             }
             MediaKind::Video => {
-                self.toggle_publish_video(enabled, source_type);
+                self.toggle_publish_video(enabled, source_kind);
             }
         }
     }
@@ -410,18 +386,24 @@ impl MediaStreamSettings {
     }
 
     /// Sets underlying [`VideoTrackConstraints::is_enabled`] based on provided
-    /// [`SourceType`] to the given value.
+    /// [`MediaSourceKind`] to the given value.
     #[inline]
     pub fn toggle_publish_video(
         &mut self,
         is_enabled: bool,
-        source_type: SourceType,
+        source_kind: Option<MediaSourceKind>,
     ) {
-        if source_type == SourceType::Display {
-            self.display_video.is_enabled = is_enabled;
-        }
-        if source_type == SourceType::Device {
-            self.device_video.is_enabled = is_enabled;
+        match source_kind {
+            None => {
+                self.display_video.is_enabled = is_enabled;
+                self.device_video.is_enabled = is_enabled;
+            }
+            Some(MediaSourceKind::Device) => {
+                self.device_video.is_enabled = is_enabled;
+            }
+            Some(MediaSourceKind::Display) => {
+                self.display_video.is_enabled = is_enabled;
+            }
         }
     }
 
@@ -651,20 +633,6 @@ impl TrackConstraints {
         }
     }
 
-    /// Returns `true` if this [`TrackConstraints`]'s media should be received
-    /// from `getDisplayMedia`.
-    #[inline]
-    pub fn is_display_video(&self) -> bool {
-        matches!(self, Self::Video(VideoSource::Display(_)))
-    }
-
-    /// Returns `true` if this [`TrackConstraints`]'s media should be received
-    /// from `getUserMedia`.
-    #[inline]
-    pub fn is_device_video(&self) -> bool {
-        matches!(self, Self::Video(VideoSource::Device(_)))
-    }
-
     /// Returns this [`TrackConstraints`] media source kind.
     pub fn media_source_kind(&self) -> MediaSourceKind {
         match &self {
@@ -675,17 +643,6 @@ impl TrackConstraints {
             TrackConstraints::Video(VideoSource::Display(_)) => {
                 MediaSourceKind::Display
             }
-        }
-    }
-
-    /// Returns [`SourceType`] based on this [`TrackConstraints`].
-    pub fn source_type(&self) -> SourceType {
-        match &self {
-            TrackConstraints::Audio(_) => SourceType::Device,
-            TrackConstraints::Video(video) => match video {
-                VideoSource::Display(_) => SourceType::Display,
-                VideoSource::Device(_) => SourceType::Device,
-            },
         }
     }
 }

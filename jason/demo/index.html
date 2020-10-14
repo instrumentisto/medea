@@ -325,7 +325,7 @@
           if (displayVideoEl === undefined) {
             displayVideoEl = document.createElement('video');
             displayVideoEl.className = 'local-display-video';
-            displayVideoEl.width = 200;
+            displayVideoEl.width = 300;
             displayVideoEl.autoplay = 'true';
             localVideo.appendChild(displayVideoEl);
           }
@@ -335,7 +335,7 @@
           if (deviceVideoEl === undefined) {
             deviceVideoEl = document.createElement('video');
             deviceVideoEl.className = 'local-device-video';
-            deviceVideoEl.width = 200;
+            deviceVideoEl.width = 300;
             deviceVideoEl.autoplay = 'true';
             localVideo.appendChild(deviceVideoEl);
           }
@@ -573,7 +573,7 @@
                 displayVideoEl.classList.add('display-video');
                 displayVideoEl.classList.add('order-2');
                 displayVideoEl.playsinline = "true";
-                displayVideoEl.width = 650;
+                displayVideoEl.width = 480;
                 displayVideoEl.controls = "true";
                 displayVideoEl.autoplay = "true";
                 memberVideoDiv.appendChild(displayVideoEl);
@@ -589,6 +589,7 @@
                 cameraVideoEl.classList.add('camera-video');
                 cameraVideoEl.classList.add('order-1');
                 cameraVideoEl.playsinline = "true";
+                cameraVideoEl.width = 480;
                 cameraVideoEl.controls = "true";
                 cameraVideoEl.autoplay = "true";
                 memberVideoDiv.appendChild(cameraVideoEl);
@@ -754,7 +755,7 @@
     };
 
     window.onerror = function (event) {
-      handleJasonError(event.reason);
+      handleJasonError(event.error);
     };
 
     // Pretty-prints JasonError, since it does not implements Error due to
@@ -804,7 +805,7 @@
   </div>
 
   <div id="video-call" style="display: none">
-    <div id="remote-videos" class="d-flex flex-row justify-content-center">
+    <div id="remote-videos" class="d-flex flex-row">
     </div>
 
     <div class="row h-25 w-75">
