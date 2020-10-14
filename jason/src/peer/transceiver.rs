@@ -56,6 +56,7 @@ impl Transceiver {
     }
 }
 
+// TODO: add INACTIVE variant.
 bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
     ///
