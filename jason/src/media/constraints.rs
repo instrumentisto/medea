@@ -105,8 +105,15 @@ impl LocalTracksConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_enabled(&self, enabled: bool, kind: MediaKind) {
-        self.0.borrow_mut().set_track_enabled(enabled, kind);
+    pub fn set_enabled(
+        &self,
+        enabled: bool,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) {
+        self.0
+            .borrow_mut()
+            .set_track_enabled(enabled, kind, source_kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -355,13 +362,18 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_track_enabled(&mut self, enabled: bool, kind: MediaKind) {
+    pub fn set_track_enabled(
+        &mut self,
+        enabled: bool,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) {
         match kind {
             MediaKind::Audio => {
                 self.toggle_publish_audio(enabled);
             }
             MediaKind::Video => {
-                self.toggle_publish_video(enabled);
+                self.toggle_publish_video(enabled, source_kind);
             }
         }
     }
@@ -373,12 +385,26 @@ impl MediaStreamSettings {
         self.audio.is_enabled = is_enabled;
     }
 
-    /// Sets the all underlying [`VideoTrackConstraints::is_enabled`] (device
-    /// and display) to the given value.
+    /// Sets underlying [`VideoTrackConstraints::is_enabled`] based on provided
+    /// [`MediaSourceKind`] to the given value.
     #[inline]
-    pub fn toggle_publish_video(&mut self, is_enabled: bool) {
-        self.display_video.is_enabled = is_enabled;
-        self.device_video.is_enabled = is_enabled;
+    pub fn toggle_publish_video(
+        &mut self,
+        is_enabled: bool,
+        source_kind: Option<MediaSourceKind>,
+    ) {
+        match source_kind {
+            None => {
+                self.display_video.is_enabled = is_enabled;
+                self.device_video.is_enabled = is_enabled;
+            }
+            Some(MediaSourceKind::Device) => {
+                self.device_video.is_enabled = is_enabled;
+            }
+            Some(MediaSourceKind::Display) => {
+                self.display_video.is_enabled = is_enabled;
+            }
+        }
     }
 
     /// Indicates whether audio is enabled in this [`MediaStreamSettings`].

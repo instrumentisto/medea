@@ -182,6 +182,7 @@ async fn ice_restart() {
             mids: hashmap! {
                 TrackId(0) => String::from("0"),
                 TrackId(1) => String::from("1"),
+                TrackId(2) => String::from("2"),
             },
         }))
         .await

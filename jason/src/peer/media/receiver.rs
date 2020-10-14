@@ -231,10 +231,12 @@ impl Muteable for Receiver {
 }
 
 impl TransceiverSide for Receiver {
+    #[inline]
     fn track_id(&self) -> TrackId {
         self.track_id
     }
 
+    #[inline]
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
     }
@@ -248,5 +250,10 @@ impl TransceiverSide for Receiver {
             }
         }
         self.mid.borrow().clone()
+    }
+
+    #[inline]
+    fn is_transitable(&self) -> bool {
+        true
     }
 }

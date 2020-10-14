@@ -125,8 +125,8 @@ async fn add_endpoints_synchronization() {
                 })
                 .count();
 
-            assert_eq!(count_send_tracks, 2);
-            assert_eq!(tracks.len(), 2);
+            assert_eq!(count_send_tracks, 3);
+            assert_eq!(tracks.len(), 3);
 
             second
                 .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
@@ -156,7 +156,7 @@ async fn add_endpoints_synchronization() {
             ..
         } = event
         {
-            assert_eq!(updates.len(), 2);
+            assert_eq!(updates.len(), 3);
             for update in updates {
                 match update {
                     TrackUpdate::Added(track) => match track.direction {
