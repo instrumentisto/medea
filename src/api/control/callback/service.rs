@@ -78,7 +78,7 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
         Ok(())
     }
 
-    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
+    /// Asynchronously sends [`CallbackEvent`] for provided [`StatefulFid`] to
     /// [`CallbackClient`] and waits for a response.
     ///
     /// Will use existing [`CallbackClient`] or create new.
@@ -97,7 +97,7 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
             .await
     }
 
-    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
+    /// Asynchronously sends [`CallbackEvent`] for provided [`StatefulFid`] to
     /// [`CallbackClient`] ignoring any potential errors.
     ///
     /// Will use existing [`CallbackClient`] or create new.

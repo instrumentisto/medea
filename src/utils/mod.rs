@@ -111,8 +111,7 @@ macro_rules! actix_try {
         match $e {
             Ok(p) => p,
             Err(e) => {
-                return Box::new(actix::fut::err(e.into()))
-                    as Box<dyn actix::fut::ActorFuture<Actor = _, Output = _>>;
+                return Box::pin(actix::fut::err(e.into()));
             }
         };
     };

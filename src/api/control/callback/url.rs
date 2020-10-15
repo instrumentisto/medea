@@ -12,8 +12,9 @@ use url::{ParseError, Url};
 /// without anything else (protocol e.g.).
 ///
 /// In [`Display`] implementation protocol will be added to this address.
-#[derive(Clone, Debug, Display, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Display, Eq, PartialEq, Hash, From)]
 #[display(fmt = "grpc://{}", _0)]
+#[from(forward)]
 pub struct GrpcCallbackUrl(String);
 
 impl GrpcCallbackUrl {

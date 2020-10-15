@@ -195,35 +195,30 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         _: &mut Self::Context,
     ) -> Self::Result {
-        info!(
-            "RpcConnectionEstablished for Member [id = {}].",
-            msg.member_id
-        );
+        let member_id = msg.member_id;
+        let connection = msg.connection;
 
-        let maybe_send_on_join =
-            match self.members.get_member_by_id(&msg.member_id) {
-                Ok(member) => {
-                    future::Either::Left(member.get_on_join().map_or_else(
-                        || future::Either::Left(future::ok(())),
-                        |callback_url| {
-                            future::Either::Right({
-                                let callback_service = self.callbacks.clone();
-                                async move {
-                                    callback_service
-                                        .send(
-                                            callback_url,
-                                            member.get_fid().into(),
-                                            OnJoinEvent,
-                                        )
-                                        .await
-                                }
-                                .err_into()
-                            })
-                        },
-                    ))
+        info!("RpcConnectionEstablished for Member [id = {}].", member_id);
+
+        let member = actix_try!(self.members.get_member_by_id(&member_id));
+        let is_reconnect = self.members.member_has_connection(&member_id);
+
+        let maybe_send_on_join = match (member.get_on_join(), is_reconnect) {
+            (Some(callback_url), false) => future::Either::Left({
+                let callback_service = self.callbacks.clone();
+                async move {
+                    callback_service
+                        .send(
+                            callback_url,
+                            member.get_fid().into(),
+                            OnJoinEvent,
+                        )
+                        .await
                 }
-                Err(err) => future::Either::Right(future::err(err.into())),
-            };
+                .err_into()
+            }),
+            _ => future::Either::Right(future::ok(())),
+        };
 
         Box::pin(
             maybe_send_on_join
@@ -231,21 +226,16 @@ impl Handler<RpcConnectionEstablished> for Room {
                 .then(move |res: Result<(), RoomError>, this, ctx| match res {
                     Ok(_) => Either::Left(
                         this.members
-                            .connection_established(
-                                ctx,
-                                msg.member_id,
-                                msg.connection,
-                            )
+                            .connection_established(ctx, member_id, connection)
                             .err_into()
                             .into_actor(this),
                     ),
                     Err(err) => Either::Right(fut::err(err)),
                 })
                 .then(|res, this, _| match res {
-                    Ok(member) => Either::Left(
-                        this.init_member_connections(&member)
-                            .map(|res, _, _| res.map(|_| ())),
-                    ),
+                    Ok(member) => {
+                        Either::Left(this.init_member_connections(&member))
+                    }
                     Err(err) => Either::Right(fut::err(err)),
                 }),
         )
@@ -435,5 +425,241 @@ mod test {
             validation,
             Err(CommandValidationError::PeerNotFound(PeerId(1)))
         );
+    }
+
+    mod callbacks {
+
+        use std::convert::TryFrom;
+
+        use actix::Addr;
+        use medea_client_api_proto::{
+            CloseDescription, CloseReason, Credential, MemberId,
+        };
+        use medea_control_api_proto::grpc::callback::on_leave::Reason;
+        use mockall::predicate::eq;
+        use serial_test::serial;
+
+        use super::*;
+
+        use crate::api::{
+            client::rpc_connection::MockRpcConnection,
+            control::{
+                callback::{
+                    clients::grpc::test::{
+                        start_callback_server, MockGrpcCallbackServer,
+                    },
+                    url::CallbackUrl,
+                },
+                RoomElement,
+            },
+        };
+
+        fn room_spec(with_on_join: bool, with_on_leave: bool) -> RoomSpec {
+            let callback_url =
+                CallbackUrl::try_from(String::from("grpc://127.0.0.1:9099"))
+                    .unwrap();
+            let on_join = if with_on_join {
+                Some(callback_url.clone())
+            } else {
+                None
+            };
+            let on_leave = if with_on_leave {
+                Some(callback_url.clone())
+            } else {
+                None
+            };
+            let id = MemberId::from("member");
+            let member = RoomElement::Member {
+                spec: Pipeline::new(HashMap::new()),
+                credentials: Credential::from(""),
+                on_leave,
+                on_join,
+                idle_timeout: None,
+                reconnect_timeout: None,
+                ping_interval: None,
+            };
+            RoomSpec {
+                id: RoomId::from("test"),
+                pipeline: Pipeline::new(hashmap! {id => member}),
+            }
+        }
+
+        async fn start_room(
+            with_on_join: bool,
+            with_on_leave: bool,
+        ) -> Addr<Room> {
+            let app_ctx = AppContext::new(
+                Conf::default(),
+                crate::turn::new_turn_auth_service_mock(),
+            );
+            let room = Room::start(
+                &room_spec(with_on_join, with_on_leave),
+                &app_ctx,
+                build_peers_traffic_watcher(&app_ctx.config.media),
+            )
+            .unwrap();
+
+            room
+        }
+
+        mod on_join {
+
+            use super::*;
+
+            #[actix_rt::test]
+            #[serial]
+            async fn on_join_when_rpc_con_established() {
+                let mut callback_server = MockGrpcCallbackServer::new();
+                callback_server
+                    .expect_on_join()
+                    .with(eq("test/member"))
+                    .return_once(|_| Ok(()));
+                let room = start_room(true, false).await;
+                let _callback_server =
+                    start_callback_server("0.0.0.0:9099", callback_server)
+                        .await;
+
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(MockRpcConnection::new()),
+                )
+                .await
+                .unwrap();
+            }
+
+            #[actix_rt::test]
+            #[serial]
+            async fn no_on_join_when_reconnect() {
+                let mut callback_server = MockGrpcCallbackServer::new();
+                callback_server
+                    .expect_on_join()
+                    .with(eq("test/member"))
+                    .return_once(|_| Ok(()));
+                let room = start_room(true, false).await;
+                let _callback_server =
+                    start_callback_server("0.0.0.0:9099", callback_server)
+                        .await;
+
+                let mut rpc_connection = MockRpcConnection::new();
+                rpc_connection
+                    .expect_close()
+                    .with(eq(CloseDescription {
+                        reason: CloseReason::Reconnected,
+                    }))
+                    .return_once(|_| Box::pin(future::ready(())));
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(rpc_connection),
+                )
+                .await
+                .unwrap();
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(MockRpcConnection::new()),
+                )
+                .await
+                .unwrap();
+            }
+
+            #[actix_rt::test]
+            #[serial]
+            async fn no_on_join_when_rpc_con_established() {
+                let callback_server = MockGrpcCallbackServer::new();
+                let room = start_room(false, false).await;
+                let _callback_server =
+                    start_callback_server("0.0.0.0:9099", callback_server)
+                        .await;
+
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(MockRpcConnection::new()),
+                )
+                .await
+                .unwrap();
+            }
+
+            #[actix_rt::test]
+            #[serial]
+            async fn rpc_con_err_if_on_join_err() {
+                let mut callback_server = MockGrpcCallbackServer::new();
+                callback_server
+                    .expect_on_join()
+                    .with(eq("test/member"))
+                    .return_once(|_| Err(()));
+                let room = start_room(true, false).await;
+                let _callback_server =
+                    start_callback_server("0.0.0.0:9099", callback_server)
+                        .await;
+
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(MockRpcConnection::new()),
+                )
+                .await
+                .unwrap_err();
+            }
+
+            #[actix_rt::test]
+            #[serial]
+            async fn rpc_con_err_if_io_err() {
+                let mut callback_server = MockGrpcCallbackServer::new();
+                callback_server
+                    .expect_on_join()
+                    .with(eq("test/member"))
+                    .return_once(|_| Err(()));
+                let room = start_room(true, false).await;
+
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(MockRpcConnection::new()),
+                )
+                .await
+                .unwrap_err();
+            }
+        }
+
+        mod on_leave {
+
+            use super::*;
+
+            // /// Member was normally disconnected.
+            // Disconnected = 0,
+            // /// Connection with Member was lost.
+            // LostConnection = 1,
+            // /// Medea media server is shutting down.
+            // ServerShutdown = 2,
+
+            #[actix_rt::test]
+            #[serial]
+            async fn on_disconnected() {
+                let mut callback_server = MockGrpcCallbackServer::new();
+                callback_server
+                    .expect_on_leave()
+                    .return_once(|fid, reason| {
+                        assert_eq!(fid, "test/member");
+                        assert_eq!(reason, Reason::Disconnected);
+                        Ok(())
+                    });
+                let room = start_room(true, true).await;
+                let _callback_server =
+                    start_callback_server("0.0.0.0:9099", callback_server)
+                        .await;
+
+                room.connection_established(
+                    MemberId::from("member"),
+                    Box::new(MockRpcConnection::new()),
+                )
+                .await
+                .unwrap();
+
+                room.connection_closed(
+                    MemberId::from("member"),
+                    ClosedReason::Closed { normal: true },
+                )
+                .await;
+                drop(_callback_server);
+                tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
+            }
+        }
     }
 }

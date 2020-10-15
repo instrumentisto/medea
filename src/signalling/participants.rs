@@ -215,7 +215,7 @@ impl ParticipantService {
         )
     }
 
-    /// Saves provided [`RpcConnection`], registers [`IceUser`].
+    /// Saves provided [`RpcConnection`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(

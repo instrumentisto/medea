@@ -109,7 +109,7 @@ pub enum RoomError {
     PeerTrafficWatcherMailbox(MailboxError),
 
     /// Failed to send callback via [`CallbackService`]
-    #[display(fmt = "CallbackClient errored in Room: {}", _0)]
+    #[display(fmt = "CallbackService errored in Room: {}", _0)]
     CallbackClientError(CallbackClientError),
 }
 
