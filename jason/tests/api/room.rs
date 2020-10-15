@@ -509,6 +509,9 @@ mod disable_send_tracks {
         }
     }
 
+    /// Tests that when [`JsMediaSouceKind::Device`] is provided to the
+    /// [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`], the
+    /// only device video will be muted/unmuted.
     #[wasm_bindgen_test]
     async fn mute_unmute_device_video() {
         let audio_track = audio_track(TrackId(1), false);
@@ -540,6 +543,9 @@ mod disable_send_tracks {
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
     }
 
+    /// Tests that when [`JsMediaSouceKind::Display`] is provided to the
+    /// [`RoomHandle::mute_video`] and [`RoomHandle::unmute_video`], the
+    /// only display video will be muted/unmuted.
     #[wasm_bindgen_test]
     async fn mute_unmute_display_video() {
         let audio_track = audio_track(TrackId(1), false);
@@ -1366,6 +1372,10 @@ mod patches_generation {
         );
     }
 
+    /// Checks that on device video muting, correct [`Command::UpdateTracks`]
+    /// will be sent to the `Media Server`.
+    ///
+    /// This test will be ignore in Firefox browser.
     #[wasm_bindgen_test]
     async fn mute_device_video() {
         if is_firefox() {
@@ -1408,6 +1418,10 @@ mod patches_generation {
         );
     }
 
+    /// Checks that on display video muting, correct [`Command::UpdateTracks`]
+    /// will be sent to the `Media Server`.
+    ///
+    /// This test will be ignore in Firefox browser.
     #[wasm_bindgen_test]
     async fn mute_display_video() {
         if is_firefox() {
