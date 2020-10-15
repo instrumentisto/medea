@@ -22,13 +22,13 @@ use medea_jason::{
     utils::JasonError,
     DeviceVideoTrackConstraints,
 };
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
 use crate::{
     delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
-    wait_and_check_test_result, MockNavigator, TEST_ROOM_URL,
+    wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -46,7 +46,7 @@ fn get_test_room(
     rpc.expect_on_reconnected()
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_send_command().returning(move |command| {
-        tx.unbounded_send(command).unwrap();
+        let _ = tx.unbounded_send(command);
     });
 
     (
@@ -469,9 +469,9 @@ mod disable_send_tracks {
         .await;
 
         let handle = room.new_handle();
-        assert!(JsFuture::from(handle.mute_video()).await.is_ok());
+        assert!(JsFuture::from(handle.mute_video(None)).await.is_ok());
         assert!(!peer.is_send_video_enabled());
-        assert!(JsFuture::from(handle.unmute_video()).await.is_ok());
+        assert!(JsFuture::from(handle.unmute_video(None)).await.is_ok());
         assert!(peer.is_send_video_enabled());
     }
 
@@ -508,6 +508,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
+            None,
             StableMuteState::Muted
         ));
     }
@@ -535,8 +536,8 @@ mod disable_send_tracks {
 
         let handle = room.new_handle();
         let (first, second) = futures::future::join(
-            JsFuture::from(handle.mute_video()),
-            JsFuture::from(handle.mute_video()),
+            JsFuture::from(handle.mute_video(None)),
+            JsFuture::from(handle.mute_video(None)),
         )
         .await;
         first.unwrap();
@@ -545,6 +546,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Video,
             TrackDirection::Send,
+            None,
             StableMuteState::Muted
         ));
     }
@@ -575,6 +577,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
+            None,
             StableMuteState::Unmuted
         ));
 
@@ -590,6 +593,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
+            None,
             StableMuteState::Unmuted
         ));
     }
@@ -620,13 +624,14 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Video,
             TrackDirection::Send,
+            None,
             StableMuteState::Unmuted
         ));
 
         let handle = room.new_handle();
         let (mute_video_result, unmute_video_result) = futures::future::join(
-            JsFuture::from(handle.mute_video()),
-            JsFuture::from(handle.unmute_video()),
+            JsFuture::from(handle.mute_video(None)),
+            JsFuture::from(handle.unmute_video(None)),
         )
         .await;
         mute_video_result.unwrap_err();
@@ -635,6 +640,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Video,
             TrackDirection::Send,
+            None,
             StableMuteState::Unmuted
         ));
     }
@@ -665,6 +671,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
+            None,
             StableMuteState::Unmuted
         ));
 
@@ -674,6 +681,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
+            None,
             StableMuteState::Muted
         ));
 
@@ -688,6 +696,7 @@ mod disable_send_tracks {
         assert!(peer.is_all_transceiver_sides_in_mute_state(
             MediaKind::Audio,
             TrackDirection::Send,
+            None,
             StableMuteState::Unmuted
         ));
     }
@@ -753,7 +762,7 @@ mod disable_send_tracks {
         .await
         .unwrap();
 
-        JsFuture::from(room.new_handle().mute_video())
+        JsFuture::from(room.new_handle().mute_video(None))
             .await
             .unwrap();
 
@@ -1045,10 +1054,11 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_enabled(false, MediaKind::Video);
+            local_stream.set_track_enabled(false, MediaKind::Video, None);
             local_stream.set_track_enabled(
                 (audio_track_enabled_state_fn)(i),
                 MediaKind::Audio,
+                None,
             );
             let peer = PeerConnection::new(
                 peer_id,
@@ -1272,4 +1282,58 @@ async fn remote_mute_unmute_video() {
     assert!(!peer.is_recv_video_enabled());
     assert!(JsFuture::from(handle.unmute_remote_video()).await.is_ok());
     assert!(peer.is_recv_video_enabled());
+}
+
+/// Tests that calling [`RoomHandle::set_local_media_settings`] updates needed
+/// [`MuteState`]s of the [`Sender`]s.
+#[wasm_bindgen_test]
+async fn set_local_media_stream_settings_updates_mute_state() {
+    let (event_tx, event_rx) = mpsc::unbounded();
+    let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+    let room_handle = room.new_handle();
+    room_handle
+        .on_failed_local_media(js_sys::Function::new_no_args(""))
+        .unwrap();
+    JsFuture::from(
+        room_handle
+            .set_local_media_settings(&media_stream_settings(true, false)),
+    )
+    .await
+    .unwrap();
+
+    let (audio_track, video_track) = get_test_unrequired_tracks();
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+    delay_for(10).await;
+
+    spawn_local(async move {
+        JsFuture::from(
+            room_handle
+                .set_local_media_settings(&media_stream_settings(true, true)),
+        )
+        .await
+        .unwrap_err();
+    });
+    yield_now().await;
+
+    while let Some(update_tracks_cmd) = commands_rx.next().await {
+        if let Command::UpdateTracks {
+            peer_id,
+            mut tracks_patches,
+        } = update_tracks_cmd
+        {
+            assert_eq!(peer_id, PeerId(1));
+            let track_patch = tracks_patches.pop().unwrap();
+            assert_eq!(track_patch.is_muted, Some(false));
+            assert!(tracks_patches.is_empty());
+            break;
+        }
+    }
 }

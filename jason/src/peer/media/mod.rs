@@ -10,7 +10,7 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
-use proto::{Direction, PeerId, TrackId};
+use proto::{Direction, MediaSourceKind, PeerId, TrackId};
 use tracerr::Traced;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
@@ -42,6 +42,10 @@ pub trait TransceiverSide: Muteable {
 
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn mid(&self) -> Option<String>;
+
+    /// Returns `true` if this [`TransceiverKind`] currently can be
+    /// muted/unmuted without [`LocalMediaStreamConstraints`] updating.
+    fn is_transitable(&self) -> bool;
 }
 
 /// Default functions for dealing with [`MuteStateController`] for objects that
@@ -221,12 +225,22 @@ struct InnerMediaConnections {
 }
 
 impl InnerMediaConnections {
-    /// Returns [`Iterator`] over [`Sender`]s with provided [`MediaKind`].
-    fn iter_senders_with_kind(
+    /// Returns [`Iterator`] over [`Sender`]s with provided [`MediaKind`]
+    /// and [`MediaSourceKind`].
+    fn iter_senders_with_kind_and_source_kind(
         &self,
         kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
     ) -> impl Iterator<Item = &Rc<Sender>> {
-        self.senders.values().filter(move |s| s.kind() == kind)
+        self.senders
+            .values()
+            .filter(move |sender| sender.kind() == kind)
+            .filter(move |sender| match source_kind {
+                None => true,
+                Some(source_kind) => {
+                    sender.caps().media_source_kind() == source_kind
+                }
+            })
     }
 
     /// Returns [`Iterator`] over [`Receiver`]s with provided
@@ -238,16 +252,17 @@ impl InnerMediaConnections {
         self.receivers.values().filter(move |s| s.kind() == kind)
     }
 
-    /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`] and
-    /// [`MediaKind`].
+    /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],
+    /// [`MediaKind`] and [`MediaSourceKind`].
     fn get_transceivers_by_direction_and_kind(
         &self,
         direction: TrackDirection,
         kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
     ) -> Vec<Rc<dyn TransceiverSide>> {
         match direction {
             TrackDirection::Send => self
-                .iter_senders_with_kind(kind)
+                .iter_senders_with_kind_and_source_kind(kind, source_kind)
                 .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
@@ -280,30 +295,41 @@ impl MediaConnections {
     }
 
     /// Returns all [`Sender`]s and [`Receiver`]s from this [`MediaConnections`]
-    /// with provided [`MediaKind`] and [`TrackDirection`].
+    /// with provided [`MediaKind`], [`TrackDirection`] and
+    /// [`MediaSourceKind`].
     pub fn get_transceivers_sides(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
+        source_kind: Option<MediaSourceKind>,
     ) -> Vec<Rc<dyn TransceiverSide>> {
-        self.0
-            .borrow()
-            .get_transceivers_by_direction_and_kind(direction, kind)
+        self.0.borrow().get_transceivers_by_direction_and_kind(
+            direction,
+            kind,
+            source_kind,
+        )
     }
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`MediaKind`] and [`TrackDirection`] is in provided [`MuteState`].
+    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
+    /// provided [`MuteState`].
     pub fn is_all_tracks_in_mute_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
+        source_kind: Option<MediaSourceKind>,
         mute_state: StableMuteState,
     ) -> bool {
-        let transceivers = self
-            .0
-            .borrow()
-            .get_transceivers_by_direction_and_kind(direction, kind);
+        let transceivers =
+            self.0.borrow().get_transceivers_by_direction_and_kind(
+                direction,
+                kind,
+                source_kind,
+            );
         for transceiver in transceivers {
+            if !transceiver.is_transitable() {
+                continue;
+            }
             if transceiver.mute_state() != mute_state.into() {
                 return false;
             }
@@ -314,20 +340,22 @@ impl MediaConnections {
 
     /// Returns `true` if all [`Sender`]s with
     /// [`MediaKind::Audio`] are enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
-            .iter_senders_with_kind(MediaKind::Audio)
+            .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
             .find(|s| s.is_muted())
             .is_none()
     }
 
     /// Returns `true` if all [`Sender`]s with
     /// [`MediaKind::Video`] are enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
-            .iter_senders_with_kind(MediaKind::Video)
+            .iter_senders_with_kind_and_source_kind(MediaKind::Video, None)
             .find(|s| s.is_muted())
             .is_none()
     }
@@ -405,6 +433,27 @@ impl MediaConnections {
         out
     }
 
+    /// Returns [`Rc`] to [`TransceiverSide`] with a provided [`TrackId`].
+    ///
+    /// Returns `None` if [`TransceiverSide`] with a provided [`TrackId`]
+    /// doesn't exists in this [`MediaConnections`].
+    pub fn get_transceiver_side_by_id(
+        &self,
+        track_id: TrackId,
+    ) -> Option<Rc<dyn TransceiverSide>> {
+        let inner = self.0.borrow();
+        inner
+            .senders
+            .get(&track_id)
+            .map(|sndr| Rc::clone(&sndr) as Rc<dyn TransceiverSide>)
+            .or_else(|| {
+                inner
+                    .receivers
+                    .get(&track_id)
+                    .map(|rcvr| Rc::clone(&rcvr) as Rc<dyn TransceiverSide>)
+            })
+    }
+
     /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
     ///
     /// # Errors
@@ -442,6 +491,7 @@ impl MediaConnections {
                         mid,
                         mute_state,
                         is_required,
+                        send_constraints: send_constraints.clone(),
                     }
                     .build()
                     .map_err(tracerr::wrap!())?;
@@ -495,16 +545,9 @@ impl MediaConnections {
     pub fn get_tracks_request(&self) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            if let MuteState::Stable(StableMuteState::Unmuted) =
-                sender.mute_state()
-            {
-                stream_request
-                    .get_or_insert_with(TracksRequest::default)
-                    .add_track_request(
-                        sender.track_id(),
-                        sender.caps().clone(),
-                    );
-            }
+            stream_request
+                .get_or_insert_with(TracksRequest::default)
+                .add_track_request(sender.track_id(), sender.caps().clone());
         }
         stream_request
     }
@@ -514,6 +557,8 @@ impl MediaConnections {
     ///  [`MediaStreamTrack`]s are inserted into [`Sender`]'s
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
+    ///
+    /// Returns [`HashMap`] with [`MuteState`]s updates for the [`Sender`]s.
     ///
     /// # Errors
     ///
@@ -532,19 +577,17 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
-    ) -> Result<()> {
+    ) -> Result<HashMap<TrackId, StableMuteState>> {
         let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
+        let mut mute_satates_updates = HashMap::new();
         for sender in inner.senders.values() {
-            // skip senders that are not Unmuted
-            if !sender.is_unmuted() {
-                continue;
-            }
-
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
+                    mute_satates_updates
+                        .insert(sender.track_id(), StableMuteState::Unmuted);
                     sender_and_track.push((sender, track));
                 } else {
                     return Err(tracerr::new!(
@@ -555,6 +598,9 @@ impl MediaConnections {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaTracks
                 ));
+            } else {
+                mute_satates_updates
+                    .insert(sender.track_id(), StableMuteState::Muted);
             }
         }
 
@@ -567,7 +613,7 @@ impl MediaConnections {
         ))
         .await?;
 
-        Ok(())
+        Ok(mute_satates_updates)
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to the

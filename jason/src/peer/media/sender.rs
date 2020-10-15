@@ -11,7 +11,10 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::RtcRtpTransceiver;
 
 use crate::{
-    media::{MediaKind, MediaStreamTrack, TrackConstraints},
+    media::{
+        LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
+        VideoSource,
+    },
     peer::{
         conn::{RtcPeerConnection, TransceiverDirection},
         media::TransceiverSide,
@@ -34,6 +37,7 @@ pub struct SenderBuilder<'a> {
     pub mid: Option<String>,
     pub mute_state: StableMuteState,
     pub is_required: bool,
+    pub send_constraints: LocalTracksConstraints,
 }
 
 impl<'a> SenderBuilder<'a> {
@@ -47,11 +51,16 @@ impl<'a> SenderBuilder<'a> {
             None => self
                 .peer
                 .add_transceiver(kind, TransceiverDirection::Inactive),
-            Some(mid) => self
-                .peer
-                .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                .map_err(tracerr::wrap!())?,
+            Some(mid) => {
+                let transceiver = self
+                    .peer
+                    .get_transceiver_by_mid(&mid)
+                    .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
+                    .map_err(tracerr::wrap!())?;
+                transceiver
+                    .set_direction(TransceiverDirection::Inactive.into());
+                transceiver
+            }
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
@@ -67,6 +76,7 @@ impl<'a> SenderBuilder<'a> {
             is_required: self.is_required,
             transceiver_direction: Cell::new(TransceiverDirection::Inactive),
             peer_events_sender: self.peer_events_sender,
+            send_constraints: self.send_constraints,
         });
         spawn_local({
             let weak_this = Rc::downgrade(&this);
@@ -105,6 +115,7 @@ pub struct Sender {
     general_mute_state: Cell<StableMuteState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+    send_constraints: LocalTracksConstraints,
 }
 
 impl Sender {
@@ -260,6 +271,18 @@ impl TransceiverSide for Sender {
 
     fn mid(&self) -> Option<String> {
         self.transceiver.mid()
+    }
+
+    fn is_transitable(&self) -> bool {
+        match &self.caps {
+            TrackConstraints::Video(VideoSource::Device(_)) => {
+                self.send_constraints.inner().get_device_video().is_some()
+            }
+            TrackConstraints::Video(VideoSource::Display(_)) => {
+                self.send_constraints.inner().get_display_video().is_some()
+            }
+            TrackConstraints::Audio(_) => true,
+        }
     }
 }
 

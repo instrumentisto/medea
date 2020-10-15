@@ -882,20 +882,25 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_transceivers_sides(MediaKind::Audio, TrackDirection::Send)
-            .into_iter()
-            .chain(
-                peer.get_transceivers_sides(
-                    MediaKind::Video,
-                    TrackDirection::Send,
-                )
-                .into_iter(),
+        peer.get_transceivers_sides(
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+        .into_iter()
+        .chain(
+            peer.get_transceivers_sides(
+                MediaKind::Video,
+                TrackDirection::Send,
+                None,
             )
-            .map(|s| {
-                s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+            .into_iter(),
+        )
+        .map(|s| {
+            s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 
-                s.when_mute_state_stable(StableMuteState::Unmuted)
-            }),
+            s.when_mute_state_stable(StableMuteState::Unmuted)
+        }),
     )
     .map(|_| ())
     .shared();
@@ -929,8 +934,8 @@ async fn new_remote_track() {
         let manager = Rc::new(MediaManager::default());
 
         let tx_caps = LocalTracksConstraints::default();
-        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio);
-        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video);
+        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio, None);
+        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video, None);
         let sender_peer = PeerConnection::new(
             PeerId(1),
             tx1,

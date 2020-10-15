@@ -145,8 +145,8 @@ pub fn get_media_stream_settings(
     video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.set_track_enabled(audio_enabled, MediaKind::Audio);
-    settings.set_track_enabled(video_enabled, MediaKind::Video);
+    settings.set_track_enabled(audio_enabled, MediaKind::Audio, None);
+    settings.set_track_enabled(video_enabled, MediaKind::Video, None);
 
     settings
 }

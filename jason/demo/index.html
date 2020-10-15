@@ -16,11 +16,12 @@
       DisplayVideoTrackConstraints,
       FacingMode,
       MediaKind,
+      MediaSourceKind
     } from './js/medea_jason.js';
 
-    const controlUrl = document.location.protocol + "//" +
-                       document.location.host + "/control-api/";
-    const userNameCookieName = "MEDEA_DEMO_USER_NAME";
+    const controlUrl = document.location.protocol + '//' +
+                       document.location.host + '/control-api/';
+    const userNameCookieName = 'MEDEA_DEMO_USER_NAME';
 
     let chooseRoomDiv = document.getElementById('choose-room');
     let videoCallDiv = document.getElementById('video-call');
@@ -29,8 +30,9 @@
     let controlBtns = document.getElementById('control');
     let audioSelect = document.getElementById('connect__select-device_audio');
     let videoSelect = document.getElementById('connect__select-device_video');
+    let screenshareSwitchEl = document.getElementById('connection-settings__screenshare');
     let localVideo = document.getElementById('local-video__video');
-    let isForceRelayCheckbox = document.getElementById("is_force_relay");
+    let isForceRelayCheckbox = document.getElementById('is_force_relay');
     let isAudioEnabledCheckbox = document.getElementById('is-audio-enabled');
     let isVideoEnabledCheckbox = document.getElementById('is-video-enabled');
     let isPublishingEnabledCheckbox = document.getElementById('is-publishing-enabled');
@@ -41,9 +43,9 @@
     let muteVideoRecvBtn = document.getElementById('control__mute_video_recv');
     let joinCallerButton = document.getElementById('join__join');
     let connectionState = document.getElementById('connection-state__state');
-    let videoDiv = document.getElementById("remote-videos");
-    let connectBtnsDiv = document.getElementById("join__join");
-    let logsTextArea = document.getElementById("logs-output");
+    let videoDiv = document.getElementById('remote-videos');
+    let connectBtnsDiv = document.getElementById('join__join');
+    let logsTextArea = document.getElementById('logs-output');
 
     let jason = null;
     let room = null;
@@ -75,7 +77,7 @@
     async function startPublishing(roomId, memberId) {
       await axios({
         method: 'post',
-        url: controlUrl + roomId + "/" + memberId + '/publish',
+        url: controlUrl + roomId + '/' + memberId + '/publish',
         data: {
           kind: 'WebRtcPublishEndpoint',
           p2p: 'Always',
@@ -94,7 +96,7 @@
     async function stopPublishing(roomId, memberId) {
       await axios({
         method: 'delete',
-        url: controlUrl + roomId + "/" + memberId + '/publish',
+        url: controlUrl + roomId + '/' + memberId + '/publish',
       });
       await stopPublishPlaying(roomId, memberId);
     }
@@ -112,7 +114,7 @@
 
         let deleteRequest = axios({
           method: 'delete',
-          url: controlUrl + roomId + "/" + id + '/play-' + memberId,
+          url: controlUrl + roomId + '/' + id + '/play-' + memberId,
         });
         deleteRequests.push(deleteRequest);
       }
@@ -132,7 +134,7 @@
 
         let playRequest = axios({
           method: 'post',
-          url: controlUrl + roomId + "/" + id + '/play-' + memberId,
+          url: controlUrl + roomId + '/' + id + '/play-' + memberId,
           data: {
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
@@ -147,7 +149,7 @@
     async function addNewMember(roomId, memberId) {
       let pipeline = {};
       if (isPublishingEnabled) {
-        pipeline["publish"] = {
+        pipeline['publish'] = {
           kind: 'WebRtcPublishEndpoint',
           p2p: 'Always',
           force_relay: isForceRelay,
@@ -165,9 +167,9 @@
         let member = otherMembers[i];
         let memberId = member.id;
         if (member.pipeline.hasOwnProperty('publish')) {
-          pipeline["play-" + memberId] = {
+          pipeline['play-' + memberId] = {
             kind: 'WebRtcPlayEndpoint',
-            src: 'local://' + roomId + '/' + memberId + "/publish",
+            src: 'local://' + roomId + '/' + memberId + '/publish',
             force_relay: isForceRelay,
           };
         }
@@ -221,18 +223,18 @@
       }
 
       const screen = document.createElement('option');
-      screen.value = "screen";
-      screen.text = "screen";
+      screen.value = 'screen';
+      screen.text = 'screen';
       video_select.append(screen);
 
       const facingModeUser = document.createElement('option');
-      facingModeUser.value = "facingModeUser";
-      facingModeUser.text = "Facing user";
+      facingModeUser.value = 'facingModeUser';
+      facingModeUser.text = 'Facing user';
       video_select.append(facingModeUser);
 
       const facingModeEnvironment = document.createElement('option');
       facingModeEnvironment.value = 'facingModeEnvironment';
-      facingModeEnvironment.text = "Facing environment";
+      facingModeEnvironment.text = 'Facing environment';
       video_select.append(facingModeEnvironment);
     }
 
@@ -250,7 +252,7 @@
       if (video_select != null) {
         let videoSource = video_select.options[video_select.selectedIndex];
         if (videoSource) {
-          if (videoSource.value === "screen") {
+          if (videoSource.value === 'screen') {
             let video = new DisplayVideoTrackConstraints();
             constraints.display_video(video);
           } else {
@@ -263,6 +265,9 @@
               video.device_id(videoSource.value);
             }
             constraints.device_video(video);
+            if (screenshareSwitchEl.checked) {
+              constraints.display_video(new DisplayVideoTrackConstraints());
+            }
           }
         } else {
           constraints.device_video(new DeviceVideoTrackConstraints());
@@ -283,19 +288,19 @@
           .init_local_tracks(constraints)
       } catch (e) {
         let origError = e.source();
-        if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
-          if (origError.message.includes("audio")) {
+        if (origError && (origError.name === 'NotReadableError' || origError.name === 'AbortError')) {
+          if (origError.message.includes('audio')) {
             constraints = await build_constraints(null, videoSelect);
             localTracks = await jason
               .media_manager()
               .init_local_tracks(constraints);
-            alert("unable to get audio, will try to enter room with video only");
-          } else if (origError.message.includes("video")) {
+            alert('unable to get audio, will try to enter room with video only');
+          } else if (origError.message.includes('video')) {
             constraints = await build_constraints(audioSelect, null);
             localTracks = await jason
               .media_manager()
               .init_local_tracks(constraints);
-            alert("unable to get video, will try to enter room with audio only");
+            alert('unable to get video, will try to enter room with audio only');
           } else {
             throw e;
           }
@@ -315,15 +320,27 @@
         }
         let mediaStream = new MediaStream();
         mediaStream.addTrack(track.get_track());
-        let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
-        if (deviceVideoEl === undefined) {
-          deviceVideoEl = document.createElement('video');
-          deviceVideoEl.className = 'local-device-video';
-          deviceVideoEl.width = 200;
-          deviceVideoEl.autoplay = 'true';
-          localVideo.appendChild(deviceVideoEl);
+        if (track.media_source_kind() === MediaSourceKind.Display) {
+          let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
+          if (displayVideoEl === undefined) {
+            displayVideoEl = document.createElement('video');
+            displayVideoEl.className = 'local-display-video';
+            displayVideoEl.width = 300;
+            displayVideoEl.autoplay = 'true';
+            localVideo.appendChild(displayVideoEl);
+          }
+          displayVideoEl.srcObject = mediaStream;
+        } else {
+          let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
+          if (deviceVideoEl === undefined) {
+            deviceVideoEl = document.createElement('video');
+            deviceVideoEl.className = 'local-device-video';
+            deviceVideoEl.width = 300;
+            deviceVideoEl.autoplay = 'true';
+            localVideo.appendChild(deviceVideoEl);
+          }
+          deviceVideoEl.srcObject = mediaStream;
         }
-        deviceVideoEl.srcObject = mediaStream;
       }
     }
 
@@ -407,7 +424,7 @@
           await axios.get(controlUrl + roomId);
         } catch (e) {
           if (e.response.status === 400) {
-            console.log("Room not found. Creating new room...");
+            console.log('Room not found. Creating new room...');
             await createRoom(roomId)
           } else {
             throw e;
@@ -415,7 +432,7 @@
         }
 
         await axios.delete(controlUrl + roomId + '/' + username);
-        console.log("Creating new member.");
+        console.log('Creating new member.');
         await room.join(await addNewMember(roomId, username));
         connectionState.className = 'badge badge-success';
         connectionState.textContent = 'Connected';
@@ -494,7 +511,7 @@
         await room.set_local_media_settings(constraints);
       });
 
-      videoSelect.addEventListener('change', async () => {
+      let videoSwitch = async () => {
         let constraints = await build_constraints(audioSelect, videoSelect);
         for (const track of localTracks) {
           if (track.ptr > 0) {
@@ -505,7 +522,9 @@
           constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
-      });
+      };
+      videoSelect.addEventListener('change', videoSwitch);
+      screenshareSwitchEl.addEventListener('change', videoSwitch);
 
       room.on_failed_local_media((error) => {
         console.error(error.message());
@@ -516,14 +535,14 @@
         logsTextArea.value += `connection with a Member '${remoteMemberId}' established\r\n`;
         isCallStarted = true;
         let memberVideoDiv = remote_videos[remoteMemberId];
-        let remoteVideos = document.getElementById("remote-videos");
+        let remoteVideos = document.getElementById('remote-videos');
         if (memberVideoDiv === undefined) {
-          memberVideoDiv = document.createElement("div");
-          memberVideoDiv.classList.add("video");
-          memberVideoDiv.classList.add("d-flex");
-          memberVideoDiv.classList.add("flex-column");
-          memberVideoDiv.classList.add("align-items-center");
-          memberVideoDiv.style = "margin: 10px";
+          memberVideoDiv = document.createElement('div');
+          memberVideoDiv.classList.add('video');
+          memberVideoDiv.classList.add('d-flex');
+          memberVideoDiv.classList.add('flex-column');
+          memberVideoDiv.classList.add('align-items-center');
+          memberVideoDiv.style = 'margin: 10px';
           remoteVideos.appendChild(memberVideoDiv);
           remote_videos[remoteMemberId] = memberVideoDiv;
         }
@@ -547,20 +566,38 @@
 
         connection.on_remote_track_added((track) => {
           if (track.kind() === MediaKind.Video) {
+            if (track.media_source_kind() === MediaSourceKind.Display) {
+              let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
+              if (displayVideoEl === undefined) {
+                displayVideoEl = document.createElement('video');
+                displayVideoEl.classList.add('display-video');
+                displayVideoEl.classList.add('order-2');
+                displayVideoEl.playsinline = 'true';
+                displayVideoEl.width = 480;
+                displayVideoEl.controls = 'true';
+                displayVideoEl.autoplay = 'true';
+                memberVideoDiv.appendChild(displayVideoEl);
+              }
+              let mediaStream = new MediaStream();
+              mediaStream.addTrack(track.get_track());
+              displayVideoEl.srcObject = mediaStream;
+            } else {
               let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
               if (cameraVideoEl === undefined) {
                 cameraVideoEl = document.createElement('video');
                 cameraVideoEl.className = 'camera-video';
                 cameraVideoEl.classList.add('camera-video');
                 cameraVideoEl.classList.add('order-1');
-                cameraVideoEl.playsinline = "true";
-                cameraVideoEl.controls = "true";
-                cameraVideoEl.autoplay = "true";
+                cameraVideoEl.playsinline = 'true';
+                cameraVideoEl.width = 480;
+                cameraVideoEl.controls = 'true';
+                cameraVideoEl.autoplay = 'true';
                 memberVideoDiv.appendChild(cameraVideoEl);
               }
               let mediaStream = new MediaStream();
               mediaStream.addTrack(track.get_track());
               cameraVideoEl.srcObject = mediaStream;
+            }
           } else {
             let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
             if (audioEl === undefined) {
@@ -568,8 +605,8 @@
               audioEl.className = 'audio';
               audioEl.classList.add('audio');
               audioEl.classList.add('order-3');
-              audioEl.controls = "true";
-              audioEl.autoplay = "true";
+              audioEl.controls = 'true';
+              audioEl.autoplay = 'true';
               memberVideoDiv.appendChild(audioEl);
             }
             let mediaStream = new MediaStream();
@@ -607,7 +644,7 @@
 
       room.on_close(function (on_closed) {
         connectionState.className = 'badge badge-danger';
-        connectionState.textContent = "Closed";
+        connectionState.textContent = 'Closed';
         alert(
           `Call was ended.
           Reason: ${on_closed.reason()};
@@ -620,7 +657,7 @@
         if (isAudioSendMuted) {
           await room.unmute_audio();
           isAudioSendMuted = false;
-          muteAudioSendBtn.textContent = "Disable audio send";
+          muteAudioSendBtn.textContent = 'Disable audio send';
           if (!isCallStarted) {
             await initLocalStream();
           }
@@ -634,14 +671,14 @@
             }
           }
           isAudioSendMuted = true;
-          muteAudioSendBtn.textContent = "Enable audio send";
+          muteAudioSendBtn.textContent = 'Enable audio send';
         }
       });
       muteVideoSendBtn.addEventListener('click', async () => {
         if (isVideoSendMuted) {
           await room.unmute_video();
           isVideoSendMuted = false;
-          muteVideoSendBtn.textContent = "Disable video send";
+          muteVideoSendBtn.textContent = 'Disable video send';
           if (!isCallStarted) {
             await initLocalStream();
           }
@@ -655,7 +692,7 @@
             }
           }
           isVideoSendMuted = true;
-          muteVideoSendBtn.textContent = "Enable video send";
+          muteVideoSendBtn.textContent = 'Enable video send';
         }
       });
 
@@ -663,31 +700,31 @@
         if (isAudioRecvMuted) {
           await room.unmute_remote_audio();
           isAudioRecvMuted = false;
-          muteAudioRecvBtn.textContent = "Disable audio recv";
+          muteAudioRecvBtn.textContent = 'Disable audio recv';
         } else {
           await room.mute_remote_audio();
           isAudioRecvMuted = true;
-          muteAudioRecvBtn.textContent = "Enable audio recv";
+          muteAudioRecvBtn.textContent = 'Enable audio recv';
         }
       });
       muteVideoRecvBtn.addEventListener('click', async () => {
         if (isVideoRecvMuted) {
           await room.unmute_remote_video();
           isVideoRecvMuted = false;
-          muteVideoRecvBtn.textContent = "Disable video recv";
+          muteVideoRecvBtn.textContent = 'Disable video recv';
         } else {
           await room.mute_remote_video();
           isVideoRecvMuted = true;
-          muteVideoRecvBtn.textContent = "Enable video recv";
+          muteVideoRecvBtn.textContent = 'Enable video recv';
         }
       });
 
-      let roomId = window.location.hash.replace("#", "");
+      let roomId = window.location.hash.replace('#', '');
 
       if (roomId) {
         bindJoinButtons(roomId);
-        chooseRoomDiv.style.display = "none";
-        videoCallDiv.style.display = "";
+        chooseRoomDiv.style.display = 'none';
+        videoCallDiv.style.display = '';
 
         const constraints = await initLocalStream();
         await fillMediaDevicesInputs(audioSelect, videoSelect);
@@ -703,8 +740,8 @@
           await fillMediaDevicesInputs(audioSelect, videoSelect);
           await room.set_local_media_settings(constraints);
 
-          chooseRoomDiv.style.display = "none";
-          videoCallDiv.style.display = "";
+          chooseRoomDiv.style.display = 'none';
+          videoCallDiv.style.display = '';
         };
       }
     }
@@ -718,7 +755,7 @@
     };
 
     window.onerror = function (event) {
-      handleJasonError(event.reason);
+      handleJasonError(event.error);
     };
 
     // Pretty-prints JasonError, since it does not implements Error due to
@@ -727,7 +764,7 @@
       if (error && error instanceof JasonError) {
         console.error(
           error.name(), "\n",
-          error.message(), "\n",
+          error.message(), "\n',
           error.source(), "\n",
           error.trace()
         );
@@ -737,17 +774,17 @@
     }
 
     function setCookie(name, value, days) {
-      var expires = "";
+      var expires = '';
       if (days) {
         var date = new Date();
         date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-        expires = "; expires=" + date.toUTCString();
+        expires = '; expires=' + date.toUTCString();
       }
-      document.cookie = name + "=" + (value || "") + expires + "; path=/";
+      document.cookie = name + '=' + (value || '') + expires + '; path=/';
     }
 
     function getCookie(name) {
-      var nameEQ = name + "=";
+      var nameEQ = name + '=';
       var ca = document.cookie.split(';');
       for (var i = 0; i < ca.length; i++) {
         var c = ca[i];
@@ -768,7 +805,7 @@
   </div>
 
   <div id="video-call" style="display: none">
-    <div id="remote-videos" class="d-flex flex-row justify-content-center">
+    <div id="remote-videos" class="d-flex flex-row">
     </div>
 
     <div class="row h-25 w-75">
@@ -795,6 +832,17 @@
             <label class="input-group-text" for="connect__select-device_video">Video</label>
           </div>
           <select class="custom-select" id="connect__select-device_video"></select>
+        </div>
+
+        <div class="custom-control custom-switch">
+          <input type="checkbox"
+                 id="connection-settings__screenshare"
+                 class="custom-control-input"
+                 autocomplete="off">
+          <label for="connection-settings__screenshare"
+                 class="custom-control-label">
+            Screenshare
+          </label>
         </div>
 
         <div id="control" class="input-group mb-3" style="display: none">
