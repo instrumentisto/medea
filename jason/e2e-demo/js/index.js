@@ -17,11 +17,7 @@ let closeApp = document.getElementById('control__close_app');
 let audioSelect = document.getElementById('connect__select-device_audio');
 let videoSelect = document.getElementById('connect__select-device_video');
 let screenshareSwitchEl = document.getElementById('connection-settings__screenshare');
-<<<<<<< HEAD
-let localVideo = document.getElementById("local-video");
-=======
 let localVideo = document.getElementById('local-video');
->>>>>>> master
 
 function getMemberId() {
   return usernameInput.value;
@@ -623,15 +619,9 @@ window.onload = async function() {
               displayVideoEl = document.createElement('video');
               displayVideoEl.classList.add('display-video');
               displayVideoEl.classList.add('order-2');
-<<<<<<< HEAD
-              displayVideoEl.playsinline = "true";
-              displayVideoEl.controls = "true";
-              displayVideoEl.autoplay = "true";
-=======
               displayVideoEl.playsinline = 'true';
               displayVideoEl.controls = 'true';
               displayVideoEl.autoplay = 'true';
->>>>>>> master
               memberVideoDiv.appendChild(displayVideoEl);
             }
             let mediaStream = new MediaStream();
@@ -772,11 +762,7 @@ window.onload = async function() {
         }
         await room.set_local_media_settings(constraints);
       } catch (e) {
-<<<<<<< HEAD
-        console.error("Changing video source failed: " + e.message());
-=======
         console.error('Changing video source failed: ' + e.message());
->>>>>>> master
       }
     };
     videoSelect.addEventListener('change', videoSwitch);
