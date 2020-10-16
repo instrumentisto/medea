@@ -3,9 +3,9 @@
 use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
     media::{
-        AudioTrackConstraints, DeviceVideoTrackConstraints, MediaKind,
-        MediaManager, MediaStreamSettings, MultiSourceTracksConstraints,
-        VideoSource,
+        AudioTrackConstraints, DeviceVideoTrackConstraints, JsMediaSourceKind,
+        MediaKind, MediaManager, MediaStreamSettings,
+        MultiSourceTracksConstraints, VideoSource,
     },
     utils::{get_property_by_name, window},
     DisplayVideoTrackConstraints,
@@ -16,7 +16,6 @@ use wasm_bindgen_test::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
 use crate::is_firefox;
-use medea_jason::media::JsMediaSourceKind;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -537,15 +536,15 @@ async fn simultaneous_device_and_display() {
     assert_eq!(display_video_track.kind(), MediaKind::Video);
     assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
     assert_eq!(
-        &display_video_track.js_media_source_kind(),
-        &JsMediaSourceKind::Display
+        display_video_track.js_media_source_kind(),
+        JsMediaSourceKind::Display
     );
 
     let device_video_track = video.pop().unwrap().0;
     assert_eq!(device_video_track.kind(), MediaKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
     assert_eq!(
-        &device_video_track.js_media_source_kind(),
-        &JsMediaSourceKind::Device
+        device_video_track.js_media_source_kind(),
+        JsMediaSourceKind::Device
     );
 }

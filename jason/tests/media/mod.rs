@@ -17,7 +17,7 @@ use medea_jason::{
 };
 use wasm_bindgen_test::*;
 
-use crate::{get_media_stream_settings, get_test_unrequired_tracks};
+use crate::get_media_stream_settings;
 
 wasm_bindgen_test_configure!(run_in_browser);
 

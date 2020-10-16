@@ -91,8 +91,8 @@ use medea_jason::{
         LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
     },
     utils::{window, JasonError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
-    SourceType,
+    AudioTrackConstraints, DeviceVideoTrackConstraints,
+    DisplayVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -144,16 +144,8 @@ pub fn get_media_stream_settings(
     video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.set_track_enabled(
-        audio_enabled,
-        MediaKind::Audio,
-        SourceType::Both,
-    );
-    settings.set_track_enabled(
-        video_enabled,
-        MediaKind::Video,
-        SourceType::Both,
-    );
+    settings.set_track_enabled(audio_enabled, MediaKind::Audio, None);
+    settings.set_track_enabled(video_enabled, MediaKind::Video, None);
 
     settings
 }
@@ -238,6 +230,7 @@ fn media_stream_settings(
     }
     if is_video_enabled {
         settings.device_video(DeviceVideoTrackConstraints::default());
+        settings.display_video(DisplayVideoTrackConstraints::default());
     }
 
     settings

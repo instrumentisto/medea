@@ -12,11 +12,12 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
+        VideoSource,
     },
     peer::{
         media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
-        PeerEvent, SourceType,
+        PeerEvent,
     },
 };
 
@@ -195,11 +196,6 @@ impl Sender {
         }
     }
 
-    /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
-    pub(super) fn source_type(&self) -> SourceType {
-        self.caps.source_type()
-    }
-
     /// Returns [`Transceiver`] of this [`Sender`].
     pub fn transceiver(&self) -> Transceiver {
         self.transceiver.clone()
@@ -253,12 +249,14 @@ impl TransceiverSide for Sender {
     }
 
     fn is_transitable(&self) -> bool {
-        if self.caps.is_display_video() {
-            self.send_constraints.is_display_video_constrained()
-        } else if self.caps.is_device_video() {
-            self.send_constraints.is_device_video_constrained()
-        } else {
-            true
+        match &self.caps {
+            TrackConstraints::Video(VideoSource::Device(_)) => {
+                self.send_constraints.inner().get_device_video().is_some()
+            }
+            TrackConstraints::Video(VideoSource::Display(_)) => {
+                self.send_constraints.inner().get_display_video().is_some()
+            }
+            TrackConstraints::Audio(_) => true,
         }
     }
 }
