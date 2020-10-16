@@ -352,10 +352,16 @@ impl MediaConnections {
     /// Returns `true` if all [`Sender`]s with
     /// [`MediaKind::Video`] are enabled or `false` otherwise.
     #[cfg(feature = "mockable")]
-    pub fn is_send_video_enabled(&self) -> bool {
+    pub fn is_send_video_enabled(
+        &self,
+        source_kind: Option<MediaSourceKind>,
+    ) -> bool {
         self.0
             .borrow()
-            .iter_senders_with_kind_and_source_kind(MediaKind::Video, None)
+            .iter_senders_with_kind_and_source_kind(
+                MediaKind::Video,
+                source_kind,
+            )
             .find(|s| s.is_muted())
             .is_none()
     }

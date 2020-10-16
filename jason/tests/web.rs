@@ -92,7 +92,8 @@ use medea_jason::{
     },
     rpc::ApiUrl,
     utils::{window, JasonError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
+    AudioTrackConstraints, DeviceVideoTrackConstraints,
+    DisplayVideoTrackConstraints, MediaStreamSettings,
 };
 use url::Url;
 use wasm_bindgen::prelude::*;
@@ -237,6 +238,7 @@ fn media_stream_settings(
     }
     if is_video_enabled {
         settings.device_video(DeviceVideoTrackConstraints::default());
+        settings.display_video(DisplayVideoTrackConstraints::default());
     }
 
     settings
