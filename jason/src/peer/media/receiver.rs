@@ -174,6 +174,14 @@ impl Receiver {
         self.general_mute_state.get() == StableMuteState::Muted
     }
 
+    /// Returns [`Transceiver`] of this [`Receiver`].
+    ///
+    /// Returns [`None`] if this [`Receiver`] doesn't have [`Transceiver`].
+    #[cfg(feature = "mockable")]
+    pub fn transceiver(&self) -> Option<Transceiver> {
+        self.transceiver.borrow().clone()
+    }
+
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
     /// and has not notified yet.
     fn maybe_notify_track(&self) {

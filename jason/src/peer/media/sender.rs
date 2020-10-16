@@ -196,12 +196,12 @@ impl Sender {
     }
 
     /// Returns [`SourceType`] based on this [`Sender`]'s [`TrackConstraints`].
-    pub fn source_type(&self) -> SourceType {
+    pub(super) fn source_type(&self) -> SourceType {
         self.caps.source_type()
     }
 
     /// Returns [`Transceiver`] of this [`Sender`].
-    pub(super) fn transceiver(&self) -> Transceiver {
+    pub fn transceiver(&self) -> Transceiver {
         self.transceiver.clone()
     }
 

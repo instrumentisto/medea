@@ -708,6 +708,13 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
+    /// Returns [`Receiver`] with a provided [`TrackId`].
+    #[inline]
+    #[cfg(feature = "mockable")]
+    pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
+        self.0.borrow().receivers.get(&id).cloned()
+    }
+
     /// Returns all references to the [`TransceiverSide`]s from this
     /// [`MediaConnections`].
     fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {

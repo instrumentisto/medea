@@ -17,14 +17,13 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
 use medea_jason::rpc::{
-    websocket::MockRpcTransport, ClientDisconnect, CloseMsg, RpcClient,
-    RpcTransport, WebSocketRpcClient,
+    websocket::{MockRpcTransport, TransportState},
+    ClientDisconnect, CloseMsg, RpcClient, RpcTransport, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::{delay_for, timeout};
-use medea_jason::rpc::websocket::TransportState;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
