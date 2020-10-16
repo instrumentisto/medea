@@ -502,6 +502,7 @@ mod test {
             room
         }
 
+        // TODO: Add on_leave callback tests.
         mod on_join {
 
             use super::*;
@@ -615,50 +616,6 @@ mod test {
                 )
                 .await
                 .unwrap_err();
-            }
-        }
-
-        mod on_leave {
-
-            use super::*;
-
-            // /// Member was normally disconnected.
-            // Disconnected = 0,
-            // /// Connection with Member was lost.
-            // LostConnection = 1,
-            // /// Medea media server is shutting down.
-            // ServerShutdown = 2,
-
-            #[actix_rt::test]
-            #[serial]
-            async fn on_disconnected() {
-                let mut callback_server = MockGrpcCallbackServer::new();
-                callback_server
-                    .expect_on_leave()
-                    .return_once(|fid, reason| {
-                        assert_eq!(fid, "test/member");
-                        assert_eq!(reason, Reason::Disconnected);
-                        Ok(())
-                    });
-                let room = start_room(true, true).await;
-                let _callback_server =
-                    start_callback_server("0.0.0.0:9099", callback_server)
-                        .await;
-
-                room.connection_established(
-                    MemberId::from("member"),
-                    Box::new(MockRpcConnection::new()),
-                )
-                .await
-                .unwrap();
-
-                room.connection_closed(
-                    MemberId::from("member"),
-                    ClosedReason::Closed { normal: true },
-                )
-                .await;
-                drop(_callback_server);
-                tokio::time::delay_for(std::time::Duration::from_secs(4)).await;
             }
         }
     }
