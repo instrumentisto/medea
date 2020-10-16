@@ -190,11 +190,11 @@ impl RoomService {
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
-        credential: &Credential,
+        credentials: &Credential,
     ) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.public_url, room_id, member_id, credential
+            self.public_url, room_id, member_id, credentials
         )
     }
 }
@@ -274,7 +274,7 @@ impl Handler<CreateRoom> for RoomService {
                     let uri = self.get_sid(
                         room_spec.id(),
                         &member_id,
-                        member.credential(),
+                        member.credentials(),
                     );
                     (member_id.clone().to_string(), uri)
                 })
@@ -329,7 +329,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
         let room_id = msg.parent_fid.take_room_id();
         let id = msg.id;
         let spec = msg.spec;
-        let sid = self.get_sid(&room_id, &id, spec.credential());
+        let sid = self.get_sid(&room_id, &id, spec.credentials());
 
         self.room_repo.get(&room_id).map_or_else(
             || {

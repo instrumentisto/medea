@@ -164,10 +164,10 @@ impl ParticipantService {
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
-        credential: &Credential,
+        credentials: &Credential,
     ) -> Option<Member> {
         let member = self.get_member_by_id(member_id)?;
-        if member.credential() == *credential {
+        if member.credentials() == *credentials {
             Some(member)
         } else {
             None
@@ -390,7 +390,7 @@ impl ParticipantService {
         }
         let signalling_member = Member::new(
             id.clone(),
-            spec.credential().clone(),
+            spec.credentials().clone(),
             self.room_id.clone(),
             spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
             spec.reconnect_timeout()

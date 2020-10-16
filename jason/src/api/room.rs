@@ -653,8 +653,7 @@ impl Room {
         handle
             .0
             .upgrade()
-            .map(|handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
-            .unwrap_or(false)
+            .map_or(false, |handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
     }
 }
 

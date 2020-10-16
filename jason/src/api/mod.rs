@@ -81,7 +81,7 @@ impl Jason {
     /// Drops [`Room`] with a provided ID.
     ///
     /// Sets [`Room`]'s close reason to [`ClientDisconnect::RoomClose`].
-    // TODO: RoomId -> RoomHandle
+    #[allow(clippy::needless_pass_by_value)]
     pub fn dispose_room(&self, room_to_delete: RoomHandle) {
         self.0.borrow_mut().rooms.retain(|room| {
             let should_be_closed = room.is_handle_parent(&room_to_delete);

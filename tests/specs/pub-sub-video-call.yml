@@ -4,7 +4,7 @@ spec:
   pipeline:
     caller:
       kind: Member
-      credential: test
+      credentials: test
       spec:
         pipeline:
           publish:
@@ -14,7 +14,7 @@ spec:
               force_relay: true
     responder:
       kind: Member
-      credential: test
+      credentials: test
       spec:
         pipeline:
           play:

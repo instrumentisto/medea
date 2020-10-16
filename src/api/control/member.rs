@@ -25,7 +25,7 @@ use crate::api::control::{
     WebRtcPlayId,
 };
 
-const CREDENTIAL_LEN: usize = 32;
+const CREDENTIALS_LEN: usize = 32;
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
@@ -53,7 +53,7 @@ pub struct MemberSpec {
     pipeline: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
-    credential: Credential,
+    credentials: Credential,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -80,7 +80,7 @@ impl Into<RoomElement> for MemberSpec {
     fn into(self) -> RoomElement {
         RoomElement::Member {
             spec: self.pipeline,
-            credential: self.credential,
+            credentials: self.credentials,
             on_join: self.on_join,
             on_leave: self.on_leave,
             idle_timeout: self.idle_timeout,
@@ -95,7 +95,7 @@ impl MemberSpec {
     #[inline]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
-        credential: Credential,
+        credentials: Credential,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
@@ -104,7 +104,7 @@ impl MemberSpec {
     ) -> Self {
         Self {
             pipeline,
-            credential,
+            credentials,
             on_join,
             on_leave,
             idle_timeout,
@@ -151,8 +151,8 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
-    pub fn credential(&self) -> &Credential {
-        &self.credential
+    pub fn credentials(&self) -> &Credential {
+        &self.credentials
     }
 
     /// Returns reference to `on_join` [`CallbackUrl`].
@@ -194,10 +194,10 @@ impl MemberSpec {
 /// [`MemberProto`] implemented for [`MemberSpec`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-fn generate_member_credential() -> Credential {
+fn generate_member_credentials() -> Credential {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(CREDENTIAL_LEN)
+        .take(CREDENTIALS_LEN)
         .collect::<String>()
         .into()
 }
@@ -227,9 +227,9 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         }
 
-        let mut credential = Credential::from(member.credentials);
-        if credential.0.is_empty() {
-            credential = generate_member_credential();
+        let mut credentials = Credential::from(member.credentials);
+        if credentials.0.is_empty() {
+            credentials = generate_member_credentials();
         }
 
         let on_leave = {
@@ -261,7 +261,7 @@ impl TryFrom<proto::Member> for MemberSpec {
 
         Ok(Self {
             pipeline: Pipeline::new(pipeline),
-            credential,
+            credentials,
             on_join,
             on_leave,
             idle_timeout,
@@ -304,7 +304,7 @@ impl TryFrom<&RoomElement> for MemberSpec {
         match from {
             RoomElement::Member {
                 spec,
-                credential,
+                credentials,
                 on_leave,
                 on_join,
                 idle_timeout,
@@ -312,7 +312,7 @@ impl TryFrom<&RoomElement> for MemberSpec {
                 ping_interval,
             } => Ok(Self {
                 pipeline: spec.clone(),
-                credential: credential.clone(),
+                credentials: credentials.clone(),
                 on_leave: on_leave.clone(),
                 on_join: on_join.clone(),
                 idle_timeout: *idle_timeout,

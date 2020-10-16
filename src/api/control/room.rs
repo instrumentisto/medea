@@ -28,7 +28,7 @@ pub enum RoomElement {
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
-        credential: Credential,
+        credentials: Credential,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
         #[serde(default, with = "humantime_serde")]
