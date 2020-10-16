@@ -81,7 +81,7 @@ impl Jason {
     /// Drops [`Room`] with a provided ID.
     ///
     /// Sets [`Room`]'s close reason to [`ClientDisconnect::RoomClose`].
-    pub fn dispose_room(&self, room_id: &str) {
+    pub fn dispose_room(&self, room: RoomHandle) {
         self.0.borrow_mut().rooms.retain(|room| {
             let should_be_closed =
                 room.id().map_or(false, |id| id.0 == room_id);
