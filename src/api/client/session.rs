@@ -1213,4 +1213,156 @@ mod test {
 
         assert_eq!(item, Frame::Text(event.into()));
     }
+
+    fn client_msg_to_text_message(msg: ClientMsg) -> Message {
+        Message::Text(
+            std::str::from_utf8(
+                Bytes::from(serde_json::to_string(&msg).unwrap()).bytes(),
+            )
+            .unwrap()
+            .to_owned(),
+        )
+    }
+
+    #[actix_rt::test]
+    async fn multi_room_support() {
+        lazy_static::lazy_static! {
+            static ref CHAN: SharedUnbounded<Box<dyn RpcConnection>> = {
+                let (tx, rx) = mpsc::unbounded();
+                (Mutex::new(tx), Mutex::new(Some(rx)))
+            };
+        }
+
+        let mut serv = test_server(|| -> WsSession {
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().returning(|_| {
+                let mut rpc_server = MockRpcServer::new();
+
+                rpc_server.expect_connection_established().return_once(
+                    |_, _, connection| {
+                        let _ =
+                            CHAN.0.lock().unwrap().unbounded_send(connection);
+                        future::ok(RpcConnectionSettings {
+                            ping_interval: Duration::from_secs(10),
+                            idle_timeout: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
+
+                Some(Box::new(rpc_server))
+            });
+
+            WsSession::new(
+                Box::new(rpc_server_repo),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+            )
+        });
+
+        let mut client = serv.ws().await.unwrap();
+        let join_msg = ClientMsg::JoinRoom {
+            room_id: "alice_room".into(),
+            member_id: "alice".into(),
+            credential: "token".into(),
+        };
+        client
+            .send(Message::Text(
+                std::str::from_utf8(
+                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
+                        .bytes(),
+                )
+                .unwrap()
+                .to_owned(),
+            ))
+            .await
+            .unwrap();
+
+        let mut connections_rx = CHAN.1.lock().unwrap().take().unwrap();
+        let alice_connection: Box<dyn RpcConnection> =
+            connections_rx.next().await.unwrap();
+
+        let alice_event = Event::SdpAnswerMade {
+            peer_id: PeerId(0),
+            sdp_answer: String::from("sdp_answer"),
+        };
+        alice_connection.send_event("alice_room".into(), alice_event.clone());
+
+        let join_msg_2 = ClientMsg::JoinRoom {
+            room_id: "bob_room".into(),
+            member_id: "bob".into(),
+            credential: "token".into(),
+        };
+        client
+            .send(client_msg_to_text_message(join_msg_2))
+            .await
+            .unwrap();
+        let bob_connection: Box<dyn RpcConnection> =
+            connections_rx.next().await.unwrap();
+
+        let bob_event = Event::SdpAnswerMade {
+            peer_id: PeerId(1),
+            sdp_answer: String::from("sdp_answer"),
+        };
+        bob_connection.send_event("bob_room".into(), bob_event.clone());
+
+        let msgs: Vec<_> = client
+            .filter_map(|f| async move {
+                if let Frame::Text(text) = f.unwrap() {
+                    let server_msg: ServerMsg = serde_json::from_str(
+                        std::str::from_utf8(&text).unwrap(),
+                    )
+                    .unwrap();
+
+                    if !matches!(server_msg, ServerMsg::Ping(_)) {
+                        Some(server_msg)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect()
+            .await;
+        assert_eq!(
+            msgs[0],
+            ServerMsg::RpcSettings(RpcSettings {
+                idle_timeout_ms: 5000,
+                ping_interval_ms: 5000,
+            })
+        );
+        assert_eq!(
+            msgs[1],
+            ServerMsg::JoinedRoom {
+                room_id: "alice_room".into(),
+                member_id: "alice".into(),
+            }
+        );
+        assert_eq!(
+            msgs[2],
+            ServerMsg::Event {
+                room_id: "alice_room".into(),
+                event: alice_event,
+            }
+        );
+        assert_eq!(
+            msgs[3],
+            ServerMsg::JoinedRoom {
+                room_id: "bob_room".into(),
+                member_id: "bob".into(),
+            }
+        );
+        assert_eq!(
+            msgs[4],
+            ServerMsg::Event {
+                room_id: "bob_room".into(),
+                event: bob_event,
+            }
+        );
+        assert_eq!(msgs.len(), 5);
+    }
 }
