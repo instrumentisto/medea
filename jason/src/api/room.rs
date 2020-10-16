@@ -14,8 +14,8 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
-    RoomId, Track, TrackId, TrackPatchCommand, TrackUpdate,
+    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
+    TrackId, TrackPatchCommand, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -227,10 +227,6 @@ impl RoomHandle {
             )));
         }
 
-        inner
-            .id
-            .borrow_mut()
-            .replace(connection_info.room_id().clone());
         Rc::clone(&inner.rpc)
             .connect(connection_info)
             .await
@@ -275,16 +271,6 @@ impl RoomHandle {
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// Returns this [`Room`]'s ID.
-    ///
-    /// Return `Ok(None)` if this [`Room`] is currently uninitialized.
-    pub fn id(&self) -> Result<Option<String>, JsValue> {
-        let inner = upgrade_or_detached!(self.0, JasonError)?;
-
-        let id = inner.id.borrow().as_ref().map(|id| id.0.clone());
-        Ok(id)
-    }
-
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
     pub fn on_new_connection(
@@ -618,13 +604,6 @@ impl Room {
         WeakRoom(Rc::downgrade(&self.0))
     }
 
-    /// Returns [`RoomId`] of this [`Room`].
-    ///
-    /// Return `None` if this [`Room`] is currently uninitialized.
-    pub fn id(&self) -> Option<RoomId> {
-        self.0.id.borrow().clone()
-    }
-
     /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
     ///
     /// Supposed that this function will trigger [`Drop`] implementation of
@@ -667,17 +646,22 @@ impl Room {
     pub fn ptr_eq(&self, other: &Room) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
+
+    /// Returns `true` if provided [`RoomHandle`] is points to the same
+    /// [`InnerRoom`] as this [`Room`].
+    pub fn is_handle_parent(&self, handle: &RoomHandle) -> bool {
+        handle
+            .0
+            .upgrade()
+            .map(|handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
+            .unwrap_or(false)
+    }
 }
 
 /// Actual data of a [`Room`].
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
-    /// [`RoomId`] of this [`Room`].
-    ///
-    /// If `None` then this [`Room`] currently is uninitialized.
-    id: RefCell<Option<RoomId>>,
-
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
@@ -730,7 +714,6 @@ impl InnerRoom {
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         Self {
-            id: RefCell::default(),
             rpc,
             send_constraints: LocalTracksConstraints::default(),
             recv_constraints: Rc::new(RecvConstraints::default()),
