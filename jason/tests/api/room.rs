@@ -1409,9 +1409,9 @@ mod patches_generation {
         assert_eq!(
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
-                peer_id: PeerId(2),
+                peer_id: PeerId(1),
                 tracks_patches: vec![TrackPatchCommand {
-                    id: TrackId(2),
+                    id: TrackId(1),
                     is_muted: Some(true),
                 }]
             }
