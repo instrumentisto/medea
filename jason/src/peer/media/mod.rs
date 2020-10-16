@@ -12,7 +12,6 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, MediaSourceKind, PeerId, TrackId};
 use tracerr::Traced;
-use wasm_bindgen::prelude::*;
 use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
 
 use crate::{
@@ -124,39 +123,6 @@ pub trait Muteable {
     #[inline]
     fn is_unmuted(&self) -> bool {
         self.mute_state_controller().is_unmuted()
-    }
-}
-
-/// Media source type.
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Eq)]
-pub enum SourceType {
-    /// Type of media which was received from `getUserMedia` request.
-    Device,
-
-    /// Type of media which was received from `getDisplayMedia` request.
-    Display,
-
-    /// Both [`SourceType::Device`] and [`SourceType::Display`].
-    Both,
-}
-
-impl PartialEq for SourceType {
-    /// Returns `true` if this [`SourceType`] equals to the `another` or any of
-    /// the comparable [`SourceType`]s are [`SourceType::Both`].
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            SourceType::Device => {
-                matches!(other, SourceType::Device | SourceType::Both)
-            }
-            SourceType::Display => {
-                matches!(other, SourceType::Display | SourceType::Both)
-            }
-            SourceType::Both => matches!(
-                other,
-                SourceType::Display | SourceType::Device | SourceType::Both
-            ),
-        }
     }
 }
 
@@ -750,23 +716,5 @@ impl MediaConnections {
         self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.reset_mute_state_transition_timeout());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Tests that [`SourceType`] comparing works correctly.
-    #[test]
-    fn source_type_eq() {
-        assert_eq!(SourceType::Device, SourceType::Both);
-        assert_eq!(SourceType::Display, SourceType::Both);
-        assert_eq!(SourceType::Both, SourceType::Both);
-        assert_eq!(SourceType::Both, SourceType::Device);
-        assert_eq!(SourceType::Both, SourceType::Display);
-
-        assert_ne!(SourceType::Display, SourceType::Device);
-        assert_ne!(SourceType::Device, SourceType::Display);
     }
 }

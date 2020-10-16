@@ -46,8 +46,8 @@ pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Receiver, Sender, SourceType,
-        StableMuteState, TrackDirection, TransceiverSide,
+        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
+        TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,

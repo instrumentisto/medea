@@ -77,6 +77,10 @@ impl Receiver {
                     .senders
                     .values()
                     .find_map(|s| {
+                        // TODO: It will work only if one Sender and Receiver of
+                        //       some type can be created in one Peer.
+                        //       If this behavior will be changed, then we need
+                        //       to rewrite this logic.
                         if s.caps().is_mutual(&caps) {
                             let trnsvr = s.transceiver();
                             trnsvr.enable(transceiver_direction);

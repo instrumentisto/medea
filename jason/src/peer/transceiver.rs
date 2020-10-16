@@ -10,7 +10,7 @@ use web_sys::{
     RtcRtpTransceiverDirection,
 };
 
-/// Wrapper arount [`RtcRtpTransceiver`] which provides handy methods for
+/// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
 #[derive(Clone, From)]
 pub struct Transceiver(RtcRtpTransceiver);

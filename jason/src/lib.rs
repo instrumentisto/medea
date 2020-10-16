@@ -33,7 +33,6 @@ pub use self::{
         DisplayVideoTrackConstraints, FacingMode, JsMediaSourceKind, MediaKind,
         MediaStreamSettings,
     },
-    peer::SourceType,
 };
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
