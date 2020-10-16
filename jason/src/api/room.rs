@@ -14,8 +14,8 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, RoomId, Track,
-    TrackId, TrackPatchCommand, TrackUpdate,
+    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
+    RoomId, Track, TrackId, TrackPatchCommand, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};

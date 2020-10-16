@@ -584,7 +584,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credential: self.credential().to_string(),
+            credentials: self.credential().to_string(),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())

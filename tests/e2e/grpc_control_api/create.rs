@@ -45,7 +45,7 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_eq!(responder.credential.as_str(), "test");
+        assert_eq!(responder.credentials.as_str(), "test");
         let mut responder_pipeline = responder.pipeline;
         assert_eq!(responder_pipeline.len(), 1);
         let responder_play = responder_pipeline.remove("play").unwrap();
@@ -63,8 +63,8 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_ne!(publisher.credential.as_str(), "test");
-        assert_ne!(publisher.credential.as_str(), "");
+        assert_ne!(publisher.credentials.as_str(), "test");
+        assert_ne!(publisher.credentials.as_str(), "");
         let publisher_pipeline = publisher.pipeline;
         assert_eq!(publisher_pipeline.len(), 1);
     }
@@ -146,7 +146,7 @@ mod member {
         let member = client.get(&format!("{}/test-member", test_name!())).await;
         let member = take_member(member);
         assert_eq!(member.pipeline.len(), 1);
-        assert_eq!(member.credential.as_str(), "qwerty");
+        assert_eq!(member.credentials.as_str(), "qwerty");
     }
 
     #[actix_rt::test]

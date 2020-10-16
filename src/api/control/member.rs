@@ -227,7 +227,7 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         }
 
-        let mut credential = Credential::from(member.credential);
+        let mut credential = Credential::from(member.credentials);
         if credential.0.is_empty() {
             credential = generate_member_credential();
         }

@@ -90,7 +90,7 @@ pub struct RpcConnectionEstablished {
     pub member_id: MemberId,
 
     /// Credential of [`Member`] to authorize WebSocket connection with.
-    pub credential: Credential,
+    pub credentials: Credential,
 
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,

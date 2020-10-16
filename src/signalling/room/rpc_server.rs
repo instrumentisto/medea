@@ -89,7 +89,7 @@ impl RpcServer for Addr<Room> {
     ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>> {
         self.send(RpcConnectionEstablished {
             member_id,
-            credential,
+            credentials: credential,
             connection,
         })
         .map(|r| {
@@ -185,7 +185,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
         if self
             .members
-            .get_member_by_id_and_credentials(&msg.member_id, &msg.credential)
+            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .is_some()
         {
             Box::pin(

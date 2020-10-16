@@ -140,8 +140,8 @@ message Member {
   // Callback which fires when the Member finishes persistent connection
   // with a media server via Client API.
   string on_leave = 3;
-  // Credential of the Member to authorize via Client API with.
-  string credential = 4;
+  // Credentials of the Member to authorize via Client API with.
+  string credentials = 4;
   // Timeout of receiving heartbeat messages from the Member via Client API.
   // Once reached, the Member is considered being idle.
   google.protobuf.Duration idle_timeout = 5;

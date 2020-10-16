@@ -1,5 +1,3 @@
-//! RPC Client which manages authorization and messages routing.
-
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,

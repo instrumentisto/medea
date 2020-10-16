@@ -1,5 +1,3 @@
-//! Implementation of the WebSocket client.
-
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use derive_more::Display;
