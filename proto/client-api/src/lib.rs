@@ -358,7 +358,7 @@ pub enum CloseReason {
 /// to Web Client.
 ///
 /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
-#[derive(Constructor, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Constructor, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CloseDescription {
     /// Reason of why WebSocket connection has been closed.
     pub reason: CloseReason,
