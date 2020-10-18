@@ -285,30 +285,26 @@ impl Actor for WsSession {
             )
             .into_actor(self)
             .then(move |result, this, ctx| {
-                match result {
-                    Ok(_) => {
-                        let rpc_settings_message = serde_json::to_string(
-                            &ServerMsg::RpcSettings(this.get_rpc_settings()),
-                        )
+                if result.is_ok() {
+                    let rpc_settings_message = serde_json::to_string(
+                        &ServerMsg::RpcSettings(this.get_rpc_settings()),
+                    )
                         .unwrap();
-                        ctx.text(rpc_settings_message);
+                    ctx.text(rpc_settings_message);
 
-                        this.start_pinger(ctx);
-                        Self::start_idle_watchdog(ctx);
-                    }
-                    Err(err) => {
-                        error!(
-                            "{}: WsSession of Member failed to join Room \
-                             because: {:?}",
-                            this, err,
-                        );
-                        this.close_in_place(
-                            ctx,
-                            Close::with_normal_code(&CloseDescription::new(
-                                CloseReason::InternalError,
-                            )),
-                        );
-                    }
+                    this.start_pinger(ctx);
+                    Self::start_idle_watchdog(ctx);
+                } else {
+                    error!(
+                        "{}: WsSession of Member failed to join Room",
+                        this,
+                    );
+                    this.close_in_place(
+                        ctx,
+                        Close::with_normal_code(&CloseDescription::new(
+                            CloseReason::InternalError,
+                        )),
+                    );
                 };
                 actix::fut::ready(())
             })
