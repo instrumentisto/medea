@@ -91,7 +91,8 @@ use medea_jason::{
         LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
     },
     utils::{window, JasonError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
+    AudioTrackConstraints, DeviceVideoTrackConstraints,
+    DisplayVideoTrackConstraints, MediaStreamSettings,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -229,6 +230,7 @@ fn media_stream_settings(
     }
     if is_video_enabled {
         settings.device_video(DeviceVideoTrackConstraints::default());
+        settings.display_video(DisplayVideoTrackConstraints::default());
     }
 
     settings
