@@ -56,7 +56,7 @@ fn pub_sub_video_call() {
                     } else {
                         is_caller = true;
                     }
-                    assert_eq!(tracks.len(), 2);
+                    assert_eq!(tracks.len(), 3);
                     for track in tracks {
                         match &track.direction {
                             Direction::Send { receivers, .. } => {

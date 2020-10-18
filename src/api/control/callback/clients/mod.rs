@@ -5,7 +5,7 @@ pub mod grpc;
 use std::{fmt, sync::Arc};
 
 use async_trait::async_trait;
-use derive_more::From;
+use derive_more::{Display, From};
 use futures::future::{FutureExt, LocalBoxFuture};
 
 use crate::{
@@ -16,12 +16,14 @@ use crate::{
 type Result<T> = std::result::Result<T, CallbackClientError>;
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
-#[derive(Debug, From)]
+#[derive(Debug, Display, From)]
 pub enum CallbackClientError {
     /// [`tonic`] failed to send [`CallbackRequest`].
+    #[display(fmt = "gRPC request failed: {}", _0)]
     Tonic(tonic::Status),
 
     /// Error while creating new [`CallbackClient`].
+    #[display(fmt = "CallbackClientError: {}", _0)]
     TonicTransport(tonic::transport::Error),
 }
 

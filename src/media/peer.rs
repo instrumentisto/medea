@@ -155,7 +155,7 @@ impl PeerError {
 ///        |                                     |
 /// +------+--------+                            |
 /// |               +<---------------------------+
-/// |   Stable      |
+/// |    Stable     |
 /// |               +<---------------------------+
 /// +------+--------+                            |
 ///        |                                     |
@@ -1062,17 +1062,28 @@ impl<'a> PeerChangesScheduler<'a> {
 
         let video_settings = src.video_settings();
         if video_settings.publish_policy != PublishPolicy::Disabled {
-            let track_video = Rc::new(MediaTrack::new(
+            let camera_video_track = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
                     is_required: video_settings.publish_policy.is_required(),
                     source_kind: MediaSourceKind::Device,
                 }),
             ));
-            self.add_sender(Rc::clone(&track_video));
+            self.add_sender(Rc::clone(&camera_video_track));
             partner_peer
                 .as_changes_scheduler()
-                .add_receiver(track_video);
+                .add_receiver(camera_video_track);
+            let display_video_track = Rc::new(MediaTrack::new(
+                tracks_counter.next_id(),
+                MediaType::Video(VideoSettings {
+                    is_required: false,
+                    source_kind: MediaSourceKind::Display,
+                }),
+            ));
+            self.add_sender(Rc::clone(&display_video_track));
+            partner_peer
+                .as_changes_scheduler()
+                .add_receiver(display_video_track);
         }
     }
 

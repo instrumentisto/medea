@@ -40,7 +40,7 @@ impl Room {
             "Deleting Member [id = {}] in Room [id = {}].",
             member_id, self.id
         );
-        if let Some(member) = self.members.get_member_by_id(member_id) {
+        if let Ok(member) = self.members.get_member_by_id(member_id) {
             let peers: HashSet<PeerId> = member
                 .sinks()
                 .values()
@@ -74,7 +74,7 @@ impl Room {
         ctx: &mut Context<Self>,
     ) {
         let endpoint_id =
-            if let Some(member) = self.members.get_member_by_id(member_id) {
+            if let Ok(member) = self.members.get_member_by_id(member_id) {
                 let play_id = endpoint_id.into();
                 if let Some(endpoint) = member.take_sink(&play_id) {
                     if let Some(peer_id) = endpoint.peer_id() {
@@ -84,7 +84,6 @@ impl Room {
                             self.member_peers_removed(
                                 peers.into_iter().map(|p| p.id()).collect(),
                                 member_id,
-                                ctx,
                             )
                             .map(|_, _, _| ())
                             .spawn(ctx);
@@ -271,7 +270,6 @@ impl Room {
                 self.member_peers_removed(
                     peers.into_iter().map(|p| p.id()).collect(),
                     member_id,
-                    ctx,
                 )
                 .map(|_, _, _| ())
                 .spawn(ctx);

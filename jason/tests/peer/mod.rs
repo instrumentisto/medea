@@ -71,17 +71,17 @@ async fn mute_unmute_audio() {
         .unwrap();
 
     assert!(peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], true))
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], false))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled(None));
 }
 
 #[wasm_bindgen_test]
@@ -104,17 +104,17 @@ async fn mute_unmute_video() {
         .unwrap();
 
     assert!(peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], true))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
-    assert!(!peer.is_send_video_enabled());
+    assert!(!peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], false))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled(None));
 }
 
 #[wasm_bindgen_test]
@@ -138,7 +138,7 @@ async fn new_with_mute_audio() {
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
 
-    assert!(peer.is_send_video_enabled());
+    assert!(peer.is_send_video_enabled(None));
 }
 
 #[wasm_bindgen_test]
@@ -161,7 +161,7 @@ async fn new_with_mute_video() {
         .unwrap();
 
     assert!(peer.is_send_audio_enabled());
-    assert!(!peer.is_send_video_enabled());
+    assert!(!peer.is_send_video_enabled(None));
 }
 
 #[wasm_bindgen_test]
@@ -882,20 +882,25 @@ async fn reset_transition_timers() {
         .unwrap();
 
     let all_unmuted = future::join_all(
-        peer.get_transceivers_sides(MediaKind::Audio, TrackDirection::Send)
-            .into_iter()
-            .chain(
-                peer.get_transceivers_sides(
-                    MediaKind::Video,
-                    TrackDirection::Send,
-                )
-                .into_iter(),
+        peer.get_transceivers_sides(
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+        .into_iter()
+        .chain(
+            peer.get_transceivers_sides(
+                MediaKind::Video,
+                TrackDirection::Send,
+                None,
             )
-            .map(|s| {
-                s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+            .into_iter(),
+        )
+        .map(|s| {
+            s.mute_state_transition_to(StableMuteState::Muted).unwrap();
 
-                s.when_mute_state_stable(StableMuteState::Unmuted)
-            }),
+            s.when_mute_state_stable(StableMuteState::Unmuted)
+        }),
     )
     .map(|_| ())
     .shared();
@@ -929,8 +934,8 @@ async fn new_remote_track() {
         let manager = Rc::new(MediaManager::default());
 
         let tx_caps = LocalTracksConstraints::default();
-        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio);
-        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video);
+        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio, None);
+        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video, None);
         let sender_peer = PeerConnection::new(
             PeerId(1),
             tx1,
