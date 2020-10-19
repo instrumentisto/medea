@@ -130,7 +130,10 @@ impl Sender {
             match mute_state {
                 StableMuteState::Unmuted => {
                     self.maybe_request_track();
-                    self.transceiver.add_direction(TransceiverDirection::SEND);
+                    if self.is_enabled_in_cons() {
+                        self.transceiver
+                            .add_direction(TransceiverDirection::SEND);
+                    }
                 }
                 StableMuteState::Muted => {
                     self.transceiver.sub_direction(TransceiverDirection::SEND);
@@ -163,6 +166,15 @@ impl Sender {
         Ok(())
     }
 
+    /// Returns `true` if this [`Sender`] is enabled in
+    /// [`LocalStreamConstraints`].
+    fn is_enabled_in_cons(&self) -> bool {
+        self.send_constraints.is_track_enabled(
+            self.caps.media_kind(),
+            self.caps.media_source_kind(),
+        )
+    }
+
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
     pub fn update(&self, track: &TrackPatchEvent) {
@@ -184,6 +196,7 @@ impl Sender {
     pub fn maybe_enable(&self) {
         if self.is_general_unmuted()
             && !self.transceiver.has_direction(TransceiverDirection::SEND)
+            && self.is_enabled_in_cons()
         {
             self.transceiver.add_direction(TransceiverDirection::SEND);
         }

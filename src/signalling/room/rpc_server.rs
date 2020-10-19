@@ -428,14 +428,12 @@ mod test {
     }
 
     mod callbacks {
-
         use std::convert::TryFrom;
 
         use actix::Addr;
         use medea_client_api_proto::{
             CloseDescription, CloseReason, Credential, MemberId,
         };
-        use medea_control_api_proto::grpc::callback::on_leave::Reason;
         use mockall::predicate::eq;
         use serial_test::serial;
 
