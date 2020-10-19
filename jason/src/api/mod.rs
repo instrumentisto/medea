@@ -84,7 +84,7 @@ impl Jason {
     #[allow(clippy::needless_pass_by_value)]
     pub fn dispose_room(&self, room_to_delete: RoomHandle) {
         self.0.borrow_mut().rooms.retain(|room| {
-            let should_be_closed = room.is_handle_parent(&room_to_delete);
+            let should_be_closed = room.inner_ptr_eq(&room_to_delete);
             if should_be_closed {
                 room.set_close_reason(ClientDisconnect::RoomClosed.into());
             }

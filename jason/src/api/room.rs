@@ -649,7 +649,7 @@ impl Room {
 
     /// Returns `true` if provided [`RoomHandle`] is points to the same
     /// [`InnerRoom`] as this [`Room`].
-    pub fn is_handle_parent(&self, handle: &RoomHandle) -> bool {
+    pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
         handle
             .0
             .upgrade()
