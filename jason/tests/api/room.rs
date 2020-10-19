@@ -1225,7 +1225,7 @@ mod patches_generation {
             PeerId(0),
             (
                 vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         let (room, mut command_rx) =
@@ -1268,14 +1268,14 @@ mod patches_generation {
             PeerId(0),
             (
                 vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         tracks.insert(
             PeerId(1),
             (
                 vec![audio_track(TrackId(2)), device_video_track(TrackId(3))],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         let (room, mut command_rx) =
@@ -1317,6 +1317,22 @@ mod patches_generation {
         );
     }
 
+    /// Returns new [`MediaStreamSettings`].
+    ///
+    /// Sets [`MediaKind::Audio`] enabling state to `is_audio_enabled`.
+    ///
+    /// Sets [`MediaKind::Video`] enabling state to `is_video_enabled`.
+    fn media_stream_settings(
+        is_audio_enabled: bool,
+        is_video_enabled: bool,
+    ) -> MediaStreamSettings {
+        let mut settings = MediaStreamSettings::default();
+        settings.set_track_enabled(is_audio_enabled, MediaKind::Audio, None);
+        settings.set_track_enabled(is_video_enabled, MediaKind::Video, None);
+
+        settings
+    }
+
     /// Tests that [`Room`] wouldn't generate [`TrackPatch`]s for already
     /// unmuted [`PeerConnection`]s.
     ///
@@ -1336,14 +1352,14 @@ mod patches_generation {
             PeerId(0),
             (
                 vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         tracks.insert(
             PeerId(1),
             (
                 vec![audio_track(TrackId(2)), device_video_track(TrackId(3))],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         let (room, mut command_rx) =
@@ -1376,19 +1392,7 @@ mod patches_generation {
             PeerId(0),
             (
                 vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
-                {
-                    let mut settings = MediaStreamSettings::default();
-                    settings.set_track_enabled(true, MediaKind::Audio, None);
-
-                    settings
-                },
-            ),
-        );
-        tracks.insert(
-            PeerId(1),
-            (
-                vec![audio_track(TrackId(2)), device_video_track(TrackId(3))],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         let (room, mut command_rx) =
@@ -1430,18 +1434,7 @@ mod patches_generation {
                     device_video_track(TrackId(1)),
                     display_video_track(TrackId(2)),
                 ],
-                MediaStreamSettings::default(),
-            ),
-        );
-        tracks.insert(
-            PeerId(1),
-            (
-                vec![
-                    audio_track(TrackId(3)),
-                    device_video_track(TrackId(4)),
-                    display_video_track(TrackId(5)),
-                ],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         let (room, mut command_rx) =
@@ -1460,9 +1453,9 @@ mod patches_generation {
         assert_eq!(
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
-                peer_id: PeerId(2),
+                peer_id: PeerId(0),
                 tracks_patches: vec![TrackPatchCommand {
-                    id: TrackId(2),
+                    id: TrackId(1),
                     is_muted: Some(true),
                 }]
             }
@@ -1488,18 +1481,7 @@ mod patches_generation {
                     device_video_track(TrackId(1)),
                     display_video_track(TrackId(2)),
                 ],
-                MediaStreamSettings::default(),
-            ),
-        );
-        tracks.insert(
-            PeerId(1),
-            (
-                vec![
-                    audio_track(TrackId(3)),
-                    device_video_track(TrackId(4)),
-                    display_video_track(TrackId(5)),
-                ],
-                MediaStreamSettings::default(),
+                media_stream_settings(true, true),
             ),
         );
         let (room, mut command_rx) =
@@ -1518,7 +1500,7 @@ mod patches_generation {
         assert_eq!(
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
-                peer_id: PeerId(1),
+                peer_id: PeerId(0),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(2),
                     is_muted: Some(true),
