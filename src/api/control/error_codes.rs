@@ -425,6 +425,7 @@ impl From<RoomError> for ErrorResponse {
             }
             E::WrongRoomId(_, _)
             | E::PeerNotFound(_)
+            | E::CallbackClientError(_)
             | E::NoTurnCredentials(_)
             | E::ConnectionNotExists(_)
             | E::UnableToSendEvent(_)

@@ -44,6 +44,7 @@ pub(super) struct EventMessage {
 /// Abstraction over RPC connection with some remote [`Member`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
+#[cfg_attr(test, mockall::automock)]
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`] and sends [`CloseDescription`] to the client
     /// (in WebSocket implementation description will be sent in a [Close]
@@ -63,6 +64,9 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// [`Member`]: crate::signalling::elements::member::Member
     fn send_event(&self, room_id: RoomId, event: Event);
 }
+
+#[cfg(test)]
+impl_debug_by_struct_name!(MockRpcConnection);
 
 /// Settings of [`WsSession`].
 #[derive(Clone, Copy, Debug)]

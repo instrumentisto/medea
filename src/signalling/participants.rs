@@ -116,8 +116,20 @@ impl ParticipantService {
     }
 
     /// Lookups [`Member`] by provided [`MemberId`].
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
-        self.members.get(id).cloned()
+    ///
+    /// ## Errors
+    ///
+    /// With [`ParticipantServiceErr::ParticipantNotFound`] if [`Member`] lookup
+    /// failed.
+    pub fn get_member_by_id(
+        &self,
+        id: &MemberId,
+    ) -> Result<Member, ParticipantServiceErr> {
+        self.members.get(id).cloned().ok_or_else(|| {
+            ParticipantServiceErr::ParticipantNotFound(
+                self.get_fid_to_member(id.clone()),
+            )
+        })
     }
 
     /// Generates [`Fid`] which point to some [`Member`] in this
@@ -156,21 +168,21 @@ impl ParticipantService {
     ///
     /// # Errors
     ///
-    /// Errors with [`AuthorizationError::MemberNotExists`] if lookup by
-    /// [`MemberId`] fails.
-    ///
-    /// Errors with [`AuthorizationError::InvalidCredentials`] if [`Member`]
-    /// was found, but incorrect credentials were provided.
+    /// Errors with [`RoomError::AuthorizationError`] if lookup by [`MemberId`]
+    /// fails or if [`Member`] was found, but incorrect credentials were
+    /// provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
         credentials: &Credential,
-    ) -> Option<Member> {
-        let member = self.get_member_by_id(member_id)?;
-        if member.credentials() == *credentials {
-            Some(member)
+    ) -> Result<Member, RoomError> {
+        let member = self
+            .get_member_by_id(member_id)
+            .map_err(|_| RoomError::AuthorizationError)?;
+        if &member.credentials() == credentials {
+            Ok(member)
         } else {
-            None
+            Err(RoomError::AuthorizationError)
         }
     }
 
@@ -200,7 +212,7 @@ impl ParticipantService {
         )
     }
 
-    /// Saves provided [`RpcConnection`], registers [`IceUser`].
+    /// Saves provided [`RpcConnection`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(
@@ -210,14 +222,10 @@ impl ParticipantService {
         conn: Box<dyn RpcConnection>,
     ) -> LocalBoxFuture<'static, Result<Member, ParticipantServiceErr>> {
         let member = match self.get_member_by_id(&member_id) {
-            None => {
-                return Box::pin(future::err(
-                    ParticipantServiceErr::ParticipantNotFound(
-                        self.get_fid_to_member(member_id),
-                    ),
-                ));
+            Err(err) => {
+                return Box::pin(future::err(err));
             }
-            Some(member) => member,
+            Ok(member) => member,
         };
 
         // lookup previous member connection
@@ -273,7 +281,7 @@ impl ParticipantService {
                 //       now.
             }
             ClosedReason::Lost => {
-                if let Some(member) = self.get_member_by_id(&member_id) {
+                if let Ok(member) = self.get_member_by_id(&member_id) {
                     self.drop_connection_tasks.insert(
                         member_id.clone(),
                         ctx.run_later(
@@ -383,7 +391,7 @@ impl ParticipantService {
         id: MemberId,
         spec: &MemberSpec,
     ) -> Result<(), RoomError> {
-        if self.get_member_by_id(&id).is_some() {
+        if self.get_member_by_id(&id).is_ok() {
             return Err(RoomError::MemberAlreadyExists(
                 self.get_fid_to_member(id),
             ));

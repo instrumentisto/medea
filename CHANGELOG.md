@@ -26,9 +26,9 @@ All user visible changes to this project will be documented in this file. This p
         - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
         - `Delete` method for `Room`, `Member`, `Endpoint`.
-    - gRPC Control API callbacks ([#63]):
-        - `on_join`;
-        - `on_leave`.
+    - gRPC Control API callbacks:
+        - `on_join` ([#63], [#153]);
+        - `on_leave` ([#63]).
     - Configuration of `Member`'s Client API RPC settings ([#95]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
@@ -83,6 +83,7 @@ All user visible changes to this project will be documented in this file. This p
 [#135]: /../../pull/135
 [#138]: /../../pull/138
 [#147]: /../../pull/147
+[#153]: /../../pull/153
 
 
 
