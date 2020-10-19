@@ -72,11 +72,10 @@ async fn sendrecv_works() {
     assert!(video_sender.is_publishing());
     assert!(video_receiver.is_receiving());
 
-    assert!(video_sender
-        .transceiver()
-        .is_enabled(TransceiverDirection::SEND | TransceiverDirection::RECV));
-    assert!(video_receiver
-        .transceiver()
-        .unwrap()
-        .is_enabled(TransceiverDirection::SEND | TransceiverDirection::RECV));
+    assert!(video_sender.transceiver().has_direction(
+        TransceiverDirection::SEND | TransceiverDirection::RECV
+    ));
+    assert!(video_receiver.transceiver().unwrap().has_direction(
+        TransceiverDirection::SEND | TransceiverDirection::RECV
+    ));
 }

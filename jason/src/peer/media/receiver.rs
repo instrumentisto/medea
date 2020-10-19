@@ -76,14 +76,17 @@ impl Receiver {
                 media_connections
                     .senders
                     .values()
-                    .find_map(|s| {
+                    .find_map(|sender| {
                         // TODO: It will work only if one Sender and Receiver of
                         //       some type can be created in one Peer.
                         //       If this behavior will be changed, then we need
                         //       to rewrite this logic.
-                        if s.caps().is_mutual(&caps) {
-                            let trnsvr = s.transceiver();
-                            trnsvr.enable(transceiver_direction);
+                        if sender.caps().media_kind() == caps.media_kind()
+                            && sender.caps().media_source_kind()
+                                == caps.media_source_kind()
+                        {
+                            let trnsvr = sender.transceiver();
+                            trnsvr.add_direction(transceiver_direction);
 
                             Some(trnsvr)
                         } else {
@@ -121,7 +124,7 @@ impl Receiver {
         let is_unmuted = self.mute_state_controller.is_unmuted();
         let is_trnsvr_enabled =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
-                trnsvr.is_enabled(TransceiverDirection::RECV)
+                trnsvr.has_direction(TransceiverDirection::RECV)
             });
 
         is_unmuted && is_trnsvr_enabled
@@ -147,9 +150,9 @@ impl Receiver {
             MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
         if self.is_not_muted() {
-            transceiver.enable(TransceiverDirection::RECV);
+            transceiver.add_direction(TransceiverDirection::RECV);
         } else {
-            transceiver.disable(TransceiverDirection::RECV);
+            transceiver.sub_direction(TransceiverDirection::RECV);
         }
         new_track.set_enabled(self.is_not_muted());
 
@@ -221,7 +224,7 @@ impl Receiver {
                     if let Some(transceiver) =
                         self.transceiver.borrow().as_ref()
                     {
-                        transceiver.disable(TransceiverDirection::RECV);
+                        transceiver.sub_direction(TransceiverDirection::RECV);
                     }
                 }
                 StableMuteState::Unmuted => {
@@ -231,7 +234,7 @@ impl Receiver {
                     if let Some(transceiver) =
                         self.transceiver.borrow().as_ref()
                     {
-                        transceiver.enable(TransceiverDirection::RECV);
+                        transceiver.add_direction(TransceiverDirection::RECV);
                     }
                 }
             }

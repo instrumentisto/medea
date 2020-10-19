@@ -1,9 +1,6 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::Cell, rc::Rc};
 
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
@@ -60,7 +57,6 @@ impl<'a> SenderBuilder<'a> {
             peer_id: media_connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
-            track: RefCell::new(None),
             general_mute_state: Cell::new(self.mute_state),
             transceiver,
             mute_state: mute_state_observer,
@@ -98,7 +94,6 @@ pub struct Sender {
     peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
-    track: RefCell<Option<MediaStreamTrack>>,
     transceiver: Transceiver,
     mute_state: Rc<MuteStateController>,
     general_mute_state: Cell<StableMuteState>,
@@ -116,7 +111,7 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
-        self.transceiver.is_enabled(TransceiverDirection::SEND)
+        self.transceiver.has_direction(TransceiverDirection::SEND)
     }
 
     /// Updates [`Sender`]s general mute state based on the provided
@@ -135,10 +130,10 @@ impl Sender {
             match mute_state {
                 StableMuteState::Unmuted => {
                     self.maybe_request_track();
-                    self.transceiver.enable(TransceiverDirection::SEND);
+                    self.transceiver.add_direction(TransceiverDirection::SEND);
                 }
                 StableMuteState::Muted => {
-                    self.transceiver.disable(TransceiverDirection::SEND);
+                    self.transceiver.sub_direction(TransceiverDirection::SEND);
                 }
             }
         }
@@ -152,20 +147,18 @@ impl Sender {
         new_track: MediaStreamTrack,
     ) -> Result<()> {
         // no-op if we try to insert same track
-        if let Some(current_track) = self.track.borrow().as_ref() {
+        if let Some(current_track) = self.transceiver.send_track() {
             if new_track.id() == current_track.id() {
                 return Ok(());
             }
         }
 
         self.transceiver
-            .replace_sender_track(Some(new_track.as_ref()))
+            .set_send_track(Some(new_track))
             .await
             .map_err(Into::into)
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
             .map_err(tracerr::wrap!())?;
-
-        self.track.borrow_mut().replace(new_track);
 
         Ok(())
     }
@@ -190,9 +183,9 @@ impl Sender {
     /// state is [`StableMuteState::Unmuted`].
     pub fn maybe_enable(&self) {
         if self.is_general_unmuted()
-            && !self.transceiver.is_enabled(TransceiverDirection::SEND)
+            && !self.transceiver.has_direction(TransceiverDirection::SEND)
         {
-            self.transceiver.enable(TransceiverDirection::SEND);
+            self.transceiver.add_direction(TransceiverDirection::SEND);
         }
     }
 
@@ -217,15 +210,14 @@ impl Sender {
     /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to `None`.
     async fn remove_track(&self) {
-        self.track.borrow_mut().take();
         // cannot fail
-        self.transceiver.replace_sender_track(None).await.unwrap();
+        self.transceiver.set_send_track(None).await.unwrap();
     }
 
     /// Emits [`PeerEvent::NewLocalStreamRequired`] if [`Sender`] does not have
     /// a track to send.
     fn maybe_request_track(&self) {
-        if self.track.borrow().is_none() {
+        if self.transceiver.send_track().is_none() {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::NewLocalStreamRequired {
                     peer_id: self.peer_id,

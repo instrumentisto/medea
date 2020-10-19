@@ -1,58 +1,86 @@
-//! Implementation of the wrapper around [`RtcRtpTranseiver`].
+//! [`RtcRtpTranseiver`] wrapper.
+
+use std::cell::RefCell;
 
 use bitflags::bitflags;
-use derive_more::From;
 use medea_client_api_proto::Direction as DirectionProto;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-    MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver,
-    RtcRtpTransceiverDirection,
-};
+use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
+
+use crate::media::MediaStreamTrack;
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
-#[derive(Clone, From)]
-pub struct Transceiver(RtcRtpTransceiver);
+#[derive(Clone)]
+pub struct Transceiver {
+    send_track: RefCell<Option<MediaStreamTrack>>,
+    transceiver: RtcRtpTransceiver,
+}
 
 impl Transceiver {
     /// Returns current [`TransceiverDirection`] of this [`Transceiver`].
     fn current_direction(&self) -> TransceiverDirection {
-        TransceiverDirection::from(self.0.direction())
+        TransceiverDirection::from(self.transceiver.direction())
     }
 
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
-    pub fn disable(&self, disabled_direction: TransceiverDirection) {
-        self.0.set_direction(
-            self.current_direction().disable(disabled_direction).into(),
+    pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
+        self.transceiver.set_direction(
+            (self.current_direction() - disabled_direction).into(),
         );
     }
 
     /// Enables provided [`TransceiverDirection`] of this [`Transceiver`].
-    pub fn enable(&self, enabled_direction: TransceiverDirection) {
-        self.0.set_direction(
-            self.current_direction().enable(enabled_direction).into(),
+    pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
+        self.transceiver.set_direction(
+            (self.current_direction() | enabled_direction).into(),
         );
     }
 
     /// Returns `true` if provided [`TransceiverDirection`] if enabled for this
     /// [`Transceiver`].
-    pub fn is_enabled(&self, direction: TransceiverDirection) -> bool {
+    pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
         self.current_direction().contains(direction)
     }
 
     /// Replaces [`TransceiverDirection::SEND`] [`SysMediaStreamTrack`] of this
     /// [`Transceiver`].
-    pub async fn replace_sender_track(
+    ///
+    /// ## Errors
+    ///
+    /// Errors with JS Error if underlying [`replaceTrack`][1] call fails.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    pub async fn set_send_track(
         &self,
-        new_track: Option<&SysMediaStreamTrack>,
-    ) -> Result<JsValue, JsValue> {
-        JsFuture::from(self.0.sender().replace_track(new_track)).await
+        new_track: Option<MediaStreamTrack>,
+    ) -> Result<(), JsValue> {
+        let sys_track = new_track.as_ref().map(AsRef::as_ref);
+        JsFuture::from(self.transceiver.sender().replace_track(sys_track))
+            .await
+            .map(|_| {
+                self.send_track.replace(new_track);
+            })
     }
 
     /// Returns `mid` of this [`Transceiver`].
     pub fn mid(&self) -> Option<String> {
-        self.0.mid()
+        self.transceiver.mid()
+    }
+
+    /// Returns [`MediaStreamTrack`] that is being send to remote, if any.
+    pub fn send_track(&self) -> Option<MediaStreamTrack> {
+        self.send_track.borrow().clone()
+    }
+}
+
+impl From<RtcRtpTransceiver> for Transceiver {
+    fn from(transceiver: RtcRtpTransceiver) -> Self {
+        Transceiver {
+            send_track: RefCell::new(None),
+            transceiver,
+        }
     }
 }
 
@@ -79,20 +107,6 @@ bitflags! {
         ///
         /// [1]: https://tinyurl.com/y2nlxpzf
         const RECV = 0b10;
-    }
-}
-
-impl TransceiverDirection {
-    /// Enables provided [`TransceiverDirection`] in this
-    /// [`TransceiverDirection`].
-    fn enable(self, enabled_direction: Self) -> Self {
-        self | enabled_direction
-    }
-
-    /// Disables provided [`TransceiverDirection`] in this
-    /// [`TransceiverDirection`].
-    fn disable(self, disabled_direction: Self) -> Self {
-        self - disabled_direction
     }
 }
 
@@ -152,12 +166,12 @@ mod tests {
             (D::SEND, D::RECV, D::all()),
             (D::RECV, D::SEND, D::all()),
         ] {
-            assert_eq!(init.enable(*enable_dir), *result);
+            assert_eq!(*init | *enable_dir, *result);
         }
     }
 
     #[test]
-    fn disable_works_corretly() {
+    fn disable_works_correctly() {
         use TransceiverDirection as D;
 
         for (init, disable_dir, result) in &[
@@ -166,7 +180,7 @@ mod tests {
             (D::all(), D::SEND, D::RECV),
             (D::all(), D::RECV, D::SEND),
         ] {
-            assert_eq!(init.disable(*disable_dir), *result);
+            assert_eq!(*init - *disable_dir, *result);
         }
     }
 

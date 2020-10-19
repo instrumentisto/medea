@@ -278,9 +278,7 @@ impl InnerMediaConnections {
         kind: MediaKind,
         direction: TransceiverDirection,
     ) -> Transceiver {
-        let transceiver = self.peer.add_transceiver(kind, direction);
-
-        Transceiver::from(transceiver)
+        Transceiver::from(self.peer.add_transceiver(kind, direction))
     }
 
     /// Lookups [`Transceiver`] by provided `mid`.
