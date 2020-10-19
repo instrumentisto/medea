@@ -1110,64 +1110,61 @@ mod patches_generation {
 
     use super::*;
 
-    fn audio_and_device_video_tracks_content() -> Vec<(MediaType, Direction)> {
-        vec![
-            (
-                MediaType::Audio(AudioSettings { is_required: false }),
-                Direction::Send {
-                    receivers: Vec::new(),
-                    mid: None,
-                },
-            ),
-            (
-                MediaType::Video(VideoSettings {
-                    is_required: false,
-                    source_kind: MediaSourceKind::Device,
-                }),
-                Direction::Send {
-                    receivers: Vec::new(),
-                    mid: None,
-                },
-            ),
-        ]
+    /// Returns [`MediaType::Audio`] [`Track`] with a provided [`TrackId`].
+    fn audio_track(id: TrackId) -> Track {
+        Track {
+            id,
+            media_type: MediaType::Audio(AudioSettings { is_required: false }),
+            direction: Direction::Send {
+                receivers: Vec::new(),
+                mid: None,
+            },
+        }
     }
 
-    /// Returns [`Room`] with mocked [`PeerRepository`] with provided count of
-    /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
-    /// sent from this [`Room`].
-    ///
-    /// `audio_track_muted_state_fn`'s output will be used as `is_muted` value
-    /// for all audio [`Track`]s.
+    /// Returns [`MediaType::Video`] and [`MediaSourceKind::Device`] [`Track`]
+    /// with a provided [`TrackId`].
+    fn device_video_track(id: TrackId) -> Track {
+        Track {
+            id,
+            media_type: MediaType::Video(VideoSettings {
+                is_required: false,
+                source_kind: MediaSourceKind::Device,
+            }),
+            direction: Direction::Send {
+                receivers: Vec::new(),
+                mid: None,
+            },
+        }
+    }
+
+    /// Returns [`MediaType::Video`] and [`MediaSourceKind::Display`] [`Track`]
+    /// with a provided [`TrackId`].
+    fn display_video_track(id: TrackId) -> Track {
+        Track {
+            id,
+            media_type: MediaType::Video(VideoSettings {
+                is_required: false,
+                source_kind: MediaSourceKind::Display,
+            }),
+            direction: Direction::Send {
+                receivers: Vec::new(),
+                mid: None,
+            },
+        }
+    }
+
+    /// Returns [`Room`] with mocked [`PeerRepository`] with [`PeerId`],
+    /// [`Track`]s and [`MediaStreamSettings`].
     async fn get_room_and_commands_receiver(
-        peers_count: u32,
-        audio_track_enabled_state_fn: impl Fn(u32) -> bool,
-        tracks_content: Vec<(MediaType, Direction)>,
+        peers_data: HashMap<PeerId, (Vec<Track>, MediaStreamSettings)>,
     ) -> (Room, mpsc::UnboundedReceiver<Command>) {
         let mut repo = Box::new(MockPeerRepository::new());
 
         let mut peers = HashMap::new();
-        for i in 0..peers_count {
+        for (peer_id, (tracks, local_stream)) in peers_data {
             let (tx, _rx) = mpsc::unbounded();
-            let tracks = tracks_content
-                .iter()
-                .enumerate()
-                .map(|(track_i, (media_type, direction))| {
-                    let track_i = (track_i as u32) + i;
-                    Track {
-                        id: TrackId(track_i),
-                        direction: direction.clone(),
-                        media_type: media_type.clone(),
-                    }
-                })
-                .collect();
-            let peer_id = PeerId(i + 1);
 
-            let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_enabled(
-                (audio_track_enabled_state_fn)(i),
-                MediaKind::Audio,
-                None,
-            );
             let peer = PeerConnection::new(
                 peer_id,
                 tx,
@@ -1223,12 +1220,16 @@ mod patches_generation {
     ///    one [`TrackPatch`] for audio [`Track`].
     #[wasm_bindgen_test]
     async fn track_patch_for_all_video() {
-        let (room, mut command_rx) = get_room_and_commands_receiver(
-            1,
-            |_| true,
-            audio_and_device_video_tracks_content(),
-        )
-        .await;
+        let mut tracks = HashMap::new();
+        tracks.insert(
+            PeerId(0),
+            (
+                vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
+                MediaStreamSettings::default(),
+            ),
+        );
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(tracks).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1238,7 +1239,7 @@ mod patches_generation {
         assert_eq!(
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
-                peer_id: PeerId(1),
+                peer_id: PeerId(0),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
                     is_muted: Some(true),
@@ -1262,12 +1263,23 @@ mod patches_generation {
     ///    unmuted [`PeerConnection`]s. [`PeerConnection`]s.
     #[wasm_bindgen_test]
     async fn track_patch_for_many_tracks() {
-        let (room, mut command_rx) = get_room_and_commands_receiver(
-            2,
-            |_| true,
-            audio_and_device_video_tracks_content(),
-        )
-        .await;
+        let mut tracks = HashMap::new();
+        tracks.insert(
+            PeerId(0),
+            (
+                vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
+                MediaStreamSettings::default(),
+            ),
+        );
+        tracks.insert(
+            PeerId(1),
+            (
+                vec![audio_track(TrackId(2)), device_video_track(TrackId(3))],
+                MediaStreamSettings::default(),
+            ),
+        );
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(tracks).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1289,7 +1301,7 @@ mod patches_generation {
         }
 
         assert_eq!(
-            commands.remove(&PeerId(1)).unwrap(),
+            commands.remove(&PeerId(0)).unwrap(),
             vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_muted: Some(true),
@@ -1297,9 +1309,9 @@ mod patches_generation {
         );
 
         assert_eq!(
-            commands.remove(&PeerId(2)).unwrap(),
+            commands.remove(&PeerId(1)).unwrap(),
             vec![TrackPatchCommand {
-                id: TrackId(1),
+                id: TrackId(2),
                 is_muted: Some(true),
             }]
         );
@@ -1319,12 +1331,23 @@ mod patches_generation {
     ///    [`RpcClient`].
     #[wasm_bindgen_test]
     async fn try_to_unmute_unmuted() {
-        let (room, mut command_rx) = get_room_and_commands_receiver(
-            2,
-            |_| true,
-            audio_and_device_video_tracks_content(),
-        )
-        .await;
+        let mut tracks = HashMap::new();
+        tracks.insert(
+            PeerId(0),
+            (
+                vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
+                MediaStreamSettings::default(),
+            ),
+        );
+        tracks.insert(
+            PeerId(1),
+            (
+                vec![audio_track(TrackId(2)), device_video_track(TrackId(3))],
+                MediaStreamSettings::default(),
+            ),
+        );
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(tracks).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1348,12 +1371,28 @@ mod patches_generation {
     ///    unmuted [`PeerConnection`].
     #[wasm_bindgen_test]
     async fn mute_room_with_one_muted_track() {
-        let (room, mut command_rx) = get_room_and_commands_receiver(
-            2,
-            |i| i % 2 == 1,
-            audio_and_device_video_tracks_content(),
-        )
-        .await;
+        let mut tracks = HashMap::new();
+        tracks.insert(
+            PeerId(0),
+            (
+                vec![audio_track(TrackId(0)), device_video_track(TrackId(1))],
+                {
+                    let mut settings = MediaStreamSettings::default();
+                    settings.set_track_enabled(true, MediaKind::Audio, None);
+
+                    settings
+                },
+            ),
+        );
+        tracks.insert(
+            PeerId(1),
+            (
+                vec![audio_track(TrackId(2)), device_video_track(TrackId(3))],
+                MediaStreamSettings::default(),
+            ),
+        );
+        let (room, mut command_rx) =
+            get_room_and_commands_receiver(tracks).await;
         let room_handle = room.new_handle();
 
         spawn_local(async move {
@@ -1363,9 +1402,9 @@ mod patches_generation {
         assert_eq!(
             command_rx.next().await.unwrap(),
             Command::UpdateTracks {
-                peer_id: PeerId(2),
+                peer_id: PeerId(0),
                 tracks_patches: vec![TrackPatchCommand {
-                    id: TrackId(1),
+                    id: TrackId(0),
                     is_muted: Some(true),
                 }]
             }
@@ -1382,19 +1421,31 @@ mod patches_generation {
             return;
         }
 
-        let mut tracks = audio_and_device_video_tracks_content();
-        tracks.push((
-            MediaType::Video(VideoSettings {
-                source_kind: MediaSourceKind::Display,
-                is_required: false,
-            }),
-            Direction::Send {
-                mid: None,
-                receivers: vec![],
-            },
-        ));
+        let mut tracks = HashMap::new();
+        tracks.insert(
+            PeerId(0),
+            (
+                vec![
+                    audio_track(TrackId(0)),
+                    device_video_track(TrackId(1)),
+                    display_video_track(TrackId(2)),
+                ],
+                MediaStreamSettings::default(),
+            ),
+        );
+        tracks.insert(
+            PeerId(1),
+            (
+                vec![
+                    audio_track(TrackId(3)),
+                    device_video_track(TrackId(4)),
+                    display_video_track(TrackId(5)),
+                ],
+                MediaStreamSettings::default(),
+            ),
+        );
         let (room, mut command_rx) =
-            get_room_and_commands_receiver(2, |_| true, tracks).await;
+            get_room_and_commands_receiver(tracks).await;
 
         let room_handle = room.new_handle();
 
@@ -1428,19 +1479,31 @@ mod patches_generation {
             return;
         }
 
-        let mut tracks = audio_and_device_video_tracks_content();
-        tracks.push((
-            MediaType::Video(VideoSettings {
-                source_kind: MediaSourceKind::Display,
-                is_required: false,
-            }),
-            Direction::Send {
-                mid: None,
-                receivers: vec![],
-            },
-        ));
+        let mut tracks = HashMap::new();
+        tracks.insert(
+            PeerId(0),
+            (
+                vec![
+                    audio_track(TrackId(0)),
+                    device_video_track(TrackId(1)),
+                    display_video_track(TrackId(2)),
+                ],
+                MediaStreamSettings::default(),
+            ),
+        );
+        tracks.insert(
+            PeerId(1),
+            (
+                vec![
+                    audio_track(TrackId(3)),
+                    device_video_track(TrackId(4)),
+                    display_video_track(TrackId(5)),
+                ],
+                MediaStreamSettings::default(),
+            ),
+        );
         let (room, mut command_rx) =
-            get_room_and_commands_receiver(2, |_| true, tracks).await;
+            get_room_and_commands_receiver(tracks).await;
 
         let room_handle = room.new_handle();
 
