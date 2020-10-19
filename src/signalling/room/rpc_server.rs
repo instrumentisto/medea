@@ -233,7 +233,7 @@ impl Handler<RpcConnectionEstablished> for Room {
                             },
                         ))
                     }
-                    Err(err) => Either::Right(fut::err(err.into())),
+                    Err(err) => Either::Right(fut::err(err)),
                 }),
         )
     }
