@@ -302,7 +302,7 @@ impl PeerConnection {
         peer.peer
             .on_track(Some(move |track_event| {
                 if let Err(err) =
-                    Self::on_track(&media_connections, &track_event)
+                    media_connections.add_remote_track(&track_event)
                 {
                     JasonError::from(err).print();
                 };
@@ -493,22 +493,6 @@ impl PeerConnection {
             peer_id,
             ice_connection_state,
         });
-    }
-
-    /// Handle `track` event from underlying peer adding new track to
-    /// `media_connections` and emitting [`PeerEvent::NewRemoteTracks`]
-    /// event into this peers `peer_events_sender` if all tracks from this
-    /// sender has arrived.
-    fn on_track(
-        media_connections: &MediaConnections,
-        track_event: &RtcTrackEvent,
-    ) -> Result<()> {
-        let transceiver = track_event.transceiver();
-        media_connections
-            .add_remote_track(transceiver, track_event.track())
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(())
     }
 
     /// Marks [`PeerConnection`] to trigger ICE restart.

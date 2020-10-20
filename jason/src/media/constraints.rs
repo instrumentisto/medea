@@ -664,7 +664,7 @@ impl TrackConstraints {
     }
 
     /// Returns this [`TrackConstraints`] media source kind.
-    pub const fn media_source_kind(&self) -> MediaSourceKind {
+    pub fn media_source_kind(&self) -> MediaSourceKind {
         match &self {
             TrackConstraints::Audio(_) => MediaSourceKind::Device,
             TrackConstraints::Video(VideoSource::Device(_)) => {
@@ -677,7 +677,7 @@ impl TrackConstraints {
     }
 
     /// Returns this [`TrackConstraints`] media kind.
-    pub const fn media_kind(&self) -> MediaKind {
+    pub fn media_kind(&self) -> MediaKind {
         match &self {
             TrackConstraints::Audio(_) => MediaKind::Audio,
             TrackConstraints::Video(_) => MediaKind::Video,

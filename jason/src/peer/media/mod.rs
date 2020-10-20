@@ -12,7 +12,7 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, MediaSourceKind, PeerId, TrackId};
 use tracerr::Traced;
-use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
+use web_sys::RtcTrackEvent;
 
 use crate::{
     media::{
@@ -40,7 +40,9 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn kind(&self) -> MediaKind;
 
-    /// Returns mid of this [`TransceiverSide`].
+    /// Returns [`mid`] of this [`TransceiverSide`].
+    ///
+    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn mid(&self) -> Option<String>;
 
     /// Returns `true` if this [`TransceiverKind`] currently can be
@@ -151,7 +153,7 @@ pub enum MediaConnectionsError {
                connections",
         _0
     )]
-    CouldNotInsertRemoteTrack(Option<String>),
+    CouldNotInsertRemoteTrack(String),
 
     /// Could not find [`RtcRtpTransceiver`] by `mid`.
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
@@ -281,7 +283,9 @@ impl InnerMediaConnections {
         Transceiver::from(self.peer.add_transceiver(kind, direction))
     }
 
-    /// Lookups [`Transceiver`] by provided `mid`.
+    /// Lookups [`Transceiver`] by provided [`mid`].
+    ///
+    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
     }
@@ -632,9 +636,8 @@ impl MediaConnections {
         Ok(mute_satates_updates)
     }
 
-    /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to the
-    /// stored [`Receiver`], which is associated with a given
-    /// [`RtcRtpTransceiver`].
+    /// Handles [`RtcTrackEvent`], adding new track to corresponding
+    /// [`Receiver`].
     ///
     /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
     /// any.
@@ -642,34 +645,26 @@ impl MediaConnections {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
-    /// provided transceiver has empty `mid`, that means that negotiation has
-    /// not completed.
-    ///
-    /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
     /// could not find [`Receiver`] by transceivers `mid`.
-    pub fn add_remote_track(
-        &self,
-        transceiver: RtcRtpTransceiver,
-        track: SysMediaStreamTrack,
-    ) -> Result<()> {
+    pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
         let inner = self.0.borrow();
-        let mid = transceiver.mid();
+        let transceiver = Transceiver::from(track_event.transceiver());
+        let track = track_event.track();
+        // Cannot fail, since transceiver is guaranteed to be negotiated at this
+        // point.
+        let mid = transceiver.mid().unwrap();
 
-        mid.as_ref()
-            .and_then(|mid| {
-                inner.receivers.values().find(|recv| {
-                    recv.mid().map_or(false, |recv_mid| &recv_mid == mid)
-                })
-            })
-            .map(|recv| {
-                let transceiver = Transceiver::from(transceiver);
-                recv.set_remote_track(transceiver, track);
-            })
-            .ok_or_else(|| {
-                tracerr::new!(MediaConnectionsError::CouldNotInsertRemoteTrack(
-                    mid
-                ))
-            })
+        for receiver in inner.receivers.values() {
+            if let Some(recv_mid) = &receiver.mid() {
+                if recv_mid == &mid {
+                    receiver.set_remote_track(transceiver, track);
+                    return Ok(());
+                }
+            }
+        }
+        Err(tracerr::new!(
+            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
+        ))
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
