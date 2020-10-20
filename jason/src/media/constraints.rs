@@ -683,6 +683,13 @@ impl TrackConstraints {
             TrackConstraints::Video(_) => MediaKind::Video,
         }
     }
+
+    /// Returns `true` if provided [`TrackConstraints`] is mutual to this
+    /// [`TrackConstraints`].
+    pub fn is_mutual(&self, another: &Self) -> bool {
+        self.media_kind() == another.media_kind()
+            && self.media_source_kind() == another.media_source_kind()
+    }
 }
 
 impl From<ProtoTrackConstraints> for TrackConstraints {

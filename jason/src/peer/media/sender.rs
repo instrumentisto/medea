@@ -40,12 +40,19 @@ impl<'a> SenderBuilder<'a> {
     /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
-        let media_connections = self.media_connections.0.borrow();
+        let connections = self.media_connections.0.borrow();
         let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
-            None => media_connections
-                .add_transceiver(kind, TransceiverDirection::INACTIVE),
-            Some(mid) => media_connections
+            None => connections
+                .receivers
+                .values()
+                .find(|rcvr| rcvr.caps().is_mutual(&self.caps))
+                .and_then(|rcvr| rcvr.transceiver())
+                .unwrap_or_else(|| {
+                    connections
+                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                }),
+            Some(mid) => connections
                 .get_transceiver_by_mid(&mid)
                 .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
                 .map_err(tracerr::wrap!())?,
@@ -54,14 +61,14 @@ impl<'a> SenderBuilder<'a> {
         let mute_state_observer = MuteStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
-            peer_id: media_connections.peer_id,
+            peer_id: connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             general_mute_state: Cell::new(self.mute_state),
             transceiver,
             mute_state: mute_state_observer,
             is_required: self.is_required,
-            peer_events_sender: media_connections.peer_events_sender.clone(),
+            peer_events_sender: connections.peer_events_sender.clone(),
             send_constraints: self.send_constraints,
         });
         spawn_local({

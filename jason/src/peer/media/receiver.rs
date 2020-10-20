@@ -76,11 +76,7 @@ impl Receiver {
             let mut senders = connections.senders.values();
             // We assume that there are no transceivers with exactly the
             // same media_kind + media_source_kind.
-            let sender = senders.find(|sender| {
-                sender.caps().media_kind() == caps.media_kind()
-                    && sender.caps().media_source_kind()
-                        == caps.media_source_kind()
-            });
+            let sender = senders.find(|sndr| sndr.caps().is_mutual(&caps));
             Some(sender.map_or_else(
                 || connections.add_transceiver(kind, transceiver_direction),
                 |sender| {
@@ -109,6 +105,12 @@ impl Receiver {
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }
+    }
+
+    /// Returns [`TrackConstraints`] of this [`Receiver`].
+    #[inline]
+    pub fn caps(&self) -> &TrackConstraints {
+        &self.caps
     }
 
     /// Returns `true` if this [`Receiver`] is receives media data.
@@ -176,7 +178,7 @@ impl Receiver {
     /// Returns [`Transceiver`] of this [`Receiver`].
     ///
     /// Returns [`None`] if this [`Receiver`] doesn't have [`Transceiver`].
-    #[cfg(feature = "mockable")]
+    #[inline]
     pub fn transceiver(&self) -> Option<Transceiver> {
         self.transceiver.borrow().clone()
     }
