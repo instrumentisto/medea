@@ -667,6 +667,22 @@ impl MediaConnections {
         ))
     }
 
+    /// Tries to add [`Transceiver`]s to the [`Receiver`]s which are currently
+    /// doesn't have them.
+    pub fn bind_transceivers_with_receivers(&self) {
+        let inner = self.0.borrow();
+        inner
+            .receivers
+            .values()
+            .filter(|recv| !recv.is_have_transceiver())
+            .filter_map(|recv| {
+                recv.mid().and_then(|mid| {
+                    Some((recv, inner.peer.get_transceiver_by_mid(&mid)?))
+                })
+            })
+            .for_each(|(recv, trnsvr)| recv.replace_transceiver(trnsvr.into()));
+    }
+
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
     #[inline]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {

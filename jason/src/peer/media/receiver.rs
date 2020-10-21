@@ -155,6 +155,25 @@ impl Receiver {
         self.maybe_notify_track();
     }
 
+    /// Replaces [`Receiver`]'s [`Transceiver`] with a provided [`Transceiver`].
+    ///
+    /// Doesn't updates [`TransceiverDirection`] of the [`Transceiver`].
+    ///
+    /// No-op if provided same [`Transceiver`] as already exists in this
+    /// [`Receiver`].
+    pub fn replace_transceiver(&self, transceiver: Transceiver) {
+        let is_same_transceiver = self
+            .transceiver
+            .borrow()
+            .as_ref()
+            .map_or(false, |t| t.mid() == transceiver.mid());
+        if is_same_transceiver {
+            return;
+        }
+
+        self.transceiver.replace(Some(transceiver));
+    }
+
     /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.track_id != track_patch.id {
@@ -181,6 +200,12 @@ impl Receiver {
     #[inline]
     pub fn transceiver(&self) -> Option<Transceiver> {
         self.transceiver.borrow().clone()
+    }
+
+    /// Returns `true` if [`Receiver`] have some [`Transceiver`].
+    #[inline]
+    pub fn is_have_transceiver(&self) -> bool {
+        self.transceiver.borrow().is_some()
     }
 
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
