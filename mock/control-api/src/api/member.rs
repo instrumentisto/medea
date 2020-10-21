@@ -21,10 +21,10 @@ pub struct Member {
     /// [Control API]: https://tinyurl.com/yxsqplq7
     pipeline: HashMap<String, Endpoint>,
 
-    /// Optional `Member` credential.
+    /// Optional `Member` credentials.
     ///
     /// If `None` then random credentials will be generated on Medea side.
-    credential: Option<String>,
+    credentials: Option<String>,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,7 +62,7 @@ impl Member {
         proto::Member {
             pipeline: member_elements,
             id,
-            credentials: self.credential.unwrap_or_default(),
+            credentials: self.credentials.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
             on_leave: self.on_leave.unwrap_or_default(),
             idle_timeout: self.idle_timeout.map(Into::into),
@@ -91,7 +91,7 @@ impl From<proto::Member> for Member {
         Self {
             id: proto.id,
             pipeline: member_pipeline,
-            credential: Some(proto.credentials),
+            credentials: Some(proto.credentials),
             on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
             idle_timeout: proto.idle_timeout.map(|dur| dur.try_into().unwrap()),

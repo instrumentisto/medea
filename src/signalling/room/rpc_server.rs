@@ -86,12 +86,12 @@ impl RpcServer for Addr<Room> {
     fn connection_established(
         &self,
         member_id: MemberId,
-        credential: Credential,
+        credentials: Credential,
         connection: Box<dyn RpcConnection>,
     ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>> {
         self.send(RpcConnectionEstablished {
             member_id,
-            credentials: credential,
+            credentials,
             connection,
         })
         .map(|r| {
@@ -191,10 +191,6 @@ impl Handler<RpcConnectionEstablished> for Room {
             .get_member_by_id_and_credentials(&member_id, &credentials));
 
         let is_reconnect = self.members.member_has_connection(&member_id);
-        let connection_settings = RpcConnectionSettings {
-            idle_timeout: member.get_idle_timeout(),
-            ping_interval: member.get_ping_interval(),
-        };
 
         let maybe_send_on_join = match (member.get_on_join(), is_reconnect) {
             (Some(callback_url), false) => future::Either::Left({
@@ -225,11 +221,14 @@ impl Handler<RpcConnectionEstablished> for Room {
                     ),
                     Err(err) => Either::Right(fut::err(err)),
                 })
-                .then(move |res, room, _| match res {
+                .then(|res, this, _| match res {
                     Ok(member) => {
-                        Either::Left(room.init_member_connections(&member).map(
+                        Either::Left(this.init_member_connections(&member).map(
                             move |res, _, _| {
-                                res.map(move |_| connection_settings)
+                                res.map(move |_| RpcConnectionSettings {
+                                    idle_timeout: member.get_idle_timeout(),
+                                    ping_interval: member.get_ping_interval(),
+                                })
                             },
                         ))
                     }
@@ -323,7 +322,7 @@ mod test {
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
-            id: "test".into(),
+            id: RoomId::from("test"),
             pipeline: Pipeline::new(HashMap::new()),
         };
         let context = AppContext::new(
@@ -361,11 +360,11 @@ mod test {
         );
 
         room.members
-            .create_member("member1".into(), &member1)
+            .create_member(MemberId("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            "member1".into(),
+            MemberId("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -399,11 +398,11 @@ mod test {
         );
 
         room.members
-            .create_member("member1".into(), &member1)
+            .create_member(MemberId("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            "member1".into(),
+            MemberId("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {

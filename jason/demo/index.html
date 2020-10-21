@@ -180,7 +180,7 @@
         url: controlUrl + roomId + '/' + memberId,
         data: {
           kind: 'Member',
-          credential: 'test',
+          credentials: 'test',
           pipeline: pipeline,
         },
       });
@@ -452,7 +452,7 @@
       await init();
 
       jason = new Jason();
-      room = await jason.init_room();
+      room = jason.init_room();
 
       let userNameFromCookies = getCookie(userNameCookieName);
       if (userNameFromCookies) {
@@ -764,7 +764,7 @@
       if (error && error instanceof JasonError) {
         console.error(
           error.name(), "\n",
-          error.message(), "\n',
+          error.message(), "\n",
           error.source(), "\n",
           error.trace()
         );

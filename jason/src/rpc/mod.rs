@@ -26,7 +26,7 @@ pub use self::{
     backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
     reconnect_handle::ReconnectHandle,
-    rpc_session::{RpcSession, Session},
+    rpc_session::{RpcSession, WebSocketRpcSession},
     websocket::{
         ClientDisconnect, RpcTransport, TransportError, WebSocketRpcClient,
         WebSocketRpcTransport,
@@ -38,6 +38,7 @@ pub use self::{
 pub struct ApiUrl(Url);
 
 /// Information about [`RpcSession`] connection.
+#[derive(Clone)]
 pub struct ConnectionInfo {
     /// [`Url`] to which transport layer will connect.
     url: ApiUrl,

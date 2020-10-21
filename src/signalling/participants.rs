@@ -465,7 +465,7 @@ mod test {
 
     pub fn empty_participants_service() -> ParticipantService {
         let room_spec = RoomSpec {
-            id: "test".into(),
+            id: RoomId::from("test"),
             pipeline: Pipeline::new(HashMap::new()),
         };
         let ctx = AppContext::new(

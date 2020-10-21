@@ -13,7 +13,7 @@ use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
     rpc::{
-        ClientDisconnect, RpcSession, RpcTransport, Session,
+        ClientDisconnect, RpcSession, RpcTransport, WebSocketRpcSession,
         WebSocketRpcClient, WebSocketRpcTransport,
     },
     set_panic_hook,
@@ -70,7 +70,7 @@ impl Jason {
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::clone(&self.0.borrow().rpc);
-        self.inner_init_room(Session::new(rpc))
+        self.inner_init_room(WebSocketRpcSession::new(rpc))
     }
 
     /// Returns handle to [`MediaManager`].

@@ -47,6 +47,7 @@ impl_debug_by_struct_name!(MockRpcServerRepository);
 
 /// Used to generate [`WsSession`] IDs.
 static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 /// [`WsSession`] authentication timeout.
 ///
 /// When this [`Duration`] will pass, [`WsSession`] will check that at least one

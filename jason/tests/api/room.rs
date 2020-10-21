@@ -1148,13 +1148,10 @@ mod patches_generation {
             let tracks = tracks_content
                 .iter()
                 .enumerate()
-                .map(|(track_i, (media_type, direction))| {
-                    let track_i = (track_i as u32) + i;
-                    Track {
-                        id: TrackId(track_i),
-                        direction: direction.clone(),
-                        media_type: media_type.clone(),
-                    }
+                .map(|(track_i, (media_type, direction))| Track {
+                    id: TrackId(track_i as u32),
+                    direction: direction.clone(),
+                    media_type: media_type.clone(),
                 })
                 .collect();
             let peer_id = PeerId(i + 1);
@@ -1295,7 +1292,7 @@ mod patches_generation {
         assert_eq!(
             commands.remove(&PeerId(2)).unwrap(),
             vec![TrackPatchCommand {
-                id: TrackId(1),
+                id: TrackId(0),
                 is_muted: Some(true),
             }]
         );
@@ -1361,7 +1358,7 @@ mod patches_generation {
             Command::UpdateTracks {
                 peer_id: PeerId(2),
                 tracks_patches: vec![TrackPatchCommand {
-                    id: TrackId(1),
+                    id: TrackId(0),
                     is_muted: Some(true),
                 }]
             }
@@ -1389,7 +1386,7 @@ mod patches_generation {
                 receivers: vec![],
             },
         ));
-        let (room, mut command_rx) =
+        let (room, command_rx) =
             get_room_and_commands_receiver(2, |_| true, tracks).await;
 
         let room_handle = room.new_handle();
@@ -1402,16 +1399,21 @@ mod patches_generation {
             .unwrap_err();
         });
 
-        assert_eq!(
-            command_rx.next().await.unwrap(),
-            Command::UpdateTracks {
-                peer_id: PeerId(2),
-                tracks_patches: vec![TrackPatchCommand {
-                    id: TrackId(2),
-                    is_muted: Some(true),
-                }]
+        let commands: Vec<_> = command_rx.take(2).collect().await;
+        for command in commands {
+            match command {
+                Command::UpdateTracks { tracks_patches, .. } => assert_eq!(
+                    tracks_patches,
+                    vec![TrackPatchCommand {
+                        id: TrackId(1),
+                        is_muted: Some(true),
+                    }]
+                ),
+                _ => {
+                    unreachable!("unexpected command");
+                }
             }
-        );
+        }
     }
 
     /// Checks that on display video muting, correct [`Command::UpdateTracks`]
@@ -1435,7 +1437,7 @@ mod patches_generation {
                 receivers: vec![],
             },
         ));
-        let (room, mut command_rx) =
+        let (room, command_rx) =
             get_room_and_commands_receiver(2, |_| true, tracks).await;
 
         let room_handle = room.new_handle();
@@ -1448,16 +1450,21 @@ mod patches_generation {
             .unwrap_err();
         });
 
-        assert_eq!(
-            command_rx.next().await.unwrap(),
-            Command::UpdateTracks {
-                peer_id: PeerId(1),
-                tracks_patches: vec![TrackPatchCommand {
-                    id: TrackId(2),
-                    is_muted: Some(true),
-                }]
+        let commands: Vec<_> = command_rx.take(2).collect().await;
+        for command in commands {
+            match command {
+                Command::UpdateTracks { tracks_patches, .. } => assert_eq!(
+                    tracks_patches,
+                    vec![TrackPatchCommand {
+                        id: TrackId(2),
+                        is_muted: Some(true),
+                    }]
+                ),
+                _ => {
+                    unreachable!("unexpected command");
+                }
             }
-        );
+        }
     }
 }
 

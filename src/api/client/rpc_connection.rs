@@ -36,7 +36,7 @@ impl CommandMessage {
 /// Newtype for [`Event`] with actix [`Message`] implementation.
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub(super) struct EventMessage {
+pub struct EventMessage {
     pub room_id: RoomId,
     pub event: Event,
 }

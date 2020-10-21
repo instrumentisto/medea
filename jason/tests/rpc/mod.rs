@@ -2,6 +2,7 @@
 
 mod backoff_delayer;
 mod heartbeat;
+mod rpc_session;
 mod websocket;
 
 use std::{collections::HashMap, rc::Rc};
@@ -26,6 +27,12 @@ use wasm_bindgen_test::*;
 use crate::{delay_for, join_room_url, timeout};
 
 wasm_bindgen_test_configure!(run_in_browser);
+
+/// [`ServerMsg::RpcSettings`] that can be used in tests.
+pub const RPC_SETTINGS: ServerMsg = ServerMsg::RpcSettings(RpcSettings {
+    idle_timeout_ms: 5_000,
+    ping_interval_ms: 2_000,
+});
 
 /// Creates [`WebSocketRpcClient`] with the provided [`MockRpcTransport`].
 fn new_client(transport: Rc<MockRpcTransport>) -> Rc<WebSocketRpcClient> {

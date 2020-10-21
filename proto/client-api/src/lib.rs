@@ -113,7 +113,13 @@ pub enum ServerMsg {
 
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
-    Event { room_id: RoomId, event: Event },
+    Event {
+        /// ID of `Room` that this [`Event`] is associated with.
+        room_id: RoomId,
+
+        /// Actual [`Event`] sent to `Client`.
+        event: Event,
+    },
 
     /// `Media Server` notifies `Client` about necessity to update its RPC
     /// settings.
@@ -138,9 +144,9 @@ pub enum ServerMsg {
     },
 }
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "msg", content = "data")]
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Debug, PartialEq)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `pong` message that `Client` answers with to `Media Server` in response
@@ -148,7 +154,13 @@ pub enum ClientMsg {
     Pong(u32),
 
     /// Request of `Client` to change the state on `Media Server`.
-    Command { room_id: RoomId, command: Command },
+    Command {
+        /// ID of `Room` that this [`Command`] is associated with.
+        room_id: RoomId,
+
+        /// Actual [`Command`] sent to `Media Server`.
+        command: Command,
+    },
 
     /// Request of `Client` to join `Room`.
     JoinRoom {

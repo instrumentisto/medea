@@ -107,26 +107,24 @@ pub trait RpcSession {
 /// Client to talk with server via Client API RPC.
 ///
 /// Responsible for [`Room`] authorization and closing.
-pub struct Session {
-    /// Client API RPC client to talk with server via [WebSocket].
+pub struct WebSocketRpcSession {
+    /// [WebSocket] based Rpc Client used to .
     ///
     /// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
     client: Rc<WebSocketRpcClient>,
 
-    /// Information about [`Session`] connection.
-    ///
-    /// If `None` then this [`Session`] currently is uninitialized.
+    /// Credentials used to authorize current session [`WebSocketRpcSession`].
     credentials: RefCell<Option<ConnectionInfo>>,
 
-    /// [`Session`] connection state.
+    /// [`WebSocketRpcSession`] connection state.
     state: ObservableCell<SessionState>,
 
-    /// Flag which indicates that this [`Session`] was initially connected.
+    /// Flag which indicates that this [`WebSocketRpcSession`] was initially connected.
     initially_connected: Cell<bool>,
 }
 
-impl Session {
-    /// Returns new uninitialized [`Session`] with a provided
+impl WebSocketRpcSession {
+    /// Returns new uninitialized [`WebSocketRpcSession`] with a provided
     /// [`WebSocketRpcClient`].
     pub fn new(client: Rc<WebSocketRpcClient>) -> Rc<Self> {
         let this = Rc::new(Self {
@@ -152,21 +150,23 @@ impl Session {
 
         this
     }
-}
 
-impl Session {
     /// Connects to the `Media Server` with a [`ConnectionInfo`] from this
-    /// [`Session`].
+    /// [`WebSocketRpcSession`].
     ///
     /// No op if current [`SessionState`] is [`SessionState::Closed`].
+    // TODO: почему No op if SessionState::Closed
     async fn connect_session(&self) -> Result<(), Traced<RpcClientError>> {
+        // TODO: 1. so we return Ok if no credentials?
+        // TODO: 2. yield while holding refcell
         if let Some(credentials) = self.credentials.borrow().as_ref() {
             if self.state.get() != SessionState::Closed {
+                // TODO: thats wrong, what if current state is Connecting?
+                // TODO: add test
                 return Ok(());
             }
             self.state.set(SessionState::Connecting);
-            self.client
-                .clone()
+            Rc::clone(&self.client)
                 .connect(credentials.url().clone())
                 .await
                 .map_err(|e| {
@@ -192,7 +192,7 @@ impl Session {
 }
 
 #[async_trait(?Send)]
-impl RpcSession for Session {
+impl RpcSession for WebSocketRpcSession {
     async fn connect(
         self: Rc<Self>,
         connection_info: ConnectionInfo,
@@ -202,7 +202,9 @@ impl RpcSession for Session {
     }
 
     async fn reconnect(self: Rc<Self>) -> Result<(), Traced<RpcClientError>> {
+        // TODO: yield while holding refcell
         if let Some(credentials) = self.credentials.borrow().as_ref() {
+            // TODO: зачем здесь коннект, если он и так дергается в connect_session?
             Rc::clone(&self.client)
                 .connect(credentials.url.clone())
                 .await?;
@@ -218,7 +220,7 @@ impl RpcSession for Session {
             let weak_this = weak_this.clone();
             async move {
                 let this = weak_this.upgrade()?;
-                let x = match (this.credentials.borrow().as_ref(), event) {
+                match (this.credentials.borrow().as_ref(), event) {
                     (Some(credentials), RpcEvent::Event { room_id, event }) => {
                         if credentials.room_id == room_id {
                             Some(event)
@@ -240,8 +242,7 @@ impl RpcSession for Session {
                         None
                     }
                     _ => None,
-                };
-                x
+                }
             }
         }))
     }
@@ -261,6 +262,7 @@ impl RpcSession for Session {
         self.client.on_normal_close()
     }
 
+    // TODO: maybe close_with_reason?
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         if let Some(credentials) = self.credentials.borrow().as_ref() {
             self.client.leave_room(
@@ -276,7 +278,7 @@ impl RpcSession for Session {
             .subscribe()
             .skip(1)
             .filter_map(|state| {
-                futures::future::ready(
+                future::ready(
                     Some(()).filter(|_| matches!(state, SessionState::Closed)),
                 )
             })

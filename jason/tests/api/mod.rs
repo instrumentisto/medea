@@ -7,7 +7,7 @@ use futures::{
     channel::{mpsc, oneshot},
     stream, StreamExt,
 };
-use medea_client_api_proto::{ClientMsg, CloseReason, RpcSettings, ServerMsg};
+use medea_client_api_proto::{ClientMsg, CloseReason, ServerMsg};
 use medea_jason::{
     rpc::{
         websocket::{MockRpcTransport, TransportState},
@@ -20,16 +20,9 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
-use crate::{timeout, yield_now, TEST_ROOM_URL};
+use crate::{rpc::RPC_SETTINGS, timeout, yield_now, TEST_ROOM_URL};
 
 wasm_bindgen_test_configure!(run_in_browser);
-
-/// [`ServerMsg::RpcSettings`] which will be sent in the all tests from this
-/// module.
-const RPC_SETTINGS: ServerMsg = ServerMsg::RpcSettings(RpcSettings {
-    idle_timeout_ms: 5_000,
-    ping_interval_ms: 2_000,
-});
 
 /// Checks that only one [`Rc`] to the [`RpcClient`] exists.
 #[wasm_bindgen_test]
