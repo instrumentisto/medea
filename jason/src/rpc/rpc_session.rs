@@ -12,14 +12,15 @@ use futures::{
     stream::LocalBoxStream,
     StreamExt,
 };
-use medea_client_api_proto::{Command, Event, RoomId};
+use medea_client_api_proto::{Command, Event, MemberId, RoomId};
 use medea_reactive::ObservableCell;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::rpc::{
-    rpc_session::SessionError::RpcClient, websocket::RpcEvent, ApiUrl,
-    ClientDisconnect, CloseReason, ConnectionInfo, RpcClientError,
+    rpc_session::SessionError::RpcClient,
+    websocket::{RpcEvent, RpcEventHandler},
+    ApiUrl, ClientDisconnect, CloseReason, ConnectionInfo, RpcClientError,
     WebSocketRpcClient,
 };
 
@@ -307,64 +308,7 @@ impl RpcSession for WebSocketRpcSession {
             let weak_this = weak_this.clone();
             async move {
                 let this = weak_this.upgrade()?;
-                let current_state = this.state.clone_inner();
-                match event {
-                    RpcEvent::JoinedRoom { room_id, member_id } => {
-                        if let SessionState::Connected(state) = current_state {
-                            if let ConnectedSessionState::Open = state.state {
-                                if &room_id == &state.info.room_id
-                                    && &member_id == &state.info.member_id
-                                {
-                                    this.state.set(SessionState::Connected(
-                                        ConnectedSession::new(
-                                            ConnectedSessionState::Open,
-                                            state.info,
-                                        ),
-                                    ));
-                                }
-                            }
-                        }
-                        None
-                    }
-                    RpcEvent::LeftRoom {
-                        room_id,
-                        close_reason,
-                    } => {
-                        if let SessionState::Connected(state) = current_state {
-                            match state.state {
-                                ConnectedSessionState::Open => {
-                                    if state.info.room_id == room_id {
-                                        this.state.set(SessionState::Finished(
-                                            close_reason,
-                                        ));
-                                    }
-                                }
-                                ConnectedSessionState::Authorizing => {
-                                    if state.info.room_id == room_id {
-                                        this.state.set(SessionState::New);
-                                    } else {
-                                    }
-                                }
-                            }
-                        }
-                        None
-                    }
-                    RpcEvent::Event { room_id, event } => {
-                        if let SessionState::Connected(state) = current_state {
-                            if let ConnectedSessionState::Open = state.state {
-                                if state.info.room_id == room_id {
-                                    Some(event)
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                }
+                event.dispatch_with(this.as_ref())
             }
         }))
     }
@@ -372,9 +316,10 @@ impl RpcSession for WebSocketRpcSession {
     fn send_command(&self, command: Command) {
         if let SessionState::Connected(state) = self.state.clone_inner() {
             if let ConnectedSessionState::Open = state.state {
-                self.client.send_command(state.info.room_id.clone(), command);
+                self.client
+                    .send_command(state.info.room_id.clone(), command);
             } else {
-                log::error!("Trues to send command before authorizing");
+                log::error!("Tries to send command before authorizing");
             }
         } else {
             log::error!("Tried to send command before connecting");
@@ -406,8 +351,10 @@ impl RpcSession for WebSocketRpcSession {
         match self.state.clone_inner() {
             SessionState::Connected(state) => {
                 if let ConnectedSessionState::Open = state.state {
-                    self.client
-                        .leave_room(state.info.room_id.clone(), state.info.member_id.clone());
+                    self.client.leave_room(
+                        state.info.room_id.clone(),
+                        state.info.member_id.clone(),
+                    );
                 }
             }
             _ => (),
@@ -454,5 +401,72 @@ impl RpcSession for WebSocketRpcSession {
                 }
             })
             .boxed_local()
+    }
+}
+
+impl RpcEventHandler for WebSocketRpcSession {
+    type Output = Option<Event>;
+
+    fn on_joined_room(
+        &self,
+        room_id: RoomId,
+        member_id: MemberId,
+    ) -> Self::Output {
+        let current_state = self.state.clone_inner();
+        if let SessionState::Connected(state) = current_state {
+            if let ConnectedSessionState::Open = state.state {
+                if &room_id == &state.info.room_id
+                    && &member_id == &state.info.member_id
+                {
+                    self.state.set(SessionState::Connected(
+                        ConnectedSession::new(
+                            ConnectedSessionState::Open,
+                            state.info,
+                        ),
+                    ));
+                }
+            }
+        }
+        None
+    }
+
+    fn on_left_room(
+        &self,
+        room_id: RoomId,
+        close_reason: CloseReason,
+    ) -> Self::Output {
+        let current_state = self.state.clone_inner();
+        if let SessionState::Connected(state) = current_state {
+            match state.state {
+                ConnectedSessionState::Open => {
+                    if state.info.room_id == room_id {
+                        self.state.set(SessionState::Finished(close_reason));
+                    }
+                }
+                ConnectedSessionState::Authorizing => {
+                    if state.info.room_id == room_id {
+                        self.state.set(SessionState::New);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn on_event(&self, room_id: RoomId, event: Event) -> Self::Output {
+        let current_state = self.state.clone_inner();
+        if let SessionState::Connected(state) = current_state {
+            if let ConnectedSessionState::Open = state.state {
+                if state.info.room_id == room_id {
+                    Some(event)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }

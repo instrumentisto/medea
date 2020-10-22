@@ -10,6 +10,7 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason as CloseByServerReason, Command, Credential, Event,
     MemberId, RoomId, RpcSettings, ServerMsg,
 };
+use medea_macro::dispatchable;
 use medea_reactive::ObservableCell;
 use serde::Serialize;
 use tracerr::Traced;
@@ -152,6 +153,7 @@ impl Inner {
 }
 
 /// Events which can be thrown by [`WebSocketRpcClient`].
+#[dispatchable(self: &Self)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RpcEvent {
     /// Notification of the subscribers that [`WebSocketRpcClient`] is joined
