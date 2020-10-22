@@ -43,10 +43,15 @@ impl<'a> SenderBuilder<'a> {
         let connections = self.media_connections.0.borrow();
         let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
+            // Try to find rcvr transceiver that can be used as sendrecv.
             None => connections
                 .receivers
                 .values()
-                .find(|rcvr| rcvr.caps().is_mutual(&self.caps))
+                .find(|rcvr| {
+                    rcvr.caps().media_kind() == self.caps.media_kind()
+                        && rcvr.caps().media_source_kind()
+                            == self.caps.media_source_kind()
+                })
                 .and_then(|rcvr| rcvr.transceiver())
                 .unwrap_or_else(|| {
                     connections

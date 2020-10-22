@@ -667,20 +667,24 @@ impl MediaConnections {
         ))
     }
 
-    /// Tries to add [`Transceiver`]s to the [`Receiver`]s which are currently
-    /// doesn't have them.
-    pub fn bind_transceivers_with_receivers(&self) {
+    /// Walks over all [`Receivers`] with [`mid`] and without [`Transceiver`],
+    /// trying to find corresponding [`Transceiver`] in [`RtcPeerConnection`]
+    /// and insert it into [`Receiver`].
+    ///
+    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
-        inner
+        for receiver in inner
             .receivers
             .values()
-            .filter(|recv| !recv.is_have_transceiver())
-            .filter_map(|recv| {
-                recv.mid().and_then(|mid| {
-                    Some((recv, inner.peer.get_transceiver_by_mid(&mid)?))
-                })
-            })
-            .for_each(|(recv, trnsvr)| recv.replace_transceiver(trnsvr.into()));
+            .filter(|rcvr| rcvr.transceiver().is_none())
+        {
+            if let Some(mid) = receiver.mid() {
+                if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
+                    receiver.replace_transceiver(trnscvr.into())
+                }
+            }
+        }
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].

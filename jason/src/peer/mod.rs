@@ -605,6 +605,7 @@ impl PeerConnection {
             .create_and_set_offer()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+        self.media_connections.sync_receivers();
         Ok(offer)
     }
 
@@ -776,7 +777,7 @@ impl PeerConnection {
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         *self.has_remote_description.borrow_mut() = true;
-        self.media_connections.bind_transceivers_with_receivers();
+        self.media_connections.sync_receivers();
 
         let mut candidates = self.ice_candidates_buffer.borrow_mut();
         let mut futures = Vec::with_capacity(candidates.len());
@@ -860,6 +861,7 @@ impl PeerConnection {
             .create_and_set_answer()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+        self.media_connections.sync_receivers();
 
         Ok(answer)
     }

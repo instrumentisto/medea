@@ -64,7 +64,9 @@ impl Transceiver {
             })
     }
 
-    /// Returns `mid` of this [`Transceiver`].
+    /// Returns [`mid`] of this [`Transceiver`].
+    ///
+    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }

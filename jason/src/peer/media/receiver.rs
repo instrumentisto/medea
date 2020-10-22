@@ -71,16 +71,18 @@ impl Receiver {
         } else {
             TransceiverDirection::INACTIVE
         };
-        // Try to find send transceiver that can be used as rcvr.
+
         let transceiver = if mid.is_none() {
+            // Try to find send transceiver that can be used as sendrecv.
             let mut senders = connections.senders.values();
-            // We assume that there are no transceivers with exactly the
-            // same media_kind + media_source_kind.
-            let sender = senders.find(|sndr| sndr.caps().is_mutual(&caps));
+            let sender = senders.find(|sndr| {
+                sndr.caps().media_kind() == caps.media_kind()
+                    && sndr.caps().media_source_kind()
+                        == caps.media_source_kind()
+            });
             Some(sender.map_or_else(
                 || connections.add_transceiver(kind, transceiver_direction),
                 |sender| {
-                    // We found transceiver that can be reused.
                     let trnsvr = sender.transceiver();
                     trnsvr.add_direction(transceiver_direction);
 
@@ -162,16 +164,9 @@ impl Receiver {
     /// No-op if provided same [`Transceiver`] as already exists in this
     /// [`Receiver`].
     pub fn replace_transceiver(&self, transceiver: Transceiver) {
-        let is_same_transceiver = self
-            .transceiver
-            .borrow()
-            .as_ref()
-            .map_or(false, |t| t.mid() == transceiver.mid());
-        if is_same_transceiver {
-            return;
+        if self.mid.borrow().as_ref() == transceiver.mid().as_ref() {
+            self.transceiver.replace(Some(transceiver));
         }
-
-        self.transceiver.replace(Some(transceiver));
     }
 
     /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].
@@ -200,12 +195,6 @@ impl Receiver {
     #[inline]
     pub fn transceiver(&self) -> Option<Transceiver> {
         self.transceiver.borrow().clone()
-    }
-
-    /// Returns `true` if [`Receiver`] have some [`Transceiver`].
-    #[inline]
-    pub fn is_have_transceiver(&self) -> bool {
-        self.transceiver.borrow().is_some()
     }
 
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
