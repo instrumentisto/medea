@@ -20,13 +20,12 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::rpc::{
-    rpc_session::SessionError::RpcClient,
     websocket::{RpcEvent, RpcEventHandler},
     ApiUrl, ClientDisconnect, CloseReason, ConnectionInfo, RpcClientError,
     WebSocketRpcClient,
 };
 
-#[derive(Debug, From, JsCaused, Display)]
+#[derive(Clone, Debug, From, JsCaused, Display)]
 pub enum SessionError {
     #[display(fmt = "Session finished with {:?} close reason", _0)]
     SessionFinished(CloseReason),
@@ -40,9 +39,20 @@ pub enum SessionError {
     #[display(fmt = "RpcClientError: {:?}", _0)]
     RpcClient(#[js(cause)] RpcClientError),
 
-    #[display(fmt = "Connection to the server was failed")]
-    ConnectionFailed,
+    #[display(fmt = "Session was unexpectedly dropped")]
+    SessionUnexpectedlyDropped,
+
+    #[display(fmt = "Connection with a server was lost")]
+    ConnectionLost,
 }
+
+impl PartialEq for SessionError {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for SessionError {}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ConnectedSessionState {
@@ -68,8 +78,7 @@ enum SessionState {
     New,
     ReadyForConnect(Rc<ConnectionInfo>),
     Connecting(ConnectedSession),
-    // TODO: provide RpcClientError
-    Failed(ConnectedSession),
+    Failed(Rc<SessionError>, ConnectedSession),
     Connected(ConnectedSession),
     Finished(CloseReason),
 }
@@ -203,7 +212,7 @@ impl WebSocketRpcSession {
                     info,
                 )));
             }
-            S::Failed(state) => {
+            S::Failed(_, state) => {
                 self.state.set(S::Connecting(state));
             }
             S::New => {
@@ -228,7 +237,7 @@ impl WebSocketRpcSession {
                     ConnectedSessionState::Open => return Ok(()),
                     _ => (),
                 },
-                S::Failed(_) => return Err(E::ConnectionFailed),
+                S::Failed(err, _) => return Err(err.as_ref().clone()),
                 S::New => return Err(E::AuthorizationFailed),
                 S::Finished(reason) => {
                     return Err(E::SessionFinished(reason));
@@ -237,7 +246,7 @@ impl WebSocketRpcSession {
             }
         }
 
-        Err(E::ConnectionFailed)
+        Err(E::SessionUnexpectedlyDropped)
     }
 
     fn connection_lost(&self) {
@@ -247,9 +256,15 @@ impl WebSocketRpcSession {
         let current_state = self.state.clone_inner();
         match current_state {
             S::Connecting(state) | S::Connected(state) => {
-                self.state.set(S::Failed(state));
+                self.state.set(S::Failed(
+                    Rc::new(SessionError::ConnectionLost),
+                    state,
+                ));
             }
-            S::New | S::ReadyForConnect(_) | S::Failed(_) | S::Finished(_) => {}
+            S::New
+            | S::ReadyForConnect(_)
+            | S::Failed(_, _)
+            | S::Finished(_) => {}
         }
     }
 
@@ -259,8 +274,8 @@ impl WebSocketRpcSession {
             let mut state_updates = self.state.subscribe();
             async move {
                 while let Some(state) = state_updates.next().await {
-                    let this = upgrade_or_break!(weak_this);
                     log::debug!("State update: {:?}", state);
+                    let this = upgrade_or_break!(weak_this);
                     state.dispatch_with(this).await;
                 }
             }
@@ -289,7 +304,7 @@ impl WebSocketRpcSession {
             async move {
                 if let Some(this) = weak_this.upgrade() {
                     let reason = on_normal_close.await.unwrap_or_else(|_| {
-                        ClientDisconnect::RpcTransportUnexpectedlyDropped.into()
+                        ClientDisconnect::RpcClientUnexpectedlyDropped.into()
                     });
                     this.state.set(SessionState::Finished(reason));
                 }
@@ -359,7 +374,7 @@ impl RpcSession for WebSocketRpcSession {
             .boxed_local();
         Box::pin(async move {
             Ok(state_stream.next().await.unwrap_or_else(|| {
-                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+                ClientDisconnect::SessionUnexpectedlyDropped.into()
             }))
         })
     }
@@ -385,7 +400,7 @@ impl RpcSession for WebSocketRpcSession {
         self.state
             .subscribe()
             .filter_map(|state| async move {
-                if matches!(state, SessionState::Failed(_)) {
+                if matches!(state, SessionState::Failed(_, _)) {
                     Some(())
                 } else {
                     None
@@ -495,13 +510,21 @@ impl SessionStateHandler for WebSocketRpcSession {
             Ok(_) => {
                 self.state.set(SessionState::Connected(desired_state));
             }
-            Err(_) => {
-                self.state.set(SessionState::Failed(desired_state));
+            Err(e) => {
+                // TODO: use traced
+                self.state.set(SessionState::Failed(
+                    Rc::new(e.into_inner().into()),
+                    desired_state,
+                ));
             }
         }
     }
 
-    async fn on_failed(self: Rc<Self>, _: ConnectedSession) {}
+    async fn on_failed(
+        self: Rc<Self>,
+        _: (Rc<SessionError>, ConnectedSession),
+    ) {
+    }
 
     async fn on_connected(self: Rc<Self>, state: ConnectedSession) {
         match state.state {

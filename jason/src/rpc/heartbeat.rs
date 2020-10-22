@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Errors that may occur in [`Heartbeat`].
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
 
 /// Idle timeout of [`WebSocketRpcClient`].

@@ -47,6 +47,11 @@ pub enum ClientDisconnect {
     ///
     /// [`RpcTransport`]: crate::rpc::RpcTransport
     RpcTransportUnexpectedlyDropped,
+
+    /// [`WebSocketRpcSession`] was unexpectedly dropped.
+    ///
+    /// [`WebSocketRpcSession`]: crate::rpc::WebSocketRpcSession
+    SessionUnexpectedlyDropped,
 }
 
 impl ClientDisconnect {
@@ -55,7 +60,8 @@ impl ClientDisconnect {
         match self {
             Self::RoomUnexpectedlyDropped
             | Self::RpcClientUnexpectedlyDropped
-            | Self::RpcTransportUnexpectedlyDropped => true,
+            | Self::RpcTransportUnexpectedlyDropped
+            | Self::SessionUnexpectedlyDropped => true,
             Self::RoomClosed => false,
         }
     }

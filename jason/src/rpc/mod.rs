@@ -177,7 +177,7 @@ pub enum ClosedStateReason {
 }
 
 /// Errors that may occur in [`WebSocketRpcClient`].
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
