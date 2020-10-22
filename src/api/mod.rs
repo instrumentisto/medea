@@ -8,10 +8,12 @@ use std::fmt::Debug;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Command, Credential, MemberId};
 
-use crate::api::client::rpc_connection::{
-    ClosedReason, RpcConnection, RpcConnectionSettings,
+use crate::{
+    api::client::rpc_connection::{
+        ClosedReason, RpcConnection, RpcConnectionSettings,
+    },
+    signalling::room::RoomError,
 };
-use crate::signalling::room::RoomError;
 use actix::MailboxError;
 
 #[derive(Debug)]
