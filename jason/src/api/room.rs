@@ -35,7 +35,7 @@ use crate::{
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcClientError, RpcSession,
-        TransportError,
+        SessionError, TransportError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
@@ -149,6 +149,9 @@ enum RoomError {
     /// simultaneously.
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
+
+    #[display(fmt = "Some WebSocketSession error: {}", _0)]
+    SessionError(#[js(cause)] SessionError),
 }
 
 impl From<RpcClientError> for RoomError {
@@ -187,6 +190,13 @@ impl From<MediaConnectionsError> for RoomError {
     #[inline]
     fn from(e: MediaConnectionsError) -> Self {
         Self::MediaConnections(e)
+    }
+}
+
+impl From<SessionError> for RoomError {
+    #[inline]
+    fn from(e: SessionError) -> Self {
+        Self::SessionError(e)
     }
 }
 
@@ -1314,7 +1324,7 @@ impl Drop for InnerRoom {
         if let CloseReason::ByClient { reason, .. } =
             *self.close_reason.borrow()
         {
-            self.rpc.set_close_reason(reason);
+            self.rpc.close_with_reason(reason);
         };
 
         if let Some(Err(e)) = self
