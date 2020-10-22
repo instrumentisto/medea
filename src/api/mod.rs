@@ -11,6 +11,24 @@ use medea_client_api_proto::{Command, Credential, MemberId};
 use crate::api::client::rpc_connection::{
     ClosedReason, RpcConnection, RpcConnectionSettings,
 };
+use crate::signalling::room::RoomError;
+use actix::MailboxError;
+
+#[derive(Debug)]
+pub enum RpcServerError {
+    Authorization,
+    Unexpected(RoomError),
+    RoomMailbox(MailboxError),
+}
+
+impl From<RoomError> for RpcServerError {
+    fn from(err: RoomError) -> Self {
+        match &err {
+            RoomError::AuthorizationError => RpcServerError::Authorization,
+            _ => RpcServerError::Unexpected(err),
+        }
+    }
+}
 
 /// Server side of Medea RPC protocol.
 #[cfg_attr(test, mockall::automock)]
@@ -25,7 +43,7 @@ pub trait RpcServer: Debug + Send {
         member_id: MemberId,
         credential: Credential,
         connection: Box<dyn RpcConnection>,
-    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>>;
+    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, RpcServerError>>;
 
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
     /// closed.

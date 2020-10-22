@@ -31,6 +31,7 @@ use crate::{
     },
     log::prelude::*,
 };
+use crate::api::RpcServerError;
 
 /// Repository of the all [`RpcServer`]s registered on this Media Server.
 #[cfg_attr(test, mockall::automock)]
@@ -236,11 +237,19 @@ impl WsSession {
                     }
                     Self::send_join_room(ctx, room_id, member_id);
                 }
-                Err(_) => Self::send_left_room(
-                    ctx,
-                    room_id,
-                    CloseReason::InternalError,
-                ),
+                Err(err) => {
+                    let reason = match err {
+                        RpcServerError::Authorization => CloseReason::Rejected,
+                        RpcServerError::Unexpected(_) | RpcServerError::RoomMailbox(_) => {
+                            CloseReason::InternalError
+                        }
+                    };
+                    Self::send_left_room(
+                        ctx,
+                        room_id,
+                        reason,
+                    )
+                },
             })
             .wait(ctx);
         } else {

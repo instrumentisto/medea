@@ -6,7 +6,8 @@ use futures::stream;
 use medea_client_api_proto::{ClientMsg, CloseReason, ServerMsg};
 use medea_jason::rpc::{
     websocket::{MockRpcTransport, TransportState},
-    ConnectionInfo, RpcSession, RpcTransport, WebSocketRpcSession, WebSocketRpcClient,
+    ConnectionInfo, RpcSession, RpcTransport, WebSocketRpcClient,
+    WebSocketRpcSession,
 };
 use wasm_bindgen_test::*;
 
@@ -19,8 +20,8 @@ wasm_bindgen_test_configure!(run_in_browser);
 /// answered with `LeftRoom` message.
 #[wasm_bindgen_test]
 async fn could_not_init_socket_err() {
-    let session =
-        WebSocketRpcSession::new(Rc::new(WebSocketRpcClient::new(Box::new(move |_| {
+    let session = WebSocketRpcSession::new(Rc::new(WebSocketRpcClient::new(
+        Box::new(move |_| {
             Box::pin(async move {
                 let mut transport = MockRpcTransport::new();
                 transport.expect_on_message().returning_st(|| {
@@ -40,7 +41,8 @@ async fn could_not_init_socket_err() {
                 let transport = Rc::new(transport);
                 Ok(transport as Rc<dyn RpcTransport>)
             })
-        }))));
+        }),
+    )));
 
     let connect_fut = Rc::clone(&session)
         .connect(ConnectionInfo::from_str(TEST_ROOM_URL).unwrap());

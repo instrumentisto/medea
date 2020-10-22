@@ -38,7 +38,7 @@ pub use self::{
 pub struct ApiUrl(Url);
 
 /// Information about [`RpcSession`] connection.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ConnectionInfo {
     /// [`Url`] to which transport layer will connect.
     url: ApiUrl,

@@ -1,9 +1,6 @@
 //! Implementation of the [`RpcServer`] and related [`Command`]s and functions.
 
-use actix::{
-    fut::{self, Either},
-    ActorFuture, Addr, ContextFutureSpawner as _, Handler, WrapFuture,
-};
+use actix::{fut::{self, Either}, ActorFuture, Addr, ContextFutureSpawner as _, Handler, WrapFuture, MailboxError};
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{
@@ -26,6 +23,7 @@ use crate::{
 };
 
 use super::{ActFuture, Room};
+use crate::api::RpcServerError;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
@@ -88,7 +86,7 @@ impl RpcServer for Addr<Room> {
         member_id: MemberId,
         credentials: Credential,
         connection: Box<dyn RpcConnection>,
-    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, ()>> {
+    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, RpcServerError>> {
         self.send(RpcConnectionEstablished {
             member_id,
             credentials,
@@ -96,13 +94,9 @@ impl RpcServer for Addr<Room> {
         })
         .map(|r| {
             r.map_err(|e| {
-                error!("Failed to send RpcConnectionEstablished cause {:?}", e)
+                RpcServerError::RoomMailbox(e)
             })
-            .and_then(|r| {
-                r.map_err(|e| {
-                    error!("RpcConnectionEstablished failed cause: {:?}", e)
-                })
-            })
+                .and_then(|r| r.map_err(|e| e.into()))
         })
         .boxed_local()
     }

@@ -142,6 +142,12 @@ where
     pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         self.0.borrow().subscribe()
     }
+
+    /// Returns cloned underlying data.
+    #[inline]
+    pub fn clone_inner(&self) -> D {
+        self.0.borrow().data.clone()
+    }
 }
 
 impl<D> ObservableCell<D>
