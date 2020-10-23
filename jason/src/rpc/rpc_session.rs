@@ -56,7 +56,7 @@ pub enum SessionError {
 #[derive(Clone, Debug)]
 enum SessionState {
     Uninitialized,
-    ReadyForConnect(Rc<ConnectionInfo>),
+    Initialized(Rc<ConnectionInfo>),
     Connecting(Rc<ConnectionInfo>),
     Authorizing(Rc<ConnectionInfo>),
     Failed(Rc<Traced<SessionError>>, Rc<ConnectionInfo>),
@@ -69,7 +69,7 @@ impl PartialEq for SessionState {
         use SessionState as S;
         match (self, other) {
             (S::Uninitialized, S::Uninitialized) => true,
-            (S::ReadyForConnect(a), S::ReadyForConnect(b)) => a == b,
+            (S::Initialized(a), S::Initialized(b)) => a == b,
             (S::Connecting(a), S::Connecting(b)) => a == b,
             (S::Failed(_, a), S::Failed(_, b)) => a == b,
             (S::Authorizing(a), S::Authorizing(b)) => a == b,
@@ -198,7 +198,7 @@ impl WebSocketRpcSession {
         let current_state = self.state.clone_inner();
         match current_state {
             S::Connecting(_) | S::Authorizing(_) | S::Opened(_) => (),
-            S::ReadyForConnect(info) => {
+            S::Initialized(info) => {
                 self.state.set(S::Connecting(info));
             }
             S::Failed(_, info) => {
@@ -226,7 +226,7 @@ impl WebSocketRpcSession {
         let mut state_updates_stream = self.state.subscribe();
         while let Some(state) = state_updates_stream.next().await {
             match state {
-                S::ReadyForConnect(_) => {
+                S::Initialized(_) => {
                     return Err(tracerr::new!(E::NewConnectionInfo));
                 }
                 S::Opened(_) => return Ok(()),
@@ -266,7 +266,7 @@ impl WebSocketRpcSession {
                 ));
             }
             S::Uninitialized
-            | S::ReadyForConnect(_)
+            | S::Initialized(_)
             | S::Failed(_, _)
             | S::Finished(_) => {}
         }
@@ -333,26 +333,20 @@ impl RpcSession for WebSocketRpcSession {
         self: Rc<Self>,
         connection_info: ConnectionInfo,
     ) -> Result<(), Traced<SessionError>> {
+        use SessionState as S;
         match self.state.clone_inner() {
-            SessionState::Uninitialized
-            | SessionState::ReadyForConnect(_)
-            | SessionState::Failed(_, _) => {
-                self.state.set(SessionState::ReadyForConnect(Rc::new(
-                    connection_info,
-                )));
+            S::Uninitialized | S::Initialized(_) | S::Failed(_, _) => {
+                self.state.set(S::Initialized(Rc::new(connection_info)));
             }
-            SessionState::Finished(reason) => {
+            S::Finished(reason) => {
                 return Err(tracerr::new!(SessionError::SessionFinished(
                     reason
                 )));
             }
-            SessionState::Connecting(info)
-            | SessionState::Authorizing(info)
-            | SessionState::Opened(info) => {
+            S::Connecting(info) | S::Authorizing(info) | S::Opened(info) => {
                 if info.as_ref() != &connection_info {
-                    self.state.set(SessionState::ReadyForConnect(Rc::new(
-                        connection_info,
-                    )));
+                    self.state
+                        .set(S::Initialized(Rc::new(connection_info)));
                 }
             }
         }
@@ -438,10 +432,10 @@ impl RpcSession for WebSocketRpcSession {
         self.state
             .subscribe()
             .filter_map(move |current_state| {
-                let is_inited = is_can_be_reconnected.clone();
+                let is_can_be_reconnected = is_can_be_reconnected.clone();
                 async move {
                     if matches!(current_state, SessionState::Opened(_))
-                        && is_inited.get()
+                        && is_can_be_reconnected.get()
                     {
                         Some(())
                     } else {
@@ -518,7 +512,7 @@ impl SessionStateHandler for WebSocketRpcSession {
 
     async fn on_uninitialized(self: Rc<Self>) {}
 
-    async fn on_ready_for_connect(self: Rc<Self>, _: Rc<ConnectionInfo>) {}
+    async fn on_initialized(self: Rc<Self>, _: Rc<ConnectionInfo>) {}
 
     async fn on_connecting(self: Rc<Self>, info: Rc<ConnectionInfo>) {
         match Rc::clone(&self.client)
