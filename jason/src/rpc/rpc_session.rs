@@ -52,32 +52,15 @@ pub enum SessionError {
     NewConnectionInfo,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum ConnectedSessionState {
-    Open,
-    Authorizing,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-struct ConnectedSession {
-    info: Rc<ConnectionInfo>,
-    state: ConnectedSessionState,
-}
-
-impl ConnectedSession {
-    fn new(state: ConnectedSessionState, info: Rc<ConnectionInfo>) -> Self {
-        Self { info, state }
-    }
-}
-
 #[dispatchable(self: Rc<Self>, async_trait(?Send))]
 #[derive(Clone, Debug)]
 enum SessionState {
     Uninitialized,
     ReadyForConnect(Rc<ConnectionInfo>),
-    Connecting(ConnectedSession),
-    Failed(Rc<Traced<SessionError>>, ConnectedSession),
-    Connected(ConnectedSession),
+    Connecting(Rc<ConnectionInfo>),
+    Authorizing(Rc<ConnectionInfo>),
+    Failed(Rc<Traced<SessionError>>, Rc<ConnectionInfo>),
+    Opened(Rc<ConnectionInfo>),
     Finished(CloseReason),
 }
 
@@ -89,21 +72,10 @@ impl PartialEq for SessionState {
             (S::ReadyForConnect(a), S::ReadyForConnect(b)) => a == b,
             (S::Connecting(a), S::Connecting(b)) => a == b,
             (S::Failed(_, a), S::Failed(_, b)) => a == b,
-            (S::Connected(a), S::Connected(b)) => a == b,
+            (S::Authorizing(a), S::Authorizing(b)) => a == b,
+            (S::Opened(a), S::Opened(b)) => a == b,
             (S::Finished(a), S::Finished(b)) => a == b,
             _ => false,
-        }
-    }
-}
-
-impl SessionState {
-    pub fn connected(
-        &self,
-    ) -> Option<(ConnectedSessionState, &ConnectedSession)> {
-        if let SessionState::Connected(state) = &self {
-            Some((state.state, state))
-        } else {
-            None
         }
     }
 }
@@ -225,15 +197,12 @@ impl WebSocketRpcSession {
 
         let current_state = self.state.clone_inner();
         match current_state {
-            S::Connecting(_) | S::Connected(_) => (),
+            S::Connecting(_) | S::Authorizing(_) | S::Opened(_) => (),
             S::ReadyForConnect(info) => {
-                self.state.set(S::Connecting(ConnectedSession::new(
-                    ConnectedSessionState::Authorizing,
-                    info,
-                )));
+                self.state.set(S::Connecting(info));
             }
-            S::Failed(_, state) => {
-                self.state.set(S::Connecting(state));
+            S::Failed(_, info) => {
+                self.state.set(S::Connecting(info));
             }
             S::Uninitialized => {
                 return Err(tracerr::new!(E::NoCredentials));
@@ -260,10 +229,7 @@ impl WebSocketRpcSession {
                 S::ReadyForConnect(_) => {
                     return Err(tracerr::new!(E::NewConnectionInfo));
                 }
-                S::Connected(state) => match state.state {
-                    ConnectedSessionState::Open => return Ok(()),
-                    _ => (),
-                },
+                S::Opened(_) => return Ok(()),
                 S::Failed(err, _) => {
                     // TODO: Clone Traced and add new Frame to it when Traced
                     //       cloning will be implemented.
@@ -289,14 +255,14 @@ impl WebSocketRpcSession {
         use SessionState as S;
 
         let current_state = self.state.clone_inner();
+        if matches!(current_state, S::Opened(_)) {
+            self.is_can_be_reconnected.set(true);
+        }
         match current_state {
-            S::Connecting(state) | S::Connected(state) => {
-                if matches!(state.state, ConnectedSessionState::Open) {
-                    self.is_can_be_reconnected.set(true);
-                }
+            S::Connecting(info) | S::Authorizing(info) | S::Opened(info) => {
                 self.state.set(S::Failed(
                     Rc::new(tracerr::new!(SessionError::ConnectionLost)),
-                    state,
+                    info,
                 ));
             }
             S::Uninitialized
@@ -380,9 +346,10 @@ impl RpcSession for WebSocketRpcSession {
                     reason
                 )));
             }
-            SessionState::Connecting(connected)
-            | SessionState::Connected(connected) => {
-                if connected.info.as_ref() != &connection_info {
+            SessionState::Connecting(info)
+            | SessionState::Authorizing(info)
+            | SessionState::Opened(info) => {
+                if info.as_ref() != &connection_info {
                     self.state.set(SessionState::ReadyForConnect(Rc::new(
                         connection_info,
                     )));
@@ -412,15 +379,10 @@ impl RpcSession for WebSocketRpcSession {
     }
 
     fn send_command(&self, command: Command) {
-        if let SessionState::Connected(state) = self.state.clone_inner() {
-            if let ConnectedSessionState::Open = state.state {
-                self.client
-                    .send_command(state.info.room_id.clone(), command);
-            } else {
-                log::error!("Tries to send command before authorizing");
-            }
+        if let SessionState::Opened(info) = self.state.clone_inner() {
+            self.client.send_command(info.room_id.clone(), command);
         } else {
-            log::error!("Tried to send command before connecting");
+            log::error!("Tried to send command in disconnected state");
         }
     }
 
@@ -447,13 +409,9 @@ impl RpcSession for WebSocketRpcSession {
 
     fn close_with_reason(&self, close_reason: ClientDisconnect) {
         match self.state.clone_inner() {
-            SessionState::Connected(state) => {
-                if let ConnectedSessionState::Open = state.state {
-                    self.client.leave_room(
-                        state.info.room_id.clone(),
-                        state.info.member_id.clone(),
-                    );
-                }
+            SessionState::Opened(info) => {
+                self.client
+                    .leave_room(info.room_id.clone(), info.member_id.clone());
             }
             _ => (),
         }
@@ -482,8 +440,7 @@ impl RpcSession for WebSocketRpcSession {
             .filter_map(move |current_state| {
                 let is_inited = is_can_be_reconnected.clone();
                 async move {
-                    let (state, _) = current_state.connected()?;
-                    if matches!(state, ConnectedSessionState::Open)
+                    if matches!(current_state, SessionState::Opened(_))
                         && is_inited.get()
                     {
                         Some(())
@@ -504,17 +461,10 @@ impl RpcEventHandler for WebSocketRpcSession {
         room_id: RoomId,
         member_id: MemberId,
     ) -> Self::Output {
-        let current_state = self.state.clone_inner();
-        let (connected_state, state) = current_state.connected()?;
-        if matches!(connected_state, ConnectedSessionState::Authorizing)
-            && state.info.room_id == room_id
-            && state.info.member_id == member_id
-        {
-            self.state
-                .set(SessionState::Connected(ConnectedSession::new(
-                    ConnectedSessionState::Open,
-                    state.info.clone(),
-                )));
+        if let SessionState::Authorizing(info) = self.state.clone_inner() {
+            if info.room_id == room_id && info.member_id == member_id {
+                self.state.set(SessionState::Opened(info));
+            }
         }
 
         Some(())
@@ -526,30 +476,36 @@ impl RpcEventHandler for WebSocketRpcSession {
         close_reason: CloseReason,
     ) -> Self::Output {
         let current_state = self.state.clone_inner();
-        let (connected_state, state) = current_state.connected()?;
-        if state.info.room_id == room_id {
-            match connected_state {
-                ConnectedSessionState::Open => {
-                    self.state.set(SessionState::Finished(close_reason));
-                }
-                ConnectedSessionState::Authorizing => {
-                    self.state.set(SessionState::Uninitialized);
+
+        match &current_state {
+            SessionState::Opened(info) | SessionState::Authorizing(info) => {
+                if info.room_id != room_id {
+                    return None;
                 }
             }
+            _ => return None,
+        }
+
+        match current_state {
+            SessionState::Opened(_) => {
+                self.state.set(SessionState::Finished(close_reason));
+            }
+            SessionState::Authorizing(_) => {
+                self.state.set(SessionState::Uninitialized);
+            }
+            _ => (),
         }
 
         Some(())
     }
 
     fn on_event(&self, room_id: RoomId, event: Event) -> Self::Output {
-        let current_state = self.state.clone_inner();
-        let (connected_state, state) = current_state.connected()?;
-        if matches!(connected_state, ConnectedSessionState::Open)
-            && state.info.room_id == room_id
-        {
-            self.event_txs
-                .borrow_mut()
-                .retain(|tx| tx.unbounded_send(event.clone()).is_ok());
+        if let SessionState::Opened(info) = self.state.clone_inner() {
+            if info.room_id == room_id {
+                self.event_txs
+                    .borrow_mut()
+                    .retain(|tx| tx.unbounded_send(event.clone()).is_ok());
+            }
         }
 
         Some(())
@@ -564,40 +520,36 @@ impl SessionStateHandler for WebSocketRpcSession {
 
     async fn on_ready_for_connect(self: Rc<Self>, _: Rc<ConnectionInfo>) {}
 
-    async fn on_connecting(self: Rc<Self>, desired_state: ConnectedSession) {
+    async fn on_connecting(self: Rc<Self>, info: Rc<ConnectionInfo>) {
         match Rc::clone(&self.client)
-            .connect(desired_state.info.url.clone())
+            .connect(info.url.clone())
             .await
             .map_err(tracerr::map_from_and_wrap!())
         {
             Ok(_) => {
-                self.state.set(SessionState::Connected(desired_state));
+                self.state.set(SessionState::Authorizing(info));
             }
             Err(e) => {
-                self.state
-                    .set(SessionState::Failed(Rc::new(e), desired_state));
+                self.state.set(SessionState::Failed(Rc::new(e), info));
             }
         }
     }
 
     async fn on_failed(
         self: Rc<Self>,
-        _: (Rc<Traced<SessionError>>, ConnectedSession),
+        _: (Rc<Traced<SessionError>>, Rc<ConnectionInfo>),
     ) {
     }
 
-    async fn on_connected(self: Rc<Self>, state: ConnectedSession) {
-        match state.state {
-            ConnectedSessionState::Authorizing => {
-                self.client.authorize(
-                    state.info.room_id.clone(),
-                    state.info.member_id.clone(),
-                    state.info.credential.clone(),
-                );
-            }
-            ConnectedSessionState::Open => (),
-        }
+    async fn on_authorizing(self: Rc<Self>, info: Rc<ConnectionInfo>) {
+        self.client.authorize(
+            info.room_id.clone(),
+            info.member_id.clone(),
+            info.credential.clone(),
+        );
     }
+
+    async fn on_opened(self: Rc<Self>, _: Rc<ConnectionInfo>) {}
 
     async fn on_finished(self: Rc<Self>, _: CloseReason) {}
 }
