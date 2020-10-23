@@ -491,7 +491,7 @@ impl<T> TrackChangeHandler for Peer<T> {
 /// [`TrackPatchDeduper::whitelist`].
 struct TrackPatchDeduper {
     /// All merged [`TrackPatchEvent`]s from this [`TrackPatchDeduper`].
-    merged_patches: HashMap<TrackId, TrackPatchEvent>,
+    result: HashMap<TrackId, TrackPatchEvent>,
 
     /// [`TrackId`]s which are can be merged.
     ///
@@ -501,17 +501,17 @@ struct TrackPatchDeduper {
 
 impl TrackPatchDeduper {
     /// Returns new [`TrackPatchDeduper`] with a disabled whitelisting.
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
-            merged_patches: HashMap::new(),
+            result: HashMap::new(),
             whitelist: None,
         }
     }
 
     /// Returns new [`TrackPatchDeduper`] with a provided whitelist.
-    pub fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
+    fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
         Self {
-            merged_patches: HashMap::new(),
+            result: HashMap::new(),
             whitelist: Some(whitelist),
         }
     }
@@ -520,25 +520,17 @@ impl TrackPatchDeduper {
     /// [`TrackPatchDedupper::merged_patches`].
     ///
     /// Removes merged [`TrackPatchEvent`]s from the provided [`Vec`].
-    pub fn merge(&mut self, changes: &mut Vec<TrackChange>) {
+    fn merge(&mut self, changes: &mut Vec<TrackChange>) {
         changes.retain(|change| {
             self.filter_patch(change)
                 .map(|patch| {
-                    self.merged_patches
+                    self.result
                         .entry(patch.id)
                         .or_insert_with(|| TrackPatchEvent::new(patch.id))
                         .merge(patch);
                 })
                 .is_none()
         });
-    }
-
-    /// Returns [`Iterator`] with the all merged [`TrackPatchEvent`]s converted
-    /// to the [`TrackChange`].
-    pub fn into_track_change_iter(self) -> impl Iterator<Item = TrackChange> {
-        self.merged_patches
-            .into_iter()
-            .map(|(_, patch)| TrackChange::TrackPatch(patch))
     }
 
     /// Returns `Some(TrackPatchEvent)` if provided [`TrackPatchEvent`] can be
@@ -565,6 +557,14 @@ impl TrackPatchDeduper {
             }
             _ => None,
         }
+    }
+
+    /// Returns [`Iterator`] with the all merged [`TrackPatchEvent`]s converted
+    /// to the [`TrackChange`].
+    fn into_track_change_iter(self) -> impl Iterator<Item = TrackChange> {
+        self.result
+            .into_iter()
+            .map(|(_, patch)| TrackChange::TrackPatch(patch))
     }
 }
 
