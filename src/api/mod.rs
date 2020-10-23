@@ -5,6 +5,7 @@ pub mod control;
 
 use std::fmt::Debug;
 
+use actix::MailboxError;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{Command, Credential, MemberId};
 
@@ -14,12 +15,17 @@ use crate::{
     },
     signalling::room::RoomError,
 };
-use actix::MailboxError;
 
+/// Errors which [`RpcServer`] can return.
 #[derive(Debug)]
 pub enum RpcServerError {
+    /// Authorization on the [`RpcServer`] was failed.
     Authorization,
-    Unexpected(RoomError),
+
+    /// [`Room`] returned some [`RoomError`].
+    RoomError(RoomError),
+
+    /// [`Room`]s [`MailboxError`] is closed or overflowed.
     RoomMailbox(MailboxError),
 }
 
@@ -27,7 +33,7 @@ impl From<RoomError> for RpcServerError {
     fn from(err: RoomError) -> Self {
         match &err {
             RoomError::AuthorizationError => RpcServerError::Authorization,
-            _ => RpcServerError::Unexpected(err),
+            _ => RpcServerError::RoomError(err),
         }
     }
 }

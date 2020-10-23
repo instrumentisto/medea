@@ -18,7 +18,7 @@ use crate::{
             RpcConnectionEstablished, RpcConnectionSettings,
         },
         control::callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
-        RpcServer,
+        RpcServer, RpcServerError,
     },
     log::prelude::*,
     media::PeerStateMachine,
@@ -26,7 +26,6 @@ use crate::{
 };
 
 use super::{ActFuture, Room};
-use crate::api::RpcServerError;
 
 /// Error of validating received [`Command`].
 #[derive(Debug, Display, Fail, PartialEq)]
@@ -84,6 +83,13 @@ impl Room {
 impl RpcServer for Addr<Room> {
     /// Sends [`RpcConnectionEstablished`] message to [`Room`] actor propagating
     /// errors.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RpcServerError::RoomMailbox`] if [`Message`] sending is
+    /// failed.
+    ///
+    /// Errors with [`RpcServerError::RoomError`] if [`Room`] returns error.
     fn connection_established(
         &self,
         member_id: MemberId,

@@ -239,7 +239,7 @@ impl WsSession {
                 Err(err) => {
                     let reason = match err {
                         RpcServerError::Authorization => CloseReason::Rejected,
-                        RpcServerError::Unexpected(_)
+                        RpcServerError::RoomError(_)
                         | RpcServerError::RoomMailbox(_) => {
                             CloseReason::InternalError
                         }

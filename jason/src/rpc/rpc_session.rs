@@ -73,23 +73,23 @@ pub enum SessionError {
 /// +-------+-------+
 ///         |
 ///         v
-/// +-------+-------+            +--------+
-/// |  Initialized  +<-----------+ Failed |
-/// +-------+-------+            +----+---+
-///         |                         ^
-///         v                         |
-/// +-------+-------+                 |
-/// |  Connecting   +-----------------+
-/// +-------+-------+                 |
-///         |                         |
-///         v                         |
-/// +-------+-------+                 |
-/// |  Authorizing  +-----------------+
-/// +-------+-------+                 |
-///         |                         |
-///         v                         |
-/// +-------+-------+                 |
-/// |    Opened     +-----------------+
+/// +-------+-------+
+/// |  Initialized  |
+/// +-------+-------+
+///         |
+///         v                    +------------+
+/// +-------+-------+<-----------+            |
+/// |  Connecting   |            |   Failed   |
+/// +-------+-------+----------->+            |
+///         |                    +------+-----+
+///         v                           ^
+/// +-------+-------+                   |
+/// |  Authorizing  +------------------>+
+/// +-------+-------+                   |
+///         |                           |
+///         v                           |
+/// +-------+-------+                   |
+/// |    Opened     +------------------>+
 /// +-------+-------+
 ///         |
 ///         v
@@ -371,46 +371,38 @@ impl WebSocketRpcSession {
     /// Spawns [`SessionState`] updates handler for this
     /// [`WebSocketRpcSession`].
     fn spawn_state_watcher(self: &Rc<Self>) {
-        spawn_local({
-            let weak_this = Rc::downgrade(self);
-            let mut state_updates = self.state.subscribe();
-            async move {
-                while let Some(state) = state_updates.next().await {
-                    let this = upgrade_or_break!(weak_this);
-                    state.dispatch_with(this).await;
-                }
+        let weak_this = Rc::downgrade(self);
+        let mut state_updates = self.state.subscribe();
+        spawn_local(async move {
+            while let Some(state) = state_updates.next().await {
+                let this = upgrade_or_break!(weak_this);
+                state.dispatch_with(this).await;
             }
         });
     }
 
     /// Spawns [`WebSocketRpcClient::on_connection_loss`] listener.
     fn spawn_connection_loss_watcher(self: &Rc<Self>) {
-        spawn_local({
-            let weak_this = Rc::downgrade(self);
-            let mut client_on_connection_loss =
-                self.client.on_connection_loss();
-
-            async move {
-                while client_on_connection_loss.next().await.is_some() {
-                    let this = upgrade_or_break!(weak_this);
-                    this.connection_lost();
-                }
+        let weak_this = Rc::downgrade(self);
+        let mut client_on_connection_loss = self.client.on_connection_loss();
+        spawn_local(async move {
+            while client_on_connection_loss.next().await.is_some() {
+                let this = upgrade_or_break!(weak_this);
+                this.connection_lost();
             }
         });
     }
 
     /// Spawns [`WebSocketRpcClient::on_normal_close`] listener.
     fn spawn_close_watcher(self: &Rc<Self>) {
-        spawn_local({
-            let weak_this = Rc::downgrade(self);
-            let on_normal_close = self.client.on_normal_close();
-            async move {
-                let reason = on_normal_close.await.unwrap_or_else(|_| {
-                    ClientDisconnect::RpcClientUnexpectedlyDropped.into()
-                });
-                if let Some(this) = weak_this.upgrade() {
-                    this.state.set(SessionState::Finished(reason));
-                }
+        let weak_this = Rc::downgrade(self);
+        let on_normal_close = self.client.on_normal_close();
+        spawn_local(async move {
+            let reason = on_normal_close.await.unwrap_or_else(|_| {
+                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+            });
+            if let Some(this) = weak_this.upgrade() {
+                this.state.set(SessionState::Finished(reason));
             }
         });
     }
@@ -577,24 +569,18 @@ impl RpcSession for WebSocketRpcSession {
 }
 
 impl RpcEventHandler for WebSocketRpcSession {
-    type Output = Option<()>;
+    type Output = ();
 
     /// If current [`SessionState`] is [`SessionState::Authorizing`] and
     /// [`RoomId`] from [`ConnectionInfo`] is equal to the provided
     /// [`RoomId`], then [`SessionState`] will be transited to the
     /// [`SessionState::Opened`].
-    fn on_joined_room(
-        &self,
-        room_id: RoomId,
-        member_id: MemberId,
-    ) -> Self::Output {
+    fn on_joined_room(&self, room_id: RoomId, member_id: MemberId) {
         if let SessionState::Authorizing(info) = self.state.clone_inner() {
             if info.room_id == room_id && info.member_id == member_id {
                 self.state.set(SessionState::Opened(info));
             }
         }
-
-        Some(())
     }
 
     /// If current [`SessionState`] is [`SessionState::Opened`] or
@@ -604,20 +590,16 @@ impl RpcEventHandler for WebSocketRpcSession {
     /// to the [`SessionState::Finished`] if current [`SessionState`] is
     /// [`SessionState::Opened`] or to the [`SessionState::Uninitialized`] if
     /// current [`SessionState`] is [`SessionState::Authorizing`].
-    fn on_left_room(
-        &self,
-        room_id: RoomId,
-        close_reason: CloseReason,
-    ) -> Self::Output {
+    fn on_left_room(&self, room_id: RoomId, close_reason: CloseReason) {
         let current_state = self.state.clone_inner();
 
         match &current_state {
             SessionState::Opened(info) | SessionState::Authorizing(info) => {
                 if info.room_id != room_id {
-                    return None;
+                    return;
                 }
             }
-            _ => return None,
+            _ => return,
         }
 
         match current_state {
@@ -629,15 +611,13 @@ impl RpcEventHandler for WebSocketRpcSession {
             }
             _ => (),
         }
-
-        Some(())
     }
 
     /// Sends received [`Event`] to the all [`RpcSession::subscribe`]
     /// subscribers if current [`SessionState`] is [`SessionState::Opened`]
     /// and provided [`RoomId`] is equal to the [`RoomId`] from the
     /// [`ConnectionInfo`].
-    fn on_event(&self, room_id: RoomId, event: Event) -> Self::Output {
+    fn on_event(&self, room_id: RoomId, event: Event) {
         if let SessionState::Opened(info) = self.state.clone_inner() {
             if info.room_id == room_id {
                 self.event_txs
@@ -645,8 +625,6 @@ impl RpcEventHandler for WebSocketRpcSession {
                     .retain(|tx| tx.unbounded_send(event.clone()).is_ok());
             }
         }
-
-        Some(())
     }
 }
 

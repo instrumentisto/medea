@@ -1,6 +1,10 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{rc::Rc, str::FromStr, sync::atomic::Ordering};
+use std::{
+    rc::Rc,
+    str::FromStr,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use futures::stream;
 use medea_client_api_proto::{ClientMsg, CloseReason, ServerMsg};
@@ -12,7 +16,6 @@ use medea_jason::rpc::{
 use wasm_bindgen_test::*;
 
 use crate::{rpc::RPC_SETTINGS, timeout, TEST_ROOM_URL};
-use wasm_bindgen::__rt::core::sync::atomic::AtomicBool;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
