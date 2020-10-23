@@ -2,8 +2,7 @@
 
 use actix::{
     fut::{self, Either},
-    ActorFuture, Addr, ContextFutureSpawner as _, Handler, MailboxError,
-    WrapFuture,
+    ActorFuture, Addr, ContextFutureSpawner as _, Handler, WrapFuture,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -98,7 +97,7 @@ impl RpcServer for Addr<Room> {
             connection,
         })
         .map(|r| {
-            r.map_err(|e| RpcServerError::RoomMailbox(e))
+            r.map_err(RpcServerError::RoomMailbox)
                 .and_then(|r| r.map_err(|e| e.into()))
         })
         .boxed_local()
@@ -315,7 +314,7 @@ mod test {
         AppContext,
     };
 
-    use medea_client_api_proto::IceCandidate;
+    use medea_client_api_proto::{IceCandidate, RoomId};
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
@@ -357,11 +356,11 @@ mod test {
         );
 
         room.members
-            .create_member(MemberId("member1"), &member1)
+            .create_member(MemberId::from("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            MemberId("member1"),
+            MemberId::from("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -395,11 +394,11 @@ mod test {
         );
 
         room.members
-            .create_member(MemberId("member1"), &member1)
+            .create_member(MemberId::from("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            MemberId("member1"),
+            MemberId::from("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {

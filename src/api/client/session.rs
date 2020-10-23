@@ -665,7 +665,7 @@ mod test {
         client::rpc_connection::{
             ClosedReason, RpcConnection, RpcConnectionSettings,
         },
-        MockRpcServer,
+        MockRpcServer, RpcServerError,
     };
 
     use super::{MockRpcServerRepository, WsSession};
@@ -703,7 +703,9 @@ mod test {
                     .withf(move |member_id, _, _| {
                         *member_id == expected_member_id
                     })
-                    .return_once(|_, _, _| future::err(()).boxed_local());
+                    .return_once(|_, _, _| {
+                        future::err(RpcServerError::Authorization).boxed_local()
+                    });
                 rpc_server
                     .expect_connection_closed()
                     .returning(|_, _| future::ready(()).boxed_local());
@@ -744,8 +746,7 @@ mod test {
         let expected_left_room_frame = Frame::Text(
             serde_json::to_string(&ServerMsg::LeftRoom {
                 room_id: "room_id".into(),
-                close_reason:
-                    medea_client_api_proto::CloseReason::InternalError,
+                close_reason: medea_client_api_proto::CloseReason::Rejected,
             })
             .unwrap()
             .into(),
