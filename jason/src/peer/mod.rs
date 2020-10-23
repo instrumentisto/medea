@@ -8,6 +8,7 @@ mod media;
 mod repo;
 mod stats;
 mod tracks_request;
+mod transceiver;
 
 use std::{
     cell::RefCell,
@@ -42,10 +43,7 @@ use crate::{
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
-    conn::{
-        IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
-        TransceiverDirection,
-    },
+    conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
         MediaConnections, MediaConnectionsError, MuteState,
         MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
@@ -54,6 +52,7 @@ pub use self::{
     repo::{PeerRepository, Repository},
     stats::RtcStats,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
+    transceiver::TransceiverDirection,
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -303,7 +302,7 @@ impl PeerConnection {
         peer.peer
             .on_track(Some(move |track_event| {
                 if let Err(err) =
-                    Self::on_track(&media_connections, &track_event)
+                    media_connections.add_remote_track(&track_event)
                 {
                     JasonError::from(err).print();
                 };
@@ -496,22 +495,6 @@ impl PeerConnection {
         });
     }
 
-    /// Handle `track` event from underlying peer adding new track to
-    /// `media_connections` and emitting [`PeerEvent::NewRemoteTracks`]
-    /// event into this peers `peer_events_sender` if all tracks from this
-    /// sender has arrived.
-    fn on_track(
-        media_connections: &MediaConnections,
-        track_event: &RtcTrackEvent,
-    ) -> Result<()> {
-        let transceiver = track_event.transceiver();
-        media_connections
-            .add_remote_track(transceiver, track_event.track())
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(())
-    }
-
     /// Marks [`PeerConnection`] to trigger ICE restart.
     ///
     /// After this function returns, the offer returned by the next call to
@@ -622,6 +605,7 @@ impl PeerConnection {
             .create_and_set_offer()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+        self.media_connections.sync_receivers();
         Ok(offer)
     }
 
@@ -793,6 +777,7 @@ impl PeerConnection {
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         *self.has_remote_description.borrow_mut() = true;
+        self.media_connections.sync_receivers();
 
         let mut candidates = self.ice_candidates_buffer.borrow_mut();
         let mut futures = Vec::with_capacity(candidates.len());
@@ -876,6 +861,7 @@ impl PeerConnection {
             .create_and_set_answer()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+        self.media_connections.sync_receivers();
 
         Ok(answer)
     }

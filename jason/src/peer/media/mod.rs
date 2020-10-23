@@ -12,13 +12,13 @@ use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
 use proto::{Direction, MediaSourceKind, PeerId, TrackId};
 use tracerr::Traced;
-use web_sys::{MediaStreamTrack as SysMediaStreamTrack, RtcRtpTransceiver};
+use web_sys::RtcTrackEvent;
 
 use crate::{
     media::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
-    peer::PeerEvent,
+    peer::{transceiver::Transceiver, PeerEvent, TransceiverDirection},
     utils::{JsCaused, JsError},
 };
 
@@ -40,7 +40,9 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn kind(&self) -> MediaKind;
 
-    /// Returns [`MediaKind`] of this [`TransceiverSide`].
+    /// Returns [`mid`] of this [`TransceiverSide`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn mid(&self) -> Option<String>;
 
     /// Returns `true` if this [`TransceiverKind`] currently can be
@@ -151,7 +153,7 @@ pub enum MediaConnectionsError {
                connections",
         _0
     )]
-    CouldNotInsertRemoteTrack(Option<String>),
+    CouldNotInsertRemoteTrack(String),
 
     /// Could not find [`RtcRtpTransceiver`] by `mid`.
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
@@ -270,6 +272,22 @@ impl InnerMediaConnections {
                 .map(|rx| Rc::clone(&rx) as Rc<dyn TransceiverSide>)
                 .collect(),
         }
+    }
+
+    /// Creates [`Transceiver`] and adds it to the [`RtcPeerConnection`].
+    fn add_transceiver(
+        &self,
+        kind: MediaKind,
+        direction: TransceiverDirection,
+    ) -> Transceiver {
+        Transceiver::from(self.peer.add_transceiver(kind, direction))
+    }
+
+    /// Lookups [`Transceiver`] by the provided [`mid`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
+        self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
     }
 }
 
@@ -473,7 +491,6 @@ impl MediaConnections {
         send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
-        let mut inner = self.0.borrow_mut();
         for track in tracks {
             let is_required = track.is_required();
             match track.direction {
@@ -489,11 +506,9 @@ impl MediaConnections {
                             StableMuteState::Muted
                         };
                     let sndr = SenderBuilder {
-                        peer_id: inner.peer_id,
+                        media_connections: self,
                         track_id: track.id,
                         caps: track.media_type.into(),
-                        peer: &inner.peer,
-                        peer_events_sender: inner.peer_events_sender.clone(),
                         mid,
                         mute_state,
                         is_required,
@@ -501,19 +516,18 @@ impl MediaConnections {
                     }
                     .build()
                     .map_err(tracerr::wrap!())?;
-                    inner.senders.insert(track.id, sndr);
+                    self.0.borrow_mut().senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Rc::new(Receiver::new(
+                        self,
                         track.id,
                         track.media_type.into(),
                         sender,
-                        &inner.peer,
                         mid,
-                        inner.peer_events_sender.clone(),
                         recv_constraints,
                     ));
-                    inner.receivers.insert(track.id, recv);
+                    self.0.borrow_mut().receivers.insert(track.id, recv);
                 }
             }
         }
@@ -622,9 +636,8 @@ impl MediaConnections {
         Ok(mute_satates_updates)
     }
 
-    /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to the
-    /// stored [`Receiver`], which is associated with a given
-    /// [`RtcRtpTransceiver`].
+    /// Handles [`RtcTrackEvent`] by adding new track to the corresponding
+    /// [`Receiver`].
     ///
     /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
     /// any.
@@ -632,36 +645,59 @@ impl MediaConnections {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
-    /// provided transceiver has empty `mid`, that means that negotiation has
-    /// not completed.
-    ///
-    /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
     /// could not find [`Receiver`] by transceivers `mid`.
-    pub fn add_remote_track(
-        &self,
-        transceiver: RtcRtpTransceiver,
-        track: SysMediaStreamTrack,
-    ) -> Result<()> {
+    pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
         let inner = self.0.borrow();
-        if let Some(mid) = transceiver.mid() {
-            for receiver in inner.receivers.values() {
-                if let Some(recv_mid) = &receiver.mid() {
-                    if recv_mid == &mid {
-                        receiver.set_remote_track(transceiver, track);
-                        return Ok(());
-                    }
+        let transceiver = Transceiver::from(track_event.transceiver());
+        let track = track_event.track();
+        // Cannot fail, since transceiver is guaranteed to be negotiated at this
+        // point.
+        let mid = transceiver.mid().unwrap();
+
+        for receiver in inner.receivers.values() {
+            if let Some(recv_mid) = &receiver.mid() {
+                if recv_mid == &mid {
+                    receiver.set_remote_track(transceiver, track);
+                    return Ok(());
                 }
             }
         }
         Err(tracerr::new!(
-            MediaConnectionsError::CouldNotInsertRemoteTrack(transceiver.mid())
+            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
         ))
+    }
+
+    /// Iterates over all [`Receivers`] with [`mid`] and without
+    /// [`Transceiver`], trying to find the corresponding [`Transceiver`] in
+    /// [`RtcPeerConnection`] and to insert it into the [`Receiver`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    pub fn sync_receivers(&self) {
+        let inner = self.0.borrow();
+        for receiver in inner
+            .receivers
+            .values()
+            .filter(|rcvr| rcvr.transceiver().is_none())
+        {
+            if let Some(mid) = receiver.mid() {
+                if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
+                    receiver.replace_transceiver(trnscvr.into())
+                }
+            }
+        }
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
     #[inline]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.0.borrow().senders.get(&id).cloned()
+    }
+
+    /// Returns [`Receiver`] with the provided [`TrackId`].
+    #[cfg(feature = "mockable")]
+    #[inline]
+    pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
+        self.0.borrow().receivers.get(&id).cloned()
     }
 
     /// Returns all references to the [`TransceiverSide`]s from this

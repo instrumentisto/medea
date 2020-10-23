@@ -313,13 +313,17 @@ mod receiver_patch {
 
     fn get_receiver() -> (Rc<Receiver>, mpsc::UnboundedReceiver<PeerEvent>) {
         let (tx, rx) = mpsc::unbounded();
+        let media_connections = MediaConnections::new(
+            PeerId(0),
+            Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
+            tx,
+        );
         let recv = Receiver::new(
+            &media_connections,
             TRACK_ID,
             MediaType::Audio(AudioSettings { is_required: true }).into(),
             MemberId(SENDER_ID.to_string()),
-            &Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
             Some(MID.to_string()),
-            tx,
             &RecvConstraints::default(),
         );
 
