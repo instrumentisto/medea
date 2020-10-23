@@ -11,7 +11,7 @@ use medea_jason::rpc::{
 };
 use wasm_bindgen_test::*;
 
-use crate::{rpc::RPC_SETTINGS, TEST_ROOM_URL};
+use crate::{rpc::RPC_SETTINGS, timeout, TEST_ROOM_URL};
 use wasm_bindgen::__rt::core::sync::atomic::AtomicBool;
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -47,8 +47,7 @@ async fn could_not_init_socket_err() {
     let connect_fut = Rc::clone(&session)
         .connect(ConnectionInfo::from_str(TEST_ROOM_URL).unwrap());
 
-    // TODO: assert error type
-    // timeout(100, connect_fut).await.unwrap().unwrap_err();
+    timeout(100, connect_fut).await.unwrap().unwrap_err();
 }
 
 /// Makes sure that if multiple concurrent `connect` and `reconnect` calls are
@@ -101,10 +100,10 @@ async fn concurrent_connect_requests() {
     let connect2 = Rc::clone(&session).connect(connection_info);
     let reconnect2 = Rc::clone(&session).reconnect();
 
-    // futures::future::try_join_all(vec![
-    //     connect1, reconnect1, connect2, reconnect2,
-    // ])
-    // .await
-    // .unwrap();
-    // assert!(join_room_sent.load(Ordering::Relaxed));
+    futures::future::try_join_all(vec![
+        connect1, reconnect1, connect2, reconnect2,
+    ])
+    .await
+    .unwrap();
+    assert!(join_room_sent.load(Ordering::Relaxed));
 }

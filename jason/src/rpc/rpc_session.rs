@@ -47,6 +47,9 @@ pub enum SessionError {
 
     #[display(fmt = "Session state currently is not New")]
     NotNew,
+
+    #[display(fmt = "New connection info was provided")]
+    NewConnectionInfo,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -254,6 +257,9 @@ impl WebSocketRpcSession {
         let mut state_updates_stream = self.state.subscribe();
         while let Some(state) = state_updates_stream.next().await {
             match state {
+                S::ReadyForConnect(_) => {
+                    return Err(tracerr::new!(E::NewConnectionInfo));
+                }
                 S::Connected(state) => match state.state {
                     ConnectedSessionState::Open => return Ok(()),
                     _ => (),
@@ -361,12 +367,29 @@ impl RpcSession for WebSocketRpcSession {
         self: Rc<Self>,
         connection_info: ConnectionInfo,
     ) -> Result<(), Traced<SessionError>> {
-        if !matches!(self.state.clone_inner(), SessionState::Uninitialized) {
-            return Err(tracerr::new!(SessionError::NotNew));
+        match self.state.clone_inner() {
+            SessionState::Uninitialized
+            | SessionState::ReadyForConnect(_)
+            | SessionState::Failed(_, _) => {
+                self.state.set(SessionState::ReadyForConnect(Rc::new(
+                    connection_info,
+                )));
+            }
+            SessionState::Finished(reason) => {
+                return Err(tracerr::new!(SessionError::SessionFinished(
+                    reason
+                )));
+            }
+            SessionState::Connecting(connected)
+            | SessionState::Connected(connected) => {
+                if connected.info.as_ref() != &connection_info {
+                    self.state.set(SessionState::ReadyForConnect(Rc::new(
+                        connection_info,
+                    )));
+                }
+            }
         }
 
-        self.state
-            .set(SessionState::ReadyForConnect(Rc::new(connection_info)));
         self.connect()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
