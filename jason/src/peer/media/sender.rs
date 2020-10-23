@@ -1,14 +1,10 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use std::{cell::Cell, rc::Rc};
 
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
-use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::RtcRtpTransceiver;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
@@ -16,24 +12,22 @@ use crate::{
         VideoSource,
     },
     peer::{
-        conn::{RtcPeerConnection, TransceiverDirection},
         media::TransceiverSide,
+        transceiver::{Transceiver, TransceiverDirection},
         PeerEvent,
     },
 };
 
 use super::{
     mute_state::{MuteStateController, StableMuteState},
-    MediaConnectionsError, Muteable, Result,
+    MediaConnections, MediaConnectionsError, Muteable, Result,
 };
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
-    pub peer_id: PeerId,
+    pub media_connections: &'a MediaConnections,
     pub track_id: TrackId,
     pub caps: TrackConstraints,
-    pub peer: &'a RtcPeerConnection,
-    pub peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     pub mid: Option<String>,
     pub mute_state: StableMuteState,
     pub is_required: bool,
@@ -46,36 +40,40 @@ impl<'a> SenderBuilder<'a> {
     /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
+        let connections = self.media_connections.0.borrow();
         let kind = MediaKind::from(&self.caps);
         let transceiver = match self.mid {
-            None => self
-                .peer
-                .add_transceiver(kind, TransceiverDirection::Inactive),
-            Some(mid) => {
-                let transceiver = self
-                    .peer
-                    .get_transceiver_by_mid(&mid)
-                    .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                    .map_err(tracerr::wrap!())?;
-                transceiver
-                    .set_direction(TransceiverDirection::Inactive.into());
-                transceiver
-            }
+            // Try to find rcvr transceiver that can be used as sendrecv.
+            None => connections
+                .receivers
+                .values()
+                .find(|rcvr| {
+                    rcvr.caps().media_kind() == self.caps.media_kind()
+                        && rcvr.caps().media_source_kind()
+                            == self.caps.media_source_kind()
+                })
+                .and_then(|rcvr| rcvr.transceiver())
+                .unwrap_or_else(|| {
+                    connections
+                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                }),
+            Some(mid) => connections
+                .get_transceiver_by_mid(&mid)
+                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
+                .map_err(tracerr::wrap!())?,
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
-            peer_id: self.peer_id,
+            peer_id: connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
-            track: RefCell::new(None),
             general_mute_state: Cell::new(self.mute_state),
             transceiver,
             mute_state: mute_state_observer,
             is_required: self.is_required,
-            transceiver_direction: Cell::new(TransceiverDirection::Inactive),
-            peer_events_sender: self.peer_events_sender,
+            peer_events_sender: connections.peer_events_sender.clone(),
             send_constraints: self.send_constraints,
         });
         spawn_local({
@@ -108,9 +106,7 @@ pub struct Sender {
     peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
-    track: RefCell<Option<MediaStreamTrack>>,
-    transceiver: RtcRtpTransceiver,
-    transceiver_direction: Cell<TransceiverDirection>,
+    transceiver: Transceiver,
     mute_state: Rc<MuteStateController>,
     general_mute_state: Cell<StableMuteState>,
     is_required: bool,
@@ -127,12 +123,7 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
-        match self.transceiver_direction.get() {
-            TransceiverDirection::Recvonly | TransceiverDirection::Inactive => {
-                false
-            }
-            TransceiverDirection::Sendonly => true,
-        }
+        self.transceiver.has_direction(TransceiverDirection::SEND)
     }
 
     /// Updates [`Sender`]s general mute state based on the provided
@@ -151,11 +142,13 @@ impl Sender {
             match mute_state {
                 StableMuteState::Unmuted => {
                     self.maybe_request_track();
+                    if self.is_enabled_in_cons() {
+                        self.transceiver
+                            .add_direction(TransceiverDirection::SEND);
+                    }
                 }
                 StableMuteState::Muted => {
-                    self.set_transceiver_direction(
-                        TransceiverDirection::Inactive,
-                    );
+                    self.transceiver.sub_direction(TransceiverDirection::SEND);
                 }
             }
         }
@@ -169,25 +162,29 @@ impl Sender {
         new_track: MediaStreamTrack,
     ) -> Result<()> {
         // no-op if we try to insert same track
-        if let Some(current_track) = self.track.borrow().as_ref() {
+        if let Some(current_track) = self.transceiver.send_track() {
             if new_track.id() == current_track.id() {
                 return Ok(());
             }
         }
 
-        JsFuture::from(
-            self.transceiver
-                .sender()
-                .replace_track(Some(new_track.as_ref())),
-        )
-        .await
-        .map_err(Into::into)
-        .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
-        .map_err(tracerr::wrap!())?;
-
-        self.track.borrow_mut().replace(new_track);
+        self.transceiver
+            .set_send_track(Some(new_track))
+            .await
+            .map_err(Into::into)
+            .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
+            .map_err(tracerr::wrap!())?;
 
         Ok(())
+    }
+
+    /// Indicates whether this [`Sender`] is enabled in
+    /// [`LocalStreamConstraints`].
+    fn is_enabled_in_cons(&self) -> bool {
+        self.send_constraints.is_track_enabled(
+            self.caps.media_kind(),
+            self.caps.media_source_kind(),
+        )
     }
 
     /// Updates this [`Sender`]s tracks based on the provided
@@ -210,11 +207,16 @@ impl Sender {
     /// state is [`StableMuteState::Unmuted`].
     pub fn maybe_enable(&self) {
         if self.is_general_unmuted()
-            && self.transceiver_direction.get()
-                != TransceiverDirection::Sendonly
+            && !self.transceiver.has_direction(TransceiverDirection::SEND)
+            && self.is_enabled_in_cons()
         {
-            self.set_transceiver_direction(TransceiverDirection::Sendonly);
+            self.transceiver.add_direction(TransceiverDirection::SEND);
         }
+    }
+
+    /// Returns [`Transceiver`] of this [`Sender`].
+    pub fn transceiver(&self) -> Transceiver {
+        self.transceiver.clone()
     }
 
     /// Checks whether general mute state of the [`Sender`] is in
@@ -230,27 +232,17 @@ impl Sender {
         self.general_mute_state.get() == StableMuteState::Unmuted
     }
 
-    /// Sets provided [`TransceiverDirection`] of this [`Sender`]'s
-    /// [`RtcRtpTransceiver`].
-    fn set_transceiver_direction(&self, direction: TransceiverDirection) {
-        self.transceiver.set_direction(direction.into());
-        self.transceiver_direction.set(direction);
-    }
-
     /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to `None`.
     async fn remove_track(&self) {
-        self.track.borrow_mut().take();
         // cannot fail
-        JsFuture::from(self.transceiver.sender().replace_track(None))
-            .await
-            .unwrap();
+        self.transceiver.set_send_track(None).await.unwrap();
     }
 
     /// Emits [`PeerEvent::NewLocalStreamRequired`] if [`Sender`] does not have
     /// a track to send.
     fn maybe_request_track(&self) {
-        if self.track.borrow().is_none() {
+        if self.transceiver.send_track().is_none() {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::NewLocalStreamRequired {
                     peer_id: self.peer_id,
