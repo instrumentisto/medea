@@ -40,7 +40,7 @@ fn get_test_room(
     let mut rpc = MockRpcSession::new();
 
     rpc.expect_subscribe().return_once(move || events);
-    rpc.expect_set_close_reason().return_const(());
+    rpc.expect_close_with_reason().return_const(());
     rpc.expect_on_connection_loss()
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_on_reconnected()
@@ -69,7 +69,7 @@ async fn get_test_room_and_exist_peer(
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_on_reconnected()
         .return_once(|| stream::pending().boxed_local());
-    rpc.expect_set_close_reason().return_const(());
+    rpc.expect_close_with_reason().return_const(());
     let event_tx_clone = event_tx.clone();
     rpc.expect_send_command().returning(move |cmd| match cmd {
         Command::UpdateTracks {
@@ -1028,7 +1028,7 @@ mod rpc_close_reason_on_room_drop {
         rpc.expect_on_reconnected()
             .return_once(|| stream::pending().boxed_local());
         let (test_tx, test_rx) = oneshot::channel();
-        rpc.expect_set_close_reason().return_once(move |reason| {
+        rpc.expect_close_with_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
         });
         let room = Room::new(Rc::new(rpc), Box::new(MockPeerRepository::new()));
@@ -1192,7 +1192,7 @@ mod patches_generation {
         });
         rpc.expect_subscribe()
             .return_once(move || Box::pin(futures::stream::pending()));
-        rpc.expect_set_close_reason().return_once(|_| ());
+        rpc.expect_close_with_reason().return_once(|_| ());
         rpc.expect_on_connection_loss()
             .return_once(|| stream::pending().boxed_local());
         rpc.expect_on_reconnected()
