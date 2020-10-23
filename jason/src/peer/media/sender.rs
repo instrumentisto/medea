@@ -178,7 +178,7 @@ impl Sender {
         Ok(())
     }
 
-    /// Returns `true` if this [`Sender`] is enabled in
+    /// Indicates whether this [`Sender`] is enabled in
     /// [`LocalStreamConstraints`].
     fn is_enabled_in_cons(&self) -> bool {
         self.send_constraints.is_track_enabled(

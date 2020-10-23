@@ -42,7 +42,7 @@ pub trait TransceiverSide: Muteable {
 
     /// Returns [`mid`] of this [`TransceiverSide`].
     ///
-    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn mid(&self) -> Option<String>;
 
     /// Returns `true` if this [`TransceiverKind`] currently can be
@@ -283,9 +283,9 @@ impl InnerMediaConnections {
         Transceiver::from(self.peer.add_transceiver(kind, direction))
     }
 
-    /// Lookups [`Transceiver`] by provided [`mid`].
+    /// Lookups [`Transceiver`] by the provided [`mid`].
     ///
-    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
     }
@@ -636,7 +636,7 @@ impl MediaConnections {
         Ok(mute_satates_updates)
     }
 
-    /// Handles [`RtcTrackEvent`], adding new track to corresponding
+    /// Handles [`RtcTrackEvent`] by adding new track to the corresponding
     /// [`Receiver`].
     ///
     /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
@@ -667,11 +667,11 @@ impl MediaConnections {
         ))
     }
 
-    /// Walks over all [`Receivers`] with [`mid`] and without [`Transceiver`],
-    /// trying to find corresponding [`Transceiver`] in [`RtcPeerConnection`]
-    /// and insert it into [`Receiver`].
+    /// Iterates over all [`Receivers`] with [`mid`] and without
+    /// [`Transceiver`], trying to find the corresponding [`Transceiver`] in
+    /// [`RtcPeerConnection`] and to insert it into the [`Receiver`].
     ///
-    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
         for receiver in inner
@@ -693,9 +693,9 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Returns [`Receiver`] with a provided [`TrackId`].
-    #[inline]
+    /// Returns [`Receiver`] with the provided [`TrackId`].
     #[cfg(feature = "mockable")]
+    #[inline]
     pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
         self.0.borrow().receivers.get(&id).cloned()
     }

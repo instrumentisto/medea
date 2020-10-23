@@ -159,10 +159,10 @@ impl Receiver {
 
     /// Replaces [`Receiver`]'s [`Transceiver`] with a provided [`Transceiver`].
     ///
-    /// Doesn't updates [`TransceiverDirection`] of the [`Transceiver`].
+    /// Doesn't update [`TransceiverDirection`] of the [`Transceiver`].
     ///
-    /// No-op if provided same [`Transceiver`] as already exists in this
-    /// [`Receiver`].
+    /// No-op if provided with the same [`Transceiver`] as already exists in
+    /// this [`Receiver`].
     pub fn replace_transceiver(&self, transceiver: Transceiver) {
         if self.mid.borrow().as_ref() == transceiver.mid().as_ref() {
             self.transceiver.replace(Some(transceiver));

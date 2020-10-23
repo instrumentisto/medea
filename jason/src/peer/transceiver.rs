@@ -1,4 +1,4 @@
-//! [`RtcRtpTranseiver`] wrapper.
+//! [`RtcRtpTransceiver`] wrapper.
 
 use std::cell::RefCell;
 
@@ -38,8 +38,8 @@ impl Transceiver {
         );
     }
 
-    /// Returns `true` if provided [`TransceiverDirection`] if enabled for this
-    /// [`Transceiver`].
+    /// Indicates whether the provided [`TransceiverDirection`] is enabled for
+    /// this [`Transceiver`].
     pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
         self.current_direction().contains(direction)
     }
@@ -47,11 +47,11 @@ impl Transceiver {
     /// Replaces [`TransceiverDirection::SEND`] [`SysMediaStreamTrack`] of this
     /// [`Transceiver`].
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Errors with JS Error if underlying [`replaceTrack`][1] call fails.
+    /// Errors with JS error if the underlying [`replaceTrack`][1] call fails.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn set_send_track(
         &self,
         new_track: Option<MediaStreamTrack>,
@@ -66,7 +66,7 @@ impl Transceiver {
 
     /// Returns [`mid`] of this [`Transceiver`].
     ///
-    /// [`mid`]: https://www.w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }
@@ -93,7 +93,7 @@ bitflags! {
     /// [`TransceiverDirection::all`] bitflag.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
-    /// [2]: https://tinyurl.com/yywbvbzx
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendrecv
     pub struct TransceiverDirection: u8 {
         /// [`inactive` direction][1] of transceiver.
         ///
@@ -113,7 +113,6 @@ bitflags! {
 }
 
 impl From<RtcRtpTransceiverDirection> for TransceiverDirection {
-    #[allow(clippy::match_wildcard_for_single_variants)]
     fn from(direction: RtcRtpTransceiverDirection) -> Self {
         use RtcRtpTransceiverDirection as D;
 
@@ -122,7 +121,9 @@ impl From<RtcRtpTransceiverDirection> for TransceiverDirection {
             D::Recvonly => Self::RECV,
             D::Inactive => Self::INACTIVE,
             D::Sendrecv => Self::SEND | Self::RECV,
-            _ => unreachable!("unexpected transceiver direction"),
+            D::__Nonexhaustive => {
+                unreachable!("unexpected transceiver direction")
+            }
         }
     }
 }
@@ -156,7 +157,7 @@ impl From<&DirectionProto> for TransceiverDirection {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{RtcRtpTransceiverDirection, TransceiverDirection};
 
     #[test]
     fn enable_works_correctly() {

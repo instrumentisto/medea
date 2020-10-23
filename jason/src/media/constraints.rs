@@ -123,7 +123,7 @@ impl LocalTracksConstraints {
         self.0.borrow().is_enabled(kind)
     }
 
-    /// Returns `true` if provided [`MediaKind`] and [`MediaSourceKind`] is
+    /// Indicates whether provided [`MediaKind`] and [`MediaSourceKind`] are
     /// enabled in this [`LocalTracksConstraints`].
     #[inline]
     pub fn is_track_enabled(
@@ -452,7 +452,7 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Returns `true` if provided [`MediaKind`] and [`MediaSourceKind`] is
+    /// Indicates whether the given [`MediaKind`] and [`MediaSourceKind`] are
     /// enabled in this [`MediaStreamSettings`].
     pub fn is_track_enabled(
         &self,
@@ -676,7 +676,7 @@ impl TrackConstraints {
         }
     }
 
-    /// Returns this [`TrackConstraints`] media kind.
+    /// Returns [`MediaKind`] of these [`TrackConstraints`].
     pub fn media_kind(&self) -> MediaKind {
         match &self {
             TrackConstraints::Audio(_) => MediaKind::Audio,
