@@ -9,8 +9,7 @@ use medea_client_api_proto::{MediaType, TrackId as Id};
 /// Representation of [MediaStreamTrack][1] object.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-#[derive(Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Debug, Eq, PartialEq)]
 pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,
@@ -66,8 +65,7 @@ impl MediaTrack {
 /// Mute state of the [`MediaTrack`].
 ///
 /// Contains mute state for the `Send` and `Recv` side.
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MuteState {
     /// Mute state of the `Send` side.
     ///

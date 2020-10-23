@@ -343,8 +343,7 @@ pub struct Context {
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
-#[derive(Clone, Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
@@ -517,34 +516,6 @@ impl TrackPatchDeduper {
         }
     }
 
-    /// Returns `Some(TrackPatchEvent)` if provided [`TrackPatchEvent`] can be
-    /// merged.
-    ///
-    /// Returns `None` if provided [`TrackPatchEvent`] can't be merged.
-    fn filter_patch<'a>(
-        &self,
-        change: &'a TrackChange,
-    ) -> Option<&'a TrackPatchEvent> {
-        if !change.can_force_apply() {
-            return None;
-        }
-
-        match change {
-            TrackChange::TrackPatch(patch) => {
-                if let Some(whitelist) = &self.whitelist {
-                    if whitelist.contains(&patch.id) {
-                        Some(patch)
-                    } else {
-                        None
-                    }
-                } else {
-                    Some(patch)
-                }
-            }
-            _ => None,
-        }
-    }
-
     /// Merges all mergeable [`TrackPatchEvent`]s to the
     /// [`TrackPatchDedupper::merged_patches`].
     ///
@@ -568,6 +539,32 @@ impl TrackPatchDeduper {
         self.merged_patches
             .into_iter()
             .map(|(_, patch)| TrackChange::TrackPatch(patch))
+    }
+
+    /// Returns `Some(TrackPatchEvent)` if provided [`TrackPatchEvent`] can be
+    /// merged.
+    ///
+    /// Returns `None` if provided [`TrackPatchEvent`] can't be merged.
+    fn filter_patch<'a>(
+        &self,
+        change: &'a TrackChange,
+    ) -> Option<&'a TrackPatchEvent> {
+        if !change.can_force_apply() {
+            return None;
+        }
+
+        match change {
+            TrackChange::TrackPatch(patch) => {
+                self.whitelist.as_ref().map_or(Some(patch), |whitelist| {
+                    if whitelist.contains(&patch.id) {
+                        Some(patch)
+                    } else {
+                        None
+                    }
+                })
+            }
+            _ => None,
+        }
     }
 }
 
@@ -699,16 +696,18 @@ impl<T> Peer<T> {
         }
         self.context.track_changes_queue = filtered_changes_queue;
 
-        let deduper_whitelist = forcible_changes
-            .iter()
-            .filter_map(|t| match t {
-                TrackChange::TrackPatch(patch) => Some(patch.id),
-                _ => None,
-            })
-            .collect();
-        let mut deduper = TrackPatchDeduper::with_whitelist(deduper_whitelist);
+        let mut deduper = TrackPatchDeduper::with_whitelist(
+            forcible_changes
+                .iter()
+                .filter_map(|t| match t {
+                    TrackChange::TrackPatch(patch) => Some(patch.id),
+                    _ => None,
+                })
+                .collect(),
+        );
         deduper.merge(&mut self.context.pending_track_updates);
         deduper.merge(&mut forcible_changes);
+
         forcible_changes.extend(deduper.into_track_change_iter());
 
         let updates: Vec<_> = forcible_changes
