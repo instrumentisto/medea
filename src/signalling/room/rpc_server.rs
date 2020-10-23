@@ -428,7 +428,6 @@ mod test {
     }
 
     mod callbacks {
-
         use std::convert::TryFrom;
 
         use actix::Addr;

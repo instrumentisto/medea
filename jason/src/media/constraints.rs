@@ -120,7 +120,18 @@ impl LocalTracksConstraints {
     /// [`MediaStreamSettings`].
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
-        self.0.borrow_mut().is_enabled(kind)
+        self.0.borrow().is_enabled(kind)
+    }
+
+    /// Indicates whether provided [`MediaKind`] and [`MediaSourceKind`] are
+    /// enabled in this [`LocalTracksConstraints`].
+    #[inline]
+    pub fn is_track_enabled(
+        &self,
+        kind: MediaKind,
+        source: MediaSourceKind,
+    ) -> bool {
+        self.0.borrow().is_track_enabled(kind, source)
     }
 }
 
@@ -432,11 +443,30 @@ impl MediaStreamSettings {
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         match kind {
-            MediaType::Video(video) => match video.source_kind {
-                MediaSourceKind::Device => self.device_video.is_enabled(),
-                MediaSourceKind::Display => self.display_video.is_enabled(),
-            },
-            MediaType::Audio(_) => self.audio.is_enabled,
+            MediaType::Video(video) => {
+                self.is_track_enabled(MediaKind::Video, video.source_kind)
+            }
+            MediaType::Audio(_) => {
+                self.is_track_enabled(MediaKind::Audio, MediaSourceKind::Device)
+            }
+        }
+    }
+
+    /// Indicates whether the given [`MediaKind`] and [`MediaSourceKind`] are
+    /// enabled in this [`MediaStreamSettings`].
+    pub fn is_track_enabled(
+        &self,
+        kind: MediaKind,
+        source: MediaSourceKind,
+    ) -> bool {
+        match (kind, source) {
+            (MediaKind::Video, MediaSourceKind::Device) => {
+                self.device_video.is_enabled()
+            }
+            (MediaKind::Video, MediaSourceKind::Display) => {
+                self.display_video.is_enabled()
+            }
+            (MediaKind::Audio, _) => self.audio.is_enabled,
         }
     }
 
@@ -643,6 +673,14 @@ impl TrackConstraints {
             TrackConstraints::Video(VideoSource::Display(_)) => {
                 MediaSourceKind::Display
             }
+        }
+    }
+
+    /// Returns [`MediaKind`] of these [`TrackConstraints`].
+    pub fn media_kind(&self) -> MediaKind {
+        match &self {
+            TrackConstraints::Audio(_) => MediaKind::Audio,
+            TrackConstraints::Video(_) => MediaKind::Video,
         }
     }
 }

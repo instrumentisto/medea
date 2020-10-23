@@ -5,18 +5,15 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use medea_client_api_proto::{
-    Direction as DirectionProto, IceServer, PeerConnectionState,
-};
+use medea_client_api_proto::{IceServer, PeerConnectionState};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
     RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
-    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
-    RtcTrackEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverInit, RtcSdpType,
+    RtcSessionDescription, RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
@@ -28,7 +25,7 @@ use crate::{
     },
 };
 
-use super::ice_server::RtcIceServers;
+use super::{ice_server::RtcIceServers, TransceiverDirection};
 
 /// [RTCIceCandidate][1] representation.
 ///
@@ -58,51 +55,6 @@ impl From<&TrackConstraints> for MediaKind {
         match media_type {
             TrackConstraints::Audio(_) => Self::Audio,
             TrackConstraints::Video(_) => Self::Video,
-        }
-    }
-}
-
-/// Representation of [RTCRtpTransceiverDirection][1].
-///
-/// [1]:https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-// TODO: sendrecv optimization
-pub enum TransceiverDirection {
-    /// [`sendonly` direction][1] of transceiver.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendonly
-    Sendonly,
-
-    /// [`recvonly` direction][1] of transceiver.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-recvonly
-    Recvonly,
-
-    /// [`inactive` direction][1] of transceiver.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-inactive
-    Inactive,
-}
-
-impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
-    #[inline]
-    fn from(direction: TransceiverDirection) -> Self {
-        use TransceiverDirection as D;
-
-        match direction {
-            D::Sendonly => Self::Sendonly,
-            D::Recvonly => Self::Recvonly,
-            D::Inactive => Self::Inactive,
-        }
-    }
-}
-
-impl From<&DirectionProto> for TransceiverDirection {
-    #[inline]
-    fn from(proto: &DirectionProto) -> Self {
-        match proto {
-            DirectionProto::Recv { .. } => Self::Recvonly,
-            DirectionProto::Send { .. } => Self::Sendonly,
         }
     }
 }
