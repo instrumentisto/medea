@@ -120,10 +120,10 @@ macro_rules! upgrade_or_detached {
 ///   which type conversion is required.
 macro_rules! new_js_error {
     ($e:expr) => {
-        $crate::utils::JasonError::from(tracerr::new!($e)).into()
+        $crate::utils::JasonError::from(&tracerr::new!($e)).into()
     };
     ($e:expr => $o:ty) => {
-        <$o>::from($crate::utils::JasonError::from(tracerr::new!($e)))
+        <$o>::from($crate::utils::JasonError::from(&tracerr::new!($e)))
     };
 }
 

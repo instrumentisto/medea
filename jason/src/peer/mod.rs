@@ -166,12 +166,6 @@ pub enum PeerEvent {
         /// [`RtcStats`] of this [`PeerConnection`].
         stats: RtcStats,
     },
-
-    /// [`RtcPeerConnection`] is signalling that it [`MediaStream`]
-    NewLocalStreamRequired {
-        /// ID of the [`PeerConnection`] that requested new media stream.
-        peer_id: Id,
-    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -304,7 +298,7 @@ impl PeerConnection {
                 if let Err(err) =
                     media_connections.add_remote_track(&track_event)
                 {
-                    JasonError::from(err).print();
+                    JasonError::from(&err).print();
                 };
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
@@ -384,7 +378,7 @@ impl PeerConnection {
         match self.peer.get_stats().await {
             Ok(stats) => self.send_peer_stats(stats),
             Err(e) => {
-                JasonError::from(e).print();
+                JasonError::from(&e).print();
             }
         };
     }

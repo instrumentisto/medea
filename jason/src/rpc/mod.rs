@@ -637,7 +637,7 @@ impl RpcClient for WebSocketRpcClient {
                 //       should be handled properly as a part of future
                 //       state synchronization mechanism
                 //       PR: https://github.com/instrumentisto/medea/pull/51
-                JasonError::from(err).print()
+                JasonError::from(&err).print()
             }
         }
     }

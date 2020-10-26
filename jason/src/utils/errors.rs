@@ -35,7 +35,7 @@ pub trait JsCaused {
     fn name(&self) -> &'static str;
 
     /// Returns JS error if it is the cause.
-    fn js_cause(self) -> Option<Self::Error>;
+    fn js_cause(&self) -> Option<Self::Error>;
 }
 
 /// Wrapper for JS value which returned from JS side as error.
@@ -121,26 +121,17 @@ impl JasonError {
     }
 }
 
-impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
+impl<E: JsCaused + Display> From<&Traced<E>> for JasonError
 where
     E::Error: Into<js_sys::Error>,
 {
-    fn from((err, trace): (E, Trace)) -> Self {
+    fn from(traced: &Traced<E>) -> Self {
         Self {
-            name: err.name(),
-            message: err.to_string(),
-            trace,
-            source: err.js_cause().map(Into::into),
+            name: traced.as_ref().name(),
+            message: traced.as_ref().to_string(),
+            trace: traced.trace().clone(),
+            source: traced.as_ref().js_cause().map(Into::into),
         }
-    }
-}
-
-impl<E: JsCaused + Display> From<Traced<E>> for JasonError
-where
-    E::Error: Into<js_sys::Error>,
-{
-    fn from(traced: Traced<E>) -> Self {
-        Self::from(traced.into_parts())
     }
 }
 

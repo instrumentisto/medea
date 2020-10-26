@@ -211,13 +211,13 @@ impl RoomHandle {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
         if !inner.on_failed_local_media.is_set() {
-            return Err(JasonError::from(tracerr::new!(
+            return Err(JasonError::from(&tracerr::new!(
                 RoomError::CallbackNotSet("Room.on_failed_local_media()")
             )));
         }
 
         if !inner.on_connection_loss.is_set() {
-            return Err(JasonError::from(tracerr::new!(
+            return Err(JasonError::from(&tracerr::new!(
                 RoomError::CallbackNotSet("Room.on_connection_loss()")
             )));
         }
@@ -225,7 +225,8 @@ impl RoomHandle {
         Rc::clone(&inner.rpc)
             .connect(token)
             .await
-            .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
+            .map_err(tracerr::map_from_and_wrap!( => RoomError))
+            .map_err(|e| JasonError::from(&e))?;
 
         let mut connection_loss_stream = inner.rpc.on_connection_loss();
         let weak_inner = Rc::downgrade(&inner);
@@ -273,7 +274,8 @@ impl RoomHandle {
                         source_kind,
                     );
                     tracerr::new!(e)
-                })?;
+                })
+                .map_err(|e| JasonError::from(&e))?;
         }
         Ok(())
     }
@@ -368,7 +370,7 @@ impl RoomHandle {
             inner?
                 .set_local_media_settings(settings)
                 .await
-                .map_err(JasonError::from)?;
+                .map_err(|e| JasonError::from(&e))?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -564,18 +566,15 @@ impl Room {
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
-                                    let (err, trace) = err.into_parts();
-                                    match err {
+                                    match err.as_ref() {
                                         RoomError::InvalidLocalTracks(_)
                                         | RoomError::CouldNotGetLocalMedia(_) =>
                                         {
-                                            let e =
-                                                JasonError::from((err, trace));
+                                            let e = JasonError::from(&err);
                                             e.print();
                                             inner.on_failed_local_media.call(e);
                                         }
-                                        _ => JasonError::from((err, trace))
-                                            .print(),
+                                        _ => JasonError::from(&err).print(),
                                     };
                                 };
                             }
@@ -583,7 +582,7 @@ impl Room {
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
-                                    JasonError::from(err).print();
+                                    JasonError::from(&err).print();
                                 };
                             }
                             RoomEvent::RpcClientLostConnection => {
@@ -751,13 +750,14 @@ impl InnerRoom {
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
         let mut mute_states_backup = HashMap::new();
+        let mut peers_to_update_local_stream = Vec::new();
         let mute_tracks: HashMap<_, _> = self
             .peers
             .get_all()
             .into_iter()
             .map(|peer| {
                 let mut trnscvrs_backup_mute_states = HashMap::new();
-                let new_mute_states = peer
+                let new_mute_states: HashMap<_, _> = peer
                     .get_transceivers_sides(kind, direction, source_kind)
                     .into_iter()
                     .filter(|transceiver| transceiver.is_transitable())
@@ -781,7 +781,11 @@ impl InnerRoom {
                     .collect();
                 mute_states_backup
                     .insert(peer.id(), trnscvrs_backup_mute_states);
-                (peer.id(), new_mute_states)
+                let peer_id = peer.id();
+                if !new_mute_states.is_empty() {
+                    peers_to_update_local_stream.push(peer);
+                }
+                (peer_id, new_mute_states)
             })
             .collect();
 
@@ -791,6 +795,19 @@ impl InnerRoom {
         )) = &update_result.as_ref().map_err(AsRef::as_ref)
         {
             self.update_mute_states(mute_states_backup).await?;
+        } else {
+            if matches!(direction, TrackDirection::Send) {
+                for peer in peers_to_update_local_stream {
+                    let res = peer
+                        .update_local_stream()
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!());
+                    if let Err(e) = res {
+                        self.on_failed_local_media.call(JasonError::from(&e));
+                        return Err(e);
+                    }
+                }
+            }
         }
 
         update_result
@@ -943,7 +960,10 @@ impl InnerRoom {
                     mute_states_update.insert(peer.id(), new_mute_states);
                 }
                 Err(err) => {
-                    self.on_failed_local_media.call(JasonError::from(err));
+                    let err = tracerr::new!(err);
+                    self.on_failed_local_media.call(JasonError::from(&err));
+
+                    return Err(err);
                 }
             }
         }
@@ -1267,25 +1287,25 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
-    /// stream of [`PeerConnection`] that sent request.
-    async fn on_new_local_stream_required(
-        &self,
-        peer_id: PeerId,
-    ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        if let Err(err) = peer
-            .update_local_stream()
-            .await
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-        {
-            self.on_failed_local_media.call(JasonError::from(err));
-        };
-        Ok(())
-    }
+    // /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
+    // /// stream of [`PeerConnection`] that sent request.
+    // async fn on_new_local_stream_required(
+    //     &self,
+    //     peer_id: PeerId,
+    // ) -> Self::Output {
+    //     let peer = self
+    //         .peers
+    //         .get(peer_id)
+    //         .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+    //     if let Err(err) = peer
+    //         .update_local_stream()
+    //         .await
+    //         .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+    //     {
+    //         self.on_failed_local_media.call(JasonError::from(err));
+    //     };
+    //     Ok(())
+    // }
 }
 
 impl Drop for InnerRoom {

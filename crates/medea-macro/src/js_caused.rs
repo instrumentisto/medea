@@ -27,7 +27,7 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
         if let Some(js_error) =
             v.bindings().iter().find(|&bi| is_error(bi, &error_type))
         {
-            quote!(return Some(#js_error))
+            quote!(return Some(#js_error.clone()))
         } else if let Some(js_caused) =
             v.bindings().iter().find(|&bi| is_caused(bi))
         {
@@ -46,7 +46,7 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
                 match self { #name_body }
             }
 
-            fn js_cause(self) -> Option<Self::Error> {
+            fn js_cause(&self) -> Option<Self::Error> {
                 match self { #cause_body }
             }
         }

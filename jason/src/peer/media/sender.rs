@@ -243,11 +243,11 @@ impl Sender {
     /// a track to send.
     fn maybe_request_track(&self) {
         if self.transceiver.send_track().is_none() {
-            let _ = self.peer_events_sender.unbounded_send(
-                PeerEvent::NewLocalStreamRequired {
-                    peer_id: self.peer_id,
-                },
-            );
+            // let _ = self.peer_events_sender.unbounded_send(
+            //     PeerEvent::NewLocalStreamRequired {
+            //         peer_id: self.peer_id,
+            //     },
+            // );
         }
     }
 }

@@ -51,7 +51,7 @@ impl ReconnectHandle {
                 .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
             rpc.connect(token)
                 .await
-                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+                .map_err(|e| JsValue::from(JasonError::from(&e)))?;
 
             Ok(JsValue::UNDEFINED)
         })

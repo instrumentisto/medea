@@ -400,7 +400,7 @@ impl MediaManagerHandle {
                         .into()
                 })
                 .map_err(tracerr::wrap!(=> MediaManagerError))
-                .map_err(|e| JasonError::from(e).into())
+                .map_err(|e| JasonError::from(&e).into())
         })
     }
 
@@ -422,7 +422,7 @@ impl MediaManagerHandle {
                         .into()
                 })
                 .map_err(tracerr::wrap!(=> MediaManagerError))
-                .map_err(|e| JasonError::from(e).into())
+                .map_err(|e| JasonError::from(&e).into())
         })
     }
 }

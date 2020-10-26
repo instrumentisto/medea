@@ -435,6 +435,13 @@ mod disable_recv_tracks {
     }
 }
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(inline_js = "export function set_conn(conn) { console.log(conn.message()); }")]
+extern "C" {
+    fn set_conn(conn: &JsValue);
+}
+
 /// Tests disabling tracks publishing.
 mod disable_send_tracks {
     use medea_client_api_proto::{
@@ -531,7 +538,8 @@ mod disable_send_tracks {
             handle.mute_video(Some(JsMediaSourceKind::Device))
         )
         .await
-        .is_ok());
+        .map_err(|e| set_conn(&e))
+            .is_ok());
         assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
         assert!(JsFuture::from(
