@@ -690,7 +690,6 @@ impl<T> Peer<T> {
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .into_iter()
             .map(|c| c.as_track_update(self.partner_member_id()))
             .collect();
 
