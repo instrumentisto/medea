@@ -306,6 +306,8 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::collections::HashMap;
 
+    use medea_client_api_proto::{IceCandidate, RoomId};
+
     use super::*;
 
     use crate::{
@@ -319,8 +321,6 @@ mod test {
         },
         AppContext,
     };
-
-    use medea_client_api_proto::{IceCandidate, RoomId};
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {

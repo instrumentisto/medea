@@ -150,6 +150,7 @@ enum RoomError {
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
 
+    /// [`WebSocketSession`] returned [`SessionError`].
     #[display(fmt = "Some WebSocketSession error: {}", _0)]
     SessionError(#[js(cause)] SessionError),
 }
