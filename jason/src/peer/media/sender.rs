@@ -146,6 +146,11 @@ impl Sender {
         }
     }
 
+    #[inline]
+    pub fn has_track(&self) -> bool {
+        self.transceiver.send_track().is_some()
+    }
+
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
     /// transceiver. No-op if provided track already being used by this
     /// [`Sender`].

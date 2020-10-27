@@ -166,6 +166,10 @@ pub enum PeerEvent {
         /// [`RtcStats`] of this [`PeerConnection`].
         stats: RtcStats,
     },
+
+    FailedLocalMedia {
+        error: JasonError,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -582,7 +586,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(&self, tracks: Vec<proto::Track>) -> Result<String> {
+    pub async fn get_offer(&self, tracks: Vec<proto::Track>, maybe_update_local_media: bool) -> Result<String> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -591,7 +595,9 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream().await.map_err(tracerr::wrap!())?;
+        if self.is_local_stream_update_needed() && maybe_update_local_media {
+            let _ = self.update_local_stream().await;
+        }
 
         let offer = self
             .peer
@@ -667,6 +673,21 @@ impl PeerConnection {
     pub async fn update_local_stream(
         &self,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
+        self.inner_update_local_stream().await.map_err(|e| {
+            let e = tracerr::new!(e);
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::FailedLocalMedia {
+                    error: JasonError::from(&e),
+                },
+            );
+
+            e
+        })
+    }
+
+    async fn inner_update_local_stream(
+        &self,
+    ) -> Result<HashMap<TrackId, StableMuteState>> {
         if let Some(request) = self.media_connections.get_tracks_request() {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
@@ -706,6 +727,11 @@ impl PeerConnection {
         } else {
             Ok(HashMap::new())
         }
+    }
+
+    #[inline]
+    pub fn is_local_stream_update_needed(&self) -> bool {
+        self.media_connections.is_local_stream_update_needed()
     }
 
     /// Returns [`Rc`] to [`TransceiverSide`] with a provided [`TrackId`].
@@ -823,6 +849,7 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<proto::Track>,
+        maybe_update_local_media: bool,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
@@ -847,7 +874,9 @@ impl PeerConnection {
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream().await.map_err(tracerr::wrap!())?;
+        if self.is_local_stream_update_needed() && maybe_update_local_media {
+            let _ = self.update_local_stream().await;
+        }
 
         let answer = self
             .peer

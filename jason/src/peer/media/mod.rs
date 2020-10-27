@@ -682,6 +682,18 @@ impl MediaConnections {
         }
     }
 
+    pub fn is_local_stream_update_needed(&self) -> bool {
+        let inner = self.0.borrow();
+        inner
+            .senders
+            .values()
+            .find(|s| {
+                s.mute_state() == StableMuteState::Unmuted.into()
+                    && !s.has_track()
+            })
+            .is_some()
+    }
+
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
     #[inline]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
