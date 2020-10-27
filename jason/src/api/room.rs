@@ -795,18 +795,15 @@ impl InnerRoom {
         )) = &update_result.as_ref().map_err(AsRef::as_ref)
         {
             self.update_mute_states(mute_states_backup).await?;
-        } else {
-            if matches!(direction, TrackDirection::Send) {
-                for peer in peers_to_update_local_stream {
-                    let res = peer
-                        .update_local_stream()
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!());
-                    if let Err(e) = res {
+        } else if matches!(direction, TrackDirection::Send) {
+            for peer in peers_to_update_local_stream {
+                peer.update_local_stream()
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())
+                    .map_err(|e| {
                         self.on_failed_local_media.call(JasonError::from(&e));
-                        return Err(e);
-                    }
-                }
+                        e
+                    })?;
             }
         }
 
@@ -951,21 +948,16 @@ impl InnerRoom {
 
         let mut mute_states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            match peer
-                .update_local_stream()
+            peer.update_local_stream()
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-            {
-                Ok(new_mute_states) => {
-                    mute_states_update.insert(peer.id(), new_mute_states);
-                }
-                Err(err) => {
-                    let err = tracerr::new!(err);
-                    self.on_failed_local_media.call(JasonError::from(&err));
-
-                    return Err(err);
-                }
-            }
+                .map_err(|e| {
+                    self.on_failed_local_media.call(JasonError::from(&e));
+                    e
+                })
+                .map(|new_mute_states| {
+                    mute_states_update.insert(peer.id(), new_mute_states)
+                })?;
         }
 
         self.update_mute_states(mute_states_update)
@@ -1286,26 +1278,6 @@ impl PeerEventHandler for InnerRoom {
         });
         Ok(())
     }
-
-    // /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
-    // /// stream of [`PeerConnection`] that sent request.
-    // async fn on_new_local_stream_required(
-    //     &self,
-    //     peer_id: PeerId,
-    // ) -> Self::Output {
-    //     let peer = self
-    //         .peers
-    //         .get(peer_id)
-    //         .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-    //     if let Err(err) = peer
-    //         .update_local_stream()
-    //         .await
-    //         .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-    //     {
-    //         self.on_failed_local_media.call(JasonError::from(err));
-    //     };
-    //     Ok(())
-    // }
 }
 
 impl Drop for InnerRoom {

@@ -25,7 +25,6 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn sendrecv_works() {
     let (tx, _rx) = mpsc::unbounded();
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );

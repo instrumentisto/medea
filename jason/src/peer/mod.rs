@@ -238,7 +238,6 @@ impl PeerConnection {
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections = Rc::new(MediaConnections::new(
-            id,
             Rc::clone(&peer),
             peer_events_sender.clone(),
         ));

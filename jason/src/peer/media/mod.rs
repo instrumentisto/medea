@@ -10,7 +10,7 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
-use proto::{Direction, MediaSourceKind, PeerId, TrackId};
+use proto::{Direction, MediaSourceKind, TrackId};
 use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
@@ -209,9 +209,6 @@ type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
-    /// [`PeerId`] of peer that owns this [`MediaConnections`].
-    peer_id: PeerId,
-
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
     peer: Rc<RtcPeerConnection>,
@@ -299,12 +296,10 @@ impl MediaConnections {
     /// [`RtcPeerConnection`].
     #[inline]
     pub fn new(
-        peer_id: PeerId,
         peer: Rc<RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
-            peer_id,
             peer,
             peer_events_sender,
             senders: HashMap::new(),

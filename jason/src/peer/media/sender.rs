@@ -2,8 +2,8 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
+use futures::StreamExt;
+use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -14,7 +14,6 @@ use crate::{
     peer::{
         media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
-        PeerEvent,
     },
 };
 
@@ -66,14 +65,12 @@ impl<'a> SenderBuilder<'a> {
         let mute_state_observer = MuteStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
-            peer_id: connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             general_mute_state: Cell::new(self.mute_state),
             transceiver,
             mute_state: mute_state_observer,
             is_required: self.is_required,
-            peer_events_sender: connections.peer_events_sender.clone(),
             send_constraints: self.send_constraints,
         });
         spawn_local({
@@ -82,9 +79,7 @@ impl<'a> SenderBuilder<'a> {
                 while let Some(mute_state) = mute_state_rx.next().await {
                     if let Some(this) = weak_this.upgrade() {
                         match mute_state {
-                            StableMuteState::Unmuted => {
-                                this.maybe_request_track();
-                            }
+                            StableMuteState::Unmuted => {}
                             StableMuteState::Muted => {
                                 this.remove_track().await;
                             }
@@ -103,14 +98,12 @@ impl<'a> SenderBuilder<'a> {
 /// Representation of a local [`MediaStreamTrack`] that is being sent to some
 /// remote peer.
 pub struct Sender {
-    peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
     mute_state: Rc<MuteStateController>,
     general_mute_state: Cell<StableMuteState>,
     is_required: bool,
-    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     send_constraints: LocalTracksConstraints,
 }
 
@@ -141,7 +134,6 @@ impl Sender {
             self.general_mute_state.set(mute_state);
             match mute_state {
                 StableMuteState::Unmuted => {
-                    self.maybe_request_track();
                     if self.is_enabled_in_cons() {
                         self.transceiver
                             .add_direction(TransceiverDirection::SEND);
@@ -237,18 +229,6 @@ impl Sender {
     async fn remove_track(&self) {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
-    }
-
-    /// Emits [`PeerEvent::NewLocalStreamRequired`] if [`Sender`] does not have
-    /// a track to send.
-    fn maybe_request_track(&self) {
-        if self.transceiver.send_track().is_none() {
-            // let _ = self.peer_events_sender.unbounded_send(
-            //     PeerEvent::NewLocalStreamRequired {
-            //         peer_id: self.peer_id,
-            //     },
-            // );
-        }
     }
 }
 

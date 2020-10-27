@@ -1,5 +1,6 @@
 use medea_jason::utils::JsCaused;
 
+#[derive(Clone)]
 struct JsError {}
 
 #[test]
@@ -55,6 +56,7 @@ fn derives_for_enum_with_nested_js_error() {
 
 #[test]
 fn derives_for_non_default_name_js_error() {
+    #[derive(Clone)]
     struct SomeError;
 
     #[derive(JsCaused)]

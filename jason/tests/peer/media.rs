@@ -26,7 +26,6 @@ async fn get_test_media_connections(
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -73,7 +72,6 @@ fn get_tracks_request1() {
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -94,7 +92,6 @@ fn get_tracks_request2() {
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -314,7 +311,6 @@ mod receiver_patch {
     fn get_receiver() -> (Rc<Receiver>, mpsc::UnboundedReceiver<PeerEvent>) {
         let (tx, rx) = mpsc::unbounded();
         let media_connections = MediaConnections::new(
-            PeerId(0),
             Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
             tx,
         );

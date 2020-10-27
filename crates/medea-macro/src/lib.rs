@@ -297,6 +297,7 @@ decl_derive!([JsCaused, attributes(js)] =>
 /// ```
 /// use medea_jason::utils::JsCaused;
 ///
+/// #[derive(Clone)]
 /// struct JsError;
 ///
 /// #[derive(JsCaused)]
@@ -320,6 +321,7 @@ decl_derive!([JsCaused, attributes(js)] =>
 /// ```
 /// # use medea_jason::utils::JsCaused;
 /// #
+/// # #[derive(Clone)]
 /// # struct JsError;
 /// #
 /// # #[derive(JsCaused)]

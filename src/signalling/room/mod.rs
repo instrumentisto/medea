@@ -161,6 +161,8 @@ impl Room {
         context: &AppContext,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Addr<Self>, RoomError> {
+        let room: Addr<Room> = Room::new().spawn();
+        room.do_send(FooBar(123));
         // 16 is the default actix address channel capacity.
         let (_, rx) = actix::dev::channel::channel(16);
 
