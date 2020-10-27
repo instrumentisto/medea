@@ -580,9 +580,7 @@ impl Room {
                                     event.dispatch_with(inner.deref()).await
                                 {
                                     match err.as_ref() {
-                                        RoomError::InvalidLocalTracks(_)
-                                        | RoomError::CouldNotGetLocalMedia(_) =>
-                                        {
+                                        RoomError::InvalidLocalTracks(_) => {
                                             let e = JasonError::from(&err);
                                             e.print();
                                         }
@@ -762,7 +760,6 @@ impl InnerRoom {
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
         let mut mute_states_backup = HashMap::new();
-        let mut peers_to_update_local_stream = Vec::new();
         let mute_tracks: HashMap<_, _> = self
             .peers
             .get_all()
@@ -793,13 +790,7 @@ impl InnerRoom {
                     .collect();
                 mute_states_backup
                     .insert(peer.id(), trnscvrs_backup_mute_states);
-                let peer_id = peer.id();
-                if matches!(direction, TrackDirection::Send) {
-                    if peer.is_local_stream_update_needed() {
-                        peers_to_update_local_stream.push(peer);
-                    }
-                }
-                (peer_id, new_mute_states)
+                (peer.id(), new_mute_states)
             })
             .collect();
 
@@ -809,12 +800,6 @@ impl InnerRoom {
         )) = &update_result.as_ref().map_err(AsRef::as_ref)
         {
             self.update_mute_states(mute_states_backup).await?;
-        } else if matches!(direction, TrackDirection::Send) {
-            // for peer in peers_to_update_local_stream {
-            //     peer.update_local_stream()
-            //         .await
-            //         .map_err(tracerr::map_from_and_wrap!())?;
-            // }
         }
 
         update_result

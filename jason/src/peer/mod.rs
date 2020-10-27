@@ -167,7 +167,10 @@ pub enum PeerEvent {
         stats: RtcStats,
     },
 
+    /// [`PeerConnection::update_local_stream`] was failed, so
+    /// `on_failed_local_stream` callback should be called.
     FailedLocalMedia {
+        /// Reasons of local media updating fail.
         error: JasonError,
     },
 }
@@ -586,7 +589,11 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(&self, tracks: Vec<proto::Track>, maybe_update_local_media: bool) -> Result<String> {
+    pub async fn get_offer(
+        &self,
+        tracks: Vec<proto::Track>,
+        maybe_update_local_media: bool,
+    ) -> Result<String> {
         self.media_connections
             .create_tracks(
                 tracks,
@@ -685,6 +692,7 @@ impl PeerConnection {
         })
     }
 
+    /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
@@ -729,9 +737,11 @@ impl PeerConnection {
         }
     }
 
+    /// Returns `true` if [`PeerConnection::update_local_stream`] should be
+    /// called.
     #[inline]
     pub fn is_local_stream_update_needed(&self) -> bool {
-        self.media_connections.is_local_stream_update_needed()
+        self.media_connections.is_local_media_update_needed()
     }
 
     /// Returns [`Rc`] to [`TransceiverSide`] with a provided [`TrackId`].

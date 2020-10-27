@@ -146,9 +146,11 @@ impl Sender {
         }
     }
 
+    /// Returns `true` if [`Transceiver`] of this [`Sender`] has
+    /// [`MediaStreamTrack`].
     #[inline]
     pub fn has_track(&self) -> bool {
-        self.transceiver.send_track().is_some()
+        self.transceiver.has_send_track()
     }
 
     /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s

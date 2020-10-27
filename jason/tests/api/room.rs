@@ -143,11 +143,11 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let room_handle = room.new_handle();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "InvalidLocalTracks");
+        cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
         cb_assert_eq!(
             err.message(),
-            "Invalid local tracks: MuteState of Sender can\'t be transited \
-             into muted state, because this Sender is required."
+            "MuteState of Sender can\'t be transited into muted state, \
+             because this Sender is required."
         );
     });
     room_handle.on_failed_local_media(cb.into()).unwrap();
@@ -185,11 +185,10 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "InvalidLocalTracks");
+        cb_assert_eq!(&err.name(), "TracksRequest");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local tracks: provided multiple device video \
-             MediaStreamTracks"
+            "provided multiple device video MediaStreamTracks"
         );
     });
     let (audio_track, video_track) = get_test_required_tracks();
@@ -276,11 +275,11 @@ async fn error_get_local_stream_on_new_peer() {
     .unwrap();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
+        cb_assert_eq!(&err.name(), "MediaManager");
         cb_assert_eq!(
             &err.message(),
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: error_get_local_stream_on_new_peer"
+            "MediaDevices.getUserMedia() failed: Unknown JS error: \
+             error_get_local_stream_on_new_peer"
         );
     });
 
@@ -1194,7 +1193,7 @@ mod patches_generation {
             )
             .unwrap();
 
-            peer.get_offer(tracks).await.unwrap();
+            peer.get_offer(tracks, true).await.unwrap();
 
             peers.insert(peer_id, peer);
         }

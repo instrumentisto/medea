@@ -19,7 +19,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
     peer::{transceiver::Transceiver, PeerEvent, TransceiverDirection},
-    utils::{JsCaused, JsError},
+    utils::{JasonError, JsCaused, JsError},
 };
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
@@ -490,16 +490,24 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let mute_state =
-                        if send_constraints.is_enabled(&track.media_type) {
-                            StableMuteState::Unmuted
-                        } else if is_required {
-                            return Err(tracerr::new!(
+                    let mute_state = if send_constraints
+                        .is_enabled(&track.media_type)
+                    {
+                        StableMuteState::Unmuted
+                    } else if is_required {
+                        let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
-                        ));
-                        } else {
-                            StableMuteState::Muted
-                        };
+                        );
+                        let _ =
+                            self.0.borrow().peer_events_sender.unbounded_send(
+                                PeerEvent::FailedLocalMedia {
+                                    error: JasonError::from(&e),
+                                },
+                            );
+                        return Err(e);
+                    } else {
+                        StableMuteState::Muted
+                    };
                     let sndr = SenderBuilder {
                         media_connections: self,
                         track_id: track.id,
@@ -682,16 +690,13 @@ impl MediaConnections {
         }
     }
 
-    pub fn is_local_stream_update_needed(&self) -> bool {
+    /// Returns `true` if [`PeerConnection::update_local_stream`] should be
+    /// called.
+    pub fn is_local_media_update_needed(&self) -> bool {
         let inner = self.0.borrow();
-        inner
-            .senders
-            .values()
-            .find(|s| {
-                s.mute_state() == StableMuteState::Unmuted.into()
-                    && !s.has_track()
-            })
-            .is_some()
+        inner.senders.values().any(|s| {
+            s.mute_state() == StableMuteState::Unmuted.into() && !s.has_track()
+        })
     }
 
     /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].

@@ -66,7 +66,7 @@ async fn mute_unmute_audio() {
     )
     .unwrap();
 
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], true)
         .await
         .unwrap();
 
@@ -99,7 +99,7 @@ async fn mute_unmute_video() {
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], true)
         .await
         .unwrap();
 
@@ -133,7 +133,7 @@ async fn new_with_mute_audio() {
     )
     .unwrap();
 
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], true)
         .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
@@ -156,7 +156,7 @@ async fn new_with_mute_video() {
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], true)
         .await
         .unwrap();
 
@@ -192,13 +192,16 @@ async fn add_candidates_to_answerer_before_offer() {
     )
     .unwrap();
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let offer = pc1.get_offer(vec![audio_track, video_track]).await.unwrap();
+    let offer = pc1
+        .get_offer(vec![audio_track, video_track], true)
+        .await
+        .unwrap();
 
     handle_ice_candidates(rx1, &pc2, 1).await;
     // assert that pc2 has buffered candidates
     assert!(pc2.candidates_buffer_len() > 0);
     // then set its remote description
-    pc2.process_offer(offer, Vec::new()).await.unwrap();
+    pc2.process_offer(offer, Vec::new(), true).await.unwrap();
 
     // and assert that buffer was flushed
     assert_eq!(pc2.candidates_buffer_len(), 0);
@@ -236,8 +239,11 @@ async fn add_candidates_to_offerer_before_answer() {
     );
 
     let (audio_track, video_track) = get_test_unrequired_tracks();
-    let offer = pc1.get_offer(vec![audio_track, video_track]).await.unwrap();
-    let answer = pc2.process_offer(offer, Vec::new()).await.unwrap();
+    let offer = pc1
+        .get_offer(vec![audio_track, video_track], true)
+        .await
+        .unwrap();
+    let answer = pc2.process_offer(offer, Vec::new(), true).await.unwrap();
 
     handle_ice_candidates(rx2, &pc1, 1).await;
 
@@ -277,11 +283,11 @@ async fn normal_exchange_of_candidates() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()])
+        .get_offer(vec![audio_track.clone(), video_track.clone()], true)
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track])
+        .process_offer(offer, vec![audio_track, video_track], true)
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
@@ -338,7 +344,7 @@ async fn send_event_on_new_local_stream() {
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], true)
         .await
         .unwrap();
 
@@ -384,11 +390,11 @@ async fn ice_connection_state_changed_is_emitted() {
     let (audio_track, video_track) = get_test_unrequired_tracks();
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()])
+        .get_offer(vec![audio_track.clone(), video_track.clone()], true)
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track])
+        .process_offer(offer, vec![audio_track, video_track], true)
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
@@ -495,9 +501,12 @@ impl InterconnectedPeers {
         )
         .unwrap();
 
-        let offer = peer1.get_offer(Self::get_peer1_tracks()).await.unwrap();
+        let offer = peer1
+            .get_offer(Self::get_peer1_tracks(), true)
+            .await
+            .unwrap();
         let answer = peer2
-            .process_offer(offer, Self::get_peer2_tracks())
+            .process_offer(offer, Self::get_peer2_tracks(), true)
             .await
             .unwrap();
         peer1.set_remote_answer(answer).await.unwrap();
@@ -877,7 +886,7 @@ async fn reset_transition_timers() {
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], true)
         .await
         .unwrap();
 
@@ -963,7 +972,7 @@ async fn new_remote_track() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
 
         let offer = sender_peer
-            .get_offer(vec![audio_track.clone(), video_track.clone()])
+            .get_offer(vec![audio_track.clone(), video_track.clone()], true)
             .await
             .unwrap();
         let answer = rcvr_peer
@@ -992,6 +1001,7 @@ async fn new_remote_track() {
                         }),
                     },
                 ],
+                true,
             )
             .await
             .unwrap();
@@ -1089,11 +1099,13 @@ async fn ice_restart_works() {
     }
 
     let peers = InterconnectedPeers::new().await;
-    let sdp_offer_before = peers.first_peer.get_offer(vec![]).await.unwrap();
+    let sdp_offer_before =
+        peers.first_peer.get_offer(vec![], true).await.unwrap();
     let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
     let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
     peers.first_peer.restart_ice();
-    let sdp_offer_after = peers.first_peer.get_offer(vec![]).await.unwrap();
+    let sdp_offer_after =
+        peers.first_peer.get_offer(vec![], true).await.unwrap();
     let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
     let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
 

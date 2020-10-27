@@ -6,7 +6,7 @@ use std::{convert::TryFrom, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, MemberId, PeerId, Track, TrackId,
+    AudioSettings, Direction, MediaType, MemberId, Track, TrackId,
 };
 use medea_jason::{
     media::{MediaManager, RecvConstraints},
