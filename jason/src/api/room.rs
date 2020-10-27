@@ -579,13 +579,7 @@ impl Room {
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
-                                    match err.as_ref() {
-                                        RoomError::InvalidLocalTracks(_) => {
-                                            let e = JasonError::from(&err);
-                                            e.print();
-                                        }
-                                        _ => JasonError::from(&err).print(),
-                                    };
+                                    JasonError::from(&err).print();
                                 };
                             }
                             RoomEvent::PeerEvent(event) => {
