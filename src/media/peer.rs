@@ -343,7 +343,7 @@ pub struct Context {
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
@@ -483,15 +483,15 @@ impl<T> TrackChangeHandler for Peer<T> {
 
 /// Deduper of the [`TrackPatchEvent`]s.
 ///
-/// Responsible for merging [`TrackPatchEvent`]s from different sources
-/// (queue, pending updates).
+/// Responsible for merging [`TrackPatchEvent`]s from different sources (queue,
+/// pending updates).
 struct TrackPatchDeduper {
     /// All merged [`TrackPatchEvent`]s from this [`TrackPatchDeduper`].
     result: HashMap<TrackId, TrackPatchEvent>,
 
     /// [`TrackId`]s that can be merged.
     ///
-    /// If `None` then all [`TrackPatchEvent`]s can be merged.
+    /// If [`None`] then all [`TrackPatchEvent`]s can be merged.
     whitelist: Option<HashSet<TrackId>>,
 }
 
@@ -504,9 +504,9 @@ impl TrackPatchDeduper {
         }
     }
 
-    /// Returns new [`TrackPatchDeduper`] with provided whitelist, meaning that
-    /// [`TrackPatchDeduper::drain_merge`] will drain only [`TrackChange`]s with
-    /// [`TrackId`]s in provided set.
+    /// Returns new [`TrackPatchDeduper`] with the provided whitelist, meaning
+    /// that [`TrackPatchDeduper::drain_merge`] will drain only [`TrackChange`]s
+    /// with [`TrackId`]s in the provided set.
     fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
         Self {
             result: HashMap::new(),
@@ -514,7 +514,7 @@ impl TrackPatchDeduper {
         }
     }
 
-    /// Drains mergeable [`TrackPatchEvent`]s from provided [`Vec`], merging
+    /// Drains mergeable [`TrackPatchEvent`]s from the provided [`Vec`], merging
     /// those to accumulative [`TrackPatchEvent`]s list inside this struct.
     fn drain_merge(&mut self, changes: &mut Vec<TrackChange>) {
         changes.retain(|change| {
