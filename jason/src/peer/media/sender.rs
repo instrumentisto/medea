@@ -73,6 +73,7 @@ impl<'a> SenderBuilder<'a> {
             is_required: self.is_required,
             send_constraints: self.send_constraints,
         });
+        // TODO: no nned for spawn_local, you do it in sync manner
         spawn_local({
             let weak_this = Rc::downgrade(&this);
             async move {
@@ -186,6 +187,7 @@ impl Sender {
         )
     }
 
+    // TODO: should signall caller that new track is required
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
     pub fn update(&self, track: &TrackPatchEvent) {
