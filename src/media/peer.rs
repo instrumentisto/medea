@@ -50,7 +50,7 @@
 #![allow(clippy::use_self)]
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt,
     rc::Rc,
@@ -334,7 +334,7 @@ pub struct Context {
 
     /// Queue of the [`TrackChange`]s that are scheduled to apply when this
     /// [`Peer`] will be in a [`Stable`] state.
-    track_changes_queue: VecDeque<TrackChange>,
+    track_changes_queue: Vec<TrackChange>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
@@ -343,7 +343,7 @@ pub struct Context {
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
@@ -481,6 +481,74 @@ impl<T> TrackChangeHandler for Peer<T> {
     }
 }
 
+/// Deduper of the [`TrackPatchEvent`]s.
+///
+/// Responsible for merging [`TrackPatchEvent`]s from different sources (queue,
+/// pending updates).
+struct TrackPatchDeduper {
+    /// All merged [`TrackPatchEvent`]s from this [`TrackPatchDeduper`].
+    result: HashMap<TrackId, TrackPatchEvent>,
+
+    /// [`TrackId`]s that can be merged.
+    ///
+    /// If [`None`] then all [`TrackPatchEvent`]s can be merged.
+    whitelist: Option<HashSet<TrackId>>,
+}
+
+impl TrackPatchDeduper {
+    /// Returns new [`TrackPatchDeduper`].
+    fn new() -> Self {
+        Self {
+            result: HashMap::new(),
+            whitelist: None,
+        }
+    }
+
+    /// Returns new [`TrackPatchDeduper`] with the provided whitelist, meaning
+    /// that [`TrackPatchDeduper::drain_merge`] will drain only [`TrackChange`]s
+    /// with [`TrackId`]s in the provided set.
+    fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
+        Self {
+            result: HashMap::new(),
+            whitelist: Some(whitelist),
+        }
+    }
+
+    /// Drains mergeable [`TrackPatchEvent`]s from the provided [`Vec`], merging
+    /// those to accumulative [`TrackPatchEvent`]s list inside this struct.
+    fn drain_merge(&mut self, changes: &mut Vec<TrackChange>) {
+        changes.retain(|change| {
+            if !change.can_force_apply() {
+                return true;
+            }
+            let patch = if let TrackChange::TrackPatch(patch) = change {
+                patch
+            } else {
+                return true;
+            };
+
+            if self.whitelist.is_some()
+                && !self.whitelist.as_ref().unwrap().contains(&patch.id)
+            {
+                return true;
+            }
+
+            self.result
+                .entry(patch.id)
+                .or_insert_with(|| TrackPatchEvent::new(patch.id))
+                .merge(patch);
+            false
+        });
+    }
+
+    /// Returns [`Iterator`] with all previously merged [`TrackChange`]s.
+    fn into_inner(self) -> impl Iterator<Item = TrackChange> {
+        self.result
+            .into_iter()
+            .map(|(_, patch)| TrackChange::TrackPatch(patch))
+    }
+}
+
 /// [RTCPeerConnection] representation.
 ///
 /// [RTCPeerConnection]: https://webrtcglossary.com/peerconnection/
@@ -596,29 +664,34 @@ impl<T> Peer<T> {
     /// Commits all [`TrackChange`]s which are marked as forcible
     /// ([`TrackChange::can_force_apply`]).
     pub fn inner_force_commit_scheduled_changes(&mut self) {
-        let track_changes_queue = std::mem::replace(
-            &mut self.context.track_changes_queue,
-            VecDeque::new(),
-        );
-        let mut forcible_changes = VecDeque::new();
-        let mut filtered_changes_queue = VecDeque::new();
-        for track_change in track_changes_queue {
-            if track_change.can_force_apply() {
-                forcible_changes.push_back(track_change);
+        let mut forcible_changes = Vec::new();
+        let mut filtered_changes_queue = Vec::new();
+        // TODO: use drain_filter when its stable
+        for change in std::mem::take(&mut self.context.track_changes_queue) {
+            if change.can_force_apply() {
+                forcible_changes.push(change.dispatch_with(self));
             } else {
-                filtered_changes_queue.push_back(track_change);
+                filtered_changes_queue.push(change);
             }
         }
         self.context.track_changes_queue = filtered_changes_queue;
 
-        let mut updates = Vec::new();
-        for change in forcible_changes {
-            let track_update = change.as_track_update(self.partner_member_id());
-            change.dispatch_with(self);
-            updates.push(track_update);
-        }
+        let mut deduper = TrackPatchDeduper::with_whitelist(
+            forcible_changes
+                .iter()
+                .filter_map(|t| match t {
+                    TrackChange::TrackPatch(patch) => Some(patch.id),
+                    _ => None,
+                })
+                .collect(),
+        );
+        deduper.drain_merge(&mut self.context.pending_track_updates);
+        deduper.drain_merge(&mut forcible_changes);
 
-        self.dedup_pending_track_updates();
+        let updates: Vec<_> = deduper
+            .into_inner()
+            .map(|c| c.as_track_update(self.partner_member_id()))
+            .collect();
 
         if !updates.is_empty() {
             self.context
@@ -672,34 +745,11 @@ impl<T> Peer<T> {
 
     /// Dedupes [`TrackChange`]s from this [`Peer`].
     fn dedup_track_patches(&mut self) {
-        let mut grouped_patches: HashMap<TrackId, TrackPatchEvent> =
-            HashMap::new();
-        let mut track_changes = Vec::new();
-
-        for track_change in
-            std::mem::take(&mut self.context.pending_track_updates)
-        {
-            match track_change {
-                TrackChange::TrackPatch(patch)
-                | TrackChange::PartnerTrackPatch(patch) => {
-                    grouped_patches
-                        .entry(patch.id)
-                        .or_insert_with(|| TrackPatchEvent::new(patch.id))
-                        .merge(&patch);
-                }
-                _ => {
-                    track_changes.push(track_change);
-                }
-            }
-        }
-
-        track_changes.extend(
-            grouped_patches
-                .into_iter()
-                .map(|(_, patch)| TrackChange::TrackPatch(patch)),
-        );
-
-        self.context.pending_track_updates = track_changes;
+        let mut deduper = TrackPatchDeduper::new();
+        deduper.drain_merge(&mut self.context.pending_track_updates);
+        self.context
+            .pending_track_updates
+            .extend(deduper.into_inner());
     }
 }
 
@@ -811,7 +861,7 @@ impl Peer<Stable> {
         partner_peer: Id,
         partner_member: MemberId,
         is_force_relayed: bool,
-        negotiation_subscriber: Rc<dyn PeerUpdatesSubscriber>,
+        peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Self {
         let context = Context {
             id,
@@ -827,8 +877,8 @@ impl Peer<Stable> {
             endpoints: Vec::new(),
             is_known_to_remote: false,
             pending_track_updates: Vec::new(),
-            track_changes_queue: VecDeque::new(),
-            peer_updates_sub: negotiation_subscriber,
+            track_changes_queue: Vec::new(),
+            peer_updates_sub,
         };
 
         Self {
@@ -899,11 +949,14 @@ impl Peer<Stable> {
         Ok(mids)
     }
 
-    /// Runs [`Task`]s which are scheduled for this [`Peer`].
+    /// Applies previously scheduled [`TrackChange`]s to this [`Peer`], marks
+    /// those changes as applied, so they can be retrieved via
+    /// [`PeerStateMachine::get_updates`]. Calls
+    /// [`PeerUpdatesSubscriber::negotiation_needed`] notifying subscriber that
+    /// this [`Peer`] has changes to negotiate.
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty() {
-            while let Some(task) = self.context.track_changes_queue.pop_front()
-            {
+            for task in std::mem::take(&mut self.context.track_changes_queue) {
                 let change = task.dispatch_with(self);
                 self.context.pending_track_updates.push(change);
             }
@@ -1015,7 +1068,7 @@ impl<'a> PeerChangesScheduler<'a> {
     /// Adds provided [`TrackChange`] to scheduled changes queue.
     #[inline]
     fn schedule_change(&mut self, job: TrackChange) {
-        self.context.track_changes_queue.push_back(job);
+        self.context.track_changes_queue.push(job);
     }
 
     /// Schedules [`Track`] addition to [`Peer`] receive tracks list.
@@ -1370,5 +1423,177 @@ pub mod tests {
         let deduped_track_updates = peer.context.pending_track_updates;
         assert_eq!(deduped_track_updates.len(), 3);
         assert!(matches!(deduped_track_updates[1], TrackChange::IceRestart));
+    }
+
+    /// Checks that [`Peer::inner_force_commit_scheduled_changes`] merges
+    /// changes from the [`Context::pending_track_updates`] with a forcible
+    /// changes from the [`Context::track_changes_queue`].
+    #[test]
+    fn force_update_dedups_normally() {
+        let mut peer_updates_sub = MockPeerUpdatesSubscriber::new();
+        peer_updates_sub.expect_force_update().times(1).returning(
+            |peer_id, changes| {
+                assert_eq!(peer_id, PeerId(0));
+                assert_eq!(changes.len(), 1);
+                if let TrackUpdate::Updated(patch) = &changes[0] {
+                    assert_eq!(patch.id, TrackId(0));
+                    assert_eq!(patch.is_muted_individual, Some(true));
+                } else {
+                    unreachable!();
+                }
+            },
+        );
+
+        let mut peer = Peer::new(
+            PeerId(0),
+            MemberId::from("alice"),
+            PeerId(1),
+            MemberId::from("bob"),
+            false,
+            Rc::new(peer_updates_sub),
+        );
+        peer.context.pending_track_updates = vec![
+            TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(0),
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            }),
+            TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(0),
+                is_muted_general: Some(false),
+                is_muted_individual: Some(false),
+            }),
+            TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(1),
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            }),
+        ];
+        peer.as_changes_scheduler().patch_tracks(vec![
+            TrackPatchCommand {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+            TrackPatchCommand {
+                id: TrackId(0),
+                is_muted: Some(false),
+            },
+            TrackPatchCommand {
+                id: TrackId(0),
+                is_muted: Some(true),
+            },
+        ]);
+        peer.inner_force_commit_scheduled_changes();
+
+        assert_eq!(peer.context.track_changes_queue.len(), 0);
+        assert_eq!(peer.context.pending_track_updates.len(), 1);
+        let filtered_track_change =
+            peer.context.pending_track_updates.pop().unwrap();
+        if let TrackChange::TrackPatch(patch) = filtered_track_change {
+            assert_eq!(patch.id, TrackId(1));
+            assert_eq!(patch.is_muted_general, Some(true));
+        } else {
+            unreachable!();
+        }
+    }
+
+    /// Tests for the [`TrackPatchDeduper`].
+    mod track_patch_deduper {
+        use super::*;
+
+        /// Checks that [`TrackPatchDeduper::with_whitelist`] filters
+        /// [`TrackPatchEvent`]s which are not listed in the whitelist.
+        #[test]
+        fn whitelisting_works() {
+            let mut deduper =
+                TrackPatchDeduper::with_whitelist(hashset![TrackId(1)]);
+            let filtered_patch = TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(2),
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            });
+            let whitelisted_patch = TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(1),
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            });
+            let mut patches =
+                vec![whitelisted_patch.clone(), filtered_patch.clone()];
+            deduper.drain_merge(&mut patches);
+            assert_eq!(patches.len(), 1);
+            assert_eq!(patches[0], filtered_patch);
+
+            let merged_changes: Vec<_> = deduper.into_inner().collect();
+            assert_eq!(merged_changes.len(), 1);
+            assert_eq!(merged_changes[0], whitelisted_patch);
+        }
+
+        /// Checks that [`TrackPatchDeduper`] merges [`TrackChange`]s correctly.
+        #[test]
+        fn merging_works() {
+            let mut deduper = TrackPatchDeduper::new();
+
+            let mut changes: Vec<_> = vec![
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    is_muted_general: Some(false),
+                    is_muted_individual: Some(false),
+                },
+                TrackPatchEvent {
+                    id: TrackId(2),
+                    is_muted_general: Some(true),
+                    is_muted_individual: Some(true),
+                },
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    is_muted_general: Some(true),
+                    is_muted_individual: Some(true),
+                },
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    is_muted_general: None,
+                    is_muted_individual: None,
+                },
+                TrackPatchEvent {
+                    id: TrackId(2),
+                    is_muted_general: Some(false),
+                    is_muted_individual: Some(false),
+                },
+            ]
+            .into_iter()
+            .map(|p| TrackChange::TrackPatch(p))
+            .collect();
+            let unrelated_change =
+                TrackChange::AddSendTrack(Rc::new(MediaTrack::new(
+                    TrackId(1),
+                    MediaType::Audio(AudioSettings { is_required: true }),
+                )));
+            changes.push(unrelated_change.clone());
+            deduper.drain_merge(&mut changes);
+
+            assert_eq!(changes.len(), 1);
+            assert_eq!(changes[0], unrelated_change);
+
+            let merged_changes: HashMap<_, _> = deduper
+                .into_inner()
+                .filter_map(|t| {
+                    if let TrackChange::TrackPatch(patch) = t {
+                        Some((patch.id, patch))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            assert_eq!(merged_changes.len(), 2);
+            {
+                let track_1 = merged_changes.get(&TrackId(1)).unwrap();
+                assert_eq!(track_1.is_muted_general, Some(true));
+            }
+            {
+                let track_2 = merged_changes.get(&TrackId(2)).unwrap();
+                assert_eq!(track_2.is_muted_general, Some(false));
+            }
+        }
     }
 }
