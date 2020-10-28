@@ -40,6 +40,9 @@ pub trait TransceiverSide: Muteable {
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn kind(&self) -> MediaKind;
 
+    /// Returns [`MediaSourceKind`] of this [`TransceiverSide`].
+    fn source_kind(&self) -> MediaSourceKind;
+
     /// Returns [`mid`] of this [`TransceiverSide`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
@@ -547,10 +550,22 @@ impl MediaConnections {
     pub fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<()> {
+    ) -> Result<HashMap<MediaKind, Vec<MediaSourceKind>>> {
+        let mut kinds_to_update: HashMap<_, Vec<_>> = HashMap::new();
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
+                let mute_state_before = sender.mute_state();
                 sender.update(&track_proto);
+                if let (MuteState::Stable(before), MuteState::Stable(after)) =
+                    (mute_state_before, sender.mute_state())
+                {
+                    if before != after {
+                        kinds_to_update
+                            .entry(sender.kind())
+                            .or_default()
+                            .push(sender.source_kind());
+                    }
+                }
             } else if let Some(receiver) =
                 self.0.borrow_mut().receivers.get_mut(&track_proto.id)
             {
@@ -561,13 +576,21 @@ impl MediaConnections {
                 ));
             }
         }
-        Ok(())
+        Ok(kinds_to_update)
     }
 
     /// Returns [`TracksRequest`] if this [`MediaConnections`] has [`Sender`]s.
-    pub fn get_tracks_request(&self) -> Option<TracksRequest> {
+    pub fn get_tracks_request(
+        &self,
+        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+    ) -> Option<TracksRequest> {
         let mut stream_request = None;
-        for sender in self.0.borrow().senders.values() {
+        for sender in self.0.borrow().senders.values().filter(|s| {
+            kinds
+                .get(&s.kind())
+                .map(|k| k.contains(&s.source_kind()))
+                .unwrap_or(false)
+        }) {
             stream_request
                 .get_or_insert_with(TracksRequest::default)
                 .add_track_request(sender.track_id(), sender.caps().clone());
@@ -692,10 +715,19 @@ impl MediaConnections {
 
     /// Returns `true` if [`PeerConnection::update_local_stream`] should be
     /// called.
-    pub fn is_local_media_update_needed(&self) -> bool {
+    pub fn is_local_media_update_needed(
+        &self,
+        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+    ) -> bool {
         let inner = self.0.borrow();
+
         inner.senders.values().any(|s| {
-            s.mute_state() == StableMuteState::Unmuted.into() && !s.has_track()
+            kinds
+                .get(&s.kind())
+                .map(|k| k.contains(&s.source_kind()))
+                .unwrap_or(false)
+                && s.mute_state() == StableMuteState::Unmuted.into()
+                && !s.has_track()
         })
     }
 

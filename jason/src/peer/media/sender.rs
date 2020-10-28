@@ -3,7 +3,7 @@
 use std::{cell::Cell, rc::Rc};
 
 use futures::StreamExt;
-use medea_client_api_proto::{TrackId, TrackPatchEvent};
+use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -248,6 +248,10 @@ impl TransceiverSide for Sender {
 
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+        self.caps.media_source_kind()
     }
 
     fn mid(&self) -> Option<String> {

@@ -279,18 +279,26 @@ impl RoomHandle {
         }
 
         if let TrackDirection::Send = direction {
-            for peer in inner
-                .peers
-                .get_all()
-                .into_iter()
-                .filter(|p| p.is_local_stream_update_needed())
-            {
-                peer.update_local_stream(Some(kind), source_kind)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                    .map_err(|e| JasonError::from(&e))?;
+            for peer in inner.peers.get_all().into_iter().filter(|p| {
+                let source_kinds =
+                    source_kind.map(|k| vec![k]).unwrap_or_else(|| {
+                        vec![MediaSourceKind::Device, MediaSourceKind::Display]
+                    });
+                p.is_local_stream_update_needed(hashmap! {
+                    kind => source_kinds
+                })
+            }) {
+                let source_kinds =
+                    source_kind.map(|k| vec![k]).unwrap_or_else(|| {
+                        vec![MediaSourceKind::Device, MediaSourceKind::Display]
+                    });
+                peer.update_local_stream(hashmap! {
+                    kind => source_kinds
+                })
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                .map_err(|e| JasonError::from(&e))?;
             }
-
         }
 
         Ok(())
@@ -936,11 +944,30 @@ impl InnerRoom {
         &self,
         settings: MediaStreamSettings,
     ) -> Result<(), Traced<RoomError>> {
+        let mut kinds = HashMap::new();
+
+        if settings.is_audio_enabled() {
+            kinds.insert(
+                MediaKind::Audio,
+                vec![MediaSourceKind::Device, MediaSourceKind::Display],
+            );
+        }
+        let mut video_source_kinds = Vec::new();
+        if settings.is_device_video_enabled() {
+            video_source_kinds.push(MediaSourceKind::Device);
+        }
+        if settings.is_display_video_enabled() {
+            video_source_kinds.push(MediaSourceKind::Display);
+        }
+        if !video_source_kinds.is_empty() {
+            kinds.insert(MediaKind::Video, video_source_kinds);
+        }
+
         self.send_constraints.constrain(settings);
 
         let mut mute_states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            peer.update_local_stream()
+            peer.update_local_stream(kinds.clone())
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_mute_states| {
@@ -1141,7 +1168,11 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
-        peer.patch_tracks(patches)
+        let kinds = peer
+            .patch_tracks(patches)
+            .map_err(tracerr::map_from_and_wrap!())?;
+        peer.update_local_stream(kinds)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?;
         self.create_tracks_and_maybe_negotiate(
             peer,

@@ -127,6 +127,40 @@ macro_rules! new_js_error {
     };
 }
 
+/// Creates new [`HashMap`] from a list of key-value pairs.
+///
+/// # Example
+///
+/// ```rust
+/// # use medea_jason::hashmap;
+/// let map = hashmap! {
+///     "a" => 1,
+///     "b" => 2,
+/// };
+/// assert_eq!(map["a"], 1);
+/// assert_eq!(map["b"], 2);
+/// assert_eq!(map.get("c"), None);
+/// ```
+///
+/// [`HashMap`]: std::collections::HashMap
+#[macro_export]
+macro_rules! hashmap {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashmap!(@single $rest)),*]));
+
+    ($($key:expr => $value:expr,)+) => { hashmap!($($key => $value),+) };
+    ($($key:expr => $value:expr),*) => {
+        {
+            let _cap = hashmap!(@count $($key),*);
+            let mut _map = ::std::collections::HashMap::with_capacity(_cap);
+            $(
+                let _ = _map.insert($key, $value);
+            )*
+            _map
+        }
+    };
+}
+
 /// Returns property of JS object by name if its defined.
 /// Converts the value with a given predicate.
 pub fn get_property_by_name<T, F, U>(

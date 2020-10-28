@@ -506,7 +506,7 @@
           }
         }
         if (!isAudioSendMuted) {
-          constraints = await initLocalStream();
+          // constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
       });
@@ -519,7 +519,7 @@
           }
         }
         if (!isVideoSendMuted) {
-          constraints = await initLocalStream();
+// <!--          constraints = await initLocalStream();-->
         }
         await room.set_local_media_settings(constraints);
       };
@@ -527,6 +527,7 @@
       screenshareSwitchEl.addEventListener('change', videoSwitch);
 
       room.on_failed_local_media((error) => {
+        console.log("asdkjflsdkjf");
         console.error(error.message());
       });
 
@@ -659,7 +660,7 @@
           isAudioSendMuted = false;
           muteAudioSendBtn.textContent = 'Disable audio send';
           if (!isCallStarted) {
-            await initLocalStream();
+// <!--            await initLocalStream();-->
           }
         } else {
           await room.mute_audio();
@@ -680,7 +681,7 @@
           isVideoSendMuted = false;
           muteVideoSendBtn.textContent = 'Disable video send';
           if (!isCallStarted) {
-            await initLocalStream();
+// <!--            await initLocalStream();-->
           }
         } else {
           await room.mute_video();
@@ -726,9 +727,9 @@
         chooseRoomDiv.style.display = 'none';
         videoCallDiv.style.display = '';
 
-        const constraints = await initLocalStream();
-        await fillMediaDevicesInputs(audioSelect, videoSelect);
-        await room.set_local_media_settings(constraints);
+// <!--        const constraints = await initLocalStream();-->
+// <!--        await fillMediaDevicesInputs(audioSelect, videoSelect);-->
+// <!--        await room.set_local_media_settings(constraints);-->
       } else {
         chooseRoomButton.onclick = async function () {
           let roomId = roomIdInput.value;
@@ -736,9 +737,9 @@
           window.location.hash = roomId;
           bindJoinButtons(roomId);
 
-          const constraints = await initLocalStream();
-          await fillMediaDevicesInputs(audioSelect, videoSelect);
-          await room.set_local_media_settings(constraints);
+// <!--          const constraints = await initLocalStream();-->
+// <!--          await fillMediaDevicesInputs(audioSelect, videoSelect);-->
+// <!--          await room.set_local_media_settings(constraints);-->
 
           chooseRoomDiv.style.display = 'none';
           videoCallDiv.style.display = '';

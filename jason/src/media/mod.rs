@@ -26,7 +26,7 @@ pub use self::{
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum MediaKind {
     /// Audio track.
     Audio,

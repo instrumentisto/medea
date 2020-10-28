@@ -22,8 +22,8 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
-    MediaSourceKind, MemberId, PeerConnectionState, PeerId as Id, PeerId,
-    TrackId,
+    MediaSourceKind, MediaType, MemberId, PeerConnectionState, PeerId as Id,
+    PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -173,6 +173,32 @@ pub enum PeerEvent {
         /// Reasons of local media updating fail.
         error: JasonError,
     },
+}
+
+/// Returns [`MediaKind`]s and [`MediaSourceKind`]s of the provided
+/// [`proto:;Track`]s.
+fn get_tracks_kinds(
+    tracks: &Vec<proto::Track>,
+) -> HashMap<MediaKind, Vec<MediaSourceKind>> {
+    let mut video_kinds = Vec::new();
+    let mut audio_kinds = Vec::new();
+    for track in tracks
+        .iter()
+        .filter(|t| matches!(t.direction, Direction::Send { .. }))
+    {
+        match &track.media_type {
+            MediaType::Audio(_) => {
+                audio_kinds.push(MediaSourceKind::Device);
+            }
+            MediaType::Video(video) => {
+                video_kinds.push(video.source_kind);
+            }
+        }
+    }
+    hashmap! {
+        MediaKind::Audio => audio_kinds,
+        MediaKind::Video => video_kinds,
+    }
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -437,7 +463,7 @@ impl PeerConnection {
     pub fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<()> {
+    ) -> Result<HashMap<MediaKind, Vec<MediaSourceKind>>> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
@@ -594,6 +620,8 @@ impl PeerConnection {
         tracks: Vec<proto::Track>,
         maybe_update_local_media: bool,
     ) -> Result<String> {
+        let kinds = get_tracks_kinds(&tracks);
+
         self.media_connections
             .create_tracks(
                 tracks,
@@ -602,8 +630,10 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if self.is_local_stream_update_needed() && maybe_update_local_media {
-            let _ = self.update_local_stream().await;
+        if self.is_local_stream_update_needed(kinds.clone())
+            && maybe_update_local_media
+        {
+            let _ = self.update_local_stream(kinds).await;
         }
 
         let offer = self
@@ -679,8 +709,9 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
+        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
-        self.inner_update_local_stream().await.map_err(|e| {
+        self.inner_update_local_stream(kinds).await.map_err(|e| {
             let e = tracerr::new!(e);
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
@@ -695,8 +726,10 @@ impl PeerConnection {
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
+        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
-        if let Some(request) = self.media_connections.get_tracks_request() {
+        if let Some(request) = self.media_connections.get_tracks_request(kinds)
+        {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
@@ -740,8 +773,11 @@ impl PeerConnection {
     /// Returns `true` if [`PeerConnection::update_local_stream`] should be
     /// called.
     #[inline]
-    pub fn is_local_stream_update_needed(&self) -> bool {
-        self.media_connections.is_local_media_update_needed()
+    pub fn is_local_stream_update_needed(
+        &self,
+        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+    ) -> bool {
+        self.media_connections.is_local_media_update_needed(kinds)
     }
 
     /// Returns [`Rc`] to [`TransceiverSide`] with a provided [`TrackId`].
@@ -861,6 +897,8 @@ impl PeerConnection {
         tracks: Vec<proto::Track>,
         maybe_update_local_media: bool,
     ) -> Result<String> {
+        let kinds = get_tracks_kinds(&tracks);
+
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
             tracks.into_iter().partition(|track| match track.direction {
@@ -884,8 +922,10 @@ impl PeerConnection {
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if self.is_local_stream_update_needed() && maybe_update_local_media {
-            let _ = self.update_local_stream().await;
+        if self.is_local_stream_update_needed(kinds.clone())
+            && maybe_update_local_media
+        {
+            let _ = self.update_local_stream(kinds.clone()).await;
         }
 
         let answer = self
