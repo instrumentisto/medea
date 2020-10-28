@@ -278,16 +278,19 @@ impl RoomHandle {
                 .map_err(|e| JasonError::from(&e))?;
         }
 
-        for peer in inner
-            .peers
-            .get_all()
-            .into_iter()
-            .filter(|p| p.is_local_stream_update_needed())
-        {
-            peer.update_local_stream()
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map_err(|e| JasonError::from(&e))?;
+        if let TrackDirection::Send = direction {
+            for peer in inner
+                .peers
+                .get_all()
+                .into_iter()
+                .filter(|p| p.is_local_stream_update_needed())
+            {
+                peer.update_local_stream(Some(kind), source_kind)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                    .map_err(|e| JasonError::from(&e))?;
+            }
+
         }
 
         Ok(())
