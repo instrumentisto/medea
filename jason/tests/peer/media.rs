@@ -14,7 +14,8 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{
-    get_media_stream_settings, get_test_unrequired_tracks, local_constraints,
+    all_kinds, get_media_stream_settings, get_test_unrequired_tracks,
+    local_constraints,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -39,7 +40,7 @@ async fn get_test_media_connections(
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request().unwrap();
+    let request = media_connections.get_tracks_request(all_kinds()).unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();
@@ -83,7 +84,7 @@ fn get_tracks_request1() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request();
+    let request = media_connections.get_tracks_request(all_kinds());
     assert!(request.is_some());
 }
 
@@ -102,7 +103,7 @@ fn get_tracks_request2() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request();
+    let request = media_connections.get_tracks_request(all_kinds());
     assert!(request.is_none());
 }
 

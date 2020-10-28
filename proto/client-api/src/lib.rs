@@ -632,9 +632,9 @@ pub struct VideoSettings {
 }
 
 /// Media source kind.
-#[cfg_attr(feature = "medea", derive(Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Debug, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MediaSourceKind {
     /// Media is sourced by some media device (webcam or microphone).
     Device,

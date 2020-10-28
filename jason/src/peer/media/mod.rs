@@ -31,6 +31,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use std::collections::HashSet;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -550,8 +551,8 @@ impl MediaConnections {
     pub fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<HashMap<MediaKind, Vec<MediaSourceKind>>> {
-        let mut kinds_to_update: HashMap<_, Vec<_>> = HashMap::new();
+    ) -> Result<HashMap<MediaKind, HashSet<MediaSourceKind>>> {
+        let mut kinds_to_update: HashMap<_, HashSet<_>> = HashMap::new();
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
                 let mute_state_before = sender.mute_state();
@@ -563,7 +564,7 @@ impl MediaConnections {
                         kinds_to_update
                             .entry(sender.kind())
                             .or_default()
-                            .push(sender.source_kind());
+                            .insert(sender.source_kind());
                     }
                 }
             } else if let Some(receiver) =
@@ -582,7 +583,7 @@ impl MediaConnections {
     /// Returns [`TracksRequest`] if this [`MediaConnections`] has [`Sender`]s.
     pub fn get_tracks_request(
         &self,
-        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values().filter(|s| {
@@ -717,7 +718,7 @@ impl MediaConnections {
     /// called.
     pub fn is_local_media_update_needed(
         &self,
-        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> bool {
         let inner = self.0.borrow();
 

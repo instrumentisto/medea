@@ -54,6 +54,7 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::TransceiverDirection,
 };
+use std::collections::HashSet;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -179,19 +180,19 @@ pub enum PeerEvent {
 /// [`proto:;Track`]s.
 fn get_tracks_kinds(
     tracks: &Vec<proto::Track>,
-) -> HashMap<MediaKind, Vec<MediaSourceKind>> {
-    let mut video_kinds = Vec::new();
-    let mut audio_kinds = Vec::new();
+) -> HashMap<MediaKind, HashSet<MediaSourceKind>> {
+    let mut video_kinds = HashSet::new();
+    let mut audio_kinds = HashSet::new();
     for track in tracks
         .iter()
         .filter(|t| matches!(t.direction, Direction::Send { .. }))
     {
         match &track.media_type {
             MediaType::Audio(_) => {
-                audio_kinds.push(MediaSourceKind::Device);
+                audio_kinds.insert(MediaSourceKind::Device);
             }
             MediaType::Video(video) => {
-                video_kinds.push(video.source_kind);
+                video_kinds.insert(video.source_kind);
             }
         }
     }
@@ -463,7 +464,7 @@ impl PeerConnection {
     pub fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<HashMap<MediaKind, Vec<MediaSourceKind>>> {
+    ) -> Result<HashMap<MediaKind, HashSet<MediaSourceKind>>> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
@@ -709,7 +710,7 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
         self.inner_update_local_stream(kinds).await.map_err(|e| {
             let e = tracerr::new!(e);
@@ -726,7 +727,7 @@ impl PeerConnection {
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
-        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
         if let Some(request) = self.media_connections.get_tracks_request(kinds)
         {
@@ -775,7 +776,7 @@ impl PeerConnection {
     #[inline]
     pub fn is_local_stream_update_needed(
         &self,
-        kinds: HashMap<MediaKind, Vec<MediaSourceKind>>,
+        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> bool {
         self.media_connections.is_local_media_update_needed(kinds)
     }

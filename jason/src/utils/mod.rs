@@ -161,6 +161,36 @@ macro_rules! hashmap {
     };
 }
 
+/// Creates new [`HashSet`] from a list of values.
+///
+/// # Example
+///
+/// ```rust
+/// # use medea_jason::hashset;
+/// let map = hashset![1, 1, 2];
+/// assert!(map.contains(&1));
+/// assert!(map.contains(&2));
+/// ```
+///
+/// [`HashSet`]: std::collections::HashSet
+#[macro_export]
+macro_rules! hashset {
+    (@single $($x:tt)*) => (());
+    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
+
+    ($($value:expr,)+) => { hashset!($($value),+) };
+    ($($value:expr),*) => {
+        {
+            let _cap = hashset!(@count $($value),*);
+            let mut _map = ::std::collections::HashSet::with_capacity(_cap);
+            $(
+                let _ = _map.insert($value);
+            )*
+            _map
+        }
+    };
+}
+
 /// Returns property of JS object by name if its defined.
 /// Converts the value with a given predicate.
 pub fn get_property_by_name<T, F, U>(

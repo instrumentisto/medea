@@ -39,6 +39,7 @@ use crate::{
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
 };
+use std::collections::HashSet;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -281,16 +282,22 @@ impl RoomHandle {
         if let TrackDirection::Send = direction {
             for peer in inner.peers.get_all().into_iter().filter(|p| {
                 let source_kinds =
-                    source_kind.map(|k| vec![k]).unwrap_or_else(|| {
-                        vec![MediaSourceKind::Device, MediaSourceKind::Display]
+                    source_kind.map(|k| hashset![k]).unwrap_or_else(|| {
+                        hashset![
+                            MediaSourceKind::Device,
+                            MediaSourceKind::Display
+                        ]
                     });
                 p.is_local_stream_update_needed(hashmap! {
                     kind => source_kinds
                 })
             }) {
                 let source_kinds =
-                    source_kind.map(|k| vec![k]).unwrap_or_else(|| {
-                        vec![MediaSourceKind::Device, MediaSourceKind::Display]
+                    source_kind.map(|k| hashset![k]).unwrap_or_else(|| {
+                        hashset![
+                            MediaSourceKind::Device,
+                            MediaSourceKind::Display
+                        ]
                     });
                 peer.update_local_stream(hashmap! {
                     kind => source_kinds
@@ -944,24 +951,16 @@ impl InnerRoom {
         &self,
         settings: MediaStreamSettings,
     ) -> Result<(), Traced<RoomError>> {
-        let mut kinds = HashMap::new();
-
-        if settings.is_audio_enabled() {
-            kinds.insert(
-                MediaKind::Audio,
-                vec![MediaSourceKind::Device, MediaSourceKind::Display],
-            );
-        }
-        let mut video_source_kinds = Vec::new();
-        if settings.is_device_video_enabled() {
-            video_source_kinds.push(MediaSourceKind::Device);
-        }
-        if settings.is_display_video_enabled() {
-            video_source_kinds.push(MediaSourceKind::Display);
-        }
-        if !video_source_kinds.is_empty() {
-            kinds.insert(MediaKind::Video, video_source_kinds);
-        }
+        let kinds = hashmap! {
+            MediaKind::Audio => hashset![
+                MediaSourceKind::Device,
+                MediaSourceKind::Display,
+            ],
+            MediaKind::Video => hashset![
+                MediaSourceKind::Device,
+                MediaSourceKind::Display,
+            ]
+        };
 
         self.send_constraints.constrain(settings);
 

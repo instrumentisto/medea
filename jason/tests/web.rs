@@ -80,6 +80,8 @@ mod peer;
 mod rpc;
 mod utils;
 
+use std::collections::{HashMap, HashSet};
+
 use futures::{channel::oneshot, future::Either, Future};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -87,6 +89,7 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
+    hashmap, hashset,
     media::{
         LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
     },
@@ -205,6 +208,19 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
             }),
         },
     )
+}
+
+fn all_kinds() -> HashMap<MediaKind, HashSet<MediaSourceKind>> {
+    hashmap! {
+        MediaKind::Audio => hashset![
+            MediaSourceKind::Display,
+            MediaSourceKind::Device,
+        ],
+        MediaKind::Video => hashset![
+            MediaSourceKind::Display,
+            MediaSourceKind::Device,
+        ]
+    }
 }
 
 /// Resolves after provided number of milliseconds.

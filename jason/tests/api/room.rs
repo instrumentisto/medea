@@ -235,14 +235,21 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
 
         let room_handle = room.new_handle();
         room_handle.on_failed_local_media(closure.into()).unwrap();
+
         let is_should_be_ok =
-            audio_required == add_audio && video_required == add_video;
+            audio_required == add_audio || video_required == add_video;
         assert_eq!(
             JsFuture::from(room_handle.set_local_media_settings(&constraints))
                 .await
                 .map_err(|e| set_conn(&e))
                 .is_ok(),
-            is_should_be_ok
+            is_should_be_ok,
+            "audio_required: {}; add_audio: {}; video_required: {}; \
+             add_video: {}",
+            audio_required,
+            add_audio,
+            video_required,
+            add_video,
         );
 
         timeout(1000, test_rx)
