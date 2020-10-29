@@ -42,9 +42,7 @@ impl MuteStateController {
 
     /// Returns [`Stream`] to which [`StableMuteState`] update will be sent on
     /// [`MuteStateController::mute_state`] stabilization.
-    pub(in super::super) fn on_stabilize(
-        &self,
-    ) -> LocalBoxStream<'static, StableMuteState> {
+    pub fn on_stabilize(&self) -> LocalBoxStream<'static, StableMuteState> {
         self.state
             .subscribe()
             .skip(1)

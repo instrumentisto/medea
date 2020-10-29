@@ -4,7 +4,12 @@ mod mute_state;
 mod receiver;
 mod sender;
 
-use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    convert::From,
+    rc::Rc,
+};
 
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
@@ -31,7 +36,6 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use std::collections::HashSet;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Muteable {
@@ -548,7 +552,7 @@ impl MediaConnections {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
-    pub fn patch_tracks(
+    pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
     ) -> Result<HashMap<MediaKind, HashSet<MediaSourceKind>>> {
@@ -556,7 +560,7 @@ impl MediaConnections {
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
                 let mute_state_before = sender.mute_state();
-                sender.update(&track_proto);
+                sender.update(&track_proto).await;
                 if let (MuteState::Stable(before), MuteState::Stable(after)) =
                     (mute_state_before, sender.mute_state())
                 {
@@ -583,14 +587,13 @@ impl MediaConnections {
     /// Returns [`TracksRequest`] if this [`MediaConnections`] has [`Sender`]s.
     pub fn get_tracks_request(
         &self,
-        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
+        kinds: &HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values().filter(|s| {
             kinds
                 .get(&s.kind())
-                .map(|k| k.contains(&s.source_kind()))
-                .unwrap_or(false)
+                .map_or(false, |k| k.contains(&s.source_kind()))
         }) {
             stream_request
                 .get_or_insert_with(TracksRequest::default)
@@ -718,15 +721,14 @@ impl MediaConnections {
     /// called.
     pub fn is_local_media_update_needed(
         &self,
-        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
+        kinds: &HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> bool {
         let inner = self.0.borrow();
 
         inner.senders.values().any(|s| {
             kinds
                 .get(&s.kind())
-                .map(|k| k.contains(&s.source_kind()))
-                .unwrap_or(false)
+                .map_or(false, |k| k.contains(&s.source_kind()))
                 && s.mute_state() == StableMuteState::Unmuted.into()
                 && !s.has_track()
         })

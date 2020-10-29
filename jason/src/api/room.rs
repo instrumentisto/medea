@@ -39,7 +39,6 @@ use crate::{
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
 };
-use std::collections::HashSet;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -280,31 +279,23 @@ impl RoomHandle {
         }
 
         if let TrackDirection::Send = direction {
-            for peer in inner.peers.get_all().into_iter().filter(|p| {
-                let source_kinds =
-                    source_kind.map(|k| hashset![k]).unwrap_or_else(|| {
-                        hashset![
-                            MediaSourceKind::Device,
-                            MediaSourceKind::Display
-                        ]
-                    });
-                p.is_local_stream_update_needed(hashmap! {
-                    kind => source_kinds
-                })
-            }) {
-                let source_kinds =
-                    source_kind.map(|k| hashset![k]).unwrap_or_else(|| {
-                        hashset![
-                            MediaSourceKind::Device,
-                            MediaSourceKind::Display
-                        ]
-                    });
-                peer.update_local_stream(hashmap! {
-                    kind => source_kinds
-                })
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map_err(|e| JasonError::from(&e))?;
+            let source_kinds = source_kind.map_or_else(
+                || hashset![MediaSourceKind::Device, MediaSourceKind::Display],
+                |k| hashset![k],
+            );
+            let kinds = &hashmap! {
+                kind => source_kinds
+            };
+            for peer in inner
+                .peers
+                .get_all()
+                .into_iter()
+                .filter(|p| p.is_local_stream_update_needed(&kinds))
+            {
+                peer.update_local_stream(&kinds)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                    .map_err(|e| JasonError::from(&e))?;
             }
         }
 
@@ -778,7 +769,7 @@ impl InnerRoom {
             .into_iter()
             .map(|peer| {
                 let mut trnscvrs_backup_mute_states = HashMap::new();
-                let new_mute_states: HashMap<_, _> = peer
+                let new_mute_states = peer
                     .get_transceivers_sides(kind, direction, source_kind)
                     .into_iter()
                     .filter(|transceiver| transceiver.is_transitable())
@@ -966,7 +957,7 @@ impl InnerRoom {
 
         let mut mute_states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            peer.update_local_stream(kinds.clone())
+            peer.update_local_stream(&kinds)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_mute_states| {
@@ -1169,8 +1160,9 @@ impl EventHandler for InnerRoom {
         }
         let kinds = peer
             .patch_tracks(patches)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?;
-        peer.update_local_stream(kinds)
+        peer.update_local_stream(&kinds)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         self.create_tracks_and_maybe_negotiate(

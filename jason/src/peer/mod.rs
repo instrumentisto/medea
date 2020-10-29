@@ -179,7 +179,7 @@ pub enum PeerEvent {
 /// Returns [`MediaKind`]s and [`MediaSourceKind`]s of the provided
 /// [`proto:;Track`]s.
 fn get_tracks_kinds(
-    tracks: &Vec<proto::Track>,
+    tracks: &[proto::Track],
 ) -> HashMap<MediaKind, HashSet<MediaSourceKind>> {
     let mut video_kinds = HashSet::new();
     let mut audio_kinds = HashSet::new();
@@ -461,13 +461,14 @@ impl PeerConnection {
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// provided [`proto::TrackPatch`] contains unknown ID.
-    pub fn patch_tracks(
+    pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
     ) -> Result<HashMap<MediaKind, HashSet<MediaSourceKind>>> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?)
     }
 
@@ -631,10 +632,10 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if self.is_local_stream_update_needed(kinds.clone())
+        if self.is_local_stream_update_needed(&kinds)
             && maybe_update_local_media
         {
-            let _ = self.update_local_stream(kinds).await;
+            let _ = self.update_local_stream(&kinds).await;
         }
 
         let offer = self
@@ -710,7 +711,7 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
+        kinds: &HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
         self.inner_update_local_stream(kinds).await.map_err(|e| {
             let e = tracerr::new!(e);
@@ -727,7 +728,7 @@ impl PeerConnection {
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
-        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
+        kinds: &HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> Result<HashMap<TrackId, StableMuteState>> {
         if let Some(request) = self.media_connections.get_tracks_request(kinds)
         {
@@ -776,7 +777,7 @@ impl PeerConnection {
     #[inline]
     pub fn is_local_stream_update_needed(
         &self,
-        kinds: HashMap<MediaKind, HashSet<MediaSourceKind>>,
+        kinds: &HashMap<MediaKind, HashSet<MediaSourceKind>>,
     ) -> bool {
         self.media_connections.is_local_media_update_needed(kinds)
     }
@@ -923,10 +924,10 @@ impl PeerConnection {
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if self.is_local_stream_update_needed(kinds.clone())
+        if self.is_local_stream_update_needed(&kinds)
             && maybe_update_local_media
         {
-            let _ = self.update_local_stream(kinds.clone()).await;
+            let _ = self.update_local_stream(&kinds).await;
         }
 
         let answer = self

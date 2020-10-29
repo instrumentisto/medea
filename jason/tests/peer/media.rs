@@ -40,7 +40,7 @@ async fn get_test_media_connections(
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(all_kinds()).unwrap();
+    let request = media_connections.get_tracks_request(&all_kinds()).unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();
@@ -84,7 +84,7 @@ fn get_tracks_request1() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(all_kinds());
+    let request = media_connections.get_tracks_request(&all_kinds());
     assert!(request.is_some());
 }
 
@@ -103,7 +103,7 @@ fn get_tracks_request2() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(all_kinds());
+    let request = media_connections.get_tracks_request(&all_kinds());
     assert!(request.is_none());
 }
 
@@ -138,6 +138,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted_general: Some(true),
             is_muted_individual: Some(true),
         }])
+        .await
         .unwrap();
     assert!(audio_track.is_general_muted());
     assert!(!video_track.is_general_muted());
@@ -151,6 +152,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted_general: Some(true),
             is_muted_individual: Some(true),
         }])
+        .await
         .unwrap();
     assert!(audio_track.is_general_muted());
     assert!(video_track.is_general_muted());
@@ -164,6 +166,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted_individual: Some(false),
             is_muted_general: Some(false),
         }])
+        .await
         .unwrap();
     assert!(!audio_track.is_general_muted());
     assert!(video_track.is_general_muted());
@@ -177,6 +180,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_muted_individual: Some(false),
             is_muted_general: Some(false),
         }])
+        .await
         .unwrap();
     assert!(!audio_track.is_general_muted());
     assert!(!video_track.is_general_muted());
@@ -231,11 +235,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: TrackId(track_id.0 + 100),
-            is_muted_individual: Some(true),
-            is_muted_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: TrackId(track_id.0 + 100),
+                is_muted_individual: Some(true),
+                is_muted_general: Some(true),
+            })
+            .await;
 
         assert!(!sender.is_general_muted());
     }
@@ -243,11 +249,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_muted_individual: Some(true),
-            is_muted_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_muted_individual: Some(true),
+                is_muted_general: Some(true),
+            })
+            .await;
 
         assert!(sender.is_general_muted());
     }
@@ -255,11 +263,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn unmute_unmuted() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_muted_individual: Some(false),
-            is_muted_general: Some(false),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_muted_individual: Some(false),
+                is_muted_general: Some(false),
+            })
+            .await;
 
         assert!(!sender.is_general_muted());
     }
@@ -267,18 +277,22 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn mute_muted() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_muted_individual: Some(true),
-            is_muted_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_muted_individual: Some(true),
+                is_muted_general: Some(true),
+            })
+            .await;
         assert!(sender.is_general_muted());
 
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_muted_individual: Some(true),
-            is_muted_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_muted_individual: Some(true),
+                is_muted_general: Some(true),
+            })
+            .await;
 
         assert!(sender.is_general_muted());
     }
@@ -286,11 +300,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_muted_individual: None,
-            is_muted_general: None,
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_muted_individual: None,
+                is_muted_general: None,
+            })
+            .await;
 
         assert!(!sender.is_general_muted());
     }

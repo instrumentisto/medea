@@ -74,11 +74,13 @@ async fn mute_unmute_audio() {
     assert!(peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], true))
+        .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], false))
+        .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
@@ -107,11 +109,13 @@ async fn mute_unmute_video() {
     assert!(peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], true))
+        .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled(None));
 
     peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], false))
+        .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));

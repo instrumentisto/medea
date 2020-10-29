@@ -51,7 +51,7 @@ async fn sendrecv_works() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(all_kinds()).unwrap();
+    let request = media_connections.get_tracks_request(&all_kinds()).unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();

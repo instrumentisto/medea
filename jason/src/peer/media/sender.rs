@@ -2,9 +2,7 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::StreamExt;
 use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
@@ -63,7 +61,6 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
-        let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
             track_id: self.track_id,
             caps: self.caps,
@@ -72,24 +69,6 @@ impl<'a> SenderBuilder<'a> {
             mute_state: mute_state_observer,
             is_required: self.is_required,
             send_constraints: self.send_constraints,
-        });
-        // TODO: no nned for spawn_local, you do it in sync manner
-        spawn_local({
-            let weak_this = Rc::downgrade(&this);
-            async move {
-                while let Some(mute_state) = mute_state_rx.next().await {
-                    if let Some(this) = weak_this.upgrade() {
-                        match mute_state {
-                            StableMuteState::Unmuted => {}
-                            StableMuteState::Muted => {
-                                this.remove_track().await;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
         });
 
         Ok(this)
@@ -187,16 +166,18 @@ impl Sender {
         )
     }
 
-    // TODO: should signall caller that new track is required
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
-    pub fn update(&self, track: &TrackPatchEvent) {
+    pub async fn update(&self, track: &TrackPatchEvent) {
         if track.id != self.track_id {
             return;
         }
 
         if let Some(is_muted) = track.is_muted_individual {
             self.mute_state.update(is_muted);
+            if is_muted {
+                self.remove_track().await;
+            }
         }
         if let Some(is_muted_general) = track.is_muted_general {
             self.update_general_mute_state(is_muted_general.into());
