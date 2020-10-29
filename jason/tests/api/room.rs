@@ -26,9 +26,9 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
-    get_test_unrequired_tracks, media_stream_settings, timeout,
-    wait_and_check_test_result, yield_now, MockNavigator,
+    delay_for, get_jason_error, get_test_recv_tracks, get_test_required_tracks,
+    get_test_tracks, get_test_unrequired_tracks, media_stream_settings,
+    timeout, wait_and_check_test_result, yield_now, MockNavigator,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -200,9 +200,17 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     constraints.audio(AudioTrackConstraints::new());
     let room_handle = room.new_handle();
     room_handle.on_failed_local_media(cb.into()).unwrap();
-    JsFuture::from(room_handle.set_local_media_settings(&constraints))
-        .await
-        .unwrap_err();
+    let err = get_jason_error(
+        JsFuture::from(room_handle.set_local_media_settings(&constraints))
+            .await
+            .unwrap_err(),
+    );
+    assert_eq!(err.name(), "InvalidLocalTracks");
+    assert_eq!(
+        err.message(),
+        "Invalid local tracks: provided multiple device video \
+         MediaStreamTracks"
+    );
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -1551,12 +1559,20 @@ async fn set_local_media_stream_settings_updates_mute_state() {
     delay_for(10).await;
 
     spawn_local(async move {
-        JsFuture::from(
-            room_handle
-                .set_local_media_settings(&media_stream_settings(true, true)),
-        )
-        .await
-        .unwrap_err();
+        let err =
+            get_jason_error(
+                JsFuture::from(room_handle.set_local_media_settings(
+                    &media_stream_settings(true, true),
+                ))
+                .await
+                .unwrap_err(),
+            );
+        assert_eq!(err.name(), "MediaConnections");
+        assert_eq!(
+            err.message(),
+            "Some MediaConnectionsError: MuteState of Sender transits into \
+             opposite to expected MuteState"
+        );
     });
     yield_now().await;
 

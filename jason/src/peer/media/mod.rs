@@ -548,6 +548,9 @@ impl MediaConnections {
     /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
     /// with [`proto::TrackPatch`].
     ///
+    /// Returns [`MediaKind`] and [`MediaSourceKind`] for which local media
+    /// stream should be updated.
+    ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
@@ -559,17 +562,11 @@ impl MediaConnections {
         let mut kinds_to_update: HashMap<_, HashSet<_>> = HashMap::new();
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
-                let mute_state_before = sender.mute_state();
-                sender.update(&track_proto).await;
-                if let (MuteState::Stable(before), MuteState::Stable(after)) =
-                    (mute_state_before, sender.mute_state())
-                {
-                    if before != after {
-                        kinds_to_update
-                            .entry(sender.kind())
-                            .or_default()
-                            .insert(sender.source_kind());
-                    }
+                if sender.update(&track_proto).await {
+                    kinds_to_update
+                        .entry(sender.kind())
+                        .or_default()
+                        .insert(sender.source_kind());
                 }
             } else if let Some(receiver) =
                 self.0.borrow_mut().receivers.get_mut(&track_proto.id)

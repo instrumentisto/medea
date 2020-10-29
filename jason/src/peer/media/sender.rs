@@ -12,6 +12,7 @@ use crate::{
     peer::{
         media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
+        MuteState,
     },
 };
 
@@ -168,13 +169,24 @@ impl Sender {
 
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
-    pub async fn update(&self, track: &TrackPatchEvent) {
+    ///
+    /// Returns `true` if media stream update should be performed for this
+    /// [`Sender`].
+    pub async fn update(&self, track: &TrackPatchEvent) -> bool {
+        let mut want_media_update = false;
         if track.id != self.track_id {
-            return;
+            return false;
         }
 
         if let Some(is_muted) = track.is_muted_individual {
+            let mute_state_before = self.mute_state.mute_state();
             self.mute_state.update(is_muted);
+            if let (MuteState::Stable(before), MuteState::Stable(after)) =
+                (mute_state_before, self.mute_state.mute_state())
+            {
+                want_media_update = before != after;
+            }
+
             if is_muted {
                 self.remove_track().await;
             }
@@ -182,6 +194,8 @@ impl Sender {
         if let Some(is_muted_general) = track.is_muted_general {
             self.update_general_mute_state(is_muted_general.into());
         }
+
+        want_media_update
     }
 
     /// Changes underlying transceiver direction to

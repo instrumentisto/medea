@@ -10,10 +10,9 @@ mod stats;
 mod tracks_request;
 mod transceiver;
 
-use std::collections::HashSet;
 use std::{
     cell::RefCell,
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{hash_map::DefaultHasher, HashMap, HashSet},
     convert::TryFrom as _,
     hash::{Hash, Hasher},
     rc::Rc,
@@ -457,7 +456,8 @@ impl PeerConnection {
     /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
     /// [`proto::TrackPatch`].
     ///
-    /// Returns [`MediaKind`]s and [`MediaSourceKinds`] for which local stream updating should be started.
+    /// Returns [`MediaKind`]s and [`MediaSourceKinds`] for which local stream
+    /// updating should be started.
     ///
     /// # Errors
     ///
