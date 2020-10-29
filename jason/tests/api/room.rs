@@ -241,7 +241,6 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         assert_eq!(
             JsFuture::from(room_handle.set_local_media_settings(&constraints))
                 .await
-                .map_err(|e| set_conn(&e))
                 .is_ok(),
             is_should_be_ok,
             "audio_required: {}; add_audio: {}; video_required: {}; \
@@ -455,14 +454,6 @@ mod disable_recv_tracks {
 
         // TODO: add is_recv_audio/video asserts
     }
-}
-
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen(inline_js = "export function set_conn(conn) { \
-                            console.log(conn.message()); }")]
-extern "C" {
-    fn set_conn(conn: &JsValue);
 }
 
 /// Tests disabling tracks publishing.

@@ -10,6 +10,7 @@ mod stats;
 mod tracks_request;
 mod transceiver;
 
+use std::collections::HashSet;
 use std::{
     cell::RefCell,
     collections::{hash_map::DefaultHasher, HashMap},
@@ -54,7 +55,6 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::TransceiverDirection,
 };
-use std::collections::HashSet;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -456,6 +456,8 @@ impl PeerConnection {
 
     /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
     /// [`proto::TrackPatch`].
+    ///
+    /// Returns [`MediaKind`]s and [`MediaSourceKinds`] for which local stream updating should be started.
     ///
     /// # Errors
     ///
