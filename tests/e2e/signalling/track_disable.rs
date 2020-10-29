@@ -1,5 +1,6 @@
 use std::{
     cell::Cell,
+    collections::HashMap,
     rc::Rc,
     sync::atomic::{AtomicU8, Ordering},
     time::Duration,
@@ -12,17 +13,18 @@ use futures::{
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, TrackId, TrackPatchCommand,
-    TrackUpdate,
+    Command, Direction, Event, NegotiationRole, PeerId, TrackId,
+    TrackPatchCommand, TrackUpdate,
 };
 use medea_control_api_proto::grpc::api as proto;
 use tokio::time::timeout;
 
 use crate::{
     grpc_control_api::{
-        create_room_req, ControlClient, WebRtcPlayEndpointBuilder,
-        WebRtcPublishEndpointBuilder,
+        create_room_req, pub_pub_room_req, ControlClient,
+        WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
     },
+    if_let_next,
     signalling::{
         handle_peer_created, ConnectionEvent, SendCommand, TestMember,
     },
@@ -136,12 +138,8 @@ async fn track_disables_and_enables() {
     .await;
 
     // wait until initial negotiation finishes
-    loop {
-        if let Event::SdpAnswerMade { .. } =
-            publisher_rx.select_next_some().await
-        {
-            break;
-        };
+    if_let_next! {
+        Event::SdpAnswerMade { .. } = publisher_rx {}
     }
 
     helper(true, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
@@ -225,9 +223,9 @@ async fn track_disables_and_enables_are_instant() {
     // wait until initial negotiation finishes, and send a bunch of
     // UpdateTracks
     let mut mutes_sent = Vec::with_capacity(EVENTS_COUNT);
-    loop {
-        if let Event::SdpAnswerMade { .. } =
-            publisher_rx.select_next_some().await
+    if_let_next! {
+        Event::SdpAnswerMade { .. } =
+            publisher_rx
         {
             for i in 0..EVENTS_COUNT {
                 let is_muted = i % 2 == 1;
@@ -240,8 +238,7 @@ async fn track_disables_and_enables_are_instant() {
                     }],
                 }));
             }
-            break;
-        };
+        }
     }
 
     // we dont know how many events we will receive, so gather events they
@@ -333,42 +330,38 @@ async fn track_disables_and_enables_are_instant2() {
     )
     .await;
 
-    loop {
-        if let Event::PeerCreated {
+    if_let_next! {
+        Event::PeerCreated {
             peer_id,
             negotiation_role,
             tracks,
             ..
-        } = first_rx.select_next_some().await
+        } = first_rx
         {
             first
                 .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
                 .await
                 .unwrap();
-            break;
         }
     }
 
-    loop {
-        if let Event::PeerCreated {
+    if_let_next! {
+        Event::PeerCreated {
             peer_id,
             negotiation_role,
             tracks,
             ..
-        } = second_rx.select_next_some().await
+        } = second_rx
         {
             second
                 .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
                 .await
                 .unwrap();
-            break;
         }
     }
     // wait until initial negotiation finishes
-    loop {
-        if let Event::SdpAnswerMade { .. } = first_rx.select_next_some().await {
-            break;
-        };
+    if_let_next! {
+        Event::SdpAnswerMade { .. } = first_rx {}
     }
 
     first
@@ -381,16 +374,15 @@ async fn track_disables_and_enables_are_instant2() {
         }))
         .await
         .unwrap();
-    loop {
-        if let Event::TracksApplied {
+    if_let_next! {
+        Event::TracksApplied {
             peer_id,
-            updates: _,
             negotiation_role,
-        } = first_rx.select_next_some().await
+            ..
+        } = first_rx
         {
             assert_eq!(peer_id.0, 0);
             assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
-            break;
         }
     }
     second
@@ -535,6 +527,245 @@ async fn force_update_works() {
     .await;
     force_update.unwrap().unwrap();
     renegotiation_update.unwrap().unwrap();
+}
+
+/// Checks that bug from [https://github.com/instrumentisto/medea/pull/134]
+/// is fixed.
+///
+/// # Algorithm
+///
+/// 1. Waits for initial negotiation finish
+///
+/// 2. Mutes `Alice`'s `Send` `MediaTrack`
+///
+/// 3. Unmutes `Alice`'s `Send` `MediaTrack`
+///
+/// 4. Mutes `Bob`'s `Send` `MediaTrack`
+///
+/// 5. `Alice` sends SDP offer
+///
+/// 6. `Bob` should receive [`Event::TracksApplied`] with empty updates
+#[actix_rt::test]
+#[named]
+async fn ordering_on_force_update_is_correct() {
+    let mut client = ControlClient::new().await;
+    let credentials = client.create(pub_pub_room_req(test_name!())).await;
+
+    let (alice_events_tx, mut alice_events_rx) = mpsc::unbounded();
+    let alice = TestMember::connect(
+        credentials.get("alice").unwrap(),
+        Some(Box::new(move |event, _, _| {
+            alice_events_tx.unbounded_send(event.clone()).unwrap()
+        })),
+        None,
+        None,
+        false,
+    )
+    .await;
+    let (bob_events_tx, mut bob_events_rx) = mpsc::unbounded();
+    let bob = TestMember::connect(
+        credentials.get("bob").unwrap(),
+        Some(Box::new(move |event, _, _| {
+            bob_events_tx.unbounded_send(event.clone()).unwrap()
+        })),
+        None,
+        None,
+        false,
+    )
+    .await;
+
+    let alice_peer_id;
+    let alice_sender_id;
+    let alice_mids: HashMap<_, _>;
+    if_let_next! {
+        Event::PeerCreated {
+            peer_id,
+            negotiation_role,
+            tracks,
+            ..
+        } = alice_events_rx
+        {
+            alice
+                .send(handle_peer_created(peer_id, &negotiation_role, &tracks))
+                .await
+                .unwrap();
+            alice_mids = tracks
+                .iter()
+                .map(|t| t.id)
+                .enumerate()
+                .map(|(mid, id)| (id, mid.to_string()))
+                .collect();
+            alice_sender_id = tracks
+                .iter()
+                .filter_map(|t| {
+                    if let Direction::Send { .. } = t.direction {
+                        Some(t.id)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+                .unwrap();
+            alice_peer_id = peer_id;
+        }
+    }
+
+    let bob_peer_id;
+    let bob_sender_id;
+    if_let_next! {
+        Event::PeerCreated {
+            peer_id,
+            negotiation_role,
+            tracks,
+            ..
+        } = bob_events_rx
+        {
+            bob.send(handle_peer_created(peer_id, &negotiation_role, &tracks))
+                .await
+                .unwrap();
+            bob_sender_id = tracks.iter()
+                .filter_map(|t| {
+                    if let Direction::Send { .. } = t.direction {
+                        Some(t.id)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+                .unwrap();
+            bob_peer_id = peer_id;
+        }
+    }
+    // wait until initial negotiation finishes
+    if_let_next! {
+        Event::SdpAnswerMade { .. } = alice_events_rx {}
+    }
+
+    alice
+        .send(SendCommand(Command::UpdateTracks {
+            peer_id: alice_peer_id,
+            tracks_patches: vec![TrackPatchCommand {
+                is_muted: Some(true),
+                id: alice_sender_id,
+            }],
+        }))
+        .await
+        .unwrap();
+    if_let_next! {
+        Event::TracksApplied {
+                peer_id,
+                negotiation_role,
+                mut updates,
+        } = alice_events_rx {
+            assert_eq!(peer_id, alice_peer_id);
+            let update = updates.pop().unwrap();
+            if let TrackUpdate::Updated(patch) = update {
+                assert_eq!(patch.id, alice_sender_id);
+                assert_eq!(patch.is_muted_individual, Some(true));
+                assert_eq!(patch.is_muted_general, Some(true));
+            }
+            assert_eq!(updates.len(), 0);
+            assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
+        }
+    }
+
+    alice
+        .send(SendCommand(Command::UpdateTracks {
+            peer_id: alice_peer_id,
+            tracks_patches: vec![TrackPatchCommand {
+                is_muted: Some(false),
+                id: alice_sender_id,
+            }],
+        }))
+        .await
+        .unwrap();
+    if_let_next! {
+        Event::TracksApplied {
+            peer_id,
+            negotiation_role,
+            mut updates,
+        } = alice_events_rx
+        {
+            assert_eq!(peer_id, alice_peer_id);
+            let update = updates.pop().unwrap();
+            if let TrackUpdate::Updated(patch) = update {
+                assert_eq!(patch.id, alice_sender_id);
+                assert_eq!(patch.is_muted_individual, Some(false));
+                assert_eq!(patch.is_muted_general, Some(false));
+            }
+            assert_eq!(updates.len(), 0);
+            assert_eq!(negotiation_role, None);
+        }
+    }
+
+    bob.send(SendCommand(Command::UpdateTracks {
+        peer_id: bob_peer_id,
+        tracks_patches: vec![TrackPatchCommand {
+            is_muted: Some(true),
+            id: bob_sender_id,
+        }],
+    }))
+    .await
+    .unwrap();
+
+    if_let_next! {
+        Event::TracksApplied {
+            peer_id,
+            negotiation_role,
+            updates,
+        } = bob_events_rx
+        {
+            assert_eq!(peer_id, bob_peer_id);
+            let mut patches: Vec<_> = updates
+                .into_iter()
+                .map(|upd| {
+                    if let TrackUpdate::Updated(patch) = upd {
+                        patch
+                    } else {
+                        panic!("Expected TrackPatch fount {:?}", upd);
+                    }
+                })
+                .collect();
+            patches.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+
+            assert_eq!(patches[1].id, bob_sender_id);
+            assert_eq!(patches[1].is_muted_individual, Some(true));
+            assert_eq!(patches[1].is_muted_general, Some(true));
+
+            assert_eq!(patches[0].id, alice_sender_id);
+            assert_eq!(patches[0].is_muted_individual, None);
+            assert_eq!(patches[0].is_muted_general, Some(false));
+
+            assert_eq!(patches.len(), 2);
+            assert_eq!(negotiation_role, None);
+        }
+    }
+
+    alice
+        .send(SendCommand(Command::MakeSdpOffer {
+            peer_id: alice_peer_id,
+            sdp_offer: "sdp_offer".to_string(),
+            transceivers_statuses: HashMap::new(),
+            mids: alice_mids,
+        }))
+        .await
+        .unwrap();
+
+    if_let_next! {
+        Event::TracksApplied {
+            peer_id,
+            updates,
+            negotiation_role,
+        } = bob_events_rx
+        {
+            assert_eq!(peer_id, bob_peer_id);
+            assert_eq!(updates.len(), 0);
+            assert_eq!(
+                negotiation_role,
+                Some(NegotiationRole::Answerer("sdp_offer".to_string()))
+            );
+        }
+    }
 }
 
 /// Checks that server validly switches individual and general mute states based

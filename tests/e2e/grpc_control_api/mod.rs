@@ -436,3 +436,84 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .unwrap()
         .build_request(String::new())
 }
+
+/// Creates [`proto::CreateRequest`] for creating `Room` element with provided
+/// `Room` ID.
+///
+/// # Spec of `Room` which will be created with this [`proto::CreateRequest`]
+///
+/// ```yaml
+/// kind: Room
+/// id: {{ room_id }}
+/// spec:
+///   pipeline:
+///     alice:
+///       kind: Member
+///       spec:
+///         pipeline:
+///           publish:
+///             kind: WebRtcPublishEndpoint
+///             spec:
+///               p2p: Always
+///           play:
+///             kind: WebRtcPlayEndpoint
+///             spec:
+///               src: "local://{{ room_id }}/bob/publish"
+///     bob:
+///       kind: Member
+///       credentials: test
+///       spec:
+///         pipeline:
+///           play:
+///             kind: WebRtcPlayEndpoint
+///             spec:
+///               src: "local://{{ room_id }}/alice/publish"
+/// ```
+pub fn pub_pub_room_req(room_id: &str) -> proto::CreateRequest {
+    RoomBuilder::default()
+        .id(room_id.to_string())
+        .add_member(
+            MemberBuilder::default()
+                .id("alice")
+                .add_endpoint(
+                    WebRtcPublishEndpointBuilder::default()
+                        .id("publish")
+                        .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
+                        .build()
+                        .unwrap(),
+                )
+                .add_endpoint(
+                    WebRtcPlayEndpointBuilder::default()
+                        .id("play")
+                        .src(format!("local://{}/bob/publish", room_id))
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+        )
+        .add_member(
+            MemberBuilder::default()
+                .id("bob")
+                .credentials("test")
+                .add_endpoint(
+                    WebRtcPublishEndpointBuilder::default()
+                        .id("publish")
+                        .p2p_mode(proto::web_rtc_publish_endpoint::P2p::Always)
+                        .build()
+                        .unwrap(),
+                )
+                .add_endpoint(
+                    WebRtcPlayEndpointBuilder::default()
+                        .id("play")
+                        .src(format!("local://{}/alice/publish", room_id))
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .build_request(String::new())
+}
