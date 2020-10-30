@@ -435,13 +435,15 @@ impl<T> TrackChangeHandler for Peer<T> {
 
     /// Applies provided [`TrackPatchEvent`] to [`Peer`]s [`Track`].
     fn on_track_patch(&mut self, mut patch: TrackPatchEvent) -> Self::Output {
-        if let Some(is_muted) = patch.is_muted_individual {
+        if let Some(is_disabled) = patch.is_disabled_individual {
             if let Some(tx) = self.senders().get(&patch.id) {
-                tx.set_send_mute_state(is_muted);
-                patch.is_muted_general = Some(tx.is_muted());
+                tx.set_send_media_exchange_state(is_disabled);
+                patch.is_disabled_general =
+                    Some(tx.is_media_exchange_disabled());
             } else if let Some(rx) = self.receivers().get(&patch.id) {
-                rx.set_recv_mute_state(is_muted);
-                patch.is_muted_general = Some(rx.is_muted());
+                rx.set_recv_media_exchange_state(is_disabled);
+                patch.is_disabled_general =
+                    Some(rx.is_media_exchange_disabled());
             };
         }
 
@@ -454,19 +456,22 @@ impl<T> TrackChangeHandler for Peer<T> {
         &mut self,
         mut patch: TrackPatchEvent,
     ) -> Self::Output {
-        if let Some(is_muted_individual) = patch.is_muted_individual {
-            // Resets `is_muted_individual` to `None`. Sets `is_muted_general`
-            // to `Some` if provided `is_muted_individual` is equal to the real
-            // general mute state.
-            patch.is_muted_individual = None;
+        if let Some(is_disabled_individual) = patch.is_disabled_individual {
+            // Resets `is_disabled_individual` to `None`. Sets
+            // `is_disabled_general` to `Some` if provided
+            // `is_disabled_individual` is equal to the real general
+            // media exchange state.
+            patch.is_disabled_individual = None;
             let track = self
                 .senders()
                 .get(&patch.id)
                 .or_else(|| self.receivers().get(&patch.id));
 
             if let Some(track) = track {
-                if is_muted_individual == track.is_muted() {
-                    patch.is_muted_general = Some(track.is_muted());
+                if is_disabled_individual == track.is_media_exchange_disabled()
+                {
+                    patch.is_disabled_general =
+                        Some(track.is_media_exchange_disabled());
                 }
             }
         }
@@ -817,7 +822,7 @@ impl Peer<WaitLocalSdp> {
     ) {
         for (track_id, is_publishing) in senders_statuses {
             if let Some(sender) = self.context.senders.get(&track_id) {
-                sender.set_enabled(is_publishing);
+                sender.set_transceiver_enabled(is_publishing);
             }
         }
     }
@@ -1280,11 +1285,11 @@ pub mod tests {
         peer.as_changes_scheduler().patch_tracks(vec![
             TrackPatchCommand {
                 id: TrackId(0),
-                is_muted: Some(true),
+                is_disabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(1),
-                is_muted: Some(true),
+                is_disabled: Some(true),
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1322,31 +1327,31 @@ pub mod tests {
         let patches = vec![
             TrackPatchCommand {
                 id: TrackId(1),
-                is_muted: Some(true),
+                is_disabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_muted: None,
+                is_disabled: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
-                is_muted: Some(false),
+                is_disabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_muted: Some(true),
+                is_disabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_muted: Some(false),
+                is_disabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_muted: None,
+                is_disabled: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
-                is_muted: None,
+                is_disabled: None,
             },
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
@@ -1372,10 +1377,10 @@ pub mod tests {
             .collect();
 
         let second_track_patch = track_patches_after.pop().unwrap();
-        assert_eq!(second_track_patch.is_muted_individual, Some(false));
+        assert_eq!(second_track_patch.is_disabled_individual, Some(false));
 
         let first_track_patch = track_patches_after.pop().unwrap();
-        assert_eq!(first_track_patch.is_muted_general, None);
+        assert_eq!(first_track_patch.is_disabled_general, None);
 
         assert!(track_patches_after.is_empty());
     }
@@ -1389,14 +1394,14 @@ pub mod tests {
             TrackChange::IceRestart,
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_muted_individual: None,
-                is_muted_general: None,
+                is_disabled_individual: None,
+                is_disabled_general: None,
             }),
             TrackChange::IceRestart,
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_muted_individual: None,
-                is_muted_general: None,
+                is_disabled_individual: None,
+                is_disabled_general: None,
             }),
         ];
 
@@ -1437,7 +1442,7 @@ pub mod tests {
                 assert_eq!(changes.len(), 1);
                 if let TrackUpdate::Updated(patch) = &changes[0] {
                     assert_eq!(patch.id, TrackId(0));
-                    assert_eq!(patch.is_muted_individual, Some(true));
+                    assert_eq!(patch.is_disabled_individual, Some(true));
                 } else {
                     unreachable!();
                 }
@@ -1455,32 +1460,32 @@ pub mod tests {
         peer.context.pending_track_updates = vec![
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_muted_general: Some(false),
-                is_muted_individual: Some(false),
+                is_disabled_general: Some(false),
+                is_disabled_individual: Some(false),
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             }),
         ];
         peer.as_changes_scheduler().patch_tracks(vec![
             TrackPatchCommand {
                 id: TrackId(0),
-                is_muted: Some(true),
+                is_disabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(0),
-                is_muted: Some(false),
+                is_disabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(0),
-                is_muted: Some(true),
+                is_disabled: Some(true),
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1491,7 +1496,7 @@ pub mod tests {
             peer.context.pending_track_updates.pop().unwrap();
         if let TrackChange::TrackPatch(patch) = filtered_track_change {
             assert_eq!(patch.id, TrackId(1));
-            assert_eq!(patch.is_muted_general, Some(true));
+            assert_eq!(patch.is_disabled_general, Some(true));
         } else {
             unreachable!();
         }
@@ -1509,13 +1514,13 @@ pub mod tests {
                 TrackPatchDeduper::with_whitelist(hashset![TrackId(1)]);
             let filtered_patch = TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(2),
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             });
             let whitelisted_patch = TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             });
             let mut patches =
                 vec![whitelisted_patch.clone(), filtered_patch.clone()];
@@ -1536,28 +1541,28 @@ pub mod tests {
             let mut changes: Vec<_> = vec![
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: Some(false),
-                    is_muted_individual: Some(false),
+                    is_disabled_general: Some(false),
+                    is_disabled_individual: Some(false),
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
+                    is_disabled_general: Some(true),
+                    is_disabled_individual: Some(true),
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
+                    is_disabled_general: Some(true),
+                    is_disabled_individual: Some(true),
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: None,
-                    is_muted_individual: None,
+                    is_disabled_general: None,
+                    is_disabled_individual: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
-                    is_muted_general: Some(false),
-                    is_muted_individual: Some(false),
+                    is_disabled_general: Some(false),
+                    is_disabled_individual: Some(false),
                 },
             ]
             .into_iter()
@@ -1588,11 +1593,11 @@ pub mod tests {
             assert_eq!(merged_changes.len(), 2);
             {
                 let track_1 = merged_changes.get(&TrackId(1)).unwrap();
-                assert_eq!(track_1.is_muted_general, Some(true));
+                assert_eq!(track_1.is_disabled_general, Some(true));
             }
             {
                 let track_2 = merged_changes.get(&TrackId(2)).unwrap();
-                assert_eq!(track_2.is_muted_general, Some(false));
+                assert_eq!(track_2.is_disabled_general, Some(false));
             }
         }
     }

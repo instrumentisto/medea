@@ -180,7 +180,7 @@ pub struct VideoTrackConstraints<C> {
     /// Indicator whether video is enabled and this constraints should be
     /// injected into `Peer`.
     ///
-    /// Any action with this flag should be performed only while mute/unmute
+    /// Any action with this flag should be performed only while disable/enable
     /// actions by [`Room`]. This flag can't be changed by
     /// [`MediaStreamSettings`] updating.
     is_enabled: bool,
@@ -474,8 +474,8 @@ impl MediaStreamSettings {
     /// [`MediaStreamSettings`].
     #[inline]
     fn constrain(&mut self, other: Self) {
-        // `&=` cause we should not unmute muted Room, but we can mute not muted
-        // room.
+        // `&=` cause we should not enable disabled Room, but we can disable
+        // enabled room.
         self.audio.is_enabled &= other.audio.is_enabled;
         self.audio.constraints = other.audio.constraints;
         self.display_video.constrain(other.display_video);

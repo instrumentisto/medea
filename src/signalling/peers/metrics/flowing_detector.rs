@@ -429,13 +429,21 @@ impl From<&Peer> for PeerTracks {
         let mut audio_recv = 0;
         let mut video_recv = 0;
 
-        for sender in peer.senders().values().filter(|t| t.is_enabled()) {
+        for sender in peer
+            .senders()
+            .values()
+            .filter(|t| t.is_transceiver_enabled())
+        {
             match sender.media_type {
                 MediaTypeProto::Audio(_) => audio_send += 1,
                 MediaTypeProto::Video(_) => video_send += 1,
             }
         }
-        for receiver in peer.receivers().values().filter(|t| t.is_enabled()) {
+        for receiver in peer
+            .receivers()
+            .values()
+            .filter(|t| t.is_transceiver_enabled())
+        {
             match receiver.media_type {
                 MediaTypeProto::Audio(_) => audio_recv += 1,
                 MediaTypeProto::Video(_) => video_recv += 1,

@@ -14,8 +14,8 @@ pub struct MediaTrack {
     pub id: Id,
     mid: RefCell<Option<String>>,
     pub media_type: MediaType,
-    enabled: Cell<bool>,
-    mute_state: RefCell<MuteState>,
+    transceiver_enabled: Cell<bool>,
+    media_exchange_state: RefCell<MediaExchangeState>,
 }
 
 impl MediaTrack {
@@ -25,8 +25,8 @@ impl MediaTrack {
             id,
             mid: RefCell::new(None),
             media_type,
-            enabled: Cell::new(true),
-            mute_state: RefCell::new(MuteState::new()),
+            transceiver_enabled: Cell::new(true),
+            media_exchange_state: RefCell::new(MediaExchangeState::new()),
         }
     }
 
@@ -38,74 +38,74 @@ impl MediaTrack {
         self.mid.borrow_mut().as_ref().cloned()
     }
 
-    pub fn set_enabled(&self, enabled: bool) {
-        self.enabled.set(enabled);
+    pub fn set_transceiver_enabled(&self, enabled: bool) {
+        self.transceiver_enabled.set(enabled);
     }
 
-    pub fn is_enabled(&self) -> bool {
-        self.enabled.get()
+    pub fn is_transceiver_enabled(&self) -> bool {
+        self.transceiver_enabled.get()
     }
 
-    /// Returns `true` if this [`MediaTrack`] currently is muted.
-    pub fn is_muted(&self) -> bool {
-        self.mute_state.borrow().is_muted()
+    /// Returns `true` if this [`MediaTrack`] currently is disabled.
+    pub fn is_media_exchange_disabled(&self) -> bool {
+        self.media_exchange_state.borrow().is_disabled()
     }
 
-    /// Sets mute state of the [`MediaTrack`]'s `Recv` side.
-    pub fn set_recv_mute_state(&self, is_muted: bool) {
-        self.mute_state.borrow_mut().set_recv(is_muted);
+    /// Sets media exchange state of the [`MediaTrack`]'s `Recv` side.
+    pub fn set_recv_media_exchange_state(&self, is_disabled: bool) {
+        self.media_exchange_state.borrow_mut().set_recv(is_disabled);
     }
 
-    /// Sets mute state of the [`MediaTrack`]'s `Send` side.
-    pub fn set_send_mute_state(&self, is_muted: bool) {
-        self.mute_state.borrow_mut().set_send(is_muted);
+    /// Sets media exchange state of the [`MediaTrack`]'s `Send` side.
+    pub fn set_send_media_exchange_state(&self, is_disabled: bool) {
+        self.media_exchange_state.borrow_mut().set_send(is_disabled);
     }
 }
 
-/// Mute state of the [`MediaTrack`].
+/// media exchange state of the [`MediaTrack`].
 ///
-/// Contains mute state for the `Send` and `Recv` side.
+/// Contains media exchange state for the `Send` and `Recv` side.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct MuteState {
-    /// Mute state of the `Send` side.
+struct MediaExchangeState {
+    /// Media exchange state of the `Send` side.
     ///
-    /// If `true` then sender is muted.
-    send_muted: bool,
+    /// If `true` then sender is disabled.
+    send_disabled: bool,
 
-    /// Mute state of the `Recv` side.
+    /// Media exchange state of the `Recv` side.
     ///
-    /// If `true` then receiver is muted.
-    recv_muted: bool,
+    /// If `true` then receiver is disabled.
+    recv_disabled: bool,
 }
 
-impl Default for MuteState {
+impl Default for MediaExchangeState {
     fn default() -> Self {
         Self {
-            send_muted: false,
-            recv_muted: false,
+            send_disabled: false,
+            recv_disabled: false,
         }
     }
 }
 
-impl MuteState {
-    /// Returns new default [`MuteState`].
+impl MediaExchangeState {
+    /// Returns new default [`MediaExchangeState`].
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Returns `true` if [`MuteState::send_muted`] or [`MuteState::recv_muted`]
-    /// are `true`.
-    pub fn is_muted(self) -> bool {
-        self.send_muted || self.recv_muted
+    /// Returns `true` if [`MediaExchangeState::send_disabled`] or
+    /// [`MediaExchangeState::recv_disabled`] are `true`.
+    pub fn is_disabled(self) -> bool {
+        self.send_disabled || self.recv_disabled
     }
 
-    /// Sets mute state for the `Recv` side of [`MediaTrack`].
-    pub fn set_recv(&mut self, is_muted: bool) {
-        self.recv_muted = is_muted;
+    /// Sets media exchange state for the `Recv` side of [`MediaTrack`].
+    pub fn set_recv(&mut self, is_disabled: bool) {
+        self.recv_disabled = is_disabled;
     }
 
-    /// Sets mute state for the `Send` side of the [`MediaTrack`].
-    pub fn set_send(&mut self, is_muted: bool) {
-        self.send_muted = is_muted;
+    /// Sets media exchange state for the `Send` side of the [`MediaTrack`].
+    pub fn set_send(&mut self, is_disabled: bool) {
+        self.send_disabled = is_disabled;
     }
 }

@@ -45,9 +45,9 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
-        MediaConnections, MediaConnectionsError, MuteState,
-        MuteStateTransition, Muteable, Receiver, Sender, StableMuteState,
-        TrackDirection, TransceiverSide,
+        Disableable, MediaConnections, MediaConnectionsError,
+        MediaExchangeState, MediaExchangeStateTransition, Receiver, Sender,
+        StableMediaExchangeState, TrackDirection, TransceiverSide,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -321,7 +321,7 @@ impl PeerConnection {
     /// In some cases you might want to stop expiry timers, e.g. when
     /// connection to Medea is temporary lost.
     ///
-    /// This currently affects only [`Senders`] mute/unmute transitions.
+    /// This currently affects only [`Senders`] disable/enable transitions.
     pub fn stop_state_transitions_timers(&self) {
         self.media_connections.stop_state_transitions_timers()
     }
@@ -335,7 +335,7 @@ impl PeerConnection {
     /// In some cases you might want to stop expiry timers, e.g. when
     /// connection to Medea is temporary lost.
     ///
-    /// This currently affects only [`Senders`] mute/unmute transitions.
+    /// This currently affects only [`Senders`] disable/enable transitions.
     pub fn reset_state_transitions_timers(&self) {
         self.media_connections.reset_state_transitions_timers();
     }
@@ -404,21 +404,22 @@ impl PeerConnection {
 
     /// Returns `true` if all [`TransceiverSide`]s with a provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in the
-    /// provided [`StableMuteState`].
+    /// provided [`StableMediaExchangeState`].
     #[inline]
-    pub fn is_all_transceiver_sides_in_mute_state(
+    pub fn is_all_transceiver_sides_in_media_exchange_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        mute_state: StableMuteState,
+        media_exchange_state: StableMediaExchangeState,
     ) -> bool {
-        self.media_connections.is_all_tracks_in_mute_state(
-            kind,
-            direction,
-            source_kind,
-            mute_state,
-        )
+        self.media_connections
+            .is_all_tracks_in_media_exchange_state(
+                kind,
+                direction,
+                source_kind,
+                media_exchange_state,
+            )
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
@@ -646,7 +647,8 @@ impl PeerConnection {
     /// [`Sender`]s, which are configured by server during signalling, and
     /// [`LocalStreamConstraints`], that are optionally configured by JS-side.
     ///
-    /// Returns [`HashMap`] with [`MuteState`]s updates for the [`Sender`]s.
+    /// Returns [`HashMap`] with [`MediaExchangeState`]s updates for the
+    /// [`Sender`]s.
     ///
     /// # Errors
     ///
@@ -673,7 +675,7 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-    ) -> Result<HashMap<TrackId, StableMuteState>> {
+    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
         if let Some(request) = self.media_connections.get_tracks_request() {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
@@ -695,7 +697,7 @@ impl PeerConnection {
                 )
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let mute_states_updates = self
+            let media_exchange_states_updates = self
                 .media_connections
                 .insert_local_tracks(&peer_tracks)
                 .await
@@ -709,7 +711,7 @@ impl PeerConnection {
                 }
             }
 
-            Ok(mute_states_updates)
+            Ok(media_exchange_states_updates)
         } else {
             Ok(HashMap::new())
         }

@@ -14,13 +14,15 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
-        media::{mute_state::MuteStateController, TransceiverSide},
+        media::{
+            media_exchange_state::MediaExchangeStateController, TransceiverSide,
+        },
         transceiver::Transceiver,
-        MediaConnections, Muteable, PeerEvent, TransceiverDirection,
+        Disableable, MediaConnections, PeerEvent, TransceiverDirection,
     },
 };
 
-use super::mute_state::StableMuteState;
+use super::media_exchange_state::StableMediaExchangeState;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -34,9 +36,9 @@ pub struct Receiver {
     transceiver: RefCell<Option<Transceiver>>,
     mid: RefCell<Option<String>>,
     track: RefCell<Option<MediaStreamTrack>>,
-    general_mute_state: Cell<StableMuteState>,
+    general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_track_notified: Cell<bool>,
-    mute_state_controller: Rc<MuteStateController>,
+    media_exchange_state_controller: Rc<MediaExchangeStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
@@ -100,10 +102,12 @@ impl Receiver {
             transceiver: RefCell::new(transceiver),
             mid: RefCell::new(mid),
             track: RefCell::new(None),
-            general_mute_state: Cell::new(StableMuteState::from(!enabled)),
+            general_media_exchange_state: Cell::new(
+                StableMediaExchangeState::from(!enabled),
+            ),
             is_track_notified: Cell::new(false),
-            mute_state_controller: MuteStateController::new(
-                StableMuteState::from(!enabled),
+            media_exchange_state_controller: MediaExchangeStateController::new(
+                StableMediaExchangeState::from(!enabled),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }
@@ -117,13 +121,13 @@ impl Receiver {
 
     /// Returns `true` if this [`Receiver`] is receives media data.
     pub fn is_receiving(&self) -> bool {
-        let is_unmuted = self.mute_state_controller.is_unmuted();
+        let is_enabled = self.media_exchange_state_controller.is_enabled();
         let is_recv_direction =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
                 trnsvr.has_direction(TransceiverDirection::RECV)
             });
 
-        is_unmuted && is_recv_direction
+        is_enabled && is_recv_direction
     }
 
     /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -145,12 +149,12 @@ impl Receiver {
         let new_track =
             MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
-        if self.is_not_muted() {
+        if self.is_not_disabled() {
             transceiver.add_direction(TransceiverDirection::RECV);
         } else {
             transceiver.sub_direction(TransceiverDirection::RECV);
         }
-        new_track.set_enabled(self.is_not_muted());
+        new_track.set_enabled(self.is_not_disabled());
 
         self.transceiver.replace(Some(transceiver));
         self.track.replace(Some(new_track));
@@ -174,19 +178,20 @@ impl Receiver {
         if self.track_id != track_patch.id {
             return;
         }
-        if let Some(is_muted_general) = track_patch.is_muted_general {
-            self.update_general_mute_state(is_muted_general.into());
+        if let Some(is_disabled_general) = track_patch.is_disabled_general {
+            self.update_general_mute_state(is_disabled_general.into());
         }
-        if let Some(is_muted) = track_patch.is_muted_individual {
-            self.mute_state_controller.update(is_muted);
+        if let Some(is_disabled) = track_patch.is_disabled_individual {
+            self.media_exchange_state_controller.update(is_disabled);
         }
     }
 
-    /// Checks whether general mute state of the [`Receiver`] is in
-    /// [`StableMuteState::Muted`].
+    /// Checks whether general media exchange state of the [`Receiver`] is in
+    /// [`StableMediaExchangeState::Disabled`].
     #[cfg(feature = "mockable")]
-    pub fn is_general_muted(&self) -> bool {
-        self.general_mute_state.get() == StableMuteState::Muted
+    pub fn is_general_disabled(&self) -> bool {
+        self.general_media_exchange_state.get()
+            == StableMediaExchangeState::Disabled
     }
 
     /// Returns [`Transceiver`] of this [`Receiver`].
@@ -218,14 +223,14 @@ impl Receiver {
     }
 
     /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
-    /// based on the provided [`StableMuteState`].
+    /// based on the provided [`StableMediaExchangeState`].
     ///
     /// Updates [`InnerReceiver::general_mute_state`].
-    fn update_general_mute_state(&self, mute_state: StableMuteState) {
-        if self.general_mute_state.get() != mute_state {
-            self.general_mute_state.set(mute_state);
+    fn update_general_mute_state(&self, mute_state: StableMediaExchangeState) {
+        if self.general_media_exchange_state.get() != mute_state {
+            self.general_media_exchange_state.set(mute_state);
             match mute_state {
-                StableMuteState::Muted => {
+                StableMediaExchangeState::Disabled => {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(false);
                     }
@@ -233,7 +238,7 @@ impl Receiver {
                         trnscvr.sub_direction(TransceiverDirection::RECV);
                     }
                 }
-                StableMuteState::Unmuted => {
+                StableMediaExchangeState::Enabled => {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(true);
                     }
@@ -246,17 +251,20 @@ impl Receiver {
         }
     }
 
-    /// Checks whether general mute state of this [`Receiver`] is in
-    /// [`StableMuteState::Unmuted`].
-    fn is_not_muted(&self) -> bool {
-        self.general_mute_state.get() == StableMuteState::Unmuted
+    /// Checks whether general media exchange state of this [`Receiver`] is in
+    /// [`StableMediaExchangeState::Enabled`].
+    fn is_not_disabled(&self) -> bool {
+        self.general_media_exchange_state.get()
+            == StableMediaExchangeState::Enabled
     }
 }
 
-impl Muteable for Receiver {
+impl Disableable for Receiver {
     #[inline]
-    fn mute_state_controller(&self) -> Rc<MuteStateController> {
-        self.mute_state_controller.clone()
+    fn media_exchange_state_controller(
+        &self,
+    ) -> Rc<MediaExchangeStateController> {
+        self.media_exchange_state_controller.clone()
     }
 }
 

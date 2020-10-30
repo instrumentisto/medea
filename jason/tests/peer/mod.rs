@@ -21,7 +21,8 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints},
     peer::{
-        PeerConnection, PeerEvent, RtcStats, StableMuteState, TrackDirection,
+        PeerConnection, PeerEvent, RtcStats, StableMediaExchangeState,
+        TrackDirection,
     },
 };
 use wasm_bindgen_test::*;
@@ -33,16 +34,16 @@ use crate::{
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-fn toggle_mute_tracks_updates(
+fn toggle_disable_tracks_updates(
     tracks_ids: &[u32],
-    is_muted: bool,
+    is_disabled: bool,
 ) -> Vec<TrackPatchEvent> {
     tracks_ids
         .into_iter()
         .map(|track_id| TrackPatchEvent {
             id: TrackId(*track_id),
-            is_muted_individual: Some(is_muted),
-            is_muted_general: Some(is_muted),
+            is_disabled_individual: Some(is_disabled),
+            is_disabled_general: Some(is_disabled),
         })
         .collect()
 }
@@ -51,7 +52,7 @@ const AUDIO_TRACK_ID: u32 = 1;
 const VIDEO_TRACK_ID: u32 = 2;
 
 #[wasm_bindgen_test]
-async fn mute_unmute_audio() {
+async fn disable_enable_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -73,19 +74,19 @@ async fn mute_unmute_audio() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], true))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_mute_tracks_updates(&[AUDIO_TRACK_ID], false))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], false))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 }
 
 #[wasm_bindgen_test]
-async fn mute_unmute_video() {
+async fn disable_enable_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -106,19 +107,19 @@ async fn mute_unmute_video() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], true))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], true))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_mute_tracks_updates(&[VIDEO_TRACK_ID], false))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], false))
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 }
 
 #[wasm_bindgen_test]
-async fn new_with_mute_audio() {
+async fn new_with_disable_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -142,7 +143,7 @@ async fn new_with_mute_audio() {
 }
 
 #[wasm_bindgen_test]
-async fn new_with_mute_video() {
+async fn new_with_disable_video() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -881,7 +882,7 @@ async fn reset_transition_timers() {
         .await
         .unwrap();
 
-    let all_unmuted = future::join_all(
+    let all_enabled = future::join_all(
         peer.get_transceivers_sides(
             MediaKind::Audio,
             TrackDirection::Send,
@@ -897,9 +898,14 @@ async fn reset_transition_timers() {
             .into_iter(),
         )
         .map(|s| {
-            s.mute_state_transition_to(StableMuteState::Muted).unwrap();
+            s.media_exchange_state_transition_to(
+                StableMediaExchangeState::Disabled,
+            )
+            .unwrap();
 
-            s.when_mute_state_stable(StableMuteState::Unmuted)
+            s.when_media_exchange_state_stable(
+                StableMediaExchangeState::Enabled,
+            )
         }),
     )
     .map(|_| ())
@@ -907,13 +913,13 @@ async fn reset_transition_timers() {
 
     delay_for(400).await;
     peer.stop_state_transitions_timers();
-    timeout(600, all_unmuted.clone()).await.unwrap_err();
+    timeout(600, all_enabled.clone()).await.unwrap_err();
 
     peer.stop_state_transitions_timers();
     delay_for(30).await;
     peer.reset_state_transitions_timers();
 
-    timeout(600, all_unmuted).await.unwrap();
+    timeout(600, all_enabled).await.unwrap();
 }
 
 #[wasm_bindgen_test]

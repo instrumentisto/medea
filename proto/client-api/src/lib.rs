@@ -488,7 +488,7 @@ impl Track {
 #[derive(Eq, PartialEq)]
 pub struct TrackPatchCommand {
     pub id: TrackId,
-    pub is_muted: Option<bool>,
+    pub is_disabled: Option<bool>,
 }
 
 /// Patch of the [`Track`] which Media Server can send with
@@ -499,28 +499,28 @@ pub struct TrackPatchEvent {
     /// ID of the [`Track`] which should be patched.
     pub id: TrackId,
 
-    /// Mute state of the concrete `Member`.
+    /// media exchange state of the concrete `Member`.
     ///
     /// This state doesn't indicates that connection between two `Member`s are
-    /// really muted. This is intention of this `Member`.
-    pub is_muted_individual: Option<bool>,
+    /// really disabled. This is intention of this `Member`.
+    pub is_disabled_individual: Option<bool>,
 
-    /// Mute state of the connection between `Member`s.
+    /// media exchange state of the connection between `Member`s.
     ///
-    /// This state indicates real mute state between `Member`s. But this state
-    /// doesn't changes intention of this `Member`.
+    /// This state indicates real media exchange state between `Member`s. But
+    /// this state doesn't changes intention of this `Member`.
     ///
-    /// So intention of this `Member` (`is_muted_individual`) can be `false`,
-    /// but real mute state can be `true`.
-    pub is_muted_general: Option<bool>,
+    /// So intention of this `Member` (`is_disabled_individual`) can be
+    /// `false`, but real media exchange state can be `true`.
+    pub is_disabled_general: Option<bool>,
 }
 
 impl From<TrackPatchCommand> for TrackPatchEvent {
     fn from(from: TrackPatchCommand) -> Self {
         Self {
             id: from.id,
-            is_muted_individual: from.is_muted,
-            is_muted_general: None,
+            is_disabled_individual: from.is_disabled,
+            is_disabled_general: None,
         }
     }
 }
@@ -532,8 +532,8 @@ impl TrackPatchEvent {
     pub fn new(id: TrackId) -> Self {
         Self {
             id,
-            is_muted_general: None,
-            is_muted_individual: None,
+            is_disabled_general: None,
+            is_disabled_individual: None,
         }
     }
 
@@ -546,12 +546,12 @@ impl TrackPatchEvent {
             return;
         }
 
-        if let Some(is_muted_general) = another.is_muted_general {
-            self.is_muted_general = Some(is_muted_general);
+        if let Some(is_disabled_general) = another.is_disabled_general {
+            self.is_disabled_general = Some(is_disabled_general);
         }
 
-        if let Some(is_muted_individual) = another.is_muted_individual {
-            self.is_muted_individual = Some(is_muted_individual);
+        if let Some(is_disabled_individual) = another.is_disabled_individual {
+            self.is_disabled_individual = Some(is_disabled_individual);
         }
     }
 }
@@ -675,91 +675,91 @@ mod test {
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
+                        is_disabled_general: Some(true),
+                        is_disabled_individual: Some(true),
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: Some(false),
-                        is_muted_individual: Some(false),
+                        is_disabled_general: Some(false),
+                        is_disabled_individual: Some(false),
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
+                        is_disabled_general: None,
+                        is_disabled_individual: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
+                        is_disabled_general: Some(true),
+                        is_disabled_individual: Some(true),
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
+                        is_disabled_general: Some(true),
+                        is_disabled_individual: Some(true),
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
+                    is_disabled_general: Some(true),
+                    is_disabled_individual: Some(true),
                 },
             ),
             (
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
+                        is_disabled_general: None,
+                        is_disabled_individual: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
+                        is_disabled_general: Some(true),
+                        is_disabled_individual: Some(true),
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
+                    is_disabled_general: Some(true),
+                    is_disabled_individual: Some(true),
                 },
             ),
             (
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
+                        is_disabled_general: Some(true),
+                        is_disabled_individual: Some(true),
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
+                        is_disabled_general: None,
+                        is_disabled_individual: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: Some(true),
-                    is_muted_individual: Some(true),
+                    is_disabled_general: Some(true),
+                    is_disabled_individual: Some(true),
                 },
             ),
             (
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_muted_general: None,
-                        is_muted_individual: None,
+                        is_disabled_general: None,
+                        is_disabled_individual: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(2),
-                        is_muted_general: Some(true),
-                        is_muted_individual: Some(true),
+                        is_disabled_general: Some(true),
+                        is_disabled_individual: Some(true),
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_muted_general: None,
-                    is_muted_individual: None,
+                    is_disabled_general: None,
+                    is_disabled_individual: None,
                 },
             ),
         ] {
