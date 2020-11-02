@@ -36,6 +36,7 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
+use crate::peer::media::media_exchange_state::StableMuteState;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Disableable {
@@ -242,6 +243,9 @@ struct InnerMediaConnections {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
+    send_device_video_mute_state: StableMuteState,
+    send_device_audio_mute_state: StableMuteState,
+
     /// [`TrackId`] to its [`Sender`].
     senders: HashMap<TrackId, Rc<Sender>>,
 
@@ -330,6 +334,8 @@ impl MediaConnections {
             peer_id,
             peer,
             peer_events_sender,
+            send_device_audio_mute_state: StableMuteState::Unmuted,
+            send_device_video_mute_state: StableMuteState::Unmuted,
             senders: HashMap::new(),
             receivers: HashMap::new(),
         }))
@@ -529,10 +535,20 @@ impl MediaConnections {
                         } else {
                             StableMediaExchangeState::Disabled
                         };
+                    use medea_client_api_proto::MediaType;
+                    let mute_state = match &track.media_type {
+                        MediaType::Audio(_) => {
+                            self.0.borrow().send_device_audio_mute_state
+                        }
+                        MediaType::Video(_) => {
+                            self.0.borrow().send_device_video_mute_state
+                        }
+                    };
                     let sndr = SenderBuilder {
                         media_connections: self,
                         track_id: track.id,
                         caps: track.media_type.into(),
+                        mute_state,
                         mid,
                         media_exchange_state,
                         is_required,

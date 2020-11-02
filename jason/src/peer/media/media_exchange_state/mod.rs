@@ -8,7 +8,7 @@ mod mute_state;
 use derive_more::From;
 
 pub use self::controller::MediaExchangeStateController;
-use crate::peer::media::media_exchange_state::mute_state::StableMuteState;
+pub use self::mute_state::{StableMuteState, TransitionMuteState};
 
 /// All media exchange states in which [`Disableable`] can be.
 ///
@@ -40,6 +40,28 @@ impl From<MediaExchangeStateTransition>
     >
 {
     fn from(from: MediaExchangeStateTransition) -> Self {
+        Self::Transition(from)
+    }
+}
+
+impl From<StableMuteState>
+for MediaExchangeState<
+    TransitionMuteState,
+    StableMuteState,
+>
+{
+    fn from(from: StableMuteState) -> Self {
+        Self::Stable(from)
+    }
+}
+
+impl From<TransitionMuteState>
+for MediaExchangeState<
+    TransitionMuteState,
+    StableMuteState,
+>
+{
+    fn from(from: TransitionMuteState) -> Self {
         Self::Transition(from)
     }
 }

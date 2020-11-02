@@ -75,6 +75,12 @@ impl Transceiver {
     pub fn send_track(&self) -> Option<MediaStreamTrack> {
         self.send_track.borrow().clone()
     }
+
+    pub fn set_sender_enabled(&self, is_enabled: bool) {
+        if let Some(track) = self.send_track.borrow().as_ref() {
+            track.set_enabled(is_enabled);
+        }
+    }
 }
 
 impl From<RtcRtpTransceiver> for Transceiver {

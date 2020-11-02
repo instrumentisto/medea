@@ -25,6 +25,7 @@ use super::{
     Disableable, MediaConnections, MediaConnectionsError, Result,
 };
 use crate::peer::MediaExchangeStateTransition;
+use crate::peer::media::media_exchange_state::{TransitionMuteState, StableMuteState};
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -33,6 +34,7 @@ pub struct SenderBuilder<'a> {
     pub caps: TrackConstraints,
     pub mid: Option<String>,
     pub media_exchange_state: StableMediaExchangeState,
+    pub mute_state: StableMuteState,
     pub is_required: bool,
     pub send_constraints: LocalTracksConstraints,
 }
@@ -70,11 +72,14 @@ impl<'a> SenderBuilder<'a> {
             MediaExchangeStateController::new(self.media_exchange_state);
         let mut media_exchange_state_rx =
             media_exchange_state_controller.on_stabilize();
+        let mute_state_controller = MediaExchangeStateController::new(self.mute_state);
+        let mut mute_state_rx = mute_state_controller.on_stabilize();
         let this = Rc::new(Sender {
             peer_id: connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             general_media_exchange_state: Cell::new(self.media_exchange_state),
+            mute_state: mute_state_controller,
             transceiver,
             media_exchange_state: media_exchange_state_controller,
             is_required: self.is_required,
@@ -102,6 +107,23 @@ impl<'a> SenderBuilder<'a> {
                 }
             }
         });
+        spawn_local({
+            let weak_this = Rc::downgrade(&this);
+            async move {
+                while let Some(mute_state) = mute_state_rx.next().await {
+                    if let Some(this) = weak_this.upgrade() {
+                        match mute_state {
+                            StableMuteState::Unmuted => {
+                                this.transceiver.set_sender_enabled(false);
+                            }
+                            StableMuteState::Muted => {
+                                this.transceiver.set_sender_enabled(true);
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         Ok(this)
     }
@@ -120,6 +142,7 @@ pub struct Sender {
             StableMediaExchangeState,
         >,
     >,
+    mute_state: Rc<MediaExchangeStateController<TransitionMuteState, StableMuteState>>,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -209,6 +232,9 @@ impl Sender {
             return;
         }
 
+        if let Some(is_muted) = track.is_muted {
+            self.mute_state.update(is_muted);
+        }
         if let Some(is_disabled) = track.is_disabled_individual {
             self.media_exchange_state.update(is_disabled);
         }

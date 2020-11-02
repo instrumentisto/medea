@@ -20,6 +20,7 @@ use crate::{
 };
 
 use super::{MediaExchangeState, StableMediaExchangeState};
+use crate::peer::media::media_exchange_state::{TransitionMuteState, StableMuteState};
 
 /// Component that manages [`MediaExchangeState`].
 pub struct MediaExchangeStateController<T, S> {
@@ -198,6 +199,51 @@ where
             Ok(())
         }
         .boxed_local()
+    }
+}
+
+impl MediaExchangeStateController<
+    TransitionMuteState,
+    StableMuteState,
+> {
+    /// Updates [`MediaExchangeStateController::state`].
+    ///
+    /// Real disable/enable __wouldn't__ be performed on this update.
+    ///
+    /// `Room.disable_audio` like `Promise`s will be resolved based on this
+    /// update.
+    pub(in super::super) fn update(&self, is_muted: bool) {
+        let new_mute_state =
+            StableMuteState::from(is_muted);
+        let current_mute_state = self.state.get();
+
+        let mute_state_update: MediaExchangeState<
+            TransitionMuteState,
+            StableMuteState,
+        > = match current_mute_state {
+            MediaExchangeState::Stable(_) => new_mute_state.into(),
+            MediaExchangeState::Transition(t) => {
+                if t.intended() == new_mute_state {
+                    new_mute_state.into()
+                } else {
+                    t.set_inner(new_mute_state).into()
+                }
+            }
+        };
+
+        self.state.set(mute_state_update);
+    }
+
+    /// Checks whether [`MediaExchangeStateController`]'s media exchange state
+    /// is in [`MediaExchangeState::Disabled`].
+    pub fn is_muted(&self) -> bool {
+        self.state.get() == StableMuteState::Muted.into()
+    }
+
+    /// Checks whether [`MediaExchangeStateController`]'s media exchange state
+    /// is in [`MediaExchangeState::Enabled`].
+    pub fn is_unmuted(&self) -> bool {
+        self.state.get() == StableMuteState::Unmuted.into()
     }
 }
 
