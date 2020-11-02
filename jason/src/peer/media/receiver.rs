@@ -23,6 +23,7 @@ use crate::{
 };
 
 use super::media_exchange_state::StableMediaExchangeState;
+use crate::peer::MediaExchangeStateTransition;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -38,7 +39,12 @@ pub struct Receiver {
     track: RefCell<Option<MediaStreamTrack>>,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_track_notified: Cell<bool>,
-    media_exchange_state_controller: Rc<MediaExchangeStateController>,
+    media_exchange_state_controller: Rc<
+        MediaExchangeStateController<
+            MediaExchangeStateTransition,
+            StableMediaExchangeState,
+        >,
+    >,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
@@ -263,7 +269,12 @@ impl Disableable for Receiver {
     #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController> {
+    ) -> Rc<
+        MediaExchangeStateController<
+            MediaExchangeStateTransition,
+            StableMediaExchangeState,
+        >,
+    > {
         self.media_exchange_state_controller.clone()
     }
 }

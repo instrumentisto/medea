@@ -30,8 +30,8 @@ use self::{
 
 pub use self::{
     media_exchange_state::{
-        MediaExchangeState, MediaExchangeStateTransition,
-        StableMediaExchangeState,
+        InStable, InTransition, MediaExchangeState,
+        MediaExchangeStateTransition, StableMediaExchangeState,
     },
     receiver::Receiver,
     sender::Sender,
@@ -61,11 +61,21 @@ pub trait Disableable {
     /// Returns reference to the [`MediaExchangeStateController`].
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController>;
+    ) -> Rc<
+        MediaExchangeStateController<
+            MediaExchangeStateTransition,
+            StableMediaExchangeState,
+        >,
+    >;
 
     /// Returns [`MediaExchangeState`] of this [`Disableable`].
     #[inline]
-    fn media_exchange_state(&self) -> MediaExchangeState {
+    fn media_exchange_state(
+        &self,
+    ) -> MediaExchangeState<
+        MediaExchangeStateTransition,
+        StableMediaExchangeState,
+    > {
         self.media_exchange_state_controller()
             .media_exchange_state()
     }

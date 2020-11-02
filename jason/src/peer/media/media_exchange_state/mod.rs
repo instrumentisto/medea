@@ -3,24 +3,60 @@
 //! [`Disableable`]: super::Disableable
 
 mod controller;
+mod mute_state;
 
 use derive_more::From;
 
 pub use self::controller::MediaExchangeStateController;
+use crate::peer::media::media_exchange_state::mute_state::StableMuteState;
 
 /// All media exchange states in which [`Disableable`] can be.
 ///
 /// [`Disableable`]: super::Disableable
-#[derive(Clone, Copy, Debug, From, Eq, PartialEq)]
-pub enum MediaExchangeState {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MediaExchangeState<T, S> {
     /// State of transition.
-    Transition(MediaExchangeStateTransition),
+    Transition(T),
 
     /// Stable state.
-    Stable(StableMediaExchangeState),
+    Stable(S),
 }
 
-impl MediaExchangeState {
+impl From<StableMediaExchangeState>
+    for MediaExchangeState<
+        MediaExchangeStateTransition,
+        StableMediaExchangeState,
+    >
+{
+    fn from(from: StableMediaExchangeState) -> Self {
+        Self::Stable(from)
+    }
+}
+
+impl From<MediaExchangeStateTransition>
+    for MediaExchangeState<
+        MediaExchangeStateTransition,
+        StableMediaExchangeState,
+    >
+{
+    fn from(from: MediaExchangeStateTransition) -> Self {
+        Self::Transition(from)
+    }
+}
+
+impl<T, S> MediaExchangeState<T, S>
+where
+    T: InTransition<Stable = S>
+        + Clone
+        + Copy
+        + PartialEq
+        + Into<MediaExchangeState<T, S>>,
+    S: InStable<Transition = T>
+        + Clone
+        + Copy
+        + PartialEq
+        + Into<MediaExchangeState<T, S>>,
+{
     /// Indicates whether [`MediaExchangeState`] is stable (not in transition).
     #[inline]
     pub fn is_stable(self) -> bool {
@@ -34,10 +70,7 @@ impl MediaExchangeState {
     /// [`MediaExchangeState::Transition`].
     ///
     /// No-op if already in the `desired_state`.
-    pub fn transition_to(
-        self,
-        desired_state: StableMediaExchangeState,
-    ) -> Self {
+    pub fn transition_to(self, desired_state: S) -> Self {
         if self == desired_state.into() {
             return self;
         }
@@ -47,15 +80,7 @@ impl MediaExchangeState {
                 if transition.intended() == desired_state {
                     self
                 } else {
-                    match transition {
-                        MediaExchangeStateTransition::Enabling(from) => {
-                            MediaExchangeStateTransition::Disabling(from)
-                        }
-                        MediaExchangeStateTransition::Disabling(from) => {
-                            MediaExchangeStateTransition::Enabling(from)
-                        }
-                    }
-                    .into()
+                    transition.reverse().into()
                 }
             }
         }
@@ -85,7 +110,30 @@ pub enum StableMediaExchangeState {
     Disabled,
 }
 
-impl StableMediaExchangeState {
+pub trait InStable {
+    type Transition: InTransition;
+
+    fn start_transition(self) -> Self::Transition;
+}
+
+pub trait InTransition {
+    type Stable: InStable;
+
+    /// Returns intention which this [`MediaExchangeStateTransition`] indicates.
+    fn intended(self) -> Self::Stable;
+
+    /// Sets inner [`StableMediaExchangeState`].
+    fn set_inner(self, inner: Self::Stable) -> Self;
+
+    /// Returns inner [`StableMediaExchangeState`].
+    fn into_inner(self) -> Self::Stable;
+
+    fn reverse(self) -> Self;
+}
+
+impl InStable for StableMediaExchangeState {
+    type Transition = MediaExchangeStateTransition;
+
     /// Converts this [`StableMediaExchangeState`] into
     /// [`MediaExchangeStateTransition`].
     ///
@@ -95,7 +143,7 @@ impl StableMediaExchangeState {
     /// [`StableMediaExchangeState::Disabled`] =>
     /// [`MediaExchangeStateTransition::Enabling`].
     #[inline]
-    pub fn start_transition(self) -> MediaExchangeStateTransition {
+    fn start_transition(self) -> Self::Transition {
         match self {
             Self::Enabled => MediaExchangeStateTransition::Disabling(self),
             Self::Disabled => MediaExchangeStateTransition::Enabling(self),
@@ -133,6 +181,44 @@ pub enum MediaExchangeStateTransition {
     ///
     /// [`Disableable`]: super::Disableable
     Disabling(StableMediaExchangeState),
+}
+
+impl InTransition for MediaExchangeStateTransition {
+    type Stable = StableMediaExchangeState;
+
+    /// Returns intention which this [`MediaExchangeStateTransition`] indicates.
+    #[inline]
+    fn intended(self) -> Self::Stable {
+        match self {
+            Self::Enabling(_) => StableMediaExchangeState::Enabled,
+            Self::Disabling(_) => StableMediaExchangeState::Disabled,
+        }
+    }
+
+    /// Sets inner [`StableMediaExchangeState`].
+    #[inline]
+    fn set_inner(self, inner: Self::Stable) -> Self {
+        match self {
+            Self::Enabling(_) => Self::Enabling(inner),
+            Self::Disabling(_) => Self::Disabling(inner),
+        }
+    }
+
+    /// Returns inner [`StableMediaExchangeState`].
+    #[inline]
+    fn into_inner(self) -> Self::Stable {
+        match self {
+            Self::Enabling(s) | Self::Disabling(s) => s,
+        }
+    }
+
+    #[inline]
+    fn reverse(self) -> Self {
+        match self {
+            Self::Enabling(stable) => Self::Disabling(stable),
+            Self::Disabling(stable) => Self::Enabling(stable),
+        }
+    }
 }
 
 impl MediaExchangeStateTransition {

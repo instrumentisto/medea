@@ -489,6 +489,7 @@ impl Track {
 pub struct TrackPatchCommand {
     pub id: TrackId,
     pub is_disabled: Option<bool>,
+    pub is_muted: Option<bool>,
 }
 
 /// Patch of the [`Track`] which Media Server can send with
@@ -513,6 +514,8 @@ pub struct TrackPatchEvent {
     /// So intention of this `Member` (`is_disabled_individual`) can be
     /// `false`, but real media exchange state can be `true`.
     pub is_disabled_general: Option<bool>,
+
+    pub is_muted: Option<bool>,
 }
 
 impl From<TrackPatchCommand> for TrackPatchEvent {
@@ -521,6 +524,7 @@ impl From<TrackPatchCommand> for TrackPatchEvent {
             id: from.id,
             is_disabled_individual: from.is_disabled,
             is_disabled_general: None,
+            is_muted: from.is_muted,
         }
     }
 }
@@ -534,6 +538,7 @@ impl TrackPatchEvent {
             id,
             is_disabled_general: None,
             is_disabled_individual: None,
+            is_muted: None,
         }
     }
 

@@ -54,6 +54,7 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::TransceiverDirection,
 };
+use crate::peer::media::{InStable, InTransition};
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///

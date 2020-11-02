@@ -880,6 +880,7 @@ impl InnerRoom {
                                             desired_media_exchange_state
                                                 == Disabled,
                                         ),
+                                        is_muted: None,
                                     });
                                 }
 

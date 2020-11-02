@@ -24,6 +24,7 @@ use super::{
     },
     Disableable, MediaConnections, MediaConnectionsError, Result,
 };
+use crate::peer::MediaExchangeStateTransition;
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -113,7 +114,12 @@ pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
-    media_exchange_state: Rc<MediaExchangeStateController>,
+    media_exchange_state: Rc<
+        MediaExchangeStateController<
+            MediaExchangeStateTransition,
+            StableMediaExchangeState,
+        >,
+    >,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -295,7 +301,12 @@ impl Disableable for Sender {
     #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController> {
+    ) -> Rc<
+        MediaExchangeStateController<
+            MediaExchangeStateTransition,
+            StableMediaExchangeState,
+        >,
+    > {
         self.media_exchange_state.clone()
     }
 
