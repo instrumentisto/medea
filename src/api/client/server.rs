@@ -11,8 +11,6 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use futures::FutureExt as _;
-use medea_client_api_proto::{Credential, MemberId, RoomId};
-use serde::Deserialize;
 
 use crate::{
     api::client::session::WsSession,
@@ -21,19 +19,6 @@ use crate::{
     shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
 };
-
-/// Parameters of new WebSocket connection creation HTTP request.
-#[derive(Debug, Deserialize)]
-struct RequestParams {
-    /// ID of [`Room`] that WebSocket connection conne1cts to.
-    room_id: RoomId,
-
-    /// ID of [`Member`] that establishes WebSocket connection.
-    member_id: MemberId,
-
-    /// Credential of [`Member`] to authorize WebSocket connection with.
-    credential: Credential,
-}
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.

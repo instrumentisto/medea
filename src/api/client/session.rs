@@ -149,7 +149,10 @@ impl WsSession {
                 } else {
                     Self::send_left_room(ctx, room_id, CloseReason::Finished);
                     if self.sessions.is_empty() {
-                        ctx.stop();
+                        self.close_in_place(
+                            ctx,
+                            &CloseDescription::new(CloseReason::Rejected),
+                        );
                     }
                 }
             }
@@ -234,9 +237,14 @@ impl WsSession {
                     {
                         ctx.cancel_future(auth_timeout_handle);
                     }
-                    Self::send_join_room(ctx, room_id, member_id);
+                    Self::send_joined_room(ctx, room_id, member_id);
                 }
                 Err(err) => {
+                    error!(
+                        "{}: Failed to authorize Rpc Session `{}/{}` cause: \
+                         {:?}",
+                        this, room_id, member_id, err
+                    );
                     let reason = match err {
                         RpcServerError::Authorization => CloseReason::Rejected,
                         RpcServerError::RoomError(_)
@@ -249,25 +257,33 @@ impl WsSession {
             })
             .wait(ctx);
         } else {
+            error!(
+                "{}: Failed to authorize Rpc Session: Room `{}` does not exist",
+                self, room_id
+            );
             Self::send_left_room(ctx, room_id, CloseReason::Rejected)
         }
     }
 
     /// Handles [`ClientMsg::LeftRoom`].
     ///
-    /// Sends [`RpcServer::connection_closed`] to the [`RpcServer`] from which
-    /// [`Member`] left.
+    /// Sends [`RpcServer::connection_closed`] to the [`RpcServer`] based on
+    /// provided [`RoomId`].
     fn handle_leave_room(
-        &self,
+        &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
         room_id: &RoomId,
-        member_id: MemberId,
+        _: MemberId,
         reason: ClosedReason,
     ) {
-        if let Some(room) = self.rpc_server_repo.get(room_id) {
-            ctx.spawn(
-                room.connection_closed(member_id, reason).into_actor(self),
-            );
+        if let Some((member, room)) = self.sessions.remove(&room_id) {
+            ctx.spawn(room.connection_closed(member, reason).into_actor(self));
+        }
+        if self.sessions.is_empty() {
+            self.close_in_place(
+                ctx,
+                &CloseDescription::new(CloseReason::Finished),
+            )
         }
     }
 
@@ -404,7 +420,7 @@ impl WsSession {
     }
 
     /// Sends [`ServerMsg::JoinedRoom`] to the client.
-    fn send_join_room(
+    fn send_joined_room(
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         member_id: MemberId,
@@ -459,8 +475,8 @@ impl WsSession {
 impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
-    /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
-    /// signal to the [`Room`].
+    /// Sends default [`RpcSettings`], starts [`Heartbeat`], idle watchdog and
+    /// authentication timeout watchdog.
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("{}: WsSession started", self);
         self.send_current_rpc_settings(ctx);
@@ -677,6 +693,20 @@ mod test {
         Mutex<Option<UnboundedReceiver<T>>>,
     );
 
+    fn into_frame(msg: ServerMsg) -> Frame {
+        Frame::Text(serde_json::to_string(&msg).unwrap().into())
+    }
+
+    fn into_message(msg: ClientMsg) -> Message {
+        Message::Text(
+            std::str::from_utf8(
+                Bytes::from(serde_json::to_string(&msg).unwrap()).bytes(),
+            )
+            .unwrap()
+            .to_owned(),
+        )
+    }
+
     fn test_server(factory: fn() -> WsSession) -> TestServer {
         actix_web::test::start(move || {
             App::new().service(web::resource("/").to(
@@ -724,34 +754,25 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "room_id".into(),
-            member_id: "member_id".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
         let mut client = client.skip(2);
         let left_room_frame = client.next().await.unwrap().unwrap();
-        let expected_left_room_frame = Frame::Text(
-            serde_json::to_string(&ServerMsg::LeftRoom {
+
+        assert_eq!(
+            left_room_frame,
+            into_frame(ServerMsg::LeftRoom {
                 room_id: "room_id".into(),
                 close_reason: medea_client_api_proto::CloseReason::Rejected,
             })
-            .unwrap()
-            .into(),
         );
-        assert_eq!(left_room_frame, expected_left_room_frame);
 
         let item = client.next().await.unwrap().unwrap();
         let close_frame = Frame::Close(Some(CloseReason {
@@ -793,50 +814,37 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "room_id".into(),
-            member_id: "member_id".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
-        fn msg_to_text_frame(msg: &ServerMsg) -> Frame {
-            Frame::Text(serde_json::to_string(msg).unwrap().into())
-        }
-
         // let mut client = client;
         let item = client.next().await.unwrap().unwrap();
-        let expected_item =
-            msg_to_text_frame(&ServerMsg::RpcSettings(RpcSettings {
-                idle_timeout_ms: 5000,
-                ping_interval_ms: 50,
-            }));
+        let expected_item = into_frame(ServerMsg::RpcSettings(RpcSettings {
+            idle_timeout_ms: 5000,
+            ping_interval_ms: 50,
+        }));
         assert_eq!(item, expected_item);
 
         let item = client.next().await.unwrap().unwrap();
-        assert_eq!(item, msg_to_text_frame(&ServerMsg::Ping(0)));
+        assert_eq!(item, into_frame(ServerMsg::Ping(0)));
 
         let item = client.next().await.unwrap().unwrap();
         assert_eq!(
             item,
-            msg_to_text_frame(&ServerMsg::JoinedRoom {
+            into_frame(ServerMsg::JoinedRoom {
                 room_id: "room_id".into(),
                 member_id: "member_id".into(),
             })
         );
 
         let item = client.next().await.unwrap().unwrap();
-        assert_eq!(item, msg_to_text_frame(&ServerMsg::Ping(1)));
+        assert_eq!(item, into_frame(ServerMsg::Ping(1)));
     }
 
     // WsSession is dropped and WebSocket connection is closed if no pongs
@@ -879,20 +887,12 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "room_id".into(),
-            member_id: "member_id".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
@@ -956,20 +956,12 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "room_id".into(),
-            member_id: "member_id".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
@@ -986,12 +978,7 @@ mod test {
         };
         let command = Bytes::from(serde_json::to_string(&cmd).unwrap());
 
-        client
-            .send(Message::Text(
-                std::str::from_utf8(command.bytes()).unwrap().to_owned(),
-            ))
-            .await
-            .unwrap();
+        client.send(into_message(cmd)).await.unwrap();
         client
             .send(Message::Continuation(Item::FirstText(command.slice(0..10))))
             .await
@@ -1082,20 +1069,12 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
 
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "room_id".into(),
-            member_id: "member_id".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
@@ -1113,14 +1092,13 @@ mod test {
         let mut client = client.skip(3);
 
         let left_room_frame = client.next().await.unwrap().unwrap();
-        let correct_left_room_frame = Frame::Text(Bytes::from(
-            serde_json::to_string(&ServerMsg::LeftRoom {
+        assert_eq!(
+            left_room_frame,
+            into_frame(ServerMsg::LeftRoom {
                 room_id: "room_id".into(),
                 close_reason: medea_client_api_proto::CloseReason::Finished,
             })
-            .unwrap(),
-        ));
-        assert_eq!(left_room_frame, correct_left_room_frame);
+        );
         let item = client.next().await.unwrap().unwrap();
 
         let close_frame = Frame::Close(Some(CloseReason {
@@ -1178,20 +1156,12 @@ mod test {
         });
 
         let mut client = serv.ws().await.unwrap();
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "room_id".into(),
-            member_id: "member_id".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room_id".into(),
+                member_id: "member_id".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
@@ -1218,16 +1188,6 @@ mod test {
         .unwrap();
 
         assert_eq!(item, Frame::Text(event.into()));
-    }
-
-    fn client_msg_to_text_message(msg: ClientMsg) -> Message {
-        Message::Text(
-            std::str::from_utf8(
-                Bytes::from(serde_json::to_string(&msg).unwrap()).bytes(),
-            )
-            .unwrap()
-            .to_owned(),
-        )
     }
 
     #[actix_rt::test]
@@ -1270,20 +1230,12 @@ mod test {
         });
 
         let mut client = serv.ws().await.unwrap();
-        let join_msg = ClientMsg::JoinRoom {
-            room_id: "alice_room".into(),
-            member_id: "alice".into(),
-            credential: "token".into(),
-        };
         client
-            .send(Message::Text(
-                std::str::from_utf8(
-                    Bytes::from(serde_json::to_string(&join_msg).unwrap())
-                        .bytes(),
-                )
-                .unwrap()
-                .to_owned(),
-            ))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "alice_room".into(),
+                member_id: "alice".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
 
@@ -1297,13 +1249,12 @@ mod test {
         };
         alice_connection.send_event("alice_room".into(), alice_event.clone());
 
-        let join_msg_2 = ClientMsg::JoinRoom {
-            room_id: "bob_room".into(),
-            member_id: "bob".into(),
-            credential: "token".into(),
-        };
         client
-            .send(client_msg_to_text_message(join_msg_2))
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "bob_room".into(),
+                member_id: "bob".into(),
+                credential: "token".into(),
+            }))
             .await
             .unwrap();
         let bob_connection: Box<dyn RpcConnection> =
@@ -1370,5 +1321,88 @@ mod test {
             }
         );
         assert_eq!(msgs.len(), 5);
+    }
+
+    #[actix_rt::test]
+    async fn close_connection_when_no_active_sessions() {
+        let mut serv = test_server(|| -> WsSession {
+            let mut rpc_server_repo = MockRpcServerRepository::new();
+            rpc_server_repo.expect_get().times(2).returning(|_| {
+                let mut rpc_server = MockRpcServer::new();
+
+                rpc_server.expect_connection_established().returning(
+                    |_, _, _| {
+                        future::ok(RpcConnectionSettings {
+                            idle_timeout: Duration::from_secs(10),
+                            ping_interval: Duration::from_secs(10),
+                        })
+                        .boxed_local()
+                    },
+                );
+                rpc_server
+                    .expect_connection_closed()
+                    .returning(|_, _| future::ready(()).boxed_local());
+
+                Some(Box::new(rpc_server))
+            });
+
+            WsSession::new(
+                Box::new(rpc_server_repo),
+                Duration::from_secs(5),
+                Duration::from_secs(5),
+            )
+        });
+
+        let mut client = serv.ws().await.unwrap();
+
+        client
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room1".into(),
+                member_id: "member1".into(),
+                credential: "token".into(),
+            }))
+            .await
+            .unwrap();
+        client
+            .send(into_message(ClientMsg::JoinRoom {
+                room_id: "room2".into(),
+                member_id: "member2".into(),
+                credential: "token".into(),
+            }))
+            .await
+            .unwrap();
+
+        client
+            .send(into_message(ClientMsg::LeaveRoom {
+                room_id: "room1".into(),
+                member_id: "member1".into(),
+            }))
+            .await
+            .unwrap();
+        client
+            .send(into_message(ClientMsg::LeaveRoom {
+                room_id: "room2".into(),
+                member_id: "member2".into(),
+            }))
+            .await
+            .unwrap();
+
+        let mut frames: Vec<_> =
+            client.map(|frame| frame.unwrap()).collect().await;
+        assert!(frames.contains(&Frame::Text(Bytes::from(
+            "{\"msg\":\"JoinedRoom\",\"data\":{\"room_id\":\"room1\",\"\
+             member_id\":\"member1\"}}"
+        ))));
+        assert!(frames.contains(&Frame::Text(Bytes::from(
+            "{\"msg\":\"JoinedRoom\",\"data\":{\"room_id\":\"room2\",\"\
+             member_id\":\"member2\"}}"
+        ))));
+        assert_eq!(
+            frames.pop().unwrap(),
+            Frame::Close(Some(CloseReason {
+                code: CloseCode::Normal,
+                description: Some(String::from("{\"reason\":\"Finished\"}"))
+            }))
+        )
     }
 }

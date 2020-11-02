@@ -42,9 +42,10 @@ All user visible changes to this project will be documented in this file. This p
             - `FacingMode` enum ([#137]).
         - `MediaKind` enum that provides `MediaTrack` and `InputDeviceInfo` kind ([#146]);
         - `MediaSourceKind` enum that provides `MediaTrack` media source kind (`Device` or `Display`) ([#146]);
-        - Room initialization ([#46]):
-            - `Jason.init_room()`;
-            - `Room.join()`.
+        - Room management:
+            - `Jason.init_room()` ([#46]);
+            - `Room.join()` ([#46]);
+            - `Jason.close_room` ([#147]).
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145]);
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
@@ -56,8 +57,6 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.mute_remote_video`;
             - `Room.unmute_remote_video`.
         - `MediaTrack.media_source_kind` function ([#145], [#146]).
-        - Multiple `Room`s management ([#147]):
-            - `Jason.dispose_room`.
     - Optional tracks support ([#106]);
     - Simultaneous device and display video tracks publishing and receiving ([#144]);
     - `RtcIceTransportPolicy` configuration ([#79]).

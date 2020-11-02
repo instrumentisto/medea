@@ -85,43 +85,43 @@ pub enum ConnectionInfoParseError {
 
     /// Provided URL doesn't have important segments.
     #[display(fmt = "Provided URL doesn't have important segments")]
-    FewSegments,
+    NotEnoughSegments,
 }
 
 impl FromStr for ConnectionInfo {
     type Err = Traced<ConnectionInfoParseError>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut url = Url::parse(s).map_err(|err| {
-            tracerr::new!(ConnectionInfoParseError::UrlParse(err))
-        })?;
+        use ConnectionInfoParseError as E;
+
+        let mut url =
+            Url::parse(s).map_err(|err| tracerr::new!(E::UrlParse(err)))?;
         url.set_fragment(None);
         url.set_query(None);
 
-        macro_rules! few_segments_error {
-            () => {
-                || tracerr::new!(ConnectionInfoParseError::FewSegments)
-            };
-        }
-
-        let mut segments =
-            url.path_segments().ok_or_else(few_segments_error!())?.rev();
+        let mut segments = url
+            .path_segments()
+            .ok_or_else(|| tracerr::new!(E::NotEnoughSegments))?
+            .rev();
         let credential = segments
             .next()
-            .ok_or_else(few_segments_error!())?
+            .ok_or_else(|| tracerr::new!(E::NotEnoughSegments))?
             .to_owned()
             .into();
         let member_id = segments
             .next()
-            .ok_or_else(few_segments_error!())?
+            .ok_or_else(|| tracerr::new!(E::NotEnoughSegments))?
             .to_owned()
             .into();
         let room_id = segments
             .next()
-            .ok_or_else(few_segments_error!())?
+            .ok_or_else(|| tracerr::new!(E::NotEnoughSegments))?
             .to_owned()
             .into();
-        url.set_path("/ws");
+
+        // Remove last three segments. Safe to unwrap cause we already made all
+        // necessary checks.
+        url.path_segments_mut().unwrap().pop().pop().pop();
 
         Ok(ConnectionInfo {
             url: url.into(),

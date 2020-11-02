@@ -855,7 +855,7 @@ window.onload = async function() {
 
   try {
     closeApp.addEventListener('click', () => {
-      jason.dispose_room(room);
+      jason.close_room(room);
       // jason.dispose();
     });
 

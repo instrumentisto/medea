@@ -7,13 +7,12 @@ use async_trait::async_trait;
 use derivative::Derivative;
 use derive_more::{Display, From};
 use futures::{
-    channel::{mpsc, oneshot, oneshot::Canceled},
-    future::LocalBoxFuture,
+    channel::mpsc,
+    future::{self, LocalBoxFuture},
     stream::LocalBoxStream,
     StreamExt,
 };
 use medea_client_api_proto::{Command, Event, MemberId, RoomId};
-use medea_macro::dispatchable;
 use medea_reactive::ObservableCell;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -63,88 +62,6 @@ pub enum SessionError {
     NewConnectionInfo,
 }
 
-/// State for the [`WebSocketRpcSession`].
-///
-/// # State transition scheme
-///
-/// ```text
-///      +---------------+
-/// +--->+ Uninitialized |
-/// |    +-------+-------+
-/// |            |
-/// |            v
-/// |    +-------+-------+
-/// |    |  Initialized  |
-/// |    +-------+-------+
-/// |            |
-/// |            v                    +------------+
-/// |    +-------+-------+<-----------+            |
-/// |    |  Connecting   |            |   Failed   |
-/// |    +-------+-------+----------->+            |
-/// |            |                    +------+-----+
-/// |            v                           ^
-/// |    +-------+-------+                   |
-/// +----+  Authorizing  +------------------>+
-///      +-------+-------+                   |
-///              |                           |
-///              v                           |
-///      +-------+-------+                   |
-///      |    Opened     +------------------>+
-///      +-------+-------+
-///              |
-///              v
-///      +-------+-------+
-///      |   Finished    |
-///      +---------------+
-/// ```
-#[dispatchable(self: Rc<Self>, async_trait(?Send))]
-#[derive(Clone, Debug, Derivative)]
-#[derivative(PartialEq)]
-enum SessionState {
-    /// [`WebSocketRpcSession`] currently doesn't have [`ConnectionInfo`] to
-    /// authorize with.
-    Uninitialized,
-
-    /// [`WebSocketRpcSession`] has [`ConnectionInfo`], but connection with a
-    /// server currently doesn't established.
-    Initialized(Rc<ConnectionInfo>),
-
-    /// [`WebSocketRpcSession`] connecting to the server.
-    Connecting(Rc<ConnectionInfo>),
-
-    /// [`WebSocketRpcSession`] is connected to the server and authorizing on
-    /// it.
-    Authorizing(Rc<ConnectionInfo>),
-
-    /// Connection with a server was lost.
-    Failed(
-        #[derivative(PartialEq = "ignore")] Rc<Traced<SessionError>>,
-        Rc<ConnectionInfo>,
-    ),
-
-    /// Connection with a server is established and [`WebSocketRpcSession`] is
-    /// authorized.
-    Opened(Rc<ConnectionInfo>),
-
-    /// Session with a server was finished.
-    ///
-    /// [`WebSocketRpcSession`] can't be used.
-    Finished(CloseReason),
-}
-
-/// Tries to upgrade [`Weak`].
-///
-/// Breaks cycle if [`Weak`] is [`None`].
-macro_rules! upgrade_or_break {
-    ($weak:tt) => {
-        if let Some(this) = $weak.upgrade() {
-            this
-        } else {
-            break;
-        }
-    };
-}
-
 /// Client to talk with server via Client API RPC.
 #[async_trait(?Send)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -187,9 +104,7 @@ pub trait RpcSession {
     /// abnormal close [`RpcSession::on_connection_loss`] will be thrown.
     ///
     /// [`Future`]: std::future::Future
-    fn on_normal_close(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
+    fn on_normal_close(&self) -> LocalBoxFuture<'static, CloseReason>;
 
     /// Sets reason, that will be passed to underlying transport when this
     /// client will be dropped.
@@ -225,8 +140,8 @@ pub struct WebSocketRpcSession {
     state: ObservableCell<SessionState>,
 
     /// Flag which indicates that [`WebSocketRpcSession`] goes to the
-    /// [`SessionState::Failed`] from the [`SessionState::Open`].
-    is_can_be_reconnected: Rc<Cell<bool>>,
+    /// [`SessionState::Lost`] from the [`SessionState::Open`].
+    can_reconnect: Rc<Cell<bool>>,
 
     /// Subscribers of the [`RpcSession::subscribe`].
     event_txs: RefCell<Vec<mpsc::UnboundedSender<Event>>>,
@@ -241,23 +156,20 @@ impl WebSocketRpcSession {
         let this = Rc::new(Self {
             client,
             state: ObservableCell::new(SessionState::Uninitialized),
-            is_can_be_reconnected: Rc::new(Cell::new(false)),
+            can_reconnect: Rc::new(Cell::new(false)),
             event_txs: RefCell::default(),
         });
-        this.spawn_tasks();
+
+        this.spawn_state_watcher();
+        this.spawn_connection_loss_watcher();
+        this.spawn_close_watcher();
+        this.spawn_server_msg_listener();
 
         this
     }
 
-    /// Spawns tasks important for [`WebSocketRpcSession`] work.
-    fn spawn_tasks(self: &Rc<Self>) {
-        self.spawn_state_watcher();
-        self.spawn_connection_loss_watcher();
-        self.spawn_close_watcher();
-        self.spawn_server_msg_listener();
-    }
-
-    /// Tries to establish connection with a server.
+    /// Tries to establish transport connection to media server and authorize
+    /// RPC session.
     ///
     /// If [`WebSocketRpcSession`] is already trying to do it, then this method
     /// will wait for connection result and return it.
@@ -270,35 +182,6 @@ impl WebSocketRpcSession {
     /// Errors with [`SessionError::SessionFinished`] if current
     /// [`SessionState`] is [`SessionState::Finished`].
     ///
-    /// Errors with [`SessionError`] if
-    /// [`WebSocketRpcSession::wait_for_connect`] returned error.
-    async fn connect(self: Rc<Self>) -> Result<(), Traced<SessionError>> {
-        use SessionError as E;
-        use SessionState as S;
-
-        let current_state = self.state.clone_inner();
-        match current_state {
-            S::Connecting(_) | S::Authorizing(_) | S::Opened(_) => (),
-            S::Initialized(info) | S::Failed(_, info) => {
-                self.state.set(S::Connecting(info));
-            }
-            S::Uninitialized => {
-                return Err(tracerr::new!(E::NoCredentials));
-            }
-            S::Finished(reason) => {
-                return Err(tracerr::new!(E::SessionFinished(reason)));
-            }
-        }
-
-        self.wait_for_connect()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-    }
-
-    /// Waits for [`WebSocketRpcSession`] connecting result.
-    ///
-    /// # Errors
-    ///
     /// Errors with [`SessionError::NewConnectionInfo`] if [`SessionState`] goes
     /// into [`SessionState::Initialized`].
     ///
@@ -309,21 +192,32 @@ impl WebSocketRpcSession {
     /// into [`SessionState::Finished`].
     ///
     /// Errors with [`SessionError`] if [`SessionState`] goes into
-    /// [`SessionState::Failed`].
-    async fn wait_for_connect(
-        self: Rc<Self>,
-    ) -> Result<(), Traced<SessionError>> {
+    /// [`SessionState::Lost`].
+    async fn inner_connect(self: Rc<Self>) -> Result<(), Traced<SessionError>> {
         use SessionError as E;
         use SessionState as S;
+
+        match self.state.get() {
+            S::Connecting(_) | S::Authorizing(_) | S::Opened(_) => {}
+            S::Initialized(info) | S::Lost(_, info) => {
+                self.state.set(S::Connecting(info));
+            }
+            S::Uninitialized => {
+                return Err(tracerr::new!(E::NoCredentials));
+            }
+            S::Finished(reason) => {
+                return Err(tracerr::new!(E::SessionFinished(reason)));
+            }
+        }
 
         let mut state_updates_stream = self.state.subscribe();
         while let Some(state) = state_updates_stream.next().await {
             match state {
+                S::Opened(_) => return Ok(()),
                 S::Initialized(_) => {
                     return Err(tracerr::new!(E::NewConnectionInfo));
                 }
-                S::Opened(_) => return Ok(()),
-                S::Failed(err, _) => {
+                S::Lost(err, _) => {
                     // TODO: Clone Traced and add new Frame to it when Traced
                     //       cloning will be implemented.
                     return Err(tracerr::new!(AsRef::<SessionError>::as_ref(
@@ -332,71 +226,98 @@ impl WebSocketRpcSession {
                     .clone()));
                 }
                 S::Uninitialized => {
-                    return Err(tracerr::new!(E::AuthorizationFailed))
+                    return Err(tracerr::new!(E::AuthorizationFailed));
                 }
                 S::Finished(reason) => {
                     return Err(tracerr::new!(E::SessionFinished(reason)));
                 }
-                _ => (),
+                _ => {}
             }
         }
 
         Err(tracerr::new!(E::SessionUnexpectedlyDropped))
     }
 
-    /// Handler for the [`WebSocketRpcClient::on_connection_loss`].
-    ///
-    /// Sets [`WebSocketRpcSession::state`] to the [`SessionState::Failed`].
-    fn connection_lost(&self) {
-        use SessionState as S;
-
-        let current_state = self.state.clone_inner();
-        if matches!(current_state, S::Opened(_)) {
-            self.is_can_be_reconnected.set(true);
-        }
-        match current_state {
-            S::Connecting(info) | S::Authorizing(info) | S::Opened(info) => {
-                self.state.set(S::Failed(
-                    Rc::new(tracerr::new!(SessionError::ConnectionLost)),
-                    info,
-                ));
-            }
-            S::Uninitialized
-            | S::Initialized(_)
-            | S::Failed(_, _)
-            | S::Finished(_) => {}
-        }
-    }
-
     /// Spawns [`SessionState`] updates handler for this
     /// [`WebSocketRpcSession`].
     fn spawn_state_watcher(self: &Rc<Self>) {
-        let weak_this = Rc::downgrade(self);
+        use SessionState as S;
+
         let mut state_updates = self.state.subscribe();
+        let weak_this = Rc::downgrade(self);
         spawn_local(async move {
             while let Some(state) = state_updates.next().await {
                 let this = upgrade_or_break!(weak_this);
-                state.dispatch_with(this).await;
+                match state {
+                    S::Connecting(info) => {
+                        match Rc::clone(&this.client)
+                            .connect(info.url.clone())
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())
+                        {
+                            Ok(_) => {
+                                this.state.set(S::Authorizing(info));
+                            }
+                            Err(e) => {
+                                this.state.set(S::Lost(Rc::new(e), info));
+                            }
+                        }
+                    }
+                    S::Authorizing(info) => {
+                        this.client.authorize(
+                            info.room_id.clone(),
+                            info.member_id.clone(),
+                            info.credential.clone(),
+                        );
+                    }
+                    _ => {}
+                }
             }
         });
     }
 
     /// Spawns [`WebSocketRpcClient::on_connection_loss`] listener.
+    ///
+    /// Handler for the [`WebSocketRpcClient::on_connection_loss`].
+    ///
+    /// Sets [`WebSocketRpcSession::state`] to the [`SessionState::Lost`].
     fn spawn_connection_loss_watcher(self: &Rc<Self>) {
-        let weak_this = Rc::downgrade(self);
+        use SessionState as S;
+
         let mut client_on_connection_loss = self.client.on_connection_loss();
+        let weak_this = Rc::downgrade(self);
         spawn_local(async move {
             while client_on_connection_loss.next().await.is_some() {
                 let this = upgrade_or_break!(weak_this);
-                this.connection_lost();
+
+                let state = this.state.get();
+                if matches!(state, S::Opened(_)) {
+                    this.can_reconnect.set(true);
+                }
+                match state {
+                    S::Connecting(info)
+                    | S::Authorizing(info)
+                    | S::Opened(info) => {
+                        this.state.set(S::Lost(
+                            Rc::new(tracerr::new!(
+                                SessionError::ConnectionLost
+                            )),
+                            info,
+                        ));
+                    }
+                    S::Uninitialized
+                    | S::Initialized(_)
+                    | S::Lost(_, _)
+                    | S::Finished(_) => {}
+                }
             }
         });
     }
 
     /// Spawns [`WebSocketRpcClient::on_normal_close`] listener.
     fn spawn_close_watcher(self: &Rc<Self>) {
-        let weak_this = Rc::downgrade(self);
         let on_normal_close = self.client.on_normal_close();
+        let weak_this = Rc::downgrade(self);
         spawn_local(async move {
             let reason = on_normal_close.await.unwrap_or_else(|_| {
                 ClientDisconnect::RpcClientUnexpectedlyDropped.into()
@@ -435,8 +356,9 @@ impl RpcSession for WebSocketRpcSession {
         connection_info: ConnectionInfo,
     ) -> Result<(), Traced<SessionError>> {
         use SessionState as S;
-        match self.state.clone_inner() {
-            S::Uninitialized | S::Initialized(_) | S::Failed(_, _) => {
+
+        match self.state.get() {
+            S::Uninitialized | S::Initialized(_) | S::Lost(_, _) => {
                 self.state.set(S::Initialized(Rc::new(connection_info)));
             }
             S::Finished(reason) => {
@@ -444,14 +366,22 @@ impl RpcSession for WebSocketRpcSession {
                     reason
                 )));
             }
-            S::Connecting(info) | S::Authorizing(info) | S::Opened(info) => {
+            S::Connecting(info) => {
                 if info.as_ref() != &connection_info {
                     self.state.set(S::Initialized(Rc::new(connection_info)));
                 }
             }
+            S::Authorizing(info) | S::Opened(info) => {
+                if info.as_ref() != &connection_info {
+                    unimplemented!(
+                        "Changing `ConnectionInfo` with active or pending \
+                         authorization is not supported"
+                    );
+                }
+            }
         }
 
-        self.connect()
+        self.inner_connect()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -460,7 +390,7 @@ impl RpcSession for WebSocketRpcSession {
 
     /// Tries to reconnect this [`WebSocketRpcSession`] to the server.
     async fn reconnect(self: Rc<Self>) -> Result<(), Traced<SessionError>> {
-        self.connect()
+        self.inner_connect()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -476,13 +406,13 @@ impl RpcSession for WebSocketRpcSession {
     /// Sends [`Command`] to the server if current [`SessionState`] is
     /// [`SessionState::Opened`].
     fn send_command(&self, command: Command) {
-        let current_state = self.state.clone_inner();
-        if let SessionState::Opened(info) = current_state {
+        let state = self.state.get();
+        if let SessionState::Opened(info) = state {
             self.client.send_command(info.room_id.clone(), command);
         } else {
             log::error!(
-                "Tried to send Command while RPC Sesssion is in {:?} state",
-                current_state
+                "Tried to send Command while RPC Session is in {:?} state",
+                state
             );
         }
     }
@@ -490,9 +420,7 @@ impl RpcSession for WebSocketRpcSession {
     /// Returns [`Future`] which will be resolved when [`SessionState`] will be
     /// transited to the [`SessionState::Finished`] or [`WebSocketRpcSession`]
     /// will be dropped.
-    fn on_normal_close(
-        &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, Canceled>> {
+    fn on_normal_close(&self) -> LocalBoxFuture<'static, CloseReason> {
         let mut state_stream = self
             .state
             .subscribe()
@@ -505,9 +433,9 @@ impl RpcSession for WebSocketRpcSession {
             })
             .boxed_local();
         Box::pin(async move {
-            Ok(state_stream.next().await.unwrap_or_else(|| {
+            state_stream.next().await.unwrap_or_else(|| {
                 ClientDisconnect::SessionUnexpectedlyDropped.into()
-            }))
+            })
         })
     }
 
@@ -519,7 +447,7 @@ impl RpcSession for WebSocketRpcSession {
     /// Provided [`ClientDisconnect`] will be provided to the underlying
     /// [`WebSocketRpcClient`] with [`WebSocketRpcClient::set_close_reason`].
     fn close_with_reason(&self, close_reason: ClientDisconnect) {
-        if let SessionState::Opened(info) = self.state.clone_inner() {
+        if let SessionState::Opened(info) = self.state.get() {
             self.client
                 .leave_room(info.room_id.clone(), info.member_id.clone());
         }
@@ -529,15 +457,18 @@ impl RpcSession for WebSocketRpcSession {
     }
 
     /// Returns [`Stream`] which will provided `Some(())` every time when
-    /// [`SessionState`] goes to the [`SessionState::Failed`].
+    /// [`SessionState`] goes to the [`SessionState::Lost`].
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
+        let can_reconnect = Rc::clone(&self.can_reconnect);
         self.state
             .subscribe()
-            .filter_map(|state| async move {
-                if matches!(state, SessionState::Failed(_, _)) {
-                    Some(())
+            .filter_map(move |state| {
+                if matches!(state, SessionState::Lost(_, _))
+                    && can_reconnect.get()
+                {
+                    future::ready(Some(()))
                 } else {
-                    None
+                    future::ready(None)
                 }
             })
             .boxed_local()
@@ -549,14 +480,14 @@ impl RpcSession for WebSocketRpcSession {
     /// Nothing will be provided if [`SessionState`] goes to the
     /// [`SessionState::Opened`] first time.
     fn on_reconnected(&self) -> LocalBoxStream<'static, ()> {
-        let is_can_be_reconnected = Rc::clone(&self.is_can_be_reconnected);
+        let can_reconnect = Rc::clone(&self.can_reconnect);
         self.state
             .subscribe()
             .filter_map(move |current_state| {
-                let is_can_be_reconnected = is_can_be_reconnected.clone();
+                let can_reconnect = Rc::clone(&can_reconnect);
                 async move {
                     if matches!(current_state, SessionState::Opened(_))
-                        && is_can_be_reconnected.get()
+                        && can_reconnect.get()
                     {
                         Some(())
                     } else {
@@ -576,7 +507,8 @@ impl RpcEventHandler for WebSocketRpcSession {
     /// [`RoomId`], then [`SessionState`] will be transited to the
     /// [`SessionState::Opened`].
     fn on_joined_room(&self, room_id: RoomId, member_id: MemberId) {
-        if let SessionState::Authorizing(info) = self.state.clone_inner() {
+        let state = self.state.get();
+        if let SessionState::Authorizing(info) = state {
             if info.room_id == room_id && info.member_id == member_id {
                 self.state.set(SessionState::Opened(info));
             }
@@ -591,9 +523,9 @@ impl RpcEventHandler for WebSocketRpcSession {
     /// [`SessionState::Opened`] or to the [`SessionState::Uninitialized`] if
     /// current [`SessionState`] is [`SessionState::Authorizing`].
     fn on_left_room(&self, room_id: RoomId, close_reason: CloseReason) {
-        let current_state = self.state.clone_inner();
+        let state = self.state.get();
 
-        match &current_state {
+        match &state {
             SessionState::Opened(info) | SessionState::Authorizing(info) => {
                 if info.room_id != room_id {
                     return;
@@ -602,14 +534,14 @@ impl RpcEventHandler for WebSocketRpcSession {
             _ => return,
         }
 
-        match current_state {
+        match state {
             SessionState::Opened(_) => {
                 self.state.set(SessionState::Finished(close_reason));
             }
             SessionState::Authorizing(_) => {
                 self.state.set(SessionState::Uninitialized);
             }
-            _ => (),
+            _ => {}
         }
     }
 
@@ -618,7 +550,7 @@ impl RpcEventHandler for WebSocketRpcSession {
     /// and provided [`RoomId`] is equal to the [`RoomId`] from the
     /// [`ConnectionInfo`].
     fn on_event(&self, room_id: RoomId, event: Event) {
-        if let SessionState::Opened(info) = self.state.clone_inner() {
+        if let SessionState::Opened(info) = self.state.get() {
             if info.room_id == room_id {
                 self.event_txs
                     .borrow_mut()
@@ -628,61 +560,68 @@ impl RpcEventHandler for WebSocketRpcSession {
     }
 }
 
-#[async_trait(?Send)]
-impl SessionStateHandler for WebSocketRpcSession {
-    type Output = ();
+/// State for the [`WebSocketRpcSession`].
+///
+/// # State transition scheme
+///
+/// ```text
+///      +---------------+
+/// +--->+ Uninitialized |
+/// |    +-------+-------+
+/// |            |
+/// |            v
+/// |    +-------+-------+
+/// |    |  Initialized  |
+/// |    +-------+-------+
+/// |            |
+/// |            v                    +------------+
+/// |    +-------+-------+<-----------+            |
+/// |    |  Connecting   |            |   Failed   |
+/// |    +-------+-------+----------->+            |
+/// |            |                    +------+-----+
+/// |            v                           ^
+/// |    +-------+-------+                   |
+/// +----+  Authorizing  +------------------>+
+///      +-------+-------+                   |
+///              |                           |
+///              v                           |
+///      +-------+-------+                   |
+///      |    Opened     +------------------>+
+///      +-------+-------+
+///              |
+///              v
+///      +-------+-------+
+///      |   Finished    |
+///      +---------------+
+/// ```
+#[derive(Clone, Debug, Derivative)]
+#[derivative(PartialEq)]
+enum SessionState {
+    /// [`WebSocketRpcSession`] currently doesn't have [`ConnectionInfo`] to
+    /// authorize with.
+    Uninitialized,
 
-    /// No-op.
-    async fn on_uninitialized(self: Rc<Self>) {}
+    /// [`ConnectionInfo`] was specified, but no transport connection
+    /// establishment attempts were made yet.
+    Initialized(Rc<ConnectionInfo>),
 
-    /// No-op.
-    async fn on_initialized(self: Rc<Self>, _: Rc<ConnectionInfo>) {}
+    /// Ongoing transport connection establishment.
+    Connecting(Rc<ConnectionInfo>),
 
-    /// Tries to connect to the server with a [`WebSocketRpcClient::connect`].
-    ///
-    /// Sets [`SessionState`] to the [`SessionState::Authorizing`] if
-    /// [`WebSocketRpcClient`] successfully connected to the server.
-    ///
-    /// Sets [`SessionState`] to the [`SessionState::Failed`] if
-    /// [`WebSocketRpcClient::connect`] errored.
-    async fn on_connecting(self: Rc<Self>, info: Rc<ConnectionInfo>) {
-        match Rc::clone(&self.client)
-            .connect(info.url.clone())
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-        {
-            Ok(_) => {
-                self.state.set(SessionState::Authorizing(info));
-            }
-            Err(e) => {
-                self.state.set(SessionState::Failed(Rc::new(e), info));
-            }
-        }
-    }
+    /// Transport connection is establish and [`WebSocketRpcSession`] is
+    /// currently performing session authorization.
+    Authorizing(Rc<ConnectionInfo>),
 
-    /// No-op.
-    async fn on_failed(
-        self: Rc<Self>,
-        _: (Rc<Traced<SessionError>>, Rc<ConnectionInfo>),
-    ) {
-    }
+    /// Connection with a server was lost but can be recovered.
+    Lost(
+        #[derivative(PartialEq = "ignore")] Rc<Traced<SessionError>>,
+        Rc<ConnectionInfo>,
+    ),
 
-    /// Authorizes [`WebSocketRpcSession`] on server with
-    /// [`WebSocketRpcClient::authorize`].
-    ///
-    /// Doesn't updates [`SessionState`]. [`SessionState`] will be updated when
-    /// [`ServerMsg::JoinedRoom`] will be received.
-    async fn on_authorizing(self: Rc<Self>, info: Rc<ConnectionInfo>) {
-        self.client.authorize(
-            info.room_id.clone(),
-            info.member_id.clone(),
-            info.credential.clone(),
-        );
-    }
+    /// Connection with a server is established and [`WebSocketRpcSession`] is
+    /// authorized.
+    Opened(Rc<ConnectionInfo>),
 
-    /// No-op.
-    async fn on_opened(self: Rc<Self>, _: Rc<ConnectionInfo>) {}
-
-    /// No-op.
-    async fn on_finished(self: Rc<Self>, _: CloseReason) {}
+    /// Terminal state: transport is closed and can not be reopened.
+    Finished(CloseReason),
 }

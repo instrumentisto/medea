@@ -26,26 +26,24 @@ pub use self::{
     room::RoomHandle,
 };
 
-struct Inner {
-    /// Connection with `Media Server`. Only one [`WebSocketRpcClient`] is
-    /// supported atm.
-    rpc: Rc<WebSocketRpcClient>,
-
-    /// [`Room`]s maintained by this [`Jason`] instance.
-    rooms: Vec<Room>,
-
-    /// [`Jason`]s [`MediaManager`]. It is shared across [`Room`]s since
-    /// [`MediaManager`] contains media tracks that can be used by multiple
-    /// [`Room`]s.
-    media_manager: Rc<MediaManager>,
-}
-
 /// General library interface.
 ///
 /// Responsible for managing shared transports, local media
 /// and room initialization.
 #[wasm_bindgen]
 pub struct Jason(Rc<RefCell<Inner>>);
+
+struct Inner {
+    /// [`Jason`]s [`MediaManager`]. It is shared across [`Room`]s since
+    /// [`MediaManager`] contains media tracks that can be used by multiple
+    /// [`Room`]s.
+    media_manager: Rc<MediaManager>,
+    /// [`Room`]s maintained by this [`Jason`] instance.
+    rooms: Vec<Room>,
+    /// Connection with `Media Server`. Only one [`WebSocketRpcClient`] is
+    /// supported atm.
+    rpc: Rc<WebSocketRpcClient>,
+}
 
 #[wasm_bindgen]
 impl Jason {
@@ -78,11 +76,9 @@ impl Jason {
         self.0.borrow().media_manager.new_handle()
     }
 
-    /// Drops [`Room`] with a provided ID.
-    ///
-    /// Sets [`Room`]'s close reason to [`ClientDisconnect::RoomClose`].
+    /// Closes provided [`Room`].
     #[allow(clippy::needless_pass_by_value)]
-    pub fn dispose_room(&self, room_to_delete: RoomHandle) {
+    pub fn close_room(&self, room_to_delete: RoomHandle) {
         self.0.borrow_mut().rooms.retain(|room| {
             let should_be_closed = room.inner_ptr_eq(&room_to_delete);
             if should_be_closed {
@@ -123,13 +119,10 @@ impl Jason {
 
         let weak_room = room.downgrade();
         let weak_inner = Rc::downgrade(&self.0);
-        spawn_local(on_normal_close.map(move |res| {
+        spawn_local(on_normal_close.map(move |reason| {
             (|| {
                 let room = weak_room.upgrade()?;
                 let inner = weak_inner.upgrade()?;
-                let reason = res.unwrap_or_else(|_| {
-                    ClientDisconnect::RpcClientUnexpectedlyDropped.into()
-                });
                 let mut inner = inner.borrow_mut();
                 let index = inner.rooms.iter().position(|r| r.ptr_eq(&room));
                 if let Some(index) = index {
