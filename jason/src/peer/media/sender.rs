@@ -24,8 +24,10 @@ use super::{
     },
     Disableable, MediaConnections, MediaConnectionsError, Result,
 };
-use crate::peer::MediaExchangeStateTransition;
-use crate::peer::media::media_exchange_state::{TransitionMuteState, StableMuteState};
+use crate::peer::{
+    media::media_exchange_state::{StableMuteState, TransitionMuteState},
+    MediaExchangeStateTransition,
+};
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -72,7 +74,8 @@ impl<'a> SenderBuilder<'a> {
             MediaExchangeStateController::new(self.media_exchange_state);
         let mut media_exchange_state_rx =
             media_exchange_state_controller.on_stabilize();
-        let mute_state_controller = MediaExchangeStateController::new(self.mute_state);
+        let mute_state_controller =
+            MediaExchangeStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_controller.on_stabilize();
         let this = Rc::new(Sender {
             peer_id: connections.peer_id,
@@ -142,7 +145,8 @@ pub struct Sender {
             StableMediaExchangeState,
         >,
     >,
-    mute_state: Rc<MediaExchangeStateController<TransitionMuteState, StableMuteState>>,
+    mute_state:
+        Rc<MediaExchangeStateController<TransitionMuteState, StableMuteState>>,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -297,7 +301,9 @@ impl Sender {
     }
 }
 
-impl TransceiverSide for Sender {
+impl TransceiverSide<MediaExchangeStateTransition, StableMediaExchangeState>
+    for Sender
+{
     fn track_id(&self) -> TrackId {
         self.track_id
     }
@@ -323,7 +329,9 @@ impl TransceiverSide for Sender {
     }
 }
 
-impl Disableable for Sender {
+impl Disableable<MediaExchangeStateTransition, StableMediaExchangeState>
+    for Sender
+{
     #[inline]
     fn media_exchange_state_controller(
         &self,

@@ -263,9 +263,19 @@ impl Receiver {
         self.general_media_exchange_state.get()
             == StableMediaExchangeState::Enabled
     }
+
+    pub fn is_enabled(&self) -> bool {
+        self.media_exchange_state_controller.is_enabled()
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        self.media_exchange_state_controller.is_disabled()
+    }
 }
 
-impl Disableable for Receiver {
+impl Disableable<MediaExchangeStateTransition, StableMediaExchangeState>
+    for Receiver
+{
     #[inline]
     fn media_exchange_state_controller(
         &self,
@@ -279,7 +289,9 @@ impl Disableable for Receiver {
     }
 }
 
-impl TransceiverSide for Receiver {
+impl TransceiverSide<MediaExchangeStateTransition, StableMediaExchangeState>
+    for Receiver
+{
     #[inline]
     fn track_id(&self) -> TrackId {
         self.track_id

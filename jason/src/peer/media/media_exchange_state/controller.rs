@@ -20,7 +20,9 @@ use crate::{
 };
 
 use super::{MediaExchangeState, StableMediaExchangeState};
-use crate::peer::media::media_exchange_state::{TransitionMuteState, StableMuteState};
+use crate::peer::media::media_exchange_state::{
+    StableMuteState, TransitionMuteState,
+};
 
 /// Component that manages [`MediaExchangeState`].
 pub struct MediaExchangeStateController<T, S> {
@@ -202,10 +204,7 @@ where
     }
 }
 
-impl MediaExchangeStateController<
-    TransitionMuteState,
-    StableMuteState,
-> {
+impl MediaExchangeStateController<TransitionMuteState, StableMuteState> {
     /// Updates [`MediaExchangeStateController::state`].
     ///
     /// Real disable/enable __wouldn't__ be performed on this update.
@@ -213,8 +212,7 @@ impl MediaExchangeStateController<
     /// `Room.disable_audio` like `Promise`s will be resolved based on this
     /// update.
     pub(in super::super) fn update(&self, is_muted: bool) {
-        let new_mute_state =
-            StableMuteState::from(is_muted);
+        let new_mute_state = StableMuteState::from(is_muted);
         let current_mute_state = self.state.get();
 
         let mute_state_update: MediaExchangeState<

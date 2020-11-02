@@ -539,7 +539,14 @@ impl PeerConnection {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-    ) -> Vec<Rc<dyn TransceiverSide>> {
+    ) -> Vec<
+        Rc<
+            dyn TransceiverSide<
+                MediaExchangeStateTransition,
+                StableMediaExchangeState,
+            >,
+        >,
+    > {
         self.media_connections.get_transceivers_sides(
             kind,
             direction,
@@ -725,7 +732,14 @@ impl PeerConnection {
     pub fn get_transceiver_side_by_id(
         &self,
         track_id: TrackId,
-    ) -> Option<Rc<dyn TransceiverSide>> {
+    ) -> Option<
+        Rc<
+            dyn TransceiverSide<
+                MediaExchangeStateTransition,
+                StableMediaExchangeState,
+            >,
+        >,
+    > {
         self.media_connections.get_transceiver_side_by_id(track_id)
     }
 

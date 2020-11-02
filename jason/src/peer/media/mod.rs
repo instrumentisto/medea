@@ -36,10 +36,26 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
 };
-use crate::peer::media::media_exchange_state::StableMuteState;
+use crate::peer::media::media_exchange_state::{
+    StableMuteState, TransitionMuteState,
+};
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
-pub trait TransceiverSide: Disableable {
+pub trait TransceiverSide<T, S>: Disableable<T, S>
+where
+    T: InTransition<Stable = S>
+        + Clone
+        + Copy
+        + PartialEq
+        + Into<MediaExchangeState<T, S>>
+        + 'static,
+    S: InStable<Transition = T>
+        + Clone
+        + Copy
+        + PartialEq
+        + Into<MediaExchangeState<T, S>>
+        + 'static,
+{
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
 
@@ -58,25 +74,29 @@ pub trait TransceiverSide: Disableable {
 
 /// Default functions for dealing with [`MediaExchangeStateController`] for
 /// objects that use it.
-pub trait Disableable {
+pub trait Disableable<T, S>
+where
+    T: InTransition<Stable = S>
+        + Clone
+        + Copy
+        + PartialEq
+        + Into<MediaExchangeState<T, S>>
+        + 'static,
+    S: InStable<Transition = T>
+        + Clone
+        + Copy
+        + PartialEq
+        + Into<MediaExchangeState<T, S>>
+        + 'static,
+{
     /// Returns reference to the [`MediaExchangeStateController`].
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<
-        MediaExchangeStateController<
-            MediaExchangeStateTransition,
-            StableMediaExchangeState,
-        >,
-    >;
+    ) -> Rc<MediaExchangeStateController<T, S>>;
 
     /// Returns [`MediaExchangeState`] of this [`Disableable`].
     #[inline]
-    fn media_exchange_state(
-        &self,
-    ) -> MediaExchangeState<
-        MediaExchangeStateTransition,
-        StableMediaExchangeState,
-    > {
+    fn media_exchange_state(&self) -> MediaExchangeState<T, S> {
         self.media_exchange_state_controller()
             .media_exchange_state()
     }
@@ -91,7 +111,7 @@ pub trait Disableable {
     #[inline]
     fn media_exchange_state_transition_to(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: S,
     ) -> Result<()> {
         self.media_exchange_state_controller()
             .transition_to(desired_state);
@@ -117,7 +137,7 @@ pub trait Disableable {
     #[inline]
     fn when_media_exchange_state_stable(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: S,
     ) -> LocalBoxFuture<'static, Result<()>> {
         self.media_exchange_state_controller()
             .when_media_exchange_state_stable(desired_state)
@@ -135,20 +155,6 @@ pub trait Disableable {
     fn reset_media_exchange_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
             .reset_transition_timeout()
-    }
-
-    /// Indicates whether media exchange state of the [`Disableable`] is in
-    /// [`MediaExchangeState::Disabled`].
-    #[inline]
-    fn is_disabled(&self) -> bool {
-        self.media_exchange_state_controller().is_disabled()
-    }
-
-    /// Indicates whether media exchange state of the [`Disableable`] is in
-    /// [`MediaExchangeState::Enabled`].
-    #[inline]
-    fn is_enabled(&self) -> bool {
-        self.media_exchange_state_controller().is_enabled()
     }
 }
 
@@ -288,15 +294,38 @@ impl InnerMediaConnections {
         direction: TrackDirection,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Vec<Rc<dyn TransceiverSide>> {
+    ) -> Vec<
+        Rc<
+            dyn TransceiverSide<
+                MediaExchangeStateTransition,
+                StableMediaExchangeState,
+            >,
+        >,
+    > {
         match direction {
             TrackDirection::Send => self
                 .iter_senders_with_kind_and_source_kind(kind, source_kind)
-                .map(|tx| Rc::clone(&tx) as Rc<dyn TransceiverSide>)
+                .map(|tx| {
+                    Rc::clone(&tx)
+                        as Rc<
+                            dyn TransceiverSide<
+                                MediaExchangeStateTransition,
+                                StableMediaExchangeState,
+                            >,
+                        >
+                })
                 .collect(),
             TrackDirection::Recv => self
                 .iter_receivers_with_kind(kind)
-                .map(|rx| Rc::clone(&rx) as Rc<dyn TransceiverSide>)
+                .map(|rx| {
+                    Rc::clone(&rx)
+                        as Rc<
+                            dyn TransceiverSide<
+                                MediaExchangeStateTransition,
+                                StableMediaExchangeState,
+                            >,
+                        >
+                })
                 .collect(),
         }
     }
@@ -349,7 +378,14 @@ impl MediaConnections {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-    ) -> Vec<Rc<dyn TransceiverSide>> {
+    ) -> Vec<
+        Rc<
+            dyn TransceiverSide<
+                MediaExchangeStateTransition,
+                StableMediaExchangeState,
+            >,
+        >,
+    > {
         self.0.borrow().get_transceivers_by_direction_and_kind(
             direction,
             kind,
@@ -494,17 +530,37 @@ impl MediaConnections {
     pub fn get_transceiver_side_by_id(
         &self,
         track_id: TrackId,
-    ) -> Option<Rc<dyn TransceiverSide>> {
+    ) -> Option<
+        Rc<
+            dyn TransceiverSide<
+                MediaExchangeStateTransition,
+                StableMediaExchangeState,
+            >,
+        >,
+    > {
         let inner = self.0.borrow();
         inner
             .senders
             .get(&track_id)
-            .map(|sndr| Rc::clone(&sndr) as Rc<dyn TransceiverSide>)
+            .map(|sndr| {
+                Rc::clone(&sndr)
+                    as Rc<
+                        dyn TransceiverSide<
+                            MediaExchangeStateTransition,
+                            StableMediaExchangeState,
+                        >,
+                    >
+            })
             .or_else(|| {
-                inner
-                    .receivers
-                    .get(&track_id)
-                    .map(|rcvr| Rc::clone(&rcvr) as Rc<dyn TransceiverSide>)
+                inner.receivers.get(&track_id).map(|rcvr| {
+                    Rc::clone(&rcvr)
+                        as Rc<
+                            dyn TransceiverSide<
+                                MediaExchangeStateTransition,
+                                StableMediaExchangeState,
+                            >,
+                        >
+                })
             })
     }
 
@@ -747,18 +803,38 @@ impl MediaConnections {
 
     /// Returns all references to the [`TransceiverSide`]s from this
     /// [`MediaConnections`].
-    fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {
+    fn get_all_transceivers_sides(
+        &self,
+    ) -> Vec<
+        Rc<
+            dyn TransceiverSide<
+                MediaExchangeStateTransition,
+                StableMediaExchangeState,
+            >,
+        >,
+    > {
         let inner = self.0.borrow();
         inner
             .senders
             .values()
-            .map(|s| Rc::clone(s) as Rc<dyn TransceiverSide>)
-            .chain(
-                inner
-                    .receivers
-                    .values()
-                    .map(|r| Rc::clone(&r) as Rc<dyn TransceiverSide>),
-            )
+            .map(|s| {
+                Rc::clone(s)
+                    as Rc<
+                        dyn TransceiverSide<
+                            MediaExchangeStateTransition,
+                            StableMediaExchangeState,
+                        >,
+                    >
+            })
+            .chain(inner.receivers.values().map(|r| {
+                Rc::clone(&r)
+                    as Rc<
+                        dyn TransceiverSide<
+                            MediaExchangeStateTransition,
+                            StableMediaExchangeState,
+                        >,
+                    >
+            }))
             .collect()
     }
 
