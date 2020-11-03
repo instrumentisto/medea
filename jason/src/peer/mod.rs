@@ -45,10 +45,10 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
-        Disableable, MediaConnections, MediaConnectionsError,
-        MediaExchangeState, MediaExchangeStateTransition, Receiver, Sender,
+        Disableable, MediaConnections, MediaConnectionsError, Receiver, Sender,
         StableMediaExchangeState, StableMuteState, TrackDirection,
-        TransceiverSide, TransitionMuteState,
+        TransceiverSide, TransitableState, TransitionMediaExchangeState,
+        TransitionMuteState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -561,14 +561,7 @@ impl PeerConnection {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-    ) -> Vec<
-        Rc<
-            dyn TransceiverSide<
-                MediaExchangeStateTransition,
-                StableMediaExchangeState,
-            >,
-        >,
-    > {
+    ) -> Vec<Rc<dyn TransceiverSide>> {
         self.media_connections.get_transceivers_sides(
             kind,
             direction,
@@ -754,14 +747,7 @@ impl PeerConnection {
     pub fn get_transceiver_side_by_id(
         &self,
         track_id: TrackId,
-    ) -> Option<
-        Rc<
-            dyn TransceiverSide<
-                MediaExchangeStateTransition,
-                StableMediaExchangeState,
-            >,
-        >,
-    > {
+    ) -> Option<Rc<dyn TransceiverSide>> {
         self.media_connections.get_transceiver_side_by_id(track_id)
     }
 

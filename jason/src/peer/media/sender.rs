@@ -21,14 +21,12 @@ use crate::{
 };
 
 use super::{
-    media_exchange_state::{
-        MediaExchangeStateController, StableMediaExchangeState,
-    },
+    transitable_state::{StableMediaExchangeState, TransitableStateController},
     Disableable, MediaConnections, MediaConnectionsError, Result,
 };
-use crate::peer::{
-    media::media_exchange_state::{StableMuteState, TransitionMuteState},
-    MediaExchangeState, MediaExchangeStateTransition,
+use crate::peer::media::transitable_state::{
+    MediaExchangeStateController, MuteState, MuteStateController,
+    StableMuteState,
 };
 use futures::future::LocalBoxFuture;
 
@@ -74,11 +72,11 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let media_exchange_state_controller =
-            MediaExchangeStateController::new(self.media_exchange_state);
+            TransitableStateController::new(self.media_exchange_state);
         let mut media_exchange_state_rx =
             media_exchange_state_controller.on_stabilize();
         let mute_state_controller =
-            MediaExchangeStateController::new(self.mute_state);
+            TransitableStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_controller.on_stabilize();
         let this = Rc::new(Sender {
             peer_id: connections.peer_id,
@@ -142,14 +140,8 @@ pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
-    media_exchange_state: Rc<
-        MediaExchangeStateController<
-            MediaExchangeStateTransition,
-            StableMediaExchangeState,
-        >,
-    >,
-    mute_state:
-        Rc<MediaExchangeStateController<TransitionMuteState, StableMuteState>>,
+    media_exchange_state: Rc<MediaExchangeStateController>,
+    mute_state: Rc<MuteStateController>,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_required: bool,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -307,9 +299,7 @@ impl Sender {
         }
     }
 
-    pub fn mute_state(
-        &self,
-    ) -> MediaExchangeState<TransitionMuteState, StableMuteState> {
+    pub fn mute_state(&self) -> MuteState {
         self.mute_state.media_exchange_state()
     }
 
@@ -326,9 +316,7 @@ impl Sender {
     }
 }
 
-impl TransceiverSide<MediaExchangeStateTransition, StableMediaExchangeState>
-    for Sender
-{
+impl TransceiverSide for Sender {
     fn track_id(&self) -> TrackId {
         self.track_id
     }
@@ -354,18 +342,11 @@ impl TransceiverSide<MediaExchangeStateTransition, StableMediaExchangeState>
     }
 }
 
-impl Disableable<MediaExchangeStateTransition, StableMediaExchangeState>
-    for Sender
-{
+impl Disableable for Sender {
     #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<
-        MediaExchangeStateController<
-            MediaExchangeStateTransition,
-            StableMediaExchangeState,
-        >,
-    > {
+    ) -> Rc<MediaExchangeStateController> {
         self.media_exchange_state.clone()
     }
 

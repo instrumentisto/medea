@@ -11,42 +11,39 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     peer::{
         media::{
-            media_exchange_state::{InStable, InTransition},
+            transitable_state::{
+                InStable, InTransition, StableMuteState, TransitionMuteState,
+            },
             MediaConnectionsError, Result,
         },
-        MediaExchangeStateTransition,
+        TransitionMediaExchangeState,
     },
     utils::{resettable_delay_for, ResettableDelayHandle},
 };
 
-use super::{MediaExchangeState, StableMediaExchangeState};
-use crate::peer::media::media_exchange_state::{
-    StableMuteState, TransitionMuteState,
-};
+use super::{StableMediaExchangeState, TransitableState};
+use crate::peer::media::transitable_state::{MediaExchangeState, MuteState};
+
+pub type MuteStateController =
+    TransitableStateController<StableMuteState, TransitionMuteState>;
+pub type MediaExchangeStateController = TransitableStateController<
+    StableMediaExchangeState,
+    TransitionMediaExchangeState,
+>;
 
 /// Component that manages [`MediaExchangeState`].
-pub struct MediaExchangeStateController<T, S> {
+pub struct TransitableStateController<S, T> {
     /// Actual [`MediaExchangeState`].
-    state: ObservableCell<MediaExchangeState<T, S>>,
+    state: ObservableCell<TransitableState<S, T>>,
 
     /// Timeout of the [`MediaExchangeStateController::state`] transition.
     timeout_handle: RefCell<Option<ResettableDelayHandle>>,
 }
 
-impl<T, S> MediaExchangeStateController<T, S>
+impl<S, T> TransitableStateController<S, T>
 where
-    T: InTransition<Stable = S>
-        + Clone
-        + Copy
-        + PartialEq
-        + Into<MediaExchangeState<T, S>>
-        + 'static,
-    S: InStable<Transition = T>
-        + Clone
-        + Copy
-        + PartialEq
-        + Into<MediaExchangeState<T, S>>
-        + 'static,
+    S: InStable<Transition = T> + Into<TransitableState<S, T>> + 'static,
+    T: InTransition<Stable = S> + Into<TransitableState<S, T>> + 'static,
 {
     #[cfg(not(feature = "mockable"))]
     const TRANSITION_TIMEOUT: Duration = Duration::from_secs(10);
@@ -71,7 +68,7 @@ where
             .subscribe()
             .skip(1)
             .filter_map(|state| async move {
-                if let MediaExchangeState::Stable(s) = state {
+                if let TransitableState::Stable(s) = state {
                     Some(s)
                 } else {
                     None
@@ -91,7 +88,7 @@ where
                 media_exchange_state_changes.next().await
             {
                 if let Some(this) = weak_this.upgrade() {
-                    if let MediaExchangeState::Transition(_) =
+                    if let TransitableState::Transition(_) =
                         media_exchange_state
                     {
                         let weak_this = Rc::downgrade(&this);
@@ -144,7 +141,7 @@ where
     }
 
     /// Returns current [`MediaExchangeStateController::state`].
-    pub fn media_exchange_state(&self) -> MediaExchangeState<T, S> {
+    pub fn media_exchange_state(&self) -> TransitableState<S, T> {
         self.state.get()
     }
 
@@ -185,8 +182,8 @@ where
         async move {
             while let Some(state) = media_exchange_states.next().await {
                 match state {
-                    MediaExchangeState::Transition(_) => continue,
-                    MediaExchangeState::Stable(s) => {
+                    TransitableState::Transition(_) => continue,
+                    TransitableState::Stable(s) => {
                         return if s == desired_state {
                             Ok(())
                         } else {
@@ -204,7 +201,7 @@ where
     }
 }
 
-impl MediaExchangeStateController<TransitionMuteState, StableMuteState> {
+impl MuteStateController {
     /// Updates [`MediaExchangeStateController::state`].
     ///
     /// Real disable/enable __wouldn't__ be performed on this update.
@@ -215,12 +212,9 @@ impl MediaExchangeStateController<TransitionMuteState, StableMuteState> {
         let new_mute_state = StableMuteState::from(is_muted);
         let current_mute_state = self.state.get();
 
-        let mute_state_update: MediaExchangeState<
-            TransitionMuteState,
-            StableMuteState,
-        > = match current_mute_state {
-            MediaExchangeState::Stable(_) => new_mute_state.into(),
-            MediaExchangeState::Transition(t) => {
+        let mute_state_update: MuteState = match current_mute_state {
+            TransitableState::Stable(_) => new_mute_state.into(),
+            TransitableState::Transition(t) => {
                 if t.intended() == new_mute_state {
                     new_mute_state.into()
                 } else {
@@ -245,12 +239,7 @@ impl MediaExchangeStateController<TransitionMuteState, StableMuteState> {
     }
 }
 
-impl
-    MediaExchangeStateController<
-        MediaExchangeStateTransition,
-        StableMediaExchangeState,
-    >
-{
+impl MediaExchangeStateController {
     /// Updates [`MediaExchangeStateController::state`].
     ///
     /// Real disable/enable __wouldn't__ be performed on this update.
@@ -262,19 +251,17 @@ impl
             StableMediaExchangeState::from(is_disabled);
         let current_media_exchange_state = self.state.get();
 
-        let media_exchange_state_update: MediaExchangeState<
-            MediaExchangeStateTransition,
-            StableMediaExchangeState,
-        > = match current_media_exchange_state {
-            MediaExchangeState::Stable(_) => new_media_exchange_state.into(),
-            MediaExchangeState::Transition(t) => {
-                if t.intended() == new_media_exchange_state {
-                    new_media_exchange_state.into()
-                } else {
-                    t.set_inner(new_media_exchange_state).into()
+        let media_exchange_state_update: MediaExchangeState =
+            match current_media_exchange_state {
+                TransitableState::Stable(_) => new_media_exchange_state.into(),
+                TransitableState::Transition(t) => {
+                    if t.intended() == new_media_exchange_state {
+                        new_media_exchange_state.into()
+                    } else {
+                        t.set_inner(new_media_exchange_state).into()
+                    }
                 }
-            }
-        };
+            };
 
         self.state.set(media_exchange_state_update);
     }

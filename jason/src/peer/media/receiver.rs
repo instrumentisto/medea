@@ -15,15 +15,15 @@ use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         media::{
-            media_exchange_state::MediaExchangeStateController, TransceiverSide,
+            transitable_state::TransitableStateController, TransceiverSide,
         },
         transceiver::Transceiver,
         Disableable, MediaConnections, PeerEvent, TransceiverDirection,
     },
 };
 
-use super::media_exchange_state::StableMediaExchangeState;
-use crate::peer::MediaExchangeStateTransition;
+use super::transitable_state::StableMediaExchangeState;
+use crate::peer::media::transitable_state::MediaExchangeStateController;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -39,12 +39,7 @@ pub struct Receiver {
     track: RefCell<Option<MediaStreamTrack>>,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_track_notified: Cell<bool>,
-    media_exchange_state_controller: Rc<
-        MediaExchangeStateController<
-            MediaExchangeStateTransition,
-            StableMediaExchangeState,
-        >,
-    >,
+    media_exchange_state_controller: Rc<MediaExchangeStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
@@ -112,7 +107,7 @@ impl Receiver {
                 StableMediaExchangeState::from(!enabled),
             ),
             is_track_notified: Cell::new(false),
-            media_exchange_state_controller: MediaExchangeStateController::new(
+            media_exchange_state_controller: TransitableStateController::new(
                 StableMediaExchangeState::from(!enabled),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
@@ -273,25 +268,16 @@ impl Receiver {
     }
 }
 
-impl Disableable<MediaExchangeStateTransition, StableMediaExchangeState>
-    for Receiver
-{
+impl Disableable for Receiver {
     #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<
-        MediaExchangeStateController<
-            MediaExchangeStateTransition,
-            StableMediaExchangeState,
-        >,
-    > {
+    ) -> Rc<MediaExchangeStateController> {
         self.media_exchange_state_controller.clone()
     }
 }
 
-impl TransceiverSide<MediaExchangeStateTransition, StableMediaExchangeState>
-    for Receiver
-{
+impl TransceiverSide for Receiver {
     #[inline]
     fn track_id(&self) -> TrackId {
         self.track_id

@@ -28,10 +28,10 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        InTransition, MediaConnectionsError, MediaExchangeState,
-        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, StableMediaExchangeState, StableMuteState, TrackDirection,
-        TransceiverSide,
+        InTransition, MediaConnectionsError, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
+        StableMediaExchangeState, StableMuteState, TrackDirection,
+        TransceiverSide, TransitableState,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -285,14 +285,12 @@ impl RoomHandle {
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), JasonError> {
-        log::debug!("Set track muted");
         let inner = upgrade_or_detached!(self.0, JasonError)?;
         while !inner.is_all_peers_in_mute_state(
             kind,
             source_kind,
             StableMuteState::from(muted),
         ) {
-            log::debug!("ASDSAD");
             inner
                 .toggle_mute(muted, kind, source_kind)
                 .await
@@ -824,7 +822,7 @@ impl InnerRoom {
                     peer.get_senders(kind, source_kind)
                         .into_iter()
                         .filter_map(|trnscvr| {
-                            use MediaExchangeState as S;
+                            use TransitableState as S;
                             match trnscvr.mute_state() {
                                 S::Transition(transition) => Some((
                                     trnscvr,
@@ -900,8 +898,8 @@ impl InnerRoom {
                     .map(|transceiver| {
                         let backup_stable_media_exchange_state =
                             match transceiver.media_exchange_state() {
-                                MediaExchangeState::Stable(stable) => stable,
-                                MediaExchangeState::Transition(transition) => {
+                                TransitableState::Stable(stable) => stable,
+                                TransitableState::Transition(transition) => {
                                     transition.intended()
                                 }
                             };
@@ -970,7 +968,7 @@ impl InnerRoom {
                         )
                         .filter_map(
                             |(trnscvr, desired_media_exchange_state)| {
-                                use MediaExchangeState as S;
+                                use TransitableState as S;
                                 match trnscvr.media_exchange_state() {
                                     S::Transition(transition) => Some((
                                         trnscvr,
