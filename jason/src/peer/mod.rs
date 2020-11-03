@@ -634,9 +634,7 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if self.is_local_stream_update_needed(&kinds)
-            && maybe_update_local_media
-        {
+        if maybe_update_local_media {
             let _ = self.update_local_stream(&kinds).await;
         }
 
@@ -795,6 +793,12 @@ impl PeerConnection {
         self.media_connections.get_transceiver_side_by_id(track_id)
     }
 
+    /// Lookups [`Sender`] by provided [`TrackId`].
+    #[cfg(feature = "mockable")]
+    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
+        self.media_connections.get_sender_by_id(id)
+    }
+
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
     ///
     /// # Errors
@@ -926,9 +930,7 @@ impl PeerConnection {
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if self.is_local_stream_update_needed(&kinds)
-            && maybe_update_local_media
-        {
+        if maybe_update_local_media {
             let _ = self.update_local_stream(&kinds).await;
         }
 

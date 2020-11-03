@@ -184,7 +184,8 @@ impl Sender {
             if let (MuteState::Stable(before), MuteState::Stable(after)) =
                 (mute_state_before, self.mute_state.mute_state())
             {
-                want_media_update = before != after;
+                want_media_update =
+                    before != after && after == StableMuteState::Unmuted;
             }
 
             if is_muted {
