@@ -28,9 +28,10 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MediaExchangeState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
-        StableMediaExchangeState, TrackDirection,
+        InTransition, MediaConnectionsError, MediaExchangeState,
+        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        RtcStats, StableMediaExchangeState, StableMuteState, TrackDirection,
+        TransceiverSide,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -277,6 +278,29 @@ impl RoomHandle {
         }
         Ok(())
     }
+
+    async fn set_track_muted(
+        &self,
+        muted: bool,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), JasonError> {
+        log::debug!("Set track muted");
+        let inner = upgrade_or_detached!(self.0, JasonError)?;
+        while !inner.is_all_peers_in_mute_state(
+            kind,
+            source_kind,
+            StableMuteState::from(muted),
+        ) {
+            log::debug!("ASDSAD");
+            inner
+                .toggle_mute(muted, kind, source_kind)
+                .await
+                .map_err::<Traced<RoomError>, _>(|e| tracerr::new!(e))?;
+        }
+
+        Ok(())
+    }
 }
 
 #[wasm_bindgen]
@@ -369,6 +393,54 @@ impl RoomHandle {
                 .set_local_media_settings(settings)
                 .await
                 .map_err(JasonError::from)?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    pub fn mute_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_muted(true, MediaKind::Audio, None).await?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    pub fn unmute_audio(&self) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_muted(false, MediaKind::Audio, None).await?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    pub fn mute_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_muted(
+                true,
+                MediaKind::Video,
+                source_kind.map(Into::into),
+            )
+            .await?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    pub fn unmute_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_muted(
+                false,
+                MediaKind::Video,
+                source_kind.map(Into::into),
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -734,6 +806,70 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
+    async fn toggle_mute(
+        &self,
+        is_muted: bool,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), Traced<RoomError>> {
+        let desired_state = StableMuteState::from(is_muted);
+        future::try_join_all(
+            self.peers
+                .get_all()
+                .into_iter()
+                .map(|peer| {
+                    let peer_id = peer.id();
+                    let mut transitions_futs = Vec::new();
+                    let mut tracks_patches = Vec::new();
+                    peer.get_senders(kind, source_kind)
+                        .into_iter()
+                        .filter_map(|trnscvr| {
+                            use MediaExchangeState as S;
+                            match trnscvr.mute_state() {
+                                S::Transition(transition) => Some((
+                                    trnscvr,
+                                    transition.intended() != desired_state,
+                                )),
+                                S::Stable(stable) => {
+                                    if stable == desired_state {
+                                        None
+                                    } else {
+                                        Some((trnscvr, true))
+                                    }
+                                }
+                            }
+                        })
+                        .for_each(|(trnscvr, should_be_patched)| {
+                            trnscvr.mute_state_transition_to(desired_state);
+                            transitions_futs.push(
+                                trnscvr.when_mute_state_stable(desired_state),
+                            );
+                            if should_be_patched {
+                                tracks_patches.push(TrackPatchCommand {
+                                    id: trnscvr.track_id(),
+                                    is_muted: Some(
+                                        desired_state == StableMuteState::Muted,
+                                    ),
+                                    is_disabled: None,
+                                });
+                            }
+                        });
+                    if !tracks_patches.is_empty() {
+                        self.rpc.send_command(Command::UpdateTracks {
+                            peer_id,
+                            tracks_patches,
+                        });
+                    }
+
+                    future::try_join_all(transitions_futs)
+                })
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
+        Ok(())
+    }
+
     /// Toggles [`TransceiverSide`]s [`MediaExchangeState`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
@@ -926,6 +1062,21 @@ impl InnerRoom {
                     source_kind,
                     media_exchange_state,
                 )
+            })
+            .is_none()
+    }
+
+    pub fn is_all_peers_in_mute_state(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+        mute_state: StableMuteState,
+    ) -> bool {
+        self.peers
+            .get_all()
+            .into_iter()
+            .find(|p| {
+                !p.is_all_senders_in_mute_state(kind, source_kind, mute_state)
             })
             .is_none()
     }

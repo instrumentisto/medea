@@ -32,12 +32,10 @@ pub use self::{
     media_exchange_state::{
         InStable, InTransition, MediaExchangeState,
         MediaExchangeStateTransition, StableMediaExchangeState,
+        StableMuteState, TransitionMuteState,
     },
     receiver::Receiver,
     sender::Sender,
-};
-use crate::peer::media::media_exchange_state::{
-    StableMuteState, TransitionMuteState,
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
@@ -415,6 +413,26 @@ impl MediaConnections {
             }
             if transceiver.media_exchange_state() != media_exchange_state.into()
             {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn is_all_senders_in_mute_state(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+        mute_state: StableMuteState,
+    ) -> bool {
+        let senders = self.get_senders(kind, source_kind);
+
+        log::debug!("{}", senders.len());
+        for sender in senders {
+            log::debug!("One sender");
+            if sender.mute_state() != mute_state.into() {
+                log::debug!("Return false");
                 return false;
             }
         }
@@ -835,6 +853,21 @@ impl MediaConnections {
                         >,
                     >
             }))
+            .collect()
+    }
+
+    pub fn get_senders(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .filter(|s| s.kind() == kind)
+            .filter(|s| source_kind.map_or(true, |k| k == s.source_kind()))
+            .cloned()
             .collect()
     }
 

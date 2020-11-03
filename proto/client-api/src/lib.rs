@@ -558,6 +558,10 @@ impl TrackPatchEvent {
         if let Some(is_disabled_individual) = another.is_disabled_individual {
             self.is_disabled_individual = Some(is_disabled_individual);
         }
+
+        if let Some(is_muted) = another.is_muted {
+            self.is_muted = Some(is_muted);
+        }
     }
 }
 

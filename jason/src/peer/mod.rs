@@ -47,14 +47,15 @@ pub use self::{
     media::{
         Disableable, MediaConnections, MediaConnectionsError,
         MediaExchangeState, MediaExchangeStateTransition, Receiver, Sender,
-        StableMediaExchangeState, TrackDirection, TransceiverSide,
+        StableMediaExchangeState, StableMuteState, TrackDirection,
+        TransceiverSide, TransitionMuteState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::TransceiverDirection,
 };
-use crate::peer::media::{InStable, InTransition};
+pub use crate::peer::media::{InStable, InTransition};
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -403,6 +404,14 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
+    pub fn get_senders(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Vec<Rc<Sender>> {
+        self.media_connections.get_senders(kind, source_kind)
+    }
+
     /// Returns `true` if all [`TransceiverSide`]s with a provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in the
     /// provided [`StableMediaExchangeState`].
@@ -421,6 +430,19 @@ impl PeerConnection {
                 source_kind,
                 media_exchange_state,
             )
+    }
+
+    pub fn is_all_senders_in_mute_state(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+        mute_state: StableMuteState,
+    ) -> bool {
+        self.media_connections.is_all_senders_in_mute_state(
+            kind,
+            source_kind,
+            mute_state,
+        )
     }
 
     /// Returns [`PeerId`] of this [`PeerConnection`].
