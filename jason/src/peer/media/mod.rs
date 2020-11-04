@@ -291,9 +291,6 @@ struct InnerMediaConnections {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    send_device_video_mute_state: StableMuteState,
-    send_device_audio_mute_state: StableMuteState,
-
     /// [`TrackId`] to its [`Sender`].
     senders: HashMap<TrackId, Rc<Sender>>,
 
@@ -382,8 +379,6 @@ impl MediaConnections {
             peer_id,
             peer,
             peer_events_sender,
-            send_device_audio_mute_state: StableMuteState::Unmuted,
-            send_device_video_mute_state: StableMuteState::Unmuted,
             senders: HashMap::new(),
             receivers: HashMap::new(),
         }))
@@ -611,15 +606,17 @@ impl MediaConnections {
                         } else {
                             StableMediaExchangeState::Disabled
                         };
-                    use medea_client_api_proto::MediaType;
-                    let mute_state = match &track.media_type {
-                        MediaType::Audio(_) => {
-                            self.0.borrow().send_device_audio_mute_state
-                        }
-                        MediaType::Video(_) => {
-                            self.0.borrow().send_device_video_mute_state
-                        }
-                    };
+                    let mute_state =
+                        if !send_constraints.is_muted(&track.media_type) {
+                            StableMuteState::Unmuted
+                        } else if is_required {
+                            // TODO: is it needed??
+                            return Err(tracerr::new!(
+                            MediaConnectionsError::CannotDisableRequiredSender
+                        ));
+                        } else {
+                            StableMuteState::Muted
+                        };
                     let sndr = SenderBuilder {
                         media_connections: self,
                         track_id: track.id,

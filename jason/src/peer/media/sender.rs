@@ -208,6 +208,11 @@ impl Sender {
             }
         }
 
+        new_track.set_enabled(
+            self.mute_state.media_exchange_state().cancel_transition()
+                == MuteState::Stable(StableMuteState::Unmuted),
+        );
+
         self.transceiver
             .set_send_track(Some(new_track))
             .await

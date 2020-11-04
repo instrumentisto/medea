@@ -18,7 +18,11 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{media::MediaKind, utils::get_property_by_name};
+use crate::{
+    media::MediaKind,
+    peer::{StableMediaExchangeState, StableMuteState, TrackMediaState},
+    utils::get_property_by_name,
+};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 #[derive(Clone, Debug, Default)]
@@ -107,7 +111,7 @@ impl LocalTracksConstraints {
     #[inline]
     pub fn set_enabled(
         &self,
-        enabled: bool,
+        enabled: TrackMediaState,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
@@ -121,6 +125,11 @@ impl LocalTracksConstraints {
     #[inline]
     pub fn is_enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow().is_enabled(kind)
+    }
+
+    #[inline]
+    pub fn is_muted(&self, kind: &MediaType) -> bool {
+        self.0.borrow().is_muted(kind)
     }
 
     /// Indicates whether provided [`MediaKind`] and [`MediaSourceKind`] are
@@ -146,6 +155,8 @@ struct AudioMediaTracksSettings {
     /// Indicator whether audio is enabled and this constraints should be
     /// injected into `Peer`.
     is_enabled: bool,
+
+    is_muted: bool,
 }
 
 impl Default for AudioMediaTracksSettings {
@@ -154,6 +165,7 @@ impl Default for AudioMediaTracksSettings {
         Self {
             constraints: AudioTrackConstraints::default(),
             is_enabled: true,
+            is_muted: false,
         }
     }
 }
@@ -184,6 +196,8 @@ pub struct VideoTrackConstraints<C> {
     /// actions by [`Room`]. This flag can't be changed by
     /// [`MediaStreamSettings`] updating.
     is_enabled: bool,
+
+    is_muted: bool,
 }
 
 impl<C: Default> Default for VideoTrackConstraints<C> {
@@ -191,6 +205,7 @@ impl<C: Default> Default for VideoTrackConstraints<C> {
         Self {
             constraints: Some(C::default()),
             is_enabled: true,
+            is_muted: false,
         }
     }
 }
@@ -288,14 +303,17 @@ impl MediaStreamSettings {
             audio: AudioMediaTracksSettings {
                 constraints: AudioTrackConstraints::default(),
                 is_enabled: false,
+                is_muted: false,
             },
             display_video: VideoTrackConstraints {
                 is_enabled: true,
                 constraints: None,
+                is_muted: false,
             },
             device_video: VideoTrackConstraints {
                 is_enabled: true,
                 constraints: None,
+                is_muted: false,
             },
         }
     }
@@ -375,16 +393,57 @@ impl MediaStreamSettings {
     #[inline]
     pub fn set_track_enabled(
         &mut self,
-        enabled: bool,
+        enabled: TrackMediaState,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
         match kind {
-            MediaKind::Audio => {
-                self.toggle_publish_audio(enabled);
+            MediaKind::Audio => match enabled {
+                TrackMediaState::Mute(muted) => {
+                    self.toggle_audio_mute(muted == StableMuteState::Muted);
+                }
+                TrackMediaState::MediaExchange(media_exchange) => {
+                    self.toggle_publish_audio(
+                        media_exchange == StableMediaExchangeState::Enabled,
+                    );
+                }
+            },
+            MediaKind::Video => match enabled {
+                TrackMediaState::Mute(muted) => {
+                    self.toggle_video_mute(
+                        muted == StableMuteState::Muted,
+                        source_kind,
+                    );
+                }
+                TrackMediaState::MediaExchange(media_exchange) => {
+                    self.toggle_publish_video(
+                        media_exchange == StableMediaExchangeState::Enabled,
+                        source_kind,
+                    );
+                }
+            },
+        }
+    }
+
+    fn toggle_audio_mute(&mut self, is_muted: bool) {
+        self.audio.is_muted = is_muted;
+    }
+
+    fn toggle_video_mute(
+        &mut self,
+        is_muted: bool,
+        source_kind: Option<MediaSourceKind>,
+    ) {
+        match source_kind {
+            None => {
+                self.display_video.is_muted = is_muted;
+                self.device_video.is_muted = is_muted;
             }
-            MediaKind::Video => {
-                self.toggle_publish_video(enabled, source_kind);
+            Some(MediaSourceKind::Device) => {
+                self.device_video.is_muted = is_muted;
+            }
+            Some(MediaSourceKind::Display) => {
+                self.display_video.is_muted = is_muted;
             }
         }
     }
@@ -449,6 +508,30 @@ impl MediaStreamSettings {
             MediaType::Audio(_) => {
                 self.is_track_enabled(MediaKind::Audio, MediaSourceKind::Device)
             }
+        }
+    }
+
+    #[inline]
+    pub fn is_muted(&self, kind: &MediaType) -> bool {
+        match kind {
+            MediaType::Video(video) => {
+                self.is_track_muted(MediaKind::Video, video.source_kind)
+            }
+            MediaType::Audio(_) => {
+                self.is_track_muted(MediaKind::Audio, MediaSourceKind::Device)
+            }
+        }
+    }
+
+    fn is_track_muted(&self, kind: MediaKind, source: MediaSourceKind) -> bool {
+        match (kind, source) {
+            (MediaKind::Video, MediaSourceKind::Device) => {
+                self.device_video.is_muted
+            }
+            (MediaKind::Video, MediaSourceKind::Display) => {
+                self.display_video.is_muted
+            }
+            (MediaKind::Audio, _) => self.audio.is_muted,
         }
     }
 

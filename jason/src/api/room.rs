@@ -805,20 +805,13 @@ impl InnerRoom {
                         kind,
                     );
                 }
-                _ => (),
+                _ => {
+                    unimplemented!("Receivers muting is fully implemented")
+                },
             }
         } else {
-            // TODO: MuteState variant
-            match enabled {
-                TrackMediaState::MediaExchange(media_exchange) => {
-                    self.send_constraints.set_enabled(
-                        media_exchange == StableMediaExchangeState::Enabled,
-                        kind,
-                        source_kind,
-                    );
-                }
-                _ => (),
-            }
+            self.send_constraints
+                .set_enabled(enabled, kind, source_kind);
         }
     }
 
