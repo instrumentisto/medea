@@ -233,7 +233,7 @@ impl InnerMediaManager {
                 .filter(|track| {
                     caps.unconstrain_if_satisfies_video(track.as_ref())
                 })
-                .map(|track| track.deep_clone())
+                .map(|track| track.deep_clone()),
         );
 
         tracks

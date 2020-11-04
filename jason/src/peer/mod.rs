@@ -47,8 +47,8 @@ pub use self::{
     media::{
         Disableable, MediaConnections, MediaConnectionsError, Receiver, Sender,
         StableMediaExchangeState, StableMuteState, TrackDirection,
-        TransceiverSide, TransitableState, TransitionMediaExchangeState,
-        TransitionMuteState,
+        TrackMediaState, TransceiverSide, TransitableState,
+        TransitionMediaExchangeState, TransitionMuteState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -421,7 +421,7 @@ impl PeerConnection {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        media_exchange_state: StableMediaExchangeState,
+        media_exchange_state: TrackMediaState,
     ) -> bool {
         self.media_connections
             .is_all_tracks_in_media_exchange_state(

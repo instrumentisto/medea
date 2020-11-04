@@ -6,6 +6,15 @@ pub enum StableMuteState {
     Unmuted,
 }
 
+impl StableMuteState {
+    pub fn inverse(self) -> Self {
+        match self {
+            Self::Muted => Self::Unmuted,
+            Self::Unmuted => Self::Muted
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitionMuteState {
     Muting(StableMuteState),

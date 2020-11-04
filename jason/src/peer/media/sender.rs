@@ -24,9 +24,12 @@ use super::{
     transitable_state::{StableMediaExchangeState, TransitableStateController},
     Disableable, MediaConnections, MediaConnectionsError, Result,
 };
-use crate::peer::media::transitable_state::{
-    MediaExchangeStateController, MuteState, MuteStateController,
-    StableMuteState,
+use crate::peer::{
+    media::transitable_state::{
+        MediaExchangeStateController, MuteState, MuteStateController,
+        StableMuteState, TrackMediaState,
+    },
+    TransitionMediaExchangeState, TransitionMuteState,
 };
 use futures::future::LocalBoxFuture;
 
@@ -350,6 +353,11 @@ impl Disableable for Sender {
         self.media_exchange_state.clone()
     }
 
+    #[inline]
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        self.mute_state.clone()
+    }
+
     /// Sets current [`MediaExchangeState`] to
     /// [`MediaExchangeState::Transition`].
     ///
@@ -359,14 +367,23 @@ impl Disableable for Sender {
     /// required for the call and can't be disabled.
     fn media_exchange_state_transition_to(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: TrackMediaState,
     ) -> Result<()> {
         if self.is_required {
             Err(tracerr::new!(
                 MediaConnectionsError::CannotDisableRequiredSender
             ))
         } else {
-            self.media_exchange_state.transition_to(desired_state);
+            // TODO(evdokimovs): is_required важен для mute_state??
+            match desired_state {
+                TrackMediaState::MediaExchange(desired_state) => {
+                    self.media_exchange_state_controller()
+                        .transition_to(desired_state);
+                }
+                TrackMediaState::Mute(desired_state) => {
+                    self.mute_state_controller().transition_to(desired_state);
+                }
+            }
             Ok(())
         }
     }

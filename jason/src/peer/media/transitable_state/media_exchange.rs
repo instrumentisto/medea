@@ -14,6 +14,15 @@ pub enum StableMediaExchangeState {
     Disabled,
 }
 
+impl StableMediaExchangeState {
+    pub fn inverse(self) -> Self {
+        match self {
+            Self::Enabled => Self::Disabled,
+            Self::Disabled => Self::Enabled
+        }
+    }
+}
+
 impl InStable for StableMediaExchangeState {
     type Transition = TransitionMediaExchangeState;
 

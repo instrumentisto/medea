@@ -14,10 +14,43 @@ pub use self::{
     media_exchange::{StableMediaExchangeState, TransitionMediaExchangeState},
     mute::{StableMuteState, TransitionMuteState},
 };
+use medea_client_api_proto::{TrackId, TrackPatchCommand};
 
 pub type MediaExchangeState =
     TransitableState<StableMediaExchangeState, TransitionMediaExchangeState>;
 pub type MuteState = TransitableState<StableMuteState, TransitionMuteState>;
+
+#[derive(Clone, Copy, Debug)]
+pub enum TrackMediaState {
+    Mute(StableMuteState),
+    MediaExchange(StableMediaExchangeState),
+}
+
+impl TrackMediaState {
+    pub fn generate_track_patch(self, track_id: TrackId) -> TrackPatchCommand {
+        match self {
+            Self::Mute(mute) => TrackPatchCommand {
+                id: track_id,
+                is_muted: Some(mute == StableMuteState::Muted),
+                is_disabled: None,
+            },
+            Self::MediaExchange(media_exchange) => TrackPatchCommand {
+                id: track_id,
+                is_disabled: Some(
+                    media_exchange == StableMediaExchangeState::Disabled,
+                ),
+                is_muted: None,
+            },
+        }
+    }
+
+    pub fn inverse(self) -> Self {
+        match self {
+            Self::Mute(mute) => Self::Mute(mute.inverse()),
+            Self::MediaExchange(media_exchange) => Self::MediaExchange(media_exchange.inverse()),
+        }
+    }
+}
 
 /// All media exchange states in which [`Disableable`] can be.
 ///

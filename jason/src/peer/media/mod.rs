@@ -6,7 +6,7 @@ mod transitable_state;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
@@ -37,8 +37,12 @@ pub use self::{
     sender::Sender,
     transitable_state::{
         InStable, InTransition, StableMediaExchangeState, StableMuteState,
-        TransitableState, TransitionMediaExchangeState, TransitionMuteState,
+        TrackMediaState, TransitableState, TransitionMediaExchangeState,
+        TransitionMuteState,
     },
+};
+use crate::peer::media::transitable_state::{
+    MuteState, TransitableStateController,
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
@@ -65,13 +69,26 @@ pub trait Disableable {
     /// Returns reference to the [`MediaExchangeStateController`].
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController>;
+    ) -> Rc<
+        TransitableStateController<
+            StableMediaExchangeState,
+            TransitionMediaExchangeState,
+        >,
+    >;
+
+    fn mute_state_controller(
+        &self,
+    ) -> Rc<TransitableStateController<StableMuteState, TransitionMuteState>>;
 
     /// Returns [`MediaExchangeState`] of this [`Disableable`].
     #[inline]
     fn media_exchange_state(&self) -> MediaExchangeState {
         self.media_exchange_state_controller()
             .media_exchange_state()
+    }
+
+    fn mute_state(&self) -> MuteState {
+        self.mute_state_controller().media_exchange_state()
     }
 
     /// Sets current [`MediaExchangeState`] to
@@ -84,18 +101,65 @@ pub trait Disableable {
     #[inline]
     fn media_exchange_state_transition_to(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: TrackMediaState,
     ) -> Result<()> {
-        self.media_exchange_state_controller()
-            .transition_to(desired_state);
+        match desired_state {
+            TrackMediaState::MediaExchange(desired_state) => {
+                self.media_exchange_state_controller()
+                    .transition_to(desired_state);
+            }
+            TrackMediaState::Mute(desired_state) => {
+                self.mute_state_controller().transition_to(desired_state);
+            }
+        }
 
         Ok(())
     }
 
-    /// Cancels [`MediaExchangeState`] transition.
-    #[inline]
-    fn cancel_transition(&self) {
-        self.media_exchange_state_controller().cancel_transition()
+    fn is_subscription_needed(&self, desired_state: TrackMediaState) -> bool {
+        match desired_state {
+            TrackMediaState::MediaExchange(media_exchange) => {
+                let current = self.media_exchange_state();
+                match current {
+                    MediaExchangeState::Transition(_) => true,
+                    MediaExchangeState::Stable(stable) => {
+                        stable != media_exchange
+                    }
+                }
+            }
+            TrackMediaState::Mute(mute_state) => {
+                let current = self.mute_state();
+                match current {
+                    MuteState::Transition(_) => true,
+                    MuteState::Stable(stable) => stable != mute_state,
+                }
+            }
+        }
+    }
+
+    fn is_patch_needed(&self, desired_state: TrackMediaState) -> bool {
+        match desired_state {
+            TrackMediaState::MediaExchange(media_exchange) => {
+                let current = self.media_exchange_state();
+                match current {
+                    MediaExchangeState::Stable(stable) => {
+                        stable != media_exchange
+                    }
+                    MediaExchangeState::Transition(transition) => {
+                        transition.intended() != media_exchange
+                    }
+                }
+            }
+            TrackMediaState::Mute(mute_state) => {
+                let current = self.mute_state();
+                match current {
+                    MuteState::Stable(stable) => stable != mute_state,
+                    MuteState::Transition(transition) => {
+                        transition.intended() != mute_state
+                    }
+                }
+            }
+        }
     }
 
     /// Returns [`Future`] which will be resolved when [`MediaExchangeState`] of
@@ -110,24 +174,32 @@ pub trait Disableable {
     #[inline]
     fn when_media_exchange_state_stable(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: TrackMediaState,
     ) -> LocalBoxFuture<'static, Result<()>> {
-        self.media_exchange_state_controller()
-            .when_media_exchange_state_stable(desired_state)
+        match desired_state {
+            TrackMediaState::Mute(desired_state) => self
+                .mute_state_controller()
+                .when_media_exchange_state_stable(desired_state),
+            TrackMediaState::MediaExchange(desired_state) => self
+                .media_exchange_state_controller()
+                .when_media_exchange_state_stable(desired_state),
+        }
     }
 
     /// Stops state transition timer of this [`Disableable`].
     #[inline]
     fn stop_media_exchange_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
-            .stop_transition_timeout()
+            .stop_transition_timeout();
+        self.mute_state_controller().stop_transition_timeout();
     }
 
     /// Resets state transition timer of this [`Disableable`].
     #[inline]
     fn reset_media_exchange_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
-            .reset_transition_timeout()
+            .reset_transition_timeout();
+        self.mute_state_controller().reset_transition_timeout();
     }
 }
 
@@ -344,7 +416,7 @@ impl MediaConnections {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        media_exchange_state: StableMediaExchangeState,
+        media_exchange_state: TrackMediaState,
     ) -> bool {
         let transceivers =
             self.0.borrow().get_transceivers_by_direction_and_kind(
@@ -356,8 +428,16 @@ impl MediaConnections {
             if !transceiver.is_transitable() {
                 continue;
             }
-            if transceiver.media_exchange_state() != media_exchange_state.into()
-            {
+
+            let is_not_in_state = match media_exchange_state {
+                TrackMediaState::Mute(mute_state) => {
+                    transceiver.mute_state() != mute_state.into()
+                }
+                TrackMediaState::MediaExchange(media_exchange) => {
+                    transceiver.media_exchange_state() != media_exchange.into()
+                }
+            };
+            if is_not_in_state {
                 return false;
             }
         }

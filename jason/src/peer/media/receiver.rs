@@ -23,7 +23,10 @@ use crate::{
 };
 
 use super::transitable_state::StableMediaExchangeState;
-use crate::peer::media::transitable_state::MediaExchangeStateController;
+use crate::peer::{
+    media::transitable_state::MediaExchangeStateController, StableMuteState,
+    TransitionMediaExchangeState, TransitionMuteState,
+};
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -269,11 +272,22 @@ impl Receiver {
 }
 
 impl Disableable for Receiver {
-    #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController> {
+    ) -> Rc<
+        TransitableStateController<
+            StableMediaExchangeState,
+            TransitionMediaExchangeState,
+        >,
+    > {
         self.media_exchange_state_controller.clone()
+    }
+
+    fn mute_state_controller(
+        &self,
+    ) -> Rc<TransitableStateController<StableMuteState, TransitionMuteState>>
+    {
+        unimplemented!()
     }
 }
 

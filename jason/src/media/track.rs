@@ -2,8 +2,10 @@
 //!
 //! [1]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
 
-use std::rc::{Rc, Weak};
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use futures::StreamExt;
 use medea_client_api_proto::MediaSourceKind;
@@ -69,7 +71,8 @@ impl TracksRepo {
     }
 
     fn check_enabled(&self) {
-        self.root_track.set_enabled(self.tracks.iter().any(|t| t.enabled()));
+        self.root_track
+            .set_enabled(self.tracks.iter().any(|t| t.enabled()));
     }
 }
 
@@ -127,12 +130,17 @@ impl MediaStreamTrack {
         SysMediaStreamTrack: From<T>,
     {
         let track = SysMediaStreamTrack::from(track);
-        let tracks = Rc::new(RefCell::new(TracksRepo::new(Clone::clone(&track))));
+        let tracks =
+            Rc::new(RefCell::new(TracksRepo::new(Clone::clone(&track))));
         let track = tracks.borrow_mut().new_track_instance();
         Self::inner_new(tracks, track, media_source_kind)
     }
 
-    fn inner_new(tracks: Rc<RefCell<TracksRepo>>, track: SysMediaStreamTrack, media_source_kind: MediaSourceKind) -> Self {
+    fn inner_new(
+        tracks: Rc<RefCell<TracksRepo>>,
+        track: SysMediaStreamTrack,
+        media_source_kind: MediaSourceKind,
+    ) -> Self {
         let kind = match track.kind().as_ref() {
             "audio" => MediaKind::Audio,
             "video" => MediaKind::Video,
@@ -155,7 +163,7 @@ impl MediaStreamTrack {
             let weak_inner = Rc::downgrade(&track.0);
             async move {
                 while let Some(enabled) =
-                track_enabled_state_changes.next().await
+                    track_enabled_state_changes.next().await
                 {
                     if let Some(track) = weak_inner.upgrade() {
                         if enabled {
@@ -221,13 +229,21 @@ impl MediaStreamTrack {
     pub fn deep_clone(&self) -> Self {
         let new_track = self.0.tracks.borrow_mut().new_track_instance();
 
-        Self::inner_new(self.0.tracks.clone(), new_track, self.0.media_source_kind)
+        Self::inner_new(
+            self.0.tracks.clone(),
+            new_track,
+            self.0.media_source_kind,
+        )
     }
 
     pub fn root(&self) -> Self {
         let root_track = Clone::clone(&self.0.tracks.borrow().root_track);
 
-        Self::inner_new(self.0.tracks.clone(), root_track, self.0.media_source_kind)
+        Self::inner_new(
+            self.0.tracks.clone(),
+            root_track,
+            self.0.media_source_kind,
+        )
     }
 }
 
