@@ -606,7 +606,7 @@ mod disable_send_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -643,7 +643,7 @@ mod disable_send_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Video,
             TrackDirection::Send,
             None,
@@ -673,7 +673,7 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -690,7 +690,7 @@ mod disable_send_tracks {
         disable_audio_result.unwrap_err();
         enable_audio_result.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -720,7 +720,7 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Video,
             TrackDirection::Send,
             None,
@@ -737,7 +737,7 @@ mod disable_send_tracks {
         disable_video_result.unwrap_err();
         enable_video_result.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Video,
             TrackDirection::Send,
             None,
@@ -767,7 +767,7 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -777,7 +777,7 @@ mod disable_send_tracks {
         let handle = room.new_handle();
         JsFuture::from(handle.disable_audio()).await.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -793,7 +793,7 @@ mod disable_send_tracks {
         disable_audio_result.unwrap();
         enable_audio_result.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -1163,7 +1163,7 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_enabled(
+            local_stream.set_track_media_state(
                 (audio_track_enabled_state_fn)(i),
                 MediaKind::Audio,
                 None,

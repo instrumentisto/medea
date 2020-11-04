@@ -109,15 +109,15 @@ impl LocalTracksConstraints {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_enabled(
+    pub fn set_media_state(
         &self,
-        enabled: TrackMediaState,
+        state: TrackMediaState,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
         self.0
             .borrow_mut()
-            .set_track_enabled(enabled, kind, source_kind);
+            .set_track_media_state(state, kind, source_kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -391,14 +391,14 @@ impl MediaStreamSettings {
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_track_enabled(
+    pub fn set_track_media_state(
         &mut self,
-        enabled: TrackMediaState,
+        state: TrackMediaState,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
         match kind {
-            MediaKind::Audio => match enabled {
+            MediaKind::Audio => match state {
                 TrackMediaState::Mute(muted) => {
                     self.toggle_audio_mute(muted == StableMuteState::Muted);
                 }
@@ -408,7 +408,7 @@ impl MediaStreamSettings {
                     );
                 }
             },
-            MediaKind::Video => match enabled {
+            MediaKind::Video => match state {
                 TrackMediaState::Mute(muted) => {
                     self.toggle_video_mute(
                         muted == StableMuteState::Muted,

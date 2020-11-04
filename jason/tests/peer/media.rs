@@ -57,14 +57,14 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .media_exchange_state_transition_to(StableMediaExchangeState::from(
+        .media_state_transition_to(StableMediaExchangeState::from(
             !enabled_audio,
         ))
         .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .media_exchange_state_transition_to(StableMediaExchangeState::from(
+        .media_state_transition_to(StableMediaExchangeState::from(
             !enabled_video,
         ))
         .unwrap();
@@ -136,7 +136,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!video_track.is_general_disabled());
 
     audio_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Disabled)
+        .media_state_transition_to(StableMediaExchangeState::Disabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
@@ -149,7 +149,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!video_track.is_general_disabled());
 
     video_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Disabled)
+        .media_state_transition_to(StableMediaExchangeState::Disabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
@@ -162,7 +162,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_general_disabled());
 
     audio_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Enabled)
+        .media_state_transition_to(StableMediaExchangeState::Enabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
@@ -175,7 +175,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_general_disabled());
 
     video_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Enabled)
+        .media_state_transition_to(StableMediaExchangeState::Enabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {

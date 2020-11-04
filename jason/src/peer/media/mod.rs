@@ -19,7 +19,10 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        media::transitable_state::MediaExchangeState, transceiver::Transceiver,
+        media::transitable_state::{
+            MediaExchangeState, MuteState, TransitableStateController,
+        },
+        transceiver::Transceiver,
         PeerEvent, TransceiverDirection,
     },
     utils::{JsCaused, JsError},
@@ -37,9 +40,6 @@ pub use self::{
         TrackMediaState, TransitableState, TransitionMediaExchangeState,
         TransitionMuteState,
     },
-};
-use crate::peer::media::transitable_state::{
-    MuteState, TransitableStateController,
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
@@ -84,6 +84,7 @@ pub trait Disableable {
             .media_exchange_state()
     }
 
+    #[inline]
     fn mute_state(&self) -> MuteState {
         self.mute_state_controller().media_exchange_state()
     }
@@ -96,7 +97,7 @@ pub trait Disableable {
     /// Implementors might return [`MediaConnectionsError`] if transition could
     /// not be made for some reason.
     #[inline]
-    fn media_exchange_state_transition_to(
+    fn media_state_transition_to(
         &self,
         desired_state: TrackMediaState,
     ) -> Result<()> {
@@ -169,7 +170,7 @@ pub trait Disableable {
     /// is returned if [`MediaExchangeState`] transits into the opposite to
     /// the `desired_state`.
     #[inline]
-    fn when_media_exchange_state_stable(
+    fn when_media_state_stable(
         &self,
         desired_state: TrackMediaState,
     ) -> LocalBoxFuture<'static, Result<()>> {
@@ -185,7 +186,7 @@ pub trait Disableable {
 
     /// Stops state transition timer of this [`Disableable`].
     #[inline]
-    fn stop_media_exchange_state_transition_timeout(&self) {
+    fn stop_media_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
             .stop_transition_timeout();
         self.mute_state_controller().stop_transition_timeout();
@@ -193,7 +194,7 @@ pub trait Disableable {
 
     /// Resets state transition timer of this [`Disableable`].
     #[inline]
-    fn reset_media_exchange_state_transition_timeout(&self) {
+    fn reset_media_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
             .reset_transition_timeout();
         self.mute_state_controller().reset_transition_timeout();
@@ -403,12 +404,12 @@ impl MediaConnections {
     /// Returns `true` if all [`TransceiverSide`]s with provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
     /// provided [`MediaExchangeState`].
-    pub fn is_all_tracks_in_media_exchange_state(
+    pub fn is_all_tracks_in_media_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        media_exchange_state: TrackMediaState,
+        state: TrackMediaState,
     ) -> bool {
         let transceivers =
             self.0.borrow().get_transceivers_by_direction_and_kind(
@@ -421,7 +422,7 @@ impl MediaConnections {
                 continue;
             }
 
-            let is_not_in_state = match media_exchange_state {
+            let is_not_in_state = match state {
                 TrackMediaState::Mute(mute_state) => {
                     transceiver.mute_state() != mute_state.into()
                 }
@@ -430,26 +431,6 @@ impl MediaConnections {
                 }
             };
             if is_not_in_state {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    pub fn is_all_senders_in_mute_state(
-        &self,
-        kind: MediaKind,
-        source_kind: Option<MediaSourceKind>,
-        mute_state: StableMuteState,
-    ) -> bool {
-        let senders = self.get_senders(kind, source_kind);
-
-        log::debug!("{}", senders.len());
-        for sender in senders {
-            log::debug!("One sender");
-            if sender.mute_state() != mute_state.into() {
-                log::debug!("Return false");
                 return false;
             }
         }
@@ -835,32 +816,17 @@ impl MediaConnections {
             .collect()
     }
 
-    pub fn get_senders(
-        &self,
-        kind: MediaKind,
-        source_kind: Option<MediaSourceKind>,
-    ) -> Vec<Rc<Sender>> {
-        self.0
-            .borrow()
-            .senders
-            .values()
-            .filter(|s| s.kind() == kind)
-            .filter(|s| source_kind.map_or(true, |k| k == s.source_kind()))
-            .cloned()
-            .collect()
-    }
-
     /// Stops all [`TransceiverSide`]s state transitions expiry timers.
     pub fn stop_state_transitions_timers(&self) {
         self.get_all_transceivers_sides()
             .into_iter()
-            .for_each(|t| t.stop_media_exchange_state_transition_timeout())
+            .for_each(|t| t.stop_media_state_transition_timeout())
     }
 
     /// Resets all [`TransceiverSide`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
         self.get_all_transceivers_sides()
             .into_iter()
-            .for_each(|t| t.reset_media_exchange_state_transition_timeout());
+            .for_each(|t| t.reset_media_state_transition_timeout());
     }
 }

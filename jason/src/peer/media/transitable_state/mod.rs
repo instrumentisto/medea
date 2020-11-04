@@ -6,6 +6,7 @@ mod controller;
 mod media_exchange;
 mod mute;
 
+use derive_more::From;
 use medea_client_api_proto::{TrackId, TrackPatchCommand};
 
 pub use self::{
@@ -21,7 +22,7 @@ pub type MediaExchangeState =
     TransitableState<StableMediaExchangeState, TransitionMediaExchangeState>;
 pub type MuteState = TransitableState<StableMuteState, TransitionMuteState>;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, From)]
 pub enum TrackMediaState {
     Mute(StableMuteState),
     MediaExchange(StableMediaExchangeState),

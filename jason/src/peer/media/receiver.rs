@@ -15,18 +15,19 @@ use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         media::{
-            transitable_state::TransitableStateController, TransceiverSide,
+            transitable_state::{
+                MediaExchangeStateController, TransitableStateController,
+            },
+            TransceiverSide,
         },
         transceiver::Transceiver,
-        Disableable, MediaConnections, PeerEvent, TransceiverDirection,
+        Disableable, MediaConnections, PeerEvent, StableMuteState,
+        TransceiverDirection, TransitionMediaExchangeState,
+        TransitionMuteState,
     },
 };
 
 use super::transitable_state::StableMediaExchangeState;
-use crate::peer::{
-    media::transitable_state::MediaExchangeStateController, StableMuteState,
-    TransitionMediaExchangeState, TransitionMuteState,
-};
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -287,7 +288,7 @@ impl Disableable for Receiver {
         &self,
     ) -> Rc<TransitableStateController<StableMuteState, TransitionMuteState>>
     {
-        unimplemented!()
+        unimplemented!("Receivers muting is not implemented");
     }
 }
 

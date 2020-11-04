@@ -62,7 +62,7 @@ impl TracksRepo {
         }
     }
 
-    fn new_track_instance(&mut self) -> SysMediaStreamTrack {
+    fn new_child(&mut self) -> SysMediaStreamTrack {
         let new_track = SysMediaStreamTrack::clone(&self.root_track);
         let cloned_track = Clone::clone(&new_track);
         self.tracks.push(cloned_track);
@@ -70,9 +70,13 @@ impl TracksRepo {
         new_track
     }
 
-    fn check_enabled(&self) {
+    fn update_root_enabled(&self) {
         self.root_track
-            .set_enabled(self.tracks.iter().any(|t| t.enabled()));
+            .set_enabled(self.tracks.iter().any(SysMediaStreamTrack::enabled));
+    }
+
+    fn get_root(&self) -> SysMediaStreamTrack {
+        Clone::clone(&self.root_track)
     }
 }
 
@@ -123,19 +127,6 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
-    /// Creates new [`MediaStreamTrack`], spawns listener for
-    /// [`InnerMediaStreamTrack::enabled`] state changes.
-    pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
-    where
-        SysMediaStreamTrack: From<T>,
-    {
-        let track = SysMediaStreamTrack::from(track);
-        let tracks =
-            Rc::new(RefCell::new(TracksRepo::new(Clone::clone(&track))));
-        let track = tracks.borrow_mut().new_track_instance();
-        Self::inner_new(tracks, track, media_source_kind)
-    }
-
     fn inner_new(
         tracks: Rc<RefCell<TracksRepo>>,
         track: SysMediaStreamTrack,
@@ -181,6 +172,38 @@ impl MediaStreamTrack {
         track
     }
 
+    /// Creates new [`MediaStreamTrack`], spawns listener for
+    /// [`InnerMediaStreamTrack::enabled`] state changes.
+    pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
+    where
+        SysMediaStreamTrack: From<T>,
+    {
+        let track = SysMediaStreamTrack::from(track);
+        let tracks =
+            Rc::new(RefCell::new(TracksRepo::new(Clone::clone(&track))));
+        let track = tracks.borrow_mut().new_child();
+        Self::inner_new(tracks, track, media_source_kind)
+    }
+
+    #[inline]
+    pub fn new_root(&self) -> Self {
+        Self::inner_new(
+            self.0.tracks.clone(),
+            self.0.tracks.borrow().get_root(),
+            self.0.media_source_kind,
+        )
+    }
+
+    pub fn deep_clone(&self) -> Self {
+        let new_track = self.0.tracks.borrow_mut().new_child();
+
+        Self::inner_new(
+            self.0.tracks.clone(),
+            new_track,
+            self.0.media_source_kind,
+        )
+    }
+
     /// Returns `true` if this [`MediaStreamTrack`] is enabled.
     #[inline]
     pub fn enabled(&self) -> &ObservableCell<bool> {
@@ -194,7 +217,7 @@ impl MediaStreamTrack {
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
-        self.0.tracks.borrow().check_enabled();
+        self.0.tracks.borrow().update_root_enabled();
     }
 
     /// Returns [`id`][1] of underlying [MediaStreamTrack][2].
@@ -224,26 +247,6 @@ impl MediaStreamTrack {
     #[inline]
     pub fn media_source_kind(&self) -> MediaSourceKind {
         self.0.media_source_kind
-    }
-
-    pub fn deep_clone(&self) -> Self {
-        let new_track = self.0.tracks.borrow_mut().new_track_instance();
-
-        Self::inner_new(
-            self.0.tracks.clone(),
-            new_track,
-            self.0.media_source_kind,
-        )
-    }
-
-    pub fn root(&self) -> Self {
-        let root_track = Clone::clone(&self.0.tracks.borrow().root_track);
-
-        Self::inner_new(
-            self.0.tracks.clone(),
-            root_track,
-            self.0.media_source_kind,
-        )
     }
 }
 

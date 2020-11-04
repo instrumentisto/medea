@@ -898,14 +898,10 @@ async fn reset_transition_timers() {
             .into_iter(),
         )
         .map(|s| {
-            s.media_exchange_state_transition_to(
-                StableMediaExchangeState::Disabled,
-            )
-            .unwrap();
+            s.media_state_transition_to(StableMediaExchangeState::Disabled)
+                .unwrap();
 
-            s.when_media_exchange_state_stable(
-                StableMediaExchangeState::Enabled,
-            )
+            s.when_media_state_stable(StableMediaExchangeState::Enabled)
         }),
     )
     .map(|_| ())
@@ -940,8 +936,8 @@ async fn new_remote_track() {
         let manager = Rc::new(MediaManager::default());
 
         let tx_caps = LocalTracksConstraints::default();
-        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio, None);
-        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video, None);
+        tx_caps.set_media_state(audio_tx_enabled, MediaKind::Audio, None);
+        tx_caps.set_media_state(video_tx_enabled, MediaKind::Video, None);
         let sender_peer = PeerConnection::new(
             PeerId(1),
             tx1,

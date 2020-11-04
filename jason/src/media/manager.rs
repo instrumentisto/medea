@@ -198,6 +198,7 @@ impl InnerMediaManager {
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[allow(clippy::find_map, clippy::filter_map)]
     fn get_from_storage(
         &self,
         caps: &mut MediaStreamSettings,
@@ -219,7 +220,7 @@ impl InnerMediaManager {
             let track = storage
                 .iter()
                 .find(|track| caps.get_audio().satisfies(track.as_ref()))
-                .map(|track| track.deep_clone());
+                .map(MediaStreamTrack::deep_clone);
 
             if let Some(track) = track {
                 caps.toggle_publish_audio(false);
@@ -233,7 +234,7 @@ impl InnerMediaManager {
                 .filter(|track| {
                     caps.unconstrain_if_satisfies_video(track.as_ref())
                 })
-                .map(|track| track.deep_clone()),
+                .map(MediaStreamTrack::deep_clone),
         );
 
         tracks
@@ -416,7 +417,7 @@ impl MediaManagerHandle {
                 .map(|tracks| {
                     tracks
                         .into_iter()
-                        .map(|(t, _)| t.root())
+                        .map(|(t, _)| t.new_root())
                         .map(JsValue::from)
                         .collect::<js_sys::Array>()
                         .into()

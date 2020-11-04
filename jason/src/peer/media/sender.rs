@@ -2,10 +2,8 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::{channel::mpsc, future::LocalBoxFuture, StreamExt};
-use medea_client_api_proto::{
-    MediaSourceKind, PeerId, TrackId, TrackPatchEvent,
-};
+use futures::{channel::mpsc, StreamExt};
+use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -14,7 +12,13 @@ use crate::{
         VideoSource,
     },
     peer::{
-        media::TransceiverSide,
+        media::{
+            transitable_state::{
+                MediaExchangeStateController, MuteState, MuteStateController,
+                StableMuteState, TrackMediaState,
+            },
+            TransceiverSide,
+        },
         transceiver::{Transceiver, TransceiverDirection},
         PeerEvent,
     },
@@ -23,10 +27,6 @@ use crate::{
 use super::{
     transitable_state::{StableMediaExchangeState, TransitableStateController},
     Disableable, MediaConnections, MediaConnectionsError, Result,
-};
-use crate::peer::media::transitable_state::{
-    MediaExchangeStateController, MuteState, MuteStateController,
-    StableMuteState, TrackMediaState,
 };
 
 /// Builder of the [`Sender`].
@@ -157,10 +157,6 @@ impl Sender {
     /// Returns `true` if this [`Sender`] is publishing media traffic.
     pub fn is_publishing(&self) -> bool {
         self.transceiver.has_direction(TransceiverDirection::SEND)
-    }
-
-    pub fn source_kind(&self) -> MediaSourceKind {
-        self.caps.media_source_kind()
     }
 
     /// Updates [`Sender`]s general media exchange state based on the provided
@@ -302,22 +298,6 @@ impl Sender {
             );
         }
     }
-
-    pub fn mute_state(&self) -> MuteState {
-        self.mute_state.media_exchange_state()
-    }
-
-    pub fn mute_state_transition_to(&self, desired_state: StableMuteState) {
-        self.mute_state.transition_to(desired_state);
-    }
-
-    pub fn when_mute_state_stable(
-        &self,
-        desired_state: StableMuteState,
-    ) -> LocalBoxFuture<'static, Result<()>> {
-        self.mute_state
-            .when_media_exchange_state_stable(desired_state)
-    }
 }
 
 impl TransceiverSide for Sender {
@@ -366,7 +346,7 @@ impl Disableable for Sender {
     ///
     /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
     /// required for the call and can't be disabled.
-    fn media_exchange_state_transition_to(
+    fn media_state_transition_to(
         &self,
         desired_state: TrackMediaState,
     ) -> Result<()> {
