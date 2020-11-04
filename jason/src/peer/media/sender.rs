@@ -2,7 +2,7 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::{channel::mpsc, StreamExt};
+use futures::{channel::mpsc, future::LocalBoxFuture, StreamExt};
 use medea_client_api_proto::{
     MediaSourceKind, PeerId, TrackId, TrackPatchEvent,
 };
@@ -24,14 +24,10 @@ use super::{
     transitable_state::{StableMediaExchangeState, TransitableStateController},
     Disableable, MediaConnections, MediaConnectionsError, Result,
 };
-use crate::peer::{
-    media::transitable_state::{
-        MediaExchangeStateController, MuteState, MuteStateController,
-        StableMuteState, TrackMediaState,
-    },
-    TransitionMediaExchangeState, TransitionMuteState,
+use crate::peer::media::transitable_state::{
+    MediaExchangeStateController, MuteState, MuteStateController,
+    StableMuteState, TrackMediaState,
 };
-use futures::future::LocalBoxFuture;
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {

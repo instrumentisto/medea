@@ -12,7 +12,8 @@ use crate::{
     peer::{
         media::{
             transitable_state::{
-                InStable, InTransition, StableMuteState, TransitionMuteState,
+                InStable, InTransition, MediaExchangeState, MuteState,
+                StableMuteState, TransitionMuteState,
             },
             MediaConnectionsError, Result,
         },
@@ -22,7 +23,6 @@ use crate::{
 };
 
 use super::{StableMediaExchangeState, TransitableState};
-use crate::peer::media::transitable_state::{MediaExchangeState, MuteState};
 
 pub type MuteStateController =
     TransitableStateController<StableMuteState, TransitionMuteState>;
@@ -151,12 +151,6 @@ where
         let current_media_exchange_state = self.state.get();
         self.state
             .set(current_media_exchange_state.transition_to(desired_state));
-    }
-
-    /// Cancels [`MediaExchangeStateController::state`] transition.
-    pub(in super::super) fn cancel_transition(&self) {
-        let state = self.state.get();
-        self.state.set(state.cancel_transition());
     }
 
     /// Returns [`Future`] which will be resolved when [`MediaExchangeState`] of

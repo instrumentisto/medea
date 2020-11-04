@@ -10,7 +10,7 @@ impl StableMuteState {
     pub fn inverse(self) -> Self {
         match self {
             Self::Muted => Self::Unmuted,
-            Self::Unmuted => Self::Muted
+            Self::Unmuted => Self::Muted,
         }
     }
 }

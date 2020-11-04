@@ -6,7 +6,7 @@ mod transitable_state;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
-use derive_more::{Display, From};
+use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
@@ -19,10 +19,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        media::transitable_state::{
-            MediaExchangeState, MediaExchangeStateController,
-        },
-        transceiver::Transceiver,
+        media::transitable_state::MediaExchangeState, transceiver::Transceiver,
         PeerEvent, TransceiverDirection,
     },
     utils::{JsCaused, JsError},

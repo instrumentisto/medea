@@ -6,6 +6,8 @@ mod controller;
 mod media_exchange;
 mod mute;
 
+use medea_client_api_proto::{TrackId, TrackPatchCommand};
+
 pub use self::{
     controller::{
         MediaExchangeStateController, MuteStateController,
@@ -14,7 +16,6 @@ pub use self::{
     media_exchange::{StableMediaExchangeState, TransitionMediaExchangeState},
     mute::{StableMuteState, TransitionMuteState},
 };
-use medea_client_api_proto::{TrackId, TrackPatchCommand};
 
 pub type MediaExchangeState =
     TransitableState<StableMediaExchangeState, TransitionMediaExchangeState>;
@@ -47,7 +48,9 @@ impl TrackMediaState {
     pub fn inverse(self) -> Self {
         match self {
             Self::Mute(mute) => Self::Mute(mute.inverse()),
-            Self::MediaExchange(media_exchange) => Self::MediaExchange(media_exchange.inverse()),
+            Self::MediaExchange(media_exchange) => {
+                Self::MediaExchange(media_exchange.inverse())
+            }
         }
     }
 }

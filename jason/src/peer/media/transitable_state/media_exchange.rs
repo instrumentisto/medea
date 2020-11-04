@@ -18,7 +18,7 @@ impl StableMediaExchangeState {
     pub fn inverse(self) -> Self {
         match self {
             Self::Enabled => Self::Disabled,
-            Self::Disabled => Self::Enabled
+            Self::Disabled => Self::Enabled,
         }
     }
 }
