@@ -3,6 +3,7 @@
 //! [1]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
 
 use std::rc::{Rc, Weak};
+use std::cell::RefCell;
 
 use futures::StreamExt;
 use medea_client_api_proto::MediaSourceKind;
@@ -42,11 +43,52 @@ impl From<MediaSourceKind> for JsMediaSourceKind {
     }
 }
 
+struct TracksRepo {
+    root_track: SysMediaStreamTrack,
+    tracks: Vec<SysMediaStreamTrack>,
+}
+
+impl TracksRepo {
+    fn root_id(&self) -> String {
+        self.root_track.id()
+    }
+
+    fn new(track: SysMediaStreamTrack) -> Self {
+        Self {
+            root_track: track,
+            tracks: Vec::new(),
+        }
+    }
+
+    fn new_track_instance(&mut self) -> SysMediaStreamTrack {
+        let new_track = SysMediaStreamTrack::clone(&self.root_track);
+        let cloned_track = Clone::clone(&new_track);
+        self.tracks.push(cloned_track);
+
+        new_track
+    }
+
+    fn check_enabled(&self) {
+        self.root_track.set_enabled(self.tracks.iter().any(|t| t.enabled()));
+    }
+}
+
+impl Drop for TracksRepo {
+    fn drop(&mut self) {
+        self.tracks.drain(..).for_each(|track| {
+            track.stop();
+        });
+        self.root_track.stop();
+    }
+}
+
 /// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
 /// disabled.
 struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
+
+    tracks: Rc<RefCell<TracksRepo>>,
 
     /// Underlying [`SysMediaStreamTrack`] kind.
     kind: MediaKind,
@@ -85,6 +127,12 @@ impl MediaStreamTrack {
         SysMediaStreamTrack: From<T>,
     {
         let track = SysMediaStreamTrack::from(track);
+        let tracks = Rc::new(RefCell::new(TracksRepo::new(Clone::clone(&track))));
+        let track = tracks.borrow_mut().new_track_instance();
+        Self::inner_new(tracks, track, media_source_kind)
+    }
+
+    fn inner_new(tracks: Rc<RefCell<TracksRepo>>, track: SysMediaStreamTrack, media_source_kind: MediaSourceKind) -> Self {
         let kind = match track.kind().as_ref() {
             "audio" => MediaKind::Audio,
             "video" => MediaKind::Video,
@@ -92,6 +140,7 @@ impl MediaStreamTrack {
         };
 
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
+            tracks,
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
@@ -106,7 +155,7 @@ impl MediaStreamTrack {
             let weak_inner = Rc::downgrade(&track.0);
             async move {
                 while let Some(enabled) =
-                    track_enabled_state_changes.next().await
+                track_enabled_state_changes.next().await
                 {
                     if let Some(track) = weak_inner.upgrade() {
                         if enabled {
@@ -137,6 +186,7 @@ impl MediaStreamTrack {
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
+        self.0.tracks.borrow().check_enabled();
     }
 
     /// Returns [`id`][1] of underlying [MediaStreamTrack][2].
@@ -145,7 +195,7 @@ impl MediaStreamTrack {
     /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
     pub fn id(&self) -> String {
-        self.0.track.id()
+        self.0.tracks.borrow().root_id()
     }
 
     /// Returns track kind (audio/video).
@@ -166,6 +216,18 @@ impl MediaStreamTrack {
     #[inline]
     pub fn media_source_kind(&self) -> MediaSourceKind {
         self.0.media_source_kind
+    }
+
+    pub fn deep_clone(&self) -> Self {
+        let new_track = self.0.tracks.borrow_mut().new_track_instance();
+
+        Self::inner_new(self.0.tracks.clone(), new_track, self.0.media_source_kind)
+    }
+
+    pub fn root(&self) -> Self {
+        let root_track = Clone::clone(&self.0.tracks.borrow().root_track);
+
+        Self::inner_new(self.0.tracks.clone(), root_track, self.0.media_source_kind)
     }
 }
 

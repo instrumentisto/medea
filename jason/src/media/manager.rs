@@ -219,7 +219,7 @@ impl InnerMediaManager {
             let track = storage
                 .iter()
                 .find(|track| caps.get_audio().satisfies(track.as_ref()))
-                .cloned();
+                .map(|track| track.deep_clone());
 
             if let Some(track) = track {
                 caps.toggle_publish_audio(false);
@@ -233,7 +233,7 @@ impl InnerMediaManager {
                 .filter(|track| {
                     caps.unconstrain_if_satisfies_video(track.as_ref())
                 })
-                .cloned(),
+                .map(|track| track.deep_clone())
         );
 
         tracks
@@ -416,7 +416,7 @@ impl MediaManagerHandle {
                 .map(|tracks| {
                     tracks
                         .into_iter()
-                        .map(|(t, _)| t)
+                        .map(|(t, _)| t.root())
                         .map(JsValue::from)
                         .collect::<js_sys::Array>()
                         .into()
