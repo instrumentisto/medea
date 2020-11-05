@@ -187,6 +187,11 @@ impl Receiver {
         if let Some(is_disabled) = track_patch.is_disabled_individual {
             self.media_exchange_state_controller.update(is_disabled);
         }
+        if let Some(is_muted) = track_patch.is_muted {
+            if let Some(track) = self.track.borrow().as_ref() {
+                track.set_enabled(!is_muted);
+            }
+        }
     }
 
     /// Checks whether general media exchange state of the [`Receiver`] is in
