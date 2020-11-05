@@ -1504,6 +1504,7 @@ mod patches_generation {
         }
     }
 
+    /// Checks that correct [`TrackPatchCommand`] generated on muting.
     #[wasm_bindgen_test]
     async fn track_patch_on_muting() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
@@ -1531,6 +1532,7 @@ mod patches_generation {
         );
     }
 
+    /// Checks that correct [`TrackPatchCommand`] generated on unmuting.
     #[wasm_bindgen_test]
     async fn track_patch_on_unmuting() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
@@ -1561,6 +1563,7 @@ mod patches_generation {
     }
 }
 
+/// Checks that muting and unmuting of audio works.
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
     let (audio_track, video_track) = get_test_tracks(false, false);
