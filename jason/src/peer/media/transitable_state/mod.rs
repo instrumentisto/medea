@@ -1,6 +1,6 @@
-//! [`Disableable`]s media exchange state.
+//! [`MediaStateControllable`]s media exchange state.
 //!
-//! [`Disableable`]: super::Disableable
+//! [`MediaStateControllable`]: super::MediaStateControllable
 
 mod controller;
 mod media_exchange;
@@ -24,7 +24,7 @@ pub type MediaExchangeState =
 /// [`TransitableState`] for the [`StableMuteState`].
 pub type MuteState = TransitableState<StableMuteState, TransitionMuteState>;
 
-/// All media states which can be toggled in the [`Disableable`].
+/// All media states which can be toggled in the [`MediaStateControllable`].
 #[derive(Clone, Copy, Debug, From)]
 pub enum MediaState {
     /// Sets `MediaStreamTrack.enabled` to the `true` of `false`.
@@ -75,9 +75,34 @@ impl MediaState {
     }
 }
 
-/// All media exchange states in which [`Disableable`] can be.
+/// [`TransitableState::Stable`] variant of the [`TransitableState`].
+pub trait InStable: Clone + Copy + PartialEq {
+    type Transition: InTransition;
+
+    /// Converts this [`InStable`] into [`InStable::Transition`].
+    fn start_transition(self) -> Self::Transition;
+}
+
+/// [`TransitableState::Transition`] variant of the [`TransitableState`].
+pub trait InTransition: Clone + Copy + PartialEq {
+    type Stable: InStable;
+
+    /// Returns intention which this state indicates.
+    fn intended(self) -> Self::Stable;
+
+    /// Sets inner [`InTransition::Stable`] state.
+    fn set_inner(self, inner: Self::Stable) -> Self;
+
+    /// Returns inner [`InTransition::Stable`] state.
+    fn into_inner(self) -> Self::Stable;
+
+    /// Returns opposite to this [`InTransition`].
+    fn opposite(self) -> Self;
+}
+
+/// All media exchange states in which [`MediaStateControllable`] can be.
 ///
-/// [`Disableable`]: super::Disableable
+/// [`MediaStateControllable`]: super::MediaStateControllable
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitableState<S, T> {
     /// State of transition.
@@ -85,30 +110,6 @@ pub enum TransitableState<S, T> {
 
     /// Stable state.
     Stable(S),
-}
-
-impl From<StableMediaExchangeState> for MediaExchangeState {
-    fn from(from: StableMediaExchangeState) -> Self {
-        Self::Stable(from)
-    }
-}
-
-impl From<TransitionMediaExchangeState> for MediaExchangeState {
-    fn from(from: TransitionMediaExchangeState) -> Self {
-        Self::Transition(from)
-    }
-}
-
-impl From<StableMuteState> for MuteState {
-    fn from(from: StableMuteState) -> Self {
-        Self::Stable(from)
-    }
-}
-
-impl From<TransitionMuteState> for MuteState {
-    fn from(from: TransitionMuteState) -> Self {
-        Self::Transition(from)
-    }
 }
 
 impl<S, T> TransitableState<S, T>
@@ -155,29 +156,28 @@ where
     }
 }
 
-/// [`TransitableState::Stable`] variant of the [`TransitableState`].
-pub trait InStable: Clone + Copy + PartialEq {
-    type Transition: InTransition;
-
-    /// Converts this [`InStable`] into [`InStable::Transition`].
-    fn start_transition(self) -> Self::Transition;
+impl From<StableMediaExchangeState> for MediaExchangeState {
+    fn from(from: StableMediaExchangeState) -> Self {
+        Self::Stable(from)
+    }
 }
 
-/// [`TransitableState::Transition`] variant of the [`TransitableState`].
-pub trait InTransition: Clone + Copy + PartialEq {
-    type Stable: InStable;
+impl From<TransitionMediaExchangeState> for MediaExchangeState {
+    fn from(from: TransitionMediaExchangeState) -> Self {
+        Self::Transition(from)
+    }
+}
 
-    /// Returns intention which this state indicates.
-    fn intended(self) -> Self::Stable;
+impl From<StableMuteState> for MuteState {
+    fn from(from: StableMuteState) -> Self {
+        Self::Stable(from)
+    }
+}
 
-    /// Sets inner [`InTransition::Stable`] state.
-    fn set_inner(self, inner: Self::Stable) -> Self;
-
-    /// Returns inner [`InTransition::Stable`] state.
-    fn into_inner(self) -> Self::Stable;
-
-    /// Returns opposite to this [`InTransition`].
-    fn opposite(self) -> Self;
+impl From<TransitionMuteState> for MuteState {
+    fn from(from: TransitionMuteState) -> Self {
+        Self::Transition(from)
+    }
 }
 
 #[cfg(test)]

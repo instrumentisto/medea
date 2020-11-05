@@ -22,7 +22,7 @@ use super::{
         MediaExchangeStateController, MediaState, MuteStateController,
         StableMediaExchangeState, StableMuteState,
     },
-    Disableable, MediaConnections, MediaConnectionsError, Result,
+    MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
     TransceiverSide,
 };
 
@@ -334,7 +334,7 @@ impl TransceiverSide for Sender {
     }
 }
 
-impl Disableable for Sender {
+impl MediaStateControllable for Sender {
     #[inline]
     fn media_exchange_state_controller(
         &self,

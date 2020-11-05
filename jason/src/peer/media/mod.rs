@@ -46,7 +46,7 @@ pub use self::{
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
-pub trait TransceiverSide: Disableable {
+pub trait TransceiverSide: MediaStateControllable {
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
 
@@ -63,9 +63,9 @@ pub trait TransceiverSide: Disableable {
     fn is_transitable(&self) -> bool;
 }
 
-/// Default functions for dealing with [`MediaExchangeStateController`] for
-/// objects that use it.
-pub trait Disableable {
+/// Default functions for dealing with [`MediaExchangeStateController`] and
+/// [`MuteStateController`] for objects that use it.
+pub trait MediaStateControllable {
     /// Returns reference to the [`MediaExchangeStateController`].
     fn media_exchange_state_controller(
         &self,
@@ -74,13 +74,13 @@ pub trait Disableable {
     /// Returns reference to the [`MuteStateController`].
     fn mute_state_controller(&self) -> Rc<MuteStateController>;
 
-    /// Returns [`MediaExchangeState`] of this [`Disableable`].
+    /// Returns [`MediaExchangeState`] of this [`MediaStateControllable`].
     #[inline]
     fn media_exchange_state(&self) -> MediaExchangeState {
         self.media_exchange_state_controller().state()
     }
 
-    /// Returns [`MuteState`] of this [`Disableable`].
+    /// Returns [`MuteState`] of this [`MediaStateControllable`].
     #[inline]
     fn mute_state(&self) -> MuteState {
         self.mute_state_controller().state()
@@ -111,7 +111,7 @@ pub trait Disableable {
     }
 
     /// Returns `true` if [`Room`] should subscribe to the [`MediaState`] update
-    /// when updating [`Disableable`] to the provided [`MediaState`].
+    /// when updating [`MediaStateControllable`] to the provided [`MediaState`].
     fn is_subscription_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
             MediaState::MediaExchange(media_exchange) => {
@@ -134,7 +134,8 @@ pub trait Disableable {
     }
 
     /// Returns `true` if [`Room`] should send [`TrackPatchCommand`] to the
-    /// server when updating [`Disableable`] to the provided [`MediaState`].
+    /// server when updating [`MediaStateControllable`] to the provided
+    /// [`MediaState`].
     fn is_track_patch_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
             MediaState::MediaExchange(media_exchange) => {
@@ -161,8 +162,8 @@ pub trait Disableable {
     }
 
     /// Returns [`Future`] which will be resolved when [`MediaState`] of
-    /// this [`Disableable`] will be [`TransitableState::Stable`] or it is
-    /// dropped.
+    /// this [`MediaStateControllable`] will be [`TransitableState::Stable`] or
+    /// it is dropped.
     ///
     /// # Errors
     ///
@@ -184,7 +185,7 @@ pub trait Disableable {
         }
     }
 
-    /// Stops state transition timer of this [`Disableable`].
+    /// Stops state transition timer of this [`MediaStateControllable`].
     #[inline]
     fn stop_media_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
@@ -192,7 +193,7 @@ pub trait Disableable {
         self.mute_state_controller().stop_transition_timeout();
     }
 
-    /// Resets state transition timer of this [`Disableable`].
+    /// Resets state transition timer of this [`MediaStateControllable`].
     #[inline]
     fn reset_media_state_transition_timeout(&self) {
         self.media_exchange_state_controller()

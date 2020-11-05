@@ -7,8 +7,8 @@ use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        Disableable, MediaConnections, RtcPeerConnection, SimpleTracksRequest,
-        StableMediaExchangeState,
+        MediaConnections, MediaStateControllable, RtcPeerConnection,
+        SimpleTracksRequest, StableMediaExchangeState,
     },
 };
 use wasm_bindgen_test::*;

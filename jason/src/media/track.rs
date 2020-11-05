@@ -92,7 +92,7 @@ impl DeeplyCloneableTrack {
     /// When all [`DeeplyCloneableTrack::childs`] are in muted state, then
     /// [`DeeplyCloneableTrack::root`] will be muted, otherwise
     /// [`DeeplyCloneableTrack::root`] will be unmuted.
-    fn update_root_enabled(&self) {
+    fn sync_root_mute_state(&self) {
         self.root
             .set_enabled(self.childs.iter().any(SysMediaStreamTrack::enabled));
     }
@@ -160,7 +160,7 @@ impl MediaStreamTrack {
     /// [`DeeplyCloneableTrack`] and provided [`SysMediaStreamTrack`], spawns
     /// listener for [`InnerMediaStreamTrack::enabled`] state changes.
     fn inner_new(
-        tracks: Rc<RefCell<DeeplyCloneableTrack>>,
+        deeply_cloneable_track: Rc<RefCell<DeeplyCloneableTrack>>,
         track: SysMediaStreamTrack,
         media_source_kind: MediaSourceKind,
     ) -> Self {
@@ -171,7 +171,7 @@ impl MediaStreamTrack {
         };
 
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            deeply_cloneable_track: tracks,
+            deeply_cloneable_track,
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
@@ -255,7 +255,10 @@ impl MediaStreamTrack {
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
-        self.0.deeply_cloneable_track.borrow().update_root_enabled();
+        self.0
+            .deeply_cloneable_track
+            .borrow()
+            .sync_root_mute_state();
     }
 
     /// Returns root [`id`][1] of underlying [`DeeplyCloneableTrack`].

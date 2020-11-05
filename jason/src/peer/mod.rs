@@ -45,9 +45,9 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
-        Disableable, MediaConnections, MediaConnectionsError, MediaState,
-        Receiver, Sender, StableMediaExchangeState, StableMuteState,
-        TrackDirection, TransceiverSide, TransitableState,
+        MediaConnections, MediaConnectionsError, MediaState,
+        MediaStateControllable, Receiver, Sender, StableMediaExchangeState,
+        StableMuteState, TrackDirection, TransceiverSide, TransitableState,
         TransitionMediaExchangeState, TransitionMuteState,
     },
     repo::{PeerRepository, Repository},

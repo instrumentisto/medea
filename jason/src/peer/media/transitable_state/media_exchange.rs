@@ -5,14 +5,14 @@ use super::{InStable, InTransition};
 /// State of the media publishing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMediaExchangeState {
-    /// [`Disableable`] is enabled.
+    /// [`MediaStateControllable`] is enabled.
     ///
-    /// [`Disableable`]: super::Disableable
+    /// [`MediaStateControllable`]: super::MediaStateControllable
     Enabled,
 
-    /// [`Disableable`] is disabled.
+    /// [`MediaStateControllable`] is disabled.
     ///
-    /// [`Disableable`]: super::Disableable
+    /// [`MediaStateControllable`]: super::MediaStateControllable
     Disabled,
 }
 
@@ -67,14 +67,16 @@ impl From<bool> for StableMediaExchangeState {
 /// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitionMediaExchangeState {
-    /// [`Disableable`] should be enabled, but awaits server permission.
+    /// [`MediaStateControllable`] should be enabled, but awaits server
+    /// permission.
     ///
-    /// [`Disableable`]: super::Disableable
+    /// [`MediaStateControllable`]: super::MediaStateControllable
     Enabling(StableMediaExchangeState),
 
-    /// [`Disableable`] should be disabled, but awaits server permission.
+    /// [`MediaStateControllable`] should be disabled, but awaits server
+    /// permission.
     ///
-    /// [`Disableable`]: super::Disableable
+    /// [`MediaStateControllable`]: super::MediaStateControllable
     Disabling(StableMediaExchangeState),
 }
 

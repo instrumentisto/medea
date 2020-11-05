@@ -14,8 +14,8 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
-        transceiver::Transceiver, Disableable, MediaConnections, PeerEvent,
-        TransceiverDirection,
+        transceiver::Transceiver, MediaConnections, MediaStateControllable,
+        PeerEvent, TransceiverDirection,
     },
 };
 
@@ -277,7 +277,7 @@ impl Receiver {
     }
 }
 
-impl Disableable for Receiver {
+impl MediaStateControllable for Receiver {
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {

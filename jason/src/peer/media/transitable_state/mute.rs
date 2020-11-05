@@ -5,10 +5,10 @@ use super::{InStable, InTransition};
 /// State of the media mute state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMuteState {
-    /// [`Disableable`] is muted.
+    /// [`MediaStateControllable`] is muted.
     Muted,
 
-    /// [`Disableable`] is unmuted.
+    /// [`MediaStateControllable`] is unmuted.
     Unmuted,
 }
 
@@ -18,6 +18,29 @@ impl StableMuteState {
         match self {
             Self::Muted => Self::Unmuted,
             Self::Unmuted => Self::Muted,
+        }
+    }
+}
+
+impl From<bool> for StableMuteState {
+    #[inline]
+    fn from(is_muted: bool) -> Self {
+        if is_muted {
+            Self::Muted
+        } else {
+            Self::Unmuted
+        }
+    }
+}
+
+impl InStable for StableMuteState {
+    type Transition = TransitionMuteState;
+
+    #[inline]
+    fn start_transition(self) -> Self::Transition {
+        match self {
+            Self::Unmuted => TransitionMuteState::Muting(self),
+            Self::Muted => TransitionMuteState::Unmuting(self),
         }
     }
 }
@@ -32,26 +55,17 @@ impl StableMuteState {
 /// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitionMuteState {
-    /// [`Disableable`] should be muted, but awaits server permission.
+    /// [`MediaStateControllable`] should be muted, but awaits server
+    /// permission.
     ///
-    /// [`Disableable`]: super::Disableable
+    /// [`MediaStateControllable`]: super::MediaStateControllable
     Muting(StableMuteState),
 
-    /// [`Disableable`] should be unmuted, but awaits server permission.
+    /// [`MediaStateControllable`] should be unmuted, but awaits server
+    /// permission.
     ///
-    /// [`Disableable`]: super::Disableable
+    /// [`MediaStateControllable`]: super::MediaStateControllable
     Unmuting(StableMuteState),
-}
-
-impl From<bool> for StableMuteState {
-    #[inline]
-    fn from(is_muted: bool) -> Self {
-        if is_muted {
-            Self::Muted
-        } else {
-            Self::Unmuted
-        }
-    }
 }
 
 impl InTransition for TransitionMuteState {
@@ -85,18 +99,6 @@ impl InTransition for TransitionMuteState {
         match self {
             Self::Unmuting(stable) => Self::Muting(stable),
             Self::Muting(stable) => Self::Unmuting(stable),
-        }
-    }
-}
-
-impl InStable for StableMuteState {
-    type Transition = TransitionMuteState;
-
-    #[inline]
-    fn start_transition(self) -> Self::Transition {
-        match self {
-            Self::Unmuted => TransitionMuteState::Muting(self),
-            Self::Muted => TransitionMuteState::Unmuting(self),
         }
     }
 }
