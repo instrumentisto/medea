@@ -1208,6 +1208,19 @@ impl EventHandler for InnerRoom {
 
         Ok(())
     }
+
+    #[inline]
+    async fn on_joined_room(&self, _: MemberId) -> Self::Output {
+        unreachable!("Room can't receive Event::JoinedRoom")
+    }
+
+    #[inline]
+    async fn on_left_room(
+        &self,
+        _: medea_client_api_proto::CloseReason,
+    ) -> Self::Output {
+        unreachable!("Room can't receive Event::LeftRoom")
+    }
 }
 
 /// [`PeerEvent`]s handling.

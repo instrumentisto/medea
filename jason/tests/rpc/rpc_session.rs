@@ -8,7 +8,9 @@ use std::{
 };
 
 use futures::{future, stream, FutureExt as _, StreamExt as _};
-use medea_client_api_proto::{ClientMsg, CloseReason, ServerMsg};
+use medea_client_api_proto::{
+    ClientMsg, CloseReason, Command, Event, ServerMsg,
+};
 use medea_jason::rpc::{
     websocket::{MockRpcTransport, TransportState},
     CloseMsg, ConnectionInfo, RpcSession, RpcTransport, SessionError,
@@ -31,9 +33,11 @@ async fn could_not_auth_err() {
                 transport.expect_on_message().returning_st(|| {
                     Box::pin(stream::iter(vec![
                         RPC_SETTINGS,
-                        ServerMsg::LeftRoom {
+                        ServerMsg::Event {
                             room_id: "room_id".into(),
-                            close_reason: CloseReason::InternalError,
+                            event: Event::LeftRoom {
+                                close_reason: CloseReason::InternalError,
+                            },
                         },
                     ]))
                 });
@@ -85,15 +89,20 @@ async fn concurrent_connect_requests() {
                 transport.expect_on_message().returning_st(|| {
                     Box::pin(stream::iter(vec![
                         RPC_SETTINGS,
-                        ServerMsg::JoinedRoom {
+                        ServerMsg::Event {
                             room_id: "room_id".into(),
-                            member_id: "member_id".into(),
+                            event: Event::JoinedRoom {
+                                member_id: "member_id".into(),
+                            },
                         },
                     ]))
                 });
                 let join_room_sent = Rc::clone(&join_room_sent);
                 transport.expect_send().returning_st(move |msg| {
-                    if matches!(msg, ClientMsg::JoinRoom { .. }) {
+                    if matches!(msg, ClientMsg::Command {
+                        command: Command::JoinRoom { .. },
+                        ..
+                    }) {
                         let already_sent =
                             join_room_sent.fetch_or(true, Ordering::Relaxed);
                         assert!(
@@ -179,9 +188,11 @@ async fn reconnect_after_transport_abnormal_close() {
                 transport.expect_on_message().returning_st(|| {
                     Box::pin(stream::iter(vec![
                         RPC_SETTINGS,
-                        ServerMsg::JoinedRoom {
+                        ServerMsg::Event {
                             room_id: "room_id".into(),
-                            member_id: "member_id".into(),
+                            event: Event::JoinedRoom {
+                                member_id: "member_id".into(),
+                            },
                         },
                     ]))
                 });
@@ -231,16 +242,20 @@ async fn reconnect_after_transport_abnormal_close() {
         *commands_sent.borrow(),
         vec![
             // connect
-            ClientMsg::JoinRoom {
+            ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                }
             },
             // reconnect
-            ClientMsg::JoinRoom {
+            ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                }
             }
         ]
     );

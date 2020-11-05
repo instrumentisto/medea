@@ -223,22 +223,6 @@ impl WebSocketRpcClient {
         Self(Inner::new(rpc_transport_factory))
     }
 
-    /// Sends [`ClientMsg`] to the Media Server.
-    ///
-    /// If some error occurs while sending message, then it will be printed with
-    /// [`JasonError::print`].
-    fn send_msg(&self, msg: &ClientMsg) {
-        let inner = self.0.borrow();
-        if let Some(sock) = &inner.sock {
-            if let Err(e) = sock
-                .send(msg)
-                .map_err(tracerr::map_from_and_wrap!(=> TransportError))
-            {
-                JasonError::from(e).print();
-            }
-        }
-    }
-
     /// Authorizes [`WebSocketRpcClient`] on the Media Server.
     pub fn authorize(
         &self,
@@ -246,17 +230,19 @@ impl WebSocketRpcClient {
         member_id: MemberId,
         credential: Credential,
     ) {
-        self.send_msg(&ClientMsg::JoinRoom {
+        self.send_command(
             room_id,
-            member_id,
-            credential,
-        });
+            Command::JoinRoom {
+                member_id,
+                credential,
+            },
+        );
     }
 
     /// Leaves `Room` with a provided [`RoomId`].
     #[inline]
     pub fn leave_room(&self, room_id: RoomId, member_id: MemberId) {
-        self.send_msg(&ClientMsg::LeaveRoom { room_id, member_id });
+        self.send_command(room_id, Command::LeaveRoom { member_id });
     }
 
     /// Stops [`Heartbeat`] and notifies all
@@ -311,9 +297,16 @@ impl WebSocketRpcClient {
     /// Handles [`ServerMsg`]s from a remote server.
     fn on_transport_message(&self, msg: ServerMsg) {
         let msg = match msg {
-            ServerMsg::Event { room_id, event } => {
-                Some(RpcEvent::Event { room_id, event })
-            }
+            ServerMsg::Event { room_id, event } => match event {
+                Event::JoinedRoom { member_id } => {
+                    Some(RpcEvent::JoinedRoom { room_id, member_id })
+                }
+                Event::LeftRoom { close_reason } => Some(RpcEvent::LeftRoom {
+                    room_id,
+                    close_reason: CloseReason::ByServer(close_reason),
+                }),
+                _ => Some(RpcEvent::Event { room_id, event }),
+            },
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
                     IdleTimeout(
@@ -333,16 +326,6 @@ impl WebSocketRpcClient {
                 None
             }
             ServerMsg::Ping(_) => None,
-            ServerMsg::JoinedRoom { room_id, member_id } => {
-                Some(RpcEvent::JoinedRoom { room_id, member_id })
-            }
-            ServerMsg::LeftRoom {
-                room_id,
-                close_reason,
-            } => Some(RpcEvent::LeftRoom {
-                room_id,
-                close_reason: CloseReason::ByServer(close_reason),
-            }),
         };
         if let Some(msg) = msg {
             self.0

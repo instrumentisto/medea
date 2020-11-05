@@ -65,6 +65,10 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
+            C::LeaveRoom { .. } | C::JoinRoom { .. } => unreachable!(
+                "Room can't receive this Command: {:?}",
+                command.command
+            ),
         };
 
         let peer_member_id = self

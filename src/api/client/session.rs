@@ -18,8 +18,8 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Credential, Event, MemberId,
-    RoomId, RpcSettings, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Command, Credential, Event,
+    MemberId, RoomId, RpcSettings, ServerMsg,
 };
 
 use crate::{
@@ -144,32 +144,45 @@ impl WsSession {
             }
             Ok(ClientMsg::Command { room_id, command }) => {
                 debug!("{}: Received Command: {:?}", self, command);
-                if let Some((member_id, room)) = self.sessions.get(&room_id) {
-                    room.send_command(member_id.clone(), command);
-                } else {
-                    Self::send_left_room(ctx, room_id, CloseReason::Finished);
-                    if self.sessions.is_empty() {
-                        self.close_in_place(
-                            ctx,
-                            &CloseDescription::new(CloseReason::Rejected),
+                match command {
+                    Command::JoinRoom {
+                        member_id,
+                        credential,
+                    } => {
+                        self.handle_join_room(
+                            ctx, room_id, member_id, credential,
                         );
                     }
+                    Command::LeaveRoom { member_id } => {
+                        self.handle_leave_room(
+                            ctx,
+                            &room_id,
+                            member_id,
+                            ClosedReason::Closed { normal: true },
+                        );
+                    }
+                    _ => {
+                        if let Some((member_id, room)) =
+                            self.sessions.get(&room_id)
+                        {
+                            room.send_command(member_id.clone(), command);
+                        } else {
+                            self.send_left_room(
+                                ctx,
+                                room_id,
+                                CloseReason::Finished,
+                            );
+                            if self.sessions.is_empty() {
+                                self.close_in_place(
+                                    ctx,
+                                    &CloseDescription::new(
+                                        CloseReason::Rejected,
+                                    ),
+                                );
+                            }
+                        }
+                    }
                 }
-            }
-            Ok(ClientMsg::JoinRoom {
-                room_id,
-                member_id,
-                credential: token,
-            }) => {
-                self.handle_join_room(ctx, room_id, member_id, token);
-            }
-            Ok(ClientMsg::LeaveRoom { room_id, member_id }) => {
-                self.handle_leave_room(
-                    ctx,
-                    &room_id,
-                    member_id,
-                    ClosedReason::Closed { normal: true },
-                );
             }
             Err(err) => error!(
                 "{}: Error [{:?}] parsing client message: [{}]",
@@ -206,13 +219,13 @@ impl WsSession {
         }
     }
 
-    /// Handler for [`ClientMsg::JoinRoom`].
+    /// Handler for [`Command::JoinRoom`].
     ///
     /// Calls [`RpcServer::connection_established`], updates
     /// [`RpcConnectionSettings`] with [`RpcConnectionSettings`] returned from
     /// the [`RpcServer`].
     ///
-    /// Sends [`ServerMsg::JoinedRoom`].
+    /// Sends [`Event::JoinedRoom`].
     fn handle_join_room(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
@@ -237,7 +250,7 @@ impl WsSession {
                     {
                         ctx.cancel_future(auth_timeout_handle);
                     }
-                    Self::send_joined_room(ctx, room_id, member_id);
+                    this.send_joined_room(ctx, room_id, member_id);
                 }
                 Err(err) => {
                     error!(
@@ -252,7 +265,7 @@ impl WsSession {
                             CloseReason::InternalError
                         }
                     };
-                    Self::send_left_room(ctx, room_id, reason)
+                    this.send_left_room(ctx, room_id, reason)
                 }
             })
             .wait(ctx);
@@ -261,11 +274,11 @@ impl WsSession {
                 "{}: Failed to authorize Rpc Session: Room `{}` does not exist",
                 self, room_id
             );
-            Self::send_left_room(ctx, room_id, CloseReason::Rejected)
+            self.send_left_room(ctx, room_id, CloseReason::Rejected)
         }
     }
 
-    /// Handles [`ClientMsg::LeftRoom`].
+    /// Handles [`Command::LeftRoom`].
     ///
     /// Sends [`RpcServer::connection_closed`] to the [`RpcServer`] based on
     /// provided [`RoomId`].
@@ -419,34 +432,40 @@ impl WsSession {
         self.last_ping_num += 1;
     }
 
-    /// Sends [`ServerMsg::JoinedRoom`] to the client.
+    /// Sends [`Event`] to Web Client.
+    fn send_event(
+        &self,
+        ctx: &mut <Self as Actor>::Context,
+        room_id: RoomId,
+        event: Event,
+    ) {
+        debug!(
+            "{}: Sending Event for Room [id = {}]: {:?}]",
+            self, room_id, event
+        );
+        let event = serde_json::to_string(&ServerMsg::Event { room_id, event })
+            .unwrap();
+        ctx.text(event);
+    }
+
+    /// Sends [`Event::JoinedRoom`] to the client.
     fn send_joined_room(
+        &self,
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         member_id: MemberId,
     ) {
-        ctx.text(
-            serde_json::to_string(&ServerMsg::JoinedRoom {
-                room_id,
-                member_id,
-            })
-            .unwrap(),
-        );
+        self.send_event(ctx, room_id, Event::JoinedRoom { member_id });
     }
 
-    /// Sends [`ServerMsg::LeftRoom`] to the client.
+    /// Sends [`Event::LeftRoom`] to the client.
     fn send_left_room(
+        &self,
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         close_reason: CloseReason,
     ) {
-        ctx.text(
-            serde_json::to_string(&ServerMsg::LeftRoom {
-                room_id,
-                close_reason,
-            })
-            .unwrap(),
-        );
+        self.send_event(ctx, room_id, Event::LeftRoom { close_reason });
     }
 
     /// Sends current [`RpcSettings`] to the client.
@@ -580,7 +599,7 @@ impl Handler<CloseRoom> for WsSession {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if self.sessions.remove(&msg.room_id).is_some() {
-            Self::send_left_room(ctx, msg.room_id, CloseReason::Finished);
+            self.send_left_room(ctx, msg.room_id, CloseReason::Finished);
             if self.sessions.is_empty() {
                 self.close_in_place(ctx, &msg.close_description);
             }
@@ -593,13 +612,7 @@ impl Handler<EventMessage> for WsSession {
 
     /// Sends [`Event`] to Web Client.
     fn handle(&mut self, msg: EventMessage, ctx: &mut Self::Context) {
-        debug!("{}: Sending Event: {:?}]", self, msg);
-        let event = serde_json::to_string(&ServerMsg::Event {
-            room_id: msg.room_id,
-            event: msg.event,
-        })
-        .unwrap();
-        ctx.text(event);
+        self.send_event(ctx, msg.room_id, msg.event);
     }
 }
 
@@ -755,10 +768,12 @@ mod test {
         let mut client = serv.ws().await.unwrap();
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -768,9 +783,11 @@ mod test {
 
         assert_eq!(
             left_room_frame,
-            into_frame(ServerMsg::LeftRoom {
+            into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
-                close_reason: medea_client_api_proto::CloseReason::Rejected,
+                event: Event::LeftRoom {
+                    close_reason: medea_client_api_proto::CloseReason::Rejected,
+                }
             })
         );
 
@@ -815,10 +832,12 @@ mod test {
         let mut client = serv.ws().await.unwrap();
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -837,9 +856,11 @@ mod test {
         let item = client.next().await.unwrap().unwrap();
         assert_eq!(
             item,
-            into_frame(ServerMsg::JoinedRoom {
+            into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
+                event: Event::JoinedRoom {
+                    member_id: "member_id".into(),
+                }
             })
         );
 
@@ -888,10 +909,12 @@ mod test {
         let mut client = serv.ws().await.unwrap();
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -957,10 +980,12 @@ mod test {
         let mut client = serv.ws().await.unwrap();
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -1070,10 +1095,12 @@ mod test {
         let mut client = serv.ws().await.unwrap();
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -1094,9 +1121,11 @@ mod test {
         let left_room_frame = client.next().await.unwrap().unwrap();
         assert_eq!(
             left_room_frame,
-            into_frame(ServerMsg::LeftRoom {
+            into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
-                close_reason: medea_client_api_proto::CloseReason::Finished,
+                event: Event::LeftRoom {
+                    close_reason: medea_client_api_proto::CloseReason::Finished,
+                }
             })
         );
         let item = client.next().await.unwrap().unwrap();
@@ -1157,10 +1186,12 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room_id".into(),
-                member_id: "member_id".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member_id".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -1231,10 +1262,12 @@ mod test {
 
         let mut client = serv.ws().await.unwrap();
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "alice_room".into(),
-                member_id: "alice".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "alice".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -1250,10 +1283,12 @@ mod test {
         alice_connection.send_event("alice_room".into(), alice_event.clone());
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "bob_room".into(),
-                member_id: "bob".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "bob".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
@@ -1294,9 +1329,11 @@ mod test {
         );
         assert_eq!(
             msgs[1],
-            ServerMsg::JoinedRoom {
+            ServerMsg::Event {
                 room_id: "alice_room".into(),
-                member_id: "alice".into(),
+                event: Event::JoinedRoom {
+                    member_id: "alice".into(),
+                }
             }
         );
         assert_eq!(
@@ -1308,9 +1345,11 @@ mod test {
         );
         assert_eq!(
             msgs[3],
-            ServerMsg::JoinedRoom {
+            ServerMsg::Event {
                 room_id: "bob_room".into(),
-                member_id: "bob".into(),
+                event: Event::JoinedRoom {
+                    member_id: "bob".into(),
+                }
             }
         );
         assert_eq!(
@@ -1356,47 +1395,59 @@ mod test {
         let mut client = serv.ws().await.unwrap();
 
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room1".into(),
-                member_id: "member1".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member1".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
         client
-            .send(into_message(ClientMsg::JoinRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room2".into(),
-                member_id: "member2".into(),
-                credential: "token".into(),
+                command: Command::JoinRoom {
+                    member_id: "member2".into(),
+                    credential: "token".into(),
+                },
             }))
             .await
             .unwrap();
 
         client
-            .send(into_message(ClientMsg::LeaveRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room1".into(),
-                member_id: "member1".into(),
+                command: Command::LeaveRoom {
+                    member_id: "member1".into(),
+                },
             }))
             .await
             .unwrap();
         client
-            .send(into_message(ClientMsg::LeaveRoom {
+            .send(into_message(ClientMsg::Command {
                 room_id: "room2".into(),
-                member_id: "member2".into(),
+                command: Command::LeaveRoom {
+                    member_id: "member2".into(),
+                },
             }))
             .await
             .unwrap();
 
         let mut frames: Vec<_> =
             client.map(|frame| frame.unwrap()).collect().await;
-        assert!(frames.contains(&Frame::Text(Bytes::from(
-            "{\"msg\":\"JoinedRoom\",\"data\":{\"room_id\":\"room1\",\"\
-             member_id\":\"member1\"}}"
-        ))));
-        assert!(frames.contains(&Frame::Text(Bytes::from(
-            "{\"msg\":\"JoinedRoom\",\"data\":{\"room_id\":\"room2\",\"\
-             member_id\":\"member2\"}}"
-        ))));
+        assert!(frames.contains(&into_frame(ServerMsg::Event {
+            room_id: "room1".into(),
+            event: Event::JoinedRoom {
+                member_id: "member1".into(),
+            }
+        })));
+        assert!(frames.contains(&into_frame(ServerMsg::Event {
+            room_id: "room2".into(),
+            event: Event::JoinedRoom {
+                member_id: "member2".into(),
+            }
+        })));
         assert_eq!(
             frames.pop().unwrap(),
             Frame::Close(Some(CloseReason {

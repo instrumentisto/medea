@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 use medea_client_api_proto::{
-    CommandHandler, Event, IceCandidate, NegotiationRole, PeerId, PeerMetrics,
-    TrackId, TrackPatchCommand,
+    CommandHandler, Credential, Event, IceCandidate, MemberId, NegotiationRole,
+    PeerId, PeerMetrics, TrackId, TrackPatchCommand,
 };
 
 use crate::{
@@ -17,6 +17,16 @@ use super::{Room, RoomError};
 
 impl CommandHandler for Room {
     type Output = Result<(), RoomError>;
+
+    #[inline]
+    fn on_join_room(&mut self, _: MemberId, _: Credential) -> Self::Output {
+        unreachable!("Room can't receive Command::JoinRoom")
+    }
+
+    #[inline]
+    fn on_leave_room(&mut self, _: MemberId) -> Self::Output {
+        unreachable!("Room can't receive Command::LeaveRoom")
+    }
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to

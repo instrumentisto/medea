@@ -124,24 +124,6 @@ pub enum ServerMsg {
     /// `Media Server` notifies `Client` about necessity to update its RPC
     /// settings.
     RpcSettings(RpcSettings),
-
-    /// `Media Server` notifies `Client` that he joined `Room`.
-    JoinedRoom {
-        /// ID of `Room` into which `Client` was joined.
-        room_id: RoomId,
-
-        /// ID of `Member` which joined `Room`.
-        member_id: MemberId,
-    },
-
-    /// `Media Server` notifies `Client` that he left `Room`.
-    LeftRoom {
-        /// ID of `Room` from which `Client` was left.
-        room_id: RoomId,
-
-        /// [`CloseReason`] with which `Client` was left.
-        close_reason: CloseReason,
-    },
 }
 
 #[cfg_attr(feature = "medea", derive(Deserialize))]
@@ -160,27 +142,6 @@ pub enum ClientMsg {
 
         /// Actual [`Command`] sent to `Media Server`.
         command: Command,
-    },
-
-    /// Request of `Client` to join `Room`.
-    JoinRoom {
-        /// ID of `Room` into which `Client` requests to join.
-        room_id: RoomId,
-
-        /// ID of `Member` with which [`Credentials`] `Client` want to join.
-        member_id: MemberId,
-
-        /// [`Credential`] of `Client`'s `Member`.
-        credential: Credential,
-    },
-
-    /// Request of `Client` to leave `Room`.
-    LeaveRoom {
-        /// ID of `Room` from which `Client` requests to left.
-        room_id: RoomId,
-
-        /// ID of leaving `Member`.
-        member_id: MemberId,
     },
 }
 
@@ -206,6 +167,21 @@ pub struct RpcSettings {
 #[serde(tag = "command", content = "data")]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    /// Request of `Client` to join `Room`.
+    JoinRoom {
+        /// ID of `Member` with which [`Credentials`] `Client` want to join.
+        member_id: MemberId,
+
+        /// [`Credential`] of `Client`'s `Member`.
+        credential: Credential,
+    },
+
+    /// Request of `Client` to leave `Room`.
+    LeaveRoom {
+        /// ID of leaving `Member`.
+        member_id: MemberId,
+    },
+
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
         /// ID of the `Peer` for which Web Client sends SDP Offer.
@@ -419,6 +395,18 @@ pub struct CloseDescription {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
+    /// `Media Server` notifies `Client` that he joined `Room`.
+    JoinedRoom {
+        /// ID of `Member` which joined `Room`.
+        member_id: MemberId,
+    },
+
+    /// `Media Server` notifies `Client` that he left `Room`.
+    LeftRoom {
+        /// [`CloseReason`] with which `Client` was left.
+        close_reason: CloseReason,
+    },
+
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {

@@ -122,22 +122,11 @@ impl TestMember {
 
     /// Authorizes this [`TestMember`] on `Media Server` with a provided
     /// connection info.
-    fn authorize(
-        &mut self,
-        room_id: RoomId,
-        member_id: MemberId,
-        credential: Credential,
-    ) {
-        executor::block_on(async move {
-            let json = serde_json::to_string(&ClientMsg::JoinRoom {
-                room_id,
-                member_id,
-                credential,
-            })
-            .unwrap();
-            self.sink.send(ws::Message::Text(json)).await.unwrap();
-            self.sink.flush().await.unwrap();
-        })
+    fn authorize(&mut self, member_id: MemberId, credential: Credential) {
+        self.send_command(Command::JoinRoom {
+            member_id,
+            credential,
+        });
     }
 
     /// Sends pong to the server.
@@ -167,7 +156,7 @@ impl TestMember {
         Self::create(move |ctx| {
             Self::add_stream(stream, ctx);
             let mut this = Self {
-                room_id: room_id.clone(),
+                room_id,
                 sink,
                 events: Vec::new(),
                 known_peers: HashSet::new(),
@@ -178,7 +167,7 @@ impl TestMember {
                 on_connection_event,
                 auto_negotiation,
             };
-            this.authorize(room_id, member_id, token);
+            this.authorize(member_id, token);
 
             this
         })
@@ -308,6 +297,13 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event { room_id, event } => {
                     assert_eq!(self.room_id, room_id);
+                    if matches!(
+                        event,
+                        Event::JoinedRoom { .. }
+                        | Event::LeftRoom { .. }
+                    ) {
+                        return;
+                    }
                     if self.auto_negotiation {
                         match &event {
                             Event::PeerCreated {
@@ -431,7 +427,9 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                 peer_id, ..
                             } => assert!(self.known_peers.contains(peer_id)),
                             Event::PeersRemoved { .. }
-                            | Event::ConnectionQualityUpdated { .. } => (),
+                            | Event::ConnectionQualityUpdated { .. }
+                            | Event::JoinedRoom { .. }
+                            | Event::LeftRoom { .. } => (),
                         }
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();
@@ -446,14 +444,6 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                         func(ConnectionEvent::SettingsReceived(settings))
                     };
                 }
-                ServerMsg::JoinedRoom {
-                    room_id: _,
-                    member_id: _,
-                } => {}
-                ServerMsg::LeftRoom {
-                    room_id: _,
-                    close_reason: _,
-                } => {}
             }
         }
     }

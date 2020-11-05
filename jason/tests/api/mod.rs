@@ -7,7 +7,9 @@ use futures::{
     channel::{mpsc, oneshot},
     stream, StreamExt,
 };
-use medea_client_api_proto::{ClientMsg, CloseReason, ServerMsg};
+use medea_client_api_proto::{
+    ClientMsg, CloseReason, Command, Event, ServerMsg,
+};
 use medea_jason::{
     rpc::{
         websocket::{MockRpcTransport, TransportState},
@@ -34,9 +36,11 @@ async fn only_one_strong_rpc_rc_exists() {
                 move || {
                     Box::pin(stream::iter(vec![
                         RPC_SETTINGS,
-                        ServerMsg::JoinedRoom {
+                        ServerMsg::Event {
                             room_id: "room_id".into(),
-                            member_id: "member_id".into(),
+                            event: Event::JoinedRoom {
+                                member_id: "member_id".into(),
+                            },
                         },
                     ]))
                 }
@@ -76,9 +80,11 @@ async fn rpc_dropped_on_jason_dispose() {
                 move || {
                     Box::pin(stream::iter(vec![
                         RPC_SETTINGS,
-                        ServerMsg::JoinedRoom {
+                        ServerMsg::Event {
                             room_id: "room_id".into(),
-                            member_id: "member_id".into(),
+                            event: Event::JoinedRoom {
+                                member_id: "member_id".into(),
+                            },
                         },
                     ]))
                 }
@@ -163,9 +169,11 @@ async fn room_dispose_works() {
         async move {
             yield_now().await;
             client_msg_txs.borrow().iter().for_each(|tx| {
-                tx.unbounded_send(ServerMsg::JoinedRoom {
+                tx.unbounded_send(ServerMsg::Event {
                     room_id: "room_id".into(),
-                    member_id: "member_id".into(),
+                    event: Event::JoinedRoom {
+                        member_id: "member_id".into(),
+                    },
                 })
                 .ok();
             });
@@ -187,9 +195,11 @@ async fn room_dispose_works() {
         async move {
             yield_now().await;
             client_msg_txs.borrow().iter().for_each(|tx| {
-                tx.unbounded_send(ServerMsg::JoinedRoom {
+                tx.unbounded_send(ServerMsg::Event {
                     room_id: "another_room_id".into(),
-                    member_id: "member_id".into(),
+                    event: Event::JoinedRoom {
+                        member_id: "member_id".into(),
+                    },
                 })
                 .ok();
             });
@@ -205,23 +215,45 @@ async fn room_dispose_works() {
 
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::JoinRoom { room_id: _, member_id: _, credential: _ }
+        ClientMsg::Command {
+            room_id: _,
+            command: Command::JoinRoom {
+                member_id: _,
+                credential: _
+            }
+        }
     ));
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::JoinRoom { room_id: _, member_id: _, credential: _ }
+        ClientMsg::Command {
+            room_id: _,
+            command: Command::JoinRoom {
+                member_id: _,
+                credential: _
+            }
+        }
     ));
 
     jason.close_room(room);
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::LeaveRoom { room_id: _, member_id: _ }
+        ClientMsg::Command {
+            room_id: _,
+            command: Command::LeaveRoom {
+                member_id: _
+            }
+        }
     ));
 
     jason.close_room(another_room);
     assert!(matches!(
         cmd_rx.next().await.unwrap(),
-        ClientMsg::LeaveRoom { room_id: _, member_id: _ }
+        ClientMsg::Command {
+            room_id: _,
+            command: Command::LeaveRoom {
+                member_id: _
+            }
+        }
     ));
 
     jason.dispose();
@@ -245,9 +277,11 @@ async fn room_closes_on_rpc_transport_close() {
                     move || {
                         Box::pin(stream::iter(vec![
                             RPC_SETTINGS,
-                            ServerMsg::JoinedRoom {
+                            ServerMsg::Event {
                                 room_id: "room_id".into(),
-                                member_id: "member_id".into(),
+                                event: Event::JoinedRoom {
+                                    member_id: "member_id".into(),
+                                },
                             },
                         ]))
                     }
