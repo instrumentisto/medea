@@ -35,7 +35,7 @@ pub type MediaExchangeStateController = TransitableStateController<
 
 /// Component that manages all kinds of [`MediaState`].
 pub struct TransitableStateController<S, T> {
-    /// Actual [`MediaExchangeState`].
+    /// Actual [`TransitableState`].
     state: ObservableCell<TransitableState<S, T>>,
 
     /// Timeout of the [`TransitableStateController::state`] transition.
@@ -83,16 +83,12 @@ where
     /// [`TransitableStateController`].
     fn spawn(self: Rc<Self>) {
         // we don't care about initial state, cause transceiver is inactive atm
-        let mut media_exchange_state_changes = self.state.subscribe().skip(1);
+        let mut state_changes = self.state.subscribe().skip(1);
         let weak_this = Rc::downgrade(&self);
         spawn_local(async move {
-            while let Some(media_exchange_state) =
-                media_exchange_state_changes.next().await
-            {
+            while let Some(state) = state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    if let TransitableState::Transition(_) =
-                        media_exchange_state
-                    {
+                    if let TransitableState::Transition(_) = state {
                         let weak_this = Rc::downgrade(&this);
                         spawn_local(async move {
                             let mut transitions =
@@ -143,16 +139,15 @@ where
     }
 
     /// Returns current [`TransitableStateController::state`].
-    pub fn media_exchange_state(&self) -> TransitableState<S, T> {
+    pub fn state(&self) -> TransitableState<S, T> {
         self.state.get()
     }
 
     /// Starts transition of the [`TransitableStateController::state`] to
     /// the provided one.
     pub(in super::super) fn transition_to(&self, desired_state: S) {
-        let current_media_exchange_state = self.state.get();
-        self.state
-            .set(current_media_exchange_state.transition_to(desired_state));
+        let current_state = self.state.get();
+        self.state.set(current_state.transition_to(desired_state));
     }
 
     /// Returns [`Future`] which will be resolved when [`InStable`] state of
@@ -174,9 +169,9 @@ where
         &self,
         desired_state: S,
     ) -> future::LocalBoxFuture<'static, Result<()>> {
-        let mut media_exchange_states = self.state.subscribe();
+        let mut states = self.state.subscribe();
         async move {
-            while let Some(state) = media_exchange_states.next().await {
+            while let Some(state) = states.next().await {
                 match state {
                     TransitableState::Transition(_) => continue,
                     TransitableState::Stable(s) => {

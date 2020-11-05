@@ -118,31 +118,3 @@ impl InTransition for TransitionMediaExchangeState {
         }
     }
 }
-
-impl TransitionMediaExchangeState {
-    /// Returns intention which this [`TransitionMediaExchangeState`] indicates.
-    #[inline]
-    pub fn intended(self) -> StableMediaExchangeState {
-        match self {
-            Self::Enabling(_) => StableMediaExchangeState::Enabled,
-            Self::Disabling(_) => StableMediaExchangeState::Disabled,
-        }
-    }
-
-    /// Sets inner [`StableMediaExchangeState`].
-    #[inline]
-    pub fn set_inner(self, inner: StableMediaExchangeState) -> Self {
-        match self {
-            Self::Enabling(_) => Self::Enabling(inner),
-            Self::Disabling(_) => Self::Disabling(inner),
-        }
-    }
-
-    /// Returns inner [`StableMediaExchangeState`].
-    #[inline]
-    pub fn into_inner(self) -> StableMediaExchangeState {
-        match self {
-            Self::Enabling(s) | Self::Disabling(s) => s,
-        }
-    }
-}

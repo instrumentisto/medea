@@ -30,7 +30,10 @@ use crate::{
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
-use self::sender::SenderBuilder;
+use self::{
+    sender::SenderBuilder,
+    transitable_state::{MediaExchangeStateController, MuteStateController},
+};
 
 pub use self::{
     receiver::Receiver,
@@ -40,9 +43,6 @@ pub use self::{
         StableMuteState, TransitableState, TransitionMediaExchangeState,
         TransitionMuteState,
     },
-};
-use crate::peer::media::transitable_state::{
-    MediaExchangeStateController, MuteStateController,
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
@@ -77,14 +77,13 @@ pub trait Disableable {
     /// Returns [`MediaExchangeState`] of this [`Disableable`].
     #[inline]
     fn media_exchange_state(&self) -> MediaExchangeState {
-        self.media_exchange_state_controller()
-            .media_exchange_state()
+        self.media_exchange_state_controller().state()
     }
 
     /// Returns [`MuteState`] of this [`Disableable`].
     #[inline]
     fn mute_state(&self) -> MuteState {
-        self.mute_state_controller().media_exchange_state()
+        self.mute_state_controller().state()
     }
 
     /// Sets current [`MediaState`] to [`TransitableState::Transition`].
@@ -592,7 +591,6 @@ impl MediaConnections {
                         if !send_constraints.is_muted(&track.media_type) {
                             StableMuteState::Unmuted
                         } else if is_required {
-                            // TODO: is it needed??
                             return Err(tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         ));

@@ -12,21 +12,18 @@ use crate::{
         VideoSource,
     },
     peer::{
-        media::{
-            transitable_state::{
-                MediaExchangeStateController, MediaState, MuteStateController,
-                StableMuteState,
-            },
-            TransceiverSide,
-        },
         transceiver::{Transceiver, TransceiverDirection},
         PeerEvent,
     },
 };
 
 use super::{
-    transitable_state::StableMediaExchangeState, Disableable, MediaConnections,
-    MediaConnectionsError, Result,
+    transitable_state::{
+        MediaExchangeStateController, MediaState, MuteStateController,
+        StableMediaExchangeState, StableMuteState,
+    },
+    Disableable, MediaConnections, MediaConnectionsError, Result,
+    TransceiverSide,
 };
 
 /// Builder of the [`Sender`].
@@ -204,7 +201,7 @@ impl Sender {
         }
 
         new_track.set_enabled(
-            self.mute_state.media_exchange_state().cancel_transition()
+            self.mute_state.state().cancel_transition()
                 == StableMuteState::Unmuted.into(),
         );
 
@@ -360,7 +357,6 @@ impl Disableable for Sender {
                 MediaConnectionsError::CannotDisableRequiredSender
             ))
         } else {
-            // TODO(evdokimovs): is_required важен для mute_state??
             match desired_state {
                 MediaState::MediaExchange(desired_state) => {
                     self.media_exchange_state_controller()

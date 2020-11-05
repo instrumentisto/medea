@@ -159,6 +159,10 @@ struct AudioMediaTracksSettings {
     is_enabled: bool,
 
     /// Indicator whether audio should be muted.
+    ///
+    /// Any action with this flag should be performed only while disable/enable
+    /// actions by [`Room`]. This flag can't be changed by
+    /// [`MediaStreamSettings`] updating.
     is_muted: bool,
 }
 

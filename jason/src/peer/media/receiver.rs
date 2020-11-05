@@ -14,19 +14,18 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
-        media::{
-            transitable_state::{
-                MediaExchangeStateController, TransitableStateController,
-            },
-            TransceiverSide,
-        },
-        transceiver::Transceiver,
-        Disableable, MediaConnections, PeerEvent, TransceiverDirection,
+        transceiver::Transceiver, Disableable, MediaConnections, PeerEvent,
+        TransceiverDirection,
     },
 };
 
-use super::transitable_state::StableMediaExchangeState;
-use crate::peer::media::transitable_state::MuteStateController;
+use super::{
+    transitable_state::{
+        MediaExchangeStateController, MuteStateController,
+        StableMediaExchangeState, TransitableStateController,
+    },
+    TransceiverSide,
+};
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -281,7 +280,7 @@ impl Disableable for Receiver {
     }
 
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
-        unimplemented!("Receivers muting is not implemented");
+        unreachable!("Receivers muting is not implemented");
     }
 }
 

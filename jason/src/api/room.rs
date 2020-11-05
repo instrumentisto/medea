@@ -764,7 +764,7 @@ impl InnerRoom {
                     );
                 }
                 MediaState::Mute(_) => {
-                    unimplemented!("Receivers muting is not implemented")
+                    unreachable!("Receivers muting is not implemented")
                 }
             }
         } else {
