@@ -295,10 +295,16 @@ impl Sender {
         }
     }
 
+    /// Returns `true` if this [`Sender`] is disabled.
     #[cfg(feature = "mockable")]
-    /// Returns `true` if this [`Receiver`] is disabled.
     pub fn is_disabled(&self) -> bool {
         self.media_exchange_state.is_disabled()
+    }
+
+    /// Returns `true` if this [`Sender`] is muted.
+    #[cfg(feature = "mockable")]
+    pub fn is_muted(&self) -> bool {
+        self.mute_state.is_muted()
     }
 }
 

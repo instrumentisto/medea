@@ -1106,13 +1106,16 @@ mod patches_generation {
         AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
         TrackPatchCommand, VideoSettings,
     };
-    use medea_jason::{media::RecvConstraints, JsMediaSourceKind};
+    use medea_jason::{
+        media::RecvConstraints,
+        peer::{MediaState, StableMediaExchangeState, StableMuteState},
+        JsMediaSourceKind,
+    };
     use wasm_bindgen_futures::spawn_local;
 
     use crate::{is_firefox, timeout};
 
     use super::*;
-    use medea_jason::peer::{MediaState, StableMediaExchangeState};
 
     fn audio_and_device_video_tracks_content() -> Vec<(MediaType, Direction)> {
         vec![
@@ -1500,6 +1503,78 @@ mod patches_generation {
             }
         }
     }
+
+    #[wasm_bindgen_test]
+    async fn track_patch_on_muting() {
+        let (room, mut command_rx) = get_room_and_commands_receiver(
+            1,
+            |_| StableMuteState::Unmuted.into(),
+            audio_and_device_video_tracks_content(),
+        )
+        .await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatchCommand {
+                    id: TrackId(0),
+                    is_disabled: None,
+                    is_muted: Some(true),
+                }]
+            }
+        );
+    }
+
+    #[wasm_bindgen_test]
+    async fn track_patch_on_unmuting() {
+        let (room, mut command_rx) = get_room_and_commands_receiver(
+            1,
+            |_| StableMuteState::Muted.into(),
+            audio_and_device_video_tracks_content(),
+        )
+        .await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.unmute_audio())
+                .await
+                .unwrap_err();
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatchCommand {
+                    id: TrackId(0),
+                    is_disabled: None,
+                    is_muted: Some(false),
+                }]
+            }
+        );
+    }
+}
+
+#[wasm_bindgen_test]
+async fn mute_unmute_audio() {
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (room, peer) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    let handle = room.new_handle();
+    assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
+    assert!(!peer.is_send_audio_unmuted());
+    assert!(JsFuture::from(handle.unmute_audio()).await.is_ok());
+    assert!(peer.is_send_audio_unmuted());
 }
 
 /// Tests that muting and unmuting of remote audio works.

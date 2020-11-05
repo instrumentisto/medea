@@ -486,6 +486,32 @@ impl MediaConnections {
             .is_none()
     }
 
+    /// Returns `true` if all [`Sender`]s video tracks are unmuted.
+    #[cfg(feature = "mockable")]
+    pub fn is_send_video_unmuted(
+        &self,
+        source_kind: Option<MediaSourceKind>,
+    ) -> bool {
+        self.0
+            .borrow()
+            .iter_senders_with_kind_and_source_kind(
+                MediaKind::Video,
+                source_kind,
+            )
+            .find(|s| s.is_muted())
+            .is_none()
+    }
+
+    /// Returns `true` if all [`Sender`]s audio tracks are unmuted.
+    #[cfg(feature = "mockable")]
+    pub fn is_send_audio_unmuted(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
+            .find(|s| s.is_muted())
+            .is_none()
+    }
+
     /// Returns mapping from a [`MediaStreamTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     ///
