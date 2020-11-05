@@ -1,6 +1,8 @@
+//! State of the media publishing.
+
 use super::{InStable, InTransition};
 
-/// Stable [`MediaExchangeState`].
+/// State of the media publishing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMediaExchangeState {
     /// [`Disableable`] is enabled.
@@ -15,7 +17,8 @@ pub enum StableMediaExchangeState {
 }
 
 impl StableMediaExchangeState {
-    pub fn inverse(self) -> Self {
+    /// Returns opposite to this [`StableMediaExchangeState`].
+    pub fn opposite(self) -> Self {
         match self {
             Self::Enabled => Self::Disabled,
             Self::Disabled => Self::Enabled,
@@ -58,7 +61,7 @@ impl From<bool> for StableMediaExchangeState {
 /// [`StableMediaExchangeState`].
 ///
 /// [`StableMediaExchangeState`] which is stored in
-/// [`MediaExchangeStateTransition`] variants is a state which we already have,
+/// [`TransitionMediaExchangeState`] variants is a state which we already have,
 /// but we still waiting for a desired state update. If desired state update
 /// won't be received, then the stored [`StableMediaExchangeState`] will be
 /// applied.
@@ -78,7 +81,7 @@ pub enum TransitionMediaExchangeState {
 impl InTransition for TransitionMediaExchangeState {
     type Stable = StableMediaExchangeState;
 
-    /// Returns intention which this [`MediaExchangeStateTransition`] indicates.
+    /// Returns intention which this [`TransitionMediaExchangeState`] indicates.
     #[inline]
     fn intended(self) -> Self::Stable {
         match self {
@@ -104,8 +107,11 @@ impl InTransition for TransitionMediaExchangeState {
         }
     }
 
+    /// Converts [`TransitionMediaExchangeState`] to the opposite
+    /// [`TransitionMediaExchangeState`] with a same inner
+    /// [`StableMediaExchangeState`].
     #[inline]
-    fn reverse(self) -> Self {
+    fn opposite(self) -> Self {
         match self {
             Self::Enabling(stable) => Self::Disabling(stable),
             Self::Disabling(stable) => Self::Enabling(stable),
@@ -114,7 +120,7 @@ impl InTransition for TransitionMediaExchangeState {
 }
 
 impl TransitionMediaExchangeState {
-    /// Returns intention which this [`MediaExchangeStateTransition`] indicates.
+    /// Returns intention which this [`TransitionMediaExchangeState`] indicates.
     #[inline]
     pub fn intended(self) -> StableMediaExchangeState {
         match self {

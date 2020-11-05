@@ -1,13 +1,20 @@
-use crate::peer::media::{InStable, InTransition};
+//! State of the media mute state.
 
+use super::{InStable, InTransition};
+
+/// State of the media mute state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StableMuteState {
+    /// [`Disableable`] is muted.
     Muted,
+
+    /// [`Disableable`] is unmuted.
     Unmuted,
 }
 
 impl StableMuteState {
-    pub fn inverse(self) -> Self {
+    /// Returns opposite to this [`StableMuteState`].
+    pub fn opposite(self) -> Self {
         match self {
             Self::Muted => Self::Unmuted,
             Self::Unmuted => Self::Muted,
@@ -15,9 +22,24 @@ impl StableMuteState {
     }
 }
 
+/// [`MuteState`] in transition to another
+/// [`StableMuteState`].
+///
+/// [`StableMuteState`] which is stored in
+/// [`TransitionMuteState`] variants is a state which we already have,
+/// but we still waiting for a desired state update. If desired state update
+/// won't be received, then the stored [`StableMuteState`] will be
+/// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitionMuteState {
+    /// [`Disableable`] should be muted, but awaits server permission.
+    ///
+    /// [`Disableable`]: super::Disableable
     Muting(StableMuteState),
+
+    /// [`Disableable`] should be unmuted, but awaits server permission.
+    ///
+    /// [`Disableable`]: super::Disableable
     Unmuting(StableMuteState),
 }
 
@@ -35,7 +57,6 @@ impl From<bool> for StableMuteState {
 impl InTransition for TransitionMuteState {
     type Stable = StableMuteState;
 
-    /// Returns intention which this [`MediaExchangeStateTransition`] indicates.
     #[inline]
     fn intended(self) -> Self::Stable {
         match self {
@@ -44,7 +65,6 @@ impl InTransition for TransitionMuteState {
         }
     }
 
-    /// Sets inner [`StableMediaExchangeState`].
     #[inline]
     fn set_inner(self, inner: Self::Stable) -> Self {
         match self {
@@ -53,7 +73,6 @@ impl InTransition for TransitionMuteState {
         }
     }
 
-    /// Returns inner [`StableMediaExchangeState`].
     #[inline]
     fn into_inner(self) -> Self::Stable {
         match self {
@@ -62,7 +81,7 @@ impl InTransition for TransitionMuteState {
     }
 
     #[inline]
-    fn reverse(self) -> Self {
+    fn opposite(self) -> Self {
         match self {
             Self::Unmuting(stable) => Self::Muting(stable),
             Self::Muting(stable) => Self::Unmuting(stable),
@@ -73,14 +92,6 @@ impl InTransition for TransitionMuteState {
 impl InStable for StableMuteState {
     type Transition = TransitionMuteState;
 
-    /// Converts this [`StableMediaExchangeState`] into
-    /// [`MediaExchangeStateTransition`].
-    ///
-    /// [`StableMediaExchangeState::Enabled`] =>
-    /// [`MediaExchangeStateTransition::Disabling`].
-    ///
-    /// [`StableMediaExchangeState::Disabled`] =>
-    /// [`MediaExchangeStateTransition::Enabling`].
     #[inline]
     fn start_transition(self) -> Self::Transition {
         match self {

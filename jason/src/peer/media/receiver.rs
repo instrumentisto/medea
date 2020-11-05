@@ -21,13 +21,12 @@ use crate::{
             TransceiverSide,
         },
         transceiver::Transceiver,
-        Disableable, MediaConnections, PeerEvent, StableMuteState,
-        TransceiverDirection, TransitionMediaExchangeState,
-        TransitionMuteState,
+        Disableable, MediaConnections, PeerEvent, TransceiverDirection,
     },
 };
 
 use super::transitable_state::StableMediaExchangeState;
+use crate::peer::media::transitable_state::MuteStateController;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -146,7 +145,7 @@ impl Receiver {
         new_track: SysMediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
-            if old_track.id() == new_track.id() {
+            if old_track.root_id() == new_track.id() {
                 return;
             }
         }
@@ -263,10 +262,12 @@ impl Receiver {
             == StableMediaExchangeState::Enabled
     }
 
+    /// Returns `true` if this [`Receiver`] is enabled.
     pub fn is_enabled(&self) -> bool {
         self.media_exchange_state_controller.is_enabled()
     }
 
+    /// Returns `true` if this [`Receiver`] is disabled.
     pub fn is_disabled(&self) -> bool {
         self.media_exchange_state_controller.is_disabled()
     }
@@ -275,19 +276,11 @@ impl Receiver {
 impl Disableable for Receiver {
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<
-        TransitableStateController<
-            StableMediaExchangeState,
-            TransitionMediaExchangeState,
-        >,
-    > {
+    ) -> Rc<MediaExchangeStateController> {
         self.media_exchange_state_controller.clone()
     }
 
-    fn mute_state_controller(
-        &self,
-    ) -> Rc<TransitableStateController<StableMuteState, TransitionMuteState>>
-    {
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
         unimplemented!("Receivers muting is not implemented");
     }
 }

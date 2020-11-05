@@ -45,47 +45,73 @@ impl From<MediaSourceKind> for JsMediaSourceKind {
     }
 }
 
-struct TracksRepo {
-    root_track: SysMediaStreamTrack,
-    tracks: Vec<SysMediaStreamTrack>,
+/// Wrapper around [`SysMediaStreamTrack`] which can deeply clone underlying
+/// [`SysMediaStreamTrack`] and will stop all cloned [`SysMediaStreamTrack`]s
+/// when will be dropped.
+///
+/// Root [`SysMediaStreamTrack`] (which can be obtained by
+/// [`DeeplyCloneableTrack::get_root`]) will be muted when all child
+/// [`SysMediaStreamTrack`]s are muted.
+struct DeeplyCloneableTrack {
+    /// Root [`SysMediaStreamTrack`] which was obtained by gUM/gDM request.
+    root: SysMediaStreamTrack,
+
+    /// Child [`SysMediaStreamTrack`] which are deeply cloned from the
+    /// [`DeeplyCloneableTrack::root`].
+    childs: Vec<SysMediaStreamTrack>,
 }
 
-impl TracksRepo {
-    fn root_id(&self) -> String {
-        self.root_track.id()
-    }
-
-    fn new(track: SysMediaStreamTrack) -> Self {
+impl DeeplyCloneableTrack {
+    /// Creates new [`DeeplyCloneableTrack`] with a provided
+    /// [`SysMediaStreamTrack`] as root track.
+    fn new(root: SysMediaStreamTrack) -> Self {
         Self {
-            root_track: track,
-            tracks: Vec::new(),
+            root,
+            childs: Vec::new(),
         }
     }
 
+    /// Returns ID of root [`SysMediaStreamTrack`].
+    fn root_id(&self) -> String {
+        self.root.id()
+    }
+
+    /// Deeply clones [`DeeplyCloneableTrack::root_track`], adds it to the
+    /// [`DeeplyCloneableTrack::childs`] and returns it.
     fn new_child(&mut self) -> SysMediaStreamTrack {
-        let new_track = SysMediaStreamTrack::clone(&self.root_track);
+        let new_track = SysMediaStreamTrack::clone(&self.root);
         let cloned_track = Clone::clone(&new_track);
-        self.tracks.push(cloned_track);
+        self.childs.push(cloned_track);
 
         new_track
     }
 
+    /// Updates [`DeeplyCloneableTrack::root`] mute state based on
+    /// [`DeeplyCloneableTrack::childs`].
+    ///
+    /// When all [`DeeplyCloneableTrack::childs`] are in muted state, then
+    /// [`DeeplyCloneableTrack::root`] will be muted, otherwise
+    /// [`DeeplyCloneableTrack::root`] will be unmuted.
     fn update_root_enabled(&self) {
-        self.root_track
-            .set_enabled(self.tracks.iter().any(SysMediaStreamTrack::enabled));
+        self.root
+            .set_enabled(self.childs.iter().any(SysMediaStreamTrack::enabled));
     }
 
+    /// Returns [`DeeplyCloneableTrack::root`].
+    ///
+    /// This [`SysMediaStreamTrack`] will be muted when all
+    /// [`DeeplyCloneableTrack::childs`] are muted.
     fn get_root(&self) -> SysMediaStreamTrack {
-        Clone::clone(&self.root_track)
+        Clone::clone(&self.root)
     }
 }
 
-impl Drop for TracksRepo {
+impl Drop for DeeplyCloneableTrack {
     fn drop(&mut self) {
-        self.tracks.drain(..).for_each(|track| {
+        self.childs.drain(..).for_each(|track| {
             track.stop();
         });
-        self.root_track.stop();
+        self.root.stop();
     }
 }
 
@@ -95,7 +121,10 @@ struct InnerMediaStreamTrack {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
 
-    tracks: Rc<RefCell<TracksRepo>>,
+    /// Wrapper around [`SysMediaStreamTrack`] which can deeply clone
+    /// underlying [`SysMediaStreamTrack`] and will stop all cloned
+    /// [`SysMediaStreamTrack`]s when will be dropped.
+    deeply_cloneable_track: Rc<RefCell<DeeplyCloneableTrack>>,
 
     /// Underlying [`SysMediaStreamTrack`] kind.
     kind: MediaKind,
@@ -127,8 +156,11 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
+    /// Creates new [`MediaStreamTrack`] with a provided
+    /// [`DeeplyCloneableTrack`] and provided [`SysMediaStreamTrack`], spawns
+    /// listener for [`InnerMediaStreamTrack::enabled`] state changes.
     fn inner_new(
-        tracks: Rc<RefCell<TracksRepo>>,
+        tracks: Rc<RefCell<DeeplyCloneableTrack>>,
         track: SysMediaStreamTrack,
         media_source_kind: MediaSourceKind,
     ) -> Self {
@@ -139,7 +171,7 @@ impl MediaStreamTrack {
         };
 
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            tracks,
+            deeply_cloneable_track: tracks,
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
@@ -179,27 +211,33 @@ impl MediaStreamTrack {
         SysMediaStreamTrack: From<T>,
     {
         let track = SysMediaStreamTrack::from(track);
-        let tracks =
-            Rc::new(RefCell::new(TracksRepo::new(Clone::clone(&track))));
+        let tracks = Rc::new(RefCell::new(DeeplyCloneableTrack::new(
+            Clone::clone(&track),
+        )));
         let track = tracks.borrow_mut().new_child();
         Self::inner_new(tracks, track, media_source_kind)
     }
 
+    /// Returns root [`MediaStreamTrack`] which will be muted when all its
+    /// childs are muted.
     #[inline]
     pub fn new_root(&self) -> Self {
         Self::inner_new(
-            self.0.tracks.clone(),
-            self.0.tracks.borrow().get_root(),
+            self.0.deeply_cloneable_track.clone(),
+            self.0.deeply_cloneable_track.borrow().get_root(),
             self.0.media_source_kind,
         )
     }
 
+    /// Deeply clones this [`MediaStreamTrack`].
+    ///
+    /// Returned [`MediaStreamTrack`] can be muted/unmuted without impacting to
+    /// the original [`MediaStreamTrack`].
+    #[inline]
     pub fn deep_clone(&self) -> Self {
-        let new_track = self.0.tracks.borrow_mut().new_child();
-
         Self::inner_new(
-            self.0.tracks.clone(),
-            new_track,
+            self.0.deeply_cloneable_track.clone(),
+            self.0.deeply_cloneable_track.borrow_mut().new_child(),
             self.0.media_source_kind,
         )
     }
@@ -217,16 +255,16 @@ impl MediaStreamTrack {
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
-        self.0.tracks.borrow().update_root_enabled();
+        self.0.deeply_cloneable_track.borrow().update_root_enabled();
     }
 
-    /// Returns [`id`][1] of underlying [MediaStreamTrack][2].
+    /// Returns root [`id`][1] of underlying [`DeeplyCloneableTrack`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
     /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
-    pub fn id(&self) -> String {
-        self.0.tracks.borrow().root_id()
+    pub fn root_id(&self) -> String {
+        self.0.deeply_cloneable_track.borrow().root_id()
     }
 
     /// Returns track kind (audio/video).

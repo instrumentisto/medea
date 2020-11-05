@@ -1,4 +1,6 @@
-//! [`crate::peer::PeerConnection`] media management.
+//! [`PeerConnection`] media management.
+//!
+//! [`PeerConnection`]: crate::peer::PeerConnection
 
 mod receiver;
 mod sender;
@@ -19,9 +21,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        media::transitable_state::{
-            MediaExchangeState, MuteState, TransitableStateController,
-        },
+        media::transitable_state::{MediaExchangeState, MuteState},
         transceiver::Transceiver,
         PeerEvent, TransceiverDirection,
     },
@@ -36,10 +36,13 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
     transitable_state::{
-        InStable, InTransition, StableMediaExchangeState, StableMuteState,
-        TrackMediaState, TransitableState, TransitionMediaExchangeState,
+        InStable, InTransition, MediaState, StableMediaExchangeState,
+        StableMuteState, TransitableState, TransitionMediaExchangeState,
         TransitionMuteState,
     },
+};
+use crate::peer::media::transitable_state::{
+    MediaExchangeStateController, MuteStateController,
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
@@ -66,16 +69,10 @@ pub trait Disableable {
     /// Returns reference to the [`MediaExchangeStateController`].
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<
-        TransitableStateController<
-            StableMediaExchangeState,
-            TransitionMediaExchangeState,
-        >,
-    >;
+    ) -> Rc<MediaExchangeStateController>;
 
-    fn mute_state_controller(
-        &self,
-    ) -> Rc<TransitableStateController<StableMuteState, TransitionMuteState>>;
+    /// Returns reference to the [`MuteStateController`].
+    fn mute_state_controller(&self) -> Rc<MuteStateController>;
 
     /// Returns [`MediaExchangeState`] of this [`Disableable`].
     #[inline]
@@ -84,13 +81,13 @@ pub trait Disableable {
             .media_exchange_state()
     }
 
+    /// Returns [`MuteState`] of this [`Disableable`].
     #[inline]
     fn mute_state(&self) -> MuteState {
         self.mute_state_controller().media_exchange_state()
     }
 
-    /// Sets current [`MediaExchangeState`] to
-    /// [`MediaExchangeState::Transition`].
+    /// Sets current [`MediaState`] to [`TransitableState::Transition`].
     ///
     /// # Errors
     ///
@@ -99,14 +96,14 @@ pub trait Disableable {
     #[inline]
     fn media_state_transition_to(
         &self,
-        desired_state: TrackMediaState,
+        desired_state: MediaState,
     ) -> Result<()> {
         match desired_state {
-            TrackMediaState::MediaExchange(desired_state) => {
+            MediaState::MediaExchange(desired_state) => {
                 self.media_exchange_state_controller()
                     .transition_to(desired_state);
             }
-            TrackMediaState::Mute(desired_state) => {
+            MediaState::Mute(desired_state) => {
                 self.mute_state_controller().transition_to(desired_state);
             }
         }
@@ -114,9 +111,11 @@ pub trait Disableable {
         Ok(())
     }
 
-    fn is_subscription_needed(&self, desired_state: TrackMediaState) -> bool {
+    /// Returns `true` if [`Room`] should subscribe to the [`MediaState`] update
+    /// when updating [`Disableable`] to the provided [`MediaState`].
+    fn is_subscription_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
-            TrackMediaState::MediaExchange(media_exchange) => {
+            MediaState::MediaExchange(media_exchange) => {
                 let current = self.media_exchange_state();
                 match current {
                     MediaExchangeState::Transition(_) => true,
@@ -125,7 +124,7 @@ pub trait Disableable {
                     }
                 }
             }
-            TrackMediaState::Mute(mute_state) => {
+            MediaState::Mute(mute_state) => {
                 let current = self.mute_state();
                 match current {
                     MuteState::Transition(_) => true,
@@ -135,9 +134,11 @@ pub trait Disableable {
         }
     }
 
-    fn is_patch_needed(&self, desired_state: TrackMediaState) -> bool {
+    /// Returns `true` if [`Room`] should send [`TrackPatchCommand`] to the
+    /// server when updating [`Disableable`] to the provided [`MediaState`].
+    fn is_track_patch_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
-            TrackMediaState::MediaExchange(media_exchange) => {
+            MediaState::MediaExchange(media_exchange) => {
                 let current = self.media_exchange_state();
                 match current {
                     MediaExchangeState::Stable(stable) => {
@@ -148,7 +149,7 @@ pub trait Disableable {
                     }
                 }
             }
-            TrackMediaState::Mute(mute_state) => {
+            MediaState::Mute(mute_state) => {
                 let current = self.mute_state();
                 match current {
                     MuteState::Stable(stable) => stable != mute_state,
@@ -160,27 +161,27 @@ pub trait Disableable {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`MediaExchangeState`] of
-    /// this [`Disableable`] will be [`MediaExchangeState::Stable`] or it is
+    /// Returns [`Future`] which will be resolved when [`MediaState`] of
+    /// this [`Disableable`] will be [`TransitableState::Stable`] or it is
     /// dropped.
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
-    /// is returned if [`MediaExchangeState`] transits into the opposite to
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`]
+    /// is returned if [`MediaState`] transits into the opposite to
     /// the `desired_state`.
     #[inline]
     fn when_media_state_stable(
         &self,
-        desired_state: TrackMediaState,
+        desired_state: MediaState,
     ) -> LocalBoxFuture<'static, Result<()>> {
         match desired_state {
-            TrackMediaState::Mute(desired_state) => self
+            MediaState::Mute(desired_state) => self
                 .mute_state_controller()
-                .when_media_exchange_state_stable(desired_state),
-            TrackMediaState::MediaExchange(desired_state) => self
+                .when_media_state_stable(desired_state),
+            MediaState::MediaExchange(desired_state) => self
                 .media_exchange_state_controller()
-                .when_media_exchange_state_stable(desired_state),
+                .when_media_state_stable(desired_state),
         }
     }
 
@@ -254,11 +255,11 @@ pub enum MediaConnectionsError {
     #[display(fmt = "MediaExchangeState of Sender was dropped.")]
     MediaExchangeStateDropped,
 
-    /// Occurs when [`MediaExchangeState`] of [`Sender`] transits into opposite
-    /// to expected [`MediaExchangeState`].
-    #[display(fmt = "MediaExchangeState of Sender transits into opposite to \
+    /// Occurs when [`MediaState`] of [`Sender`] transits into opposite
+    /// to expected [`MediaState`].
+    #[display(fmt = "MediaState of Sender transits into opposite to \
                      expected MediaExchangeState")]
-    MediaExchangeStateTransitsIntoOppositeState,
+    MediaStateTransitsIntoOppositeState,
 
     /// Invalid [`medea_client_api_proto::TrackPatch`] for
     /// [`MediaStreamTrack`].
@@ -409,7 +410,7 @@ impl MediaConnections {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        state: TrackMediaState,
+        state: MediaState,
     ) -> bool {
         let transceivers =
             self.0.borrow().get_transceivers_by_direction_and_kind(
@@ -423,10 +424,10 @@ impl MediaConnections {
             }
 
             let is_not_in_state = match state {
-                TrackMediaState::Mute(mute_state) => {
+                MediaState::Mute(mute_state) => {
                     transceiver.mute_state() != mute_state.into()
                 }
-                TrackMediaState::MediaExchange(media_exchange) => {
+                MediaState::MediaExchange(media_exchange) => {
                     transceiver.media_exchange_state() != media_exchange.into()
                 }
             };

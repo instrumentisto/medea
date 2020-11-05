@@ -515,6 +515,7 @@ pub struct TrackPatchEvent {
     /// `false`, but real media exchange state can be `true`.
     pub is_disabled_general: Option<bool>,
 
+    /// Mute state of the connection between `Member`s.
     pub is_muted: Option<bool>,
 }
 

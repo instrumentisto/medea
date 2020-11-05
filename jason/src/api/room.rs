@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, StableMediaExchangeState,
-        StableMuteState, TrackDirection, TrackMediaState,
+        MediaConnectionsError, MediaState, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
+        StableMediaExchangeState, StableMuteState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -249,7 +249,7 @@ impl RoomHandle {
     /// in all [`PeerConnection`]s.
     async fn set_track_media_state(
         &self,
-        new_state: TrackMediaState,
+        new_state: MediaState,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
@@ -272,7 +272,7 @@ impl RoomHandle {
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
                     inner.set_constraints_media_state(
-                        new_state.inverse(),
+                        new_state.opposite(),
                         kind,
                         direction,
                         source_kind,
@@ -281,6 +281,32 @@ impl RoomHandle {
                 })?;
         }
         Ok(())
+    }
+
+    /// Returns [`Promise`] which will switch [`MediaState`] of the provided
+    /// [`MediaKind`], [`TrackDirection`] and [`JsMediaSourceKind`] to the
+    /// provided [`MediaState`].
+    fn media_state_toggle_promise<S>(
+        &self,
+        media_state: S,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise
+    where
+        S: Into<MediaState> + 'static,
+    {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_media_state(
+                media_state.into(),
+                kind,
+                direction,
+                source_kind.map(Into::into),
+            )
+            .await?;
+            Ok(JsValue::UNDEFINED)
+        })
     }
 }
 
@@ -378,96 +404,70 @@ impl RoomHandle {
         })
     }
 
+    /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMuteState::Muted.into(),
-                MediaKind::Audio,
-                TrackDirection::Send,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMuteState::Muted,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
+    /// Unmutes outbound audio in this [`Room`].
     pub fn unmute_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMuteState::Unmuted.into(),
-                MediaKind::Audio,
-                TrackDirection::Send,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMuteState::Unmuted,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
+    /// Mutes outbound video in this [`Room`].
     pub fn mute_video(
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMuteState::Muted.into(),
-                MediaKind::Video,
-                TrackDirection::Send,
-                source_kind.map(Into::into),
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMuteState::Muted,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
+    /// Unmutes outbound video in this [`Room`].
     pub fn unmute_video(
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMuteState::Unmuted.into(),
-                MediaKind::Video,
-                TrackDirection::Send,
-                source_kind.map(Into::into),
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMuteState::Unmuted,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
     /// Disables outbound audio in this [`Room`].
     pub fn disable_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Disabled.into(),
-                MediaKind::Audio,
-                TrackDirection::Send,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Disabled,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
     /// Enables outbound audio in this [`Room`].
     pub fn enable_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Enabled.into(),
-                MediaKind::Audio,
-                TrackDirection::Send,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Enabled,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
     /// Mutes outbound video.
@@ -477,17 +477,12 @@ impl RoomHandle {
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Disabled.into(),
-                MediaKind::Video,
-                TrackDirection::Send,
-                source_kind.map(Into::into),
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Disabled,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
     /// Enables outbound video.
@@ -497,77 +492,52 @@ impl RoomHandle {
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Enabled.into(),
-                MediaKind::Video,
-                TrackDirection::Send,
-                source_kind.map(Into::into),
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Enabled,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
     /// Disables inbound audio in this [`Room`].
     pub fn disable_remote_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Disabled.into(),
-                MediaKind::Audio,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Disabled,
+            MediaKind::Audio,
+            TrackDirection::Recv,
+            None,
+        )
     }
 
     /// Disables inbound video in this [`Room`].
     pub fn disable_remote_video(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Disabled.into(),
-                MediaKind::Video,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Disabled,
+            MediaKind::Video,
+            TrackDirection::Recv,
+            None,
+        )
     }
 
     /// Enables inbound audio in this [`Room`].
     pub fn enable_remote_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Enabled.into(),
-                MediaKind::Audio,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Enabled,
+            MediaKind::Audio,
+            TrackDirection::Recv,
+            None,
+        )
     }
 
     /// Enables inbound video in this [`Room`].
     pub fn enable_remote_video(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_media_state(
-                StableMediaExchangeState::Enabled.into(),
-                MediaKind::Video,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.media_state_toggle_promise(
+            StableMediaExchangeState::Enabled,
+            MediaKind::Video,
+            TrackDirection::Recv,
+            None,
+        )
     }
 }
 
@@ -780,20 +750,20 @@ impl InnerRoom {
     /// provided [`TrackDirection`], [`MediaKind`] and [`MediaSourceKind`].
     fn set_constraints_media_state(
         &self,
-        state: TrackMediaState,
+        state: MediaState,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
     ) {
         if let TrackDirection::Recv = direction {
             match state {
-                TrackMediaState::MediaExchange(media_exchange) => {
+                MediaState::MediaExchange(media_exchange) => {
                     self.recv_constraints.set_enabled(
                         media_exchange == StableMediaExchangeState::Enabled,
                         kind,
                     );
                 }
-                TrackMediaState::Mute(_) => {
+                MediaState::Mute(_) => {
                     unimplemented!("Receivers muting is not implemented")
                 }
             }
@@ -811,18 +781,14 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`TransceiverSide`]s [`MediaExchangeState`] by provided
+    /// Toggles [`TransceiverSide`]s [`MediaState`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
-    ///
-    /// Will fallback to the previous [`MediaExchangeState`]s if some
-    /// [`TransceiverSide`] can't be disabled because
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     #[allow(clippy::filter_map)]
     async fn toggle_media_state(
         &self,
-        state: TrackMediaState,
+        state: MediaState,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
@@ -845,16 +811,13 @@ impl InnerRoom {
         self.update_media_states(disable_tracks).await
     }
 
-    /// Updates [`MediaExchangeState`]s of the [`TransceiverSide`] with a
+    /// Updates [`MediaState`]s of the [`TransceiverSide`] with a
     /// provided [`PeerId`] and [`TrackId`] to a provided
-    /// [`StableMediaExchangeState`]s.
+    /// [`MediaState`]s.
     #[allow(clippy::filter_map)]
     async fn update_media_states(
         &self,
-        desired_media_states: HashMap<
-            PeerId,
-            HashMap<TrackId, TrackMediaState>,
-        >,
+        desired_media_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
     ) -> Result<(), Traced<RoomError>> {
         future::try_join_all(
             desired_media_states
@@ -879,7 +842,7 @@ impl InnerRoom {
                                 .is_subscription_needed(desired_media_state)
                             {
                                 let is_patch_needed = trnscvr
-                                    .is_patch_needed(desired_media_state);
+                                    .is_track_patch_needed(desired_media_state);
                                 Some((
                                     trnscvr,
                                     desired_media_state,
@@ -942,7 +905,7 @@ impl InnerRoom {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        state: TrackMediaState,
+        state: MediaState,
     ) -> bool {
         self.peers
             .get_all()

@@ -280,7 +280,7 @@ impl InnerMediaManager {
                 MediaStreamTrack::new(track.unwrap(), MediaSourceKind::Device)
             })
             .inspect(|track| {
-                storage.insert(track.id(), track.downgrade());
+                storage.insert(track.root_id(), track.downgrade());
             })
             .collect();
 
@@ -328,7 +328,7 @@ impl InnerMediaManager {
                 MediaStreamTrack::new(tr.unwrap(), MediaSourceKind::Display)
             })
             .inspect(|track| {
-                storage.insert(track.id(), track.downgrade());
+                storage.insert(track.root_id(), track.downgrade());
             })
             .collect();
 

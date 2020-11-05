@@ -45,9 +45,9 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
-        Disableable, MediaConnections, MediaConnectionsError, Receiver, Sender,
-        StableMediaExchangeState, StableMuteState, TrackDirection,
-        TrackMediaState, TransceiverSide, TransitableState,
+        Disableable, MediaConnections, MediaConnectionsError, MediaState,
+        Receiver, Sender, StableMediaExchangeState, StableMuteState,
+        TrackDirection, TransceiverSide, TransitableState,
         TransitionMediaExchangeState, TransitionMuteState,
     },
     repo::{PeerRepository, Repository},
@@ -412,7 +412,7 @@ impl PeerConnection {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        state: TrackMediaState,
+        state: MediaState,
     ) -> bool {
         self.media_connections.is_all_tracks_in_media_state(
             kind,

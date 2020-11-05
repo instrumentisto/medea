@@ -18,17 +18,35 @@ pub use self::{
     mute::{StableMuteState, TransitionMuteState},
 };
 
+/// [`TransitableState`] for the [`StableMediaExchangeState`].
 pub type MediaExchangeState =
     TransitableState<StableMediaExchangeState, TransitionMediaExchangeState>;
+/// [`TransitableState`] for the [`StableMuteState`].
 pub type MuteState = TransitableState<StableMuteState, TransitionMuteState>;
 
+/// All media states which can be toggled in the [`Disableable`].
 #[derive(Clone, Copy, Debug, From)]
-pub enum TrackMediaState {
+pub enum MediaState {
+    /// Sets `MediaStreamTrack.enabled` to the `true` of `false`.
+    ///
+    /// Doesn't requires renegotiation process, but traffic flow doesn't stops.
     Mute(StableMuteState),
+
+    /// Drops `MediaStreamTrack` if [`StableMediaExchangeState::Disabled`].
+    ///
+    /// Requires renegotiation process and traffic flow will be stopped.
     MediaExchange(StableMediaExchangeState),
 }
 
-impl TrackMediaState {
+impl MediaState {
+    /// Generates [`TrackPatchCommand`] with a provided [`TrackId`] based on
+    /// this [`MediaState`].
+    ///
+    /// If [`MediaState`] is [`MediaState::Mute`] then
+    /// [`TrackPatchCommand::is_muted`] will be [`Some`].
+    ///
+    /// If [`MediaState`] is [`MediaState::MediaExchange`] then
+    /// [`TrackPatchCommand::is_disabled`] will be [`Some`].
     pub fn generate_track_patch(self, track_id: TrackId) -> TrackPatchCommand {
         match self {
             Self::Mute(mute) => TrackPatchCommand {
@@ -46,11 +64,12 @@ impl TrackMediaState {
         }
     }
 
-    pub fn inverse(self) -> Self {
+    /// Returns opposite to this [`StableMuteState`].
+    pub fn opposite(self) -> Self {
         match self {
-            Self::Mute(mute) => Self::Mute(mute.inverse()),
+            Self::Mute(mute) => Self::Mute(mute.opposite()),
             Self::MediaExchange(media_exchange) => {
-                Self::MediaExchange(media_exchange.inverse())
+                Self::MediaExchange(media_exchange.opposite())
             }
         }
     }
@@ -97,7 +116,7 @@ where
     T: InTransition<Stable = S> + Into<TransitableState<S, T>>,
     S: InStable<Transition = T> + Into<TransitableState<S, T>>,
 {
-    /// Indicates whether [`MediaExchangeState`] is stable (not in transition).
+    /// Indicates whether [`TransitableState`] is stable (not in transition).
     #[inline]
     pub fn is_stable(self) -> bool {
         match self {
@@ -107,7 +126,7 @@ where
     }
 
     /// Starts transition into the `desired_state` changing the state to
-    /// [`MediaExchangeState::Transition`].
+    /// [`TransitableState::Transition`].
     ///
     /// No-op if already in the `desired_state`.
     pub fn transition_to(self, desired_state: S) -> Self {
@@ -120,7 +139,7 @@ where
                 if transition.intended() == desired_state {
                     self
                 } else {
-                    transition.reverse().into()
+                    transition.opposite().into()
                 }
             }
         }
@@ -136,25 +155,29 @@ where
     }
 }
 
+/// [`TransitableState::Stable`] variant of the [`TransitableState`].
 pub trait InStable: Clone + Copy + PartialEq {
     type Transition: InTransition;
 
+    /// Converts this [`InStable`] into [`InStable::Transition`].
     fn start_transition(self) -> Self::Transition;
 }
 
+/// [`TransitableState::Transition`] variant of the [`TransitableState`].
 pub trait InTransition: Clone + Copy + PartialEq {
     type Stable: InStable;
 
-    /// Returns intention which this [`MediaExchangeStateTransition`] indicates.
+    /// Returns intention which this state indicates.
     fn intended(self) -> Self::Stable;
 
-    /// Sets inner [`StableMediaExchangeState`].
+    /// Sets inner [`InTransition::Stable`] state.
     fn set_inner(self, inner: Self::Stable) -> Self;
 
-    /// Returns inner [`StableMediaExchangeState`].
+    /// Returns inner [`InTransition::Stable`] state.
     fn into_inner(self) -> Self::Stable;
 
-    fn reverse(self) -> Self;
+    /// Returns opposite to this [`InTransition`].
+    fn opposite(self) -> Self;
 }
 
 #[cfg(test)]

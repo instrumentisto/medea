@@ -152,7 +152,7 @@ async fn equal_constraints_produce_equal_streams() {
         .find(|(track, _)| track.kind() == MediaKind::Audio)
         .unwrap()
         .0;
-    assert_eq!(audio_track.id(), some_audio_track.id());
+    assert_eq!(audio_track.root_id(), some_audio_track.root_id());
 
     let video_track = &tracks
         .iter()
@@ -164,7 +164,7 @@ async fn equal_constraints_produce_equal_streams() {
         .find(|(track, _)| track.kind() == MediaKind::Video)
         .unwrap()
         .0;
-    assert_eq!(video_track.id(), some_video_track.id());
+    assert_eq!(video_track.root_id(), some_video_track.root_id());
 }
 
 /// 1. If audio_devices.len() > 1 (otherwise this test makes no sense);
@@ -199,7 +199,7 @@ async fn different_constraints_produce_different_streams() {
             .find(|(track, _)| track.kind() == MediaKind::Audio)
             .unwrap()
             .0;
-        assert_ne!(audio_track.id(), another_audio_track.id());
+        assert_ne!(audio_track.root_id(), another_audio_track.root_id());
     }
 }
 

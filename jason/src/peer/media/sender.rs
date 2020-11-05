@@ -14,8 +14,8 @@ use crate::{
     peer::{
         media::{
             transitable_state::{
-                MediaExchangeStateController, MuteState, MuteStateController,
-                StableMuteState, TrackMediaState,
+                MediaExchangeStateController, MediaState, MuteStateController,
+                StableMuteState,
             },
             TransceiverSide,
         },
@@ -25,8 +25,8 @@ use crate::{
 };
 
 use super::{
-    transitable_state::{StableMediaExchangeState, TransitableStateController},
-    Disableable, MediaConnections, MediaConnectionsError, Result,
+    transitable_state::StableMediaExchangeState, Disableable, MediaConnections,
+    MediaConnectionsError, Result,
 };
 
 /// Builder of the [`Sender`].
@@ -71,11 +71,10 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let media_exchange_state_controller =
-            TransitableStateController::new(self.media_exchange_state);
+            MediaExchangeStateController::new(self.media_exchange_state);
         let mut media_exchange_state_rx =
             media_exchange_state_controller.on_stabilize();
-        let mute_state_controller =
-            TransitableStateController::new(self.mute_state);
+        let mute_state_controller = MuteStateController::new(self.mute_state);
         let mut mute_state_rx = mute_state_controller.on_stabilize();
         let this = Rc::new(Sender {
             peer_id: connections.peer_id,
@@ -199,14 +198,14 @@ impl Sender {
     ) -> Result<()> {
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
-            if new_track.id() == current_track.id() {
+            if new_track.root_id() == current_track.root_id() {
                 return Ok(());
             }
         }
 
         new_track.set_enabled(
             self.mute_state.media_exchange_state().cancel_transition()
-                == MuteState::Stable(StableMuteState::Unmuted),
+                == StableMuteState::Unmuted.into(),
         );
 
         self.transceiver
@@ -348,7 +347,7 @@ impl Disableable for Sender {
     /// required for the call and can't be disabled.
     fn media_state_transition_to(
         &self,
-        desired_state: TrackMediaState,
+        desired_state: MediaState,
     ) -> Result<()> {
         if self.is_required {
             Err(tracerr::new!(
@@ -357,11 +356,11 @@ impl Disableable for Sender {
         } else {
             // TODO(evdokimovs): is_required важен для mute_state??
             match desired_state {
-                TrackMediaState::MediaExchange(desired_state) => {
+                MediaState::MediaExchange(desired_state) => {
                     self.media_exchange_state_controller()
                         .transition_to(desired_state);
                 }
-                TrackMediaState::Mute(desired_state) => {
+                MediaState::Mute(desired_state) => {
                     self.mute_state_controller().transition_to(desired_state);
                 }
             }
