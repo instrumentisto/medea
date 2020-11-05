@@ -26,7 +26,7 @@ All user visible changes to this project will be documented in this file. This p
 
 - Media management:
     - Library API:
-        - Disable/Enable local video/audio ([#40], [#81], [#97], [#144]):
+        - Disable/Enable local video/audio ([#40], [#81], [#97], [#144], [#155]):
             - `Room.disable_audio()`;
             - `Room.enable_audio()`;
             - `Room.disable_video()`;
@@ -50,7 +50,7 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
         - `MediaTrack.on_enabled` and `MediaTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
         - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
-        - Muting/unmuting remote video/audio ([#127]):
+        - Enabling/disabling remote video/audio ([#127], [#155]):
             - `Room.disable_remote_audio`;
             - `Room.enable_remote_audio`;
             - `Room.disable_remote_video`;
@@ -72,7 +72,7 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
-        - `ApplyTracks` for muting/unmuting ([#81]);
+        - `ApplyTracks` for enabling/disabling ([#81], [#155]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
     - Handling of RPC events:
         - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
@@ -112,6 +112,7 @@ All user visible changes to this project will be documented in this file. This p
 [#144]: /../../pull/144
 [#145]: /../../pull/145
 [#146]: /../../pull/146
+[#155]: /../../pull/155
 
 
 
