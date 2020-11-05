@@ -44,6 +44,7 @@ fn toggle_disable_tracks_updates(
             id: TrackId(*track_id),
             is_disabled_individual: Some(is_disabled),
             is_disabled_general: Some(is_disabled),
+            is_muted: None,
         })
         .collect()
 }
@@ -898,10 +899,12 @@ async fn reset_transition_timers() {
             .into_iter(),
         )
         .map(|s| {
-            s.media_state_transition_to(StableMediaExchangeState::Disabled)
-                .unwrap();
+            s.media_state_transition_to(
+                StableMediaExchangeState::Disabled.into(),
+            )
+            .unwrap();
 
-            s.when_media_state_stable(StableMediaExchangeState::Enabled)
+            s.when_media_state_stable(StableMediaExchangeState::Enabled.into())
         }),
     )
     .map(|_| ())
@@ -936,8 +939,16 @@ async fn new_remote_track() {
         let manager = Rc::new(MediaManager::default());
 
         let tx_caps = LocalTracksConstraints::default();
-        tx_caps.set_media_state(audio_tx_enabled, MediaKind::Audio, None);
-        tx_caps.set_media_state(video_tx_enabled, MediaKind::Video, None);
+        tx_caps.set_media_state(
+            StableMediaExchangeState::from(!audio_tx_enabled).into(),
+            MediaKind::Audio,
+            None,
+        );
+        tx_caps.set_media_state(
+            StableMediaExchangeState::from(!video_tx_enabled).into(),
+            MediaKind::Video,
+            None,
+        );
         let sender_peer = PeerConnection::new(
             PeerId(1),
             tx1,

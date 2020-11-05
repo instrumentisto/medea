@@ -610,7 +610,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Disabled
+            StableMediaExchangeState::Disabled.into()
         ));
     }
 
@@ -647,7 +647,7 @@ mod disable_send_tracks {
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Disabled
+            StableMediaExchangeState::Disabled.into()
         ));
     }
 
@@ -677,7 +677,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled
+            StableMediaExchangeState::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -694,7 +694,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled
+            StableMediaExchangeState::Enabled.into()
         ));
     }
 
@@ -724,7 +724,7 @@ mod disable_send_tracks {
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled
+            StableMediaExchangeState::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -741,7 +741,7 @@ mod disable_send_tracks {
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled
+            StableMediaExchangeState::Enabled.into()
         ));
     }
 
@@ -771,7 +771,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled
+            StableMediaExchangeState::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -781,7 +781,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Disabled
+            StableMediaExchangeState::Disabled.into()
         ));
 
         let (disable_audio_result, enable_audio_result) =
@@ -797,7 +797,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled
+            StableMediaExchangeState::Enabled.into()
         ));
     }
 
@@ -1112,6 +1112,7 @@ mod patches_generation {
     use crate::{is_firefox, timeout};
 
     use super::*;
+    use medea_jason::peer::{MediaState, StableMediaExchangeState};
 
     fn audio_and_device_video_tracks_content() -> Vec<(MediaType, Direction)> {
         vec![
@@ -1139,11 +1140,11 @@ mod patches_generation {
     /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
     /// sent from this [`Room`].
     ///
-    /// `audio_track_enabled_state_fn`'s output will be used as `is_enabled`
+    /// `audio_track_media_state_fn`'s output will be used as `media_state`
     /// value for all audio [`Track`]s.
     async fn get_room_and_commands_receiver(
         peers_count: u32,
-        audio_track_enabled_state_fn: impl Fn(u32) -> bool,
+        audio_track_media_state_fn: impl Fn(u32) -> MediaState,
         tracks_content: Vec<(MediaType, Direction)>,
     ) -> (Room, mpsc::UnboundedReceiver<Command>) {
         let mut repo = Box::new(MockPeerRepository::new());
@@ -1164,7 +1165,7 @@ mod patches_generation {
 
             let mut local_stream = MediaStreamSettings::default();
             local_stream.set_track_media_state(
-                (audio_track_enabled_state_fn)(i),
+                (audio_track_media_state_fn)(i),
                 MediaKind::Audio,
                 None,
             );
@@ -1225,7 +1226,7 @@ mod patches_generation {
     async fn track_patch_for_all_video() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             1,
-            |_| true,
+            |_| StableMediaExchangeState::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1244,6 +1245,7 @@ mod patches_generation {
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
                     is_disabled: Some(true),
+                    is_muted: None,
                 }]
             }
         );
@@ -1266,7 +1268,7 @@ mod patches_generation {
     async fn track_patch_for_many_tracks() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |_| true,
+            |_| StableMediaExchangeState::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1297,6 +1299,7 @@ mod patches_generation {
             vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(true),
+                is_muted: None,
             }]
         );
 
@@ -1305,6 +1308,7 @@ mod patches_generation {
             vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(true),
+                is_muted: None,
             }]
         );
     }
@@ -1325,7 +1329,7 @@ mod patches_generation {
     async fn try_to_enable_enabled() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |_| true,
+            |_| StableMediaExchangeState::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1354,7 +1358,13 @@ mod patches_generation {
     async fn disable_room_with_one_disabled_track() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |i| i % 2 == 1,
+            |i| {
+                if i % 2 == 1 {
+                    StableMediaExchangeState::Enabled.into()
+                } else {
+                    StableMediaExchangeState::Disabled.into()
+                }
+            },
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1373,6 +1383,7 @@ mod patches_generation {
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
                     is_disabled: Some(true),
+                    is_muted: None,
                 }]
             }
         );
@@ -1399,8 +1410,12 @@ mod patches_generation {
                 receivers: vec![],
             },
         ));
-        let (room, command_rx) =
-            get_room_and_commands_receiver(2, |_| true, tracks).await;
+        let (room, command_rx) = get_room_and_commands_receiver(
+            2,
+            |_| StableMediaExchangeState::Enabled.into(),
+            tracks,
+        )
+        .await;
 
         let room_handle = room.new_handle();
 
@@ -1420,6 +1435,7 @@ mod patches_generation {
                     vec![TrackPatchCommand {
                         id: TrackId(1),
                         is_disabled: Some(true),
+                        is_muted: None,
                     }]
                 ),
                 _ => {
@@ -1450,8 +1466,12 @@ mod patches_generation {
                 receivers: vec![],
             },
         ));
-        let (room, command_rx) =
-            get_room_and_commands_receiver(2, |_| true, tracks).await;
+        let (room, command_rx) = get_room_and_commands_receiver(
+            2,
+            |_| StableMediaExchangeState::Enabled.into(),
+            tracks,
+        )
+        .await;
 
         let room_handle = room.new_handle();
 
@@ -1471,6 +1491,7 @@ mod patches_generation {
                     vec![TrackPatchCommand {
                         id: TrackId(2),
                         is_disabled: Some(true),
+                        is_muted: None,
                     }]
                 ),
                 _ => {

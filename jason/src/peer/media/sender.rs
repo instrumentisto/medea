@@ -297,6 +297,12 @@ impl Sender {
             );
         }
     }
+
+    #[cfg(feature = "mockable")]
+    /// Returns `true` if this [`Receiver`] is disabled.
+    pub fn is_disabled(&self) -> bool {
+        self.media_exchange_state.is_disabled()
+    }
 }
 
 impl TransceiverSide for Sender {

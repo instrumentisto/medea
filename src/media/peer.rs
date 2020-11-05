@@ -1286,10 +1286,12 @@ pub mod tests {
             TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(true),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
                 is_disabled: Some(true),
+                is_muted: None,
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1328,30 +1330,37 @@ pub mod tests {
             TrackPatchCommand {
                 id: TrackId(1),
                 is_disabled: Some(true),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 is_disabled: None,
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
                 is_disabled: Some(false),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 is_disabled: Some(true),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 is_disabled: Some(false),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 is_disabled: None,
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
                 is_disabled: None,
+                is_muted: None,
             },
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
@@ -1396,12 +1405,14 @@ pub mod tests {
                 id: TrackId(0),
                 is_disabled_individual: None,
                 is_disabled_general: None,
+                is_muted: None,
             }),
             TrackChange::IceRestart,
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 is_disabled_individual: None,
                 is_disabled_general: None,
+                is_muted: None,
             }),
         ];
 
@@ -1462,30 +1473,36 @@ pub mod tests {
                 id: TrackId(0),
                 is_disabled_general: Some(true),
                 is_disabled_individual: Some(true),
+                is_muted: None,
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 is_disabled_general: Some(false),
                 is_disabled_individual: Some(false),
+                is_muted: None,
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
                 is_disabled_general: Some(true),
                 is_disabled_individual: Some(true),
+                is_muted: None,
             }),
         ];
         peer.as_changes_scheduler().patch_tracks(vec![
             TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(true),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(false),
+                is_muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(true),
+                is_muted: None,
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1516,11 +1533,13 @@ pub mod tests {
                 id: TrackId(2),
                 is_disabled_general: Some(true),
                 is_disabled_individual: Some(true),
+                is_muted: None,
             });
             let whitelisted_patch = TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
                 is_disabled_general: Some(true),
                 is_disabled_individual: Some(true),
+                is_muted: None,
             });
             let mut patches =
                 vec![whitelisted_patch.clone(), filtered_patch.clone()];
@@ -1543,26 +1562,31 @@ pub mod tests {
                     id: TrackId(1),
                     is_disabled_general: Some(false),
                     is_disabled_individual: Some(false),
+                    is_muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
                     is_disabled_general: Some(true),
                     is_disabled_individual: Some(true),
+                    is_muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
                     is_disabled_general: Some(true),
                     is_disabled_individual: Some(true),
+                    is_muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
                     is_disabled_general: None,
                     is_disabled_individual: None,
+                    is_muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
                     is_disabled_general: Some(false),
                     is_disabled_individual: Some(false),
+                    is_muted: None,
                 },
             ]
             .into_iter()

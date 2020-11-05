@@ -184,23 +184,23 @@ pub trait InTransition: Clone + Copy + PartialEq {
 mod test {
     use super::*;
 
-    const DISABLED: TransitableState =
+    const DISABLED: MediaExchangeState =
         TransitableState::Stable(StableMediaExchangeState::Disabled);
-    const ENABLED: TransitableState =
+    const ENABLED: MediaExchangeState =
         TransitableState::Stable(StableMediaExchangeState::Enabled);
-    const ENABLING_DISABLED: TransitableState =
+    const ENABLING_DISABLED: MediaExchangeState =
         TransitableState::Transition(TransitionMediaExchangeState::Enabling(
             StableMediaExchangeState::Disabled,
         ));
-    const ENABLING_ENABLED: TransitableState =
+    const ENABLING_ENABLED: MediaExchangeState =
         TransitableState::Transition(TransitionMediaExchangeState::Enabling(
             StableMediaExchangeState::Enabled,
         ));
-    const DISABLING_DISABLED: TransitableState =
+    const DISABLING_DISABLED: MediaExchangeState =
         TransitableState::Transition(TransitionMediaExchangeState::Disabling(
             StableMediaExchangeState::Disabled,
         ));
-    const DISABLING_ENABLED: TransitableState =
+    const DISABLING_ENABLED: MediaExchangeState =
         TransitableState::Transition(TransitionMediaExchangeState::Disabling(
             StableMediaExchangeState::Enabled,
         ));

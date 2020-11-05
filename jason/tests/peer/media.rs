@@ -57,16 +57,16 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .media_state_transition_to(StableMediaExchangeState::from(
-            !enabled_audio,
-        ))
+        .media_state_transition_to(
+            StableMediaExchangeState::from(!enabled_audio).into(),
+        )
         .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .media_state_transition_to(StableMediaExchangeState::from(
-            !enabled_video,
-        ))
+        .media_state_transition_to(
+            StableMediaExchangeState::from(!enabled_video).into(),
+        )
         .unwrap();
 
     (media_connections, audio_track_id, video_track_id)
@@ -136,52 +136,56 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!video_track.is_general_disabled());
 
     audio_track
-        .media_state_transition_to(StableMediaExchangeState::Disabled)
+        .media_state_transition_to(StableMediaExchangeState::Disabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
             is_disabled_general: Some(true),
             is_disabled_individual: Some(true),
+            is_muted: None,
         }])
         .unwrap();
     assert!(audio_track.is_general_disabled());
     assert!(!video_track.is_general_disabled());
 
     video_track
-        .media_state_transition_to(StableMediaExchangeState::Disabled)
+        .media_state_transition_to(StableMediaExchangeState::Disabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
             is_disabled_general: Some(true),
             is_disabled_individual: Some(true),
+            is_muted: None,
         }])
         .unwrap();
     assert!(audio_track.is_general_disabled());
     assert!(video_track.is_general_disabled());
 
     audio_track
-        .media_state_transition_to(StableMediaExchangeState::Enabled)
+        .media_state_transition_to(StableMediaExchangeState::Enabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
             is_disabled_individual: Some(false),
             is_disabled_general: Some(false),
+            is_muted: None,
         }])
         .unwrap();
     assert!(!audio_track.is_general_disabled());
     assert!(video_track.is_general_disabled());
 
     video_track
-        .media_state_transition_to(StableMediaExchangeState::Enabled)
+        .media_state_transition_to(StableMediaExchangeState::Enabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
             is_disabled_individual: Some(false),
             is_disabled_general: Some(false),
+            is_muted: None,
         }])
         .unwrap();
     assert!(!audio_track.is_general_disabled());
@@ -241,6 +245,7 @@ mod sender_patch {
             id: TrackId(track_id.0 + 100),
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
 
         assert!(!sender.is_general_disabled());
@@ -253,6 +258,7 @@ mod sender_patch {
             id: track_id,
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
 
         assert!(sender.is_general_disabled());
@@ -265,6 +271,7 @@ mod sender_patch {
             id: track_id,
             is_disabled_individual: Some(false),
             is_disabled_general: Some(false),
+            is_muted: None,
         });
 
         assert!(!sender.is_general_disabled());
@@ -277,6 +284,7 @@ mod sender_patch {
             id: track_id,
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
         assert!(sender.is_general_disabled());
 
@@ -284,6 +292,7 @@ mod sender_patch {
             id: track_id,
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
 
         assert!(sender.is_general_disabled());
@@ -296,6 +305,7 @@ mod sender_patch {
             id: track_id,
             is_disabled_individual: None,
             is_disabled_general: None,
+            is_muted: None,
         });
 
         assert!(!sender.is_general_disabled());
@@ -341,6 +351,7 @@ mod receiver_patch {
             id: TrackId(TRACK_ID.0 + 100),
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
 
         assert!(!receiver.is_general_disabled());
@@ -353,6 +364,7 @@ mod receiver_patch {
             id: TRACK_ID,
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
 
         assert!(receiver.is_general_disabled());
@@ -365,6 +377,7 @@ mod receiver_patch {
             id: TRACK_ID,
             is_disabled_individual: Some(false),
             is_disabled_general: Some(false),
+            is_muted: None,
         });
 
         assert!(!receiver.is_general_disabled());
@@ -377,6 +390,7 @@ mod receiver_patch {
             id: TRACK_ID,
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
         assert!(receiver.is_general_disabled());
 
@@ -384,6 +398,7 @@ mod receiver_patch {
             id: TRACK_ID,
             is_disabled_individual: Some(true),
             is_disabled_general: Some(true),
+            is_muted: None,
         });
 
         assert!(receiver.is_general_disabled());
@@ -396,6 +411,7 @@ mod receiver_patch {
             id: TRACK_ID,
             is_disabled_individual: None,
             is_disabled_general: None,
+            is_muted: None,
         });
 
         assert!(!receiver.is_general_disabled());

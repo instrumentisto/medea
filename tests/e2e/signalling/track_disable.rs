@@ -49,6 +49,7 @@ async fn helper(
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(disabled),
+                is_muted: None,
             }],
         }))
         .await
@@ -59,6 +60,7 @@ async fn helper(
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(1),
                 is_disabled: Some(disabled),
+                is_muted: None,
             }],
         }))
         .await
@@ -235,6 +237,7 @@ async fn track_disables_and_enables_are_instant() {
                     tracks_patches: vec![TrackPatchCommand {
                         id: TrackId(0),
                         is_disabled: Some(is_disabled),
+                        is_muted: None,
                     }],
                 }));
             }
@@ -370,6 +373,7 @@ async fn track_disables_and_enables_are_instant2() {
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
                 is_disabled: Some(true),
+                is_muted: None,
             }],
         }))
         .await
@@ -391,6 +395,7 @@ async fn track_disables_and_enables_are_instant2() {
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(2),
                 is_disabled: Some(true),
+                is_muted: None,
             }],
         }))
         .await
@@ -436,6 +441,7 @@ async fn force_update_works() {
                         tracks_patches: vec![TrackPatchCommand {
                             is_disabled: Some(true),
                             id: TrackId(0),
+                            is_muted: None,
                         }],
                     }));
                 }
@@ -454,6 +460,7 @@ async fn force_update_works() {
                             tracks_patches: vec![TrackPatchCommand {
                                 is_disabled: Some(true),
                                 id: TrackId(0),
+                                is_muted: None,
                             }],
                         }));
                         renegotiation_done.set(true);
@@ -490,6 +497,7 @@ async fn force_update_works() {
                     peer_id: pub_peer_id.unwrap(),
                     tracks_patches: vec![TrackPatchCommand {
                         is_disabled: Some(true),
+                        is_muted: None,
                         id: track_id.unwrap(),
                     }],
                 }));
@@ -506,6 +514,7 @@ async fn force_update_works() {
                         peer_id: pub_peer_id.unwrap(),
                         tracks_patches: vec![TrackPatchCommand {
                             is_disabled: Some(true),
+                            is_muted: None,
                             id: track_id.unwrap(),
                         }],
                     }));
@@ -646,6 +655,7 @@ async fn ordering_on_force_update_is_correct() {
             peer_id: alice_peer_id,
             tracks_patches: vec![TrackPatchCommand {
                 is_disabled: Some(true),
+                is_muted: None,
                 id: alice_sender_id,
             }],
         }))
@@ -674,6 +684,7 @@ async fn ordering_on_force_update_is_correct() {
             peer_id: alice_peer_id,
             tracks_patches: vec![TrackPatchCommand {
                 is_disabled: Some(false),
+                is_muted: None,
                 id: alice_sender_id,
             }],
         }))
@@ -702,6 +713,7 @@ async fn ordering_on_force_update_is_correct() {
         peer_id: bob_peer_id,
         tracks_patches: vec![TrackPatchCommand {
             is_disabled: Some(true),
+            is_muted: None,
             id: bob_sender_id,
         }],
     }))
@@ -814,6 +826,7 @@ async fn individual_and_general_mute_states_works() {
                                         tracks_patches: vec![
                                             TrackPatchCommand {
                                                 id: TrackId(0),
+                                                is_muted: None,
                                                 is_disabled: Some(true),
                                             },
                                         ],
@@ -852,6 +865,7 @@ async fn individual_and_general_mute_states_works() {
                                         tracks_patches: vec![
                                             TrackPatchCommand {
                                                 id: TrackId(0),
+                                                is_muted: None,
                                                 is_disabled: Some(false),
                                             },
                                         ],
@@ -903,6 +917,7 @@ async fn individual_and_general_mute_states_works() {
                             peer_id: PeerId(0),
                             tracks_patches: vec![TrackPatchCommand {
                                 id: TrackId(0),
+                                is_muted: None,
                                 is_disabled: Some(true),
                             }],
                         }));
@@ -945,6 +960,7 @@ async fn individual_and_general_mute_states_works() {
                                         tracks_patches: vec![
                                             TrackPatchCommand {
                                                 id: TrackId(0),
+                                                is_muted: None,
                                                 is_disabled: Some(false),
                                             },
                                         ],
