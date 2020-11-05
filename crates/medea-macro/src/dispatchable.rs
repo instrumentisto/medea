@@ -114,13 +114,13 @@ impl Item {
         let trait_doc = self.handler_trait_doc();
         let handler_trait_ident = self.handler_trait_ident.clone();
         let maybe_async_trait_macro = args.maybe_async_trait_macro();
-        let handler_vis = self.orig_enum.vis.clone();
+        let vis = self.orig_enum.vis.clone();
         quote! {
             #[automatically_derived]
             #[allow(clippy::needless_arbitrary_self_type)]
             #[doc = #trait_doc]
             #maybe_async_trait_macro
-            #handler_vis trait #handler_trait_ident {
+            #vis trait #handler_trait_ident {
                 /// Output type of all functions from this trait.
                 type Output;
 

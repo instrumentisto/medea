@@ -38,10 +38,12 @@ struct Inner {
     /// [`MediaManager`] contains media tracks that can be used by multiple
     /// [`Room`]s.
     media_manager: Rc<MediaManager>,
+
     /// [`Room`]s maintained by this [`Jason`] instance.
     rooms: Vec<Room>,
-    /// Connection with `Media Server`. Only one [`WebSocketRpcClient`] is
-    /// supported atm.
+
+    /// Connection with Media Server. Only one [`WebSocketRpcClient`] is
+    /// supported at the moment.
     rpc: Rc<WebSocketRpcClient>,
 }
 
@@ -76,7 +78,7 @@ impl Jason {
         self.0.borrow().media_manager.new_handle()
     }
 
-    /// Closes provided [`Room`].
+    /// Closes the provided [`Room`].
     #[allow(clippy::needless_pass_by_value)]
     pub fn close_room(&self, room_to_delete: RoomHandle) {
         self.0.borrow_mut().rooms.retain(|room| {
@@ -100,7 +102,8 @@ impl Jason {
 }
 
 impl Jason {
-    /// Returns new [`Jason`] with a provided [`WebSocketRpcClient`].
+    /// Returns new [`Jason`] with the provided [`WebSocketRpcClient`].
+    #[inline]
     pub fn with_rpc_client(rpc: Rc<WebSocketRpcClient>) -> Self {
         Self(Rc::new(RefCell::new(Inner {
             rpc,
@@ -143,6 +146,7 @@ impl Jason {
 }
 
 impl Default for Jason {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

@@ -151,7 +151,7 @@ enum RoomError {
     MediaConnections(#[js(cause)] MediaConnectionsError),
 
     /// [`WebSocketSession`] returned [`SessionError`].
-    #[display(fmt = "Some WebSocketSession error: {}", _0)]
+    #[display(fmt = "WebSocketSession error occurred: {}", _0)]
     SessionError(#[js(cause)] SessionError),
 }
 
@@ -512,7 +512,8 @@ pub struct WeakRoom(Weak<InnerRoom>);
 impl WeakRoom {
     /// Upgrades this [`WeakRoom`] to the [`Room`].
     ///
-    /// Returns `None` if weak reference can't be upgraded.
+    /// Returns [`None`] if weak reference cannot be upgraded.
+    #[inline]
     pub fn upgrade(&self) -> Option<Room> {
         self.0.upgrade().map(Room)
     }
@@ -529,7 +530,7 @@ impl WeakRoom {
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
-    /// Creates new [`Room`] and associates it with a provided [`RpcSession`].
+    /// Creates new [`Room`] and associates it with the provided [`RpcSession`].
     #[allow(clippy::mut_mut)]
     pub fn new(
         rpc: Rc<dyn RpcSession>,
@@ -610,7 +611,8 @@ impl Room {
         Self(room)
     }
 
-    /// Downgrades this [`Room`] to the weak reference [`WeakRoom`].
+    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
+    #[inline]
     pub fn downgrade(&self) -> WeakRoom {
         WeakRoom(Rc::downgrade(&self.0))
     }
@@ -631,6 +633,7 @@ impl Room {
     }
 
     /// Sets [`Room`]'s [`CloseReason`] to the provided value.
+    #[inline]
     pub fn set_close_reason(&self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
@@ -653,13 +656,16 @@ impl Room {
         self.0.peers.get(peer_id)
     }
 
-    /// Returns `true` if provided [`Room`] is the same [`Room`] reference.
+    /// Indicates whether this [`Room`] reference is the same as the given
+    /// [`Room`] reference. Compares pointers, not values.
+    #[inline]
     pub fn ptr_eq(&self, other: &Room) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Returns `true` if provided [`RoomHandle`] is points to the same
-    /// [`InnerRoom`] as this [`Room`].
+    /// Indicates whether the provided [`RoomHandle`] points to the same
+    /// [`InnerRoom`] as this [`Room`] does.
+    #[inline]
     pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
         handle
             .0

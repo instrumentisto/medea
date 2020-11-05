@@ -185,10 +185,7 @@ async fn send_goes_to_transport() {
     spawn_local(async move {
         while let Some(msg) = on_send_rx.next().await {
             match msg {
-                ClientMsg::Command {
-                    room_id: _,
-                    command,
-                } => match command {
+                ClientMsg::Command { command, .. } => match command {
                     Command::MakeSdpOffer {
                         peer_id,
                         sdp_offer,
