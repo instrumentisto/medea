@@ -1481,7 +1481,7 @@ mod patches_generation {
     }
 }
 
-/// Tests that muting and unmuting of remote audio works.
+/// Tests that disabling and enabling of remote audio works.
 #[wasm_bindgen_test]
 async fn remote_disable_enable_audio() {
     let (audio_track, video_track) = get_test_recv_tracks();
@@ -1498,7 +1498,7 @@ async fn remote_disable_enable_audio() {
     assert!(peer.is_recv_audio_enabled());
 }
 
-/// Tests that muting and unmuting of remote video works.
+/// Tests that disabling and enabling of remote video works.
 #[wasm_bindgen_test]
 async fn remote_disable_enable_video() {
     let (audio_track, video_track) = get_test_recv_tracks();
