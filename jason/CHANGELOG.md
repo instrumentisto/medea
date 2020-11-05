@@ -31,6 +31,11 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.enable_audio()`;
             - `Room.disable_video()`;
             - `Room.enable_video()`.
+        - Mute/unmute local video/audio ([#156]):
+            - `Room.mute_audio()`;
+            - `Room.unmute_audio()`;
+            - `Room.mute_video()`;
+            - `Room.unmute_video()`.
         - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46]);
         - `MediaManager` class obtainable via `Jason.media_manager()` ([#46]):
             - `MediaManager.enumerate_devices()`;
@@ -74,6 +79,7 @@ All user visible changes to this project will be documented in this file. This p
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
         - `ApplyTracks` for enabling/disabling ([#81], [#155]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
+        - `UpdateTracks` for muting/unmuting ([#156]).
     - Handling of RPC events:
         - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
         - `ConnectionQualityUpdated` ([#132]).
@@ -113,6 +119,7 @@ All user visible changes to this project will be documented in this file. This p
 [#145]: /../../pull/145
 [#146]: /../../pull/146
 [#155]: /../../pull/155
+[#156]: /../../pull/156
 
 
 
