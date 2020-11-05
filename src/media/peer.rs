@@ -365,6 +365,19 @@ pub enum TrackChange {
 }
 
 impl TrackChange {
+    /// Returns `true` if this [`TrackChange`] doesn't requires renegotiation.
+    fn is_negotiationless(&self) -> bool {
+        matches!(
+            self,
+            Self::TrackPatch(TrackPatchEvent {
+                id: _,
+                is_disabled_individual: None,
+                is_disabled_general: None,
+                is_muted: Some(_),
+            })
+        )
+    }
+
     /// Tries to return new [`Track`] based on this [`TrackChange`].
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
@@ -961,14 +974,32 @@ impl Peer<Stable> {
     /// this [`Peer`] has changes to negotiate.
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty() {
+            let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
                 let change = task.dispatch_with(self);
-                self.context.pending_track_updates.push(change);
+                if change.is_negotiationless() {
+                    negotiationless_changes.push(change);
+                } else {
+                    self.context.pending_track_updates.push(change);
+                }
             }
 
             self.dedup_pending_track_updates();
 
-            self.context.peer_updates_sub.negotiation_needed(self.id());
+            if self.context.pending_track_updates.is_empty() {
+                self.context.peer_updates_sub.force_update(
+                    self.id(),
+                    negotiationless_changes
+                        .into_iter()
+                        .map(|c| c.as_track_update(self.partner_member_id()))
+                        .collect(),
+                );
+            } else {
+                self.context
+                    .pending_track_updates
+                    .extend(negotiationless_changes.into_iter());
+                self.context.peer_updates_sub.negotiation_needed(self.id());
+            }
         }
     }
 
