@@ -587,14 +587,14 @@ impl Room {
                     match event {
                         RoomEvent::RpcEvent(event) => {
                             if let Err(err) =
-                            event.dispatch_with(inner.deref()).await
+                                event.dispatch_with(inner.deref()).await
                             {
                                 JasonError::from(err).print();
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
                             if let Err(err) =
-                            event.dispatch_with(inner.deref()).await
+                                event.dispatch_with(inner.deref()).await
                             {
                                 JasonError::from(err).print();
                             };

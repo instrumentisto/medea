@@ -961,6 +961,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb582b60359da160a9477ee80f15c8d784c477e69c217ef2cdd4169c24ea380f"
+dependencies = [
+ "proc-macro2 1.0.24",
+ "quote 1.0.7",
+ "syn 1.0.48",
+]
+
+[[package]]
 name = "derive_builder"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1833,6 +1844,7 @@ dependencies = [
  "async-trait",
  "bitflags",
  "console_error_panic_hook",
+ "derivative",
  "derive_more",
  "downcast",
  "fragile",
@@ -1847,6 +1859,7 @@ dependencies = [
  "serde 1.0.117",
  "serde_json",
  "tracerr",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",

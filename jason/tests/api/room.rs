@@ -29,7 +29,8 @@ use wasm_bindgen_test::*;
 use crate::{
     delay_for, get_jason_error, get_test_recv_tracks, get_test_required_tracks,
     get_test_tracks, get_test_unrequired_tracks, media_stream_settings,
-    timeout, wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
+    timeout, wait_and_check_test_result, yield_now, MockNavigator,
+    TEST_ROOM_URL,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
