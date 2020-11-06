@@ -33,8 +33,9 @@ use crate::{
         RtcStats, StableMuteState, TrackDirection,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
-        RpcClientError, TransportError,
+        ClientDisconnect, CloseReason, ConnectionInfo,
+        ConnectionInfoParseError, ReconnectHandle, RpcClientError, RpcSession,
+        SessionError, TransportError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
@@ -112,7 +113,7 @@ enum RoomError {
     #[display(fmt = "Unable to init RPC transport: {}", _0)]
     InitRpcTransportFailed(#[js(cause)] TransportError),
 
-    /// Returned if [`RpcClient`] was unable to connect to RPC server.
+    /// Returned if [`WebSocketRpcClient`] was unable to connect to RPC server.
     #[display(fmt = "Unable to connect RPC server: {}", _0)]
     CouldNotConnectToServer(#[js(cause)] RpcClientError),
 
@@ -148,6 +149,10 @@ enum RoomError {
     /// simultaneously.
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
+
+    /// [`WebSocketSession`] returned [`SessionError`].
+    #[display(fmt = "WebSocketSession error occurred: {}", _0)]
+    SessionError(#[js(cause)] SessionError),
 }
 
 impl From<RpcClientError> for RoomError {
@@ -189,6 +194,13 @@ impl From<MediaConnectionsError> for RoomError {
     }
 }
 
+impl From<SessionError> for RoomError {
+    #[inline]
+    fn from(e: SessionError) -> Self {
+        Self::SessionError(e)
+    }
+}
+
 /// JS side handle to `Room` where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
@@ -207,8 +219,12 @@ impl RoomHandle {
     ///
     /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
     /// server.
-    pub async fn inner_join(&self, token: String) -> Result<(), JasonError> {
+    pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
+
+        let connection_info: ConnectionInfo = url.parse().map_err(
+            tracerr::map_from_and_wrap!(=> ConnectionInfoParseError),
+        )?;
 
         if !inner.on_failed_local_media.is_set() {
             return Err(JasonError::from(tracerr::new!(
@@ -223,24 +239,9 @@ impl RoomHandle {
         }
 
         Rc::clone(&inner.rpc)
-            .connect(token)
+            .connect(connection_info)
             .await
             .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
-
-        let mut connection_loss_stream = inner.rpc.on_connection_loss();
-        let weak_inner = Rc::downgrade(&inner);
-        spawn_local(async move {
-            while connection_loss_stream.next().await.is_some() {
-                if let Some(inner) = weak_inner.upgrade() {
-                    let reconnect_handle =
-                        ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                    inner.on_connection_loss.call(reconnect_handle);
-                } else {
-                    log::error!("Inner Room dropped unexpectedly");
-                    break;
-                }
-            }
-        });
 
         Ok(())
     }
@@ -331,7 +332,7 @@ impl RoomHandle {
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
-    /// [`RpcClient`] connection loss.
+    /// [`WebSocketRpcClient`] connection loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -516,6 +517,20 @@ impl RoomHandle {
     }
 }
 
+/// [`Weak`] reference upgradeable to the [`Room`].
+#[derive(Clone)]
+pub struct WeakRoom(Weak<InnerRoom>);
+
+impl WeakRoom {
+    /// Upgrades this [`WeakRoom`] to the [`Room`].
+    ///
+    /// Returns [`None`] if weak reference cannot be upgraded.
+    #[inline]
+    pub fn upgrade(&self) -> Option<Room> {
+        self.0.upgrade().map(Room)
+    }
+}
+
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
 /// handles media server events, etc).
 ///
@@ -527,9 +542,12 @@ impl RoomHandle {
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
-    /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
+    /// Creates new [`Room`] and associates it with the provided [`RpcSession`].
     #[allow(clippy::mut_mut)]
-    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
+    pub fn new(
+        rpc: Rc<dyn RpcSession>,
+        peers: Box<dyn PeerRepository>,
+    ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
             PeerEvent(PeerEvent),
@@ -540,7 +558,7 @@ impl Room {
         let (tx, peer_events_rx) = mpsc::unbounded();
 
         let mut rpc_events_stream =
-            rpc.subscribe().map(RoomEvent::RpcEvent).fuse();
+            Rc::clone(&rpc).subscribe().map(RoomEvent::RpcEvent).fuse();
         let mut peer_events_stream =
             peer_events_rx.map(RoomEvent::PeerEvent).fuse();
         let mut rpc_connection_lost = rpc
@@ -565,40 +583,43 @@ impl Room {
                     complete => break,
                 };
 
-                match inner.upgrade() {
-                    None => {
-                        log::error!("Inner Room dropped unexpectedly");
-                        break;
+                if let Some(inner) = inner.upgrade() {
+                    match event {
+                        RoomEvent::RpcEvent(event) => {
+                            if let Err(err) =
+                            event.dispatch_with(inner.deref()).await
+                            {
+                                JasonError::from(err).print();
+                            };
+                        }
+                        RoomEvent::PeerEvent(event) => {
+                            if let Err(err) =
+                            event.dispatch_with(inner.deref()).await
+                            {
+                                JasonError::from(err).print();
+                            };
+                        }
+                        RoomEvent::RpcClientLostConnection => {
+                            inner.handle_rpc_connection_lost();
+                        }
+                        RoomEvent::RpcClientReconnected => {
+                            inner.handle_rpc_connection_recovered();
+                        }
                     }
-                    Some(inner) => {
-                        match event {
-                            RoomEvent::RpcEvent(event) => {
-                                if let Err(err) =
-                                    event.dispatch_with(inner.deref()).await
-                                {
-                                    JasonError::from(err).print();
-                                };
-                            }
-                            RoomEvent::PeerEvent(event) => {
-                                if let Err(err) =
-                                    event.dispatch_with(inner.deref()).await
-                                {
-                                    JasonError::from(err).print();
-                                };
-                            }
-                            RoomEvent::RpcClientLostConnection => {
-                                inner.handle_rpc_connection_lost();
-                            }
-                            RoomEvent::RpcClientReconnected => {
-                                inner.handle_rpc_connection_recovered();
-                            }
-                        };
-                    }
+                } else {
+                    log::error!("Inner Room dropped unexpectedly");
+                    break;
                 }
             }
         });
 
         Self(room)
+    }
+
+    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
+    #[inline]
+    pub fn downgrade(&self) -> WeakRoom {
+        WeakRoom(Rc::downgrade(&self.0))
     }
 
     /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
@@ -613,6 +634,12 @@ impl Room {
     /// may check count of pointers to [`InnerRoom`] with
     /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
+        self.0.set_close_reason(reason);
+    }
+
+    /// Sets [`Room`]'s [`CloseReason`] to the provided value.
+    #[inline]
+    pub fn set_close_reason(&self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
 
@@ -633,6 +660,23 @@ impl Room {
     ) -> Option<Rc<PeerConnection>> {
         self.0.peers.get(peer_id)
     }
+
+    /// Indicates whether this [`Room`] reference is the same as the given
+    /// [`Room`] reference. Compares pointers, not values.
+    #[inline]
+    pub fn ptr_eq(&self, other: &Room) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Indicates whether the provided [`RoomHandle`] points to the same
+    /// [`InnerRoom`] as this [`Room`] does.
+    #[inline]
+    pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
+        handle
+            .0
+            .upgrade()
+            .map_or(false, |handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
+    }
 }
 
 /// Actual data of a [`Room`].
@@ -640,7 +684,7 @@ impl Room {
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
-    rpc: Rc<dyn RpcClient>,
+    rpc: Rc<dyn RpcSession>,
 
     /// Constraints to local [`MediaStream`] that is being published by
     /// [`PeerConnection`]s in this [`Room`].
@@ -667,7 +711,7 @@ struct InnerRoom {
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     on_failed_local_media: Rc<Callback1<JasonError>>,
 
-    /// Callback to be invoked when [`RpcClient`] loses connection.
+    /// Callback to be invoked when [`RpcSession`] loses connection.
     on_connection_loss: Callback1<ReconnectHandle>,
 
     /// JS callback which will be called when this [`Room`] will be closed.
@@ -686,7 +730,7 @@ impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
     fn new(
-        rpc: Rc<dyn RpcClient>,
+        rpc: Rc<dyn RpcSession>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
@@ -953,6 +997,8 @@ impl InnerRoom {
         for peer in self.peers.get_all() {
             peer.stop_state_transitions_timers();
         }
+        self.on_connection_loss
+            .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
 
     /// Resets state transition timers in all [`PeerConnection`]'s in this
@@ -1169,6 +1215,19 @@ impl EventHandler for InnerRoom {
 
         Ok(())
     }
+
+    #[inline]
+    async fn on_room_joined(&self, _: MemberId) -> Self::Output {
+        unreachable!("Room can't receive Event::RoomJoined")
+    }
+
+    #[inline]
+    async fn on_room_left(
+        &self,
+        _: medea_client_api_proto::CloseReason,
+    ) -> Self::Output {
+        unreachable!("Room can't receive Event::RoomLeft")
+    }
 }
 
 /// [`PeerEvent`]s handling.
@@ -1279,12 +1338,10 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
-        self.rpc.unsub();
-
         if let CloseReason::ByClient { reason, .. } =
             *self.close_reason.borrow()
         {
-            self.rpc.set_close_reason(reason);
+            self.rpc.close_with_reason(reason);
         };
 
         if let Some(Err(e)) = self
