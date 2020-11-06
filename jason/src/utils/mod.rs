@@ -120,74 +120,10 @@ macro_rules! upgrade_or_detached {
 ///   which type conversion is required.
 macro_rules! new_js_error {
     ($e:expr) => {
-        $crate::utils::JasonError::from(&tracerr::new!($e)).into()
+        $crate::utils::JasonError::from(tracerr::new!($e)).into()
     };
     ($e:expr => $o:ty) => {
-        <$o>::from($crate::utils::JasonError::from(&tracerr::new!($e)))
-    };
-}
-
-/// Creates new [`HashMap`] from a list of key-value pairs.
-///
-/// # Example
-///
-/// ```rust
-/// # use medea_jason::hashmap;
-/// let map = hashmap! {
-///     "a" => 1,
-///     "b" => 2,
-/// };
-/// assert_eq!(map["a"], 1);
-/// assert_eq!(map["b"], 2);
-/// assert_eq!(map.get("c"), None);
-/// ```
-///
-/// [`HashMap`]: std::collections::HashMap
-#[macro_export]
-macro_rules! hashmap {
-    (@single $($x:tt)*) => (());
-    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashmap!(@single $rest)),*]));
-
-    ($($key:expr => $value:expr,)+) => { hashmap!($($key => $value),+) };
-    ($($key:expr => $value:expr),*) => {
-        {
-            let _cap = hashmap!(@count $($key),*);
-            let mut _map = ::std::collections::HashMap::with_capacity(_cap);
-            $(
-                let _ = _map.insert($key, $value);
-            )*
-            _map
-        }
-    };
-}
-
-/// Creates new [`HashSet`] from a list of values.
-///
-/// # Example
-///
-/// ```rust
-/// # use medea_jason::hashset;
-/// let map = hashset![1, 1, 2];
-/// assert!(map.contains(&1));
-/// assert!(map.contains(&2));
-/// ```
-///
-/// [`HashSet`]: std::collections::HashSet
-#[macro_export]
-macro_rules! hashset {
-    (@single $($x:tt)*) => (());
-    (@count $($rest:expr),*) => (<[()]>::len(&[$(hashset!(@single $rest)),*]));
-
-    ($($value:expr,)+) => { hashset!($($value),+) };
-    ($($value:expr),*) => {
-        {
-            let _cap = hashset!(@count $($value),*);
-            let mut _map = ::std::collections::HashSet::with_capacity(_cap);
-            $(
-                let _ = _map.insert($value);
-            )*
-            _map
-        }
+        <$o>::from($crate::utils::JasonError::from(tracerr::new!($e)))
     };
 }
 

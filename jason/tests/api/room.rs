@@ -1535,7 +1535,7 @@ async fn remote_mute_unmute_video() {
 async fn mute_by_server() {
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1564,7 +1564,7 @@ async fn unmute_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1604,7 +1604,7 @@ async fn unmute_by_server() {
     assert_eq!(mock.get_user_media_requests_count(), 2);
     mock.stop();
     let sender = peer.get_sender_by_id(audio_track_id).unwrap();
-    assert!(sender.has_track());
+    assert!(sender.transceiver().send_track().is_some());
 }
 
 /// Checks that only one get user media request will be performed on
@@ -1666,12 +1666,11 @@ async fn only_one_gum_performed_on_unmute_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
     .await;
-    let room_handle = room.new_handle();
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx

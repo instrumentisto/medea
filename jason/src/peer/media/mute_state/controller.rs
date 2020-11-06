@@ -2,9 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{
-    future, future::Either, stream::LocalBoxStream, FutureExt, StreamExt,
-};
+use futures::{future, future::Either, FutureExt, StreamExt};
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
 
@@ -38,22 +36,6 @@ impl MuteStateController {
         });
         this.clone().spawn();
         this
-    }
-
-    /// Returns [`Stream`] to which [`StableMuteState`] update will be sent on
-    /// [`MuteStateController::mute_state`] stabilization.
-    pub fn on_stabilize(&self) -> LocalBoxStream<'static, StableMuteState> {
-        self.state
-            .subscribe()
-            .skip(1)
-            .filter_map(|state| async move {
-                if let MuteState::Stable(s) = state {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
-            .boxed_local()
     }
 
     /// Spawns all needed [`Stream`] listeners for this [`MuteStateController`].

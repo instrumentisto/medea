@@ -19,7 +19,7 @@ use crate::{
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`MediaStreamTrack`]s.
-#[derive(Debug, Display, JsCaused)]
+#[derive(Clone, Debug, Display, JsCaused)]
 pub enum TracksRequestError {
     /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
     #[display(fmt = "only one audio track is allowed in SimpleTracksRequest")]

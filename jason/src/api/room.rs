@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
-        TrackDirection,
+        LocalStreamUpdateCriteria, MediaConnectionsError, MuteState,
+        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        RtcStats, StableMuteState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
@@ -211,13 +211,13 @@ impl RoomHandle {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
         if !inner.on_failed_local_media.is_set() {
-            return Err(JasonError::from(&tracerr::new!(
+            return Err(JasonError::from(tracerr::new!(
                 RoomError::CallbackNotSet("Room.on_failed_local_media()")
             )));
         }
 
         if !inner.on_connection_loss.is_set() {
-            return Err(JasonError::from(&tracerr::new!(
+            return Err(JasonError::from(tracerr::new!(
                 RoomError::CallbackNotSet("Room.on_connection_loss()")
             )));
         }
@@ -225,8 +225,7 @@ impl RoomHandle {
         Rc::clone(&inner.rpc)
             .connect(token)
             .await
-            .map_err(tracerr::map_from_and_wrap!( => RoomError))
-            .map_err(|e| JasonError::from(&e))?;
+            .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
 
         let mut connection_loss_stream = inner.rpc.on_connection_loss();
         let weak_inner = Rc::downgrade(&inner);
@@ -274,28 +273,17 @@ impl RoomHandle {
                         source_kind,
                     );
                     tracerr::new!(e)
-                })
-                .map_err(|e| JasonError::from(&e))?;
+                })?;
         }
 
-        if let TrackDirection::Send = direction {
-            let source_kinds = source_kind.map_or_else(
-                || hashset![MediaSourceKind::Device, MediaSourceKind::Display],
-                |k| hashset![k],
-            );
-            let kinds = &hashmap! {
-                kind => source_kinds
-            };
-            for peer in inner
-                .peers
-                .get_all()
-                .into_iter()
-                .filter(|p| p.is_local_stream_update_needed(&kinds))
-            {
-                peer.update_local_stream(&kinds)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                    .map_err(|e| JasonError::from(&e))?;
+        // Enabled senders may require new tracks to be inserted.
+        if let (true, TrackDirection::Send) = (enabled, direction) {
+            for peer in inner.peers.get_all() {
+                peer.update_local_stream(
+                    LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
+                )
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
             }
         }
 
@@ -392,7 +380,7 @@ impl RoomHandle {
             inner?
                 .set_local_media_settings(settings)
                 .await
-                .map_err(|e| JasonError::from(&e))?;
+                .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -588,14 +576,14 @@ impl Room {
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
-                                    JasonError::from(&err).print();
+                                    JasonError::from(err).print();
                                 };
                             }
                             RoomEvent::PeerEvent(event) => {
                                 if let Err(err) =
                                     event.dispatch_with(inner.deref()).await
                                 {
-                                    JasonError::from(&err).print();
+                                    JasonError::from(err).print();
                                 };
                             }
                             RoomEvent::RpcClientLostConnection => {
@@ -942,22 +930,11 @@ impl InnerRoom {
         &self,
         settings: MediaStreamSettings,
     ) -> Result<(), Traced<RoomError>> {
-        let kinds = hashmap! {
-            MediaKind::Audio => hashset![
-                MediaSourceKind::Device,
-                MediaSourceKind::Display,
-            ],
-            MediaKind::Video => hashset![
-                MediaSourceKind::Device,
-                MediaSourceKind::Display,
-            ]
-        };
-
         self.send_constraints.constrain(settings);
 
         let mut mute_states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            peer.update_local_stream(&kinds)
+            peer.update_local_stream(LocalStreamUpdateCriteria::all())
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_mute_states| {
@@ -1162,7 +1139,7 @@ impl EventHandler for InnerRoom {
             .patch_tracks(patches)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
-        peer.update_local_stream(&kinds)
+        peer.update_local_stream(kinds)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         self.create_tracks_and_maybe_negotiate(

@@ -11,13 +11,13 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{MediaManager, RecvConstraints},
     peer::{
-        MediaConnections, RtcPeerConnection, SimpleTracksRequest,
-        TransceiverDirection,
+        LocalStreamUpdateCriteria, MediaConnections, RtcPeerConnection,
+        SimpleTracksRequest, TransceiverDirection,
     },
 };
 use wasm_bindgen_test::*;
 
-use crate::{all_kinds, get_media_stream_settings};
+use crate::get_media_stream_settings;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -51,7 +51,9 @@ async fn sendrecv_works() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(&all_kinds()).unwrap();
+    let request = media_connections
+        .get_tracks_request(LocalStreamUpdateCriteria::all())
+        .unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();

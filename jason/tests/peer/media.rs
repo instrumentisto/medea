@@ -7,15 +7,14 @@ use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        MediaConnections, Muteable, RtcPeerConnection, SimpleTracksRequest,
-        StableMuteState,
+        LocalStreamUpdateCriteria, MediaConnections, Muteable,
+        RtcPeerConnection, SimpleTracksRequest, StableMuteState,
     },
 };
 use wasm_bindgen_test::*;
 
 use crate::{
-    all_kinds, get_media_stream_settings, get_test_unrequired_tracks,
-    local_constraints,
+    get_media_stream_settings, get_test_unrequired_tracks, local_constraints,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -40,7 +39,9 @@ async fn get_test_media_connections(
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(&all_kinds()).unwrap();
+    let request = media_connections
+        .get_tracks_request(LocalStreamUpdateCriteria::all())
+        .unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();
@@ -84,7 +85,8 @@ fn get_tracks_request1() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(&all_kinds());
+    let request =
+        media_connections.get_tracks_request(LocalStreamUpdateCriteria::all());
     assert!(request.is_some());
 }
 
@@ -103,7 +105,8 @@ fn get_tracks_request2() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request(&all_kinds());
+    let request =
+        media_connections.get_tracks_request(LocalStreamUpdateCriteria::all());
     assert!(request.is_none());
 }
 

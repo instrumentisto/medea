@@ -331,7 +331,7 @@ impl WebSocketRpcTransport {
                         Err(e) => {
                             // TODO: protocol versions mismatch? should drop
                             //       connection if so
-                            JasonError::from(&tracerr::new!(e)).print();
+                            JasonError::from(tracerr::new!(e)).print();
                             return;
                         }
                     };

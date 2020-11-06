@@ -75,13 +75,6 @@ impl Transceiver {
     pub fn send_track(&self) -> Option<MediaStreamTrack> {
         self.send_track.borrow().clone()
     }
-
-    /// Returns `true` if this [`Transceiver`] has [`Some`]
-    /// [`MediaStreamTrack`].
-    #[inline]
-    pub fn has_send_track(&self) -> bool {
-        self.send_track.borrow().is_some()
-    }
 }
 
 impl From<RtcRtpTransceiver> for Transceiver {
