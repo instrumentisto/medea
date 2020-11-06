@@ -421,19 +421,9 @@ async function updateLocalVideo(stream) {
 }
 
 window.onload = async function() {
-  if (window === window.top) {
-    return;
-  }
-
-  if (!window.parent.jason) {
-    rust = await import('../../pkg');
-    if (!window.parent.jason) {
-      window.parent.rust = rust;
-      window.parent.jason = new rust.Jason();
-    }
-  }
-  let jason = window.parent.jason;
-  rust = window.parent.rust;
+  rust = await import('../../pkg');
+  let jason = new rust.Jason();
+  console.log(baseUrl);
   usernameInput.addEventListener('change', (e) => {
     usernameMenuButton.innerHTML = e.target.value;
   });
@@ -466,35 +456,33 @@ window.onload = async function() {
   let room = await newRoom();
 
   async function initLocalStream() {
-    let constraints = await build_constraints(
-      isAudioSendMuted ? null : audioSelect,
-      isVideoSendMuted ? null : videoSelect
-    );
-
-    try {
-      localTracks = await jason.media_manager().init_local_tracks(constraints)
-    } catch (e) {
-      console.error(e);
-      let origError = e.source();
-      if (origError && (origError.name === 'NotReadableError' || origError.name === 'AbortError')) {
-        if (origError.message.includes('audio')) {
-          constraints = await build_constraints(null, videoSelect);
-          localTracks = await jason.media_manager().init_local_tracks(constraints);
-          alert('unable to get audio, will try to enter room with video only');
-        } else if (origError.message.includes('video')) {
-          constraints = await build_constraints(audioSelect, null);
-          localTracks = await jason.media_manager().init_local_tracks(constraints);
-          alert('unable to get video, will try to enter room with audio only');
+      let constraints = await build_constraints(
+        isAudioSendMuted ? null : audioSelect,
+        isVideoSendMuted ? null : videoSelect
+      );
+      try {
+        localTracks = await jason.media_manager().init_local_tracks(constraints)
+      } catch (e) {
+        let origError = e.source();
+        if (origError && (origError.name === 'NotReadableError' || origError.name === 'AbortError')) {
+          if (origError.message.includes('audio')) {
+            constraints = await build_constraints(null, videoSelect);
+            localTracks = await jason.media_manager().init_local_tracks(constraints);
+            alert('unable to get audio, will try to enter room with video only');
+          } else if (origError.message.includes('video')) {
+            constraints = await build_constraints(audioSelect, null);
+            localTracks = await jason.media_manager().init_local_tracks(constraints);
+            alert('unable to get video, will try to enter room with audio only');
+          } else {
+            throw e;
+          }
         } else {
           throw e;
         }
-      } else {
-        throw e;
       }
-    }
-    await updateLocalVideo(localTracks);
+      await updateLocalVideo(localTracks);
 
-    return constraints;
+      return constraints;
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
@@ -724,7 +712,6 @@ window.onload = async function() {
     });
 
     room.on_close(async function (on_closed) {
-      alert("CLOOOOOOOOOOOSE");
       let videos = document.getElementsByClassName('remote-videos')[0];
       while (videos.firstChild) {
         videos.firstChild.remove();
@@ -741,6 +728,10 @@ window.onload = async function() {
       );
     });
 
+    return room;
+  }
+
+  try {
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
@@ -849,14 +840,8 @@ window.onload = async function() {
         muteVideoRecv.textContent = 'Enable video recv'
       }
     });
-
-    return room;
-  }
-
-  try {
     closeApp.addEventListener('click', () => {
-      jason.close_room(room);
-      // jason.dispose();
+      jason.dispose();
     });
 
     usernameInput.value = faker.name.firstName();

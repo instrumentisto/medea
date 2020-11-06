@@ -3,10 +3,12 @@
 <head>
   <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <title>Medea E2E demo</title>
-  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+  <script>
+    function goToCall() {
+      let roomId = document.getElementsByClassName('choose-room__id')[0].value;
+      document.location = "/video-call#" + roomId;
+    }
+  </script>
 
   <style>
     .choose-room {
@@ -25,151 +27,11 @@
     .choose-room__join {
       height: 30px;
     }
-
-    .rooms-tabs {
-      background-color: #fff;
-      width: 100%;
-    }
-
-    .room-tabs-trigger:hover {
-      display: none;
-    }
-
-    .room-tab {
-      padding: 7px;
-      margin-right: 5px;
-      background-color: #eff0f1;
-    }
-
-    .room-tab-selected {
-      background-color: #d7d8d9;
-    }
-
-    .room-frame {
-      width: 100%;
-      height: 100vh;
-      border: none;
-    }
   </style>
 </head>
 <body>
-  <div class="rooms-tabs">
-    <div class="room-tabs-trigger"></div>
-    <ul class="nav nav-tabs" id="tabs-bar">
-      <li class="nav-item">
-        <a href="#" class="nav-link" id="new-room">+</a>
-      </li>
-    </ul>
+  <div class="choose-room">
+    <input class="choose-room__id" placeholder="Room ID">
+    <button class="choose-room__join" onclick="goToCall()" type="submit">JOIN</button>
   </div>
-  <div class="modal fade"
-       id="new-room-tab-dialog"
-       tabindex="1"
-       role="dialog"
-       aria-hidden="false">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Open Room</h5>
-          <button type="button"
-                  class="close"
-                  data-dismiss="modal"
-                  aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-        </div>
-
-        <div class="modal-body">
-            <input type="text"
-                   id="open-new-room-id"
-                   placeholder="Room ID"
-                   class="form-control">
-        </div>
-
-        <div class="modal-footer">
-          <button type="button"
-                  id="open-new-room"
-                  class="btn btn-success">
-            Open
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div id="room-frames-container">
-  </div>
-  <script>
-      let tabsBarEl = document.getElementById('tabs-bar');
-      let roomFramesContainer = document.getElementById('room-frames-container');
-      let newRoomBtnEl = document.getElementById('new-room');
-      let roomTabs = {};
-      let roomFrames = {};
-      let currentRoomFrame = null;
-
-      newRoomBtnEl.addEventListener('click', () => {
-        $('#new-room-tab-dialog').modal('show');
-      });
-      let openNewRoomBtnEl = document.getElementById('open-new-room');
-      let roomIdInputEl = document.getElementById('open-new-room-id');
-      openNewRoomBtnEl.addEventListener('click', () => {
-        let newIframe = document.createElement('iframe');
-        newIframe.className = 'room-frame';
-        let roomId = roomIdInputEl.value;
-        newIframe.id = roomId;
-        newIframe.src = "http://localhost:8081/video-call#" + roomId;
-        newIframe.style.display = 'none';
-        roomFramesContainer.appendChild(newIframe);
-
-        let newRoomTab = document.createElement('li');
-        newRoomTab.className = 'nav-item';
-        let newRoomTabBtn = document.createElement('a');
-        newRoomTabBtn.className = 'nav-link';
-        newRoomTabBtn.id = roomId;
-        newRoomTabBtn.innerHTML = roomId;
-        newRoomTabBtn.href = '#';
-        newRoomTab.appendChild(newRoomTabBtn);
-        tabsBarEl.appendChild(newRoomTab);
-
-        let i = tabsBarEl.childNodes.length - 2;
-        let aa = tabsBarEl.childNodes[i];
-        tabsBarEl.insertBefore(newRoomTab, newRoomBtnEl.parentElement);
-        console.log(aa);
-        roomTabs[roomId] = newRoomTabBtn;
-        roomFrames[roomId] = newIframe;
-        newRoomTabBtn.addEventListener('click', (e) => {
-          switchRoomTab(e.target.id);
-        });
-
-        switchRoomTab(roomId);
-        $('#new-room-tab-dialog').modal('hide');
-      });
-
-      function switchRoomTab(roomId) {
-        let roomTab = roomTabs[roomId];
-        if (currentTabEl) {
-          currentTabEl.className = "nav-link";
-        }
-        roomTab.className = "nav-link active";
-        currentTabEl = roomTab;
-        roomFrames[roomId].style.display = "block";
-        if (currentRoomFrame) {
-          currentRoomFrame.style.display = "none";
-        }
-        currentRoomFrame = roomFrames[roomId];
-      }
-
-      $('.modal').on('show.bs.modal', function(event) {
-          var idx = $('.modal:visible').length;
-          $(this).css('z-index', 1040 + (10 * idx));
-      });
-      $('.modal').on('shown.bs.modal', function(event) {
-          var idx = ($('.modal:visible').length) -1; // raise backdrop after animation.
-          $('.modal-backdrop').not('.stacked').css('z-index', 1039 + (10 * idx));
-          $('.modal-backdrop').not('.stacked').addClass('stacked');
-      });
-
-      let roomVideoCallTabEl = document.getElementById('room-video-call');
-      let roomTestCallTabEl = document.getElementById('room-test-call');
-      let roomVideoCallFrameEl = document.getElementById('room-video-call-frame');
-      let roomTestCallFrameEl = document.getElementById('room-test-call-frame');
-      let currentTabEl = roomVideoCallTabEl;
-  </script>
 </body>
