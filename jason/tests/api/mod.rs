@@ -38,7 +38,7 @@ async fn only_one_strong_rpc_rc_exists() {
                         RPC_SETTINGS,
                         ServerMsg::Event {
                             room_id: "room_id".into(),
-                            event: Event::JoinedRoom {
+                            event: Event::RoomJoined {
                                 member_id: "member_id".into(),
                             },
                         },
@@ -82,7 +82,7 @@ async fn rpc_dropped_on_jason_dispose() {
                         RPC_SETTINGS,
                         ServerMsg::Event {
                             room_id: "room_id".into(),
-                            event: Event::JoinedRoom {
+                            event: Event::RoomJoined {
                                 member_id: "member_id".into(),
                             },
                         },
@@ -171,7 +171,7 @@ async fn room_dispose_works() {
             client_msg_txs.borrow().iter().for_each(|tx| {
                 tx.unbounded_send(ServerMsg::Event {
                     room_id: "room_id".into(),
-                    event: Event::JoinedRoom {
+                    event: Event::RoomJoined {
                         member_id: "member_id".into(),
                     },
                 })
@@ -197,7 +197,7 @@ async fn room_dispose_works() {
             client_msg_txs.borrow().iter().for_each(|tx| {
                 tx.unbounded_send(ServerMsg::Event {
                     room_id: "another_room_id".into(),
-                    event: Event::JoinedRoom {
+                    event: Event::RoomJoined {
                         member_id: "member_id".into(),
                     },
                 })
@@ -279,7 +279,7 @@ async fn room_closes_on_rpc_transport_close() {
                             RPC_SETTINGS,
                             ServerMsg::Event {
                                 room_id: "room_id".into(),
-                                event: Event::JoinedRoom {
+                                event: Event::RoomJoined {
                                     member_id: "member_id".into(),
                                 },
                             },

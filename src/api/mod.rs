@@ -32,8 +32,8 @@ pub enum RpcServerError {
 impl From<RoomError> for RpcServerError {
     fn from(err: RoomError) -> Self {
         match &err {
-            RoomError::AuthorizationError => RpcServerError::Authorization,
-            _ => RpcServerError::RoomError(err),
+            RoomError::AuthorizationError => Self::Authorization,
+            _ => Self::RoomError(err),
         }
     }
 }

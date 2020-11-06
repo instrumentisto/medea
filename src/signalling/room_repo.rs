@@ -55,6 +55,7 @@ impl RoomRepository {
 }
 
 impl RpcServerRepository for RoomRepository {
+    #[inline]
     fn get(&self, room_id: &RoomId) -> Option<Box<dyn RpcServer>> {
         self.get(room_id).map(|r| Box::new(r) as Box<dyn RpcServer>)
     }

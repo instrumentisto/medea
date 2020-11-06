@@ -396,13 +396,13 @@ pub struct CloseDescription {
 #[serde(tag = "event", content = "data")]
 pub enum Event {
     /// `Media Server` notifies `Client` that he joined `Room`.
-    JoinedRoom {
+    RoomJoined {
         /// ID of `Member` which joined `Room`.
         member_id: MemberId,
     },
 
     /// `Media Server` notifies `Client` that he left `Room`.
-    LeftRoom {
+    RoomLeft {
         /// [`CloseReason`] with which `Client` was left.
         close_reason: CloseReason,
     },

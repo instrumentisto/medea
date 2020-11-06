@@ -55,7 +55,7 @@ pub enum ClientDisconnect {
 }
 
 impl ClientDisconnect {
-    /// Indicated whether this [`ClientDisconnect`] is considered as error.
+    /// Indicates whether this [`ClientDisconnect`] is considered as error.
     #[inline]
     #[must_use]
     pub fn is_err(self) -> bool {
@@ -146,6 +146,7 @@ pub type RpcTransportFactory = Box<
 >;
 
 impl Inner {
+    /// Instantiates new [`Inner`] state of [`WebsocketRpcClient`].
     fn new(rpc_transport_factory: RpcTransportFactory) -> RefCell<Self> {
         RefCell::new(Self {
             sock: None,
@@ -298,10 +299,10 @@ impl WebSocketRpcClient {
     fn on_transport_message(&self, msg: ServerMsg) {
         let msg = match msg {
             ServerMsg::Event { room_id, event } => match event {
-                Event::JoinedRoom { member_id } => {
+                Event::RoomJoined { member_id } => {
                     Some(RpcEvent::JoinedRoom { room_id, member_id })
                 }
-                Event::LeftRoom { close_reason } => Some(RpcEvent::LeftRoom {
+                Event::RoomLeft { close_reason } => Some(RpcEvent::LeftRoom {
                     room_id,
                     close_reason: CloseReason::ByServer(close_reason),
                 }),

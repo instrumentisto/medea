@@ -299,8 +299,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                     assert_eq!(self.room_id, room_id);
                     if matches!(
                         event,
-                        Event::JoinedRoom { .. }
-                        | Event::LeftRoom { .. }
+                        Event::RoomJoined { .. }
+                        | Event::RoomLeft { .. }
                     ) {
                         return;
                     }
@@ -428,8 +428,8 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             } => assert!(self.known_peers.contains(peer_id)),
                             Event::PeersRemoved { .. }
                             | Event::ConnectionQualityUpdated { .. }
-                            | Event::JoinedRoom { .. }
-                            | Event::LeftRoom { .. } => (),
+                            | Event::RoomJoined { .. }
+                            | Event::RoomLeft { .. } => (),
                         }
                     }
                     let mut events: Vec<&Event> = self.events.iter().collect();

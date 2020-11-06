@@ -225,7 +225,7 @@ impl WsSession {
     /// [`RpcConnectionSettings`] with [`RpcConnectionSettings`] returned from
     /// the [`RpcServer`].
     ///
-    /// Sends [`Event::JoinedRoom`].
+    /// Sends [`Event::RoomJoined`].
     fn handle_join_room(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,
@@ -448,24 +448,24 @@ impl WsSession {
         ctx.text(event);
     }
 
-    /// Sends [`Event::JoinedRoom`] to the client.
+    /// Sends [`Event::RoomJoined`] to the client.
     fn send_joined_room(
         &self,
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         member_id: MemberId,
     ) {
-        self.send_event(ctx, room_id, Event::JoinedRoom { member_id });
+        self.send_event(ctx, room_id, Event::RoomJoined { member_id });
     }
 
-    /// Sends [`Event::LeftRoom`] to the client.
+    /// Sends [`Event::RoomLeft`] to the client.
     fn send_left_room(
         &self,
         ctx: &mut <Self as Actor>::Context,
         room_id: RoomId,
         close_reason: CloseReason,
     ) {
-        self.send_event(ctx, room_id, Event::LeftRoom { close_reason });
+        self.send_event(ctx, room_id, Event::RoomLeft { close_reason });
     }
 
     /// Sends current [`RpcSettings`] to the client.
@@ -785,7 +785,7 @@ mod test {
             left_room_frame,
             into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
-                event: Event::LeftRoom {
+                event: Event::RoomLeft {
                     close_reason: medea_client_api_proto::CloseReason::Rejected,
                 }
             })
@@ -858,7 +858,7 @@ mod test {
             item,
             into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
-                event: Event::JoinedRoom {
+                event: Event::RoomJoined {
                     member_id: "member_id".into(),
                 }
             })
@@ -1123,7 +1123,7 @@ mod test {
             left_room_frame,
             into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
-                event: Event::LeftRoom {
+                event: Event::RoomLeft {
                     close_reason: medea_client_api_proto::CloseReason::Finished,
                 }
             })
@@ -1331,7 +1331,7 @@ mod test {
             msgs[1],
             ServerMsg::Event {
                 room_id: "alice_room".into(),
-                event: Event::JoinedRoom {
+                event: Event::RoomJoined {
                     member_id: "alice".into(),
                 }
             }
@@ -1347,7 +1347,7 @@ mod test {
             msgs[3],
             ServerMsg::Event {
                 room_id: "bob_room".into(),
-                event: Event::JoinedRoom {
+                event: Event::RoomJoined {
                     member_id: "bob".into(),
                 }
             }
@@ -1438,13 +1438,13 @@ mod test {
             client.map(|frame| frame.unwrap()).collect().await;
         assert!(frames.contains(&into_frame(ServerMsg::Event {
             room_id: "room1".into(),
-            event: Event::JoinedRoom {
+            event: Event::RoomJoined {
                 member_id: "member1".into(),
             }
         })));
         assert!(frames.contains(&into_frame(ServerMsg::Event {
             room_id: "room2".into(),
-            event: Event::JoinedRoom {
+            event: Event::RoomJoined {
                 member_id: "member2".into(),
             }
         })));

@@ -60,7 +60,7 @@ All user visible changes to this project will be documented in this file. This p
 - `source_kind` field to `VideoSettings` type ([#145]);
 - `RoomId` and `Credential` types ([#148]);
 - `JoinRoom` and `LeaveRoom` client messages ([#147]);
-- `JoinedRoom` and `LeftRoom` server messages ([#147]).
+- `RoomJoined` and `RoomLeft` server messages ([#147]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58

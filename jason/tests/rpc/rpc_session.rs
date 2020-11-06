@@ -23,7 +23,7 @@ use crate::{delay_for, rpc::RPC_SETTINGS, timeout, TEST_ROOM_URL};
 wasm_bindgen_test_configure!(run_in_browser);
 
 /// Makes sure that `connect` fails immediately if `JoinRoom` request is
-/// answered with `LeftRoom` message.
+/// answered with `RoomLeft` message.
 #[wasm_bindgen_test]
 async fn could_not_auth_err() {
     let session = WebSocketRpcSession::new(Rc::new(WebSocketRpcClient::new(
@@ -35,7 +35,7 @@ async fn could_not_auth_err() {
                         RPC_SETTINGS,
                         ServerMsg::Event {
                             room_id: "room_id".into(),
-                            event: Event::LeftRoom {
+                            event: Event::RoomLeft {
                                 close_reason: CloseReason::InternalError,
                             },
                         },
@@ -91,7 +91,7 @@ async fn concurrent_connect_requests() {
                         RPC_SETTINGS,
                         ServerMsg::Event {
                             room_id: "room_id".into(),
-                            event: Event::JoinedRoom {
+                            event: Event::RoomJoined {
                                 member_id: "member_id".into(),
                             },
                         },
@@ -190,7 +190,7 @@ async fn reconnect_after_transport_abnormal_close() {
                         RPC_SETTINGS,
                         ServerMsg::Event {
                             room_id: "room_id".into(),
-                            event: Event::JoinedRoom {
+                            event: Event::RoomJoined {
                                 member_id: "member_id".into(),
                             },
                         },

@@ -34,7 +34,7 @@ pub use self::{
 pub struct Jason(Rc<RefCell<Inner>>);
 
 struct Inner {
-    /// [`Jason`]s [`MediaManager`]. It is shared across [`Room`]s since
+    /// [`Jason`]s [`MediaManager`]. It's shared across [`Room`]s since
     /// [`MediaManager`] contains media tracks that can be used by multiple
     /// [`Room`]s.
     media_manager: Rc<MediaManager>,
