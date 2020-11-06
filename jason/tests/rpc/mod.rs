@@ -2,6 +2,7 @@
 
 mod backoff_delayer;
 mod heartbeat;
+mod rpc_session;
 mod websocket;
 
 use std::{collections::HashMap, rc::Rc};
@@ -17,15 +18,21 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
 use medea_jason::rpc::{
-    websocket::{MockRpcTransport, TransportState},
-    ClientDisconnect, CloseMsg, RpcClient, RpcTransport, WebSocketRpcClient,
+    websocket::{MockRpcTransport, RpcEvent, TransportState},
+    ClientDisconnect, CloseMsg, RpcTransport, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
-use crate::{delay_for, timeout};
+use crate::{delay_for, join_room_url, timeout};
 
 wasm_bindgen_test_configure!(run_in_browser);
+
+/// [`ServerMsg::RpcSettings`] that can be used in tests.
+pub const RPC_SETTINGS: ServerMsg = ServerMsg::RpcSettings(RpcSettings {
+    idle_timeout_ms: 5_000,
+    ping_interval_ms: 2_000,
+});
 
 /// Creates [`WebSocketRpcClient`] with the provided [`MockRpcTransport`].
 fn new_client(transport: Rc<MockRpcTransport>) -> Rc<WebSocketRpcClient> {
@@ -73,7 +80,10 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
                     idle_timeout_ms: 10_000,
                     ping_interval_ms: 10_000,
                 }),
-                ServerMsg::Event(SRV_EVENT),
+                ServerMsg::Event {
+                    room_id: "".into(),
+                    event: SRV_EVENT,
+                },
             ])
             .boxed()
         });
@@ -84,39 +94,15 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
     })));
 
     let mut stream = ws.subscribe();
-    ws.clone().connect(String::new()).await.unwrap();
-    assert_eq!(stream.next().await.unwrap(), SRV_EVENT);
-}
+    ws.clone().connect(join_room_url()).await.unwrap();
 
-/// Tests [`WebSocketRpcClient::unsub`] function.
-///
-/// # Algorithm
-///
-/// 1. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`].
-///
-/// 2. Call [`WebSocketRpcClient::unsub`].
-///
-/// 3. Wait for `None` received from [`WebSocketRpcClient::subscribe`]'s
-/// `Stream`.
-#[wasm_bindgen_test]
-async fn unsub_drops_subs() {
-    let ws = new_client(Rc::new(MockRpcTransport::new()));
-    let (test_tx, test_rx) = oneshot::channel();
-    let mut subscriber_stream = ws.subscribe();
-    spawn_local(async move {
-        loop {
-            match subscriber_stream.next().await {
-                Some(_) => (),
-                None => {
-                    test_tx.send(()).unwrap();
-                    break;
-                }
-            }
+    assert_eq!(
+        stream.next().await.unwrap(),
+        RpcEvent::Event {
+            room_id: "".into(),
+            event: SRV_EVENT
         }
-    });
-    ws.unsub();
-
-    timeout(1000, test_rx).await.unwrap().unwrap();
+    );
 }
 
 /// Tests that [`RpcTransport`] will be dropped when [`WebSocketRpcClient`] was
@@ -147,7 +133,7 @@ async fn transport_is_dropped_when_client_is_dropped() {
     let rpc_transport = Rc::new(transport);
 
     let ws = new_client(rpc_transport.clone());
-    ws.clone().connect(String::new()).await.unwrap();
+    ws.clone().connect(join_room_url()).await.unwrap();
     ws.set_close_reason(ClientDisconnect::RoomClosed);
     drop(ws);
     delay_for(100).await;
@@ -185,7 +171,7 @@ async fn send_goes_to_transport() {
     transport.expect_set_close_reason().return_const(());
 
     let ws = new_client(Rc::new(transport));
-    ws.clone().connect(String::new()).await.unwrap();
+    ws.clone().connect(join_room_url()).await.unwrap();
     let (test_tx, test_rx) = oneshot::channel();
     let test_peer_id = PeerId(9999);
     let test_sdp_offer = "Hello world!".to_string();
@@ -199,7 +185,7 @@ async fn send_goes_to_transport() {
     spawn_local(async move {
         while let Some(msg) = on_send_rx.next().await {
             match msg {
-                ClientMsg::Command(cmd) => match cmd {
+                ClientMsg::Command { command, .. } => match command {
                     Command::MakeSdpOffer {
                         peer_id,
                         sdp_offer,
@@ -218,7 +204,7 @@ async fn send_goes_to_transport() {
         }
     });
 
-    ws.send_command(test_cmd);
+    ws.send_command("".into(), test_cmd);
 
     timeout(1000, test_rx).await.unwrap().unwrap();
 }
@@ -249,7 +235,7 @@ mod on_close {
         transport.expect_set_close_reason().return_const(());
 
         let ws = new_client(Rc::new(transport));
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
 
         ws
     }
@@ -345,7 +331,7 @@ mod transport_close_reason_on_drop {
             });
 
         let ws = new_client(Rc::new(transport));
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
 
         (ws, test_rx)
     }
@@ -446,7 +432,7 @@ mod connect {
             let transport = Rc::new(transport);
             Box::pin(future::ok(transport as Rc<dyn RpcTransport>))
         })));
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
 
         timeout(500, test_rx.next()).await.unwrap().unwrap();
     }
@@ -491,12 +477,12 @@ mod connect {
                 }
             })
         })));
-        let first_connect_fut = ws.clone().connect(String::new());
+        let first_connect_fut = ws.clone().connect(join_room_url());
         spawn_local(async move {
             first_connect_fut.await.unwrap();
         });
 
-        timeout(1000, ws.connect(String::new()))
+        timeout(1000, ws.connect(join_room_url()))
             .await
             .unwrap()
             .unwrap();
@@ -537,9 +523,9 @@ mod connect {
                 Ok(transport as Rc<dyn RpcTransport>)
             })
         })));
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
 
-        timeout(50, ws.connect(String::new()))
+        timeout(50, ws.connect(join_room_url()))
             .await
             .unwrap()
             .unwrap();
@@ -586,7 +572,7 @@ mod on_connection_loss {
                 Ok(transport as Rc<dyn RpcTransport>)
             })
         })));
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
 
         ws
     }
@@ -717,6 +703,8 @@ mod on_connection_loss {
 }
 
 /// Tests for the [`RpcClient::on_reconnected`] function.
+// TODO: this tests should be implemented for the RpcSession!
+#[cfg(feature = "disabled")]
 mod on_reconnected {
 
     use medea_reactive::ObservableCell;
@@ -749,7 +737,7 @@ mod on_reconnected {
         })));
 
         let mut on_reconnected_stream = ws.on_reconnected();
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
         timeout(10, on_reconnected_stream.next()).await.unwrap_err();
     }
 
@@ -788,7 +776,7 @@ mod on_reconnected {
         })));
 
         let mut on_reconnected_stream = ws.on_reconnected();
-        ws.clone().connect(String::new()).await.unwrap();
+        ws.clone().connect(join_room_url()).await.unwrap();
 
         on_state_change_mock
             .set(TransportState::Closed(CloseMsg::Abnormal(1006)));
@@ -801,7 +789,7 @@ mod on_reconnected {
             ping_interval_ms: 2_000,
         }));
 
-        ws.connect(String::new()).await.unwrap();
+        ws.connect(join_room_url()).await.unwrap();
         assert!(on_reconnected_stream.next().await.is_some());
     }
 }

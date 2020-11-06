@@ -23,8 +23,7 @@ use medea_client_api_proto::{
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, ClosedReason, RpcConnection,
-            RpcConnectionClosed,
+            ClosedReason, RpcConnection, RpcConnectionClosed,
         },
         control::{
             refs::{Fid, ToEndpoint, ToMember},
@@ -169,23 +168,21 @@ impl ParticipantService {
     ///
     /// # Errors
     ///
-    /// Errors with [`AuthorizationError::MemberNotExists`] if lookup by
-    /// [`MemberId`] fails.
-    ///
-    /// Errors with [`AuthorizationError::InvalidCredentials`] if [`Member`]
-    /// was found, but incorrect credentials were provided.
+    /// Errors with [`RoomError::AuthorizationError`] if lookup by [`MemberId`]
+    /// fails or if [`Member`] was found, but incorrect credentials were
+    /// provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
         credentials: &Credential,
-    ) -> Result<Member, AuthorizationError> {
+    ) -> Result<Member, RoomError> {
         let member = self
             .get_member_by_id(member_id)
-            .map_err(|_| AuthorizationError::MemberNotExists)?;
+            .map_err(|_| RoomError::AuthorizationError)?;
         if &member.credentials() == credentials {
             Ok(member)
         } else {
-            Err(AuthorizationError::InvalidCredentials)
+            Err(RoomError::AuthorizationError)
         }
     }
 
@@ -209,7 +206,7 @@ impl ParticipantService {
         self.connections.get(&member_id).map_or(
             Err(RoomError::ConnectionNotExists(member_id)),
             |conn| {
-                conn.send_event(event);
+                conn.send_event(self.room_id.clone(), event);
                 Ok(())
             },
         )
@@ -244,7 +241,10 @@ impl ParticipantService {
             self.insert_connection(member_id, conn);
             Box::pin(
                 connection
-                    .close(CloseDescription::new(CloseReason::Reconnected))
+                    .close(
+                        self.room_id.clone(),
+                        CloseDescription::new(CloseReason::Reconnected),
+                    )
                     .map(move |_| Ok(member)),
             )
         } else {
@@ -269,7 +269,7 @@ impl ParticipantService {
     pub fn connection_closed(
         &mut self,
         member_id: MemberId,
-        reason: &ClosedReason,
+        reason: ClosedReason,
         ctx: &mut Context<Room>,
     ) {
         let closed_at = Instant::now();
@@ -316,16 +316,16 @@ impl ParticipantService {
             ctx.cancel_future(handle);
         });
 
+        let room_id = self.room_id.clone();
         // closing all RpcConnection's
         let close_rpc_connections =
             future::join_all(self.connections.drain().fold(
                 Vec::new(),
                 |mut futs, (_, mut connection)| {
-                    futs.push(
-                        connection.close(CloseDescription::new(
-                            CloseReason::Finished,
-                        )),
-                    );
+                    futs.push(connection.close(
+                        room_id.clone(),
+                        CloseDescription::new(CloseReason::Finished),
+                    ));
                     futs
                 },
             ));
@@ -358,9 +358,10 @@ impl ParticipantService {
         }
 
         if let Some(mut conn) = self.connections.remove(member_id) {
-            wrap_future::<_, Room>(
-                conn.close(CloseDescription::new(CloseReason::Evicted)),
-            )
+            wrap_future::<_, Room>(conn.close(
+                self.room_id.clone(),
+                CloseDescription::new(CloseReason::Evicted),
+            ))
             .spawn(ctx);
         }
     }
@@ -491,7 +492,7 @@ mod test {
             None,
         );
 
-        let test_member_id = MemberId(String::from("test-member"));
+        let test_member_id = MemberId::from("test-member");
         members
             .create_member(test_member_id.clone(), &test_member_spec)
             .unwrap();
@@ -533,7 +534,7 @@ mod test {
             Some(ping_interval),
         );
 
-        let test_member_id = MemberId(String::from("test-member"));
+        let test_member_id = MemberId::from("test-member");
         members
             .create_member(test_member_id.clone(), &test_member_spec)
             .unwrap();

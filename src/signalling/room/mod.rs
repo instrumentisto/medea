@@ -55,6 +55,9 @@ pub enum RoomError {
 
     MemberError(MemberError),
 
+    #[display(fmt = "Could not find Member with provided Id or Credential")]
+    AuthorizationError,
+
     #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     #[from(ignore)]
     NoTurnCredentials(MemberId),

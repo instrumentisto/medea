@@ -9,17 +9,16 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{Command, MemberId, PeerId};
+use medea_client_api_proto::{Command, Credential, MemberId, PeerId};
 
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, ClosedReason, CommandMessage,
-            RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
-            RpcConnectionSettings,
+            ClosedReason, CommandMessage, RpcConnection, RpcConnectionClosed,
+            RpcConnectionEstablished, RpcConnectionSettings,
         },
         control::callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
-        RpcServer,
+        RpcServer, RpcServerError,
     },
     log::prelude::*,
     media::PeerStateMachine,
@@ -66,6 +65,10 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
+            C::LeaveRoom { .. } | C::JoinRoom { .. } => unreachable!(
+                "Room can't receive this Command: {:?}",
+                command.command
+            ),
         };
 
         let peer_member_id = self
@@ -84,24 +87,28 @@ impl Room {
 impl RpcServer for Addr<Room> {
     /// Sends [`RpcConnectionEstablished`] message to [`Room`] actor propagating
     /// errors.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RpcServerError::RoomMailbox`] if [`Message`] sending is
+    /// failed.
+    ///
+    /// Errors with [`RpcServerError::RoomError`] if [`Room`] returns error.
     fn connection_established(
         &self,
         member_id: MemberId,
+        credentials: Credential,
         connection: Box<dyn RpcConnection>,
-    ) -> LocalBoxFuture<'static, Result<(), ()>> {
+    ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, RpcServerError>>
+    {
         self.send(RpcConnectionEstablished {
             member_id,
+            credentials,
             connection,
         })
         .map(|r| {
-            r.map_err(|e| {
-                error!("Failed to send RpcConnectionEstablished cause {:?}", e)
-            })
-            .and_then(|r| {
-                r.map_err(|e| {
-                    error!("RpcConnectionEstablished failed cause: {:?}", e)
-                })
-            })
+            r.map_err(RpcServerError::RoomMailbox)
+                .and_then(|r| r.map_err(|e| e.into()))
         })
         .boxed_local()
     }
@@ -125,24 +132,6 @@ impl RpcServer for Addr<Room> {
     /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
     fn send_command(&self, member_id: MemberId, msg: Command) {
         self.do_send(CommandMessage::new(member_id, msg));
-    }
-}
-
-impl Handler<Authorize> for Room {
-    type Result = Result<RpcConnectionSettings, AuthorizationError>;
-
-    /// Responses with `Ok` if `RpcConnection` is authorized, otherwise `Err`s.
-    fn handle(
-        &mut self,
-        msg: Authorize,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        self.members
-            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
-            .map(move |member| RpcConnectionSettings {
-                idle_timeout: member.get_idle_timeout(),
-                ping_interval: member.get_ping_interval(),
-            })
     }
 }
 
@@ -182,11 +171,13 @@ impl Handler<CommandMessage> for Room {
 }
 
 impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<Result<(), RoomError>>;
+    type Result = ActFuture<Result<RpcConnectionSettings, RoomError>>;
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`][1], initiates
     /// media establishment between members.
     /// Creates and interconnects all available `Member`'s `Peer`s.
+    ///
+    /// Returns [`RpcConnectionSettings`] of the connected `Member`.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     /// [1]: crate::signalling::participants::ParticipantService
@@ -197,10 +188,14 @@ impl Handler<RpcConnectionEstablished> for Room {
     ) -> Self::Result {
         let member_id = msg.member_id;
         let connection = msg.connection;
+        let credentials = msg.credentials;
 
         info!("RpcConnectionEstablished for Member [id = {}].", member_id);
 
-        let member = actix_try!(self.members.get_member_by_id(&member_id));
+        let member = actix_try!(self
+            .members
+            .get_member_by_id_and_credentials(&member_id, &credentials));
+
         let is_reconnect = self.members.member_has_connection(&member_id);
 
         let maybe_send_on_join = match (member.get_on_join(), is_reconnect) {
@@ -223,7 +218,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         Box::pin(
             maybe_send_on_join
                 .into_actor(self)
-                .then(move |res: Result<(), RoomError>, this, ctx| match res {
+                .then(|res: Result<(), RoomError>, this, ctx| match res {
                     Ok(_) => Either::Left(
                         this.members
                             .connection_established(ctx, member_id, connection)
@@ -234,7 +229,14 @@ impl Handler<RpcConnectionEstablished> for Room {
                 })
                 .then(|res, this, _| match res {
                     Ok(member) => {
-                        Either::Left(this.init_member_connections(&member))
+                        Either::Left(this.init_member_connections(&member).map(
+                            move |res, _, _| {
+                                res.map(move |_| RpcConnectionSettings {
+                                    idle_timeout: member.get_idle_timeout(),
+                                    ping_interval: member.get_ping_interval(),
+                                })
+                            },
+                        ))
                     }
                     Err(err) => Either::Right(fut::err(err)),
                 }),
@@ -263,7 +265,7 @@ impl Handler<RpcConnectionClosed> for Room {
         );
 
         self.members
-            .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
+            .connection_closed(msg.member_id.clone(), msg.reason, ctx);
 
         if let ClosedReason::Closed { normal } = msg.reason {
             if let Ok(member) = self.members.get_member_by_id(&msg.member_id) {
@@ -308,7 +310,7 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::collections::HashMap;
 
-    use medea_client_api_proto::RoomId;
+    use medea_client_api_proto::{IceCandidate, RoomId};
 
     use super::*;
 
@@ -323,8 +325,6 @@ mod test {
         },
         AppContext,
     };
-
-    use medea_client_api_proto::IceCandidate;
 
     fn empty_room() -> Room {
         let room_spec = RoomSpec {
@@ -366,11 +366,11 @@ mod test {
         );
 
         room.members
-            .create_member(MemberId(String::from("member1")), &member1)
+            .create_member(MemberId::from("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            MemberId(String::from("member1")),
+            MemberId::from("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -404,11 +404,11 @@ mod test {
         );
 
         room.members
-            .create_member(MemberId(String::from("member1")), &member1)
+            .create_member(MemberId::from("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
-            MemberId(String::from("member1")),
+            MemberId::from("member1"),
             Command::SetIceCandidate {
                 peer_id: PeerId(1),
                 candidate: IceCandidate {
@@ -432,12 +432,10 @@ mod test {
 
         use actix::Addr;
         use medea_client_api_proto::{
-            CloseDescription, CloseReason, Credential, MemberId,
+            CloseDescription, CloseReason, Credential, MemberId, RoomId,
         };
         use mockall::predicate::eq;
         use serial_test::serial;
-
-        use super::*;
 
         use crate::api::{
             client::rpc_connection::MockRpcConnection,
@@ -451,6 +449,8 @@ mod test {
                 RoomElement,
             },
         };
+
+        use super::*;
 
         fn room_spec(with_on_join: bool, with_on_leave: bool) -> RoomSpec {
             let callback_url =
@@ -469,7 +469,7 @@ mod test {
             let id = MemberId::from("member");
             let member = RoomElement::Member {
                 spec: Pipeline::new(HashMap::new()),
-                credentials: Credential::from(""),
+                credentials: Credential::from("test"),
                 on_leave,
                 on_join,
                 idle_timeout: None,
@@ -520,6 +520,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
+                    Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -542,18 +543,23 @@ mod test {
                 let mut rpc_connection = MockRpcConnection::new();
                 rpc_connection
                     .expect_close()
-                    .with(eq(CloseDescription {
-                        reason: CloseReason::Reconnected,
-                    }))
-                    .return_once(|_| Box::pin(future::ready(())));
+                    .with(
+                        eq(RoomId::from("test")),
+                        eq(CloseDescription {
+                            reason: CloseReason::Reconnected,
+                        }),
+                    )
+                    .return_once(|_, _| Box::pin(future::ready(())));
                 room.connection_established(
                     MemberId::from("member"),
+                    Credential::from("test"),
                     Box::new(rpc_connection),
                 )
                 .await
                 .unwrap();
                 room.connection_established(
                     MemberId::from("member"),
+                    Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -571,6 +577,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
+                    Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -592,6 +599,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
+                    Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -610,6 +618,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
+                    Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
