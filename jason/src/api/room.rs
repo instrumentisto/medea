@@ -1328,9 +1328,10 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
+    /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
+    /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
         self.on_failed_local_media.call(error);
-
         Ok(())
     }
 }

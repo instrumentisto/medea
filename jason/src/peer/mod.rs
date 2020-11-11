@@ -936,12 +936,12 @@ impl PeerConnection {
         self.media_connections.get_sender_by_id(id)
     }
 
-    /// Returns `true` if all [`Sender`]s audio tracks are enabled.
+    /// Indicates whether all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()
     }
 
-    /// Returns `true` if all [`Sender`]s video tracks are enabled.
+    /// Indicates whether all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -1046,7 +1046,7 @@ mod stream_update_criteria {
                 .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
         }
 
-        /// Checks if this [`LocalStreamUpdateCriteria`] contains provided
+        /// Checks whether this [`LocalStreamUpdateCriteria`] contains provided
         /// [`MediaKind`] + [`MediaSourceKind`] pair.
         pub fn has(
             self,

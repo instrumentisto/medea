@@ -729,8 +729,7 @@ impl MediaConnections {
         self.0.borrow().receivers.get(&id).cloned()
     }
 
-    /// Returns `true` if all [`Sender`]s with
-    /// [`MediaKind::Audio`] are enabled or `false` otherwise.
+    /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -738,8 +737,7 @@ impl MediaConnections {
             .all(|s| s.is_unmuted())
     }
 
-    /// Returns `true` if all [`Sender`]s with
-    /// [`MediaKind::Video`] are enabled or `false` otherwise.
+    /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
     pub fn is_send_video_enabled(
         &self,
         source_kind: Option<MediaSourceKind>,
