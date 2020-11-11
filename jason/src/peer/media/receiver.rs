@@ -179,7 +179,9 @@ impl Receiver {
             return;
         }
         if let Some(is_disabled_general) = track_patch.is_disabled_general {
-            self.update_general_mute_state(is_disabled_general.into());
+            self.update_general_media_exchange_state(
+                is_disabled_general.into(),
+            );
         }
         if let Some(is_disabled) = track_patch.is_disabled_individual {
             self.media_exchange_state_controller.update(is_disabled);
@@ -224,12 +226,13 @@ impl Receiver {
 
     /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
     /// based on the provided [`StableMediaExchangeState`].
-    ///
-    /// Updates [`InnerReceiver::general_mute_state`].
-    fn update_general_mute_state(&self, mute_state: StableMediaExchangeState) {
-        if self.general_media_exchange_state.get() != mute_state {
-            self.general_media_exchange_state.set(mute_state);
-            match mute_state {
+    fn update_general_media_exchange_state(
+        &self,
+        new_state: StableMediaExchangeState,
+    ) {
+        if self.general_media_exchange_state.get() != new_state {
+            self.general_media_exchange_state.set(new_state);
+            match new_state {
                 StableMediaExchangeState::Disabled => {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(false);

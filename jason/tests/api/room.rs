@@ -146,8 +146,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
         cb_assert_eq!(
             err.message(),
-            "Invalid local tracks: MediaExchangeState of Sender can\'t be \
-             transited into disabled state, because this Sender is required."
+            "MediaExchangeState of Sender can\'t be transited into disabled \
+             state, because this Sender is required."
         );
     });
     room_handle.on_failed_local_media(cb.into()).unwrap();
@@ -1536,9 +1536,9 @@ async fn remote_disable_enable_video() {
     assert!(peer.is_recv_video_enabled());
 }
 
-/// Checks that server can mute track without client's request.
+/// Checks that server can disable track without client's request.
 #[wasm_bindgen_test]
-async fn mute_by_server() {
+async fn disable_by_server() {
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
     let (_room, peer, event_tx) = get_test_room_and_exist_peer(
@@ -1553,8 +1553,8 @@ async fn mute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             })],
         })
         .unwrap();
@@ -1564,9 +1564,9 @@ async fn mute_by_server() {
     assert!(!peer.is_send_audio_enabled());
 }
 
-/// Checks that server can unmute track without client's request.
+/// Checks that server can enable track without client's request.
 #[wasm_bindgen_test]
-async fn unmute_by_server() {
+async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
@@ -1583,8 +1583,8 @@ async fn unmute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             })],
         })
         .unwrap();
@@ -1599,8 +1599,8 @@ async fn unmute_by_server() {
             negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(false),
-                is_muted_individual: Some(false),
+                is_disabled_general: Some(false),
+                is_disabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1614,9 +1614,9 @@ async fn unmute_by_server() {
 }
 
 /// Checks that only one get user media request will be performed on
-/// `Room.unmute_audio` with a failed get user media.
+/// `Room.enable_audio` with a failed get user media.
 #[wasm_bindgen_test]
-async fn only_one_gum_performed_on_unmute() {
+async fn only_one_gum_performed_on_enable() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
@@ -1634,8 +1634,8 @@ async fn only_one_gum_performed_on_unmute() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             })],
         })
         .unwrap();
@@ -1643,7 +1643,7 @@ async fn only_one_gum_performed_on_unmute() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
-    mock.error_get_user_media("only_one_gum_performed_on_unmute".into());
+    mock.error_get_user_media("only_one_gum_performed_on_enable".into());
 
     event_tx
         .unbounded_send(Event::TracksApplied {
@@ -1651,12 +1651,12 @@ async fn only_one_gum_performed_on_unmute() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             })],
         })
         .unwrap();
-    JsFuture::from(room_handle.unmute_audio())
+    JsFuture::from(room_handle.enable_audio())
         .await
         .unwrap_err();
     yield_now().await;
@@ -1668,7 +1668,7 @@ async fn only_one_gum_performed_on_unmute() {
 /// Checks that only one get user media request will be performed on
 /// [`Event::TracksApplied`] with a failed get user media.
 #[wasm_bindgen_test]
-async fn only_one_gum_performed_on_unmute_by_server() {
+async fn only_one_gum_performed_on_enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
@@ -1685,8 +1685,8 @@ async fn only_one_gum_performed_on_unmute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             })],
         })
         .unwrap();
@@ -1694,7 +1694,7 @@ async fn only_one_gum_performed_on_unmute_by_server() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
-    mock.error_get_user_media("only_one_gum_performed_on_unmute".into());
+    mock.error_get_user_media("only_one_gum_performed_on_enable".into());
 
     event_tx
         .unbounded_send(Event::TracksApplied {
@@ -1702,8 +1702,8 @@ async fn only_one_gum_performed_on_unmute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_muted_general: Some(true),
-                is_muted_individual: Some(true),
+                is_disabled_general: Some(true),
+                is_disabled_individual: Some(true),
             })],
         })
         .unwrap();
@@ -1754,8 +1754,8 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
         assert_eq!(err.name(), "MediaConnections");
         assert_eq!(
             err.message(),
-            "Some MediaConnectionsError: MuteState of Sender transits into \
-             opposite to expected MuteState"
+            "Some MediaConnectionsError: MediaExchangeState of Sender \
+             transits into opposite to expected MediaExchangeState"
         );
     });
     yield_now().await;

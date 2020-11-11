@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        LocalStreamUpdateCriteria, MediaConnectionsError, MediaExchangeState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, RtcStats,
-        StableMediaExchangeState, TrackDirection,
+        LocalStreamUpdateCriteria, MediaConnectionsError, MediaExchangeState,
+        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        RtcStats, StableMediaExchangeState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -416,7 +416,7 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes outbound video.
+    /// Disables outbound video.
     ///
     /// Affects only video with specific [`JsMediaSourceKind`] if specified.
     pub fn disable_video(
@@ -1000,7 +1000,8 @@ impl InnerRoom {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_media_exchange_states| {
-                    media_exchange_states_update.insert(peer.id(), new_media_exchange_states)
+                    media_exchange_states_update
+                        .insert(peer.id(), new_media_exchange_states)
                 })?;
         }
 

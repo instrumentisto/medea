@@ -7,7 +7,7 @@ use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        LocalStreamUpdateCriteria, MediaConnections, Disableable,
+        Disableable, LocalStreamUpdateCriteria, MediaConnections,
         RtcPeerConnection, SimpleTracksRequest, StableMediaExchangeState,
     },
 };

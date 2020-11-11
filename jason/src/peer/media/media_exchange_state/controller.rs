@@ -2,9 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{
-    future, future::Either, stream::LocalBoxStream, FutureExt, StreamExt,
-};
+use futures::{future, future::Either, FutureExt, StreamExt};
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
 
@@ -39,24 +37,6 @@ impl MediaExchangeStateController {
         });
         this.clone().spawn();
         this
-    }
-
-    /// Returns [`Stream`] to which [`StableMediaExchangeState`] update will be
-    /// sent on [`MediaExchangeStateController::state`] stabilization.
-    pub(in super::super) fn on_stabilize(
-        &self,
-    ) -> LocalBoxStream<'static, StableMediaExchangeState> {
-        self.state
-            .subscribe()
-            .skip(1)
-            .filter_map(|state| async move {
-                if let MediaExchangeState::Stable(s) = state {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
-            .boxed_local()
     }
 
     /// Spawns all needed [`Stream`] listeners for this

@@ -679,7 +679,7 @@ impl PeerConnection {
     pub async fn update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> Result<HashMap<TrackId, StableMuteState>> {
+    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
         self.inner_update_local_stream(criteria).await.map_err(|e| {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {

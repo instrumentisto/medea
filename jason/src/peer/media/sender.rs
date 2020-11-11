@@ -12,7 +12,7 @@ use crate::{
     peer::{
         media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
-        PeerEvent,
+        MediaExchangeState,
     },
 };
 
@@ -178,16 +178,20 @@ impl Sender {
 
         let mut requires_media_update = false;
         if let Some(is_disabled) = track.is_disabled_individual {
-            let mute_state_before = self.mute_state.mute_state();
+            let state_before = self.media_exchange_state.media_exchange_state();
             self.media_exchange_state.update(is_disabled);
-            if let (MuteState::Stable(before), MuteState::Stable(after)) =
-                (mute_state_before, self.mute_state.mute_state())
-            {
-                requires_media_update =
-                    before != after && after == StableMuteState::Unmuted;
+            if let (
+                MediaExchangeState::Stable(before),
+                MediaExchangeState::Stable(after),
+            ) = (
+                state_before,
+                self.media_exchange_state.media_exchange_state(),
+            ) {
+                requires_media_update = before != after
+                    && after == StableMediaExchangeState::Enabled;
             }
 
-            if is_muted {
+            if is_disabled {
                 self.remove_track().await;
             }
         }

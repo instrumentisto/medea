@@ -483,9 +483,10 @@ impl MediaConnections {
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let media_exchange_state = if send_constraints
-                        .is_enabled(&track.media_type) {
-                            StableMediaExchangeState::Enabled
-                        } else if is_required {
+                        .is_enabled(&track.media_type)
+                    {
+                        StableMediaExchangeState::Enabled
+                    } else if is_required {
                         let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         );
@@ -613,11 +614,11 @@ impl MediaConnections {
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
-        let mut mute_satates_updates = HashMap::new();
+        let mut media_exchange_state_updates = HashMap::new();
         for sender in inner.senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
-                    mute_satates_updates.insert(
+                    media_exchange_state_updates.insert(
                         sender.track_id(),
                         StableMediaExchangeState::Enabled,
                     );
@@ -632,7 +633,7 @@ impl MediaConnections {
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
-                mute_satates_updates.insert(
+                media_exchange_state_updates.insert(
                     sender.track_id(),
                     StableMediaExchangeState::Disabled,
                 );
@@ -648,7 +649,7 @@ impl MediaConnections {
         ))
         .await?;
 
-        Ok(mute_satates_updates)
+        Ok(media_exchange_state_updates)
     }
 
     /// Handles [`RtcTrackEvent`] by adding new track to the corresponding
