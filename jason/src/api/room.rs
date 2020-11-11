@@ -261,10 +261,10 @@ impl RoomHandle {
             kind,
             direction,
             source_kind,
-            StableMediaExchangeState::from(!enabled),
+            StableMediaExchangeState::from(enabled),
         ) {
             inner
-                .toggle_media_exchange(!enabled, kind, direction, source_kind)
+                .toggle_media_exchange(enabled, kind, direction, source_kind)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
                     inner.toggle_enable_constraints(
@@ -789,7 +789,7 @@ impl InnerRoom {
     #[allow(clippy::filter_map)]
     async fn toggle_media_exchange(
         &self,
-        is_disabled: bool, // TODO: change to enabled
+        is_enabled: bool,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
@@ -819,7 +819,7 @@ impl InnerRoom {
                         );
                         (
                             transceiver.track_id(),
-                            StableMediaExchangeState::from(is_disabled), // TODO: change to enabled
+                            StableMediaExchangeState::from(is_enabled),
                         )
                     })
                     .collect();
@@ -835,8 +835,7 @@ impl InnerRoom {
             MediaConnectionsError::CannotDisableRequiredSender,
         )) = &update_result.as_ref().map_err(AsRef::as_ref)
         {
-            self.update_media_exchange_states(states_backup)
-                .await?;
+            self.update_media_exchange_states(states_backup).await?;
         }
 
         update_result
@@ -857,9 +856,7 @@ impl InnerRoom {
             desired_states
                 .into_iter()
                 .filter_map(|(peer_id, desired_states)| {
-                    self.peers
-                        .get(peer_id)
-                        .map(|peer| (peer, desired_states))
+                    self.peers.get(peer_id).map(|peer| (peer, desired_states))
                 })
                 .map(|(peer, desired_states)| {
                     let peer_id = peer.id();
@@ -867,69 +864,46 @@ impl InnerRoom {
                     let mut tracks_patches = Vec::new();
                     desired_states
                         .into_iter()
-                        .filter_map(
-                            move |(track_id, desired_state)| {
-                                peer.get_transceiver_side_by_id(track_id).map(
-                                    |trnscvr| {
-                                        (trnscvr, desired_state)
-                                    },
-                                )
-                            },
-                        )
-                        .filter_map(
-                            |(trnscvr, desired_state)| {
-                                use MediaExchangeState as S;
-                                match trnscvr.media_exchange_state() {
-                                    S::Transition(transition) => Some((
-                                        trnscvr,
-                                        desired_state,
-                                        transition.intended()
-                                            != desired_state,
-                                    )),
-                                    S::Stable(stable) => {
-                                        if stable
-                                            == desired_state
-                                        {
-                                            None
-                                        } else {
-                                            Some((
-                                                trnscvr,
-                                                desired_state,
-                                                true,
-                                            ))
-                                        }
+                        .filter_map(move |(track_id, desired_state)| {
+                            peer.get_transceiver_side_by_id(track_id)
+                                .map(|trnscvr| (trnscvr, desired_state))
+                        })
+                        .filter_map(|(trnscvr, desired_state)| {
+                            use MediaExchangeState as S;
+                            match trnscvr.media_exchange_state() {
+                                S::Transition(transition) => Some((
+                                    trnscvr,
+                                    desired_state,
+                                    transition.intended() != desired_state,
+                                )),
+                                S::Stable(stable) => {
+                                    if stable == desired_state {
+                                        None
+                                    } else {
+                                        Some((trnscvr, desired_state, true))
                                     }
                                 }
-                            },
-                        )
-                        .map(
-                            |(
-                                trnscvr,
-                                 desired_state,
-                                should_be_patched,
-                            )| {
-                                trnscvr.media_exchange_state_transition_to(
+                            }
+                        })
+                        .map(|(trnscvr, desired_state, should_be_patched)| {
+                            trnscvr.media_exchange_state_transition_to(
+                                desired_state,
+                            )?;
+                            transitions_futs.push(
+                                trnscvr.when_media_exchange_state_stable(
                                     desired_state,
-                                )?;
-                                transitions_futs.push(
-                                    trnscvr.when_media_exchange_state_stable(
-                                        desired_state,
-                                    ),
-                                );
-                                if should_be_patched {
-                                    use StableMediaExchangeState::Disabled;
-                                    tracks_patches.push(TrackPatchCommand {
-                                        id: trnscvr.track_id(),
-                                        is_disabled: Some(
-                                            desired_state
-                                                == Disabled,
-                                        ),
-                                    });
-                                }
+                                ),
+                            );
+                            if should_be_patched {
+                                use StableMediaExchangeState::Enabled;
+                                tracks_patches.push(TrackPatchCommand {
+                                    id: trnscvr.track_id(),
+                                    is_enabled: Some(desired_state == Enabled),
+                                });
+                            }
 
-                                Ok(())
-                            },
-                        )
+                            Ok(())
+                        })
                         .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {

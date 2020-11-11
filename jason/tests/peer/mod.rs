@@ -36,14 +36,14 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 fn toggle_disable_tracks_updates(
     tracks_ids: &[u32],
-    is_disabled: bool,
+    is_enabled: bool,
 ) -> Vec<TrackPatchEvent> {
     tracks_ids
         .into_iter()
         .map(|track_id| TrackPatchEvent {
             id: TrackId(*track_id),
-            is_disabled_individual: Some(is_disabled),
-            is_disabled_general: Some(is_disabled),
+            is_enabled_individual: Some(is_enabled),
+            is_enabled_general: Some(is_enabled),
         })
         .collect()
 }
@@ -74,13 +74,13 @@ async fn disable_enable_audio() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], false))
         .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], false))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
         .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
@@ -109,13 +109,13 @@ async fn disable_enable_video() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], true))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], false))
         .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], false))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], true))
         .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());

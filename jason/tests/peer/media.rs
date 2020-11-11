@@ -59,14 +59,14 @@ async fn get_test_media_connections(
         .get_sender_by_id(audio_track_id)
         .unwrap()
         .media_exchange_state_transition_to(StableMediaExchangeState::from(
-            !enabled_audio,
+            enabled_audio,
         ))
         .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
         .media_exchange_state_transition_to(StableMediaExchangeState::from(
-            !enabled_video,
+            enabled_video,
         ))
         .unwrap();
 
@@ -142,8 +142,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
-            is_disabled_general: Some(true),
-            is_disabled_individual: Some(true),
+            is_enabled_general: Some(false),
+            is_enabled_individual: Some(false),
         }])
         .await
         .unwrap();
@@ -156,8 +156,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
-            is_disabled_general: Some(true),
-            is_disabled_individual: Some(true),
+            is_enabled_general: Some(false),
+            is_enabled_individual: Some(false),
         }])
         .await
         .unwrap();
@@ -170,8 +170,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
-            is_disabled_individual: Some(false),
-            is_disabled_general: Some(false),
+            is_enabled_individual: Some(true),
+            is_enabled_general: Some(true),
         }])
         .await
         .unwrap();
@@ -184,8 +184,8 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
-            is_disabled_individual: Some(false),
-            is_disabled_general: Some(false),
+            is_enabled_individual: Some(true),
+            is_enabled_general: Some(true),
         }])
         .await
         .unwrap();
@@ -245,8 +245,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: TrackId(track_id.0 + 100),
-                is_disabled_individual: Some(true),
-                is_disabled_general: Some(true),
+                is_enabled_individual: Some(false),
+                is_enabled_general: Some(false),
             })
             .await;
 
@@ -259,8 +259,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_disabled_individual: Some(true),
-                is_disabled_general: Some(true),
+                is_enabled_individual: Some(false),
+                is_enabled_general: Some(false),
             })
             .await;
 
@@ -273,8 +273,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_disabled_individual: Some(false),
-                is_disabled_general: Some(false),
+                is_enabled_individual: Some(true),
+                is_enabled_general: Some(true),
             })
             .await;
 
@@ -287,8 +287,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_disabled_individual: Some(true),
-                is_disabled_general: Some(true),
+                is_enabled_individual: Some(false),
+                is_enabled_general: Some(false),
             })
             .await;
         assert!(sender.is_general_disabled());
@@ -296,8 +296,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_disabled_individual: Some(true),
-                is_disabled_general: Some(true),
+                is_enabled_individual: Some(false),
+                is_enabled_general: Some(false),
             })
             .await;
 
@@ -310,8 +310,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_disabled_individual: None,
-                is_disabled_general: None,
+                is_enabled_individual: None,
+                is_enabled_general: None,
             })
             .await;
 
@@ -355,8 +355,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TrackId(TRACK_ID.0 + 100),
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
+            is_enabled_individual: Some(false),
+            is_enabled_general: Some(false),
         });
 
         assert!(!receiver.is_general_disabled());
@@ -367,8 +367,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
+            is_enabled_individual: Some(false),
+            is_enabled_general: Some(false),
         });
 
         assert!(receiver.is_general_disabled());
@@ -379,8 +379,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_disabled_individual: Some(false),
-            is_disabled_general: Some(false),
+            is_enabled_individual: Some(true),
+            is_enabled_general: Some(true),
         });
 
         assert!(!receiver.is_general_disabled());
@@ -391,15 +391,15 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
+            is_enabled_individual: Some(false),
+            is_enabled_general: Some(false),
         });
         assert!(receiver.is_general_disabled());
 
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
+            is_enabled_individual: Some(false),
+            is_enabled_general: Some(false),
         });
 
         assert!(receiver.is_general_disabled());
@@ -410,8 +410,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_disabled_individual: None,
-            is_disabled_general: None,
+            is_enabled_individual: None,
+            is_enabled_general: None,
         });
 
         assert!(!receiver.is_general_disabled());

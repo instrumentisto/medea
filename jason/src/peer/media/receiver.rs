@@ -103,11 +103,11 @@ impl Receiver {
             mid: RefCell::new(mid),
             track: RefCell::new(None),
             general_media_exchange_state: Cell::new(
-                StableMediaExchangeState::from(!enabled),
+                StableMediaExchangeState::from(enabled),
             ),
             is_track_notified: Cell::new(false),
             media_exchange_state_controller: MediaExchangeStateController::new(
-                StableMediaExchangeState::from(!enabled),
+                StableMediaExchangeState::from(enabled),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }
@@ -178,13 +178,12 @@ impl Receiver {
         if self.track_id != track_patch.id {
             return;
         }
-        if let Some(is_disabled_general) = track_patch.is_disabled_general {
-            self.update_general_media_exchange_state(
-                is_disabled_general.into(),
-            );
+        if let Some(is_enabled_general) = track_patch.is_enabled_general {
+            self.update_general_media_exchange_state(is_enabled_general.into());
         }
-        if let Some(is_disabled) = track_patch.is_disabled_individual {
-            self.media_exchange_state_controller.update(is_disabled);
+        if let Some(is_enabled_individual) = track_patch.is_enabled_individual {
+            self.media_exchange_state_controller
+                .update(is_enabled_individual);
         }
     }
 
@@ -256,7 +255,8 @@ impl Receiver {
 
     /// Checks whether general media exchange state of this [`Receiver`] is in
     /// [`StableMediaExchangeState::Enabled`].
-    fn is_not_disabled(&self) -> bool { // TODO: change to enabled
+    fn is_not_disabled(&self) -> bool {
+        // TODO: change to enabled
         self.general_media_exchange_state.get()
             == StableMediaExchangeState::Enabled
     }

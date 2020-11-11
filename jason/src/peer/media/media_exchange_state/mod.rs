@@ -105,11 +105,11 @@ impl StableMediaExchangeState {
 
 impl From<bool> for StableMediaExchangeState {
     #[inline]
-    fn from(is_disabled: bool) -> Self {
-        if is_disabled {
-            Self::Disabled
-        } else {
+    fn from(is_enabled: bool) -> Self {
+        if is_enabled {
             Self::Enabled
+        } else {
+            Self::Disabled
         }
     }
 }

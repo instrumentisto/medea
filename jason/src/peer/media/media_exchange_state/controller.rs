@@ -120,9 +120,9 @@ impl MediaExchangeStateController {
     ///
     /// `Room.disable_audio` like `Promise`s will be resolved based on this
     /// update.
-    pub(in super::super) fn update(&self, is_disabled: bool) {
+    pub(in super::super) fn update(&self, is_enabled: bool) {
         let new_media_exchange_state =
-            StableMediaExchangeState::from(is_disabled);
+            StableMediaExchangeState::from(is_enabled);
         let current_media_exchange_state = self.state.get();
 
         let media_exchange_state_update: MediaExchangeState =

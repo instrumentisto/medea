@@ -177,9 +177,9 @@ impl Sender {
         }
 
         let mut requires_media_update = false;
-        if let Some(is_disabled) = track.is_disabled_individual {
+        if let Some(is_enabled) = track.is_enabled_individual {
             let state_before = self.media_exchange_state.media_exchange_state();
-            self.media_exchange_state.update(is_disabled);
+            self.media_exchange_state.update(is_enabled);
             if let (
                 MediaExchangeState::Stable(before),
                 MediaExchangeState::Stable(after),
@@ -191,14 +191,12 @@ impl Sender {
                     && after == StableMediaExchangeState::Enabled;
             }
 
-            if is_disabled {
+            if !is_enabled {
                 self.remove_track().await;
             }
         }
-        if let Some(is_disabled_general) = track.is_disabled_general {
-            self.update_general_media_exchange_state(
-                is_disabled_general.into(),
-            );
+        if let Some(is_enabled_general) = track.is_enabled_general {
+            self.update_general_media_exchange_state(is_enabled_general.into());
         }
 
         requires_media_update

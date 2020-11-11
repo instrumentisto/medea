@@ -1264,7 +1264,7 @@ mod patches_generation {
                 peer_id: PeerId(1),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
-                    is_disabled: Some(true),
+                    is_enabled: Some(false),
                 }]
             }
         );
@@ -1317,7 +1317,7 @@ mod patches_generation {
             commands.remove(&PeerId(1)).unwrap(),
             vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(true),
+                is_enabled: Some(false),
             }]
         );
 
@@ -1325,7 +1325,7 @@ mod patches_generation {
             commands.remove(&PeerId(2)).unwrap(),
             vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(true),
+                is_enabled: Some(false),
             }]
         );
     }
@@ -1393,7 +1393,7 @@ mod patches_generation {
                 peer_id: PeerId(2),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
-                    is_disabled: Some(true),
+                    is_enabled: Some(false),
                 }]
             }
         );
@@ -1440,7 +1440,7 @@ mod patches_generation {
                     tracks_patches,
                     vec![TrackPatchCommand {
                         id: TrackId(1),
-                        is_disabled: Some(true),
+                        is_enabled: Some(false),
                     }]
                 ),
                 _ => {
@@ -1491,7 +1491,7 @@ mod patches_generation {
                     tracks_patches,
                     vec![TrackPatchCommand {
                         id: TrackId(2),
-                        is_disabled: Some(true),
+                        is_enabled: Some(false),
                     }]
                 ),
                 _ => {
@@ -1553,8 +1553,8 @@ async fn disable_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
+                is_enabled_general: Some(false),
+                is_enabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1583,8 +1583,8 @@ async fn enable_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
+                is_enabled_general: Some(false),
+                is_enabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1599,8 +1599,8 @@ async fn enable_by_server() {
             negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(false),
-                is_disabled_individual: Some(false),
+                is_enabled_general: Some(true),
+                is_enabled_individual: Some(true),
             })],
         })
         .unwrap();
@@ -1634,8 +1634,8 @@ async fn only_one_gum_performed_on_enable() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
+                is_enabled_general: Some(false),
+                is_enabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1651,8 +1651,8 @@ async fn only_one_gum_performed_on_enable() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
+                is_enabled_general: Some(false),
+                is_enabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1685,8 +1685,8 @@ async fn only_one_gum_performed_on_enable_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
+                is_enabled_general: Some(false),
+                is_enabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1702,8 +1702,8 @@ async fn only_one_gum_performed_on_enable_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
+                is_enabled_general: Some(false),
+                is_enabled_individual: Some(false),
             })],
         })
         .unwrap();
@@ -1768,7 +1768,7 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
         {
             assert_eq!(peer_id, PeerId(1));
             let track_patch = tracks_patches.pop().unwrap();
-            assert_eq!(track_patch.is_disabled, Some(false));
+            assert_eq!(track_patch.is_enabled, Some(true));
             assert!(tracks_patches.is_empty());
             break;
         }
