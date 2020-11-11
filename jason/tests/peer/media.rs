@@ -3,12 +3,12 @@
 use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
+use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        Disableable, MediaConnections, RtcPeerConnection, SimpleTracksRequest,
-        StableMediaExchangeState,
+        LocalStreamUpdateCriteria, MediaConnections, Disableable,
+        RtcPeerConnection, SimpleTracksRequest, StableMediaExchangeState,
     },
 };
 use wasm_bindgen_test::*;
@@ -26,7 +26,6 @@ async fn get_test_media_connections(
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -40,7 +39,9 @@ async fn get_test_media_connections(
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request().unwrap();
+    let request = media_connections
+        .get_tracks_request(LocalStreamUpdateCriteria::all())
+        .unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();
@@ -77,7 +78,6 @@ fn get_tracks_request1() {
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -89,7 +89,8 @@ fn get_tracks_request1() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request();
+    let request =
+        media_connections.get_tracks_request(LocalStreamUpdateCriteria::all());
     assert!(request.is_some());
 }
 
@@ -98,7 +99,6 @@ fn get_tracks_request2() {
     let (tx, rx) = mpsc::unbounded();
     mem::forget(rx);
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -109,7 +109,8 @@ fn get_tracks_request2() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request();
+    let request =
+        media_connections.get_tracks_request(LocalStreamUpdateCriteria::all());
     assert!(request.is_none());
 }
 
@@ -144,6 +145,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_disabled_general: Some(true),
             is_disabled_individual: Some(true),
         }])
+        .await
         .unwrap();
     assert!(audio_track.is_general_disabled());
     assert!(!video_track.is_general_disabled());
@@ -157,6 +159,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_disabled_general: Some(true),
             is_disabled_individual: Some(true),
         }])
+        .await
         .unwrap();
     assert!(audio_track.is_general_disabled());
     assert!(video_track.is_general_disabled());
@@ -170,6 +173,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_disabled_individual: Some(false),
             is_disabled_general: Some(false),
         }])
+        .await
         .unwrap();
     assert!(!audio_track.is_general_disabled());
     assert!(video_track.is_general_disabled());
@@ -183,6 +187,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
             is_disabled_individual: Some(false),
             is_disabled_general: Some(false),
         }])
+        .await
         .unwrap();
     assert!(!audio_track.is_general_disabled());
     assert!(!video_track.is_general_disabled());
@@ -237,11 +242,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: TrackId(track_id.0 + 100),
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: TrackId(track_id.0 + 100),
+                is_disabled_individual: Some(true),
+                is_disabled_general: Some(true),
+            })
+            .await;
 
         assert!(!sender.is_general_disabled());
     }
@@ -249,11 +256,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn disable() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_disabled_individual: Some(true),
+                is_disabled_general: Some(true),
+            })
+            .await;
 
         assert!(sender.is_general_disabled());
     }
@@ -261,11 +270,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn enabled_enabled() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_disabled_individual: Some(false),
-            is_disabled_general: Some(false),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_disabled_individual: Some(false),
+                is_disabled_general: Some(false),
+            })
+            .await;
 
         assert!(!sender.is_general_disabled());
     }
@@ -273,18 +284,22 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn disable_disabled() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_disabled_individual: Some(true),
+                is_disabled_general: Some(true),
+            })
+            .await;
         assert!(sender.is_general_disabled());
 
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_disabled_individual: Some(true),
-            is_disabled_general: Some(true),
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_disabled_individual: Some(true),
+                is_disabled_general: Some(true),
+            })
+            .await;
 
         assert!(sender.is_general_disabled());
     }
@@ -292,11 +307,13 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.update(&TrackPatchEvent {
-            id: track_id,
-            is_disabled_individual: None,
-            is_disabled_general: None,
-        });
+        sender
+            .update(&TrackPatchEvent {
+                id: track_id,
+                is_disabled_individual: None,
+                is_disabled_general: None,
+            })
+            .await;
 
         assert!(!sender.is_general_disabled());
     }
@@ -318,7 +335,6 @@ mod receiver_patch {
     fn get_receiver() -> (Rc<Receiver>, mpsc::UnboundedReceiver<PeerEvent>) {
         let (tx, rx) = mpsc::unbounded();
         let media_connections = MediaConnections::new(
-            PeerId(0),
             Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
             tx,
         );

@@ -7,7 +7,7 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MemberId, TrackPatchEvent};
+use medea_client_api_proto::{MediaSourceKind, MemberId, TrackPatchEvent};
 use proto::TrackId;
 use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
@@ -277,6 +277,11 @@ impl TransceiverSide for Receiver {
     #[inline]
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
+    }
+
+    #[inline]
+    fn source_kind(&self) -> MediaSourceKind {
+        self.caps.media_source_kind()
     }
 
     fn mid(&self) -> Option<String> {

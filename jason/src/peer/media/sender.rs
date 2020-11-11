@@ -2,9 +2,7 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
-use wasm_bindgen_futures::spawn_local;
+use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
 
 use crate::{
     media::{
@@ -67,39 +65,14 @@ impl<'a> SenderBuilder<'a> {
 
         let media_exchange_state_controller =
             MediaExchangeStateController::new(self.media_exchange_state);
-        let mut media_exchange_state_rx =
-            media_exchange_state_controller.on_stabilize();
         let this = Rc::new(Sender {
-            peer_id: connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             general_media_exchange_state: Cell::new(self.media_exchange_state),
             transceiver,
             media_exchange_state: media_exchange_state_controller,
             is_required: self.is_required,
-            peer_events_sender: connections.peer_events_sender.clone(),
             send_constraints: self.send_constraints,
-        });
-        spawn_local({
-            let weak_this = Rc::downgrade(&this);
-            async move {
-                while let Some(media_exchange_state) =
-                    media_exchange_state_rx.next().await
-                {
-                    if let Some(this) = weak_this.upgrade() {
-                        match media_exchange_state {
-                            StableMediaExchangeState::Enabled => {
-                                this.maybe_request_track();
-                            }
-                            StableMediaExchangeState::Disabled => {
-                                this.remove_track().await;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
         });
 
         Ok(this)
@@ -109,14 +82,12 @@ impl<'a> SenderBuilder<'a> {
 /// Representation of a local [`MediaStreamTrack`] that is being sent to some
 /// remote peer.
 pub struct Sender {
-    peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
     media_exchange_state: Rc<MediaExchangeStateController>,
     general_media_exchange_state: Cell<StableMediaExchangeState>,
     is_required: bool,
-    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     send_constraints: LocalTracksConstraints,
 }
 
@@ -150,7 +121,6 @@ impl Sender {
             self.general_media_exchange_state.set(media_exchange_state);
             match media_exchange_state {
                 StableMediaExchangeState::Enabled => {
-                    self.maybe_request_track();
                     if self.is_enabled_in_cons() {
                         self.transceiver
                             .add_direction(TransceiverDirection::SEND);
@@ -198,19 +168,36 @@ impl Sender {
 
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
-    pub fn update(&self, track: &TrackPatchEvent) {
+    ///
+    /// Returns `true` if media stream update should be performed for this
+    /// [`Sender`].
+    pub async fn update(&self, track: &TrackPatchEvent) -> bool {
         if track.id != self.track_id {
-            return;
+            return false;
         }
 
+        let mut requires_media_update = false;
         if let Some(is_disabled) = track.is_disabled_individual {
+            let mute_state_before = self.mute_state.mute_state();
             self.media_exchange_state.update(is_disabled);
+            if let (MuteState::Stable(before), MuteState::Stable(after)) =
+                (mute_state_before, self.mute_state.mute_state())
+            {
+                requires_media_update =
+                    before != after && after == StableMuteState::Unmuted;
+            }
+
+            if is_muted {
+                self.remove_track().await;
+            }
         }
         if let Some(is_disabled_general) = track.is_disabled_general {
             self.update_general_media_exchange_state(
                 is_disabled_general.into(),
             );
         }
+
+        requires_media_update
     }
 
     /// Changes underlying transceiver direction to
@@ -251,18 +238,6 @@ impl Sender {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
     }
-
-    /// Emits [`PeerEvent::NewLocalStreamRequired`] if [`Sender`] does not have
-    /// a track to send.
-    fn maybe_request_track(&self) {
-        if self.transceiver.send_track().is_none() {
-            let _ = self.peer_events_sender.unbounded_send(
-                PeerEvent::NewLocalStreamRequired {
-                    peer_id: self.peer_id,
-                },
-            );
-        }
-    }
 }
 
 impl TransceiverSide for Sender {
@@ -272,6 +247,10 @@ impl TransceiverSide for Sender {
 
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+        self.caps.media_source_kind()
     }
 
     fn mid(&self) -> Option<String> {

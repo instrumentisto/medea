@@ -10,7 +10,7 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
-use proto::{Direction, MediaSourceKind, PeerId, TrackId};
+use proto::{Direction, MediaSourceKind, TrackId};
 use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
@@ -18,8 +18,11 @@ use crate::{
     media::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
-    peer::{transceiver::Transceiver, PeerEvent, TransceiverDirection},
-    utils::{JsCaused, JsError},
+    peer::{
+        transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
+        TransceiverDirection,
+    },
+    utils::{JasonError, JsCaused, JsError},
 };
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
@@ -44,6 +47,9 @@ pub trait TransceiverSide: Disableable {
 
     /// Returns [`MediaKind`] of this [`TransceiverSide`].
     fn kind(&self) -> MediaKind;
+
+    /// Returns [`MediaSourceKind`] of this [`TransceiverSide`].
+    fn source_kind(&self) -> MediaSourceKind;
 
     /// Returns [`mid`] of this [`TransceiverSide`].
     ///
@@ -152,7 +158,7 @@ pub enum TrackDirection {
 }
 
 /// Errors that may occur in [`MediaConnections`] storage.
-#[derive(Debug, Display, JsCaused)]
+#[derive(Clone, Debug, Display, JsCaused)]
 pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaStreamTrack`] cannot be inserted into
     /// provided [`Sender`]s transceiver.
@@ -222,9 +228,6 @@ type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
-    /// [`PeerId`] of peer that owns this [`MediaConnections`].
-    peer_id: PeerId,
-
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
     peer: Rc<RtcPeerConnection>,
@@ -312,12 +315,10 @@ impl MediaConnections {
     /// [`RtcPeerConnection`].
     #[inline]
     pub fn new(
-        peer_id: PeerId,
         peer: Rc<RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
-            peer_id,
             peer,
             peer_events_sender,
             senders: HashMap::new(),
@@ -368,34 +369,6 @@ impl MediaConnections {
         }
 
         true
-    }
-
-    /// Returns `true` if all [`Sender`]s with
-    /// [`MediaKind::Audio`] are enabled or `false` otherwise.
-    #[cfg(feature = "mockable")]
-    pub fn is_send_audio_enabled(&self) -> bool {
-        self.0
-            .borrow()
-            .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
-            .find(|s| s.is_disabled())
-            .is_none()
-    }
-
-    /// Returns `true` if all [`Sender`]s with
-    /// [`MediaKind::Video`] are enabled or `false` otherwise.
-    #[cfg(feature = "mockable")]
-    pub fn is_send_video_enabled(
-        &self,
-        source_kind: Option<MediaSourceKind>,
-    ) -> bool {
-        self.0
-            .borrow()
-            .iter_senders_with_kind_and_source_kind(
-                MediaKind::Video,
-                source_kind,
-            )
-            .find(|s| s.is_disabled())
-            .is_none()
     }
 
     /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
@@ -509,16 +482,23 @@ impl MediaConnections {
             let is_required = track.is_required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let media_exchange_state =
-                        if send_constraints.is_enabled(&track.media_type) {
+                    let media_exchange_state = if send_constraints
+                        .is_enabled(&track.media_type) {
                             StableMediaExchangeState::Enabled
                         } else if is_required {
-                            return Err(tracerr::new!(
+                        let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
-                        ));
-                        } else {
-                            StableMediaExchangeState::Disabled
-                        };
+                        );
+                        let _ =
+                            self.0.borrow().peer_events_sender.unbounded_send(
+                                PeerEvent::FailedLocalMedia {
+                                    error: JasonError::from(e.clone()),
+                                },
+                            );
+                        return Err(e);
+                    } else {
+                        StableMediaExchangeState::Disabled
+                    };
                     let sndr = SenderBuilder {
                         media_connections: self,
                         track_id: track.id,
@@ -551,17 +531,23 @@ impl MediaConnections {
     /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
     /// with [`proto::TrackPatch`].
     ///
+    /// Returns [`MediaKind`] and [`MediaSourceKind`] for which local media
+    /// stream should be updated.
+    ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
-    pub fn patch_tracks(
+    pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<()> {
+    ) -> Result<LocalStreamUpdateCriteria> {
+        let mut result = LocalStreamUpdateCriteria::empty();
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
-                sender.update(&track_proto);
+                if sender.update(&track_proto).await {
+                    result.add(sender.kind(), sender.source_kind());
+                }
             } else if let Some(receiver) =
                 self.0.borrow_mut().receivers.get_mut(&track_proto.id)
             {
@@ -572,16 +558,26 @@ impl MediaConnections {
                 ));
             }
         }
-        Ok(())
+        Ok(result)
     }
 
-    /// Returns [`TracksRequest`] if this [`MediaConnections`] has [`Sender`]s.
-    pub fn get_tracks_request(&self) -> Option<TracksRequest> {
+    /// Returns [`TracksRequest`] based on [`Sender`]s in this
+    /// [`MediaConnections`]. [`Sender`]s are chosen based on provided
+    /// [`LocalStreamUpdateCriteria`].
+    pub fn get_tracks_request(
+        &self,
+        kinds: LocalStreamUpdateCriteria,
+    ) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            stream_request
-                .get_or_insert_with(TracksRequest::default)
-                .add_track_request(sender.track_id(), sender.caps().clone());
+            if kinds.has(sender.kind(), sender.source_kind()) {
+                stream_request
+                    .get_or_insert_with(TracksRequest::default)
+                    .add_track_request(
+                        sender.track_id(),
+                        sender.caps().clone(),
+                    );
+            }
         }
         stream_request
     }
@@ -712,13 +708,6 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).cloned()
     }
 
-    /// Returns [`Receiver`] with the provided [`TrackId`].
-    #[cfg(feature = "mockable")]
-    #[inline]
-    pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
-        self.0.borrow().receivers.get(&id).cloned()
-    }
-
     /// Returns all references to the [`TransceiverSide`]s from this
     /// [`MediaConnections`].
     fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {
@@ -748,5 +737,35 @@ impl MediaConnections {
         self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.reset_media_exchange_state_transition_timeout());
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl MediaConnections {
+    /// Returns [`Receiver`] with the provided [`TrackId`].
+    pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
+        self.0.borrow().receivers.get(&id).cloned()
+    }
+
+    /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
+    pub fn is_send_audio_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
+            .all(|s| s.is_enabled())
+    }
+
+    /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
+    pub fn is_send_video_enabled(
+        &self,
+        source_kind: Option<MediaSourceKind>,
+    ) -> bool {
+        self.0
+            .borrow()
+            .iter_senders_with_kind_and_source_kind(
+                MediaKind::Video,
+                source_kind,
+            )
+            .all(|s| s.is_enabled())
     }
 }
