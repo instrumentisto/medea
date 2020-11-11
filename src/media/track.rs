@@ -46,7 +46,7 @@ impl MediaTrack {
         self.transceiver_enabled.get()
     }
 
-    /// Returns `true` if this [`MediaTrack`] currently is disabled.
+    /// Returns `true` if this [`MediaTrack`] currently is enabled.
     pub fn is_media_exchange_enabled(&self) -> bool {
         self.media_exchange_state.borrow().is_enabled()
     }
@@ -69,12 +69,12 @@ impl MediaTrack {
 struct MediaExchangeState {
     /// Media exchange state of the `Send` side.
     ///
-    /// If `true` then sender is disabled.
+    /// If `true` then sender is enabled.
     send_enabled: bool,
 
     /// Media exchange state of the `Recv` side.
     ///
-    /// If `true` then receiver is disabled.
+    /// If `true` then receiver is enabled.
     recv_enabled: bool,
 }
 
@@ -93,8 +93,8 @@ impl MediaExchangeState {
         Self::default()
     }
 
-    /// Returns `true` if [`MediaExchangeState::send_disabled`] or
-    /// [`MediaExchangeState::recv_disabled`] are `true`.
+    /// Returns `true` if [`MediaExchangeState::send_enabled`] or
+    /// [`MediaExchangeState::recv_enabled`] are `true`.
     pub fn is_enabled(self) -> bool {
         self.send_enabled && self.recv_enabled
     }

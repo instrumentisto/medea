@@ -455,9 +455,9 @@ impl<T> TrackChangeHandler for Peer<T> {
         mut patch: TrackPatchEvent,
     ) -> Self::Output {
         if let Some(is_enabled_individual) = patch.is_enabled_individual {
-            // Resets `is_disabled_individual` to `None`. Sets
-            // `is_disabled_general` to `Some` if provided
-            // `is_disabled_individual` is equal to the real general
+            // Resets `is_enabled_individual` to `None`. Sets
+            // `is_enabled_general` to `Some` if provided
+            // `is_enabled_individual` is equal to the real general
             // media exchange state.
             patch.is_enabled_individual = None;
             let track = self

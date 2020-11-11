@@ -149,12 +149,12 @@ impl Receiver {
         let new_track =
             MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
-        if self.is_not_disabled() {
+        if self.is_enabled() {
             transceiver.add_direction(TransceiverDirection::RECV);
         } else {
             transceiver.sub_direction(TransceiverDirection::RECV);
         }
-        new_track.set_enabled(self.is_not_disabled());
+        new_track.set_enabled(self.is_enabled());
 
         self.transceiver.replace(Some(transceiver));
         self.track.replace(Some(new_track));
@@ -255,8 +255,7 @@ impl Receiver {
 
     /// Checks whether general media exchange state of this [`Receiver`] is in
     /// [`StableMediaExchangeState::Enabled`].
-    fn is_not_disabled(&self) -> bool {
-        // TODO: change to enabled
+    fn is_enabled(&self) -> bool {
         self.general_media_exchange_state.get()
             == StableMediaExchangeState::Enabled
     }
