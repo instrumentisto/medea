@@ -789,19 +789,19 @@ impl InnerRoom {
     #[allow(clippy::filter_map)]
     async fn toggle_media_exchange(
         &self,
-        is_disabled: bool,
+        is_disabled: bool, // TODO: change to enabled
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
-        let mut media_exchange_states_backup = HashMap::new();
-        let disable_tracks: HashMap<_, _> = self
+        let mut states_backup = HashMap::new();
+        let tracks_to_disable: HashMap<_, _> = self
             .peers
             .get_all()
             .into_iter()
             .map(|peer| {
                 let mut trnscvrs_backup_media_exchange_state = HashMap::new();
-                let new_media_exchange_states = peer
+                let new_states = peer
                     .get_transceivers_sides(kind, direction, source_kind)
                     .into_iter()
                     .filter(|transceiver| transceiver.is_transitable())
@@ -819,23 +819,23 @@ impl InnerRoom {
                         );
                         (
                             transceiver.track_id(),
-                            StableMediaExchangeState::from(is_disabled),
+                            StableMediaExchangeState::from(is_disabled), // TODO: change to enabled
                         )
                     })
                     .collect();
-                media_exchange_states_backup
+                states_backup
                     .insert(peer.id(), trnscvrs_backup_media_exchange_state);
-                (peer.id(), new_media_exchange_states)
+                (peer.id(), new_states)
             })
             .collect();
 
         let update_result =
-            self.update_media_exchange_states(disable_tracks).await;
+            self.update_media_exchange_states(tracks_to_disable).await;
         if let Err(RoomError::MediaConnections(
             MediaConnectionsError::CannotDisableRequiredSender,
         )) = &update_result.as_ref().map_err(AsRef::as_ref)
         {
-            self.update_media_exchange_states(media_exchange_states_backup)
+            self.update_media_exchange_states(states_backup)
                 .await?;
         }
 
@@ -848,53 +848,53 @@ impl InnerRoom {
     #[allow(clippy::filter_map)]
     async fn update_media_exchange_states(
         &self,
-        desired_media_exchange_states: HashMap<
+        desired_states: HashMap<
             PeerId,
             HashMap<TrackId, StableMediaExchangeState>,
         >,
     ) -> Result<(), Traced<RoomError>> {
         future::try_join_all(
-            desired_media_exchange_states
+            desired_states
                 .into_iter()
-                .filter_map(|(peer_id, desired_media_exchange_states)| {
+                .filter_map(|(peer_id, desired_states)| {
                     self.peers
                         .get(peer_id)
-                        .map(|peer| (peer, desired_media_exchange_states))
+                        .map(|peer| (peer, desired_states))
                 })
-                .map(|(peer, desired_media_exchange_states)| {
+                .map(|(peer, desired_states)| {
                     let peer_id = peer.id();
                     let mut transitions_futs = Vec::new();
                     let mut tracks_patches = Vec::new();
-                    desired_media_exchange_states
+                    desired_states
                         .into_iter()
                         .filter_map(
-                            move |(track_id, desired_media_exchange_state)| {
+                            move |(track_id, desired_state)| {
                                 peer.get_transceiver_side_by_id(track_id).map(
                                     |trnscvr| {
-                                        (trnscvr, desired_media_exchange_state)
+                                        (trnscvr, desired_state)
                                     },
                                 )
                             },
                         )
                         .filter_map(
-                            |(trnscvr, desired_media_exchange_state)| {
+                            |(trnscvr, desired_state)| {
                                 use MediaExchangeState as S;
                                 match trnscvr.media_exchange_state() {
                                     S::Transition(transition) => Some((
                                         trnscvr,
-                                        desired_media_exchange_state,
+                                        desired_state,
                                         transition.intended()
-                                            != desired_media_exchange_state,
+                                            != desired_state,
                                     )),
                                     S::Stable(stable) => {
                                         if stable
-                                            == desired_media_exchange_state
+                                            == desired_state
                                         {
                                             None
                                         } else {
                                             Some((
                                                 trnscvr,
-                                                desired_media_exchange_state,
+                                                desired_state,
                                                 true,
                                             ))
                                         }
@@ -905,15 +905,15 @@ impl InnerRoom {
                         .map(
                             |(
                                 trnscvr,
-                                desired_media_exchange_state,
+                                 desired_state,
                                 should_be_patched,
                             )| {
                                 trnscvr.media_exchange_state_transition_to(
-                                    desired_media_exchange_state,
+                                    desired_state,
                                 )?;
                                 transitions_futs.push(
                                     trnscvr.when_media_exchange_state_stable(
-                                        desired_media_exchange_state,
+                                        desired_state,
                                     ),
                                 );
                                 if should_be_patched {
@@ -921,7 +921,7 @@ impl InnerRoom {
                                     tracks_patches.push(TrackPatchCommand {
                                         id: trnscvr.track_id(),
                                         is_disabled: Some(
-                                            desired_media_exchange_state
+                                            desired_state
                                                 == Disabled,
                                         ),
                                     });

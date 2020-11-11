@@ -256,7 +256,7 @@ impl Receiver {
 
     /// Checks whether general media exchange state of this [`Receiver`] is in
     /// [`StableMediaExchangeState::Enabled`].
-    fn is_not_disabled(&self) -> bool {
+    fn is_not_disabled(&self) -> bool { // TODO: change to enabled
         self.general_media_exchange_state.get()
             == StableMediaExchangeState::Enabled
     }

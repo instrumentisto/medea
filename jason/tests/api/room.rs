@@ -453,9 +453,9 @@ mod disable_recv_tracks {
                 let audio_recv =
                     transceivers_statuses.get(&TrackId(3)).unwrap();
 
-                assert!(audio_send); // not disable
-                assert!(video_recv); // not disable
-                assert!(!audio_recv); // disable
+                assert!(audio_send); // enabled
+                assert!(video_recv); // enabled
+                assert!(!audio_recv); // disabled
             }
             _ => unreachable!(),
         }
@@ -864,7 +864,7 @@ mod disable_send_tracks {
                 let video = transceivers_statuses.get(&TrackId(2)).unwrap();
 
                 assert!(!audio); // disabled
-                assert!(video); // not disabled
+                assert!(video); // enabled
             }
             _ => unreachable!(),
         }
@@ -913,7 +913,7 @@ mod disable_send_tracks {
                 let audio = transceivers_statuses.get(&TrackId(1)).unwrap();
                 let video = transceivers_statuses.get(&TrackId(2)).unwrap();
 
-                assert!(audio); // not disabled
+                assert!(audio); // enabled
                 assert!(!video); // disabled
             }
             _ => unreachable!(),

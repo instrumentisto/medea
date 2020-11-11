@@ -525,7 +525,7 @@ impl Track {
 #[derive(Eq, PartialEq)]
 pub struct TrackPatchCommand {
     pub id: TrackId,
-    pub is_disabled: Option<bool>,
+    pub is_disabled: Option<bool>, // TODO: change to enabled
 }
 
 /// Patch of the [`Track`] which Media Server can send with
@@ -540,7 +540,7 @@ pub struct TrackPatchEvent {
     ///
     /// This state doesn't indicates that connection between two `Member`s are
     /// really disabled. This is intention of this `Member`.
-    pub is_disabled_individual: Option<bool>,
+    pub is_disabled_individual: Option<bool>, // TODO: change to enabled_individual
 
     /// media exchange state of the connection between `Member`s.
     ///
@@ -549,7 +549,7 @@ pub struct TrackPatchEvent {
     ///
     /// So intention of this `Member` (`is_disabled_individual`) can be
     /// `false`, but real media exchange state can be `true`.
-    pub is_disabled_general: Option<bool>,
+    pub is_disabled_general: Option<bool>, // TODO: change to enabled_general
 }
 
 impl From<TrackPatchCommand> for TrackPatchEvent {
