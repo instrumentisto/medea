@@ -52,6 +52,7 @@ pub use self::{
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
+    stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::TransceiverDirection,
 };
@@ -59,7 +60,7 @@ pub use self::{
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
@@ -168,10 +169,11 @@ pub enum PeerEvent {
         stats: RtcStats,
     },
 
-    /// [`RtcPeerConnection`] is signalling that it [`MediaStream`]
-    NewLocalStreamRequired {
-        /// ID of the [`PeerConnection`] that requested new media stream.
-        peer_id: Id,
+    /// [`PeerConnection::update_local_stream`] was failed, so
+    /// `on_failed_local_stream` callback should be called.
+    FailedLocalMedia {
+        /// Reasons of local media updating fail.
+        error: JasonError,
     },
 }
 
@@ -245,7 +247,6 @@ impl PeerConnection {
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections = Rc::new(MediaConnections::new(
-            id,
             Rc::clone(&peer),
             peer_events_sender.clone(),
         ));
@@ -431,17 +432,21 @@ impl PeerConnection {
     /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
     /// [`proto::TrackPatch`].
     ///
+    /// Returns [`MediaKind`]s and [`MediaSourceKinds`] for which local stream
+    /// updating should be started.
+    ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
     /// provided [`proto::TrackPatch`] contains unknown ID.
-    pub fn patch_tracks(
+    pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<()> {
+    ) -> Result<LocalStreamUpdateCriteria> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?)
     }
 
@@ -503,21 +508,6 @@ impl PeerConnection {
     /// restart.
     pub fn restart_ice(&self) {
         self.peer.restart_ice();
-    }
-
-    /// Returns `true` if all [`Sender`]s audio tracks are enabled.
-    #[cfg(feature = "mockable")]
-    pub fn is_send_audio_enabled(&self) -> bool {
-        self.media_connections.is_send_audio_enabled()
-    }
-
-    /// Returns `true` if all [`Sender`]s video tracks are enabled.
-    #[cfg(feature = "mockable")]
-    pub fn is_send_video_enabled(
-        &self,
-        source_kind: Option<MediaSourceKind>,
-    ) -> bool {
-        self.media_connections.is_send_video_enabled(source_kind)
     }
 
     /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
@@ -605,7 +595,17 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn get_offer(&self, tracks: Vec<proto::Track>) -> Result<String> {
+    pub async fn get_offer(
+        &self,
+        tracks: Vec<proto::Track>,
+        maybe_update_local_media: bool,
+    ) -> Result<String> {
+        let stream_update_criteria = if maybe_update_local_media {
+            Some(LocalStreamUpdateCriteria::from_tracks(&tracks))
+        } else {
+            None
+        };
+
         self.media_connections
             .create_tracks(
                 tracks,
@@ -614,7 +614,9 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream().await.map_err(tracerr::wrap!())?;
+        if let Some(criteria) = stream_update_criteria {
+            let _ = self.update_local_stream(criteria).await;
+        }
 
         let offer = self
             .peer
@@ -643,7 +645,8 @@ impl PeerConnection {
     }
 
     /// Updates local [MediaStream][1] being used in [`PeerConnection`]
-    /// [`Sender`]s.
+    /// [`Sender`]s. [`Sender`]s are chosen based on provided
+    /// [`LocalStreamUpdateCriteria`].
     ///
     /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
     /// date (you set those with [`PeerConnection::create_tracks`]). If
@@ -690,8 +693,27 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
+        criteria: LocalStreamUpdateCriteria,
     ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
-        if let Some(request) = self.media_connections.get_tracks_request() {
+        self.inner_update_local_stream(criteria).await.map_err(|e| {
+            let _ = self.peer_events_sender.unbounded_send(
+                PeerEvent::FailedLocalMedia {
+                    error: JasonError::from(e.clone()),
+                },
+            );
+
+            e
+        })
+    }
+
+    /// Implementation of the [`PeerConnection::update_local_stream`] method.
+    async fn inner_update_local_stream(
+        &self,
+        criteria: LocalStreamUpdateCriteria,
+    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
+        if let Some(request) =
+            self.media_connections.get_tracks_request(criteria)
+        {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
 
@@ -847,6 +869,7 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<proto::Track>,
+        maybe_update_local_media: bool,
     ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
@@ -866,12 +889,20 @@ impl PeerConnection {
             .await
             .map_err(tracerr::wrap!())?;
 
+        let stream_update_criteria = if maybe_update_local_media {
+            Some(LocalStreamUpdateCriteria::from_tracks(&send))
+        } else {
+            None
+        };
+
         // create senders
         self.media_connections
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_local_stream().await.map_err(tracerr::wrap!())?;
+        if let Some(criteria) = stream_update_criteria {
+            let _ = self.update_local_stream(criteria).await;
+        }
 
         let answer = self
             .peer
@@ -915,6 +946,27 @@ impl PeerConnection {
     }
 }
 
+#[cfg(feature = "mockable")]
+impl PeerConnection {
+    /// Lookups [`Sender`] by provided [`TrackId`].
+    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
+        self.media_connections.get_sender_by_id(id)
+    }
+
+    /// Indicates whether all [`Sender`]s audio tracks are enabled.
+    pub fn is_send_audio_enabled(&self) -> bool {
+        self.media_connections.is_send_audio_enabled()
+    }
+
+    /// Indicates whether all [`Sender`]s video tracks are enabled.
+    pub fn is_send_video_enabled(
+        &self,
+        source_kind: Option<MediaSourceKind>,
+    ) -> bool {
+        self.media_connections.is_send_video_enabled(source_kind)
+    }
+}
+
 impl Drop for PeerConnection {
     /// Drops `on_track` and `on_ice_candidate` callbacks to prevent leak.
     fn drop(&mut self) {
@@ -922,5 +974,104 @@ impl Drop for PeerConnection {
         let _ = self
             .peer
             .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
+    }
+}
+
+mod stream_update_criteria {
+    use std::ops::BitOrAssign;
+
+    use medea_client_api_proto::{
+        Direction, MediaSourceKind, MediaType, Track,
+    };
+
+    use crate::MediaKind;
+
+    bitflags::bitflags! {
+        pub struct Inner: u8 {
+            const DEVICE_AUDIO =  0b0001;
+            const DISPLAY_AUDIO = 0b0010;
+            const DEVICE_VIDEO =  0b0100;
+            const DISPLAY_VIDEO = 0b1000;
+        }
+    }
+
+    /// [`PeerConnection::update_local_stream`] function argument. Allows to
+    /// specify a set of [`MediaKind`] + [`MediaSourceKind`] pairs.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    pub struct LocalStreamUpdateCriteria(Inner);
+
+    impl LocalStreamUpdateCriteria {
+        /// Creates [`LocalStreamUpdateCriteria`] with all [`MediaKind`] +
+        /// [`MediaSourceKind`] combinations.
+        pub fn all() -> Self {
+            Self(Inner::all())
+        }
+
+        /// Creates empty [`LocalStreamUpdateCriteria`].
+        pub fn empty() -> Self {
+            Self(Inner::empty())
+        }
+
+        /// Creates [`LocalStreamUpdateCriteria`] with provided [`MediaKind`] +
+        /// [`MediaSourceKind`] pair. `None` `source_kind` means both
+        /// [`MediaSourceKind`]s.
+        pub fn from_kinds(
+            media_kind: MediaKind,
+            source_kind: Option<MediaSourceKind>,
+        ) -> Self {
+            use MediaKind as MK;
+            use MediaSourceKind as SK;
+
+            let inner = match (source_kind, media_kind) {
+                (None, MK::Audio) => Inner::DEVICE_AUDIO | Inner::DISPLAY_AUDIO,
+                (Some(SK::Device), MK::Audio) => Inner::DEVICE_AUDIO,
+                (Some(SK::Display), MK::Audio) => Inner::DISPLAY_AUDIO,
+                (None, MK::Video) => Inner::DEVICE_VIDEO | Inner::DISPLAY_VIDEO,
+                (Some(SK::Device), MK::Video) => Inner::DEVICE_VIDEO,
+                (Some(SK::Display), MK::Video) => Inner::DISPLAY_VIDEO,
+            };
+            Self(inner)
+        }
+
+        /// Builds [`LocalStreamUpdateCriteria`] from provided tracks. Only
+        /// [`Direction::Send`] are taken into account.
+        pub fn from_tracks(tracks: &[Track]) -> LocalStreamUpdateCriteria {
+            let mut result = LocalStreamUpdateCriteria::empty();
+            for track in tracks
+                .iter()
+                .filter(|t| matches!(t.direction, Direction::Send { .. }))
+            {
+                match &track.media_type {
+                    MediaType::Audio(_) => {
+                        result.add(MediaKind::Audio, MediaSourceKind::Device);
+                    }
+                    MediaType::Video(video) => {
+                        result.add(MediaKind::Video, video.source_kind);
+                    }
+                }
+            }
+            result
+        }
+
+        /// Adds provided [`MediaKind`] + [`MediaSourceKind`] pair.
+        pub fn add(
+            &mut self,
+            media_kind: MediaKind,
+            source_kind: MediaSourceKind,
+        ) {
+            self.0
+                .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
+        }
+
+        /// Checks whether this [`LocalStreamUpdateCriteria`] contains provided
+        /// [`MediaKind`] + [`MediaSourceKind`] pair.
+        pub fn has(
+            self,
+            media_kind: MediaKind,
+            source_kind: MediaSourceKind,
+        ) -> bool {
+            self.0
+                .contains(Self::from_kinds(media_kind, Some(source_kind)).0)
+        }
     }
 }

@@ -456,7 +456,7 @@
       await init();
 
       jason = new Jason();
-      room = await jason.init_room();
+      room = jason.init_room();
 
       let userNameFromCookies = getCookie(userNameCookieName);
       if (userNameFromCookies) {

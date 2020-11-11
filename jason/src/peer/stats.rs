@@ -1,6 +1,6 @@
 //! Deserialization of the [`RtcStats`] from the [`SysRtcStats`].
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
 use js_sys::{
@@ -75,6 +75,7 @@ impl TryFrom<&JsValue> for RtcStats {
                 .map_err(tracerr::map_from_and_wrap!())?;
             let stat: RtcStat = JsValue::from(&stat.1)
                 .into_serde()
+                .map_err(Rc::new)
                 .map_err(tracerr::from_and_wrap!())?;
 
             if let RtcStatsType::Other = &stat.stats {
@@ -89,7 +90,7 @@ impl TryFrom<&JsValue> for RtcStats {
 }
 
 /// Errors which can occur during deserialization of the [`RtcStatsType`].
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum RtcStatsError {
     /// [RTCStats.id][1] is undefined.
     ///
@@ -113,5 +114,5 @@ pub enum RtcStatsError {
 
     /// Error of [`RtcStats`] deserialization.
     #[display(fmt = "Failed to deserialize into RtcStats: {}", _0)]
-    ParseError(serde_json::Error),
+    ParseError(Rc<serde_json::Error>),
 }

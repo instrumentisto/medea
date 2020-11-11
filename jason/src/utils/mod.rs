@@ -168,3 +168,14 @@ impl Drop for TaskHandle {
         self.0.abort();
     }
 }
+
+/// Tries to upgrade [`Weak`] reference breaks cycle if upgrade fails.
+macro_rules! upgrade_or_break {
+    ($weak:tt) => {
+        if let Some(this) = $weak.upgrade() {
+            this
+        } else {
+            break;
+        }
+    };
+}

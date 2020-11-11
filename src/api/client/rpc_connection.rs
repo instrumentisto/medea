@@ -5,10 +5,9 @@
 use std::{fmt, time::Duration};
 
 use actix::Message;
-use derive_more::{From, Into};
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
-    CloseDescription, Command, Credential, Event, MemberId,
+    CloseDescription, Command, Credential, Event, MemberId, RoomId,
 };
 
 use crate::signalling::room::RoomError;
@@ -35,9 +34,12 @@ impl CommandMessage {
 }
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
-#[derive(Debug, From, Into, Message)]
+#[derive(Debug, Message)]
 #[rtype(result = "()")]
-pub struct EventMessage(Event);
+pub struct EventMessage {
+    pub room_id: RoomId,
+    pub event: Event,
+}
 
 /// Abstraction over RPC connection with some remote [`Member`].
 ///
@@ -53,13 +55,14 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
+        room_id: RoomId,
         close_description: CloseDescription,
     ) -> LocalBoxFuture<'static, ()>;
 
     /// Sends [`Event`] to remote [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
-    fn send_event(&self, msg: Event);
+    fn send_event(&self, room_id: RoomId, event: Event);
 }
 
 #[cfg(test)]
@@ -78,45 +81,20 @@ pub struct RpcConnectionSettings {
     pub ping_interval: Duration,
 }
 
-/// Signal for authorizing new [`RpcConnection`] before establishing.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<RpcConnectionSettings, AuthorizationError>")]
-pub struct Authorize {
-    /// ID of [`Member`] to authorize [`RpcConnection`] for.
-    ///
-    /// [`Member`]: crate::signalling::elements::member::Member
-    pub member_id: MemberId,
-
-    /// Credentials to authorize [`RpcConnection`] with.
-    pub credentials: Credential,
-}
-
-/// Error of authorization [`RpcConnection`] in [`Room`].
-///
-/// [`Room`]: crate::signalling::Room
-#[derive(Debug)]
-pub enum AuthorizationError {
-    /// Authorizing [`Member`] does not exists in the [`Room`].
-    ///
-    /// [`Member`]: crate::signalling::elements::member::Member
-    /// [`Room`]: crate::signalling::Room
-    MemberNotExists,
-
-    /// Provided credentials are invalid.
-    InvalidCredentials,
-}
-
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
 /// Transport should consider dropping connection if message result is err.
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), RoomError>")]
+#[rtype(result = "Result<RpcConnectionSettings, RoomError>")]
 pub struct RpcConnectionEstablished {
     /// ID of [`Member`] that establishes [`RpcConnection`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub member_id: MemberId,
+
+    /// Credential of [`Member`] to authorize WebSocket connection with.
+    pub credentials: Credential,
 
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,
@@ -137,7 +115,7 @@ pub struct RpcConnectionClosed {
 }
 
 /// Reasons of why [`RpcConnection`] may be closed.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ClosedReason {
     /// [`RpcConnection`] was irrevocably closed.
     Closed {

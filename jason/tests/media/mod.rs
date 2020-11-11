@@ -6,13 +6,13 @@ use std::{convert::TryFrom, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, MemberId, PeerId, Track, TrackId,
+    AudioSettings, Direction, MediaType, MemberId, Track, TrackId,
 };
 use medea_jason::{
     media::{MediaManager, RecvConstraints},
     peer::{
-        MediaConnections, RtcPeerConnection, SimpleTracksRequest,
-        TransceiverDirection,
+        LocalStreamUpdateCriteria, MediaConnections, RtcPeerConnection,
+        SimpleTracksRequest, TransceiverDirection,
     },
 };
 use wasm_bindgen_test::*;
@@ -25,7 +25,6 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn sendrecv_works() {
     let (tx, _rx) = mpsc::unbounded();
     let media_connections = MediaConnections::new(
-        PeerId(0),
         Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),
         tx,
     );
@@ -52,7 +51,9 @@ async fn sendrecv_works() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request = media_connections.get_tracks_request().unwrap();
+    let request = media_connections
+        .get_tracks_request(LocalStreamUpdateCriteria::all())
+        .unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
     let tracks = manager.get_tracks(&caps).await.unwrap();

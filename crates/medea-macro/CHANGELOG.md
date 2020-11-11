@@ -23,12 +23,14 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Fixed
 
-- `#[enum_delegate]` macro now works fine on functions with multiple arguments ([#91]).
+- `#[enum_delegate]` macro now works fine on functions with multiple arguments ([#91]);
+- `#[dispatchable]` handler trait visibility now corresponds to original enum visibility ([#147]).
 
 [#66]: /../../pull/66
 [#68]: /../../pull/68
 [#91]: /../../pull/91
 [#112]: /../../pull/112
+[#147]: /../../pull/147
 
 
 

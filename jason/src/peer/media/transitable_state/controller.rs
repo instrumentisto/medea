@@ -2,9 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{
-    future, future::Either, stream::LocalBoxStream, FutureExt, StreamExt,
-};
+use futures::{future, future::Either, FutureExt, StreamExt};
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
 
@@ -61,22 +59,6 @@ where
         });
         this.clone().spawn();
         this
-    }
-
-    /// Returns [`Stream`] to which [`InStable`] update will be
-    /// sent on [`TransitableStateController::state`] stabilization.
-    pub(in super::super) fn on_stabilize(&self) -> LocalBoxStream<'static, S> {
-        self.state
-            .subscribe()
-            .skip(1)
-            .filter_map(|state| async move {
-                if let TransitableState::Stable(s) = state {
-                    Some(s)
-                } else {
-                    None
-                }
-            })
-            .boxed_local()
     }
 
     /// Spawns all needed [`Stream`] listeners for this
