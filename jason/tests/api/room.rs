@@ -10,7 +10,8 @@ use futures::{
     stream::{self, BoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerId, Track, TrackId, TrackUpdate,
+    Command, Event, NegotiationRole, PeerId, Track, TrackId, TrackPatchEvent,
+    TrackUpdate,
 };
 use medea_jason::{
     api::Room,
@@ -26,12 +27,23 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
-    get_test_unrequired_tracks, media_stream_settings, timeout,
-    wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
+    delay_for, get_jason_error, get_test_recv_tracks, get_test_required_tracks,
+    get_test_tracks, get_test_unrequired_tracks, media_stream_settings,
+    timeout, wait_and_check_test_result, yield_now, MockNavigator,
+    TEST_ROOM_URL,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
+
+macro_rules! can_fail_in_firefox {
+    ($fut:expr) => {
+        if crate::is_firefox() {
+            let _ = $fut.await;
+        } else {
+            assert!($fut.await.is_ok());
+        }
+    };
+}
 
 fn get_test_room(
     events: BoxStream<'static, Event>,
@@ -58,7 +70,7 @@ fn get_test_room(
 async fn get_test_room_and_exist_peer(
     tracks: Vec<Track>,
     media_stream_settings: Option<MediaStreamSettings>,
-) -> (Room, Rc<PeerConnection>) {
+) -> (Room, Rc<PeerConnection>, mpsc::UnboundedSender<Event>) {
     let mut rpc = MockRpcSession::new();
 
     let (event_tx, event_rx) = mpsc::unbounded();
@@ -113,7 +125,7 @@ async fn get_test_room_and_exist_peer(
     // wait until Event::PeerCreated is handled
     delay_for(200).await;
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
-    (room, peer)
+    (room, peer, event_tx)
 }
 
 /// Tests RoomHandle::set_local_media_settings before creating PeerConnection.
@@ -131,11 +143,11 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let room_handle = room.new_handle();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "InvalidLocalTracks");
+        cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
         cb_assert_eq!(
             err.message(),
-            "Invalid local tracks: MuteState of Sender can\'t be transited \
-             into muted state, because this Sender is required."
+            "MuteState of Sender can\'t be transited into muted state, \
+             because this Sender is required."
         );
     });
     room_handle.on_failed_local_media(cb.into()).unwrap();
@@ -173,15 +185,14 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "InvalidLocalTracks");
+        cb_assert_eq!(&err.name(), "TracksRequest");
         cb_assert_eq!(
             &err.message(),
-            "Invalid local tracks: provided multiple device video \
-             MediaStreamTracks"
+            "provided multiple device video MediaStreamTracks"
         );
     });
     let (audio_track, video_track) = get_test_required_tracks();
-    let (room, _peer) =
+    let (room, _peer, _) =
         get_test_room_and_exist_peer(vec![audio_track, video_track], None)
             .await;
 
@@ -189,9 +200,17 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     constraints.audio(AudioTrackConstraints::new());
     let room_handle = room.new_handle();
     room_handle.on_failed_local_media(cb.into()).unwrap();
-    JsFuture::from(room_handle.set_local_media_settings(&constraints))
-        .await
-        .unwrap();
+    let err = get_jason_error(
+        JsFuture::from(room_handle.set_local_media_settings(&constraints))
+            .await
+            .unwrap_err(),
+    );
+    assert_eq!(err.name(), "InvalidLocalTracks");
+    assert_eq!(
+        err.message(),
+        "Invalid local tracks: provided multiple device video \
+         MediaStreamTracks"
+    );
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -210,7 +229,7 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         });
         let (audio_track, video_track) =
             get_test_tracks(audio_required, video_required);
-        let (room, _peer) =
+        let (room, _peer, _) =
             get_test_room_and_exist_peer(vec![audio_track, video_track], None)
                 .await;
 
@@ -224,9 +243,21 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
 
         let room_handle = room.new_handle();
         room_handle.on_failed_local_media(closure.into()).unwrap();
-        JsFuture::from(room_handle.set_local_media_settings(&constraints))
-            .await
-            .unwrap();
+
+        let is_should_be_ok =
+            audio_required == add_audio || video_required == add_video;
+        assert_eq!(
+            JsFuture::from(room_handle.set_local_media_settings(&constraints))
+                .await
+                .is_ok(),
+            is_should_be_ok,
+            "audio_required: {}; add_audio: {}; video_required: {}; \
+             add_video: {}",
+            audio_required,
+            add_audio,
+            video_required,
+            add_video,
+        );
 
         timeout(1000, test_rx)
             .await
@@ -258,11 +289,11 @@ async fn error_get_local_stream_on_new_peer() {
     .unwrap();
 
     let (cb, test_result) = js_callback!(|err: JasonError| {
-        cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
+        cb_assert_eq!(&err.name(), "MediaManager");
         cb_assert_eq!(
             &err.message(),
-            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
-             Unknown JS error: error_get_local_stream_on_new_peer"
+            "MediaDevices.getUserMedia() failed: Unknown JS error: \
+             error_get_local_stream_on_new_peer"
         );
     });
 
@@ -449,7 +480,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn mute_unmute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -465,7 +496,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn mute_unmute_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -518,25 +549,21 @@ mod disable_send_tracks {
         let display_video_track =
             video_track(TrackId(3), false, MediaSourceKind::Display);
 
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, device_video_track, display_video_track],
             Some(media_stream_settings(true, true)),
         )
         .await;
 
         let handle = room.new_handle();
-        assert!(JsFuture::from(
+        can_fail_in_firefox!(JsFuture::from(
             handle.mute_video(Some(JsMediaSourceKind::Device))
-        )
-        .await
-        .is_ok());
+        ));
         assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
-        assert!(JsFuture::from(
+        can_fail_in_firefox!(JsFuture::from(
             handle.unmute_video(Some(JsMediaSourceKind::Device))
-        )
-        .await
-        .is_ok());
+        ));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
     }
@@ -552,7 +579,7 @@ mod disable_send_tracks {
         let display_video_track =
             video_track(TrackId(3), false, MediaSourceKind::Display);
 
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, device_video_track, display_video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -566,11 +593,9 @@ mod disable_send_tracks {
         .is_ok());
         assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
-        assert!(JsFuture::from(
+        can_fail_in_firefox!(JsFuture::from(
             handle.unmute_video(Some(JsMediaSourceKind::Display))
-        )
-        .await
-        .is_ok());
+        ));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
     }
@@ -589,7 +614,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_two_audio_mutes() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -626,7 +651,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_two_video_mutes() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -665,7 +690,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_mute_and_unmute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -711,7 +736,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_mute_and_unmute_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -757,7 +782,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_unmute_and_mute_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer) = get_test_room_and_exist_peer(
+        let (room, peer, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -1173,7 +1198,7 @@ mod patches_generation {
             )
             .unwrap();
 
-            peer.get_offer(tracks).await.unwrap();
+            peer.get_offer(tracks, true).await.unwrap();
 
             peers.insert(peer_id, peer);
         }
@@ -1472,7 +1497,7 @@ mod patches_generation {
 #[wasm_bindgen_test]
 async fn remote_mute_unmute_audio() {
     let (audio_track, video_track) = get_test_recv_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
+    let (room, peer, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1489,7 +1514,7 @@ async fn remote_mute_unmute_audio() {
 #[wasm_bindgen_test]
 async fn remote_mute_unmute_video() {
     let (audio_track, video_track) = get_test_recv_tracks();
-    let (room, peer) = get_test_room_and_exist_peer(
+    let (room, peer, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1500,6 +1525,183 @@ async fn remote_mute_unmute_video() {
     assert!(!peer.is_recv_video_enabled());
     assert!(JsFuture::from(handle.unmute_remote_video()).await.is_ok());
     assert!(peer.is_recv_video_enabled());
+}
+
+/// Checks that server can mute track without client's request.
+#[wasm_bindgen_test]
+async fn mute_by_server() {
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let audio_track_id = audio_track.id;
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            })],
+        })
+        .unwrap();
+
+    yield_now().await;
+
+    assert!(!peer.is_send_audio_enabled());
+}
+
+/// Checks that server can unmute track without client's request.
+#[wasm_bindgen_test]
+async fn unmute_by_server() {
+    let mock = MockNavigator::new();
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let audio_track_id = audio_track.id;
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            })],
+        })
+        .unwrap();
+    yield_now().await;
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert!(!peer.is_send_audio_enabled());
+
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: Some(NegotiationRole::Offerer),
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(false),
+                is_muted_individual: Some(false),
+            })],
+        })
+        .unwrap();
+    delay_for(100).await;
+
+    assert!(peer.is_send_audio_enabled());
+    assert_eq!(mock.get_user_media_requests_count(), 2);
+    mock.stop();
+    let sender = peer.get_sender_by_id(audio_track_id).unwrap();
+    assert!(sender.transceiver().send_track().is_some());
+}
+
+/// Checks that only one get user media request will be performed on
+/// `Room.unmute_audio` with a failed get user media.
+#[wasm_bindgen_test]
+async fn only_one_gum_performed_on_unmute() {
+    let mock = MockNavigator::new();
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let audio_track_id = audio_track.id;
+    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+    let room_handle = room.new_handle();
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            })],
+        })
+        .unwrap();
+    yield_now().await;
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert!(!peer.is_send_audio_enabled());
+
+    mock.error_get_user_media("only_one_gum_performed_on_unmute".into());
+
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            })],
+        })
+        .unwrap();
+    JsFuture::from(room_handle.unmute_audio())
+        .await
+        .unwrap_err();
+    yield_now().await;
+
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    mock.stop();
+}
+
+/// Checks that only one get user media request will be performed on
+/// [`Event::TracksApplied`] with a failed get user media.
+#[wasm_bindgen_test]
+async fn only_one_gum_performed_on_unmute_by_server() {
+    let mock = MockNavigator::new();
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let audio_track_id = audio_track.id;
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            })],
+        })
+        .unwrap();
+    yield_now().await;
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert!(!peer.is_send_audio_enabled());
+
+    mock.error_get_user_media("only_one_gum_performed_on_unmute".into());
+
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: peer.id(),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: audio_track_id,
+                is_muted_general: Some(true),
+                is_muted_individual: Some(true),
+            })],
+        })
+        .unwrap();
+    yield_now().await;
+
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    mock.stop();
 }
 
 /// Tests that calling [`RoomHandle::set_local_media_settings`] updates needed
@@ -1532,12 +1734,20 @@ async fn set_local_media_stream_settings_updates_mute_state() {
     delay_for(10).await;
 
     spawn_local(async move {
-        JsFuture::from(
-            room_handle
-                .set_local_media_settings(&media_stream_settings(true, true)),
-        )
-        .await
-        .unwrap_err();
+        let err =
+            get_jason_error(
+                JsFuture::from(room_handle.set_local_media_settings(
+                    &media_stream_settings(true, true),
+                ))
+                .await
+                .unwrap_err(),
+            );
+        assert_eq!(err.name(), "MediaConnections");
+        assert_eq!(
+            err.message(),
+            "Some MediaConnectionsError: MuteState of Sender transits into \
+             opposite to expected MuteState"
+        );
     });
     yield_now().await;
 

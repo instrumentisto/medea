@@ -2,9 +2,7 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::{channel::mpsc, StreamExt};
-use medea_client_api_proto::{PeerId, TrackId, TrackPatchEvent};
-use wasm_bindgen_futures::spawn_local;
+use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
 
 use crate::{
     media::{
@@ -14,7 +12,7 @@ use crate::{
     peer::{
         media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
-        PeerEvent,
+        MuteState,
     },
 };
 
@@ -64,36 +62,14 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let mute_state_observer = MuteStateController::new(self.mute_state);
-        let mut mute_state_rx = mute_state_observer.on_stabilize();
         let this = Rc::new(Sender {
-            peer_id: connections.peer_id,
             track_id: self.track_id,
             caps: self.caps,
             general_mute_state: Cell::new(self.mute_state),
             transceiver,
             mute_state: mute_state_observer,
             is_required: self.is_required,
-            peer_events_sender: connections.peer_events_sender.clone(),
             send_constraints: self.send_constraints,
-        });
-        spawn_local({
-            let weak_this = Rc::downgrade(&this);
-            async move {
-                while let Some(mute_state) = mute_state_rx.next().await {
-                    if let Some(this) = weak_this.upgrade() {
-                        match mute_state {
-                            StableMuteState::Unmuted => {
-                                this.maybe_request_track();
-                            }
-                            StableMuteState::Muted => {
-                                this.remove_track().await;
-                            }
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
         });
 
         Ok(this)
@@ -103,14 +79,12 @@ impl<'a> SenderBuilder<'a> {
 /// Representation of a local [`MediaStreamTrack`] that is being sent to some
 /// remote peer.
 pub struct Sender {
-    peer_id: PeerId,
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
     mute_state: Rc<MuteStateController>,
     general_mute_state: Cell<StableMuteState>,
     is_required: bool,
-    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     send_constraints: LocalTracksConstraints,
 }
 
@@ -141,7 +115,6 @@ impl Sender {
             self.general_mute_state.set(mute_state);
             match mute_state {
                 StableMuteState::Unmuted => {
-                    self.maybe_request_track();
                     if self.is_enabled_in_cons() {
                         self.transceiver
                             .add_direction(TransceiverDirection::SEND);
@@ -189,17 +162,34 @@ impl Sender {
 
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
-    pub fn update(&self, track: &TrackPatchEvent) {
+    ///
+    /// Returns `true` if media stream update should be performed for this
+    /// [`Sender`].
+    pub async fn update(&self, track: &TrackPatchEvent) -> bool {
         if track.id != self.track_id {
-            return;
+            return false;
         }
 
+        let mut requires_media_update = false;
         if let Some(is_muted) = track.is_muted_individual {
+            let mute_state_before = self.mute_state.mute_state();
             self.mute_state.update(is_muted);
+            if let (MuteState::Stable(before), MuteState::Stable(after)) =
+                (mute_state_before, self.mute_state.mute_state())
+            {
+                requires_media_update =
+                    before != after && after == StableMuteState::Unmuted;
+            }
+
+            if is_muted {
+                self.remove_track().await;
+            }
         }
         if let Some(is_muted_general) = track.is_muted_general {
             self.update_general_mute_state(is_muted_general.into());
         }
+
+        requires_media_update
     }
 
     /// Changes underlying transceiver direction to
@@ -238,18 +228,6 @@ impl Sender {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
     }
-
-    /// Emits [`PeerEvent::NewLocalStreamRequired`] if [`Sender`] does not have
-    /// a track to send.
-    fn maybe_request_track(&self) {
-        if self.transceiver.send_track().is_none() {
-            let _ = self.peer_events_sender.unbounded_send(
-                PeerEvent::NewLocalStreamRequired {
-                    peer_id: self.peer_id,
-                },
-            );
-        }
-    }
 }
 
 impl TransceiverSide for Sender {
@@ -259,6 +237,10 @@ impl TransceiverSide for Sender {
 
     fn kind(&self) -> MediaKind {
         MediaKind::from(&self.caps)
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+        self.caps.media_source_kind()
     }
 
     fn mid(&self) -> Option<String> {

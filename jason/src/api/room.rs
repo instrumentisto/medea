@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, PeerConnection, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, StableMuteState,
-        TrackDirection,
+        LocalStreamUpdateCriteria, MediaConnectionsError, MuteState,
+        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+        RtcStats, StableMuteState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -276,6 +276,18 @@ impl RoomHandle {
                     tracerr::new!(e)
                 })?;
         }
+
+        // Enabled senders may require new tracks to be inserted.
+        if let (true, TrackDirection::Send) = (enabled, direction) {
+            for peer in inner.peers.get_all() {
+                peer.update_local_stream(
+                    LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
+                )
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+            }
+        }
+
         Ok(())
     }
 }
@@ -572,34 +584,27 @@ impl Room {
                 };
 
                 if let Some(inner) = inner.upgrade() {
-                    let event_handle_result = match event {
+                    match event {
                         RoomEvent::RpcEvent(event) => {
-                            event.dispatch_with(inner.deref()).await
+                            if let Err(err) =
+                                event.dispatch_with(inner.deref()).await
+                            {
+                                JasonError::from(err).print();
+                            };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            event.dispatch_with(inner.deref()).await
+                            if let Err(err) =
+                                event.dispatch_with(inner.deref()).await
+                            {
+                                JasonError::from(err).print();
+                            };
                         }
                         RoomEvent::RpcClientLostConnection => {
                             inner.handle_rpc_connection_lost();
-                            Ok(())
                         }
                         RoomEvent::RpcClientReconnected => {
                             inner.handle_rpc_connection_recovered();
-                            Ok(())
                         }
-                    };
-
-                    if let Err(err) = event_handle_result {
-                        let (err, trace) = err.into_parts();
-                        match err {
-                            RoomError::InvalidLocalTracks(_)
-                            | RoomError::CouldNotGetLocalMedia(_) => {
-                                let e = JasonError::from((err, trace));
-                                e.print();
-                                inner.on_failed_local_media.call(e);
-                            }
-                            _ => JasonError::from((err, trace)).print(),
-                        };
                     }
                 } else {
                     log::error!("Inner Room dropped unexpectedly");
@@ -973,18 +978,12 @@ impl InnerRoom {
 
         let mut mute_states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            match peer
-                .update_local_stream()
+            peer.update_local_stream(LocalStreamUpdateCriteria::all())
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-            {
-                Ok(new_mute_states) => {
-                    mute_states_update.insert(peer.id(), new_mute_states);
-                }
-                Err(err) => {
-                    self.on_failed_local_media.call(JasonError::from(err));
-                }
-            }
+                .map(|new_mute_states| {
+                    mute_states_update.insert(peer.id(), new_mute_states)
+                })?;
         }
 
         self.update_mute_states(mute_states_update)
@@ -1018,6 +1017,7 @@ impl InnerRoom {
         peer: Rc<PeerConnection>,
         tracks: Vec<Track>,
         negotiation_role: Option<NegotiationRole>,
+        maybe_update_local_media: bool,
     ) -> Result<(), Traced<RoomError>> {
         match negotiation_role {
             None => {
@@ -1026,7 +1026,7 @@ impl InnerRoom {
             }
             Some(NegotiationRole::Offerer) => {
                 let sdp_offer = peer
-                    .get_offer(tracks)
+                    .get_offer(tracks, maybe_update_local_media)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
                 let mids =
@@ -1040,7 +1040,7 @@ impl InnerRoom {
             }
             Some(NegotiationRole::Answerer(offer)) => {
                 let sdp_answer = peer
-                    .process_offer(offer, tracks)
+                    .process_offer(offer, tracks, maybe_update_local_media)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
                 self.rpc.send_command(Command::MakeSdpAnswer {
@@ -1100,6 +1100,7 @@ impl EventHandler for InnerRoom {
             peer,
             tracks,
             Some(negotiation_role),
+            true,
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())
@@ -1180,12 +1181,18 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
-        peer.patch_tracks(patches)
+        let kinds = peer
+            .patch_tracks(patches)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+        peer.update_local_stream(kinds)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?;
         self.create_tracks_and_maybe_negotiate(
             peer,
             new_tracks,
             negotiation_role,
+            false,
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
@@ -1321,19 +1328,10 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
-    /// stream of [`PeerConnection`] that sent request.
-    async fn on_new_local_stream_required(
-        &self,
-        peer_id: PeerId,
-    ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.update_local_stream()
-            .await
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+    /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
+    /// `on_failed_local_media` [`Room`]'s callback.
+    async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
+        self.on_failed_local_media.call(error);
         Ok(())
     }
 }
