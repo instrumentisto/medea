@@ -515,21 +515,6 @@ impl PeerConnection {
         self.media_connections.is_recv_audio_enabled()
     }
 
-    /// Returns `true` if all [`Sender`]s video tracks are unmuted.
-    #[cfg(feature = "mockable")]
-    pub fn is_send_video_unmuted(
-        &self,
-        source_kind: Option<MediaSourceKind>,
-    ) -> bool {
-        self.media_connections.is_send_video_unmuted(source_kind)
-    }
-
-    /// Returns `true` if all [`Sender`]s audio tracks are unmuted.
-    #[cfg(feature = "mockable")]
-    pub fn is_send_audio_unmuted(&self) -> bool {
-        self.media_connections.is_send_audio_unmuted()
-    }
-
     /// Returns `true` if all [`Receiver`]s video tracks are enabled.
     pub fn is_recv_video_enabled(&self) -> bool {
         self.media_connections.is_recv_video_enabled()
@@ -964,6 +949,19 @@ impl PeerConnection {
         source_kind: Option<MediaSourceKind>,
     ) -> bool {
         self.media_connections.is_send_video_enabled(source_kind)
+    }
+
+    /// Returns `true` if all [`Sender`]s video tracks are unmuted.
+    pub fn is_send_video_unmuted(
+        &self,
+        source_kind: Option<MediaSourceKind>,
+    ) -> bool {
+        self.media_connections.is_send_video_unmuted(source_kind)
+    }
+
+    /// Returns `true` if all [`Sender`]s audio tracks are unmuted.
+    pub fn is_send_audio_unmuted(&self) -> bool {
+        self.media_connections.is_send_audio_unmuted()
     }
 }
 

@@ -244,14 +244,6 @@ impl Sender {
     }
 
     /// Checks whether general media exchange state of the [`Sender`] is in
-    /// [`StableMediaExchangeState::Disabled`].
-    #[cfg(feature = "mockable")]
-    pub fn is_general_disabled(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == StableMediaExchangeState::Disabled
-    }
-
-    /// Checks whether general media exchange state of the [`Sender`] is in
     /// [`MediaExchangeState::Enabled`].
     fn is_general_enabled(&self) -> bool {
         self.general_media_exchange_state.get()
@@ -264,20 +256,28 @@ impl Sender {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
     }
+}
+
+#[cfg(feature = "mockable")]
+impl Sender {
+    /// Checks whether general media exchange state of the [`Sender`] is in
+    /// [`StableMediaExchangeState::Disabled`].
+    pub fn is_general_disabled(&self) -> bool {
+        self.general_media_exchange_state.get()
+            == StableMediaExchangeState::Disabled
+    }
 
     /// Returns `true` if this [`Sender`] is disabled.
-    #[cfg(feature = "mockable")]
     pub fn is_disabled(&self) -> bool {
         self.media_exchange_state.is_disabled()
     }
 
     /// Returns `true` if this [`Sender`] is muted.
-    #[cfg(feature = "mockable")]
     pub fn is_muted(&self) -> bool {
         self.mute_state.is_muted()
     }
 
-    #[cfg(feature = "mockable")]
+    /// Returns `true` if this [`Sender`] is enabled.
     pub fn is_enabled(&self) -> bool {
         self.media_exchange_state.is_enabled()
     }
