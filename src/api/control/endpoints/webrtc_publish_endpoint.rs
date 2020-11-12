@@ -103,7 +103,7 @@ impl PublishPolicy {
     ///
     /// If `false` then media may be not published.
     #[inline]
-    pub fn is_required(self) -> bool {
+    pub fn required(self) -> bool {
         match self {
             Self::Optional | Self::Disabled => false,
             Self::Required => true,

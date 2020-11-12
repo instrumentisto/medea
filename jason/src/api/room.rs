@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        LocalStreamUpdateCriteria, MediaConnectionsError, MediaExchangeState,
+        media_exchange_state, LocalStreamUpdateCriteria, MediaConnectionsError,
         PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, StableMediaExchangeState, TrackDirection,
+        RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -261,7 +261,7 @@ impl RoomHandle {
             kind,
             direction,
             source_kind,
-            StableMediaExchangeState::from(enabled),
+            media_exchange_state::Stable::from(enabled),
         ) {
             inner
                 .toggle_media_exchange(enabled, kind, direction, source_kind)
@@ -778,10 +778,10 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`TransceiverSide`]s [`MediaExchangeState`] by provided
+    /// Toggles [`TransceiverSide`]s [`media_exchange_state::State`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
-    /// Will fallback to the previous [`MediaExchangeState`]s if some
+    /// Will fallback to the previous [`media_exchange_state::State`]s if some
     /// [`TransceiverSide`] can't be disabled because
     /// [`MediaConnectionsError::CannotDisableRequiredSender`].
     ///
@@ -789,7 +789,7 @@ impl InnerRoom {
     #[allow(clippy::filter_map)]
     async fn toggle_media_exchange(
         &self,
-        is_enabled: bool,
+        enabled: bool,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
@@ -808,10 +808,12 @@ impl InnerRoom {
                     .map(|transceiver| {
                         let backup_stable_media_exchange_state =
                             match transceiver.media_exchange_state() {
-                                MediaExchangeState::Stable(stable) => stable,
-                                MediaExchangeState::Transition(transition) => {
-                                    transition.intended()
+                                media_exchange_state::State::Stable(stable) => {
+                                    stable
                                 }
+                                media_exchange_state::State::Transition(
+                                    transition,
+                                ) => transition.intended(),
                             };
                         trnscvrs_backup_media_exchange_state.insert(
                             transceiver.track_id(),
@@ -819,7 +821,7 @@ impl InnerRoom {
                         );
                         (
                             transceiver.track_id(),
-                            StableMediaExchangeState::from(is_enabled),
+                            media_exchange_state::Stable::from(enabled),
                         )
                     })
                     .collect();
@@ -841,17 +843,22 @@ impl InnerRoom {
         update_result
     }
 
-    /// Updates [`MediaExchangeState`]s of the [`TransceiverSide`] with a
-    /// provided [`PeerId`] and [`TrackId`] to a provided
-    /// [`StableMediaExchangeState`]s.
+    /// Updates [`media_exchange_state::State`]s of the [`TransceiverSide`] with
+    /// a provided [`PeerId`] and [`TrackId`] to a provided
+    /// [`media_exchange_state::Stable`]s.
     #[allow(clippy::filter_map)]
     async fn update_media_exchange_states(
         &self,
         desired_states: HashMap<
             PeerId,
-            HashMap<TrackId, StableMediaExchangeState>,
+            HashMap<TrackId, media_exchange_state::Stable>,
         >,
     ) -> Result<(), Traced<RoomError>> {
+        use media_exchange_state::{
+            Stable::Enabled,
+            State::{Stable, Transition},
+        };
+
         future::try_join_all(
             desired_states
                 .into_iter()
@@ -869,14 +876,13 @@ impl InnerRoom {
                                 .map(|trnscvr| (trnscvr, desired_state))
                         })
                         .filter_map(|(trnscvr, desired_state)| {
-                            use MediaExchangeState as S;
                             match trnscvr.media_exchange_state() {
-                                S::Transition(transition) => Some((
+                                Transition(transition) => Some((
                                     trnscvr,
                                     desired_state,
                                     transition.intended() != desired_state,
                                 )),
-                                S::Stable(stable) => {
+                                Stable(stable) => {
                                     if stable == desired_state {
                                         None
                                     } else {
@@ -895,10 +901,9 @@ impl InnerRoom {
                                 ),
                             );
                             if should_be_patched {
-                                use StableMediaExchangeState::Enabled;
                                 tracks_patches.push(TrackPatchCommand {
                                     id: trnscvr.track_id(),
-                                    is_enabled: Some(desired_state == Enabled),
+                                    enabled: Some(desired_state == Enabled),
                                 });
                             }
 
@@ -925,13 +930,13 @@ impl InnerRoom {
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
-    /// provided `media_exchange_state`.
+    /// provided [`media_exchange_state::Stable`].
     pub fn is_all_peers_in_media_exchange_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        media_exchange_state: StableMediaExchangeState,
+        state: media_exchange_state::Stable,
     ) -> bool {
         self.peers
             .get_all()
@@ -941,7 +946,7 @@ impl InnerRoom {
                     kind,
                     direction,
                     source_kind,
-                    media_exchange_state,
+                    state,
                 )
             })
             .is_none()
@@ -957,8 +962,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`MediaExchangeState`]s of the [`Sender`]s which are should
-    /// be enabled or disabled.
+    /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
+    /// are should be enabled or disabled.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
@@ -968,18 +973,17 @@ impl InnerRoom {
     ) -> Result<(), Traced<RoomError>> {
         self.send_constraints.constrain(settings);
 
-        let mut media_exchange_states_update = HashMap::new();
+        let mut states_update = HashMap::new();
         for peer in self.peers.get_all() {
             peer.update_local_stream(LocalStreamUpdateCriteria::all())
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_media_exchange_states| {
-                    media_exchange_states_update
-                        .insert(peer.id(), new_media_exchange_states)
+                    states_update.insert(peer.id(), new_media_exchange_states)
                 })?;
         }
 
-        self.update_media_exchange_states(media_exchange_states_update)
+        self.update_media_exchange_states(states_update)
             .await
             .map_err(tracerr::map_from_and_wrap!())
     }
@@ -1199,12 +1203,9 @@ impl EventHandler for InnerRoom {
         partner_member_id: MemberId,
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
-        let conn = self
-            .connections
-            .get(&partner_member_id)
-            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
-
-        conn.update_quality_score(quality_score);
+        if let Some(conn) = self.connections.get(&partner_member_id) {
+            conn.update_quality_score(quality_score);
+        }
 
         Ok(())
     }

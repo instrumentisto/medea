@@ -7,8 +7,8 @@ use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        Disableable, LocalStreamUpdateCriteria, MediaConnections,
-        RtcPeerConnection, SimpleTracksRequest, StableMediaExchangeState,
+        media_exchange_state, Disableable, LocalStreamUpdateCriteria,
+        MediaConnections, RtcPeerConnection, SimpleTracksRequest,
     },
 };
 use wasm_bindgen_test::*;
@@ -58,14 +58,14 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .media_exchange_state_transition_to(StableMediaExchangeState::from(
+        .media_exchange_state_transition_to(media_exchange_state::Stable::from(
             enabled_audio,
         ))
         .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .media_exchange_state_transition_to(StableMediaExchangeState::from(
+        .media_exchange_state_transition_to(media_exchange_state::Stable::from(
             enabled_video,
         ))
         .unwrap();
@@ -125,6 +125,8 @@ fn get_tracks_request2() {
 //     4. Calling toggle_send_media(video, true) enables video track.
 #[wasm_bindgen_test]
 async fn disable_and_enable_all_tracks_in_media_manager() {
+    use media_exchange_state::Stable::{Disabled, Enabled};
+
     let (media_connections, audio_track_id, video_track_id) =
         get_test_media_connections(true, true).await;
 
@@ -137,13 +139,13 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!video_track.is_general_disabled());
 
     audio_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Disabled)
+        .media_exchange_state_transition_to(Disabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
-            is_enabled_general: Some(false),
-            is_enabled_individual: Some(false),
+            enabled_general: Some(false),
+            enabled_individual: Some(false),
         }])
         .await
         .unwrap();
@@ -151,13 +153,13 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(!video_track.is_general_disabled());
 
     video_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Disabled)
+        .media_exchange_state_transition_to(Disabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
-            is_enabled_general: Some(false),
-            is_enabled_individual: Some(false),
+            enabled_general: Some(false),
+            enabled_individual: Some(false),
         }])
         .await
         .unwrap();
@@ -165,13 +167,13 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_general_disabled());
 
     audio_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Enabled)
+        .media_exchange_state_transition_to(Enabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
-            is_enabled_individual: Some(true),
-            is_enabled_general: Some(true),
+            enabled_individual: Some(true),
+            enabled_general: Some(true),
         }])
         .await
         .unwrap();
@@ -179,13 +181,13 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     assert!(video_track.is_general_disabled());
 
     video_track
-        .media_exchange_state_transition_to(StableMediaExchangeState::Enabled)
+        .media_exchange_state_transition_to(Enabled)
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
-            is_enabled_individual: Some(true),
-            is_enabled_general: Some(true),
+            enabled_individual: Some(true),
+            enabled_general: Some(true),
         }])
         .await
         .unwrap();
@@ -245,8 +247,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: TrackId(track_id.0 + 100),
-                is_enabled_individual: Some(false),
-                is_enabled_general: Some(false),
+                enabled_individual: Some(false),
+                enabled_general: Some(false),
             })
             .await;
 
@@ -259,8 +261,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_enabled_individual: Some(false),
-                is_enabled_general: Some(false),
+                enabled_individual: Some(false),
+                enabled_general: Some(false),
             })
             .await;
 
@@ -273,8 +275,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_enabled_individual: Some(true),
-                is_enabled_general: Some(true),
+                enabled_individual: Some(true),
+                enabled_general: Some(true),
             })
             .await;
 
@@ -287,8 +289,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_enabled_individual: Some(false),
-                is_enabled_general: Some(false),
+                enabled_individual: Some(false),
+                enabled_general: Some(false),
             })
             .await;
         assert!(sender.is_general_disabled());
@@ -296,8 +298,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_enabled_individual: Some(false),
-                is_enabled_general: Some(false),
+                enabled_individual: Some(false),
+                enabled_general: Some(false),
             })
             .await;
 
@@ -310,8 +312,8 @@ mod sender_patch {
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
-                is_enabled_individual: None,
-                is_enabled_general: None,
+                enabled_individual: None,
+                enabled_general: None,
             })
             .await;
 
@@ -341,7 +343,7 @@ mod receiver_patch {
         let recv = Receiver::new(
             &media_connections,
             TRACK_ID,
-            MediaType::Audio(AudioSettings { is_required: true }).into(),
+            MediaType::Audio(AudioSettings { required: true }).into(),
             MemberId(SENDER_ID.to_string()),
             Some(MID.to_string()),
             &RecvConstraints::default(),
@@ -355,8 +357,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TrackId(TRACK_ID.0 + 100),
-            is_enabled_individual: Some(false),
-            is_enabled_general: Some(false),
+            enabled_individual: Some(false),
+            enabled_general: Some(false),
         });
 
         assert!(!receiver.is_general_disabled());
@@ -367,8 +369,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_enabled_individual: Some(false),
-            is_enabled_general: Some(false),
+            enabled_individual: Some(false),
+            enabled_general: Some(false),
         });
 
         assert!(receiver.is_general_disabled());
@@ -379,8 +381,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_enabled_individual: Some(true),
-            is_enabled_general: Some(true),
+            enabled_individual: Some(true),
+            enabled_general: Some(true),
         });
 
         assert!(!receiver.is_general_disabled());
@@ -391,15 +393,15 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_enabled_individual: Some(false),
-            is_enabled_general: Some(false),
+            enabled_individual: Some(false),
+            enabled_general: Some(false),
         });
         assert!(receiver.is_general_disabled());
 
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_enabled_individual: Some(false),
-            is_enabled_general: Some(false),
+            enabled_individual: Some(false),
+            enabled_general: Some(false),
         });
 
         assert!(receiver.is_general_disabled());
@@ -410,8 +412,8 @@ mod receiver_patch {
         let (receiver, _tx) = get_receiver();
         receiver.update(&TrackPatchEvent {
             id: TRACK_ID,
-            is_enabled_individual: None,
-            is_enabled_general: None,
+            enabled_individual: None,
+            enabled_general: None,
         });
 
         assert!(!receiver.is_general_disabled());

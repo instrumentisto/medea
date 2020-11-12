@@ -221,7 +221,7 @@ impl SimpleTracksRequest {
 
         if let Some((_, audio_caps)) = &self.audio {
             if !other.is_audio_enabled() {
-                if audio_caps.is_required() {
+                if audio_caps.required() {
                     return Err(tracerr::new!(
                         TracksRequestError::ExpectedAudioTracks
                     ));
@@ -232,7 +232,7 @@ impl SimpleTracksRequest {
         }
         if let Some((_, device_video_caps)) = &self.device_video {
             if !other.is_device_video_enabled() {
-                if device_video_caps.is_required() {
+                if device_video_caps.required() {
                     return Err(tracerr::new!(
                         TracksRequestError::ExpectedDeviceVideoTracks
                     ));
@@ -243,7 +243,7 @@ impl SimpleTracksRequest {
         }
         if let Some((_, display_video_caps)) = &self.display_video {
             if !other.is_display_video_enabled() {
-                if display_video_caps.is_required() {
+                if display_video_caps.required() {
                     return Err(tracerr::new!(
                         TracksRequestError::ExpectedDisplayVideoTracks
                     ));

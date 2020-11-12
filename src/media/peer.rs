@@ -435,13 +435,13 @@ impl<T> TrackChangeHandler for Peer<T> {
 
     /// Applies provided [`TrackPatchEvent`] to [`Peer`]s [`Track`].
     fn on_track_patch(&mut self, mut patch: TrackPatchEvent) -> Self::Output {
-        if let Some(is_enabled) = patch.is_enabled_individual {
+        if let Some(enabled) = patch.enabled_individual {
             if let Some(tx) = self.senders().get(&patch.id) {
-                tx.set_send_media_exchange_state(is_enabled);
-                patch.is_enabled_general = Some(tx.is_media_exchange_enabled());
+                tx.set_send_media_exchange_state(enabled);
+                patch.enabled_general = Some(tx.is_media_exchange_enabled());
             } else if let Some(rx) = self.receivers().get(&patch.id) {
-                rx.set_recv_media_exchange_state(is_enabled);
-                patch.is_enabled_general = Some(rx.is_media_exchange_enabled());
+                rx.set_recv_media_exchange_state(enabled);
+                patch.enabled_general = Some(rx.is_media_exchange_enabled());
             };
         }
 
@@ -454,20 +454,19 @@ impl<T> TrackChangeHandler for Peer<T> {
         &mut self,
         mut patch: TrackPatchEvent,
     ) -> Self::Output {
-        if let Some(is_enabled_individual) = patch.is_enabled_individual {
-            // Resets `is_enabled_individual` to `None`. Sets
-            // `is_enabled_general` to `Some` if provided
-            // `is_enabled_individual` is equal to the real general
-            // media exchange state.
-            patch.is_enabled_individual = None;
+        if let Some(enabled_individual) = patch.enabled_individual {
+            // Resets `enabled_individual` to `None`. Sets `enabled_general` to
+            // `Some` if provided `enabled_individual` is equal to the real
+            // general media exchange state.
+            patch.enabled_individual = None;
             let track = self
                 .senders()
                 .get(&patch.id)
                 .or_else(|| self.receivers().get(&patch.id));
 
             if let Some(track) = track {
-                if is_enabled_individual == track.is_media_exchange_enabled() {
-                    patch.is_enabled_general =
+                if enabled_individual == track.is_media_exchange_enabled() {
+                    patch.enabled_general =
                         Some(track.is_media_exchange_enabled());
                 }
             }
@@ -1031,7 +1030,7 @@ impl<'a> PeerChangesScheduler<'a> {
             let track_audio = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Audio(AudioSettings {
-                    is_required: audio_settings.publish_policy.is_required(),
+                    required: audio_settings.publish_policy.required(),
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
@@ -1045,7 +1044,7 @@ impl<'a> PeerChangesScheduler<'a> {
             let camera_video_track = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
-                    is_required: video_settings.publish_policy.is_required(),
+                    required: video_settings.publish_policy.required(),
                     source_kind: MediaSourceKind::Device,
                 }),
             ));
@@ -1056,7 +1055,7 @@ impl<'a> PeerChangesScheduler<'a> {
             let display_video_track = Rc::new(MediaTrack::new(
                 tracks_counter.next_id(),
                 MediaType::Video(VideoSettings {
-                    is_required: false,
+                    required: false,
                     source_kind: MediaSourceKind::Display,
                 }),
             ));
@@ -1129,7 +1128,7 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Audio(AudioSettings { is_required: true }),
+                MediaType::Audio(AudioSettings { required: true }),
             );
             peer.context.senders.insert(track_id, Rc::new(track));
         }
@@ -1139,7 +1138,7 @@ pub mod tests {
             let track = MediaTrack::new(
                 track_id,
                 MediaType::Video(VideoSettings {
-                    is_required: true,
+                    required: true,
                     source_kind: MediaSourceKind::Device,
                 }),
             );
@@ -1150,7 +1149,7 @@ pub mod tests {
             let track_id = track_id_counter.next_id();
             let track = MediaTrack::new(
                 track_id,
-                MediaType::Audio(AudioSettings { is_required: true }),
+                MediaType::Audio(AudioSettings { required: true }),
             );
             peer.context.receivers.insert(track_id, Rc::new(track));
         }
@@ -1160,7 +1159,7 @@ pub mod tests {
             let track = MediaTrack::new(
                 track_id,
                 MediaType::Video(VideoSettings {
-                    is_required: true,
+                    required: true,
                     source_kind: MediaSourceKind::Device,
                 }),
             );
@@ -1174,7 +1173,7 @@ pub mod tests {
         Rc::new(MediaTrack::new(
             TrackId(track_id),
             MediaType::Video(VideoSettings {
-                is_required: true,
+                required: true,
                 source_kind: MediaSourceKind::Device,
             }),
         ))
@@ -1282,11 +1281,11 @@ pub mod tests {
         peer.as_changes_scheduler().patch_tracks(vec![
             TrackPatchCommand {
                 id: TrackId(0),
-                is_enabled: Some(true),
+                enabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(1),
-                is_enabled: Some(true),
+                enabled: Some(false),
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1324,31 +1323,31 @@ pub mod tests {
         let patches = vec![
             TrackPatchCommand {
                 id: TrackId(1),
-                is_enabled: Some(true),
+                enabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_enabled: None,
+                enabled: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
-                is_enabled: Some(false),
+                enabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_enabled: Some(true),
+                enabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_enabled: Some(false),
+                enabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(2),
-                is_enabled: None,
+                enabled: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
-                is_enabled: None,
+                enabled: None,
             },
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
@@ -1374,10 +1373,10 @@ pub mod tests {
             .collect();
 
         let second_track_patch = track_patches_after.pop().unwrap();
-        assert_eq!(second_track_patch.is_enabled_individual, Some(false));
+        assert_eq!(second_track_patch.enabled_individual, Some(true));
 
         let first_track_patch = track_patches_after.pop().unwrap();
-        assert_eq!(first_track_patch.is_enabled_general, None);
+        assert_eq!(first_track_patch.enabled_general, None);
 
         assert!(track_patches_after.is_empty());
     }
@@ -1391,14 +1390,14 @@ pub mod tests {
             TrackChange::IceRestart,
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_enabled_individual: None,
-                is_enabled_general: None,
+                enabled_individual: None,
+                enabled_general: None,
             }),
             TrackChange::IceRestart,
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_enabled_individual: None,
-                is_enabled_general: None,
+                enabled_individual: None,
+                enabled_general: None,
             }),
         ];
 
@@ -1439,7 +1438,7 @@ pub mod tests {
                 assert_eq!(changes.len(), 1);
                 if let TrackUpdate::Updated(patch) = &changes[0] {
                     assert_eq!(patch.id, TrackId(0));
-                    assert_eq!(patch.is_enabled_individual, Some(true));
+                    assert_eq!(patch.enabled_individual, Some(false));
                 } else {
                     unreachable!();
                 }
@@ -1457,32 +1456,32 @@ pub mod tests {
         peer.context.pending_track_updates = vec![
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_enabled_general: Some(true),
-                is_enabled_individual: Some(true),
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
-                is_enabled_general: Some(false),
-                is_enabled_individual: Some(false),
+                enabled_general: Some(true),
+                enabled_individual: Some(true),
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
-                is_enabled_general: Some(true),
-                is_enabled_individual: Some(true),
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
             }),
         ];
         peer.as_changes_scheduler().patch_tracks(vec![
             TrackPatchCommand {
                 id: TrackId(0),
-                is_enabled: Some(true),
+                enabled: Some(false),
             },
             TrackPatchCommand {
                 id: TrackId(0),
-                is_enabled: Some(false),
+                enabled: Some(true),
             },
             TrackPatchCommand {
                 id: TrackId(0),
-                is_enabled: Some(true),
+                enabled: Some(false),
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1493,7 +1492,7 @@ pub mod tests {
             peer.context.pending_track_updates.pop().unwrap();
         if let TrackChange::TrackPatch(patch) = filtered_track_change {
             assert_eq!(patch.id, TrackId(1));
-            assert_eq!(patch.is_enabled_general, Some(true));
+            assert_eq!(patch.enabled_general, Some(false));
         } else {
             unreachable!();
         }
@@ -1511,13 +1510,13 @@ pub mod tests {
                 TrackPatchDeduper::with_whitelist(hashset![TrackId(1)]);
             let filtered_patch = TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(2),
-                is_enabled_general: Some(true),
-                is_enabled_individual: Some(true),
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
             });
             let whitelisted_patch = TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
-                is_enabled_general: Some(true),
-                is_enabled_individual: Some(true),
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
             });
             let mut patches =
                 vec![whitelisted_patch.clone(), filtered_patch.clone()];
@@ -1538,28 +1537,28 @@ pub mod tests {
             let mut changes: Vec<_> = vec![
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_enabled_general: Some(false),
-                    is_enabled_individual: Some(false),
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
-                    is_enabled_general: Some(true),
-                    is_enabled_individual: Some(true),
+                    enabled_general: Some(false),
+                    enabled_individual: Some(false),
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_enabled_general: Some(true),
-                    is_enabled_individual: Some(true),
+                    enabled_general: Some(false),
+                    enabled_individual: Some(false),
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_enabled_general: None,
-                    is_enabled_individual: None,
+                    enabled_general: None,
+                    enabled_individual: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
-                    is_enabled_general: Some(false),
-                    is_enabled_individual: Some(false),
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
                 },
             ]
             .into_iter()
@@ -1568,7 +1567,7 @@ pub mod tests {
             let unrelated_change =
                 TrackChange::AddSendTrack(Rc::new(MediaTrack::new(
                     TrackId(1),
-                    MediaType::Audio(AudioSettings { is_required: true }),
+                    MediaType::Audio(AudioSettings { required: true }),
                 )));
             changes.push(unrelated_change.clone());
             deduper.drain_merge(&mut changes);
@@ -1590,11 +1589,11 @@ pub mod tests {
             assert_eq!(merged_changes.len(), 2);
             {
                 let track_1 = merged_changes.get(&TrackId(1)).unwrap();
-                assert_eq!(track_1.is_enabled_general, Some(true));
+                assert_eq!(track_1.enabled_general, Some(false));
             }
             {
                 let track_2 = merged_changes.get(&TrackId(2)).unwrap();
-                assert_eq!(track_2.is_enabled_general, Some(false));
+                assert_eq!(track_2.enabled_general, Some(true));
             }
         }
     }

@@ -21,7 +21,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints},
     peer::{
-        PeerConnection, PeerEvent, RtcStats, StableMediaExchangeState,
+        media_exchange_state, PeerConnection, PeerEvent, RtcStats,
         TrackDirection,
     },
 };
@@ -36,14 +36,14 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 fn toggle_disable_tracks_updates(
     tracks_ids: &[u32],
-    is_enabled: bool,
+    enabled: bool,
 ) -> Vec<TrackPatchEvent> {
     tracks_ids
         .into_iter()
         .map(|track_id| TrackPatchEvent {
             id: TrackId(*track_id),
-            is_enabled_individual: Some(is_enabled),
-            is_enabled_general: Some(is_enabled),
+            enabled_individual: Some(enabled),
+            enabled_general: Some(enabled),
         })
         .collect()
 }
@@ -610,9 +610,7 @@ impl InterconnectedPeers {
                     receivers: vec![MemberId::from("bob")],
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {
-                    is_required: true,
-                }),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
             },
             Track {
                 id: TrackId(2),
@@ -621,7 +619,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
-                    is_required: true,
+                    required: true,
                     source_kind: MediaSourceKind::Device,
                 }),
             },
@@ -637,9 +635,7 @@ impl InterconnectedPeers {
                     sender: MemberId::from("alice"),
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {
-                    is_required: true,
-                }),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
             },
             Track {
                 id: TrackId(2),
@@ -648,7 +644,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
-                    is_required: true,
+                    required: true,
                     source_kind: MediaSourceKind::Device,
                 }),
             },
@@ -912,12 +908,12 @@ async fn reset_transition_timers() {
         )
         .map(|s| {
             s.media_exchange_state_transition_to(
-                StableMediaExchangeState::Disabled,
+                media_exchange_state::Stable::Disabled,
             )
             .unwrap();
 
             s.when_media_exchange_state_stable(
-                StableMediaExchangeState::Enabled,
+                media_exchange_state::Stable::Enabled,
             )
         }),
     )
@@ -996,7 +992,7 @@ async fn new_remote_track() {
                             mid: Some(String::from("0")),
                         },
                         media_type: MediaType::Audio(AudioSettings {
-                            is_required: true,
+                            required: true,
                         }),
                     },
                     Track {
@@ -1006,7 +1002,7 @@ async fn new_remote_track() {
                             mid: Some(String::from("1")),
                         },
                         media_type: MediaType::Video(VideoSettings {
-                            is_required: true,
+                            required: true,
                             source_kind: MediaSourceKind::Device,
                         }),
                     },

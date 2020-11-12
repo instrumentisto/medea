@@ -164,7 +164,7 @@ pub fn get_test_tracks(
                 mid: None,
             },
             media_type: MediaType::Audio(AudioSettings {
-                is_required: is_audio_required,
+                required: is_audio_required,
             }),
         },
         Track {
@@ -174,7 +174,7 @@ pub fn get_test_tracks(
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {
-                is_required: is_video_required,
+                required: is_video_required,
                 source_kind: MediaSourceKind::Device,
             }),
         },
@@ -193,7 +193,7 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
                 sender: "bob".into(),
                 mid: Some("mid0".to_string()),
             },
-            media_type: MediaType::Audio(AudioSettings { is_required: false }),
+            media_type: MediaType::Audio(AudioSettings { required: false }),
         },
         Track {
             id: TrackId(1),
@@ -202,7 +202,7 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
                 mid: Some("mid1".to_string()),
             },
             media_type: MediaType::Video(VideoSettings {
-                is_required: false,
+                required: false,
                 source_kind: MediaSourceKind::Device,
             }),
         },

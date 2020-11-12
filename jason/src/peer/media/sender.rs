@@ -12,15 +12,12 @@ use crate::{
     peer::{
         media::TransceiverSide,
         transceiver::{Transceiver, TransceiverDirection},
-        MediaExchangeState,
     },
 };
 
 use super::{
-    media_exchange_state::{
-        MediaExchangeStateController, StableMediaExchangeState,
-    },
-    Disableable, MediaConnections, MediaConnectionsError, Result,
+    media_exchange_state, Disableable, MediaConnections, MediaConnectionsError,
+    Result,
 };
 
 /// Builder of the [`Sender`].
@@ -29,8 +26,8 @@ pub struct SenderBuilder<'a> {
     pub track_id: TrackId,
     pub caps: TrackConstraints,
     pub mid: Option<String>,
-    pub media_exchange_state: StableMediaExchangeState,
-    pub is_required: bool,
+    pub media_exchange_state: media_exchange_state::Stable,
+    pub required: bool,
     pub send_constraints: LocalTracksConstraints,
 }
 
@@ -64,14 +61,14 @@ impl<'a> SenderBuilder<'a> {
         };
 
         let media_exchange_state_controller =
-            MediaExchangeStateController::new(self.media_exchange_state);
+            media_exchange_state::Controller::new(self.media_exchange_state);
         let this = Rc::new(Sender {
             track_id: self.track_id,
             caps: self.caps,
             general_media_exchange_state: Cell::new(self.media_exchange_state),
             transceiver,
             media_exchange_state: media_exchange_state_controller,
-            is_required: self.is_required,
+            required: self.required,
             send_constraints: self.send_constraints,
         });
 
@@ -85,9 +82,9 @@ pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
-    media_exchange_state: Rc<MediaExchangeStateController>,
-    general_media_exchange_state: Cell<StableMediaExchangeState>,
-    is_required: bool,
+    media_exchange_state: Rc<media_exchange_state::Controller>,
+    general_media_exchange_state: Cell<media_exchange_state::Stable>,
+    required: bool,
     send_constraints: LocalTracksConstraints,
 }
 
@@ -104,29 +101,29 @@ impl Sender {
     }
 
     /// Updates [`Sender`]s general media exchange state based on the provided
-    /// [`StableMediaExchangeState`].
+    /// [`media_exchange_state::Stable`].
     ///
     /// Sets [`Sender`]s underlying transceiver direction to
     /// [`TransceiverDirection::Inactive`] if provided media exchange state is
-    /// [`StableMediaExchangeState::Disabled`].
+    /// [`media_exchange_state::Stable::Disabled`].
     ///
     /// Emits [`PeerEvent::NewLocalStreamRequired`] if new state is
-    /// [`StableMediaExchangeState::Enabled`] and [`Sender`] does not have a
+    /// [`media_exchange_state::Stable::Enabled`] and [`Sender`] does not have a
     /// track to send.
     fn update_general_media_exchange_state(
         &self,
-        media_exchange_state: StableMediaExchangeState,
+        new_state: media_exchange_state::Stable,
     ) {
-        if self.general_media_exchange_state.get() != media_exchange_state {
-            self.general_media_exchange_state.set(media_exchange_state);
-            match media_exchange_state {
-                StableMediaExchangeState::Enabled => {
-                    if self.is_enabled_in_cons() {
+        if self.general_media_exchange_state.get() != new_state {
+            self.general_media_exchange_state.set(new_state);
+            match new_state {
+                media_exchange_state::Stable::Enabled => {
+                    if self.enabled_in_cons() {
                         self.transceiver
                             .add_direction(TransceiverDirection::SEND);
                     }
                 }
-                StableMediaExchangeState::Disabled => {
+                media_exchange_state::Stable::Disabled => {
                     self.transceiver.sub_direction(TransceiverDirection::SEND);
                 }
             }
@@ -159,7 +156,7 @@ impl Sender {
 
     /// Indicates whether this [`Sender`] is enabled in
     /// [`LocalStreamConstraints`].
-    fn is_enabled_in_cons(&self) -> bool {
+    fn enabled_in_cons(&self) -> bool {
         self.send_constraints.is_track_enabled(
             self.caps.media_kind(),
             self.caps.media_source_kind(),
@@ -177,26 +174,26 @@ impl Sender {
         }
 
         let mut requires_media_update = false;
-        if let Some(is_enabled) = track.is_enabled_individual {
+        if let Some(enabled) = track.enabled_individual {
             let state_before = self.media_exchange_state.media_exchange_state();
-            self.media_exchange_state.update(is_enabled);
+            self.media_exchange_state.update(enabled);
             if let (
-                MediaExchangeState::Stable(before),
-                MediaExchangeState::Stable(after),
+                media_exchange_state::State::Stable(before),
+                media_exchange_state::State::Stable(after),
             ) = (
                 state_before,
                 self.media_exchange_state.media_exchange_state(),
             ) {
                 requires_media_update = before != after
-                    && after == StableMediaExchangeState::Enabled;
+                    && after == media_exchange_state::Stable::Enabled;
             }
 
-            if !is_enabled {
+            if !enabled {
                 self.remove_track().await;
             }
         }
-        if let Some(is_enabled_general) = track.is_enabled_general {
-            self.update_general_media_exchange_state(is_enabled_general.into());
+        if let Some(enabled) = track.enabled_general {
+            self.update_general_media_exchange_state(enabled.into());
         }
 
         requires_media_update
@@ -204,11 +201,11 @@ impl Sender {
 
     /// Changes underlying transceiver direction to
     /// [`TransceiverDirection::Sendonly`] if this [`Receiver`]s general media
-    /// exchange state is [`StableMediaExchangeState::Enabled`].
+    /// exchange state is [`media_exchange_state::Stable::Enabled`].
     pub fn maybe_enable(&self) {
         if self.is_general_enabled()
             && !self.transceiver.has_direction(TransceiverDirection::SEND)
-            && self.is_enabled_in_cons()
+            && self.enabled_in_cons()
         {
             self.transceiver.add_direction(TransceiverDirection::SEND);
         }
@@ -220,18 +217,18 @@ impl Sender {
     }
 
     /// Checks whether general media exchange state of the [`Sender`] is in
-    /// [`StableMediaExchangeState::Disabled`].
+    /// [`media_exchange_state::Stable::Disabled`].
     #[cfg(feature = "mockable")]
     pub fn is_general_disabled(&self) -> bool {
         self.general_media_exchange_state.get()
-            == StableMediaExchangeState::Disabled
+            == media_exchange_state::Stable::Disabled
     }
 
     /// Checks whether general media exchange state of the [`Sender`] is in
-    /// [`MediaExchangeState::Enabled`].
+    /// [`media_exchange_state::Stable::Enabled`].
     fn is_general_enabled(&self) -> bool {
         self.general_media_exchange_state.get()
-            == StableMediaExchangeState::Enabled
+            == media_exchange_state::Stable::Enabled
     }
 
     /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by
@@ -276,12 +273,12 @@ impl Disableable for Sender {
     #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController> {
+    ) -> Rc<media_exchange_state::Controller> {
         self.media_exchange_state.clone()
     }
 
-    /// Sets current [`MediaExchangeState`] to
-    /// [`MediaExchangeState::Transition`].
+    /// Sets current [`media_exchange_state::State`] to
+    /// [`media_exchange_state::State::Transition`].
     ///
     /// # Errors
     ///
@@ -289,9 +286,9 @@ impl Disableable for Sender {
     /// required for the call and can't be disabled.
     fn media_exchange_state_transition_to(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: media_exchange_state::Stable,
     ) -> Result<()> {
-        if self.is_required {
+        if self.required {
             Err(tracerr::new!(
                 MediaConnectionsError::CannotDisableRequiredSender
             ))

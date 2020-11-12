@@ -1,6 +1,6 @@
 //! [`crate::peer::PeerConnection`] media management.
 
-mod media_exchange_state;
+pub mod media_exchange_state;
 mod receiver;
 mod sender;
 
@@ -27,18 +27,9 @@ use crate::{
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
-use self::{
-    media_exchange_state::MediaExchangeStateController, sender::SenderBuilder,
-};
+use self::sender::SenderBuilder;
 
-pub use self::{
-    media_exchange_state::{
-        MediaExchangeState, MediaExchangeStateTransition,
-        StableMediaExchangeState,
-    },
-    receiver::Receiver,
-    sender::Sender,
-};
+pub use self::{receiver::Receiver, sender::Sender};
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: Disableable {
@@ -61,23 +52,23 @@ pub trait TransceiverSide: Disableable {
     fn is_transitable(&self) -> bool;
 }
 
-/// Default functions for dealing with [`MediaExchangeStateController`] for
+/// Default functions for dealing with [`media_exchange_state::Controller`] for
 /// objects that use it.
 pub trait Disableable {
-    /// Returns reference to the [`MediaExchangeStateController`].
+    /// Returns reference to the [`media_exchange_state::Controller`].
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<MediaExchangeStateController>;
+    ) -> Rc<media_exchange_state::Controller>;
 
-    /// Returns [`MediaExchangeState`] of this [`Disableable`].
+    /// Returns [`media_exchange_state::State`] of this [`Disableable`].
     #[inline]
-    fn media_exchange_state(&self) -> MediaExchangeState {
+    fn media_exchange_state(&self) -> media_exchange_state::State {
         self.media_exchange_state_controller()
             .media_exchange_state()
     }
 
-    /// Sets current [`MediaExchangeState`] to
-    /// [`MediaExchangeState::Transition`].
+    /// Sets current [`media_exchange_state::State`] to
+    /// [`media_exchange_state::State::Transition`].
     ///
     /// # Errors
     ///
@@ -86,7 +77,7 @@ pub trait Disableable {
     #[inline]
     fn media_exchange_state_transition_to(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: media_exchange_state::Stable,
     ) -> Result<()> {
         self.media_exchange_state_controller()
             .transition_to(desired_state);
@@ -94,25 +85,25 @@ pub trait Disableable {
         Ok(())
     }
 
-    /// Cancels [`MediaExchangeState`] transition.
+    /// Cancels [`media_exchange_state::State`] transition.
     #[inline]
     fn cancel_transition(&self) {
         self.media_exchange_state_controller().cancel_transition()
     }
 
-    /// Returns [`Future`] which will be resolved when [`MediaExchangeState`] of
-    /// this [`Disableable`] will be [`MediaExchangeState::Stable`] or it is
-    /// dropped.
+    /// Returns [`Future`] which will be resolved when
+    /// [`media_exchange_state::State`] of this [`Disableable`] will be
+    /// [`media_exchange_state::State::Stable`] or it is dropped.
     ///
     /// # Errors
     ///
     /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
-    /// is returned if [`MediaExchangeState`] transits into the opposite to
-    /// the `desired_state`.
+    /// is returned if [`media_exchange_state::State`] transits into the
+    /// opposite to the `desired_state`.
     #[inline]
     fn when_media_exchange_state_stable(
         &self,
-        desired_state: StableMediaExchangeState,
+        desired_state: media_exchange_state::Stable,
     ) -> LocalBoxFuture<'static, Result<()>> {
         self.media_exchange_state_controller()
             .when_media_exchange_state_stable(desired_state)
@@ -133,17 +124,17 @@ pub trait Disableable {
     }
 
     /// Indicates whether media exchange state of the [`Disableable`] is in
-    /// [`MediaExchangeState::Disabled`].
+    /// [`media_exchange_state::Stable::Disabled`].
     #[inline]
-    fn is_disabled(&self) -> bool {
-        self.media_exchange_state_controller().is_disabled()
+    fn disabled(&self) -> bool {
+        self.media_exchange_state_controller().disabled()
     }
 
     /// Indicates whether media exchange state of the [`Disableable`] is in
-    /// [`MediaExchangeState::Enabled`].
+    /// [`media_exchange_state::Stable::Enabled`].
     #[inline]
-    fn is_enabled(&self) -> bool {
-        self.media_exchange_state_controller().is_enabled()
+    fn enabled(&self) -> bool {
+        self.media_exchange_state_controller().enabled()
     }
 }
 
@@ -196,12 +187,12 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// Occurs when [`MediaExchangeState`] of [`Sender`] was dropped.
+    /// Occurs when [`media_exchange_state::State`] of [`Sender`] was dropped.
     #[display(fmt = "MediaExchangeState of Sender was dropped.")]
     MediaExchangeStateDropped,
 
-    /// Occurs when [`MediaExchangeState`] of [`Sender`] transits into opposite
-    /// to expected [`MediaExchangeState`].
+    /// Occurs when [`media_exchange_state::State`] of [`Sender`] transits into
+    /// opposite to expected [`media_exchange_state::State`].
     #[display(fmt = "MediaExchangeState of Sender transits into opposite to \
                      expected MediaExchangeState")]
     MediaExchangeStateTransitsIntoOppositeState,
@@ -344,13 +335,13 @@ impl MediaConnections {
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
-    /// provided [`MediaExchangeState`].
+    /// provided [`media_exchange_state::State`].
     pub fn is_all_tracks_in_media_exchange_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        media_exchange_state: StableMediaExchangeState,
+        media_exchange_state: media_exchange_state::Stable,
     ) -> bool {
         let transceivers =
             self.0.borrow().get_transceivers_by_direction_and_kind(
@@ -377,7 +368,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.is_disabled())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -387,7 +378,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.is_disabled())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -479,14 +470,14 @@ impl MediaConnections {
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
         for track in tracks {
-            let is_required = track.is_required();
+            let required = track.required();
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let media_exchange_state = if send_constraints
-                        .is_enabled(&track.media_type)
+                        .enabled(&track.media_type)
                     {
-                        StableMediaExchangeState::Enabled
-                    } else if is_required {
+                        media_exchange_state::Stable::Enabled
+                    } else if required {
                         let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         );
@@ -498,7 +489,7 @@ impl MediaConnections {
                             );
                         return Err(e);
                     } else {
-                        StableMediaExchangeState::Disabled
+                        media_exchange_state::Stable::Disabled
                     };
                     let sndr = SenderBuilder {
                         media_connections: self,
@@ -506,7 +497,7 @@ impl MediaConnections {
                         caps: track.media_type.into(),
                         mid,
                         media_exchange_state,
-                        is_required,
+                        required,
                         send_constraints: send_constraints.clone(),
                     }
                     .build()
@@ -589,8 +580,8 @@ impl MediaConnections {
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
     ///
-    /// Returns [`HashMap`] with [`MediaExchangeState`]s updates for the
-    /// [`Sender`]s.
+    /// Returns [`HashMap`] with [`media_exchange_state::State`]s updates for
+    /// the [`Sender`]s.
     ///
     /// # Errors
     ///
@@ -609,7 +600,7 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
-    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
+    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
@@ -620,7 +611,7 @@ impl MediaConnections {
                 if sender.caps().satisfies(&track) {
                     media_exchange_state_updates.insert(
                         sender.track_id(),
-                        StableMediaExchangeState::Enabled,
+                        media_exchange_state::Stable::Enabled,
                     );
                     sender_and_track.push((sender, track));
                 } else {
@@ -628,14 +619,14 @@ impl MediaConnections {
                         MediaConnectionsError::InvalidMediaTrack
                     ));
                 }
-            } else if sender.caps().is_required() {
+            } else if sender.caps().required() {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
                 media_exchange_state_updates.insert(
                     sender.track_id(),
-                    StableMediaExchangeState::Disabled,
+                    media_exchange_state::Stable::Disabled,
                 );
             }
         }
@@ -753,7 +744,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
-            .all(|s| s.is_enabled())
+            .all(|s| s.enabled())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
@@ -767,6 +758,6 @@ impl MediaConnections {
                 MediaKind::Video,
                 source_kind,
             )
-            .all(|s| s.is_enabled())
+            .all(|s| s.enabled())
     }
 }
