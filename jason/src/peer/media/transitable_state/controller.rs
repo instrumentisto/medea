@@ -7,28 +7,25 @@ use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    peer::{
-        media::{
-            transitable_state::{
-                InStable, InTransition, MediaExchangeState, MuteState,
-                StableMuteState, TransitionMuteState,
-            },
-            MediaConnectionsError, Result,
+    peer::media::{
+        transitable_state::{
+            media_exchange_state, mute_state, InStable, InTransition,
+            MediaExchangeState, MuteState,
         },
-        TransitionMediaExchangeState,
+        MediaConnectionsError, Result,
     },
     utils::{resettable_delay_for, ResettableDelayHandle},
 };
 
-use super::{StableMediaExchangeState, TransitableState};
+use super::TransitableState;
 
-/// [`TransitableStateController`] for the [`StableMuteState`].
+/// [`TransitableStateController`] for the [`mute_state::Stable`].
 pub type MuteStateController =
-    TransitableStateController<StableMuteState, TransitionMuteState>;
-/// [`TransitableStateController`] for the [`StableMediaExchangeState`].
+    TransitableStateController<mute_state::Stable, mute_state::Transition>;
+/// [`TransitableStateController`] for the [`media_exchange_state::Stable`].
 pub type MediaExchangeStateController = TransitableStateController<
-    StableMediaExchangeState,
-    TransitionMediaExchangeState,
+    media_exchange_state::Stable,
+    media_exchange_state::Transition,
 >;
 
 /// Component that manages all kinds of [`MediaState`].
@@ -180,7 +177,7 @@ impl MuteStateController {
     /// `Room.mute_audio` like `Promise`s will be resolved based on this
     /// update.
     pub(in super::super) fn update(&self, is_muted: bool) {
-        let new_mute_state = StableMuteState::from(is_muted);
+        let new_mute_state = mute_state::Stable::from(is_muted);
         let current_mute_state = self.state.get();
 
         let mute_state_update: MuteState = match current_mute_state {
@@ -198,15 +195,15 @@ impl MuteStateController {
     }
 
     /// Checks whether [`TransitableStateController`]'s mute state
-    /// is in [`StableMuteState::Muted`].
+    /// is in [`mute_state::Stable::Muted`].
     pub fn is_muted(&self) -> bool {
-        self.state.get() == StableMuteState::Muted.into()
+        self.state.get() == mute_state::Stable::Muted.into()
     }
 
     /// Checks whether [`TransitableStateController`]'s mute state
-    /// is in [`StableMuteState::Unmuted`].
+    /// is in [`mute_state::Stable::Unmuted`].
     pub fn is_unmuted(&self) -> bool {
-        self.state.get() == StableMuteState::Unmuted.into()
+        self.state.get() == mute_state::Stable::Unmuted.into()
     }
 }
 
@@ -217,9 +214,9 @@ impl MediaExchangeStateController {
     ///
     /// `Room.disable_audio` like `Promise`s will be resolved based on this
     /// update.
-    pub(in super::super) fn update(&self, is_disabled: bool) {
+    pub(in super::super) fn update(&self, enabled: bool) {
         let new_media_exchange_state =
-            StableMediaExchangeState::from(is_disabled);
+            media_exchange_state::Stable::from(enabled);
         let current_media_exchange_state = self.state.get();
 
         let media_exchange_state_update: MediaExchangeState =
@@ -240,12 +237,12 @@ impl MediaExchangeStateController {
     /// Checks whether [`TransitableStateController`]'s media exchange state
     /// is in [`MediaExchangeState::Disabled`].
     pub fn is_disabled(&self) -> bool {
-        self.state.get() == StableMediaExchangeState::Disabled.into()
+        self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
 
     /// Checks whether [`TransitableStateController`]'s media exchange state
     /// is in [`MediaExchangeState::Enabled`].
     pub fn is_enabled(&self) -> bool {
-        self.state.get() == StableMediaExchangeState::Enabled.into()
+        self.state.get() == media_exchange_state::Stable::Enabled.into()
     }
 }

@@ -52,7 +52,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcCertificateStats`;
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
-- `is_required` field to `AudioSettings` and `VideoSettings` ([#106]);
+- `required` field to `AudioSettings` and `VideoSettings` ([#106], [#155]);
 - `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]);
 - `ConnectionQualityUpdated` event ([#132]);
 - `TrackPatchEvent` and `TrackPatchCommand` types ([#127], [#155], [#156]);

@@ -353,7 +353,7 @@ async fn multi_source_media_stream_constraints_build6() {
 
 fn get_device_video_track_constraints() -> DeviceVideoTrackConstraints {
     match VideoSource::from(VideoSettings {
-        is_required: true,
+        required: true,
         source_kind: MediaSourceKind::Device,
     }) {
         VideoSource::Device(device) => device,

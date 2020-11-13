@@ -451,18 +451,18 @@ window.onload = async function() {
 
   let isCallStarted = false;
   let localTracks = [];
-  let isAudioSendDisabled = false;
-  let isVideoSendDisabled = false;
-  let isAudioRecvDisabled = false;
-  let isVideoRecvDisabled = false;
+  let isAudioSendEnabled = true;
+  let isVideoSendEnabled = true;
+  let isAudioRecvEnabled = true;
+  let isVideoRecvEnabled = true;
   let isAudioMuted = false;
   let isVideoMuted = false;
   let room = await newRoom();
 
   async function initLocalStream() {
       let constraints = await build_constraints(
-        isAudioSendDisabled ? null : audioSelect,
-        isVideoSendDisabled ? null : videoSelect
+        isAudioSendEnabled ? audioSelect : null,
+        isVideoSendEnabled ? videoSelect : null
       );
       try {
         localTracks = await jason.media_manager().init_local_tracks(constraints)
@@ -744,7 +744,7 @@ window.onload = async function() {
             track.free();
           }
         }
-        if (!isAudioSendDisabled) {
+        if (!isAudioSendEnabled) {
           constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
@@ -761,7 +761,7 @@ window.onload = async function() {
             track.free();
           }
         }
-        if (!isVideoSendDisabled) {
+        if (isVideoSendEnabled) {
           constraints = await initLocalStream();
         }
         await room.set_local_media_settings(constraints);
@@ -774,14 +774,7 @@ window.onload = async function() {
 
     disableAudioSend.addEventListener('click', async () => {
       try {
-        if (isAudioSendDisabled) {
-          await room.enable_audio();
-          isAudioSendDisabled = false;
-          disableAudioSend.textContent = 'Disable audio send';
-          if (!isCallStarted) {
-            await initLocalStream();
-          }
-        } else {
+        if (isAudioSendEnabled) {
           await room.disable_audio();
           for (const track of localTracks) {
             if (track.ptr > 0) {
@@ -790,8 +783,15 @@ window.onload = async function() {
               }
             }
           }
-          isAudioSendDisabled = true;
+          isAudioSendEnabled = false;
           disableAudioSend.textContent = 'Enable audio send';
+        } else {
+          await room.enable_audio();
+          isAudioSendEnabled = true;
+          disableAudioSend.textContent = 'Disable audio send';
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
         }
       } catch (e) {
         console.error(e.message());
@@ -799,14 +799,7 @@ window.onload = async function() {
     });
     disableVideoSend.addEventListener('click', async () => {
       try {
-        if (isVideoSendDisabled) {
-          await room.enable_video();
-          isVideoSendDisabled = false;
-          disableVideoSend.textContent = 'Disable video send';
-          if (!isCallStarted) {
-            await initLocalStream();
-          }
-        } else {
+        if (isVideoSendEnabled) {
           await room.disable_video();
           for (const track of localTracks) {
             if (track.ptr > 0) {
@@ -815,8 +808,15 @@ window.onload = async function() {
               }
             }
           }
-          isVideoSendDisabled = true;
+          isVideoSendEnabled = false;
           disableVideoSend.textContent = 'Enable video send';
+        } else {
+          await room.enable_video();
+          isVideoSendEnabled = true;
+          disableVideoSend.textContent = 'Disable video send';
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
         }
       } catch (e) {
         console.error(e.trace());
@@ -853,25 +853,25 @@ window.onload = async function() {
       }
     });
     disableAudioRecv.addEventListener('click', async () => {
-      if (isAudioRecvDisabled) {
-        await room.enable_remote_audio();
-        isAudioRecvDisabled = false;
-        disableAudioRecv.textContent = 'Disable audio recv'
-      } else {
+      if (isAudioRecvEnabled) {
         await room.disable_remote_audio();
-        isAudioRecvDisabled = true;
+        isAudioRecvEnabled = false;
         disableAudioRecv.textContent = 'Enable audio recv'
+      } else {
+        await room.enable_remote_audio();
+        isAudioRecvEnabled = true;
+        disableAudioRecv.textContent = 'Disable audio recv'
       }
     });
     disableVideoRecv.addEventListener('click', async () => {
-      if (isVideoRecvDisabled) {
-        await room.enable_remote_video();
-        isVideoRecvDisabled = false;
-        disableVideoRecv.textContent = 'Disable video recv'
-      } else {
+      if (isVideoRecvEnabled) {
         await room.disable_remote_video();
-        isVideoRecvDisabled = true;
+        isVideoRecvEnabled = false;
         disableVideoRecv.textContent = 'Enable video recv'
+      } else {
+        await room.enable_remote_video();
+        isVideoRecvEnabled = true;
+        disableVideoRecv.textContent = 'Disable video recv'
       }
     });
     closeApp.addEventListener('click', () => {

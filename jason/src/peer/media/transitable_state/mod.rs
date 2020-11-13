@@ -3,26 +3,25 @@
 //! [`MediaStateControllable`]: super::MediaStateControllable
 
 mod controller;
-mod media_exchange;
-mod mute;
+pub mod media_exchange_state;
+pub mod mute_state;
 
 use derive_more::From;
 use medea_client_api_proto::{TrackId, TrackPatchCommand};
 
-pub use self::{
-    controller::{
-        MediaExchangeStateController, MuteStateController,
-        TransitableStateController,
-    },
-    media_exchange::{StableMediaExchangeState, TransitionMediaExchangeState},
-    mute::{StableMuteState, TransitionMuteState},
+pub use self::controller::{
+    MediaExchangeStateController, MuteStateController,
+    TransitableStateController,
 };
 
-/// [`TransitableState`] for the [`StableMediaExchangeState`].
-pub type MediaExchangeState =
-    TransitableState<StableMediaExchangeState, TransitionMediaExchangeState>;
-/// [`TransitableState`] for the [`StableMuteState`].
-pub type MuteState = TransitableState<StableMuteState, TransitionMuteState>;
+/// [`TransitableState`] for the [`media_exchange_state::Stable`].
+pub type MediaExchangeState = TransitableState<
+    media_exchange_state::Stable,
+    media_exchange_state::Transition,
+>;
+/// [`TransitableState`] for the [`mute_state::Stable`].
+pub type MuteState =
+    TransitableState<mute_state::Stable, mute_state::Transition>;
 
 /// All media states which can be toggled in the [`MediaStateControllable`].
 #[derive(Clone, Copy, Debug, From)]
@@ -30,12 +29,12 @@ pub enum MediaState {
     /// Sets `MediaStreamTrack.enabled` to the `true` of `false`.
     ///
     /// Doesn't requires renegotiation process, but traffic flow doesn't stops.
-    Mute(StableMuteState),
+    Mute(mute_state::Stable),
 
-    /// Drops `MediaStreamTrack` if [`StableMediaExchangeState::Disabled`].
+    /// Drops `MediaStreamTrack` if [`media_exchange_state::Stable::Disabled`].
     ///
     /// Requires renegotiation process and traffic flow will be stopped.
-    MediaExchange(StableMediaExchangeState),
+    MediaExchange(media_exchange_state::Stable),
 }
 
 impl MediaState {
@@ -51,20 +50,20 @@ impl MediaState {
         match self {
             Self::Mute(mute) => TrackPatchCommand {
                 id: track_id,
-                is_muted: Some(mute == StableMuteState::Muted),
-                is_disabled: None,
+                muted: Some(mute == mute_state::Stable::Muted),
+                enabled: None,
             },
             Self::MediaExchange(media_exchange) => TrackPatchCommand {
                 id: track_id,
-                is_disabled: Some(
-                    media_exchange == StableMediaExchangeState::Disabled,
+                enabled: Some(
+                    media_exchange == media_exchange_state::Stable::Enabled,
                 ),
-                is_muted: None,
+                muted: None,
             },
         }
     }
 
-    /// Returns opposite to this [`StableMuteState`].
+    /// Returns opposite to this [`mute_state::Stable`].
     pub fn opposite(self) -> Self {
         match self {
             Self::Mute(mute) => Self::Mute(mute.opposite()),
@@ -156,26 +155,26 @@ where
     }
 }
 
-impl From<StableMediaExchangeState> for MediaExchangeState {
-    fn from(from: StableMediaExchangeState) -> Self {
+impl From<media_exchange_state::Stable> for MediaExchangeState {
+    fn from(from: media_exchange_state::Stable) -> Self {
         Self::Stable(from)
     }
 }
 
-impl From<TransitionMediaExchangeState> for MediaExchangeState {
-    fn from(from: TransitionMediaExchangeState) -> Self {
+impl From<media_exchange_state::Transition> for MediaExchangeState {
+    fn from(from: media_exchange_state::Transition) -> Self {
         Self::Transition(from)
     }
 }
 
-impl From<StableMuteState> for MuteState {
-    fn from(from: StableMuteState) -> Self {
+impl From<mute_state::Stable> for MuteState {
+    fn from(from: mute_state::Stable) -> Self {
         Self::Stable(from)
     }
 }
 
-impl From<TransitionMuteState> for MuteState {
-    fn from(from: TransitionMuteState) -> Self {
+impl From<mute_state::Transition> for MuteState {
+    fn from(from: mute_state::Transition) -> Self {
         Self::Transition(from)
     }
 }
@@ -185,76 +184,87 @@ mod test {
     use super::*;
 
     const DISABLED: MediaExchangeState =
-        TransitableState::Stable(StableMediaExchangeState::Disabled);
+        TransitableState::Stable(media_exchange_state::Stable::Disabled);
     const ENABLED: MediaExchangeState =
-        TransitableState::Stable(StableMediaExchangeState::Enabled);
-    const ENABLING_DISABLED: MediaExchangeState =
-        TransitableState::Transition(TransitionMediaExchangeState::Enabling(
-            StableMediaExchangeState::Disabled,
-        ));
-    const ENABLING_ENABLED: MediaExchangeState =
-        TransitableState::Transition(TransitionMediaExchangeState::Enabling(
-            StableMediaExchangeState::Enabled,
-        ));
-    const DISABLING_DISABLED: MediaExchangeState =
-        TransitableState::Transition(TransitionMediaExchangeState::Disabling(
-            StableMediaExchangeState::Disabled,
-        ));
-    const DISABLING_ENABLED: MediaExchangeState =
-        TransitableState::Transition(TransitionMediaExchangeState::Disabling(
-            StableMediaExchangeState::Enabled,
-        ));
+        TransitableState::Stable(media_exchange_state::Stable::Enabled);
+    const ENABLING_DISABLED: MediaExchangeState = TransitableState::Transition(
+        media_exchange_state::Transition::Enabling(
+            media_exchange_state::Stable::Disabled,
+        ),
+    );
+    const ENABLING_ENABLED: MediaExchangeState = TransitableState::Transition(
+        media_exchange_state::Transition::Enabling(
+            media_exchange_state::Stable::Enabled,
+        ),
+    );
+    const DISABLING_DISABLED: MediaExchangeState = TransitableState::Transition(
+        media_exchange_state::Transition::Disabling(
+            media_exchange_state::Stable::Disabled,
+        ),
+    );
+    const DISABLING_ENABLED: MediaExchangeState = TransitableState::Transition(
+        media_exchange_state::Transition::Disabling(
+            media_exchange_state::Stable::Enabled,
+        ),
+    );
 
     #[test]
     fn transition_to() {
         assert_eq!(
-            DISABLED.transition_to(StableMediaExchangeState::Disabled),
+            DISABLED.transition_to(media_exchange_state::Stable::Disabled),
             DISABLED
         );
         assert_eq!(
-            DISABLED.transition_to(StableMediaExchangeState::Enabled),
+            DISABLED.transition_to(media_exchange_state::Stable::Enabled),
             ENABLING_DISABLED
         );
         assert_eq!(
-            ENABLED.transition_to(StableMediaExchangeState::Enabled),
+            ENABLED.transition_to(media_exchange_state::Stable::Enabled),
             ENABLED
         );
         assert_eq!(
-            ENABLED.transition_to(StableMediaExchangeState::Disabled),
+            ENABLED.transition_to(media_exchange_state::Stable::Disabled),
             DISABLING_ENABLED
         );
 
         assert_eq!(
-            ENABLING_DISABLED.transition_to(StableMediaExchangeState::Disabled),
+            ENABLING_DISABLED
+                .transition_to(media_exchange_state::Stable::Disabled),
             DISABLING_DISABLED
         );
         assert_eq!(
-            ENABLING_DISABLED.transition_to(StableMediaExchangeState::Enabled),
+            ENABLING_DISABLED
+                .transition_to(media_exchange_state::Stable::Enabled),
             ENABLING_DISABLED
         );
         assert_eq!(
-            DISABLING_ENABLED.transition_to(StableMediaExchangeState::Disabled),
+            DISABLING_ENABLED
+                .transition_to(media_exchange_state::Stable::Disabled),
             DISABLING_ENABLED
         );
         assert_eq!(
-            DISABLING_ENABLED.transition_to(StableMediaExchangeState::Enabled),
+            DISABLING_ENABLED
+                .transition_to(media_exchange_state::Stable::Enabled),
             ENABLING_ENABLED
         );
         assert_eq!(
             DISABLING_DISABLED
-                .transition_to(StableMediaExchangeState::Disabled),
+                .transition_to(media_exchange_state::Stable::Disabled),
             DISABLING_DISABLED
         );
         assert_eq!(
-            DISABLING_DISABLED.transition_to(StableMediaExchangeState::Enabled),
+            DISABLING_DISABLED
+                .transition_to(media_exchange_state::Stable::Enabled),
             ENABLING_DISABLED
         );
         assert_eq!(
-            ENABLING_ENABLED.transition_to(StableMediaExchangeState::Disabled),
+            ENABLING_ENABLED
+                .transition_to(media_exchange_state::Stable::Disabled),
             DISABLING_ENABLED
         );
         assert_eq!(
-            ENABLING_ENABLED.transition_to(StableMediaExchangeState::Enabled),
+            ENABLING_ENABLED
+                .transition_to(media_exchange_state::Stable::Enabled),
             ENABLING_ENABLED
         );
     }

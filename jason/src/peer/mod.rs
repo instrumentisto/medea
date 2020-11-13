@@ -45,10 +45,9 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
-        MediaConnections, MediaConnectionsError, MediaState,
-        MediaStateControllable, Receiver, Sender, StableMediaExchangeState,
-        StableMuteState, TrackDirection, TransceiverSide, TransitableState,
-        TransitionMediaExchangeState, TransitionMuteState,
+        media_exchange_state, mute_state, MediaConnections,
+        MediaConnectionsError, MediaState, MediaStateControllable, Receiver,
+        Sender, TrackDirection, TransceiverSide, TransitableState,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
@@ -650,8 +649,8 @@ impl PeerConnection {
     /// [`Sender`]s, which are configured by server during signalling, and
     /// [`LocalStreamConstraints`], that are optionally configured by JS-side.
     ///
-    /// Returns [`HashMap`] with [`MediaExchangeState`]s updates for the
-    /// [`Sender`]s.
+    /// Returns [`HashMap`] with [`media_exchange_state::State`]s updates for
+    /// the [`Sender`]s.
     ///
     /// # Errors
     ///
@@ -679,7 +678,7 @@ impl PeerConnection {
     pub async fn update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
+    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         self.inner_update_local_stream(criteria).await.map_err(|e| {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
@@ -695,7 +694,7 @@ impl PeerConnection {
     async fn inner_update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
-    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
+    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         if let Some(request) =
             self.media_connections.get_tracks_request(criteria)
         {

@@ -511,10 +511,10 @@ pub struct Track {
 }
 
 impl Track {
-    /// Returns `true` if this [`Track`] is required to call starting.
+    /// Indicates whether this [`Track`] is required to call starting.
     #[must_use]
-    pub fn is_required(&self) -> bool {
-        self.media_type.is_required()
+    pub fn required(&self) -> bool {
+        self.media_type.required()
     }
 }
 
@@ -525,8 +525,8 @@ impl Track {
 #[derive(Eq, PartialEq)]
 pub struct TrackPatchCommand {
     pub id: TrackId,
-    pub is_disabled: Option<bool>,
-    pub is_muted: Option<bool>,
+    pub enabled: Option<bool>,
+    pub muted: Option<bool>,
 }
 
 /// Patch of the [`Track`] which Media Server can send with
@@ -537,32 +537,32 @@ pub struct TrackPatchEvent {
     /// ID of the [`Track`] which should be patched.
     pub id: TrackId,
 
-    /// media exchange state of the concrete `Member`.
+    /// Media exchange state of the concrete `Member`.
     ///
     /// This state doesn't indicates that connection between two `Member`s are
     /// really disabled. This is intention of this `Member`.
-    pub is_disabled_individual: Option<bool>,
+    pub enabled_individual: Option<bool>,
 
-    /// media exchange state of the connection between `Member`s.
+    /// So intention of this `Member` (`enabled_individual`) can be
+    /// `false`, but real media exchange state can be `true`.
+    pub enabled_general: Option<bool>,
+
+    /// Media exchange state of the connection between `Member`s.
     ///
     /// This state indicates real media exchange state between `Member`s. But
     /// this state doesn't changes intention of this `Member`.
     ///
-    /// So intention of this `Member` (`is_disabled_individual`) can be
-    /// `false`, but real media exchange state can be `true`.
-    pub is_disabled_general: Option<bool>,
-
     /// Mute state of the connection between `Member`s.
-    pub is_muted: Option<bool>,
+    pub muted: Option<bool>,
 }
 
 impl From<TrackPatchCommand> for TrackPatchEvent {
     fn from(from: TrackPatchCommand) -> Self {
         Self {
             id: from.id,
-            is_disabled_individual: from.is_disabled,
-            is_disabled_general: None,
-            is_muted: from.is_muted,
+            enabled_individual: from.enabled,
+            enabled_general: None,
+            muted: from.muted,
         }
     }
 }
@@ -574,9 +574,9 @@ impl TrackPatchEvent {
     pub fn new(id: TrackId) -> Self {
         Self {
             id,
-            is_disabled_general: None,
-            is_disabled_individual: None,
-            is_muted: None,
+            enabled_general: None,
+            enabled_individual: None,
+            muted: None,
         }
     }
 
@@ -589,16 +589,16 @@ impl TrackPatchEvent {
             return;
         }
 
-        if let Some(is_disabled_general) = another.is_disabled_general {
-            self.is_disabled_general = Some(is_disabled_general);
+        if let Some(enabled_general) = another.enabled_general {
+            self.enabled_general = Some(enabled_general);
         }
 
-        if let Some(is_disabled_individual) = another.is_disabled_individual {
-            self.is_disabled_individual = Some(is_disabled_individual);
+        if let Some(enabled_individual) = another.enabled_individual {
+            self.enabled_individual = Some(enabled_individual);
         }
 
-        if let Some(is_muted) = another.is_muted {
-            self.is_muted = Some(is_muted);
+        if let Some(muted) = another.muted {
+            self.muted = Some(muted);
         }
     }
 }
@@ -647,10 +647,10 @@ pub enum MediaType {
 impl MediaType {
     /// Returns `true` if this [`MediaType`] is required to call starting.
     #[must_use]
-    pub fn is_required(&self) -> bool {
+    pub fn required(&self) -> bool {
         match self {
-            MediaType::Audio(audio) => audio.is_required,
-            MediaType::Video(video) => video.is_required,
+            MediaType::Audio(audio) => audio.required,
+            MediaType::Video(video) => video.required,
         }
     }
 }
@@ -662,7 +662,7 @@ pub struct AudioSettings {
     /// Importance of the audio media type.
     ///
     /// If `false` then audio may be not published.
-    pub is_required: bool,
+    pub required: bool,
 }
 
 #[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
@@ -672,7 +672,7 @@ pub struct VideoSettings {
     /// Importance of the video media type.
     ///
     /// If `false` then video may be not published.
-    pub is_required: bool,
+    pub required: bool,
 
     /// Source kind of this [`VideoSettings`] media.
     pub source_kind: MediaSourceKind,
@@ -722,106 +722,106 @@ mod test {
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: Some(true),
-                        is_disabled_individual: Some(true),
-                        is_muted: None,
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: Some(false),
-                        is_disabled_individual: Some(false),
-                        is_muted: None,
+                        enabled_general: Some(false),
+                        enabled_individual: Some(false),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: None,
-                        is_disabled_individual: None,
-                        is_muted: None,
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: Some(true),
-                        is_disabled_individual: Some(true),
-                        is_muted: None,
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: Some(true),
-                        is_disabled_individual: Some(true),
-                        is_muted: None,
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_disabled_general: Some(true),
-                    is_disabled_individual: Some(true),
-                    is_muted: None,
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
+                    muted: None,
                 },
             ),
             (
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: None,
-                        is_disabled_individual: None,
-                        is_muted: None,
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: Some(true),
-                        is_disabled_individual: Some(true),
-                        is_muted: None,
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_disabled_general: Some(true),
-                    is_disabled_individual: Some(true),
-                    is_muted: None,
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
+                    muted: None,
                 },
             ),
             (
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: Some(true),
-                        is_disabled_individual: Some(true),
-                        is_muted: None,
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: None,
-                        is_disabled_individual: None,
-                        is_muted: None,
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_disabled_general: Some(true),
-                    is_disabled_individual: Some(true),
-                    is_muted: None,
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
+                    muted: None,
                 },
             ),
             (
                 vec![
                     TrackPatchEvent {
                         id: TrackId(1),
-                        is_disabled_general: None,
-                        is_disabled_individual: None,
-                        is_muted: None,
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(2),
-                        is_disabled_general: Some(true),
-                        is_disabled_individual: Some(true),
-                        is_muted: None,
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
-                    is_disabled_general: None,
-                    is_disabled_individual: None,
-                    is_muted: None,
+                    enabled_general: None,
+                    enabled_individual: None,
+                    muted: None,
                 },
             ),
         ] {

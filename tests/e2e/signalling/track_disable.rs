@@ -31,25 +31,25 @@ use crate::{
     test_name,
 };
 
-// Sends 2 UpdateTracks with is_disabled = `disabled`.
+// Sends 2 UpdateTracks with provided `enabled`.
 // Waits for single/multiple TracksApplied with expected track changes on on
 // `publisher_rx`.
 // Waits for single/multiple TracksApplied with expected track
 // changes on on `subscriber_rx`.
 async fn helper(
-    disabled: bool,
+    enabled: bool,
     publisher: &Addr<TestMember>,
     publisher_rx: &mut UnboundedReceiver<Event>,
     subscriber_rx: &mut UnboundedReceiver<Event>,
 ) {
-    // send 2 UpdateTracks with is_disabled = true.
+    // Send 2 UpdateTracks with provided enabled.
     publisher
         .send(SendCommand(Command::UpdateTracks {
             peer_id: PeerId(0),
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(disabled),
-                is_muted: None,
+                enabled: Some(enabled),
+                muted: None,
             }],
         }))
         .await
@@ -59,15 +59,15 @@ async fn helper(
             peer_id: PeerId(0),
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(1),
-                is_disabled: Some(disabled),
-                is_muted: None,
+                enabled: Some(enabled),
+                muted: None,
             }],
         }))
         .await
         .unwrap();
 
     async fn wait_tracks_applied(
-        disabled: bool,
+        enabled: bool,
         rx: &mut UnboundedReceiver<Event>,
         expected_peer_id: PeerId,
     ) {
@@ -82,11 +82,7 @@ async fn helper(
                 for update in updates {
                     match update {
                         TrackUpdate::Updated(patch) => {
-                            if let Some(is_disabled_general) =
-                                patch.is_disabled_general
-                            {
-                                assert_eq!(is_disabled_general, disabled);
-                            }
+                            assert_eq!(patch.enabled_general, Some(enabled));
                             if patch.id == TrackId(0) {
                                 first_disabled = true;
                             } else if patch.id == TrackId(1) {
@@ -104,8 +100,8 @@ async fn helper(
             }
         }
     };
-    wait_tracks_applied(disabled, publisher_rx, PeerId(0)).await;
-    wait_tracks_applied(disabled, subscriber_rx, PeerId(1)).await;
+    wait_tracks_applied(enabled, publisher_rx, PeerId(0)).await;
+    wait_tracks_applied(enabled, subscriber_rx, PeerId(1)).await;
 }
 
 /// Creates `pub => sub` `Room`, and publisher disables and enables his tracks
@@ -144,11 +140,11 @@ async fn track_disables_and_enables() {
         Event::SdpAnswerMade { .. } = publisher_rx {}
     }
 
-    helper(true, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
     helper(false, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
+    helper(true, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
 
-    helper(true, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
     helper(false, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
+    helper(true, &publisher, &mut publisher_rx, &mut subscriber_rx).await;
 }
 
 /// Tests that track disabled and enables will be performed instantly and will
@@ -179,10 +175,7 @@ async fn track_disables_and_enables_are_instant() {
                             if let TrackUpdate::Updated(patch) =
                                 updates.pop().unwrap()
                             {
-                                Some((
-                                    patch.is_disabled_general?,
-                                    negotiation_role,
-                                ))
+                                Some((patch.enabled_general?, negotiation_role))
                             } else {
                                 unreachable!();
                             }
@@ -230,14 +223,14 @@ async fn track_disables_and_enables_are_instant() {
             publisher_rx
         {
             for i in 0..EVENTS_COUNT {
-                let is_disabled = i % 2 == 1;
-                mutes_sent.push(is_disabled);
+                let enabled = i % 2 == 1;
+                mutes_sent.push(enabled);
                 publisher.do_send(SendCommand(Command::UpdateTracks {
                     peer_id: PeerId(0),
                     tracks_patches: vec![TrackPatchCommand {
                         id: TrackId(0),
-                        is_disabled: Some(is_disabled),
-                        is_muted: None,
+                        enabled: Some(enabled),
+                        muted: None,
                     }],
                 }));
             }
@@ -372,8 +365,8 @@ async fn track_disables_and_enables_are_instant2() {
             peer_id: PeerId(0),
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(true),
-                is_muted: None,
+                enabled: Some(true),
+                muted: None,
             }],
         }))
         .await
@@ -394,8 +387,8 @@ async fn track_disables_and_enables_are_instant2() {
             peer_id: PeerId(1),
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(2),
-                is_disabled: Some(true),
-                is_muted: None,
+                enabled: Some(true),
+                muted: None,
             }],
         }))
         .await
@@ -439,9 +432,9 @@ async fn force_update_works() {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: *peer_id,
                         tracks_patches: vec![TrackPatchCommand {
-                            is_disabled: Some(true),
+                            enabled: Some(true),
                             id: TrackId(0),
-                            is_muted: None,
+                            muted: None,
                         }],
                     }));
                 }
@@ -458,9 +451,9 @@ async fn force_update_works() {
                         ctx.notify(SendCommand(Command::UpdateTracks {
                             peer_id: *peer_id,
                             tracks_patches: vec![TrackPatchCommand {
-                                is_disabled: Some(true),
+                                enabled: Some(true),
                                 id: TrackId(0),
-                                is_muted: None,
+                                muted: None,
                             }],
                         }));
                         renegotiation_done.set(true);
@@ -496,8 +489,8 @@ async fn force_update_works() {
                 ctx.notify(SendCommand(Command::UpdateTracks {
                     peer_id: pub_peer_id.unwrap(),
                     tracks_patches: vec![TrackPatchCommand {
-                        is_disabled: Some(true),
-                        is_muted: None,
+                        enabled: Some(true),
+                        muted: None,
                         id: track_id.unwrap(),
                     }],
                 }));
@@ -513,8 +506,8 @@ async fn force_update_works() {
                     ctx.notify(SendCommand(Command::UpdateTracks {
                         peer_id: pub_peer_id.unwrap(),
                         tracks_patches: vec![TrackPatchCommand {
-                            is_disabled: Some(true),
-                            is_muted: None,
+                            enabled: Some(true),
+                            muted: None,
                             id: track_id.unwrap(),
                         }],
                     }));
@@ -654,8 +647,8 @@ async fn ordering_on_force_update_is_correct() {
         .send(SendCommand(Command::UpdateTracks {
             peer_id: alice_peer_id,
             tracks_patches: vec![TrackPatchCommand {
-                is_disabled: Some(true),
-                is_muted: None,
+                enabled: Some(true),
+                muted: None,
                 id: alice_sender_id,
             }],
         }))
@@ -671,8 +664,8 @@ async fn ordering_on_force_update_is_correct() {
             let update = updates.pop().unwrap();
             if let TrackUpdate::Updated(patch) = update {
                 assert_eq!(patch.id, alice_sender_id);
-                assert_eq!(patch.is_disabled_individual, Some(true));
-                assert_eq!(patch.is_disabled_general, Some(true));
+                assert_eq!(patch.enabled_individual, Some(true));
+                assert_eq!(patch.enabled_general, Some(true));
             }
             assert_eq!(updates.len(), 0);
             assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
@@ -683,8 +676,8 @@ async fn ordering_on_force_update_is_correct() {
         .send(SendCommand(Command::UpdateTracks {
             peer_id: alice_peer_id,
             tracks_patches: vec![TrackPatchCommand {
-                is_disabled: Some(false),
-                is_muted: None,
+                enabled: Some(false),
+                muted: None,
                 id: alice_sender_id,
             }],
         }))
@@ -701,8 +694,8 @@ async fn ordering_on_force_update_is_correct() {
             let update = updates.pop().unwrap();
             if let TrackUpdate::Updated(patch) = update {
                 assert_eq!(patch.id, alice_sender_id);
-                assert_eq!(patch.is_disabled_individual, Some(false));
-                assert_eq!(patch.is_disabled_general, Some(false));
+                assert_eq!(patch.enabled_individual, Some(false));
+                assert_eq!(patch.enabled_general, Some(false));
             }
             assert_eq!(updates.len(), 0);
             assert_eq!(negotiation_role, None);
@@ -712,8 +705,8 @@ async fn ordering_on_force_update_is_correct() {
     bob.send(SendCommand(Command::UpdateTracks {
         peer_id: bob_peer_id,
         tracks_patches: vec![TrackPatchCommand {
-            is_disabled: Some(true),
-            is_muted: None,
+            enabled: Some(true),
+            muted: None,
             id: bob_sender_id,
         }],
     }))
@@ -741,12 +734,12 @@ async fn ordering_on_force_update_is_correct() {
             patches.sort_by(|a, b| a.id.0.cmp(&b.id.0));
 
             assert_eq!(patches[1].id, bob_sender_id);
-            assert_eq!(patches[1].is_disabled_individual, Some(true));
-            assert_eq!(patches[1].is_disabled_general, Some(true));
+            assert_eq!(patches[1].enabled_individual, Some(true));
+            assert_eq!(patches[1].enabled_general, Some(true));
 
             assert_eq!(patches[0].id, alice_sender_id);
-            assert_eq!(patches[0].is_disabled_individual, None);
-            assert_eq!(patches[0].is_disabled_general, Some(false));
+            assert_eq!(patches[0].enabled_individual, None);
+            assert_eq!(patches[0].enabled_general, Some(false));
 
             assert_eq!(patches.len(), 2);
             assert_eq!(negotiation_role, None);
@@ -798,9 +791,9 @@ async fn individual_and_general_mute_states_works() {
         credentials.get("responder").unwrap(),
         Some({
             let test_finish_tx = test_finish_tx.clone();
-            let mut is_stage1_finished = false;
-            let mut is_stage2_finished = false;
-            let mut is_stage3_finished = false;
+            let mut stage1_finished = false;
+            let mut stage2_finished = false;
+            let mut stage3_finished = false;
 
             Box::new(move |event, ctx, _| match event {
                 Event::TracksApplied {
@@ -811,14 +804,11 @@ async fn individual_and_general_mute_states_works() {
                     match update {
                         TrackUpdate::Updated(patch) => {
                             if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
-                                && !is_stage1_finished
+                                && !stage1_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
-                                assert_eq!(
-                                    patch.is_disabled_general,
-                                    Some(true)
-                                );
-                                assert_eq!(patch.is_disabled_individual, None);
+                                assert_eq!(patch.enabled_general, Some(false));
+                                assert_eq!(patch.enabled_individual, None);
 
                                 ctx.notify(SendCommand(
                                     Command::UpdateTracks {
@@ -826,38 +816,35 @@ async fn individual_and_general_mute_states_works() {
                                         tracks_patches: vec![
                                             TrackPatchCommand {
                                                 id: TrackId(0),
-                                                is_muted: None,
-                                                is_disabled: Some(true),
+                                                enabled: Some(false),
+                                                muted: None,
                                             },
                                         ],
                                     },
                                 ));
 
                                 STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                is_stage1_finished = true;
+                                stage1_finished = true;
                             } else if STAGE2_PROGRESS.load(Ordering::Relaxed)
                                 < 2
-                                && !is_stage2_finished
+                                && !stage2_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.enabled_general, Some(false));
                                 assert_eq!(
-                                    patch.is_disabled_general,
-                                    Some(true)
-                                );
-                                assert_eq!(
-                                    patch.is_disabled_individual,
-                                    Some(true)
+                                    patch.enabled_individual,
+                                    Some(false)
                                 );
 
                                 STAGE2_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                is_stage2_finished = true;
+                                stage2_finished = true;
                             } else if STAGE3_PROGRESS.load(Ordering::Relaxed)
                                 < 2
-                                && !is_stage3_finished
+                                && !stage3_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
-                                assert_eq!(patch.is_disabled_general, None);
-                                assert_eq!(patch.is_disabled_individual, None);
+                                assert_eq!(patch.enabled_general, None);
+                                assert_eq!(patch.enabled_individual, None);
 
                                 ctx.notify(SendCommand(
                                     Command::UpdateTracks {
@@ -865,24 +852,21 @@ async fn individual_and_general_mute_states_works() {
                                         tracks_patches: vec![
                                             TrackPatchCommand {
                                                 id: TrackId(0),
-                                                is_muted: None,
-                                                is_disabled: Some(false),
+                                                enabled: Some(true),
+                                                muted: None,
                                             },
                                         ],
                                     },
                                 ));
 
                                 STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
-                                is_stage3_finished = true;
+                                stage3_finished = true;
                             } else {
                                 assert_eq!(patch.id, TrackId(0));
+                                assert_eq!(patch.enabled_general, Some(true));
                                 assert_eq!(
-                                    patch.is_disabled_general,
-                                    Some(false)
-                                );
-                                assert_eq!(
-                                    patch.is_disabled_individual,
-                                    Some(false)
+                                    patch.enabled_individual,
+                                    Some(true)
                                 );
 
                                 test_finish_tx.unbounded_send(()).unwrap();
@@ -904,7 +888,7 @@ async fn individual_and_general_mute_states_works() {
         credentials.get("publisher").unwrap(),
         Some(Box::new({
             let mut is_inited = false;
-            let mut is_individual_disabled = false;
+            let mut enabled_individual = true;
             let mut is_stage1_finished = false;
             let mut is_stage2_finished = false;
             let mut is_stage3_finished = false;
@@ -917,8 +901,8 @@ async fn individual_and_general_mute_states_works() {
                             peer_id: PeerId(0),
                             tracks_patches: vec![TrackPatchCommand {
                                 id: TrackId(0),
-                                is_muted: None,
-                                is_disabled: Some(true),
+                                enabled: Some(false),
+                                muted: None,
                             }],
                         }));
                         is_inited = true;
@@ -933,13 +917,10 @@ async fn individual_and_general_mute_states_works() {
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(
-                                    patch.is_disabled_individual,
-                                    Some(true)
+                                    patch.enabled_individual,
+                                    Some(false)
                                 );
-                                assert_eq!(
-                                    patch.is_disabled_general,
-                                    Some(true)
-                                );
+                                assert_eq!(patch.enabled_general, Some(false));
 
                                 STAGE1_PROGRESS.fetch_add(1, Ordering::Relaxed);
                                 is_stage1_finished = true;
@@ -948,11 +929,8 @@ async fn individual_and_general_mute_states_works() {
                                 && !is_stage2_finished
                             {
                                 assert_eq!(patch.id, TrackId(0));
-                                assert_eq!(patch.is_disabled_individual, None);
-                                assert_eq!(
-                                    patch.is_disabled_general,
-                                    Some(true)
-                                );
+                                assert_eq!(patch.enabled_individual, None);
+                                assert_eq!(patch.enabled_general, Some(false));
 
                                 ctx.notify(SendCommand(
                                     Command::UpdateTracks {
@@ -960,8 +938,8 @@ async fn individual_and_general_mute_states_works() {
                                         tracks_patches: vec![
                                             TrackPatchCommand {
                                                 id: TrackId(0),
-                                                is_muted: None,
-                                                is_disabled: Some(false),
+                                                enabled: Some(true),
+                                                muted: None,
                                             },
                                         ],
                                     },
@@ -975,35 +953,32 @@ async fn individual_and_general_mute_states_works() {
                             {
                                 assert_eq!(patch.id, TrackId(0));
                                 assert_eq!(
-                                    patch.is_disabled_individual,
-                                    Some(false)
+                                    patch.enabled_individual,
+                                    Some(true)
                                 );
-                                assert_eq!(patch.is_disabled_general, None);
+                                assert_eq!(patch.enabled_general, None);
 
                                 STAGE3_PROGRESS.fetch_add(1, Ordering::Relaxed);
                                 is_stage3_finished = true;
                             } else {
                                 assert_eq!(patch.id, TrackId(0));
-                                if !is_individual_disabled {
+                                if enabled_individual {
                                     assert_eq!(
-                                        patch.is_disabled_individual,
-                                        Some(false)
-                                    );
-                                    assert_eq!(
-                                        patch.is_disabled_general,
+                                        patch.enabled_individual,
                                         Some(true)
                                     );
-
-                                    is_individual_disabled = true;
-                                } else {
                                     assert_eq!(
-                                        patch.is_disabled_general,
+                                        patch.enabled_general,
                                         Some(false)
                                     );
+
+                                    enabled_individual = false;
+                                } else {
                                     assert_eq!(
-                                        patch.is_disabled_individual,
-                                        None
+                                        patch.enabled_general,
+                                        Some(true)
                                     );
+                                    assert_eq!(patch.enabled_individual, None);
 
                                     test_finish_tx.unbounded_send(()).unwrap();
 

@@ -4,7 +4,7 @@ use super::{InStable, InTransition};
 
 /// State of the media mute state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum StableMuteState {
+pub enum Stable {
     /// [`MediaStateControllable`] is muted.
     Muted,
 
@@ -12,7 +12,7 @@ pub enum StableMuteState {
     Unmuted,
 }
 
-impl StableMuteState {
+impl Stable {
     /// Returns opposite to this [`StableMuteState`].
     pub fn opposite(self) -> Self {
         match self {
@@ -22,7 +22,7 @@ impl StableMuteState {
     }
 }
 
-impl From<bool> for StableMuteState {
+impl From<bool> for Stable {
     #[inline]
     fn from(is_muted: bool) -> Self {
         if is_muted {
@@ -33,14 +33,14 @@ impl From<bool> for StableMuteState {
     }
 }
 
-impl InStable for StableMuteState {
-    type Transition = TransitionMuteState;
+impl InStable for Stable {
+    type Transition = Transition;
 
     #[inline]
     fn start_transition(self) -> Self::Transition {
         match self {
-            Self::Unmuted => TransitionMuteState::Muting(self),
-            Self::Muted => TransitionMuteState::Unmuting(self),
+            Self::Unmuted => Transition::Muting(self),
+            Self::Muted => Transition::Unmuting(self),
         }
     }
 }
@@ -54,28 +54,28 @@ impl InStable for StableMuteState {
 /// won't be received, then the stored [`StableMuteState`] will be
 /// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TransitionMuteState {
+pub enum Transition {
     /// [`MediaStateControllable`] should be muted, but awaits server
     /// permission.
     ///
     /// [`MediaStateControllable`]: super::MediaStateControllable
-    Muting(StableMuteState),
+    Muting(Stable),
 
     /// [`MediaStateControllable`] should be unmuted, but awaits server
     /// permission.
     ///
     /// [`MediaStateControllable`]: super::MediaStateControllable
-    Unmuting(StableMuteState),
+    Unmuting(Stable),
 }
 
-impl InTransition for TransitionMuteState {
-    type Stable = StableMuteState;
+impl InTransition for Transition {
+    type Stable = Stable;
 
     #[inline]
     fn intended(self) -> Self::Stable {
         match self {
-            Self::Unmuting(_) => StableMuteState::Unmuted,
-            Self::Muting(_) => StableMuteState::Muted,
+            Self::Unmuting(_) => Stable::Unmuted,
+            Self::Muting(_) => Stable::Muted,
         }
     }
 

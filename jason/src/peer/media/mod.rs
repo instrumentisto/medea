@@ -39,9 +39,8 @@ pub use self::{
     receiver::Receiver,
     sender::Sender,
     transitable_state::{
-        InStable, InTransition, MediaState, StableMediaExchangeState,
-        StableMuteState, TransitableState, TransitionMediaExchangeState,
-        TransitionMuteState,
+        media_exchange_state, mute_state, InStable, InTransition, MediaState,
+        TransitableState,
     },
 };
 
@@ -443,7 +442,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.is_disabled())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -453,7 +452,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.is_disabled())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -545,14 +544,14 @@ impl MediaConnections {
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
         for track in tracks {
-            let is_required = track.is_required();
+            let required = track.required();
             match track.direction {
                 Direction::Send { mid, .. } => {
                     let media_exchange_state = if send_constraints
-                        .is_enabled(&track.media_type)
+                        .enabled(&track.media_type)
                     {
-                        StableMediaExchangeState::Enabled
-                    } else if is_required {
+                        media_exchange_state::Stable::Enabled
+                    } else if required {
                         let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         );
@@ -565,13 +564,13 @@ impl MediaConnections {
 
                         return Err(e);
                     } else {
-                        StableMediaExchangeState::Disabled
+                        media_exchange_state::Stable::Disabled
                     };
                     let mute_state = if !send_constraints
                         .is_muted(&track.media_type)
                     {
-                        StableMuteState::Unmuted
-                    } else if is_required {
+                        mute_state::Stable::Unmuted
+                    } else if required {
                         let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         );
@@ -583,7 +582,7 @@ impl MediaConnections {
                             );
                         return Err(e);
                     } else {
-                        StableMuteState::Muted
+                        mute_state::Stable::Muted
                     };
                     let sndr = SenderBuilder {
                         media_connections: self,
@@ -592,7 +591,7 @@ impl MediaConnections {
                         mute_state,
                         mid,
                         media_exchange_state,
-                        is_required,
+                        required,
                         send_constraints: send_constraints.clone(),
                     }
                     .build()
@@ -675,8 +674,8 @@ impl MediaConnections {
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
     ///
-    /// Returns [`HashMap`] with [`MediaExchangeState`]s updates for the
-    /// [`Sender`]s.
+    /// Returns [`HashMap`] with [`media_exchange_state::State`]s updates for
+    /// the [`Sender`]s.
     ///
     /// # Errors
     ///
@@ -695,18 +694,18 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
-    ) -> Result<HashMap<TrackId, StableMediaExchangeState>> {
+    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
-        let mut mute_satates_updates = HashMap::new();
+        let mut media_exchange_state_updates = HashMap::new();
         for sender in inner.senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
-                    mute_satates_updates.insert(
+                    media_exchange_state_updates.insert(
                         sender.track_id(),
-                        StableMediaExchangeState::Enabled,
+                        media_exchange_state::Stable::Enabled,
                     );
                     sender_and_track.push((sender, track));
                 } else {
@@ -714,14 +713,14 @@ impl MediaConnections {
                         MediaConnectionsError::InvalidMediaTrack
                     ));
                 }
-            } else if sender.caps().is_required() {
+            } else if sender.caps().required() {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
-                mute_satates_updates.insert(
+                media_exchange_state_updates.insert(
                     sender.track_id(),
-                    StableMediaExchangeState::Disabled,
+                    media_exchange_state::Stable::Disabled,
                 );
             }
         }
@@ -735,7 +734,7 @@ impl MediaConnections {
         ))
         .await?;
 
-        Ok(mute_satates_updates)
+        Ok(media_exchange_state_updates)
     }
 
     /// Handles [`RtcTrackEvent`] by adding new track to the corresponding
@@ -839,7 +838,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
-            .all(|s| s.is_enabled())
+            .all(|s| s.enabled())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
@@ -853,7 +852,7 @@ impl MediaConnections {
                 MediaKind::Video,
                 source_kind,
             )
-            .all(|s| s.is_enabled())
+            .all(|s| s.enabled())
     }
 
     /// Returns `true` if all [`Sender`]s video tracks are unmuted.
@@ -867,7 +866,7 @@ impl MediaConnections {
                 MediaKind::Video,
                 source_kind,
             )
-            .find(|s| s.is_muted())
+            .find(|s| s.muted())
             .is_none()
     }
 
@@ -876,7 +875,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
-            .find(|s| s.is_muted())
+            .find(|s| s.muted())
             .is_none()
     }
 }

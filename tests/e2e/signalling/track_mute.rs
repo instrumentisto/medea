@@ -53,8 +53,8 @@ async fn track_mute_doesnt_renegotiates() {
             peer_id: PeerId(0),
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: None,
-                is_muted: Some(true),
+                enabled: None,
+                muted: Some(true),
             }],
         }))
         .await
@@ -75,10 +75,10 @@ async fn track_mute_doesnt_renegotiates() {
             assert_eq!(
                 updates[0],
                 TrackUpdate::Updated(TrackPatchEvent {
-                    is_muted: Some(true),
+                    muted: Some(true),
                     id: TrackId(0),
-                    is_disabled_general: None,
-                    is_disabled_individual: None
+                    enabled_general: None,
+                    enabled_individual: None
                 })
             );
             break;
@@ -100,10 +100,10 @@ async fn track_mute_doesnt_renegotiates() {
             assert_eq!(
                 updates[0],
                 TrackUpdate::Updated(TrackPatchEvent {
-                    is_muted: Some(true),
+                    muted: Some(true),
                     id: TrackId(0),
-                    is_disabled_general: None,
-                    is_disabled_individual: None
+                    enabled_general: None,
+                    enabled_individual: None
                 })
             );
             break;
@@ -152,8 +152,8 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             peer_id: PeerId(0),
             tracks_patches: vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(true),
-                is_muted: Some(true),
+                enabled: Some(false),
+                muted: Some(true),
             }],
         }))
         .await
@@ -174,10 +174,10 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             assert_eq!(
                 updates[0],
                 TrackUpdate::Updated(TrackPatchEvent {
-                    is_muted: Some(true),
+                    muted: Some(true),
                     id: TrackId(0),
-                    is_disabled_general: Some(true),
-                    is_disabled_individual: Some(true),
+                    enabled_general: Some(false),
+                    enabled_individual: Some(false),
                 })
             );
             break;
@@ -199,10 +199,10 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             assert_eq!(
                 updates[0],
                 TrackUpdate::Updated(TrackPatchEvent {
-                    is_muted: Some(true),
+                    muted: Some(true),
                     id: TrackId(0),
-                    is_disabled_general: Some(true),
-                    is_disabled_individual: None
+                    enabled_general: Some(false),
+                    enabled_individual: None
                 })
             );
             break;

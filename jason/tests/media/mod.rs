@@ -34,7 +34,7 @@ async fn sendrecv_works() {
             receivers: vec![MemberId::from("bob")],
             mid: None,
         },
-        media_type: MediaType::Audio(AudioSettings { is_required: false }),
+        media_type: MediaType::Audio(AudioSettings { required: false }),
     };
     let recv_audio_track = Track {
         id: TrackId(2),
@@ -42,7 +42,7 @@ async fn sendrecv_works() {
             mid: None,
             sender: MemberId::from("alice"),
         },
-        media_type: MediaType::Audio(AudioSettings { is_required: false }),
+        media_type: MediaType::Audio(AudioSettings { required: false }),
     };
     media_connections
         .create_tracks(

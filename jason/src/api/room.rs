@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        LocalStreamUpdateCriteria, MediaConnectionsError, MediaState,
-        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, StableMediaExchangeState, StableMuteState, TrackDirection,
+        media_exchange_state, mute_state, LocalStreamUpdateCriteria,
+        MediaConnectionsError, MediaState, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -284,7 +284,7 @@ impl RoomHandle {
 
         // Enabled senders may require new tracks to be inserted.
         if let (
-            MediaState::MediaExchange(StableMediaExchangeState::Enabled),
+            MediaState::MediaExchange(media_exchange_state::Stable::Enabled),
             TrackDirection::Send,
         ) = (new_state, direction)
         {
@@ -424,7 +424,7 @@ impl RoomHandle {
     /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMuteState::Muted,
+            mute_state::Stable::Muted,
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -434,7 +434,7 @@ impl RoomHandle {
     /// Unmutes outbound audio in this [`Room`].
     pub fn unmute_audio(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMuteState::Unmuted,
+            mute_state::Stable::Unmuted,
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -447,7 +447,7 @@ impl RoomHandle {
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
         self.media_state_toggle_promise(
-            StableMuteState::Muted,
+            mute_state::Stable::Muted,
             MediaKind::Video,
             TrackDirection::Send,
             source_kind,
@@ -460,7 +460,7 @@ impl RoomHandle {
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
         self.media_state_toggle_promise(
-            StableMuteState::Unmuted,
+            mute_state::Stable::Unmuted,
             MediaKind::Video,
             TrackDirection::Send,
             source_kind,
@@ -470,7 +470,7 @@ impl RoomHandle {
     /// Disables outbound audio in this [`Room`].
     pub fn disable_audio(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Disabled,
+            media_exchange_state::Stable::Disabled,
             MediaKind::Audio,
             TrackDirection::Send,
             None,
@@ -480,14 +480,14 @@ impl RoomHandle {
     /// Enables outbound audio in this [`Room`].
     pub fn enable_audio(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Enabled,
+            media_exchange_state::Stable::Enabled,
             MediaKind::Audio,
             TrackDirection::Send,
             None,
         )
     }
 
-    /// Mutes outbound video.
+    /// Disables outbound video.
     ///
     /// Affects only video with specific [`JsMediaSourceKind`] if specified.
     pub fn disable_video(
@@ -495,7 +495,7 @@ impl RoomHandle {
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Disabled,
+            media_exchange_state::Stable::Disabled,
             MediaKind::Video,
             TrackDirection::Send,
             source_kind,
@@ -510,7 +510,7 @@ impl RoomHandle {
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Enabled,
+            media_exchange_state::Stable::Enabled,
             MediaKind::Video,
             TrackDirection::Send,
             source_kind,
@@ -520,7 +520,7 @@ impl RoomHandle {
     /// Disables inbound audio in this [`Room`].
     pub fn disable_remote_audio(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Disabled,
+            media_exchange_state::Stable::Disabled,
             MediaKind::Audio,
             TrackDirection::Recv,
             None,
@@ -530,7 +530,7 @@ impl RoomHandle {
     /// Disables inbound video in this [`Room`].
     pub fn disable_remote_video(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Disabled,
+            media_exchange_state::Stable::Disabled,
             MediaKind::Video,
             TrackDirection::Recv,
             None,
@@ -540,7 +540,7 @@ impl RoomHandle {
     /// Enables inbound audio in this [`Room`].
     pub fn enable_remote_audio(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Enabled,
+            media_exchange_state::Stable::Enabled,
             MediaKind::Audio,
             TrackDirection::Recv,
             None,
@@ -550,7 +550,7 @@ impl RoomHandle {
     /// Enables inbound video in this [`Room`].
     pub fn enable_remote_video(&self) -> Promise {
         self.media_state_toggle_promise(
-            StableMediaExchangeState::Enabled,
+            media_exchange_state::Stable::Enabled,
             MediaKind::Video,
             TrackDirection::Recv,
             None,
@@ -807,7 +807,7 @@ impl InnerRoom {
             match state {
                 MediaState::MediaExchange(media_exchange) => {
                     self.recv_constraints.set_enabled(
-                        media_exchange == StableMediaExchangeState::Enabled,
+                        media_exchange == media_exchange_state::Stable::Enabled,
                         kind,
                     );
                 }
@@ -979,8 +979,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`MediaExchangeState`]s of the [`Sender`]s which are should
-    /// be enabled or disabled.
+    /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
+    /// are should be enabled or disabled.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
@@ -1226,13 +1226,9 @@ impl EventHandler for InnerRoom {
         partner_member_id: MemberId,
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
-        let conn = self
-            .connections
-            .get(&partner_member_id)
-            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
-
-        conn.update_quality_score(quality_score);
-
+        if let Some(conn) = self.connections.get(&partner_member_id) {
+            conn.update_quality_score(quality_score);
+        }
         Ok(())
     }
 

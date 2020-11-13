@@ -4,7 +4,7 @@ use super::{InStable, InTransition};
 
 /// State of the media publishing.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum StableMediaExchangeState {
+pub enum Stable {
     /// [`MediaStateControllable`] is enabled.
     ///
     /// [`MediaStateControllable`]: super::MediaStateControllable
@@ -16,7 +16,7 @@ pub enum StableMediaExchangeState {
     Disabled,
 }
 
-impl StableMediaExchangeState {
+impl Stable {
     /// Returns opposite to this [`StableMediaExchangeState`].
     pub fn opposite(self) -> Self {
         match self {
@@ -26,8 +26,8 @@ impl StableMediaExchangeState {
     }
 }
 
-impl InStable for StableMediaExchangeState {
-    type Transition = TransitionMediaExchangeState;
+impl InStable for Stable {
+    type Transition = Transition;
 
     /// Converts this [`StableMediaExchangeState`] into
     /// [`MediaExchangeStateTransition`].
@@ -40,19 +40,19 @@ impl InStable for StableMediaExchangeState {
     #[inline]
     fn start_transition(self) -> Self::Transition {
         match self {
-            Self::Enabled => TransitionMediaExchangeState::Disabling(self),
-            Self::Disabled => TransitionMediaExchangeState::Enabling(self),
+            Self::Enabled => Transition::Disabling(self),
+            Self::Disabled => Transition::Enabling(self),
         }
     }
 }
 
-impl From<bool> for StableMediaExchangeState {
+impl From<bool> for Stable {
     #[inline]
-    fn from(is_disabled: bool) -> Self {
-        if is_disabled {
-            Self::Disabled
-        } else {
+    fn from(enabled: bool) -> Self {
+        if enabled {
             Self::Enabled
+        } else {
+            Self::Disabled
         }
     }
 }
@@ -66,29 +66,29 @@ impl From<bool> for StableMediaExchangeState {
 /// won't be received, then the stored [`StableMediaExchangeState`] will be
 /// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum TransitionMediaExchangeState {
+pub enum Transition {
     /// [`MediaStateControllable`] should be enabled, but awaits server
     /// permission.
     ///
     /// [`MediaStateControllable`]: super::MediaStateControllable
-    Enabling(StableMediaExchangeState),
+    Enabling(Stable),
 
     /// [`MediaStateControllable`] should be disabled, but awaits server
     /// permission.
     ///
     /// [`MediaStateControllable`]: super::MediaStateControllable
-    Disabling(StableMediaExchangeState),
+    Disabling(Stable),
 }
 
-impl InTransition for TransitionMediaExchangeState {
-    type Stable = StableMediaExchangeState;
+impl InTransition for Transition {
+    type Stable = Stable;
 
     /// Returns intention which this [`TransitionMediaExchangeState`] indicates.
     #[inline]
     fn intended(self) -> Self::Stable {
         match self {
-            Self::Enabling(_) => StableMediaExchangeState::Enabled,
-            Self::Disabling(_) => StableMediaExchangeState::Disabled,
+            Self::Enabling(_) => Stable::Enabled,
+            Self::Disabling(_) => Stable::Disabled,
         }
     }
 

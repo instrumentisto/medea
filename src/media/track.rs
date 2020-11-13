@@ -20,6 +20,8 @@ pub struct MediaTrack {
 
 impl MediaTrack {
     /// Creates new [`MediaTrack`] of the specified [`MediaType`].
+    #[inline]
+    #[must_use]
     pub fn new(id: Id, media_type: MediaType) -> Self {
         Self {
             id,
@@ -30,82 +32,99 @@ impl MediaTrack {
         }
     }
 
+    #[inline]
     pub fn set_mid(&self, mid: String) {
         self.mid.borrow_mut().replace(mid);
     }
 
+    #[inline]
+    #[must_use]
     pub fn mid(&self) -> Option<String> {
         self.mid.borrow_mut().as_ref().cloned()
     }
 
+    #[inline]
     pub fn set_transceiver_enabled(&self, enabled: bool) {
         self.transceiver_enabled.set(enabled);
     }
 
+    #[inline]
+    #[must_use]
     pub fn is_transceiver_enabled(&self) -> bool {
         self.transceiver_enabled.get()
     }
 
-    /// Returns `true` if this [`MediaTrack`] currently is disabled.
-    pub fn is_media_exchange_disabled(&self) -> bool {
-        self.media_exchange_state.borrow().is_disabled()
+    /// Indicates whether this [`MediaTrack`] is enabled currently.
+    #[inline]
+    #[must_use]
+    pub fn is_media_exchange_enabled(&self) -> bool {
+        self.media_exchange_state.borrow().is_enabled()
     }
 
     /// Sets media exchange state of the [`MediaTrack`]'s `Recv` side.
-    pub fn set_recv_media_exchange_state(&self, is_disabled: bool) {
-        self.media_exchange_state.borrow_mut().set_recv(is_disabled);
+    #[inline]
+    pub fn set_recv_media_exchange_state(&self, is_enabled: bool) {
+        self.media_exchange_state.borrow_mut().set_recv(is_enabled);
     }
 
     /// Sets media exchange state of the [`MediaTrack`]'s `Send` side.
-    pub fn set_send_media_exchange_state(&self, is_disabled: bool) {
-        self.media_exchange_state.borrow_mut().set_send(is_disabled);
+    #[inline]
+    pub fn set_send_media_exchange_state(&self, is_enabled: bool) {
+        self.media_exchange_state.borrow_mut().set_send(is_enabled);
     }
 }
 
-/// media exchange state of the [`MediaTrack`].
+/// Media exchange state of the [`MediaTrack`].
 ///
 /// Contains media exchange state for the `Send` and `Recv` side.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MediaExchangeState {
     /// Media exchange state of the `Send` side.
     ///
-    /// If `true` then sender is disabled.
-    send_disabled: bool,
+    /// If `true` then sender is enabled.
+    send_enabled: bool,
 
     /// Media exchange state of the `Recv` side.
     ///
-    /// If `true` then receiver is disabled.
-    recv_disabled: bool,
+    /// If `true` then receiver is enabled.
+    recv_enabled: bool,
 }
 
 impl Default for MediaExchangeState {
+    #[inline]
     fn default() -> Self {
         Self {
-            send_disabled: false,
-            recv_disabled: false,
+            send_enabled: true,
+            recv_enabled: true,
         }
     }
 }
 
 impl MediaExchangeState {
     /// Returns new default [`MediaExchangeState`].
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Returns `true` if [`MediaExchangeState::send_disabled`] or
-    /// [`MediaExchangeState::recv_disabled`] are `true`.
-    pub fn is_disabled(self) -> bool {
-        self.send_disabled || self.recv_disabled
+    /// Indicates whether [`MediaExchangeState::send_enabled`] or
+    /// [`MediaExchangeState::recv_enabled`].
+    #[inline]
+    #[must_use]
+    pub fn is_enabled(self) -> bool {
+        self.send_enabled && self.recv_enabled
     }
 
     /// Sets media exchange state for the `Recv` side of [`MediaTrack`].
-    pub fn set_recv(&mut self, is_disabled: bool) {
-        self.recv_disabled = is_disabled;
+    #[inline]
+    pub fn set_recv(&mut self, is_enabled: bool) {
+        self.recv_enabled = is_enabled;
     }
 
     /// Sets media exchange state for the `Send` side of the [`MediaTrack`].
-    pub fn set_send(&mut self, is_disabled: bool) {
-        self.send_disabled = is_disabled;
+    #[inline]
+    pub fn set_send(&mut self, is_enabled: bool) {
+        self.send_enabled = is_enabled;
     }
 }

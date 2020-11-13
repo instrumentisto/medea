@@ -146,7 +146,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
         cb_assert_eq!(
             err.message(),
-            "MediaExchangeState of Sender can\'t be transited into disabled \
+            "MediaExchangeState of Sender can't be transited into disabled \
              state, because this Sender is required."
         );
     });
@@ -406,7 +406,7 @@ mod disable_recv_tracks {
                             mid: None,
                         },
                         media_type: MediaType::Audio(AudioSettings {
-                            is_required: true,
+                            required: true,
                         }),
                     },
                     Track {
@@ -416,7 +416,7 @@ mod disable_recv_tracks {
                             mid: None,
                         },
                         media_type: MediaType::Video(VideoSettings {
-                            is_required: true,
+                            required: true,
                             source_kind: MediaSourceKind::Device,
                         }),
                     },
@@ -427,7 +427,7 @@ mod disable_recv_tracks {
                             mid: None,
                         },
                         media_type: MediaType::Audio(AudioSettings {
-                            is_required: true,
+                            required: true,
                         }),
                     },
                 ],
@@ -453,9 +453,9 @@ mod disable_recv_tracks {
                 let audio_recv =
                     transceivers_statuses.get(&TrackId(3)).unwrap();
 
-                assert!(audio_send); // not disable
-                assert!(video_recv); // not disable
-                assert!(!audio_recv); // disable
+                assert!(audio_send); // enabled
+                assert!(video_recv); // enabled
+                assert!(!audio_recv); // disabled
             }
             _ => unreachable!(),
         }
@@ -472,7 +472,7 @@ mod disable_send_tracks {
     };
     use medea_jason::{
         media::{JsMediaSourceKind, MediaKind},
-        peer::{StableMediaExchangeState, TrackDirection},
+        peer::{media_exchange_state, TrackDirection},
     };
 
     use super::*;
@@ -509,20 +509,20 @@ mod disable_send_tracks {
         assert!(peer.is_send_video_enabled(None));
     }
 
-    fn audio_track(track_id: TrackId, is_required: bool) -> Track {
+    fn audio_track(track_id: TrackId, required: bool) -> Track {
         Track {
             id: track_id,
             direction: Direction::Send {
                 receivers: vec![MemberId::from("bob")],
                 mid: None,
             },
-            media_type: MediaType::Audio(AudioSettings { is_required }),
+            media_type: MediaType::Audio(AudioSettings { required }),
         }
     }
 
     fn video_track(
         track_id: TrackId,
-        is_required: bool,
+        required: bool,
         source_kind: MediaSourceKind,
     ) -> Track {
         Track {
@@ -532,7 +532,7 @@ mod disable_send_tracks {
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {
-                is_required,
+                required,
                 source_kind,
             }),
         }
@@ -605,12 +605,12 @@ mod disable_send_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MediaExchangeState::Enabled`].
+    /// 1. Create [`Room`] in [`media_exchange_state::Stable::Enabled`].
     ///
     /// 2. Call [`RoomHandle::disable_audio`] simultaneous twice.
     ///
     /// 3. Check that [`PeerConnection`] with [`MediaKind::Audio`] of
-    /// [`Room`] is in [`MediaExchangeState::Disabled`].
+    /// [`Room`] is in [`media_exchange_state::Stable::Disabled`].
     #[wasm_bindgen_test]
     async fn join_two_audio_disables() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -633,7 +633,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Disabled.into()
+            media_exchange_state::Stable::Disabled.into()
         ));
     }
 
@@ -642,12 +642,12 @@ mod disable_send_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MediaExchangeState::Enabled`].
+    /// 1. Create [`Room`] in [`media_exchange_state::State::Stable`].
     ///
     /// 2. Call [`RoomHandle::disable_video`] simultaneous twice.
     ///
     /// 3. Check that [`PeerConnection`] with [`MediaKind::Video`] of
-    /// [`Room`] is in [`MediaExchangeState::Disabled`].
+    /// [`Room`] is in [`media_exchange_state::Stable::Disabled`].
     #[wasm_bindgen_test]
     async fn join_two_video_disables() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -670,7 +670,7 @@ mod disable_send_tracks {
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Disabled.into()
+            media_exchange_state::Stable::Disabled.into()
         ));
     }
 
@@ -680,13 +680,13 @@ mod disable_send_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MediaExchangeState::Enabled`].
+    /// 1. Create [`Room`] in [`media_exchange_state::Stable::Enabled`].
     ///
     /// 2. Call [`RoomHandle::disable_audio`] and [`RoomHandle::enable_audio`]
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`MediaKind::Audio`] of
-    /// [`Room`] is stayed in [`MediaExchangeState::Enabled`].
+    /// [`Room`] is stayed in [`media_exchange_state::Stable::Enabled`].
     #[wasm_bindgen_test]
     async fn join_disable_and_enable_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -700,7 +700,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled.into()
+            media_exchange_state::Stable::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -717,7 +717,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled.into()
+            media_exchange_state::Stable::Enabled.into()
         ));
     }
 
@@ -727,13 +727,13 @@ mod disable_send_tracks {
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] in [`MediaExchangeState::Enabled`].
+    /// 1. Create [`Room`] in [`media_exchange_state::Stable::Enabled`].
     ///
     /// 2. Call [`RoomHandle::disable_video`] and [`RoomHandle::enable_video`]
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`MediaKind::Video`] of
-    /// [`Room`] is stayed in [`MediaExchangeState::Enabled`].
+    /// [`Room`] is stayed in [`media_exchange_state::Stable::Enabled`].
     #[wasm_bindgen_test]
     async fn join_disable_and_enable_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -747,7 +747,7 @@ mod disable_send_tracks {
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled.into()
+            media_exchange_state::Stable::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -764,23 +764,25 @@ mod disable_send_tracks {
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled.into()
+            media_exchange_state::Stable::Enabled.into()
         ));
     }
 
     /// Tests that simultaneous calls of [`RoomHandle::disable_video`] and
     /// [`RoomHandle::enable_video`] on [`Room`] with video in
-    /// [`MediaExchangeState::Disabled`] not goes into an infinite loop.
+    /// [`media_exchange_state::Stable::Disabled`] not goes into an infinite
+    /// loop.
     ///
     /// # Algorithm
     ///
-    /// 1. Create [`Room`] video tracks in [`MediaExchangeState::Disabled`].
+    /// 1. Create [`Room`] video tracks in
+    /// [`media_exchange_state::Stable::Disabled`].
     ///
     /// 2. Call [`RoomHandle::disable_video`] and [`RoomHandle::enable_video`]
     ///    simultaneous.
     ///
     /// 3. Check that [`PeerConnection`] with [`MediaKind::Video`] of
-    /// [`Room`] is in [`MediaExchangeState::Enabled`].
+    /// [`Room`] is in [`media_exchange_state::Stable::Enabled`].
     #[wasm_bindgen_test]
     async fn join_enable_and_disable_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -794,7 +796,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled.into()
+            media_exchange_state::Stable::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -804,7 +806,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Disabled.into()
+            media_exchange_state::Stable::Disabled.into()
         ));
 
         let (disable_audio_result, enable_audio_result) =
@@ -820,7 +822,7 @@ mod disable_send_tracks {
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            StableMediaExchangeState::Enabled.into()
+            media_exchange_state::Stable::Enabled.into()
         ));
     }
 
@@ -864,7 +866,7 @@ mod disable_send_tracks {
                 let video = transceivers_statuses.get(&TrackId(2)).unwrap();
 
                 assert!(!audio); // disabled
-                assert!(video); // not disabled
+                assert!(video); // enabled
             }
             _ => unreachable!(),
         }
@@ -913,7 +915,7 @@ mod disable_send_tracks {
                 let audio = transceivers_statuses.get(&TrackId(1)).unwrap();
                 let video = transceivers_statuses.get(&TrackId(2)).unwrap();
 
-                assert!(audio); // not disabled
+                assert!(audio); // enabled
                 assert!(!video); // disabled
             }
             _ => unreachable!(),
@@ -1130,7 +1132,7 @@ mod patches_generation {
     };
     use medea_jason::{
         media::RecvConstraints,
-        peer::{MediaState, StableMediaExchangeState, StableMuteState},
+        peer::{media_exchange_state, mute_state, MediaState},
         JsMediaSourceKind,
     };
     use wasm_bindgen_futures::spawn_local;
@@ -1142,7 +1144,7 @@ mod patches_generation {
     fn audio_and_device_video_tracks_content() -> Vec<(MediaType, Direction)> {
         vec![
             (
-                MediaType::Audio(AudioSettings { is_required: false }),
+                MediaType::Audio(AudioSettings { required: false }),
                 Direction::Send {
                     receivers: Vec::new(),
                     mid: None,
@@ -1150,7 +1152,7 @@ mod patches_generation {
             ),
             (
                 MediaType::Video(VideoSettings {
-                    is_required: false,
+                    required: false,
                     source_kind: MediaSourceKind::Device,
                 }),
                 Direction::Send {
@@ -1165,7 +1167,7 @@ mod patches_generation {
     /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
     /// sent from this [`Room`].
     ///
-    /// `audio_track_media_state_fn`'s output will be used as `media_state`
+    /// `audio_track_enabled_state_fn`'s output will be used as `enabled`
     /// value for all audio [`Track`]s.
     async fn get_room_and_commands_receiver(
         peers_count: u32,
@@ -1250,7 +1252,7 @@ mod patches_generation {
     async fn track_patch_for_all_video() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             1,
-            |_| StableMediaExchangeState::Enabled.into(),
+            |_| media_exchange_state::Stable::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1268,8 +1270,8 @@ mod patches_generation {
                 peer_id: PeerId(1),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
-                    is_disabled: Some(true),
-                    is_muted: None,
+                    enabled: Some(false),
+                    muted: None,
                 }]
             }
         );
@@ -1292,7 +1294,7 @@ mod patches_generation {
     async fn track_patch_for_many_tracks() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |_| StableMediaExchangeState::Enabled.into(),
+            |_| media_exchange_state::Stable::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1322,8 +1324,8 @@ mod patches_generation {
             commands.remove(&PeerId(1)).unwrap(),
             vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(true),
-                is_muted: None,
+                enabled: Some(false),
+                muted: None,
             }]
         );
 
@@ -1331,8 +1333,8 @@ mod patches_generation {
             commands.remove(&PeerId(2)).unwrap(),
             vec![TrackPatchCommand {
                 id: TrackId(0),
-                is_disabled: Some(true),
-                is_muted: None,
+                enabled: Some(false),
+                muted: None,
             }]
         );
     }
@@ -1353,7 +1355,7 @@ mod patches_generation {
     async fn try_to_enable_enabled() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |_| StableMediaExchangeState::Enabled.into(),
+            |_| media_exchange_state::Stable::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1384,9 +1386,9 @@ mod patches_generation {
             2,
             |i| {
                 if i % 2 == 1 {
-                    StableMediaExchangeState::Enabled.into()
+                    media_exchange_state::Stable::Enabled.into()
                 } else {
-                    StableMediaExchangeState::Disabled.into()
+                    media_exchange_state::Stable::Disabled.into()
                 }
             },
             audio_and_device_video_tracks_content(),
@@ -1406,8 +1408,8 @@ mod patches_generation {
                 peer_id: PeerId(2),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
-                    is_disabled: Some(true),
-                    is_muted: None,
+                    enabled: Some(false),
+                    muted: None,
                 }]
             }
         );
@@ -1427,7 +1429,7 @@ mod patches_generation {
         tracks.push((
             MediaType::Video(VideoSettings {
                 source_kind: MediaSourceKind::Display,
-                is_required: false,
+                required: false,
             }),
             Direction::Send {
                 mid: None,
@@ -1436,7 +1438,7 @@ mod patches_generation {
         ));
         let (room, command_rx) = get_room_and_commands_receiver(
             2,
-            |_| StableMediaExchangeState::Enabled.into(),
+            |_| media_exchange_state::Stable::Enabled.into(),
             tracks,
         )
         .await;
@@ -1458,8 +1460,8 @@ mod patches_generation {
                     tracks_patches,
                     vec![TrackPatchCommand {
                         id: TrackId(1),
-                        is_disabled: Some(true),
-                        is_muted: None,
+                        enabled: Some(false),
+                        muted: None,
                     }]
                 ),
                 _ => {
@@ -1483,7 +1485,7 @@ mod patches_generation {
         tracks.push((
             MediaType::Video(VideoSettings {
                 source_kind: MediaSourceKind::Display,
-                is_required: false,
+                required: false,
             }),
             Direction::Send {
                 mid: None,
@@ -1492,7 +1494,7 @@ mod patches_generation {
         ));
         let (room, command_rx) = get_room_and_commands_receiver(
             2,
-            |_| StableMediaExchangeState::Enabled.into(),
+            |_| media_exchange_state::Stable::Enabled.into(),
             tracks,
         )
         .await;
@@ -1514,8 +1516,8 @@ mod patches_generation {
                     tracks_patches,
                     vec![TrackPatchCommand {
                         id: TrackId(2),
-                        is_disabled: Some(true),
-                        is_muted: None,
+                        enabled: Some(false),
+                        muted: None,
                     }]
                 ),
                 _ => {
@@ -1530,7 +1532,7 @@ mod patches_generation {
     async fn track_patch_on_muting() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             1,
-            |_| StableMuteState::Unmuted.into(),
+            |_| mute_state::Stable::Unmuted.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1546,8 +1548,8 @@ mod patches_generation {
                 peer_id: PeerId(1),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
-                    is_disabled: None,
-                    is_muted: Some(true),
+                    enabled: None,
+                    muted: Some(true),
                 }]
             }
         );
@@ -1558,7 +1560,7 @@ mod patches_generation {
     async fn track_patch_on_unmuting() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             1,
-            |_| StableMuteState::Muted.into(),
+            |_| mute_state::Stable::Muted.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1576,8 +1578,8 @@ mod patches_generation {
                 peer_id: PeerId(1),
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
-                    is_disabled: None,
-                    is_muted: Some(false),
+                    enabled: None,
+                    muted: Some(false),
                 }]
             }
         );
@@ -1635,9 +1637,9 @@ async fn remote_disable_enable_video() {
     assert!(peer.is_recv_video_enabled());
 }
 
-/// Checks that server can mute track without client's request.
+/// Checks that server can disable track without client's request.
 #[wasm_bindgen_test]
-async fn mute_by_server() {
+async fn disable_by_server() {
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
     let (_room, peer, event_tx) = get_test_room_and_exist_peer(
@@ -1652,9 +1654,9 @@ async fn mute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
-                is_muted: None,
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1664,9 +1666,9 @@ async fn mute_by_server() {
     assert!(!peer.is_send_audio_enabled());
 }
 
-/// Checks that server can unmute track without client's request.
+/// Checks that server can enable track without client's request.
 #[wasm_bindgen_test]
-async fn unmute_by_server() {
+async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
@@ -1683,9 +1685,9 @@ async fn unmute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
-                is_muted: None,
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1700,9 +1702,9 @@ async fn unmute_by_server() {
             negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(false),
-                is_disabled_individual: Some(false),
-                is_muted: None,
+                enabled_general: Some(true),
+                enabled_individual: Some(true),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1716,9 +1718,9 @@ async fn unmute_by_server() {
 }
 
 /// Checks that only one get user media request will be performed on
-/// `Room.unmute_audio` with a failed get user media.
+/// `Room.enable_audio` with a failed get user media.
 #[wasm_bindgen_test]
-async fn only_one_gum_performed_on_unmute() {
+async fn only_one_gum_performed_on_enable() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
@@ -1736,9 +1738,9 @@ async fn only_one_gum_performed_on_unmute() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
-                is_muted: None,
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1746,7 +1748,7 @@ async fn only_one_gum_performed_on_unmute() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
-    mock.error_get_user_media("only_one_gum_performed_on_unmute".into());
+    mock.error_get_user_media("only_one_gum_performed_on_enable".into());
 
     event_tx
         .unbounded_send(Event::TracksApplied {
@@ -1754,9 +1756,9 @@ async fn only_one_gum_performed_on_unmute() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
-                is_muted: None,
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1772,7 +1774,7 @@ async fn only_one_gum_performed_on_unmute() {
 /// Checks that only one get user media request will be performed on
 /// [`Event::TracksApplied`] with a failed get user media.
 #[wasm_bindgen_test]
-async fn only_one_gum_performed_on_unmute_by_server() {
+async fn only_one_gum_performed_on_enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
@@ -1789,9 +1791,9 @@ async fn only_one_gum_performed_on_unmute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
-                is_muted: None,
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1799,7 +1801,7 @@ async fn only_one_gum_performed_on_unmute_by_server() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
-    mock.error_get_user_media("only_one_gum_performed_on_unmute".into());
+    mock.error_get_user_media("only_one_gum_performed_on_enable".into());
 
     event_tx
         .unbounded_send(Event::TracksApplied {
@@ -1807,9 +1809,9 @@ async fn only_one_gum_performed_on_unmute_by_server() {
             negotiation_role: None,
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
-                is_disabled_general: Some(true),
-                is_disabled_individual: Some(true),
-                is_muted: None,
+                enabled_general: Some(false),
+                enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1820,7 +1822,7 @@ async fn only_one_gum_performed_on_unmute_by_server() {
 }
 
 /// Tests that calling [`RoomHandle::set_local_media_settings`] updates needed
-/// [`MediaExchangeState`]s of the [`Sender`]s.
+/// [`media_exchange_state::State`]s of the [`Sender`]s.
 #[wasm_bindgen_test]
 async fn set_local_media_stream_settings_updates_media_exchange_state() {
     let (event_tx, event_rx) = mpsc::unbounded();
@@ -1874,7 +1876,7 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
         {
             assert_eq!(peer_id, PeerId(1));
             let track_patch = tracks_patches.pop().unwrap();
-            assert_eq!(track_patch.is_disabled, Some(false));
+            assert_eq!(track_patch.enabled, Some(true));
             assert!(tracks_patches.is_empty());
             break;
         }

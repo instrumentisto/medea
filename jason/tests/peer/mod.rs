@@ -21,7 +21,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints},
     peer::{
-        PeerConnection, PeerEvent, RtcStats, StableMediaExchangeState,
+        media_exchange_state, PeerConnection, PeerEvent, RtcStats,
         TrackDirection,
     },
 };
@@ -36,15 +36,15 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 fn toggle_disable_tracks_updates(
     tracks_ids: &[u32],
-    is_disabled: bool,
+    enabled: bool,
 ) -> Vec<TrackPatchEvent> {
     tracks_ids
         .into_iter()
         .map(|track_id| TrackPatchEvent {
             id: TrackId(*track_id),
-            is_disabled_individual: Some(is_disabled),
-            is_disabled_general: Some(is_disabled),
-            is_muted: None,
+            enabled_individual: Some(enabled),
+            enabled_general: Some(enabled),
+            muted: None,
         })
         .collect()
 }
@@ -75,13 +75,13 @@ async fn disable_enable_audio() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], false))
         .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], false))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
         .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
@@ -110,13 +110,13 @@ async fn disable_enable_video() {
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], true))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], false))
         .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled(None));
 
-    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], false))
+    peer.patch_tracks(toggle_disable_tracks_updates(&[VIDEO_TRACK_ID], true))
         .await
         .unwrap();
     assert!(peer.is_send_audio_enabled());
@@ -611,9 +611,7 @@ impl InterconnectedPeers {
                     receivers: vec![MemberId::from("bob")],
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {
-                    is_required: true,
-                }),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
             },
             Track {
                 id: TrackId(2),
@@ -622,7 +620,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
-                    is_required: true,
+                    required: true,
                     source_kind: MediaSourceKind::Device,
                 }),
             },
@@ -638,9 +636,7 @@ impl InterconnectedPeers {
                     sender: MemberId::from("alice"),
                     mid: None,
                 },
-                media_type: MediaType::Audio(AudioSettings {
-                    is_required: true,
-                }),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
             },
             Track {
                 id: TrackId(2),
@@ -649,7 +645,7 @@ impl InterconnectedPeers {
                     mid: None,
                 },
                 media_type: MediaType::Video(VideoSettings {
-                    is_required: true,
+                    required: true,
                     source_kind: MediaSourceKind::Device,
                 }),
             },
@@ -913,11 +909,13 @@ async fn reset_transition_timers() {
         )
         .map(|s| {
             s.media_state_transition_to(
-                StableMediaExchangeState::Disabled.into(),
+                media_exchange_state::Stable::Disabled.into(),
             )
             .unwrap();
 
-            s.when_media_state_stable(StableMediaExchangeState::Enabled.into())
+            s.when_media_state_stable(
+                media_exchange_state::Stable::Enabled.into(),
+            )
         }),
     )
     .map(|_| ())
@@ -953,12 +951,12 @@ async fn new_remote_track() {
 
         let tx_caps = LocalTracksConstraints::default();
         tx_caps.set_media_state(
-            StableMediaExchangeState::from(!audio_tx_enabled).into(),
+            media_exchange_state::Stable::from(audio_tx_enabled).into(),
             MediaKind::Audio,
             None,
         );
         tx_caps.set_media_state(
-            StableMediaExchangeState::from(!video_tx_enabled).into(),
+            media_exchange_state::Stable::from(video_tx_enabled).into(),
             MediaKind::Video,
             None,
         );
@@ -1003,7 +1001,7 @@ async fn new_remote_track() {
                             mid: Some(String::from("0")),
                         },
                         media_type: MediaType::Audio(AudioSettings {
-                            is_required: true,
+                            required: true,
                         }),
                     },
                     Track {
@@ -1013,7 +1011,7 @@ async fn new_remote_track() {
                             mid: Some(String::from("1")),
                         },
                         media_type: MediaType::Video(VideoSettings {
-                            is_required: true,
+                            required: true,
                             source_kind: MediaSourceKind::Device,
                         }),
                     },

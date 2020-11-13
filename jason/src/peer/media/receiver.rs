@@ -21,8 +21,8 @@ use crate::{
 
 use super::{
     transitable_state::{
-        MediaExchangeStateController, MuteStateController,
-        StableMediaExchangeState, TransitableStateController,
+        media_exchange_state, MediaExchangeStateController,
+        MuteStateController, TransitableStateController,
     },
     TransceiverSide,
 };
@@ -39,7 +39,7 @@ pub struct Receiver {
     transceiver: RefCell<Option<Transceiver>>,
     mid: RefCell<Option<String>>,
     track: RefCell<Option<MediaStreamTrack>>,
-    general_media_exchange_state: Cell<StableMediaExchangeState>,
+    general_media_exchange_state: Cell<media_exchange_state::Stable>,
     is_track_notified: Cell<bool>,
     media_exchange_state_controller: Rc<MediaExchangeStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -106,11 +106,11 @@ impl Receiver {
             mid: RefCell::new(mid),
             track: RefCell::new(None),
             general_media_exchange_state: Cell::new(
-                StableMediaExchangeState::from(!enabled),
+                media_exchange_state::Stable::from(enabled),
             ),
             is_track_notified: Cell::new(false),
             media_exchange_state_controller: TransitableStateController::new(
-                StableMediaExchangeState::from(!enabled),
+                media_exchange_state::Stable::from(enabled),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }
@@ -124,13 +124,13 @@ impl Receiver {
 
     /// Returns `true` if this [`Receiver`] is receives media data.
     pub fn is_receiving(&self) -> bool {
-        let is_enabled = self.media_exchange_state_controller.is_enabled();
+        let enabled = self.media_exchange_state_controller.is_enabled();
         let is_recv_direction =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
                 trnsvr.has_direction(TransceiverDirection::RECV)
             });
 
-        is_enabled && is_recv_direction
+        enabled && is_recv_direction
     }
 
     /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
@@ -152,12 +152,12 @@ impl Receiver {
         let new_track =
             MediaStreamTrack::new(new_track, self.caps.media_source_kind());
 
-        if self.is_not_disabled() {
+        if self.enabled() {
             transceiver.add_direction(TransceiverDirection::RECV);
         } else {
             transceiver.sub_direction(TransceiverDirection::RECV);
         }
-        new_track.set_enabled(self.is_not_disabled());
+        new_track.set_enabled(self.enabled());
 
         self.transceiver.replace(Some(transceiver));
         self.track.replace(Some(new_track));
@@ -181,25 +181,25 @@ impl Receiver {
         if self.track_id != track_patch.id {
             return;
         }
-        if let Some(is_disabled_general) = track_patch.is_disabled_general {
-            self.update_general_mute_state(is_disabled_general.into());
+        if let Some(enabled) = track_patch.enabled_general {
+            self.update_general_media_exchange_state(enabled.into());
         }
-        if let Some(is_disabled) = track_patch.is_disabled_individual {
-            self.media_exchange_state_controller.update(is_disabled);
+        if let Some(enabled) = track_patch.enabled_individual {
+            self.media_exchange_state_controller.update(enabled);
         }
-        if let Some(is_muted) = track_patch.is_muted {
+        if let Some(muted) = track_patch.muted {
             if let Some(track) = self.track.borrow().as_ref() {
-                track.set_enabled(!is_muted);
+                track.set_enabled(!muted);
             }
         }
     }
 
     /// Checks whether general media exchange state of the [`Receiver`] is in
-    /// [`StableMediaExchangeState::Disabled`].
+    /// [`media_exchange_state::Stable::Disabled`].
     #[cfg(feature = "mockable")]
     pub fn is_general_disabled(&self) -> bool {
         self.general_media_exchange_state.get()
-            == StableMediaExchangeState::Disabled
+            == media_exchange_state::Stable::Disabled
     }
 
     /// Returns [`Transceiver`] of this [`Receiver`].
@@ -231,14 +231,15 @@ impl Receiver {
     }
 
     /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
-    /// based on the provided [`StableMediaExchangeState`].
-    ///
-    /// Updates [`InnerReceiver::general_mute_state`].
-    fn update_general_mute_state(&self, mute_state: StableMediaExchangeState) {
-        if self.general_media_exchange_state.get() != mute_state {
-            self.general_media_exchange_state.set(mute_state);
-            match mute_state {
-                StableMediaExchangeState::Disabled => {
+    /// based on the provided [`media_exchange_state::Stable`].
+    fn update_general_media_exchange_state(
+        &self,
+        new_state: media_exchange_state::Stable,
+    ) {
+        if self.general_media_exchange_state.get() != new_state {
+            self.general_media_exchange_state.set(new_state);
+            match new_state {
+                media_exchange_state::Stable::Disabled => {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(false);
                     }
@@ -246,7 +247,7 @@ impl Receiver {
                         trnscvr.sub_direction(TransceiverDirection::RECV);
                     }
                 }
-                StableMediaExchangeState::Enabled => {
+                media_exchange_state::Stable::Enabled => {
                     if let Some(track) = self.track.borrow().as_ref() {
                         track.set_enabled(true);
                     }
@@ -259,20 +260,13 @@ impl Receiver {
         }
     }
 
-    /// Checks whether general media exchange state of this [`Receiver`] is in
-    /// [`StableMediaExchangeState::Enabled`].
-    fn is_not_disabled(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == StableMediaExchangeState::Enabled
-    }
-
     /// Returns `true` if this [`Receiver`] is enabled.
-    pub fn is_enabled(&self) -> bool {
+    pub fn enabled(&self) -> bool {
         self.media_exchange_state_controller.is_enabled()
     }
 
     /// Returns `true` if this [`Receiver`] is disabled.
-    pub fn is_disabled(&self) -> bool {
+    pub fn disabled(&self) -> bool {
         self.media_exchange_state_controller.is_disabled()
     }
 }

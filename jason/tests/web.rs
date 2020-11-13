@@ -90,7 +90,7 @@ use medea_jason::{
     media::{
         LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
     },
-    peer::StableMediaExchangeState,
+    peer::media_exchange_state,
     rpc::ApiUrl,
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints,
@@ -148,12 +148,12 @@ pub fn get_media_stream_settings(
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
     settings.set_track_media_state(
-        StableMediaExchangeState::from(!audio_enabled).into(),
+        media_exchange_state::Stable::from(audio_enabled).into(),
         MediaKind::Audio,
         None,
     );
     settings.set_track_media_state(
-        StableMediaExchangeState::from(!video_enabled).into(),
+        media_exchange_state::Stable::from(video_enabled).into(),
         MediaKind::Video,
         None,
     );
@@ -173,7 +173,7 @@ pub fn get_test_tracks(
                 mid: None,
             },
             media_type: MediaType::Audio(AudioSettings {
-                is_required: is_audio_required,
+                required: is_audio_required,
             }),
         },
         Track {
@@ -183,7 +183,7 @@ pub fn get_test_tracks(
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {
-                is_required: is_video_required,
+                required: is_video_required,
                 source_kind: MediaSourceKind::Device,
             }),
         },
@@ -202,7 +202,7 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
                 sender: "bob".into(),
                 mid: Some("mid0".to_string()),
             },
-            media_type: MediaType::Audio(AudioSettings { is_required: false }),
+            media_type: MediaType::Audio(AudioSettings { required: false }),
         },
         Track {
             id: TrackId(1),
@@ -211,7 +211,7 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
                 mid: Some("mid1".to_string()),
             },
             media_type: MediaType::Video(VideoSettings {
-                is_required: false,
+                required: false,
                 source_kind: MediaSourceKind::Device,
             }),
         },
