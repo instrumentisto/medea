@@ -23,6 +23,7 @@ pub enum State {
 impl State {
     /// Indicates whether [`State`] is stable (not in transition).
     #[inline]
+    #[must_use]
     pub fn is_stable(self) -> bool {
         match self {
             State::Stable(_) => true,
@@ -34,6 +35,7 @@ impl State {
     /// [`State::Transition`].
     ///
     /// No-op if already in the `desired_state`.
+    #[must_use]
     pub fn transition_to(self, desired_state: Stable) -> Self {
         if self == desired_state.into() {
             return self;
@@ -60,6 +62,7 @@ impl State {
 
     /// Cancels ongoing transition if any.
     #[inline]
+    #[must_use]
     pub fn cancel_transition(self) -> Self {
         match self {
             Self::Stable(_) => self,
@@ -89,6 +92,7 @@ impl Stable {
     ///
     /// [`Stable::Disabled`] => [`Transition::Enabling`].
     #[inline]
+    #[must_use]
     pub fn start_transition(self) -> Transition {
         match self {
             Self::Enabled => Transition::Disabling(self),
@@ -108,13 +112,11 @@ impl From<bool> for Stable {
     }
 }
 
-/// [`State`] in transition to another
-/// [`Stable`].
+/// [`State`] in transition to another [`Stable`].
 ///
 /// [`Stable`] which is stored in [`Transition`] variants is a state which we
 /// already have, but we still waiting for a desired state update. If desired
-/// state update won't be received, then the stored [`Stable`] will be
-/// applied.
+/// state update won't be received, then the stored [`Stable`] will be applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Transition {
     /// [`Disableable`] should be enabled, but awaits server permission.
@@ -131,6 +133,7 @@ pub enum Transition {
 impl Transition {
     /// Returns intention which this [`Transition`] indicates.
     #[inline]
+    #[must_use]
     pub fn intended(self) -> Stable {
         match self {
             Self::Enabling(_) => Stable::Enabled,
@@ -140,6 +143,7 @@ impl Transition {
 
     /// Sets inner [`Stable`].
     #[inline]
+    #[must_use]
     pub fn set_inner(self, inner: Stable) -> Self {
         match self {
             Self::Enabling(_) => Self::Enabling(inner),
@@ -149,6 +153,7 @@ impl Transition {
 
     /// Returns inner [`Stable`].
     #[inline]
+    #[must_use]
     pub fn into_inner(self) -> Stable {
         match self {
             Self::Enabling(s) | Self::Disabling(s) => s,

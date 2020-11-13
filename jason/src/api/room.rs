@@ -1206,7 +1206,6 @@ impl EventHandler for InnerRoom {
         if let Some(conn) = self.connections.get(&partner_member_id) {
             conn.update_quality_score(quality_score);
         }
-
         Ok(())
     }
 

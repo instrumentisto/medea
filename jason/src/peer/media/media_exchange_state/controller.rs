@@ -28,6 +28,7 @@ impl Controller {
 
     /// Returns new [`Controller`] with a provided
     /// [`media_exchange_state::Stable`].
+    #[must_use]
     pub(in super::super) fn new(
         state: media_exchange_state::Stable,
     ) -> Rc<Self> {
@@ -89,12 +90,16 @@ impl Controller {
 
     /// Checks whether [`Controller`]'s media exchange state is in
     /// [`media_exchange_state::Stable::Disabled`].
+    #[inline]
+    #[must_use]
     pub fn disabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
 
     /// Checks whether [`Controller`]'s media exchange state is in
     /// [`media_exchange_state::Stable::Enabled`].
+    #[inline]
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Enabled.into()
     }
@@ -141,6 +146,8 @@ impl Controller {
     }
 
     /// Returns current [`Controller::state`].
+    #[inline]
+    #[must_use]
     pub fn media_exchange_state(&self) -> media_exchange_state::State {
         self.state.get()
     }

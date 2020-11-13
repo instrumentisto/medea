@@ -20,6 +20,8 @@ pub struct MediaTrack {
 
 impl MediaTrack {
     /// Creates new [`MediaTrack`] of the specified [`MediaType`].
+    #[inline]
+    #[must_use]
     pub fn new(id: Id, media_type: MediaType) -> Self {
         Self {
             id,
@@ -30,39 +32,49 @@ impl MediaTrack {
         }
     }
 
+    #[inline]
     pub fn set_mid(&self, mid: String) {
         self.mid.borrow_mut().replace(mid);
     }
 
+    #[inline]
+    #[must_use]
     pub fn mid(&self) -> Option<String> {
         self.mid.borrow_mut().as_ref().cloned()
     }
 
+    #[inline]
     pub fn set_transceiver_enabled(&self, enabled: bool) {
         self.transceiver_enabled.set(enabled);
     }
 
+    #[inline]
+    #[must_use]
     pub fn is_transceiver_enabled(&self) -> bool {
         self.transceiver_enabled.get()
     }
 
-    /// Returns `true` if this [`MediaTrack`] currently is enabled.
+    /// Indicates whether this [`MediaTrack`] is enabled currently.
+    #[inline]
+    #[must_use]
     pub fn is_media_exchange_enabled(&self) -> bool {
         self.media_exchange_state.borrow().is_enabled()
     }
 
     /// Sets media exchange state of the [`MediaTrack`]'s `Recv` side.
+    #[inline]
     pub fn set_recv_media_exchange_state(&self, is_enabled: bool) {
         self.media_exchange_state.borrow_mut().set_recv(is_enabled);
     }
 
     /// Sets media exchange state of the [`MediaTrack`]'s `Send` side.
+    #[inline]
     pub fn set_send_media_exchange_state(&self, is_enabled: bool) {
         self.media_exchange_state.borrow_mut().set_send(is_enabled);
     }
 }
 
-/// media exchange state of the [`MediaTrack`].
+/// Media exchange state of the [`MediaTrack`].
 ///
 /// Contains media exchange state for the `Send` and `Recv` side.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -79,6 +91,7 @@ struct MediaExchangeState {
 }
 
 impl Default for MediaExchangeState {
+    #[inline]
     fn default() -> Self {
         Self {
             send_enabled: true,
@@ -89,22 +102,28 @@ impl Default for MediaExchangeState {
 
 impl MediaExchangeState {
     /// Returns new default [`MediaExchangeState`].
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Returns `true` if [`MediaExchangeState::send_enabled`] or
-    /// [`MediaExchangeState::recv_enabled`] are `true`.
+    /// Indicates whether [`MediaExchangeState::send_enabled`] or
+    /// [`MediaExchangeState::recv_enabled`].
+    #[inline]
+    #[must_use]
     pub fn is_enabled(self) -> bool {
         self.send_enabled && self.recv_enabled
     }
 
     /// Sets media exchange state for the `Recv` side of [`MediaTrack`].
+    #[inline]
     pub fn set_recv(&mut self, is_enabled: bool) {
         self.recv_enabled = is_enabled;
     }
 
     /// Sets media exchange state for the `Send` side of the [`MediaTrack`].
+    #[inline]
     pub fn set_send(&mut self, is_enabled: bool) {
         self.send_enabled = is_enabled;
     }

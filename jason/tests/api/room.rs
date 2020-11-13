@@ -146,7 +146,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
         cb_assert_eq!(
             err.message(),
-            "MediaExchangeState of Sender can\'t be transited into disabled \
+            "MediaExchangeState of Sender can't be transited into disabled \
              state, because this Sender is required."
         );
     });

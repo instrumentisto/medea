@@ -511,7 +511,7 @@ pub struct Track {
 }
 
 impl Track {
-    /// Returns `true` if this [`Track`] is required to call starting.
+    /// Indicates whether this [`Track`] is required to call starting.
     #[must_use]
     pub fn required(&self) -> bool {
         self.media_type.required()
