@@ -28,9 +28,9 @@ use crate::{
         MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        LocalStreamUpdateCriteria, MediaConnectionsError, MuteState,
+        media_exchange_state, LocalStreamUpdateCriteria, MediaConnectionsError,
         PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, StableMuteState, TrackDirection,
+        RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -145,8 +145,8 @@ enum RoomError {
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
-    /// Typically, returned if [`RoomHandle::mute_audio`]-like functions called
-    /// simultaneously.
+    /// Typically, returned if [`RoomHandle::disable_audio`]-like functions
+    /// called simultaneously.
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
 
@@ -257,14 +257,14 @@ impl RoomHandle {
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
         inner.toggle_enable_constraints(enabled, kind, direction, source_kind);
-        while !inner.is_all_peers_in_mute_state(
+        while !inner.is_all_peers_in_media_exchange_state(
             kind,
             direction,
             source_kind,
-            StableMuteState::from(!enabled),
+            media_exchange_state::Stable::from(enabled),
         ) {
             inner
-                .toggle_mute(!enabled, kind, direction, source_kind)
+                .toggle_media_exchange(enabled, kind, direction, source_kind)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
                     inner.toggle_enable_constraints(
@@ -314,7 +314,7 @@ impl RoomHandle {
     /// will be added to this [`Room`].
     /// This might happen in such cases:
     /// 1. Media server initiates media request.
-    /// 2. `unmute_audio`/`unmute_video` is called.
+    /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
@@ -386,8 +386,8 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes outbound audio in this [`Room`].
-    pub fn mute_audio(&self) -> Promise {
+    /// Disables outbound audio in this [`Room`].
+    pub fn disable_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
@@ -401,8 +401,8 @@ impl RoomHandle {
         })
     }
 
-    /// Unmutes outbound audio in this [`Room`].
-    pub fn unmute_audio(&self) -> Promise {
+    /// Enables outbound audio in this [`Room`].
+    pub fn enable_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
@@ -416,10 +416,10 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes outbound video.
+    /// Disables outbound video.
     ///
     /// Affects only video with specific [`JsMediaSourceKind`] if specified.
-    pub fn mute_video(
+    pub fn disable_video(
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
@@ -436,10 +436,10 @@ impl RoomHandle {
         })
     }
 
-    /// Unmutes outbound video.
+    /// Enables outbound video.
     ///
     /// Affects only video with specific [`JsMediaSourceKind`] if specified.
-    pub fn unmute_video(
+    pub fn enable_video(
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
@@ -456,8 +456,8 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes inbound audio in this [`Room`].
-    pub fn mute_remote_audio(&self) -> Promise {
+    /// Disables inbound audio in this [`Room`].
+    pub fn disable_remote_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
@@ -471,8 +471,8 @@ impl RoomHandle {
         })
     }
 
-    /// Mutes inbound video in this [`Room`].
-    pub fn mute_remote_video(&self) -> Promise {
+    /// Disables inbound video in this [`Room`].
+    pub fn disable_remote_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
@@ -486,8 +486,8 @@ impl RoomHandle {
         })
     }
 
-    /// Unmutes inbound audio in this [`Room`].
-    pub fn unmute_remote_audio(&self) -> Promise {
+    /// Enables inbound audio in this [`Room`].
+    pub fn enable_remote_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
@@ -501,8 +501,8 @@ impl RoomHandle {
         })
     }
 
-    /// Unmutes inbound video in this [`Room`].
-    pub fn unmute_remote_video(&self) -> Promise {
+    /// Enables inbound video in this [`Room`].
+    pub fn enable_remote_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
             this.set_track_enabled(
@@ -753,8 +753,8 @@ impl InnerRoom {
     }
 
     /// Toggles [`InnerRoom::recv_constraints`] or
-    /// [`InnerRoom::send_constraints`] mute status based on the provided
-    /// [`TrackDirection`], [`MediaKind`] and [`MediaSourceKind`].
+    /// [`InnerRoom::send_constraints`] media exchange status based on the
+    /// provided [`TrackDirection`], [`MediaKind`] and [`MediaSourceKind`].
     fn toggle_enable_constraints(
         &self,
         enabled: bool,
@@ -778,140 +778,137 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`TransceiverSide`]s [`MuteState`] by provided
+    /// Toggles [`TransceiverSide`]s [`media_exchange_state::State`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
-    /// Will fallback to the previous [`MuteState`]s if some [`TransceiverSide`]
-    /// can't be muted because
+    /// Will fallback to the previous [`media_exchange_state::State`]s if some
+    /// [`TransceiverSide`] can't be disabled because
     /// [`MediaConnectionsError::CannotDisableRequiredSender`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     #[allow(clippy::filter_map)]
-    async fn toggle_mute(
+    async fn toggle_media_exchange(
         &self,
-        is_muted: bool,
+        enabled: bool,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
-        let mut mute_states_backup = HashMap::new();
-        let mute_tracks: HashMap<_, _> = self
+        let mut states_backup = HashMap::new();
+        let tracks_to_disable: HashMap<_, _> = self
             .peers
             .get_all()
             .into_iter()
             .map(|peer| {
-                let mut trnscvrs_backup_mute_states = HashMap::new();
-                let new_mute_states = peer
+                let mut trnscvrs_backup_media_exchange_state = HashMap::new();
+                let new_states = peer
                     .get_transceivers_sides(kind, direction, source_kind)
                     .into_iter()
                     .filter(|transceiver| transceiver.is_transitable())
                     .map(|transceiver| {
-                        let backup_stable_mute_state =
-                            match transceiver.mute_state() {
-                                MuteState::Stable(stable) => stable,
-                                MuteState::Transition(transition) => {
-                                    transition.intended()
+                        let backup_stable_media_exchange_state =
+                            match transceiver.media_exchange_state() {
+                                media_exchange_state::State::Stable(stable) => {
+                                    stable
                                 }
+                                media_exchange_state::State::Transition(
+                                    transition,
+                                ) => transition.intended(),
                             };
-                        trnscvrs_backup_mute_states.insert(
+                        trnscvrs_backup_media_exchange_state.insert(
                             transceiver.track_id(),
-                            backup_stable_mute_state,
+                            backup_stable_media_exchange_state,
                         );
                         (
                             transceiver.track_id(),
-                            StableMuteState::from(is_muted),
+                            media_exchange_state::Stable::from(enabled),
                         )
                     })
                     .collect();
-                mute_states_backup
-                    .insert(peer.id(), trnscvrs_backup_mute_states);
-                (peer.id(), new_mute_states)
+                states_backup
+                    .insert(peer.id(), trnscvrs_backup_media_exchange_state);
+                (peer.id(), new_states)
             })
             .collect();
 
-        let update_result = self.update_mute_states(mute_tracks).await;
+        let update_result =
+            self.update_media_exchange_states(tracks_to_disable).await;
         if let Err(RoomError::MediaConnections(
             MediaConnectionsError::CannotDisableRequiredSender,
         )) = &update_result.as_ref().map_err(AsRef::as_ref)
         {
-            self.update_mute_states(mute_states_backup).await?;
+            self.update_media_exchange_states(states_backup).await?;
         }
 
         update_result
     }
 
-    /// Updates [`MuteState`]s of the [`TransceiverSide`] with a provided
-    /// [`PeerId`] and [`TrackId`] to a provided [`StableMuteState`]s.
+    /// Updates [`media_exchange_state::State`]s of the [`TransceiverSide`] with
+    /// a provided [`PeerId`] and [`TrackId`] to a provided
+    /// [`media_exchange_state::Stable`]s.
     #[allow(clippy::filter_map)]
-    async fn update_mute_states(
+    async fn update_media_exchange_states(
         &self,
-        desired_mute_states: HashMap<PeerId, HashMap<TrackId, StableMuteState>>,
+        desired_states: HashMap<
+            PeerId,
+            HashMap<TrackId, media_exchange_state::Stable>,
+        >,
     ) -> Result<(), Traced<RoomError>> {
+        use media_exchange_state::{
+            Stable::Enabled,
+            State::{Stable, Transition},
+        };
+
         future::try_join_all(
-            desired_mute_states
+            desired_states
                 .into_iter()
-                .filter_map(|(peer_id, desired_mute_states)| {
-                    self.peers
-                        .get(peer_id)
-                        .map(|peer| (peer, desired_mute_states))
+                .filter_map(|(peer_id, desired_states)| {
+                    self.peers.get(peer_id).map(|peer| (peer, desired_states))
                 })
-                .map(|(peer, desired_mute_states)| {
+                .map(|(peer, desired_states)| {
                     let peer_id = peer.id();
                     let mut transitions_futs = Vec::new();
                     let mut tracks_patches = Vec::new();
-                    desired_mute_states
+                    desired_states
                         .into_iter()
-                        .filter_map(move |(track_id, desired_mute_state)| {
+                        .filter_map(move |(track_id, desired_state)| {
                             peer.get_transceiver_side_by_id(track_id)
-                                .map(|trnscvr| (trnscvr, desired_mute_state))
+                                .map(|trnscvr| (trnscvr, desired_state))
                         })
-                        .filter_map(|(trnscvr, desired_mute_state)| {
-                            match trnscvr.mute_state() {
-                                MuteState::Transition(transition) => Some((
+                        .filter_map(|(trnscvr, desired_state)| {
+                            match trnscvr.media_exchange_state() {
+                                Transition(transition) => Some((
                                     trnscvr,
-                                    desired_mute_state,
-                                    transition.intended() != desired_mute_state,
+                                    desired_state,
+                                    transition.intended() != desired_state,
                                 )),
-                                MuteState::Stable(stable) => {
-                                    if stable == desired_mute_state {
+                                Stable(stable) => {
+                                    if stable == desired_state {
                                         None
                                     } else {
-                                        Some((
-                                            trnscvr,
-                                            desired_mute_state,
-                                            true,
-                                        ))
+                                        Some((trnscvr, desired_state, true))
                                     }
                                 }
                             }
                         })
-                        .map(
-                            |(
-                                trnscvr,
-                                desired_mute_state,
-                                should_be_patched,
-                            )| {
-                                trnscvr.mute_state_transition_to(
-                                    desired_mute_state,
-                                )?;
-                                transitions_futs.push(
-                                    trnscvr.when_mute_state_stable(
-                                        desired_mute_state,
-                                    ),
-                                );
-                                if should_be_patched {
-                                    tracks_patches.push(TrackPatchCommand {
-                                        id: trnscvr.track_id(),
-                                        is_muted: Some(
-                                            desired_mute_state
-                                                == StableMuteState::Muted,
-                                        ),
-                                    });
-                                }
+                        .map(|(trnscvr, desired_state, should_be_patched)| {
+                            trnscvr.media_exchange_state_transition_to(
+                                desired_state,
+                            )?;
+                            transitions_futs.push(
+                                trnscvr.when_media_exchange_state_stable(
+                                    desired_state,
+                                ),
+                            );
+                            if should_be_patched {
+                                tracks_patches.push(TrackPatchCommand {
+                                    id: trnscvr.track_id(),
+                                    enabled: Some(desired_state == Enabled),
+                                });
+                            }
 
-                                Ok(())
-                            },
-                        )
+                            Ok(())
+                        })
                         .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {
@@ -933,23 +930,23 @@ impl InnerRoom {
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
-    /// provided `mute_state`.
-    pub fn is_all_peers_in_mute_state(
+    /// provided [`media_exchange_state::Stable`].
+    pub fn is_all_peers_in_media_exchange_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        mute_state: StableMuteState,
+        state: media_exchange_state::Stable,
     ) -> bool {
         self.peers
             .get_all()
             .into_iter()
             .find(|p| {
-                !p.is_all_transceiver_sides_in_mute_state(
+                !p.is_all_transceiver_sides_in_media_exchange_state(
                     kind,
                     direction,
                     source_kind,
-                    mute_state,
+                    state,
                 )
             })
             .is_none()
@@ -965,8 +962,8 @@ impl InnerRoom {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`MuteState`]s of the [`Sender`]s which are should be
-    /// enabled or disabled.
+    /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
+    /// are should be enabled or disabled.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
@@ -976,17 +973,17 @@ impl InnerRoom {
     ) -> Result<(), Traced<RoomError>> {
         self.send_constraints.constrain(settings);
 
-        let mut mute_states_update = HashMap::new();
+        let mut states_update = HashMap::new();
         for peer in self.peers.get_all() {
             peer.update_local_stream(LocalStreamUpdateCriteria::all())
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map(|new_mute_states| {
-                    mute_states_update.insert(peer.id(), new_mute_states)
+                .map(|new_media_exchange_states| {
+                    states_update.insert(peer.id(), new_media_exchange_states)
                 })?;
         }
 
-        self.update_mute_states(mute_states_update)
+        self.update_media_exchange_states(states_update)
             .await
             .map_err(tracerr::map_from_and_wrap!())
     }
@@ -1206,13 +1203,9 @@ impl EventHandler for InnerRoom {
         partner_member_id: MemberId,
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
-        let conn = self
-            .connections
-            .get(&partner_member_id)
-            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
-
-        conn.update_quality_score(quality_score);
-
+        if let Some(conn) = self.connections.get(&partner_member_id) {
+            conn.update_quality_score(quality_score);
+        }
         Ok(())
     }
 

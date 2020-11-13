@@ -1,6 +1,6 @@
 //! [`crate::peer::PeerConnection`] media management.
 
-mod mute_state;
+pub mod media_exchange_state;
 mod receiver;
 mod sender;
 
@@ -27,16 +27,12 @@ use crate::{
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
-use self::{mute_state::MuteStateController, sender::SenderBuilder};
+use self::sender::SenderBuilder;
 
-pub use self::{
-    mute_state::{MuteState, MuteStateTransition, StableMuteState},
-    receiver::Receiver,
-    sender::Sender,
-};
+pub use self::{receiver::Receiver, sender::Sender};
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
-pub trait TransceiverSide: Muteable {
+pub trait TransceiverSide: Disableable {
     /// Returns [`TrackId`] of this [`TransceiverSide`].
     fn track_id(&self) -> TrackId;
 
@@ -52,85 +48,93 @@ pub trait TransceiverSide: Muteable {
     fn mid(&self) -> Option<String>;
 
     /// Returns `true` if this [`TransceiverKind`] currently can be
-    /// muted/unmuted without [`LocalMediaStreamConstraints`] updating.
+    /// disabled/enabled without [`LocalMediaStreamConstraints`] updating.
     fn is_transitable(&self) -> bool;
 }
 
-/// Default functions for dealing with [`MuteStateController`] for objects that
-/// use it.
-pub trait Muteable {
-    /// Returns reference to the [`MuteStateController`].
-    fn mute_state_controller(&self) -> Rc<MuteStateController>;
+/// Default functions for dealing with [`media_exchange_state::Controller`] for
+/// objects that use it.
+pub trait Disableable {
+    /// Returns reference to the [`media_exchange_state::Controller`].
+    fn media_exchange_state_controller(
+        &self,
+    ) -> Rc<media_exchange_state::Controller>;
 
-    /// Returns [`MuteState`] of this [`Muteable`].
+    /// Returns [`media_exchange_state::State`] of this [`Disableable`].
     #[inline]
-    fn mute_state(&self) -> MuteState {
-        self.mute_state_controller().mute_state()
+    fn media_exchange_state(&self) -> media_exchange_state::State {
+        self.media_exchange_state_controller()
+            .media_exchange_state()
     }
 
-    /// Sets current [`MuteState`] to [`MuteState::Transition`].
+    /// Sets current [`media_exchange_state::State`] to
+    /// [`media_exchange_state::State::Transition`].
     ///
     /// # Errors
     ///
     /// Implementors might return [`MediaConnectionsError`] if transition could
     /// not be made for some reason.
     #[inline]
-    fn mute_state_transition_to(
+    fn media_exchange_state_transition_to(
         &self,
-        desired_state: StableMuteState,
+        desired_state: media_exchange_state::Stable,
     ) -> Result<()> {
-        self.mute_state_controller().transition_to(desired_state);
+        self.media_exchange_state_controller()
+            .transition_to(desired_state);
 
         Ok(())
     }
 
-    /// Cancels [`MuteState`] transition.
+    /// Cancels [`media_exchange_state::State`] transition.
     #[inline]
     fn cancel_transition(&self) {
-        self.mute_state_controller().cancel_transition()
+        self.media_exchange_state_controller().cancel_transition()
     }
 
-    /// Returns [`Future`] which will be resolved when [`MuteState`] of this
-    /// [`Muteable`] will be [`MuteState::Stable`] or it is dropped.
+    /// Returns [`Future`] which will be resolved when
+    /// [`media_exchange_state::State`] of this [`Disableable`] will be
+    /// [`media_exchange_state::State::Stable`] or it is dropped.
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::MuteStateTransitsIntoOppositeState`] is
-    /// returned if [`MuteState`] transits into the opposite to the
-    /// `desired_state`.
+    /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
+    /// is returned if [`media_exchange_state::State`] transits into the
+    /// opposite to the `desired_state`.
     #[inline]
-    fn when_mute_state_stable(
+    fn when_media_exchange_state_stable(
         &self,
-        desired_state: StableMuteState,
+        desired_state: media_exchange_state::Stable,
     ) -> LocalBoxFuture<'static, Result<()>> {
-        self.mute_state_controller()
-            .when_mute_state_stable(desired_state)
+        self.media_exchange_state_controller()
+            .when_media_exchange_state_stable(desired_state)
     }
 
-    /// Stops state transition timer of this [`Muteable`].
+    /// Stops state transition timer of this [`Disableable`].
     #[inline]
-    fn stop_mute_state_transition_timeout(&self) {
-        self.mute_state_controller().stop_transition_timeout()
+    fn stop_media_exchange_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .stop_transition_timeout()
     }
 
-    /// Resets state transition timer of this [`Muteable`].
+    /// Resets state transition timer of this [`Disableable`].
     #[inline]
-    fn reset_mute_state_transition_timeout(&self) {
-        self.mute_state_controller().reset_transition_timeout()
+    fn reset_media_exchange_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .reset_transition_timeout()
     }
 
-    /// Indicates whether mute state of the [`Muteable`] is in
-    /// [`MuteState::Muted`].
+    /// Indicates whether media exchange state of the [`Disableable`] is in
+    /// [`media_exchange_state::Stable::Disabled`].
     #[inline]
-    fn is_muted(&self) -> bool {
-        self.mute_state_controller().is_muted()
+    fn disabled(&self) -> bool {
+        self.media_exchange_state_controller().disabled()
     }
 
-    /// Indicates whether mute state of the [`Muteable`] is in
-    /// [`MuteState::Unmuted`].
+    /// Indicates whether media exchange state of the [`Disableable`] is in
+    /// [`media_exchange_state::Stable::Enabled`].
     #[inline]
-    fn is_unmuted(&self) -> bool {
-        self.mute_state_controller().is_unmuted()
+    fn enabled(&self) -> bool {
+        self.media_exchange_state_controller().enabled()
     }
 }
 
@@ -183,31 +187,31 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
-    /// Occurs when [`MuteState`] of [`Sender`] was dropped.
-    #[display(fmt = "MuteState of Sender was dropped.")]
-    MuteStateDropped,
+    /// Occurs when [`media_exchange_state::State`] of [`Sender`] was dropped.
+    #[display(fmt = "MediaExchangeState of Sender was dropped.")]
+    MediaExchangeStateDropped,
 
-    /// Occurs when [`MuteState`] of [`Sender`] transits into opposite to
-    /// expected [`MuteState`].
-    #[display(fmt = "MuteState of Sender transits into opposite to expected \
-                     MuteState")]
-    MuteStateTransitsIntoOppositeState,
+    /// Occurs when [`media_exchange_state::State`] of [`Sender`] transits into
+    /// opposite to expected [`media_exchange_state::State`].
+    #[display(fmt = "MediaExchangeState of Sender transits into opposite to \
+                     expected MediaExchangeState")]
+    MediaExchangeStateTransitsIntoOppositeState,
 
     /// Invalid [`medea_client_api_proto::TrackPatch`] for
     /// [`MediaStreamTrack`].
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
 
-    /// Some [`Sender`] can't be muted because it required.
-    #[display(fmt = "MuteState of Sender can't be transited into muted \
-                     state, because this Sender is required.")]
+    /// Some [`Sender`] can't be disabled because it required.
+    #[display(fmt = "MediaExchangeState of Sender can't be transited into \
+                     disabled state, because this Sender is required.")]
     CannotDisableRequiredSender,
 }
 
 impl From<DroppedError> for MediaConnectionsError {
     #[inline]
     fn from(_: DroppedError) -> Self {
-        Self::MuteStateDropped
+        Self::MediaExchangeStateDropped
     }
 }
 
@@ -331,13 +335,13 @@ impl MediaConnections {
 
     /// Returns `true` if all [`TransceiverSide`]s with provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
-    /// provided [`MuteState`].
-    pub fn is_all_tracks_in_mute_state(
+    /// provided [`media_exchange_state::State`].
+    pub fn is_all_tracks_in_media_exchange_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        mute_state: StableMuteState,
+        media_exchange_state: media_exchange_state::Stable,
     ) -> bool {
         let transceivers =
             self.0.borrow().get_transceivers_by_direction_and_kind(
@@ -349,7 +353,8 @@ impl MediaConnections {
             if !transceiver.is_transitable() {
                 continue;
             }
-            if transceiver.mute_state() != mute_state.into() {
+            if transceiver.media_exchange_state() != media_exchange_state.into()
+            {
                 return false;
             }
         }
@@ -363,7 +368,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.is_muted())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -373,7 +378,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.is_muted())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -465,14 +470,14 @@ impl MediaConnections {
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
         for track in tracks {
-            let is_required = track.is_required();
+            let required = track.required();
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let mute_state = if send_constraints
-                        .is_enabled(&track.media_type)
+                    let media_exchange_state = if send_constraints
+                        .enabled(&track.media_type)
                     {
-                        StableMuteState::Unmuted
-                    } else if is_required {
+                        media_exchange_state::Stable::Enabled
+                    } else if required {
                         let e = tracerr::new!(
                             MediaConnectionsError::CannotDisableRequiredSender
                         );
@@ -484,15 +489,15 @@ impl MediaConnections {
                             );
                         return Err(e);
                     } else {
-                        StableMuteState::Muted
+                        media_exchange_state::Stable::Disabled
                     };
                     let sndr = SenderBuilder {
                         media_connections: self,
                         track_id: track.id,
                         caps: track.media_type.into(),
                         mid,
-                        mute_state,
-                        is_required,
+                        media_exchange_state,
+                        required,
                         send_constraints: send_constraints.clone(),
                     }
                     .build()
@@ -575,7 +580,8 @@ impl MediaConnections {
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
     ///
-    /// Returns [`HashMap`] with [`MuteState`]s updates for the [`Sender`]s.
+    /// Returns [`HashMap`] with [`media_exchange_state::State`]s updates for
+    /// the [`Sender`]s.
     ///
     /// # Errors
     ///
@@ -594,30 +600,34 @@ impl MediaConnections {
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
-    ) -> Result<HashMap<TrackId, StableMuteState>> {
+    ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         let inner = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
-        let mut mute_satates_updates = HashMap::new();
+        let mut media_exchange_state_updates = HashMap::new();
         for sender in inner.senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(&track) {
-                    mute_satates_updates
-                        .insert(sender.track_id(), StableMuteState::Unmuted);
+                    media_exchange_state_updates.insert(
+                        sender.track_id(),
+                        media_exchange_state::Stable::Enabled,
+                    );
                     sender_and_track.push((sender, track));
                 } else {
                     return Err(tracerr::new!(
                         MediaConnectionsError::InvalidMediaTrack
                     ));
                 }
-            } else if sender.caps().is_required() {
+            } else if sender.caps().required() {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
-                mute_satates_updates
-                    .insert(sender.track_id(), StableMuteState::Muted);
+                media_exchange_state_updates.insert(
+                    sender.track_id(),
+                    media_exchange_state::Stable::Disabled,
+                );
             }
         }
 
@@ -630,7 +640,7 @@ impl MediaConnections {
         ))
         .await?;
 
-        Ok(mute_satates_updates)
+        Ok(media_exchange_state_updates)
     }
 
     /// Handles [`RtcTrackEvent`] by adding new track to the corresponding
@@ -711,14 +721,14 @@ impl MediaConnections {
     pub fn stop_state_transitions_timers(&self) {
         self.get_all_transceivers_sides()
             .into_iter()
-            .for_each(|t| t.stop_mute_state_transition_timeout())
+            .for_each(|t| t.stop_media_exchange_state_transition_timeout())
     }
 
     /// Resets all [`TransceiverSide`]s state transitions expiry timers.
     pub fn reset_state_transitions_timers(&self) {
         self.get_all_transceivers_sides()
             .into_iter()
-            .for_each(|t| t.reset_mute_state_transition_timeout());
+            .for_each(|t| t.reset_media_exchange_state_transition_timeout());
     }
 }
 
@@ -734,7 +744,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
-            .all(|s| s.is_unmuted())
+            .all(|s| s.enabled())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
@@ -748,6 +758,6 @@ impl MediaConnections {
                 MediaKind::Video,
                 source_kind,
             )
-            .all(|s| s.is_unmuted())
+            .all(|s| s.enabled())
     }
 }

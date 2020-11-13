@@ -95,8 +95,8 @@ impl Into<proto::request::Event> for CallbackEvent {
 
 /// Media type of the traffic which starts/stops flowing in some `Endpoint`.
 ///
-/// This enum is used in [`MuteState`] of `Endpoint`s. That's why it represents
-/// a bitflag enum.
+/// This enum is used in [`MediaExchangeState`] of `Endpoint`s. That's why it
+/// represents a bitflag enum.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 pub enum MediaType {
     /// Started/stopped audio traffic.
