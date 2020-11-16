@@ -19,10 +19,10 @@ use crate::{
 
 use super::TransitableState;
 
-/// [`TransitableStateController`] for the [`mute_state::Stable`].
+/// [`TransitableStateController`] for the [`mute_state`].
 pub type MuteStateController =
     TransitableStateController<mute_state::Stable, mute_state::Transition>;
-/// [`TransitableStateController`] for the [`media_exchange_state::Stable`].
+/// [`TransitableStateController`] for the [`media_exchange_state`].
 pub type MediaExchangeStateController = TransitableStateController<
     media_exchange_state::Stable,
     media_exchange_state::Transition,
@@ -235,13 +235,13 @@ impl MediaExchangeStateController {
     }
 
     /// Checks whether [`TransitableStateController`]'s media exchange state
-    /// is in [`MediaExchangeState::Disabled`].
+    /// is in [`media_exchange_state::Stable::Disabled`].
     pub fn is_disabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
 
     /// Checks whether [`TransitableStateController`]'s media exchange state
-    /// is in [`MediaExchangeState::Enabled`].
+    /// is in [`media_exchange_state::Stable::Enabled`].
     pub fn is_enabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Enabled.into()
     }

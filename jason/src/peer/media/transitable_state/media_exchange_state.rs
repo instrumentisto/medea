@@ -17,7 +17,7 @@ pub enum Stable {
 }
 
 impl Stable {
-    /// Returns opposite to this [`StableMediaExchangeState`].
+    /// Returns opposite to this [`Stable`].
     pub fn opposite(self) -> Self {
         match self {
             Self::Enabled => Self::Disabled,
@@ -29,14 +29,14 @@ impl Stable {
 impl InStable for Stable {
     type Transition = Transition;
 
-    /// Converts this [`StableMediaExchangeState`] into
-    /// [`MediaExchangeStateTransition`].
+    /// Converts this [`Stable`] into
+    /// [`Transition`].
     ///
-    /// [`StableMediaExchangeState::Enabled`] =>
-    /// [`MediaExchangeStateTransition::Disabling`].
+    /// [`Stable::Enabled`] =>
+    /// [`Transition::Disabling`].
     ///
-    /// [`StableMediaExchangeState::Disabled`] =>
-    /// [`MediaExchangeStateTransition::Enabling`].
+    /// [`Stable::Disabled`] =>
+    /// [`Transition::Enabling`].
     #[inline]
     fn start_transition(self) -> Self::Transition {
         match self {
@@ -58,12 +58,12 @@ impl From<bool> for Stable {
 }
 
 /// [`MediaExchangeState`] in transition to another
-/// [`StableMediaExchangeState`].
+/// [`Stable`].
 ///
-/// [`StableMediaExchangeState`] which is stored in
-/// [`TransitionMediaExchangeState`] variants is a state which we already have,
+/// [`Stable`] which is stored in
+/// [`Transition`] variants is a state which we already have,
 /// but we still waiting for a desired state update. If desired state update
-/// won't be received, then the stored [`StableMediaExchangeState`] will be
+/// won't be received, then the stored [`Stable`] will be
 /// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Transition {
@@ -83,7 +83,7 @@ pub enum Transition {
 impl InTransition for Transition {
     type Stable = Stable;
 
-    /// Returns intention which this [`TransitionMediaExchangeState`] indicates.
+    /// Returns intention which this [`Transition`] indicates.
     #[inline]
     fn intended(self) -> Self::Stable {
         match self {
@@ -92,7 +92,7 @@ impl InTransition for Transition {
         }
     }
 
-    /// Sets inner [`StableMediaExchangeState`].
+    /// Sets inner [`Stable`].
     #[inline]
     fn set_inner(self, inner: Self::Stable) -> Self {
         match self {
@@ -101,7 +101,7 @@ impl InTransition for Transition {
         }
     }
 
-    /// Returns inner [`StableMediaExchangeState`].
+    /// Returns inner [`Stable`].
     #[inline]
     fn into_inner(self) -> Self::Stable {
         match self {
@@ -109,9 +109,9 @@ impl InTransition for Transition {
         }
     }
 
-    /// Converts [`TransitionMediaExchangeState`] to the opposite
-    /// [`TransitionMediaExchangeState`] with a same inner
-    /// [`StableMediaExchangeState`].
+    /// Converts [`Transition`] to the opposite
+    /// [`Transition`] with a same inner
+    /// [`Stable`].
     #[inline]
     fn opposite(self) -> Self {
         match self {

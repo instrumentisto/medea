@@ -13,7 +13,7 @@ pub enum Stable {
 }
 
 impl Stable {
-    /// Returns opposite to this [`StableMuteState`].
+    /// Returns opposite to this [`Stable`].
     pub fn opposite(self) -> Self {
         match self {
             Self::Muted => Self::Unmuted,
@@ -46,12 +46,12 @@ impl InStable for Stable {
 }
 
 /// [`MuteState`] in transition to another
-/// [`StableMuteState`].
+/// [`Stable`].
 ///
-/// [`StableMuteState`] which is stored in
-/// [`TransitionMuteState`] variants is a state which we already have,
+/// [`Stable`] which is stored in
+/// [`Transition`] variants is a state which we already have,
 /// but we still waiting for a desired state update. If desired state update
-/// won't be received, then the stored [`StableMuteState`] will be
+/// won't be received, then the stored [`Stable`] will be
 /// applied.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Transition {

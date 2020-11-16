@@ -674,7 +674,7 @@ impl MediaConnections {
     /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
     /// direction to `sendonly`.
     ///
-    /// Returns [`HashMap`] with [`media_exchange_state::State`]s updates for
+    /// Returns [`HashMap`] with [`media_exchange_state::Stable`]s updates for
     /// the [`Sender`]s.
     ///
     /// # Errors
