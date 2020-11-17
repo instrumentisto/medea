@@ -1652,4 +1652,146 @@ pub mod tests {
             }
         }
     }
+
+    /// Tests for negotiationless [`TrackChange`]s.
+    mod negotiationless_changes {
+        use super::*;
+
+        /// Checks that negotiationless changes will not start renegotiation.
+        #[test]
+        fn negotiationless_change_dont_triggers_negotiation() {
+            let track_patch = TrackPatchEvent {
+                id: TrackId(0),
+                muted: Some(true),
+                enabled_individual: None,
+                enabled_general: None,
+            };
+            let changes = vec![TrackChange::TrackPatch(track_patch.clone())];
+
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub.expect_force_update().times(1).return_once(
+                move |peer_id: PeerId, updates: Vec<TrackUpdate>| {
+                    assert_eq!(peer_id, PeerId(0));
+                    assert_eq!(
+                        updates,
+                        vec![TrackUpdate::Updated(track_patch)]
+                    );
+                },
+            );
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(1),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+
+            peer.context.track_changes_queue = changes;
+            peer.commit_scheduled_changes();
+        }
+
+        /// Checks that [`TrackChange`] which doesn't requires negotiation with
+        /// [`TrackChange`] which requires negotiation will trigger negotiation.
+        #[test]
+        fn mixed_changeset_will_trigger_negotiation() {
+            let changes = vec![
+                TrackChange::TrackPatch(TrackPatchEvent {
+                    id: TrackId(0),
+                    muted: Some(true),
+                    enabled_individual: None,
+                    enabled_general: None,
+                }),
+                TrackChange::TrackPatch(TrackPatchEvent {
+                    id: TrackId(1),
+                    muted: None,
+                    enabled_individual: Some(true),
+                    enabled_general: Some(true),
+                }),
+            ];
+
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub
+                .expect_negotiation_needed()
+                .times(1)
+                .return_once(move |peer_id: PeerId| {
+                    assert_eq!(peer_id, PeerId(0));
+                });
+
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(1),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+
+            peer.context.track_changes_queue = changes.clone();
+            peer.commit_scheduled_changes();
+
+            let reversed_changes = {
+                let mut changes = changes;
+                changes.reverse();
+                changes
+            };
+            assert_eq!(peer.context.pending_track_updates, reversed_changes);
+        }
+
+        /// Checks that [`TrackChange`] which changes negotiationless property
+        /// and negotiationful property will trigger negotiation.
+        #[test]
+        fn mixed_change_will_trigger_negotiation() {
+            let changes = vec![TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(0),
+                muted: Some(true),
+                enabled_individual: Some(true),
+                enabled_general: Some(true),
+            })];
+
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub
+                .expect_negotiation_needed()
+                .times(1)
+                .return_once(move |peer_id: PeerId| {
+                    assert_eq!(peer_id, PeerId(0));
+                });
+
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(1),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+
+            peer.context.track_changes_queue = changes.clone();
+            peer.commit_scheduled_changes();
+
+            assert_eq!(peer.context.pending_track_updates, changes);
+        }
+
+        /// Checks that [`TrackChange::is_negotiationless`] works correctly.
+        #[test]
+        fn is_negotiationless_works_fine() {
+            for ((enabled_general, enabled_individual, muted), expected) in &[
+                ((None, None, Some(true)), true),
+                ((Some(true), Some(true), None), false),
+                ((Some(true), None, None), false),
+                ((Some(true), Some(true), Some(true)), false),
+            ] {
+                assert_eq!(
+                    TrackChange::TrackPatch(TrackPatchEvent {
+                        id: TrackId(0),
+                        enabled_general: *enabled_general,
+                        enabled_individual: *enabled_individual,
+                        muted: *muted,
+                    })
+                    .is_negotiationless(),
+                    *expected
+                );
+            }
+        }
+    }
 }
