@@ -272,14 +272,29 @@ impl Receiver {
 }
 
 impl MediaStateControllable for Receiver {
+    #[inline]
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {
-        self.media_exchange_state_controller.clone()
+        Rc::clone(&self.media_exchange_state_controller)
     }
 
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         unreachable!("Receivers muting is not implemented");
+    }
+
+    /// Stops only [`MediaExchangeStateController`]'s state transition timer.
+    #[inline]
+    fn stop_media_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .stop_transition_timeout();
+    }
+
+    /// Resets only [`MediaExchangeStateController`]'s state transition timer.
+    #[inline]
+    fn reset_media_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .reset_transition_timeout();
     }
 }
 
