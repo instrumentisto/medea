@@ -2,7 +2,9 @@
 
 use std::{cell::RefCell, slice::Iter};
 
-use futures::{channel::mpsc, Stream};
+use futures::{channel::mpsc, future::LocalBoxFuture, Stream};
+
+use crate::progressable::{ProgressableManager, ProgressableObservableValue};
 
 /// Reactive vector based on [`Vec`].
 ///
@@ -48,10 +50,16 @@ pub struct ObservableVec<T: Clone> {
     store: Vec<T>,
 
     /// Subscribers of the [`ObservableVec::on_push`] method.
-    on_push_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
+    on_push_subs:
+        RefCell<Vec<mpsc::UnboundedSender<ProgressableObservableValue<T>>>>,
 
     /// Subscribers of the [`ObservableVec::on_remove`] method.
-    on_remove_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
+    on_remove_subs:
+        RefCell<Vec<mpsc::UnboundedSender<ProgressableObservableValue<T>>>>,
+
+    push_progressable_manager: ProgressableManager,
+
+    remove_progressable_manager: ProgressableManager,
 }
 
 impl<T> ObservableVec<T>
@@ -69,11 +77,13 @@ where
     ///
     /// This will produce [`ObservableVec::on_push`] event.
     pub fn push(&mut self, value: T) {
-        for sub in self.on_push_subs.borrow().iter() {
-            let _ = sub.unbounded_send(value.clone());
-        }
+        self.store.push(value.clone());
 
-        self.store.push(value)
+        self.on_push_subs.borrow_mut().retain(|sub| {
+            self.push_progressable_manager.incr_processors_count(1);
+            let value = self.push_progressable_manager.new_value(value.clone());
+            sub.unbounded_send(value).is_ok()
+        });
     }
 
     /// Removes and returns the element at position `index` within the vector,
@@ -82,9 +92,12 @@ where
     /// This will produce [`ObservableVec::on_remove`] event.
     pub fn remove(&mut self, index: usize) -> T {
         let value = self.store.remove(index);
-        for sub in self.on_remove_subs.borrow().iter() {
-            let _ = sub.unbounded_send(value.clone());
-        }
+        self.on_remove_subs.borrow_mut().retain(|sub| {
+            self.push_progressable_manager.incr_processors_count(1);
+            let value =
+                self.remove_progressable_manager.new_value(value.clone());
+            sub.unbounded_send(value).is_ok()
+        });
 
         value
     }
@@ -99,11 +112,16 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already pushed values
     /// of this [`ObservableVec`].
-    pub fn on_push(&self) -> impl Stream<Item = T> {
+    pub fn on_push(
+        &self,
+    ) -> impl Stream<Item = ProgressableObservableValue<T>> {
         let (tx, rx) = mpsc::unbounded();
 
         for value in self.store.iter().cloned() {
-            let _ = tx.unbounded_send(value);
+            self.push_progressable_manager.incr_processors_count(1);
+            let _ = tx.unbounded_send(
+                self.push_progressable_manager.new_value(value),
+            );
         }
 
         self.on_push_subs.borrow_mut().push(tx);
@@ -115,11 +133,21 @@ where
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableVec`] on drop.
-    pub fn on_remove(&self) -> impl Stream<Item = T> {
+    pub fn on_remove(
+        &self,
+    ) -> impl Stream<Item = ProgressableObservableValue<T>> {
         let (tx, rx) = mpsc::unbounded();
         self.on_remove_subs.borrow_mut().push(tx);
 
         rx
+    }
+
+    pub fn when_push_completed(&self) -> LocalBoxFuture<'static, ()> {
+        self.push_progressable_manager.when_all_processed()
+    }
+
+    pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
+        self.remove_progressable_manager.when_all_processed()
     }
 }
 
@@ -132,6 +160,8 @@ where
             store: Vec::new(),
             on_push_subs: RefCell::new(Vec::new()),
             on_remove_subs: RefCell::new(Vec::new()),
+            push_progressable_manager: ProgressableManager::new(),
+            remove_progressable_manager: ProgressableManager::new(),
         }
     }
 }
@@ -142,6 +172,8 @@ impl<T: Clone> From<Vec<T>> for ObservableVec<T> {
             store: from,
             on_push_subs: RefCell::new(Vec::new()),
             on_remove_subs: RefCell::new(Vec::new()),
+            push_progressable_manager: ProgressableManager::new(),
+            remove_progressable_manager: ProgressableManager::new(),
         }
     }
 }
@@ -165,10 +197,12 @@ where
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
+        let manager = &self.remove_progressable_manager;
         store.drain(..).for_each(|value| {
-            for sub in on_remove_subs.borrow().iter() {
-                let _ = sub.unbounded_send(value.clone());
-            }
+            on_remove_subs.borrow_mut().retain(|sub| {
+                sub.unbounded_send(manager.new_value(value.clone())).is_ok()
+            });
+            manager.incr_processors_count(on_remove_subs.borrow().len() as u32);
         });
     }
 }

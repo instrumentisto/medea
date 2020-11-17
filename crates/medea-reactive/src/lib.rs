@@ -23,6 +23,7 @@
 
 pub mod collections;
 pub mod field;
+mod progressable;
 
 #[doc(inline)]
 pub use crate::{
@@ -30,6 +31,6 @@ pub use crate::{
     field::{
         cell::ObservableCell, DroppedError, MutObservableFieldGuard,
         Observable, ObservableField, OnObservableFieldModification,
-        Subscribable, UniversalSubscriber, Whenable,
+        ProgressableObservable, Subscribable, UniversalSubscriber, Whenable,
     },
 };
