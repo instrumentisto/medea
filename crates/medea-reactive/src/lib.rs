@@ -12,7 +12,6 @@
 #![warn(
     deprecated_in_future,
     missing_copy_implementations,
-    missing_docs,
     unreachable_pub,
     unused_import_braces,
     unused_labels,
@@ -33,4 +32,5 @@ pub use crate::{
         Observable, ObservableField, OnObservableFieldModification,
         ProgressableObservable, Subscribable, UniversalSubscriber, Whenable,
     },
+    progressable::ProgressableObservableValue,
 };

@@ -1,11 +1,6 @@
-use futures::{
-    future::LocalBoxFuture, stream::LocalBoxStream,
-    StreamExt as _,
-};
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream, StreamExt as _};
 
-use crate::{
-    progressable::{ProgressableManager, ProgressableObservableValue},
-};
+use crate::progressable::{ProgressableManager, ProgressableObservableValue};
 
 use super::Observable;
 

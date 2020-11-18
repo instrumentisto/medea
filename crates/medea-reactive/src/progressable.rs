@@ -1,29 +1,29 @@
-use std::{cell::RefCell, mem, rc::Rc};
-use std::ops::Deref;
+use std::{cell::RefCell, mem, ops::Deref, rc::Rc};
 
-use futures::{
-    channel::oneshot, future::LocalBoxFuture,
-};
+use futures::{channel::oneshot, future::LocalBoxFuture};
 
 #[derive(Clone, Debug)]
-pub struct ProgressableManager {
+pub(crate) struct ProgressableManager {
     counter: Rc<RefCell<u32>>,
     progress_subs: Rc<RefCell<Vec<oneshot::Sender<()>>>>,
 }
 
 impl ProgressableManager {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             counter: Rc::new(RefCell::new(0)),
             progress_subs: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
-    pub fn incr_processors_count(&self, count: u32) {
+    pub(crate) fn incr_processors_count(&self, count: u32) {
         *self.counter.borrow_mut() += count;
     }
 
-    pub fn new_value<D>(&self, value: D) -> ProgressableObservableValue<D> {
+    pub(crate) fn new_value<D>(
+        &self,
+        value: D,
+    ) -> ProgressableObservableValue<D> {
         ProgressableObservableValue {
             value,
             counter: Rc::clone(&self.counter),
@@ -31,7 +31,7 @@ impl ProgressableManager {
         }
     }
 
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub(crate) fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         if *self.counter.borrow() > 0 {
             let (tx, rx) = oneshot::channel();
             self.progress_subs.borrow_mut().push(tx);
