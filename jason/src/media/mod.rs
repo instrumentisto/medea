@@ -18,8 +18,9 @@ pub use self::{
         TrackConstraints, VideoSource,
     },
     device_info::InputDeviceInfo,
+    track::DeepTrack,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
-    track::{JsMediaSourceKind, MediaStreamTrack},
+    track::{JsMediaSourceKind, MediaStreamTrack, LocalMediaTrack, Strong, Soft, LocalMediaStreamTrack},
 };
 
 /// [MediaStreamTrack.kind][1] representation.

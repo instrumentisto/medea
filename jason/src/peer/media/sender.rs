@@ -23,6 +23,7 @@ use super::{
     MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
     TransceiverSide,
 };
+use crate::media::{LocalMediaTrack, Strong};
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -143,14 +144,16 @@ impl Sender {
     /// [`Sender`].
     pub(super) async fn insert_track(
         self: Rc<Self>,
-        new_track: MediaStreamTrack,
+        new_track: LocalMediaTrack<Strong>,
     ) -> Result<()> {
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
-            if new_track.root_id() == current_track.root_id() {
+            if new_track.id() == current_track.id() {
                 return Ok(());
             }
         }
+
+        let new_track = new_track.deep_clone();
 
         new_track.set_enabled(
             self.mute_state.state().cancel_transition()

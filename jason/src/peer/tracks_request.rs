@@ -16,6 +16,7 @@ use crate::{
     utils::{JsCaused, JsError},
     DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
 };
+use crate::media::{Strong, LocalMediaTrack};
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`MediaStreamTrack`]s.
@@ -137,8 +138,8 @@ impl SimpleTracksRequest {
     ///   [`HashMap`] doesn't have the expected display video track.
     pub fn parse_tracks(
         &self,
-        tracks: Vec<MediaStreamTrack>,
-    ) -> Result<HashMap<TrackId, MediaStreamTrack>> {
+        tracks: Vec<LocalMediaTrack<Strong>>,
+    ) -> Result<HashMap<TrackId, LocalMediaTrack<Strong>>> {
         use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let mut parsed_tracks = HashMap::new();
@@ -151,7 +152,7 @@ impl SimpleTracksRequest {
                 MediaKind::Audio => {
                     audio_tracks.push(track);
                 }
-                MediaKind::Video => match track.media_source_kind() {
+                MediaKind::Video => match track.source_kind() {
                     MediaSourceKind::Device => {
                         device_video_tracks.push(track);
                     }

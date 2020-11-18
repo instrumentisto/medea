@@ -7,6 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::media::{MediaKind, LocalMediaStreamTrack};
 use derive_more::Display;
 use js_sys::Promise;
 use medea_client_api_proto::MediaSourceKind;
@@ -16,17 +17,20 @@ use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
     MediaDevices, MediaStream as SysMediaStream,
     MediaStreamConstraints as SysMediaStreamConstraints,
+    MediaStreamTrack as SysMediaStreamTrack,
 };
 
 use crate::{
     media::{
-        track::{MediaStreamTrack, WeakMediaStreamTrack},
+        track::{MediaStreamTrack},
         MediaStreamSettings, MultiSourceTracksConstraints,
     },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
+use super::track::DeepTrack;
+use super::track::{LocalMediaTrack, Strong, Soft};
 
 // TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
@@ -90,7 +94,7 @@ pub struct MediaManager(Rc<InnerMediaManager>);
 #[derive(Default)]
 struct InnerMediaManager {
     /// Obtained tracks storage
-    tracks: Rc<RefCell<HashMap<String, WeakMediaStreamTrack>>>,
+    tracks: Rc<RefCell<HashMap<String, LocalMediaTrack<Soft>>>>,
 }
 
 impl InnerMediaManager {
@@ -146,7 +150,7 @@ impl InnerMediaManager {
     async fn get_tracks(
         &self,
         mut caps: MediaStreamSettings,
-    ) -> Result<Vec<(MediaStreamTrack, bool)>> {
+    ) -> Result<Vec<(LocalMediaTrack<Strong>, bool)>> {
         let tracks_from_storage = self
             .get_from_storage(&mut caps)
             .into_iter()
@@ -202,7 +206,7 @@ impl InnerMediaManager {
     fn get_from_storage(
         &self,
         caps: &mut MediaStreamSettings,
-    ) -> Vec<MediaStreamTrack> {
+    ) -> Vec<LocalMediaTrack<Strong>> {
         // cleanup weak links
         self.tracks
             .borrow_mut()
@@ -220,7 +224,7 @@ impl InnerMediaManager {
             let track = storage
                 .iter()
                 .find(|track| caps.get_audio().satisfies(track.as_ref()))
-                .map(MediaStreamTrack::deep_clone);
+                .map(Clone::clone);
 
             if let Some(track) = track {
                 caps.toggle_publish_audio(false);
@@ -234,7 +238,7 @@ impl InnerMediaManager {
                 .filter(|track| {
                     caps.unconstrain_if_satisfies_video(track.as_ref())
                 })
-                .map(MediaStreamTrack::deep_clone),
+                .map(Clone::clone),
         );
 
         tracks
@@ -249,7 +253,7 @@ impl InnerMediaManager {
     async fn get_user_media(
         &self,
         caps: SysMediaStreamConstraints,
-    ) -> Result<Vec<MediaStreamTrack>> {
+    ) -> Result<Vec<LocalMediaTrack<Strong>>> {
         use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
 
         let media_devices = window()
@@ -277,10 +281,10 @@ impl InnerMediaManager {
             .unwrap()
             .unwrap()
             .map(|track| {
-                MediaStreamTrack::new(track.unwrap(), MediaSourceKind::Device)
+                LocalMediaTrack::new(track.unwrap().into(), MediaSourceKind::Device)
             })
             .inspect(|track| {
-                storage.insert(track.root_id(), track.downgrade());
+                storage.insert(track.id(), track.downgrade());
             })
             .collect();
 
@@ -296,7 +300,7 @@ impl InnerMediaManager {
     async fn get_display_media(
         &self,
         caps: SysMediaStreamConstraints,
-    ) -> Result<Vec<MediaStreamTrack>> {
+    ) -> Result<Vec<LocalMediaTrack<Strong>>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
         };
@@ -325,10 +329,10 @@ impl InnerMediaManager {
             .unwrap()
             .unwrap()
             .map(|tr| {
-                MediaStreamTrack::new(tr.unwrap(), MediaSourceKind::Display)
+                LocalMediaTrack::new(tr.unwrap().into(), MediaSourceKind::Display)
             })
             .inspect(|track| {
-                storage.insert(track.root_id(), track.downgrade());
+                storage.insert(track.id(), track.downgrade());
             })
             .collect();
 
@@ -355,7 +359,7 @@ impl MediaManager {
     pub async fn get_tracks<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
-    ) -> Result<Vec<(MediaStreamTrack, bool)>> {
+    ) -> Result<Vec<(LocalMediaTrack<Strong>, bool)>> {
         self.0.get_tracks(caps.into()).await
     }
 
@@ -417,7 +421,7 @@ impl MediaManagerHandle {
                 .map(|tracks| {
                     tracks
                         .into_iter()
-                        .map(|(t, _)| t.new_root())
+                        .map(|(t, _)| LocalMediaStreamTrack::new(t.deep_clone()))
                         .map(JsValue::from)
                         .collect::<js_sys::Array>()
                         .into()

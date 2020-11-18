@@ -40,6 +40,7 @@ use crate::{
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
 };
+use crate::media::LocalMediaStreamTrack;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -746,7 +747,7 @@ struct InnerRoom {
 
     /// Callback to be invoked when new local [`MediaStreamTrack`] will be
     /// added to this [`Room`].
-    on_local_track: Callback1<MediaStreamTrack>,
+    on_local_track: Callback1<LocalMediaStreamTrack>,
 
     /// Callback to be invoked when failed obtain [`MediaTrack`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
@@ -1290,7 +1291,7 @@ impl PeerEventHandler for InnerRoom {
     /// Invokes `on_local_stream` [`Room`]'s callback.
     async fn on_new_local_track(
         &self,
-        track: MediaStreamTrack,
+        track: LocalMediaStreamTrack,
     ) -> Self::Output {
         self.on_local_track.call(track);
         Ok(())

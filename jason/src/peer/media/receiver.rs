@@ -26,6 +26,7 @@ use super::{
     },
     TransceiverSide,
 };
+use crate::media::DeepTrack;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -144,7 +145,7 @@ impl Receiver {
         new_track: SysMediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
-            if old_track.root_id() == new_track.id() {
+            if old_track.id() == new_track.id() {
                 return;
             }
         }

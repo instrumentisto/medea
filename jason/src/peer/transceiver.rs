@@ -8,13 +8,13 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::media::MediaStreamTrack;
+use crate::media::{MediaStreamTrack, LocalMediaTrack, Strong};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
 #[derive(Clone)]
 pub struct Transceiver {
-    send_track: RefCell<Option<MediaStreamTrack>>,
+    send_track: RefCell<Option<LocalMediaTrack<Strong>>>,
     transceiver: RtcRtpTransceiver,
 }
 
@@ -54,7 +54,7 @@ impl Transceiver {
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn set_send_track(
         &self,
-        new_track: Option<MediaStreamTrack>,
+        new_track: Option<LocalMediaTrack<Strong>>,
     ) -> Result<(), JsValue> {
         let sys_track = new_track.as_ref().map(AsRef::as_ref);
         JsFuture::from(self.transceiver.sender().replace_track(sys_track))
@@ -72,7 +72,7 @@ impl Transceiver {
     }
 
     /// Returns [`MediaStreamTrack`] that is being send to remote, if any.
-    pub fn send_track(&self) -> Option<MediaStreamTrack> {
+    pub fn send_track(&self) -> Option<LocalMediaTrack<Strong>> {
         self.send_track.borrow().clone()
     }
 

@@ -45,86 +45,165 @@ impl From<MediaSourceKind> for JsMediaSourceKind {
     }
 }
 
-/// Wrapper around [`SysMediaStreamTrack`] which can deeply clone underlying
-/// [`SysMediaStreamTrack`] and will stop all cloned [`SysMediaStreamTrack`]s
-/// when will be dropped.
-///
-/// Root [`SysMediaStreamTrack`] (which can be obtained by
-/// [`DeeplyCloneableTrack::get_root`]) will be muted when all child
-/// [`SysMediaStreamTrack`]s are muted.
-struct DeeplyCloneableTrack {
-    /// Root [`SysMediaStreamTrack`] which was obtained by gUM/gDM request.
-    root: SysMediaStreamTrack,
+#[wasm_bindgen]
+pub struct LocalMediaStreamTrack(LocalMediaTrack<Strong>);
 
-    /// Child [`SysMediaStreamTrack`] which are deeply cloned from the
-    /// [`DeeplyCloneableTrack::root`].
-    childs: Vec<SysMediaStreamTrack>,
+impl LocalMediaStreamTrack {
+    pub fn new(track: LocalMediaTrack<Strong>) -> Self {
+        LocalMediaStreamTrack(track)
+    }
 }
 
-impl DeeplyCloneableTrack {
-    /// Creates new [`DeeplyCloneableTrack`] with a provided
-    /// [`SysMediaStreamTrack`] as root track.
-    fn new(root: SysMediaStreamTrack) -> Self {
+#[wasm_bindgen]
+impl LocalMediaStreamTrack {
+    /// Returns underlying [`SysMediaStreamTrack`] from this
+    /// [`MediaStreamTrack`].
+    pub fn get_track(&self) -> SysMediaStreamTrack {
+        Clone::clone(self.0.as_ref())
+    }
+
+    /// Returns a [`String`] set to `audio` if the track is an audio track and
+    /// to `video`, if it is a video track.
+    #[wasm_bindgen(js_name = kind)]
+    pub fn js_kind(&self) -> MediaKind {
+        self.0.kind()
+    }
+
+    /// Returns a [`String`] set to `device` if track is sourced from some
+    /// device (webcam/microphone) and to `display`, if track is captured via
+    /// [MediaDevices.getDisplayMedia()][1].
+    ///
+    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[wasm_bindgen(js_name = media_source_kind)]
+    pub fn js_media_source_kind(&self) -> JsMediaSourceKind {
+        self.0.source_kind().into()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Soft(Weak<DeepTrack>);
+
+#[derive(Clone, Debug)]
+pub struct Strong(Rc<DeepTrack>);
+
+#[derive(Clone, Debug)]
+pub struct LocalMediaTrack<S> {
+    source_kind: MediaSourceKind,
+    kind: MediaKind,
+    deep_track: S,
+}
+
+impl LocalMediaTrack<Soft> {
+    /// Checks whether this weak reference can be upgraded to a strong one.
+    #[inline]
+    pub fn can_be_upgraded(&self) -> bool {
+        self.deep_track.0.strong_count() > 0
+    }
+
+    pub fn upgrade(&self) -> Option<LocalMediaTrack<Strong>> {
+        Some(LocalMediaTrack {
+            deep_track: Strong(Weak::upgrade(&self.deep_track.0)?),
+            kind: self.kind,
+            source_kind: self.source_kind,
+        })
+    }
+}
+
+impl AsRef<SysMediaStreamTrack> for LocalMediaTrack<Strong> {
+    fn as_ref(&self) -> &SysMediaStreamTrack {
+        self.deep_track.0.track()
+    }
+}
+
+impl LocalMediaTrack<Strong> {
+    pub fn new(track: SysMediaStreamTrack, source_kind: MediaSourceKind) -> Self {
+        let kind = match track.kind().as_ref() {
+            "audio" => MediaKind::Audio,
+            "video" => MediaKind::Video,
+            _ => unreachable!(),
+        };
         Self {
-            root,
-            childs: Vec::new(),
+            deep_track: Strong(DeepTrack::new(track)),
+            source_kind,
+            kind,
         }
     }
 
-    /// Returns ID of root [`SysMediaStreamTrack`].
-    fn root_id(&self) -> String {
-        self.root.id()
+    pub fn set_enabled(&self, enabled: bool) {
+        self.deep_track.0.track().set_enabled(enabled);
     }
 
-    /// Deeply clones [`DeeplyCloneableTrack::root_track`], adds it to the
-    /// [`DeeplyCloneableTrack::childs`] and returns it.
-    fn new_child(&mut self) -> SysMediaStreamTrack {
-        let new_track = SysMediaStreamTrack::clone(&self.root);
-        let cloned_track = Clone::clone(&new_track);
-        self.childs.push(cloned_track);
-
-        new_track
+    pub fn id(&self) -> String {
+        self.deep_track.0.id()
     }
 
-    /// Updates [`DeeplyCloneableTrack::root`] mute state based on
-    /// [`DeeplyCloneableTrack::childs`].
-    ///
-    /// When all [`DeeplyCloneableTrack::childs`] are in muted state, then
-    /// [`DeeplyCloneableTrack::root`] will be muted, otherwise
-    /// [`DeeplyCloneableTrack::root`] will be unmuted.
-    fn sync_root_mute_state(&self) {
-        self.root
-            .set_enabled(self.childs.iter().any(SysMediaStreamTrack::enabled));
+    pub fn source_kind(&self) -> MediaSourceKind {
+        self.source_kind
     }
 
-    /// Returns [`DeeplyCloneableTrack::root`].
-    ///
-    /// This [`SysMediaStreamTrack`] will be muted when all
-    /// [`DeeplyCloneableTrack::childs`] are muted.
-    fn get_root(&self) -> SysMediaStreamTrack {
-        Clone::clone(&self.root)
+    pub fn kind(&self) -> MediaKind {
+        self.kind
+    }
+
+    pub fn deep_clone(&self) -> Self {
+        Self {
+            deep_track: Strong(self.deep_track.0.deep_clone_track()),
+            source_kind: self.source_kind,
+            kind: self.kind
+        }
+    }
+
+    pub fn downgrade(&self) -> LocalMediaTrack<Soft> {
+        LocalMediaTrack {
+            deep_track: Soft(Rc::downgrade(&self.deep_track.0)),
+            kind: self.kind,
+            source_kind: self.source_kind
+        }
     }
 }
 
-impl Drop for DeeplyCloneableTrack {
+#[derive(Clone, Debug)]
+pub struct DeepTrack {
+    parent: Option<Rc<DeepTrack>>,
+    track: SysMediaStreamTrack,
+}
+
+impl DeepTrack {
+    pub fn new(track: SysMediaStreamTrack) -> Rc<Self> {
+        Rc::new(Self {
+            parent: None,
+            track,
+        })
+    }
+
+    pub fn id(&self) -> String {
+        self.track.id()
+    }
+
+    pub fn track(&self) -> &SysMediaStreamTrack {
+        &self.track
+    }
+
+    pub fn deep_clone_track(self: &Rc<Self>) -> Rc<Self> {
+        let parent = Rc::clone(self);
+        let cloned_track = SysMediaStreamTrack::clone(&self.track);
+        Rc::new(Self {
+            parent: Some(parent),
+            track: cloned_track,
+        })
+    }
+}
+
+impl Drop for DeepTrack {
     fn drop(&mut self) {
-        self.childs.drain(..).for_each(|track| {
-            track.stop();
-        });
-        self.root.stop();
+        self.track.stop();
     }
 }
 
 /// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
 /// disabled.
 struct InnerMediaStreamTrack {
-    /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
-
-    /// Wrapper around [`SysMediaStreamTrack`] which can deeply clone
-    /// underlying [`SysMediaStreamTrack`] and will stop all cloned
-    /// [`SysMediaStreamTrack`]s when will be dropped.
-    deeply_cloneable_track: Rc<RefCell<DeeplyCloneableTrack>>,
 
     /// Underlying [`SysMediaStreamTrack`] kind.
     kind: MediaKind,
@@ -159,8 +238,7 @@ impl MediaStreamTrack {
     /// Creates new [`MediaStreamTrack`] with a provided
     /// [`DeeplyCloneableTrack`] and provided [`SysMediaStreamTrack`], spawns
     /// listener for [`InnerMediaStreamTrack::enabled`] state changes.
-    fn inner_new(
-        deeply_cloneable_track: Rc<RefCell<DeeplyCloneableTrack>>,
+    pub fn new(
         track: SysMediaStreamTrack,
         media_source_kind: MediaSourceKind,
     ) -> Self {
@@ -171,13 +249,12 @@ impl MediaStreamTrack {
         };
 
         let track = MediaStreamTrack(Rc::new(InnerMediaStreamTrack {
-            deeply_cloneable_track,
             enabled: ObservableCell::new(track.enabled()),
+            track,
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
             media_source_kind,
             kind,
-            track,
         }));
 
         let mut track_enabled_state_changes =
@@ -204,44 +281,6 @@ impl MediaStreamTrack {
         track
     }
 
-    /// Creates new [`MediaStreamTrack`], spawns listener for
-    /// [`InnerMediaStreamTrack::enabled`] state changes.
-    pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
-    where
-        SysMediaStreamTrack: From<T>,
-    {
-        let track = SysMediaStreamTrack::from(track);
-        let tracks = Rc::new(RefCell::new(DeeplyCloneableTrack::new(
-            Clone::clone(&track),
-        )));
-        let track = tracks.borrow_mut().new_child();
-        Self::inner_new(tracks, track, media_source_kind)
-    }
-
-    /// Returns root [`MediaStreamTrack`] which will be muted when all its
-    /// childs are muted.
-    #[inline]
-    pub fn new_root(&self) -> Self {
-        Self::inner_new(
-            self.0.deeply_cloneable_track.clone(),
-            self.0.deeply_cloneable_track.borrow().get_root(),
-            self.0.media_source_kind,
-        )
-    }
-
-    /// Deeply clones this [`MediaStreamTrack`].
-    ///
-    /// Returned [`MediaStreamTrack`] can be muted/unmuted without impacting to
-    /// the original [`MediaStreamTrack`].
-    #[inline]
-    pub fn deep_clone(&self) -> Self {
-        Self::inner_new(
-            self.0.deeply_cloneable_track.clone(),
-            self.0.deeply_cloneable_track.borrow_mut().new_child(),
-            self.0.media_source_kind,
-        )
-    }
-
     /// Returns `true` if this [`MediaStreamTrack`] is enabled.
     #[inline]
     pub fn enabled(&self) -> &ObservableCell<bool> {
@@ -255,10 +294,6 @@ impl MediaStreamTrack {
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
         self.0.track.set_enabled(enabled);
-        self.0
-            .deeply_cloneable_track
-            .borrow()
-            .sync_root_mute_state();
     }
 
     /// Returns root [`id`][1] of underlying [`DeeplyCloneableTrack`].
@@ -266,22 +301,14 @@ impl MediaStreamTrack {
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
     /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
-    pub fn root_id(&self) -> String {
-        self.0.deeply_cloneable_track.borrow().root_id()
+    pub fn id(&self) -> String {
+        self.0.track.id()
     }
 
     /// Returns track kind (audio/video).
     #[inline]
     pub fn kind(&self) -> MediaKind {
         self.0.kind
-    }
-
-    /// Creates weak reference to underlying [MediaStreamTrack][2].
-    ///
-    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    #[inline]
-    pub fn downgrade(&self) -> WeakMediaStreamTrack {
-        WeakMediaStreamTrack(Rc::downgrade(&self.0))
     }
 
     /// Returns this [`MediaStreamTrack`] media source kind.
@@ -332,41 +359,5 @@ impl MediaStreamTrack {
     #[wasm_bindgen(js_name = media_source_kind)]
     pub fn js_media_source_kind(&self) -> JsMediaSourceKind {
         self.0.media_source_kind.into()
-    }
-}
-
-impl AsRef<SysMediaStreamTrack> for MediaStreamTrack {
-    #[inline]
-    fn as_ref(&self) -> &SysMediaStreamTrack {
-        &self.0.track
-    }
-}
-
-impl Drop for MediaStreamTrack {
-    #[inline]
-    fn drop(&mut self) {
-        // Last strong ref being dropped, so stop underlying MediaTrack
-        if Rc::strong_count(&self.0) == 1 {
-            self.0.track.stop();
-        }
-    }
-}
-
-/// Weak reference to [MediaStreamTrack][1].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-pub struct WeakMediaStreamTrack(Weak<InnerMediaStreamTrack>);
-
-impl WeakMediaStreamTrack {
-    /// Tries to upgrade this weak reference to a strong one.
-    #[inline]
-    pub fn upgrade(&self) -> Option<MediaStreamTrack> {
-        self.0.upgrade().map(MediaStreamTrack)
-    }
-
-    /// Checks whether this weak reference can be upgraded to a strong one.
-    #[inline]
-    pub fn can_be_upgraded(&self) -> bool {
-        self.0.strong_count() > 0
     }
 }

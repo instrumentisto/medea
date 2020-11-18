@@ -43,6 +43,7 @@ pub use self::{
         TransitableState,
     },
 };
+use crate::media::{Strong, LocalMediaTrack};
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: MediaStateControllable {
@@ -693,7 +694,7 @@ impl MediaConnections {
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
-        tracks: &HashMap<TrackId, MediaStreamTrack>,
+        tracks: &HashMap<TrackId, LocalMediaTrack<Strong>>,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         let inner = self.0.borrow();
 
