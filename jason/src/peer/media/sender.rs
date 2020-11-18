@@ -190,7 +190,7 @@ impl Sender {
         }
 
         if let Some(muted) = track.muted {
-            self.mute_state.update(muted);
+            self.mute_state.update(muted.into());
             match mute_state::Stable::from(muted) {
                 mute_state::Stable::Unmuted => {
                     self.transceiver.set_sender_enabled(true);
@@ -203,7 +203,7 @@ impl Sender {
         let mut requires_media_update = false;
         if let Some(enabled) = track.enabled_individual {
             let mute_state_before = self.media_exchange_state.state();
-            self.media_exchange_state.update(enabled);
+            self.media_exchange_state.update(enabled.into());
             if let (
                 MediaExchangeState::Stable(before),
                 MediaExchangeState::Stable(after),
@@ -218,7 +218,7 @@ impl Sender {
             }
         }
         if let Some(enabled) = track.enabled_individual {
-            self.media_exchange_state.update(enabled);
+            self.media_exchange_state.update(enabled.into());
         }
         if let Some(enabled) = track.enabled_general {
             self.update_general_media_exchange_state(enabled.into());

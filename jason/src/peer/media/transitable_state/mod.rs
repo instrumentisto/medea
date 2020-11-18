@@ -42,10 +42,10 @@ impl MediaState {
     /// this [`MediaState`].
     ///
     /// If [`MediaState`] is [`MediaState::Mute`] then
-    /// [`TrackPatchCommand::is_muted`] will be [`Some`].
+    /// [`TrackPatchCommand::muted`] will be [`Some`].
     ///
     /// If [`MediaState`] is [`MediaState::MediaExchange`] then
-    /// [`TrackPatchCommand::is_disabled`] will be [`Some`].
+    /// [`TrackPatchCommand::disabled`] will be [`Some`].
     pub fn generate_track_patch(self, track_id: TrackId) -> TrackPatchCommand {
         match self {
             Self::Mute(mute) => TrackPatchCommand {
@@ -116,15 +116,6 @@ where
     T: InTransition<Stable = S> + Into<TransitableState<S, T>>,
     S: InStable<Transition = T> + Into<TransitableState<S, T>>,
 {
-    /// Indicates whether [`TransitableState`] is stable (not in transition).
-    #[inline]
-    pub fn is_stable(self) -> bool {
-        match self {
-            TransitableState::Stable(_) => true,
-            TransitableState::Transition(_) => false,
-        }
-    }
-
     /// Starts transition into the `desired_state` changing the state to
     /// [`TransitableState::Transition`].
     ///

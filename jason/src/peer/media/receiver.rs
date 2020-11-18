@@ -125,7 +125,7 @@ impl Receiver {
 
     /// Returns `true` if this [`Receiver`] is receives media data.
     pub fn is_receiving(&self) -> bool {
-        let enabled = self.media_exchange_state_controller.is_enabled();
+        let enabled = self.media_exchange_state_controller.enabled();
         let is_recv_direction =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
                 trnsvr.has_direction(TransceiverDirection::RECV)
@@ -186,7 +186,7 @@ impl Receiver {
             self.update_general_media_exchange_state(enabled.into());
         }
         if let Some(enabled) = track_patch.enabled_individual {
-            self.media_exchange_state_controller.update(enabled);
+            self.media_exchange_state_controller.update(enabled.into());
         }
         if let Some(muted) = track_patch.muted {
             if let Some(track) = self.track.borrow().as_ref() {
@@ -263,12 +263,12 @@ impl Receiver {
 
     /// Returns `true` if this [`Receiver`] is enabled.
     pub fn enabled(&self) -> bool {
-        self.media_exchange_state_controller.is_enabled()
+        self.media_exchange_state_controller.enabled()
     }
 
     /// Returns `true` if this [`Receiver`] is disabled.
     pub fn disabled(&self) -> bool {
-        self.media_exchange_state_controller.is_disabled()
+        self.media_exchange_state_controller.disabled()
     }
 }
 

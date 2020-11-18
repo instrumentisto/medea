@@ -227,7 +227,7 @@ impl InnerMediaManager {
                 .map(Clone::clone);
 
             if let Some(track) = track {
-                caps.toggle_publish_audio(false);
+                caps.set_audio_publish(false);
                 tracks.push(track);
             }
         }

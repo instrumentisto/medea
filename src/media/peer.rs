@@ -366,7 +366,7 @@ pub enum TrackChange {
 
 impl TrackChange {
     /// Returns `true` if this [`TrackChange`] doesn't requires renegotiation.
-    fn is_negotiationless(&self) -> bool {
+    fn is_negotiation_state_agnostic(&self) -> bool {
         matches!(
             self,
             Self::TrackPatch(TrackPatchEvent {
@@ -967,13 +967,15 @@ impl Peer<Stable> {
     /// those changes as applied, so they can be retrieved via
     /// [`PeerStateMachine::get_updates`]. Calls
     /// [`PeerUpdatesSubscriber::negotiation_needed`] notifying subscriber that
-    /// this [`Peer`] has changes to negotiate.
+    /// this [`Peer`] has changes to negotiate. Changes that can be applied
+    /// regardless of negotiation state will be immediately force pushed to
+    /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty() {
             let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
                 let change = task.dispatch_with(self);
-                if change.is_negotiationless() {
+                if change.is_negotiation_state_agnostic() {
                     negotiationless_changes.push(change);
                 } else {
                     self.context.pending_track_updates.push(change);
@@ -993,7 +995,7 @@ impl Peer<Stable> {
             } else {
                 self.context
                     .pending_track_updates
-                    .extend(negotiationless_changes.into_iter());
+                    .append(&mut negotiationless_changes);
                 self.context.peer_updates_sub.negotiation_needed(self.id());
             }
         }
@@ -1653,13 +1655,13 @@ pub mod tests {
         }
     }
 
-    /// Tests for negotiationless [`TrackChange`]s.
-    mod negotiationless_changes {
+    mod negotiation_state_agnostic_patches {
         use super::*;
 
-        /// Checks that negotiationless changes will not start renegotiation.
+        /// Checks that negotiation state agnostic changes will not start
+        /// renegotiation.
         #[test]
-        fn negotiationless_change_dont_triggers_negotiation() {
+        fn negotiation_state_agnostic_change_dont_trigger_negotiation() {
             let track_patch = TrackPatchEvent {
                 id: TrackId(0),
                 muted: Some(true),
@@ -1770,28 +1772,6 @@ pub mod tests {
             peer.commit_scheduled_changes();
 
             assert_eq!(peer.context.pending_track_updates, changes);
-        }
-
-        /// Checks that [`TrackChange::is_negotiationless`] works correctly.
-        #[test]
-        fn is_negotiationless_works_fine() {
-            for ((enabled_general, enabled_individual, muted), expected) in &[
-                ((None, None, Some(true)), true),
-                ((Some(true), Some(true), None), false),
-                ((Some(true), None, None), false),
-                ((Some(true), Some(true), Some(true)), false),
-            ] {
-                assert_eq!(
-                    TrackChange::TrackPatch(TrackPatchEvent {
-                        id: TrackId(0),
-                        enabled_general: *enabled_general,
-                        enabled_individual: *enabled_individual,
-                        muted: *muted,
-                    })
-                    .is_negotiationless(),
-                    *expected
-                );
-            }
         }
     }
 }

@@ -56,6 +56,11 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.enable_remote_audio`;
             - `Room.disable_remote_video`;
             - `Room.enable_remote_video`.
+        - Muting/unmuting audio/video send ([#156]):
+            - `Room.mute_audio`;
+            - `Room.unmute_audio`;
+            - `Room.mute_video`;
+            - `Room.unmute_video`.
         - `MediaTrack.media_source_kind` function ([#145], [#146]).
     - Optional tracks support ([#106]);
     - Simultaneous device and display video tracks publishing and receiving ([#144]);
@@ -73,9 +78,9 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
-        - `ApplyTracks` for enabling/disabling ([#81], [#155]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
-        - `UpdateTracks` for muting/unmuting ([#156]).
+        - Enabling/disabling audio/video send/receive via `UpdateTracks` command ([#81], [#155]);
+        - Muting/unmuting audio/video send via `UpdateTracks` ([#156]).
     - Handling of RPC events:
         - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
         - `ConnectionQualityUpdated` ([#132]).

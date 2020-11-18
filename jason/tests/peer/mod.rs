@@ -28,8 +28,8 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_media_stream_settings, get_test_unrequired_tracks,
-    local_constraints, timeout,
+    delay_for, get_media_stream_settings, get_test_recv_tracks,
+    get_test_unrequired_tracks, local_constraints, timeout,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -877,7 +877,7 @@ mod peer_stats_caching {
 async fn reset_transition_timers() {
     let (tx, _) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks();
+
     let peer = PeerConnection::new(
         PeerId(1),
         tx,
@@ -888,7 +888,10 @@ async fn reset_transition_timers() {
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
-    peer.get_offer(vec![audio_track, video_track], true)
+
+    let (audio_tx, video_tx) = get_test_unrequired_tracks();
+    let (audio_rx, video_rx) = get_test_recv_tracks();
+    peer.get_offer(vec![audio_tx, video_tx, audio_rx, video_rx], true)
         .await
         .unwrap();
 

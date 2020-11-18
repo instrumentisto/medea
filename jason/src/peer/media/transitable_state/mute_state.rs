@@ -24,8 +24,8 @@ impl Stable {
 
 impl From<bool> for Stable {
     #[inline]
-    fn from(is_muted: bool) -> Self {
-        if is_muted {
+    fn from(muted: bool) -> Self {
+        if muted {
             Self::Muted
         } else {
             Self::Unmuted

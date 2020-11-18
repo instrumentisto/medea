@@ -543,16 +543,18 @@ pub struct TrackPatchEvent {
     /// really disabled. This is intention of this `Member`.
     pub enabled_individual: Option<bool>,
 
-    /// So intention of this `Member` (`enabled_individual`) can be
-    /// `false`, but real media exchange state can be `true`.
-    pub enabled_general: Option<bool>,
-
     /// Media exchange state of the connection between `Member`s.
     ///
     /// This state indicates real media exchange state between `Member`s. But
     /// this state doesn't changes intention of this `Member`.
     ///
-    /// Mute state of the connection between `Member`s.
+    /// So intention of this `Member` (`enabled_individual`) can be
+    /// `false`, but real media exchange state can be `true`.
+    pub enabled_general: Option<bool>,
+
+    /// `Track` mute state. Muting and unmuting can be performed without adding
+    /// / removing tracks from transceivers, hence renegotiation is not
+    /// required.
     pub muted: Option<bool>,
 }
 

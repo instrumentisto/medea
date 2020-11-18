@@ -130,8 +130,8 @@ impl LocalTracksConstraints {
     /// Indicates whether provided [`MediaType`] is muted in the underlying
     /// [`MediaStreamSettings`].
     #[inline]
-    pub fn is_muted(&self, kind: &MediaType) -> bool {
-        self.0.borrow().is_muted(kind)
+    pub fn muted(&self, kind: &MediaType) -> bool {
+        self.0.borrow().muted(kind)
     }
 
     /// Indicates whether provided [`MediaKind`] and [`MediaSourceKind`] are
@@ -159,10 +159,6 @@ struct AudioMediaTracksSettings {
     enabled: bool,
 
     /// Indicator whether audio should be muted.
-    ///
-    /// Any action with this flag should be performed only while
-    /// muting/unmuting actions by [`Room`]. This flag can't be changed by
-    /// [`MediaStreamSettings`] updating.
     muted: bool,
 }
 
@@ -205,10 +201,6 @@ pub struct VideoTrackConstraints<C> {
     enabled: bool,
 
     /// Indicator whether video should be muted.
-    ///
-    /// Any action with this flag should be performed only while
-    /// muting/unmuting actions by [`Room`]. This flag can't be changed by
-    /// [`MediaStreamSettings`] updating.
     muted: bool,
 }
 
@@ -413,23 +405,23 @@ impl MediaStreamSettings {
         match kind {
             MediaKind::Audio => match state {
                 MediaState::Mute(muted) => {
-                    self.toggle_audio_mute(muted == mute_state::Stable::Muted);
+                    self.set_audio_muted(muted == mute_state::Stable::Muted);
                 }
                 MediaState::MediaExchange(media_exchange) => {
-                    self.toggle_publish_audio(
+                    self.set_audio_publish(
                         media_exchange == media_exchange_state::Stable::Enabled,
                     );
                 }
             },
             MediaKind::Video => match state {
                 MediaState::Mute(muted) => {
-                    self.toggle_video_mute(
+                    self.set_video_muted(
                         muted == mute_state::Stable::Muted,
                         source_kind,
                     );
                 }
                 MediaState::MediaExchange(media_exchange) => {
-                    self.toggle_publish_video(
+                    self.set_video_publish(
                         media_exchange == media_exchange_state::Stable::Enabled,
                         source_kind,
                     );
@@ -438,15 +430,15 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets the underlying [`AudioMediaTracksSettings::is_muted`] to the
+    /// Sets the underlying [`AudioMediaTracksSettings::muted`] to the
     /// given value.
-    fn toggle_audio_mute(&mut self, muted: bool) {
+    fn set_audio_muted(&mut self, muted: bool) {
         self.audio.muted = muted;
     }
 
-    /// Sets underlying [`VideoTrackConstraints::is_muted`] based on provided
+    /// Sets underlying [`VideoTrackConstraints::muted`] based on provided
     /// [`MediaSourceKind`] to the given value.
-    fn toggle_video_mute(
+    fn set_video_muted(
         &mut self,
         muted: bool,
         source_kind: Option<MediaSourceKind>,
@@ -468,14 +460,14 @@ impl MediaStreamSettings {
     /// Sets the underlying [`AudioMediaTracksSettings::enabled`] to the
     /// given value.
     #[inline]
-    pub fn toggle_publish_audio(&mut self, enabled: bool) {
+    pub fn set_audio_publish(&mut self, enabled: bool) {
         self.audio.enabled = enabled;
     }
 
     /// Sets underlying [`VideoTrackConstraints::enabled`] based on provided
     /// [`MediaSourceKind`] to the given value.
     #[inline]
-    pub fn toggle_publish_video(
+    pub fn set_video_publish(
         &mut self,
         enabled: bool,
         source_kind: Option<MediaSourceKind>,
@@ -531,28 +523,13 @@ impl MediaStreamSettings {
     /// Indicates whether the given [`MediaType`] is muted in this
     /// [`MediaStreamSettings`].
     #[inline]
-    pub fn is_muted(&self, kind: &MediaType) -> bool {
+    pub fn muted(&self, kind: &MediaType) -> bool {
         match kind {
-            MediaType::Video(video) => {
-                self.is_track_muted(MediaKind::Video, video.source_kind)
-            }
-            MediaType::Audio(_) => {
-                self.is_track_muted(MediaKind::Audio, MediaSourceKind::Device)
-            }
-        }
-    }
-
-    /// Indicates whether the given [`MediaKind`] and [`MediaSourceKind`] are
-    /// muted in this [`MediaStreamSettings`].
-    fn is_track_muted(&self, kind: MediaKind, source: MediaSourceKind) -> bool {
-        match (kind, source) {
-            (MediaKind::Video, MediaSourceKind::Device) => {
-                self.device_video.muted
-            }
-            (MediaKind::Video, MediaSourceKind::Display) => {
-                self.display_video.muted
-            }
-            (MediaKind::Audio, _) => self.audio.muted,
+            MediaType::Video(video) => match video.source_kind {
+                MediaSourceKind::Device => self.device_video.muted,
+                MediaSourceKind::Display => self.display_video.muted,
+            },
+            MediaType::Audio(_) => self.audio.muted,
         }
     }
 

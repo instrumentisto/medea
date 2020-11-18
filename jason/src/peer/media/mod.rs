@@ -568,7 +568,7 @@ impl MediaConnections {
                         media_exchange_state::Stable::Disabled
                     };
                     let mute_state = if !send_constraints
-                        .is_muted(&track.media_type)
+                        .muted(&track.media_type)
                     {
                         mute_state::Stable::Unmuted
                     } else if required {

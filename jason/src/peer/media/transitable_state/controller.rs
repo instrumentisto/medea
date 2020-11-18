@@ -10,7 +10,6 @@ use crate::{
     peer::media::{
         transitable_state::{
             media_exchange_state, mute_state, InStable, InTransition,
-            MediaExchangeState, MuteState,
         },
         MediaConnectionsError, Result,
     },
@@ -70,15 +69,14 @@ where
                     if let TransitableState::Transition(_) = state {
                         let weak_this = Rc::downgrade(&this);
                         spawn_local(async move {
-                            let mut transitions =
-                                this.state.subscribe().skip(1);
+                            let mut states = this.state.subscribe().skip(1);
                             let (timeout, timeout_handle) =
                                 resettable_delay_for(Self::TRANSITION_TIMEOUT);
                             this.timeout_handle
                                 .borrow_mut()
                                 .replace(timeout_handle);
                             match future::select(
-                                transitions.next(),
+                                states.next(),
                                 Box::pin(timeout),
                             )
                             .await
@@ -169,80 +167,50 @@ where
         }
         .boxed_local()
     }
-}
 
-impl MuteStateController {
     /// Updates [`TransitableStateController::state`].
-    ///
-    /// `Room.mute_audio` like `Promise`s will be resolved based on this
-    /// update.
-    pub(in super::super) fn update(&self, is_muted: bool) {
-        let new_mute_state = mute_state::Stable::from(is_muted);
-        let current_mute_state = self.state.get();
+    pub(in super::super) fn update(&self, new_state: S) {
+        let current_state = self.state.get();
 
-        let mute_state_update: MuteState = match current_mute_state {
-            TransitableState::Stable(_) => new_mute_state.into(),
+        let state_update = match current_state {
+            TransitableState::Stable(_) => new_state.into(),
             TransitableState::Transition(t) => {
-                if t.intended() == new_mute_state {
-                    new_mute_state.into()
+                if t.intended() == new_state {
+                    new_state.into()
                 } else {
-                    t.set_inner(new_mute_state).into()
+                    t.set_inner(new_state).into()
                 }
             }
         };
 
-        self.state.set(mute_state_update);
+        self.state.set(state_update);
     }
+}
 
+impl MuteStateController {
     /// Checks whether [`TransitableStateController`]'s mute state
     /// is in [`mute_state::Stable::Muted`].
-    pub fn is_muted(&self) -> bool {
+    pub fn muted(&self) -> bool {
         self.state.get() == mute_state::Stable::Muted.into()
     }
 
     /// Checks whether [`TransitableStateController`]'s mute state
     /// is in [`mute_state::Stable::Unmuted`].
-    pub fn is_unmuted(&self) -> bool {
+    pub fn unmuted(&self) -> bool {
         self.state.get() == mute_state::Stable::Unmuted.into()
     }
 }
 
 impl MediaExchangeStateController {
-    /// Updates [`TransitableStateController::state`].
-    ///
-    /// Real disable/enable __wouldn't__ be performed on this update.
-    ///
-    /// `Room.disable_audio` like `Promise`s will be resolved based on this
-    /// update.
-    pub(in super::super) fn update(&self, enabled: bool) {
-        let new_media_exchange_state =
-            media_exchange_state::Stable::from(enabled);
-        let current_media_exchange_state = self.state.get();
-
-        let media_exchange_state_update: MediaExchangeState =
-            match current_media_exchange_state {
-                TransitableState::Stable(_) => new_media_exchange_state.into(),
-                TransitableState::Transition(t) => {
-                    if t.intended() == new_media_exchange_state {
-                        new_media_exchange_state.into()
-                    } else {
-                        t.set_inner(new_media_exchange_state).into()
-                    }
-                }
-            };
-
-        self.state.set(media_exchange_state_update);
-    }
-
     /// Checks whether [`TransitableStateController`]'s media exchange state
     /// is in [`media_exchange_state::Stable::Disabled`].
-    pub fn is_disabled(&self) -> bool {
+    pub fn disabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
 
     /// Checks whether [`TransitableStateController`]'s media exchange state
     /// is in [`media_exchange_state::Stable::Enabled`].
-    pub fn is_enabled(&self) -> bool {
+    pub fn enabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Enabled.into()
     }
 }
