@@ -10,7 +10,7 @@ use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    media::MediaStreamTrack,
+    media::track::remote,
     utils::{Callback0, Callback1, HandlerDetachedError},
 };
 
@@ -103,7 +103,7 @@ struct InnerConnection {
 
     /// JS callback, that will be invoked when remote [`MediaStreamTrack`] is
     /// received.
-    on_remote_track_added: Callback1<MediaStreamTrack>,
+    on_remote_track_added: Callback1<remote::Track>,
 
     /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
     /// be updated.
@@ -167,7 +167,7 @@ impl Connection {
 
     /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with the
     /// provided [`MediaStreamTrack`].
-    pub fn add_remote_track(&self, track: MediaStreamTrack) {
+    pub fn add_remote_track(&self, track: remote::Track) {
         self.0.on_remote_track_added.call(track);
     }
 

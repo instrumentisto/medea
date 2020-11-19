@@ -12,7 +12,7 @@ use proto::TrackId;
 use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{
-    media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
+    media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
     peer::{
         transceiver::Transceiver, MediaConnections, MediaStateControllable,
         PeerEvent, TransceiverDirection,
@@ -26,7 +26,6 @@ use super::{
     },
     TransceiverSide,
 };
-use crate::media::DeepTrack;
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -39,7 +38,7 @@ pub struct Receiver {
     sender_id: MemberId,
     transceiver: RefCell<Option<Transceiver>>,
     mid: RefCell<Option<String>>,
-    track: RefCell<Option<MediaStreamTrack>>,
+    track: RefCell<Option<remote::Track>>,
     general_media_exchange_state: Cell<media_exchange_state::Stable>,
     is_track_notified: Cell<bool>,
     media_exchange_state_controller: Rc<MediaExchangeStateController>,
@@ -151,7 +150,7 @@ impl Receiver {
         }
 
         let new_track =
-            MediaStreamTrack::new(new_track, self.caps.media_source_kind());
+            remote::Track::new(new_track, self.caps.media_source_kind());
 
         if self.enabled() {
             transceiver.add_direction(TransceiverDirection::RECV);

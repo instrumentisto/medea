@@ -10,13 +10,13 @@ use tracerr::Traced;
 
 use crate::{
     media::{
+        track::local::{self, SharedPtr},
         AudioTrackConstraints, MediaKind, MediaStreamSettings,
-        MediaStreamTrack, TrackConstraints, VideoSource,
+        TrackConstraints, VideoSource,
     },
     utils::{JsCaused, JsError},
     DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
 };
-use crate::media::{Strong, LocalMediaTrack};
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`MediaStreamTrack`]s.
@@ -138,8 +138,8 @@ impl SimpleTracksRequest {
     ///   [`HashMap`] doesn't have the expected display video track.
     pub fn parse_tracks(
         &self,
-        tracks: Vec<LocalMediaTrack<Strong>>,
-    ) -> Result<HashMap<TrackId, LocalMediaTrack<Strong>>> {
+        tracks: Vec<local::Track<SharedPtr>>,
+    ) -> Result<HashMap<TrackId, local::Track<SharedPtr>>> {
         use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let mut parsed_tracks = HashMap::new();

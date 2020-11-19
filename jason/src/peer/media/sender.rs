@@ -6,24 +6,21 @@ use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
 
 use crate::{
     media::{
-        LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
-        VideoSource,
+        track::local::{self, SharedPtr},
+        LocalTracksConstraints, MediaKind, TrackConstraints, VideoSource,
     },
-    peer::{
-        media::transitable_state::MediaExchangeState,
-        transceiver::{Transceiver, TransceiverDirection},
-    },
+    peer::transceiver::{Transceiver, TransceiverDirection},
 };
 
 use super::{
     media_exchange_state, mute_state,
     transitable_state::{
-        MediaExchangeStateController, MediaState, MuteStateController,
+        MediaExchangeState, MediaExchangeStateController, MediaState,
+        MuteStateController,
     },
     MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
     TransceiverSide,
 };
-use crate::media::{LocalMediaTrack, Strong};
 
 /// Builder of the [`Sender`].
 pub struct SenderBuilder<'a> {
@@ -144,7 +141,7 @@ impl Sender {
     /// [`Sender`].
     pub(super) async fn insert_track(
         self: Rc<Self>,
-        new_track: LocalMediaTrack<Strong>,
+        new_track: local::Track<SharedPtr>,
     ) -> Result<()> {
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
@@ -153,7 +150,7 @@ impl Sender {
             }
         }
 
-        let new_track = new_track.deep_clone();
+        let new_track = new_track.fork();
 
         new_track.set_enabled(
             self.mute_state.state().cancel_transition()
@@ -270,17 +267,17 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] is disabled.
     pub fn disabled(&self) -> bool {
-        self.media_exchange_state.is_disabled()
+        self.media_exchange_state.disabled()
     }
 
     /// Returns `true` if this [`Sender`] is muted.
     pub fn muted(&self) -> bool {
-        self.mute_state.is_muted()
+        self.mute_state.muted()
     }
 
     /// Returns `true` if this [`Sender`] is enabled.
     pub fn enabled(&self) -> bool {
-        self.media_exchange_state.is_enabled()
+        self.media_exchange_state.enabled()
     }
 }
 

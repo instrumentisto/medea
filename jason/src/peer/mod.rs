@@ -31,8 +31,9 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
     media::{
+        track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
-        MediaStreamTrack, RecvConstraints,
+        RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
@@ -55,7 +56,6 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::TransceiverDirection,
 };
-use crate::media::{LocalMediaTrack, LocalMediaStreamTrack};
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -123,13 +123,13 @@ pub enum PeerEvent {
         sender_id: MemberId,
 
         /// Received [`MediaStreamTrack`].
-        track: MediaStreamTrack,
+        track: remote::Track,
     },
 
     /// [`RtcPeerConnection`] sent new local track to remote members.
     NewLocalTrack {
         /// Local [`MediaStreamTrack`] that is sent to remote members.
-        local_track: LocalMediaStreamTrack,
+        local_track: local::JsTrack,
     },
 
     /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
@@ -728,7 +728,9 @@ impl PeerConnection {
             for (track, is_new) in media_tracks {
                 if is_new {
                     let _ = self.peer_events_sender.unbounded_send(
-                        PeerEvent::NewLocalTrack { local_track: LocalMediaStreamTrack::new(track) },
+                        PeerEvent::NewLocalTrack {
+                            local_track: local::JsTrack::new(track),
+                        },
                     );
                 }
             }

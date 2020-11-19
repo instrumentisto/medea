@@ -147,7 +147,7 @@ async fn same_track_for_same_constraints() {
     let (track2, track2_is_new) = tracks.pop().unwrap();
 
     assert!(!track2_is_new);
-    assert_eq!(track1.root_id(), track2.root_id());
+    assert_eq!(track1.id(), track2.id());
     assert_eq!(track2.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 }
@@ -180,7 +180,7 @@ async fn new_track_if_previous_dropped() {
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
     // now drop track, and we got new track and second getUserMedia request
-    let track1_id = track1.root_id();
+    let track1_id = track1.id();
     drop(track1);
     let mut tracks = media_manager.get_tracks(constraints).await.unwrap();
 
@@ -188,7 +188,7 @@ async fn new_track_if_previous_dropped() {
     let (track2, track2_is_new) = tracks.pop().unwrap();
 
     assert!(track2_is_new);
-    assert_ne!(track2.root_id(), track1_id);
+    assert_ne!(track2.id(), track1_id);
     assert_eq!(track2.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
 
@@ -246,8 +246,8 @@ async fn request_audio_video_then_audio_then_video() {
     let (video_track2, video_track2_is_new) = tracks.pop().unwrap();
     assert!(!video_track2_is_new);
 
-    assert_eq!(audio_track.root_id(), audio_track2.root_id());
-    assert_eq!(video_track.root_id(), video_track2.root_id());
+    assert_eq!(audio_track.id(), audio_track2.id());
+    assert_eq!(video_track.id(), video_track2.id());
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
     mock_navigator.stop();
 }
@@ -295,7 +295,7 @@ async fn display_track_is_cached() {
 
     let (video_track2, video_track2_is_new) = tracks.pop().unwrap();
     assert!(!video_track2_is_new);
-    assert_eq!(video_track.root_id(), video_track2.root_id());
+    assert_eq!(video_track.id(), video_track2.id());
 
     assert_eq!(mock_navigator.get_display_media_requests_count(), 1);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);

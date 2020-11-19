@@ -87,9 +87,7 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
-    media::{
-        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
-    },
+    media::{track::remote, LocalTracksConstraints, MediaKind, MediaManager},
     peer::media_exchange_state,
     rpc::ApiUrl,
     utils::{window, JasonError},
@@ -286,20 +284,22 @@ async fn wait_and_check_test_result(
     };
 }
 
-async fn get_video_track() -> MediaStreamTrack {
+async fn get_video_track() -> remote::Track {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
     let stream = manager.get_tracks(settings).await.unwrap();
-    stream.into_iter().next().unwrap().0
+    let track = Clone::clone(stream.into_iter().next().unwrap().0.as_ref());
+    remote::Track::new(track, MediaSourceKind::Device)
 }
 
-async fn get_audio_track() -> MediaStreamTrack {
+async fn get_audio_track() -> remote::Track {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
     let stream = manager.get_tracks(settings).await.unwrap();
-    stream.into_iter().next().unwrap().0
+    let track = Clone::clone(stream.into_iter().next().unwrap().0.as_ref());
+    remote::Track::new(track, MediaSourceKind::Device)
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within

@@ -3,9 +3,9 @@
 use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
     media::{
-        AudioTrackConstraints, DeviceVideoTrackConstraints, JsMediaSourceKind,
-        MediaKind, MediaManager, MediaStreamSettings,
-        MultiSourceTracksConstraints, VideoSource,
+        AudioTrackConstraints, DeviceVideoTrackConstraints, MediaKind,
+        MediaManager, MediaStreamSettings, MultiSourceTracksConstraints,
+        VideoSource,
     },
     utils::{get_property_by_name, window},
     DisplayVideoTrackConstraints,
@@ -152,7 +152,7 @@ async fn equal_constraints_produce_equal_streams() {
         .find(|(track, _)| track.kind() == MediaKind::Audio)
         .unwrap()
         .0;
-    assert_eq!(audio_track.root_id(), some_audio_track.root_id());
+    assert_eq!(audio_track.id(), some_audio_track.id());
 
     let video_track = &tracks
         .iter()
@@ -164,7 +164,7 @@ async fn equal_constraints_produce_equal_streams() {
         .find(|(track, _)| track.kind() == MediaKind::Video)
         .unwrap()
         .0;
-    assert_eq!(video_track.root_id(), some_video_track.root_id());
+    assert_eq!(video_track.id(), some_video_track.id());
 }
 
 /// 1. If audio_devices.len() > 1 (otherwise this test makes no sense);
@@ -199,7 +199,7 @@ async fn different_constraints_produce_different_streams() {
             .find(|(track, _)| track.kind() == MediaKind::Audio)
             .unwrap()
             .0;
-        assert_ne!(audio_track.root_id(), another_audio_track.root_id());
+        assert_ne!(audio_track.id(), another_audio_track.id());
     }
 }
 
@@ -535,16 +535,10 @@ async fn simultaneous_device_and_display() {
     let display_video_track = video.pop().unwrap().0;
     assert_eq!(display_video_track.kind(), MediaKind::Video);
     assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
-    assert_eq!(
-        display_video_track.js_media_source_kind(),
-        JsMediaSourceKind::Display
-    );
+    assert_eq!(display_video_track.source_kind(), MediaSourceKind::Display);
 
     let device_video_track = video.pop().unwrap().0;
     assert_eq!(device_video_track.kind(), MediaKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
-    assert_eq!(
-        device_video_track.js_media_source_kind(),
-        JsMediaSourceKind::Device
-    );
+    assert_eq!(device_video_track.source_kind(), MediaSourceKind::Device);
 }

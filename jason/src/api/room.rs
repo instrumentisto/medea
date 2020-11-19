@@ -24,8 +24,9 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
+        track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaStreamSettings,
-        MediaStreamTrack, RecvConstraints,
+        RecvConstraints,
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
@@ -40,7 +41,6 @@ use crate::{
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
 };
-use crate::media::LocalMediaStreamTrack;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -750,7 +750,7 @@ struct InnerRoom {
 
     /// Callback to be invoked when new local [`MediaStreamTrack`] will be
     /// added to this [`Room`].
-    on_local_track: Callback1<LocalMediaStreamTrack>,
+    on_local_track: Callback1<local::JsTrack>,
 
     /// Callback to be invoked when failed obtain [`MediaTrack`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
@@ -1261,7 +1261,7 @@ impl PeerEventHandler for InnerRoom {
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,
-        track: MediaStreamTrack,
+        track: remote::Track,
     ) -> Self::Output {
         let conn = self
             .connections
@@ -1273,10 +1273,7 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Invokes `on_local_track` [`Room`]'s callback.
-    async fn on_new_local_track(
-        &self,
-        track: LocalMediaStreamTrack,
-    ) -> Self::Output {
+    async fn on_new_local_track(&self, track: local::JsTrack) -> Self::Output {
         self.on_local_track.call(track);
         Ok(())
     }

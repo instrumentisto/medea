@@ -5,7 +5,7 @@
 mod constraints;
 mod device_info;
 mod manager;
-mod track;
+pub mod track;
 
 use wasm_bindgen::prelude::*;
 
@@ -18,9 +18,8 @@ pub use self::{
         TrackConstraints, VideoSource,
     },
     device_info::InputDeviceInfo,
-    track::DeepTrack,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
-    track::{JsMediaSourceKind, MediaStreamTrack, LocalMediaTrack, Strong, Soft, LocalMediaStreamTrack},
+    track::JsMediaSourceKind,
 };
 
 /// [MediaStreamTrack.kind][1] representation.
