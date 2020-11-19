@@ -5,8 +5,15 @@ use std::{
     collections::{hash_set::Iter, HashSet},
     hash::Hash,
 };
+use std::iter;
+use std::marker::PhantomData;
 
 use futures::{channel::mpsc, Stream};
+use futures::stream::LocalBoxStream;
+
+use crate::{progressable::ProgressableManager, ProgressableObservableValue};
+
+use super::subscribers_store::SubscribersStore;
 
 /// Reactive hash set based on [`HashSet`].
 ///
@@ -67,20 +74,21 @@ use futures::{channel::mpsc, Stream};
 /// ```
 
 #[derive(Debug)]
-pub struct ObservableHashSet<T: Clone + Hash + Eq> {
+pub struct ObservableHashSet<T: Clone + Hash + Eq + 'static, S: SubscribersStore<T, O>, O> {
     /// Data stored by this [`ObservableHashSet`].
     store: HashSet<T>,
 
-    /// Subscribers of the [`ObservableHashSet::on_insert`] method.
-    on_insert_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
+    on_insert_subs: S,
 
-    /// Subscribers of the [`ObservableHashSet::on_remove`] method.
-    on_remove_subs: RefCell<Vec<mpsc::UnboundedSender<T>>>,
+    on_remove_subs: S,
+
+    _output: PhantomData<O>,
 }
 
-impl<T> ObservableHashSet<T>
+impl<T, S, O> ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq,
+    T: Clone + Hash + Eq + 'static,
+    S: SubscribersStore<T, O>,
 {
     /// Returns new empty [`ObservableHashSet`].
     #[must_use]
@@ -97,23 +105,23 @@ where
     ///
     /// This will produce [`ObservableHashSet::on_insert`] event.
     pub fn insert(&mut self, value: T) -> bool {
-        for sub in self.on_insert_subs.borrow().iter() {
-            let _ = sub.unbounded_send(value.clone());
+        if self.store.insert(value.clone()) {
+            self.on_insert_subs.send(value);
+            true
+        } else {
+            false
         }
-
-        self.store.insert(value)
     }
 
     /// Removes a value from the set. Returns whether the value was present in
     /// the set.
     ///
     /// This will produce [`ObservableHashSet::on_remove`] event.
-    pub fn remove(&mut self, index: &T) -> Option<T> {
-        let value = self.store.take(index);
+    pub fn remove(&mut self, value: &T) -> Option<T> {
+        let value = self.store.take(value);
+
         if let Some(value) = &value {
-            for sub in self.on_remove_subs.borrow().iter() {
-                let _ = sub.unbounded_send(value.clone());
-            }
+            self.on_remove_subs.send(value.clone());
         }
 
         value
@@ -130,27 +138,21 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already inserted values
     /// of this [`ObservableHashSet`].
-    pub fn on_insert(&self) -> impl Stream<Item = T> {
-        let (tx, rx) = mpsc::unbounded();
-
-        for value in self.store.iter().cloned() {
-            let _ = tx.unbounded_send(value);
-        }
-
-        self.on_insert_subs.borrow_mut().push(tx);
-
-        rx
+    pub fn on_insert(
+        &self,
+    ) -> impl Stream<Item = O> {
+        self.on_insert_subs
+            .subscribe(self.store.iter().cloned().collect())
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableHashSet`] on drop.
-    pub fn on_remove(&self) -> impl Stream<Item = T> {
-        let (tx, rx) = mpsc::unbounded();
-        self.on_remove_subs.borrow_mut().push(tx);
-
-        rx
+    pub fn on_remove(
+        &self,
+    ) -> impl Stream<Item = O> {
+        self.on_remove_subs.subscribe(Vec::new())
     }
 
     /// Makes this [`ObservableHashSet`] exactly the same as the passed
@@ -166,15 +168,11 @@ where
         let inserted_elems = updated.difference(&self.store);
 
         for removed_elem in removed_elems {
-            for remove_sub in self.on_remove_subs.borrow().iter() {
-                let _ = remove_sub.unbounded_send(removed_elem.clone());
-            }
+            self.on_remove_subs.send(removed_elem.clone());
         }
 
         for inserted_elem in inserted_elems {
-            for insert_sub in self.on_insert_subs.borrow().iter() {
-                let _ = insert_sub.unbounded_send(inserted_elem.clone());
-            }
+            self.on_insert_subs.send(inserted_elem.clone());
         }
 
         self.store = updated;
@@ -186,20 +184,22 @@ where
     }
 }
 
-impl<T> Default for ObservableHashSet<T>
+impl<T, S, O> Default for ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq,
+    T: Clone + Hash + Eq + 'static,
+    S: SubscribersStore<T, O>,
 {
     fn default() -> Self {
         Self {
             store: HashSet::new(),
-            on_insert_subs: RefCell::new(Vec::new()),
-            on_remove_subs: RefCell::new(Vec::new()),
+            on_insert_subs: S::default(),
+            on_remove_subs: S::default(),
+            _output: PhantomData::default(),
         }
     }
 }
 
-impl<'a, T: Clone + Eq + Hash> IntoIterator for &'a ObservableHashSet<T> {
+impl<'a, T: Clone + Eq + Hash, S: SubscribersStore<T, O>, O> IntoIterator for &'a ObservableHashSet<T, S, O> {
     type IntoIter = Iter<'a, T>;
     type Item = &'a T;
 
@@ -209,9 +209,10 @@ impl<'a, T: Clone + Eq + Hash> IntoIterator for &'a ObservableHashSet<T> {
     }
 }
 
-impl<T> Drop for ObservableHashSet<T>
+impl<T, S, O> Drop for ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq,
+    T: Clone + Hash + Eq + 'static,
+    S: SubscribersStore<T, O>,
 {
     /// Sends all values of a dropped [`ObservableHashSet`] to the
     /// [`ObservableHashSet::on_remove`] subs.
@@ -219,22 +220,22 @@ where
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain().for_each(|value| {
-            for sub in on_remove_subs.borrow().iter() {
-                let _ = sub.unbounded_send(value.clone());
-            }
+            on_remove_subs.send(value);
         });
     }
 }
 
-impl<T> From<HashSet<T>> for ObservableHashSet<T>
+impl<T, S, O> From<HashSet<T>> for ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq,
+    T: Clone + Hash + Eq + 'static,
+    S: SubscribersStore<T, O>,
 {
     fn from(from: HashSet<T>) -> Self {
         Self {
             store: from,
-            on_insert_subs: RefCell::new(Vec::new()),
-            on_remove_subs: RefCell::new(Vec::new()),
+            on_insert_subs: S::default(),
+            on_remove_subs: S::default(),
+            _output: PhantomData::default(),
         }
     }
 }
