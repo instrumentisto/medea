@@ -10,6 +10,7 @@ use futures::{channel::mpsc, Stream};
 use futures::stream::LocalBoxStream;
 
 use crate::{progressable::ProgressableManager, ProgressableObservableValue};
+use futures::future::LocalBoxFuture;
 
 pub trait SubscribersStore<T, O>: Default {
     fn send(&self, value: T);
@@ -56,6 +57,12 @@ impl<T> Default for ProgressableSubStore<T> {
             store: RefCell::new(Vec::new()),
             manager: ProgressableManager::new(),
         }
+    }
+}
+
+impl<T> ProgressableSubStore<T> {
+    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+        self.manager.when_all_processed()
     }
 }
 
