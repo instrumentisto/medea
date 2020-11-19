@@ -71,12 +71,12 @@ impl Transceiver {
         self.transceiver.mid()
     }
 
-    /// Returns [`MediaStreamTrack`] that is being send to remote, if any.
+    /// Returns [`local::Track`] that is being send to remote, if any.
     pub fn send_track(&self) -> Option<local::Track<SharedPtr>> {
         self.send_track.borrow().clone()
     }
 
-    /// Sets underlying [`MediaStreamTrack`] `enabled` field to the provided
+    /// Sets underlying [`local::Track`] `enabled` field to the provided
     /// `is_enabled`.
     ///
     /// No-op if [`Transceiver::send_track`] is currently [`None`].

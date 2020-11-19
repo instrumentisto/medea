@@ -1,4 +1,4 @@
-//! Acquiring and storing [`MediaStreamTrack`]s.
+//! Acquiring and storing [`local:Track`]s.
 
 use std::{
     cell::RefCell,
@@ -78,7 +78,7 @@ type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 /// for further reusage.
 ///
 /// [`MediaManager`] stores weak references to
-/// [`MediaStreamTrack`]s, so if there are no strong references to some track,
+/// [`local::Track`]s, so if there are no strong references to some track,
 /// then this track is stopped and deleted from [`MediaManager`].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
@@ -128,7 +128,7 @@ impl InnerMediaManager {
             .collect())
     }
 
-    /// Obtains [`MediaStreamTrack`]s based on a provided
+    /// Obtains [`local::Track`]s based on a provided
     /// [`MediaStreamSettings`]. This can be the tracks that were acquired
     /// earlier, or new tracks, acquired via [getUserMedia()][1] or/and
     /// [getDisplayMedia()][2] requests.

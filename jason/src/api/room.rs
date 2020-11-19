@@ -142,7 +142,7 @@ enum RoomError {
     #[display(fmt = "Remote stream from unknown member")]
     UnknownRemoteMember,
 
-    /// Returned if [`MediaStreamTrack`] update failed.
+    /// Returned if [`Sender`]/[`Receiver`] update failed.
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
@@ -320,7 +320,7 @@ impl RoomHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Sets callback, which will be invoked when new local [`MediaStreamTrack`]
+    /// Sets callback, which will be invoked when new [`local::Track`]
     /// will be added to this [`Room`].
     /// This might happen in such cases:
     /// 1. Media server initiates media request.

@@ -81,7 +81,7 @@ impl<'a> SenderBuilder<'a> {
     }
 }
 
-/// Representation of a local [`MediaStreamTrack`] that is being sent to some
+/// Representation of a [`local::Track`] that is being sent to some
 /// remote peer.
 pub struct Sender {
     track_id: TrackId,
@@ -136,7 +136,7 @@ impl Sender {
         }
     }
 
-    /// Inserts provided [`MediaStreamTrack`] into provided [`Sender`]s
+    /// Inserts provided [`local::Track`] into provided [`Sender`]s
     /// transceiver. No-op if provided track already being used by this
     /// [`Sender`].
     pub(super) async fn insert_track(
@@ -248,7 +248,7 @@ impl Sender {
             == media_exchange_state::Stable::Enabled
     }
 
-    /// Drops [`MediaStreamTrack`] used by this [`Sender`]. Sets track used by
+    /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to `None`.
     async fn remove_track(&self) {
         // cannot fail

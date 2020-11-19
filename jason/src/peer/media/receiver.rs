@@ -27,11 +27,11 @@ use super::{
     TransceiverSide,
 };
 
-/// Representation of a remote [`MediaStreamTrack`] that is being received from
+/// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
 ///
 /// We can save related [`RtcRtpTransceiver`] and the actual
-/// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
+/// [`remote::Track`] only when [`remote::Track`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
     caps: TrackConstraints,
@@ -48,14 +48,14 @@ pub struct Receiver {
 impl Receiver {
     /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
     /// creates [`Receiver`] without [`RtcRtpTransceiver`]. It will be injected
-    /// when [`MediaStreamTrack`] arrives.
+    /// when [`remote::Track`] arrives.
     ///
     /// Created [`RtcRtpTransceiver`] direction is set to
     /// [`TransceiverDirection::Inactive`] if media receiving is disabled in
     /// provided [`RecvConstraints`].
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
-    /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
+    /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
     pub fn new(
         media_connections: &MediaConnections,

@@ -19,7 +19,7 @@ use crate::{
 };
 
 /// Errors that may occur when validating [`TracksRequest`] or
-/// parsing [`MediaStreamTrack`]s.
+/// parsing [`local::Track`]s.
 #[derive(Clone, Debug, Display, JsCaused)]
 pub enum TracksRequestError {
     /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
@@ -42,15 +42,15 @@ pub enum TracksRequestError {
     #[display(fmt = "SimpleTracksRequest should have at least one track")]
     NoTracks,
 
-    /// Provided multiple audio [`MediaStreamTrack`]s.
+    /// Provided multiple audio [`local::Track`]s.
     #[display(fmt = "provided multiple audio MediaStreamTracks")]
     ExpectedAudioTracks,
 
-    /// Provided multiple device video [`MediaStreamTrack`]s.
+    /// Provided multiple device video [`local::Track`]s.
     #[display(fmt = "provided multiple device video MediaStreamTracks")]
     ExpectedDeviceVideoTracks,
 
-    /// Provided multiple display video [`MediaStreamTrack`]s.
+    /// Provided multiple display video [`local::Track`]s.
     #[display(fmt = "provided multiple display video MediaStreamTracks")]
     ExpectedDisplayVideoTracks,
 
@@ -118,8 +118,8 @@ pub struct SimpleTracksRequest {
 }
 
 impl SimpleTracksRequest {
-    /// Parses [`MediaStreamTrack`]s and returns [`HashMap`] with [`TrackId`]s
-    /// and [`MediaStreamTracks`]s.
+    /// Parses [`local::Track`]s and returns [`HashMap`] with [`TrackId`]s
+    /// and [`local::Track`]s.
     ///
     /// # Errors
     ///
