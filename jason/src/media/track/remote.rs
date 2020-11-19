@@ -1,3 +1,6 @@
+//! Implementation of the wrapper around [`SysMediaStreamTrack`] received from
+//! the remote side.
+
 use std::rc::Rc;
 
 use futures::StreamExt;
@@ -9,8 +12,8 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{media::MediaKind, utils::Callback0, JsMediaSourceKind};
 
-/// Wrapper around [`SysMediaStreamTrack`] to track when it's enabled or
-/// disabled.
+/// Wrapper around [`SysMediaStreamTrack`] received from the remote side to
+/// track when it's enabled or disabled.
 struct Inner {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
@@ -35,9 +38,6 @@ struct Inner {
 }
 
 /// Strong reference to [MediaStreamTrack][1].
-///
-/// Track will be automatically stopped when there are no strong references
-/// left.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[wasm_bindgen(js_name = RemoteMediaTrack)]
