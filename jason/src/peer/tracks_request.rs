@@ -2,7 +2,7 @@
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, rc::Rc};
 
 use derive_more::Display;
 use medea_client_api_proto::{MediaSourceKind, TrackId};
@@ -10,7 +10,7 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        track::local::{self, SharedPtr},
+        track::local::{self},
         AudioTrackConstraints, MediaKind, MediaStreamSettings,
         TrackConstraints, VideoSource,
     },
@@ -138,8 +138,8 @@ impl SimpleTracksRequest {
     ///   [`HashMap`] doesn't have the expected display video track.
     pub fn parse_tracks(
         &self,
-        tracks: Vec<local::Track<SharedPtr>>,
-    ) -> Result<HashMap<TrackId, local::Track<SharedPtr>>> {
+        tracks: Vec<Rc<local::Track>>,
+    ) -> Result<HashMap<TrackId, Rc<local::Track>>> {
         use TracksRequestError::{InvalidAudioTrack, InvalidVideoTrack};
 
         let mut parsed_tracks = HashMap::new();
@@ -165,7 +165,7 @@ impl SimpleTracksRequest {
 
         if let Some((id, audio)) = &self.audio {
             if let Some(track) = audio_tracks.into_iter().next() {
-                if audio.satisfies(track.as_ref()) {
+                if audio.satisfies(track.sys_track()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
@@ -174,7 +174,7 @@ impl SimpleTracksRequest {
         }
         if let Some((id, device_video)) = &self.device_video {
             if let Some(track) = device_video_tracks.into_iter().next() {
-                if device_video.satisfies(track.as_ref()) {
+                if device_video.satisfies(track.sys_track()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
@@ -183,7 +183,7 @@ impl SimpleTracksRequest {
         }
         if let Some((id, display_video)) = &self.display_video {
             if let Some(track) = display_video_tracks.into_iter().next() {
-                if display_video.satisfies(track.as_ref()) {
+                if display_video.satisfies(track.sys_track()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));

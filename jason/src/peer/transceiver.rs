@@ -1,6 +1,6 @@
 //! [`RtcRtpTransceiver`] wrapper.
 
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 use bitflags::bitflags;
 use medea_client_api_proto::Direction as DirectionProto;
@@ -8,13 +8,13 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::media::track::local::{self, SharedPtr};
+use crate::media::track::local;
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
 #[derive(Clone)]
 pub struct Transceiver {
-    send_track: RefCell<Option<local::Track<SharedPtr>>>,
+    send_track: RefCell<Option<Rc<local::Track>>>,
     transceiver: RtcRtpTransceiver,
 }
 
@@ -54,9 +54,9 @@ impl Transceiver {
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn set_send_track(
         &self,
-        new_track: Option<local::Track<SharedPtr>>,
+        new_track: Option<Rc<local::Track>>,
     ) -> Result<(), JsValue> {
-        let sys_track = new_track.as_ref().map(AsRef::as_ref);
+        let sys_track = new_track.as_ref().map(|t| t.sys_track());
         JsFuture::from(self.transceiver.sender().replace_track(sys_track))
             .await
             .map(|_| {
@@ -72,7 +72,7 @@ impl Transceiver {
     }
 
     /// Returns [`local::Track`] that is being send to remote, if any.
-    pub fn send_track(&self) -> Option<local::Track<SharedPtr>> {
+    pub fn send_track(&self) -> Option<Rc<local::Track>> {
         self.send_track.borrow().clone()
     }
 

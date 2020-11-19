@@ -6,8 +6,8 @@ use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
 
 use crate::{
     media::{
-        track::local::{self, SharedPtr},
-        LocalTracksConstraints, MediaKind, TrackConstraints, VideoSource,
+        track::local, LocalTracksConstraints, MediaKind, TrackConstraints,
+        VideoSource,
     },
     peer::transceiver::{Transceiver, TransceiverDirection},
 };
@@ -141,7 +141,7 @@ impl Sender {
     /// [`Sender`].
     pub(super) async fn insert_track(
         self: Rc<Self>,
-        new_track: local::Track<SharedPtr>,
+        new_track: Rc<local::Track>,
     ) -> Result<()> {
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
@@ -158,7 +158,7 @@ impl Sender {
         );
 
         self.transceiver
-            .set_send_track(Some(new_track))
+            .set_send_track(Some(Rc::new(new_track)))
             .await
             .map_err(Into::into)
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)

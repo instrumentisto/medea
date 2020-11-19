@@ -18,7 +18,7 @@ use web_sys::RtcTrackEvent;
 
 use crate::{
     media::{
-        track::local::{self, SharedPtr},
+        track::local::{self},
         LocalTracksConstraints, MediaKind, RecvConstraints,
     },
     peer::{
@@ -694,7 +694,7 @@ impl MediaConnections {
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
-        tracks: &HashMap<TrackId, local::Track<SharedPtr>>,
+        tracks: &HashMap<TrackId, Rc<local::Track>>,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         let inner = self.0.borrow();
 
@@ -703,7 +703,7 @@ impl MediaConnections {
         let mut media_exchange_state_updates = HashMap::new();
         for sender in inner.senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
-                if sender.caps().satisfies(&track) {
+                if sender.caps().satisfies(track.sys_track()) {
                     media_exchange_state_updates.insert(
                         sender.track_id(),
                         media_exchange_state::Stable::Enabled,
