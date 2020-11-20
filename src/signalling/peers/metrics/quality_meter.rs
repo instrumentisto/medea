@@ -55,9 +55,9 @@ impl QualityMeterStatsHandler {
             .and_then(|score| {
                 partner_score
                     .map(|partner_score| score.min(partner_score))
-                    .or_else(|| Some(score))
+                    .or(Some(score))
             })
-            .or_else(|| partner_score);
+            .or(partner_score);
 
         if let Some(quality_score) = score {
             if quality_score == peer.last_quality_score {

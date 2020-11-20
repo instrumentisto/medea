@@ -802,9 +802,8 @@ impl Peer<WaitLocalSdp> {
             .chain(self.context.receivers.iter_mut());
 
         for (id, track) in tracks {
-            let mid = mids
-                .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
+            let mid =
+                mids.remove(&id).ok_or(PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
 
@@ -942,9 +941,7 @@ impl Peer<Stable> {
         for (track_id, track) in &self.context.senders {
             mids.insert(
                 *track_id,
-                track
-                    .mid()
-                    .ok_or_else(|| PeerError::MidsMismatch(track.id))?,
+                track.mid().ok_or(PeerError::MidsMismatch(track.id))?,
             );
         }
         Ok(mids)

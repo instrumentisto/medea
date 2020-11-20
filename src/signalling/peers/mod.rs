@@ -584,7 +584,7 @@ impl PeerRepository {
             .0
             .borrow()
             .get(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
+            .ok_or(RoomError::PeerNotFound(peer_id))?))
     }
 
     /// Applies a function to the mutable [`PeerStateMachine`] reference with
@@ -603,7 +603,7 @@ impl PeerRepository {
             .0
             .borrow_mut()
             .get_mut(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
+            .ok_or(RoomError::PeerNotFound(peer_id))?))
     }
 
     /// Removes [`PeerStateMachine`] with a provided [`PeerId`].
@@ -621,8 +621,7 @@ impl PeerRepository {
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
     pub fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
-        self.remove(peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+        self.remove(peer_id).ok_or(RoomError::PeerNotFound(peer_id))
     }
 
     /// Returns owned [`Peer`] by its ID.

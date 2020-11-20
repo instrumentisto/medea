@@ -171,6 +171,9 @@ impl ParticipantService {
     /// Errors with [`RoomError::AuthorizationError`] if lookup by [`MemberId`]
     /// fails or if [`Member`] was found, but incorrect credentials were
     /// provided.
+    // We shouldn't specify exact reason why authorization is failed, so it's
+    // more failsafe to return 'AuthorizationError' on all fail reasons.
+    #[allow(clippy::map_err_ignore)]
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,

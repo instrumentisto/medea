@@ -28,11 +28,11 @@ use crate::{
 use super::{ActFuture, Room};
 
 /// Error of validating received [`Command`].
-#[derive(Debug, Display, Fail, PartialEq)]
+#[derive(Debug, Display, Fail)]
 pub enum CommandValidationError {
     /// Unable to find expected `Peer`.
-    #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
-    PeerNotFound(PeerId),
+    #[display(fmt = "Couldn't find Peer with [id = {}]: {:?}", _0, _1)]
+    PeerNotFound(PeerId, RoomError),
 
     /// Specified `Peer` doesn't belong to the `Member` which sends
     /// [`Command`].
@@ -74,7 +74,7 @@ impl Room {
         let peer_member_id = self
             .peers
             .map_peer_by_id(peer_id, PeerStateMachine::member_id)
-            .map_err(|_| PeerNotFound(peer_id))?;
+            .map_err(|e| PeerNotFound(peer_id, e))?;
 
         if peer_member_id != command.member_id {
             return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
@@ -383,10 +383,13 @@ mod test {
 
         let validation = room.validate_command(&no_such_peer);
 
-        assert_eq!(
+        assert!(matches!(
             validation,
-            Err(CommandValidationError::PeerNotFound(PeerId(1)))
-        );
+            Err(CommandValidationError::PeerNotFound(
+                PeerId(1),
+                RoomError::PeerNotFound(PeerId(1))
+            ))
+        ))
     }
 
     #[actix_rt::test]
@@ -421,10 +424,13 @@ mod test {
 
         let validation = room.validate_command(&no_such_peer);
 
-        assert_eq!(
+        assert!(matches!(
             validation,
-            Err(CommandValidationError::PeerNotFound(PeerId(1)))
-        );
+            Err(CommandValidationError::PeerNotFound(
+                PeerId(1),
+                RoomError::PeerNotFound(PeerId(1))
+            ))
+        ));
     }
 
     mod callbacks {

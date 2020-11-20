@@ -206,6 +206,8 @@ impl TryFrom<proto::Member> for MemberSpec {
     type Error = TryFromProtobufError;
 
     fn try_from(member: proto::Member) -> Result<Self, Self::Error> {
+        // We can't specify exact error type, so ignoring is ok.
+        #[allow(clippy::map_err_ignore)]
         fn parse_duration<T: TryInto<Duration>>(
             duration: Option<T>,
             member_id: &str,
