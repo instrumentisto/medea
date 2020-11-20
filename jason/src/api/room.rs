@@ -380,7 +380,7 @@ impl RoomHandle {
     /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
@@ -748,8 +748,8 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: Connections,
 
-    /// Callback to be invoked when new local [`MediaStreamTrack`] will be
-    /// added to this [`Room`].
+    /// Callback to be invoked when new local [`local::JsTrack`] will be added
+    /// to this [`Room`].
     on_local_track: Callback1<local::JsTrack>,
 
     /// Callback to be invoked when failed obtain [`MediaTrack`]s from
@@ -958,7 +958,7 @@ impl InnerRoom {
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
     /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStreamTrack`]s in all
+    /// [`MediaStreamSettings`] update will change [`local::Track`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
@@ -968,7 +968,7 @@ impl InnerRoom {
     /// are should be enabled or disabled.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     async fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
@@ -1257,7 +1257,7 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
-    /// [`MediaStreamTrack`] to the related [`Connection`].
+    /// [`remote::Track`] to the related [`Connection`].
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,
@@ -1273,8 +1273,11 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Invokes `on_local_track` [`Room`]'s callback.
-    async fn on_new_local_track(&self, track: local::JsTrack) -> Self::Output {
-        self.on_local_track.call(track);
+    async fn on_new_local_track(
+        &self,
+        track: Rc<local::Track>,
+    ) -> Self::Output {
+        self.on_local_track.call(local::JsTrack::new(track));
         Ok(())
     }
 

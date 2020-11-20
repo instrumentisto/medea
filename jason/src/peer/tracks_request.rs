@@ -10,8 +10,7 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        track::local::{self},
-        AudioTrackConstraints, MediaKind, MediaStreamSettings,
+        track::local, AudioTrackConstraints, MediaKind, MediaStreamSettings,
         TrackConstraints, VideoSource,
     },
     utils::{JsCaused, JsError},
@@ -152,7 +151,7 @@ impl SimpleTracksRequest {
                 MediaKind::Audio => {
                     audio_tracks.push(track);
                 }
-                MediaKind::Video => match track.source_kind() {
+                MediaKind::Video => match track.media_source_kind() {
                     MediaSourceKind::Device => {
                         device_video_tracks.push(track);
                     }

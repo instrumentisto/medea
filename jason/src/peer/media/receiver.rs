@@ -230,8 +230,8 @@ impl Receiver {
         }
     }
 
-    /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
-    /// based on the provided [`media_exchange_state::Stable`].
+    /// Updates [`TransceiverDirection`] and underlying [`local::Track`] based
+    /// on the provided [`media_exchange_state::Stable`].
     fn update_general_media_exchange_state(
         &self,
         new_state: media_exchange_state::Stable,
@@ -280,6 +280,17 @@ impl MediaStateControllable for Receiver {
     }
 
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        // Receivers can be muted, but currently they are muted directly by
+        // server events.
+        //
+        // There is no point to provide external API for muting receivers, since
+        // muting is pipelined after demuxing and decoding, so it wont reduce
+        // incoming traffic or CPU usage. Therefore receivers muting do not
+        // require MuteStateController's state management.
+        //
+        // Removing this unreachable! would require abstracting
+        // MuteStateController to some trait and creating some dummy
+        // implementation. Not worth it atm.
         unreachable!("Receivers muting is not implemented");
     }
 

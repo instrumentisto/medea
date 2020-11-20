@@ -11,16 +11,13 @@ use crate::{media::MediaKind, JsMediaSourceKind};
 
 /// Wrapper around [`SysMediaStreamTrack`] received from the gUM/gDM request.
 ///
-/// Can be forked by calling [`Track::fork`].
-///
-/// This [`Track`] will be stopped when all references to this [`Track`] and
-/// forked [`Track`]s will be dropped.
+/// Underlying [`SysMediaStreamTrack`] is stopped on [`Track`] [`Drop`].
 #[derive(Debug)]
 pub struct Track {
     /// Reference to the parent [`Track`].
     ///
-    /// Parent will be [`None`] if this [`Track`] wasn't forked from
-    /// another [`Track`].
+    /// Parent will be [`None`] if this [`Track`] wasn't forked from another
+    /// [`Track`].
     ///
     /// This field used only for holding strong reference to the parent.
     _parent: Option<Rc<Self>>,
@@ -36,7 +33,8 @@ pub struct Track {
 }
 
 impl Track {
-    /// Returns new [`Rc`] referenced [`Track`].
+    /// Builds [`Track`] from provided [`SysMediaStreamTrack`] and
+    /// [`MediaSourceKind`].
     pub fn new(
         track: SysMediaStreamTrack,
         source_kind: MediaSourceKind,
@@ -54,7 +52,11 @@ impl Track {
         }
     }
 
-    /// Sets [`SysMediaStreamTrack`] `enabled` field to the provided one.
+    /// Changes [`enabled`][1] attribute on the underlying
+    /// [MediaStreamTrack][2].
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn set_enabled(&self, enabled: bool) {
         self.track.set_enabled(enabled);
     }
@@ -68,24 +70,23 @@ impl Track {
     }
 
     /// Returns this [`Track`] media source kind.
-    pub fn source_kind(&self) -> MediaSourceKind {
+    pub fn media_source_kind(&self) -> MediaSourceKind {
         self.source_kind
     }
 
-    /// Returns track kind (audio/video).
+    /// Returns [`Track`] kind (audio/video).
     pub fn kind(&self) -> MediaKind {
         self.kind
     }
 
-    /// Returns fork of this [`Track`].
+    /// Forks this [`Track`].
     ///
-    /// Returned [`Track`] is identical except for its unique id.
+    /// Creates new [`SysMediaStreamTrack`] from this [`Track`]
+    /// [`SysMediaStreamTrack`] using [`clone`][1] method.
     ///
-    /// Forked [`Track`] will hold reference to it's parent, so this [`Track`]
-    /// can't be dropped until all his forked [`Track`]s will be dropped.
+    /// Forked [`Track`] holds strong reference to this [`Track`].
     ///
-    /// You can change properties of the forked [`Track`] without affecting the
-    /// original one.
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-clone
     pub fn fork(self: &Rc<Self>) -> Self {
         let parent = Rc::clone(self);
         let track = SysMediaStreamTrack::clone(&self.track);
@@ -114,7 +115,7 @@ impl Drop for Track {
 pub struct JsTrack(Rc<Track>);
 
 impl JsTrack {
-    /// Wraps provided [`Track`] to the [`JsTrack`].
+    /// Creates new [`JsTrack`] from provided [`Track`].
     pub fn new(track: Rc<Track>) -> Self {
         JsTrack(track)
     }
@@ -122,24 +123,23 @@ impl JsTrack {
 
 #[wasm_bindgen(js_class = LocalMediaTrack)]
 impl JsTrack {
-    /// Returns underlying [`SysMediaStreamTrack`] from this
-    /// [`MediaStreamTrack`].
+    /// Returns underlying [`SysMediaStreamTrack`] from this [`JsTrack`].
     pub fn get_track(&self) -> SysMediaStreamTrack {
         Clone::clone(self.0.track.as_ref())
     }
 
-    /// Returns a [`String`] set to `audio` if the track is an audio track
-    /// and to `video`, if it is a video track.
+    /// Returns a [`MediaKind::Audio`] if the track is an audio track and to
+    /// [`MediaKind::Video`], if it is a video track.
     pub fn kind(&self) -> MediaKind {
         self.0.kind()
     }
 
-    /// Returns a [`String`] set to `device` if track is sourced from some
-    /// device (webcam/microphone) and to `display`, if track is captured
-    /// via [MediaDevices.getDisplayMedia()][1].
+    /// Returns [`JsMediaSourceKind::Device`] if track is sourced from some
+    /// device (webcam/microphone) and [`JsMediaSourceKind::Display`], if track
+    /// is captured via [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://tinyurl.com/y2anfntz
     pub fn media_source_kind(&self) -> JsMediaSourceKind {
-        self.0.source_kind().into()
+        self.0.media_source_kind().into()
     }
 }

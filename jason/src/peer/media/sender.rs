@@ -190,10 +190,10 @@ impl Sender {
             self.mute_state.update(muted.into());
             match mute_state::Stable::from(muted) {
                 mute_state::Stable::Unmuted => {
-                    self.transceiver.set_sender_enabled(true);
+                    self.transceiver.set_send_track_enabled(true);
                 }
                 mute_state::Stable::Muted => {
-                    self.transceiver.set_sender_enabled(false);
+                    self.transceiver.set_send_track_enabled(false);
                 }
             }
         }
@@ -316,12 +316,12 @@ impl MediaStateControllable for Sender {
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {
-        self.media_exchange_state.clone()
+        Rc::clone(&self.media_exchange_state)
     }
 
     #[inline]
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
-        self.mute_state.clone()
+        Rc::clone(&self.mute_state)
     }
 
     /// Sets current [`MediaExchangeState`] to

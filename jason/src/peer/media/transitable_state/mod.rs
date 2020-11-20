@@ -26,14 +26,18 @@ pub type MuteState =
 /// All media states which can be toggled in the [`MediaStateControllable`].
 #[derive(Clone, Copy, Debug, From)]
 pub enum MediaState {
-    /// Sets `MediaStreamTrack.enabled` to the `true` of `false`.
+    /// Responsible for changing [enabled][1] property of [MediaStreamTrack][2].
     ///
-    /// Doesn't requires renegotiation process, but traffic flow doesn't stops.
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
     Mute(mute_state::Stable),
 
-    /// Drops `MediaStreamTrack` if [`media_exchange_state::Stable::Disabled`].
+    /// Responsible for changing [RTCRtpTransceiverDirection][1] to stop
+    /// traffic flow.
     ///
-    /// Requires renegotiation process and traffic flow will be stopped.
+    /// Requires renegotiation for changes to take effect.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
     MediaExchange(media_exchange_state::Stable),
 }
 

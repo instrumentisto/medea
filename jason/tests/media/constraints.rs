@@ -537,10 +537,16 @@ async fn simultaneous_device_and_display() {
     assert!(
         display_video_constraints.satisfies(display_video_track.sys_track())
     );
-    assert_eq!(display_video_track.source_kind(), MediaSourceKind::Display);
+    assert_eq!(
+        display_video_track.media_source_kind(),
+        MediaSourceKind::Display
+    );
 
     let device_video_track = video.pop().unwrap().0;
     assert_eq!(device_video_track.kind(), MediaKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.sys_track()));
-    assert_eq!(device_video_track.source_kind(), MediaSourceKind::Device);
+    assert_eq!(
+        device_video_track.media_source_kind(),
+        MediaSourceKind::Device
+    );
 }

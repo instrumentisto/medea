@@ -390,7 +390,7 @@ impl MediaStreamSettings {
         self.device_video.constraints.as_ref()
     }
 
-    /// Enables or disables (muted or unmutes) audio or video type in this
+    /// Changes [`MediaState`] of audio or video type in this
     /// [`MediaStreamSettings`].
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
@@ -576,7 +576,7 @@ impl MediaStreamSettings {
 pub enum MultiSourceTracksConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     Device(SysMediaStreamConstraints),
 
     /// Only [getDisplayMedia()][1] request is required.
@@ -586,7 +586,7 @@ pub enum MultiSourceTracksConstraints {
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
 }
@@ -653,15 +653,13 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
     }
 }
 
-/// Constraints for the [`MediaKind::Video`] [`MediaStreamTrack`].
+/// Constraints for the [`MediaKind::Video`] [`local::Track`].
 #[derive(Clone, Debug)]
 pub enum VideoSource {
-    /// [`MediaStreamTrack`] should be received from the `getUserMedia`
-    /// request.
+    /// [`local::Track`] should be received from the `getUserMedia` request.
     Device(DeviceVideoTrackConstraints),
 
-    /// [`MediaStreamTrack`] should be received from the `getDisplayMedia`
-    /// request.
+    /// [`local::Track`] should be received from the `getDisplayMedia` request.
     Display(DisplayVideoTrackConstraints),
 }
 

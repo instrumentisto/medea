@@ -49,8 +49,8 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145]);
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `MediaTrack.on_enabled` and `MediaTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
-        - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
+        - `RemoteMediaTrack.on_enabled` and `RemoteMediaTrack.on_disabled` callbacks being called when `RemoteMediaTrack` is enabled or disabled ([#123], [#143], [#156]);
+        - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `RemoteMediaTrack` is added ([#123], [#143], [#156]);
         - Enabling/disabling remote video/audio ([#127], [#155]):
             - `Room.disable_remote_audio`;
             - `Room.enable_remote_audio`;
@@ -63,9 +63,6 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.unmute_video`.
         - `RemoteMediaTrack`/`LocalMediaTrack` `media_source_kind` function ([#145], [#146], [#156]);
         - `RemoteMediaTrack` class ([#156]);
-        - `RemoteMediaTrack` callbacks ([#123], [#156]):
-            - `RemoteMediaTrack.on_enabled`;
-            - `RemoteMediaTrack.on_disabled`.
         - `LocalMediaTrack` class ([#156]).
     - Optional tracks support ([#106]);
     - Simultaneous device and display video tracks publishing and receiving ([#144]);

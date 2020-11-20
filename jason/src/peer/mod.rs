@@ -77,8 +77,8 @@ pub enum PeerError {
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
-    /// Errors that may occur when validating [`TracksRequest`] or
-    /// parsing [`MediaStreamTrack`]s.
+    /// Errors that may occur when validating [`TracksRequest`] or parsing
+    /// [`loca::Track`]s.
     #[display(fmt = "{}", _0)]
     TracksRequest(#[js(cause)] TracksRequestError),
 }
@@ -116,20 +116,20 @@ pub enum PeerEvent {
         sdp_mid: Option<String>,
     },
 
-    /// [`RtcPeerConnection`] received new [`MediaStreamTrack`] from remote
+    /// [`RtcPeerConnection`] received new [`remote::Track`] from remote
     /// sender.
     NewRemoteTrack {
         /// Remote `Member` ID.
         sender_id: MemberId,
 
-        /// Received [`MediaStreamTrack`].
+        /// Received [`remote::Track`].
         track: remote::Track,
     },
 
     /// [`RtcPeerConnection`] sent new local track to remote members.
     NewLocalTrack {
-        /// Local [`MediaStreamTrack`] that is sent to remote members.
-        local_track: local::JsTrack,
+        /// Local [`local::Track`] that is sent to remote members.
+        local_track: Rc<local::Track>,
     },
 
     /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
@@ -725,12 +725,10 @@ impl PeerConnection {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            for (track, is_new) in media_tracks {
+            for (local_track, is_new) in media_tracks {
                 if is_new {
                     let _ = self.peer_events_sender.unbounded_send(
-                        PeerEvent::NewLocalTrack {
-                            local_track: local::JsTrack::new(track),
-                        },
+                        PeerEvent::NewLocalTrack { local_track },
                     );
                 }
             }

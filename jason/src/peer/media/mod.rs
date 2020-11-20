@@ -218,13 +218,13 @@ pub enum TrackDirection {
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Clone, Debug, Display, JsCaused)]
 pub enum MediaConnectionsError {
-    /// Occurs when the provided [`MediaStreamTrack`] cannot be inserted into
+    /// Occurs when the provided [`local::Track`] cannot be inserted into
     /// provided [`Sender`]s transceiver.
     #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
     CouldNotInsertLocalTrack(JsError),
 
-    /// Occurs when [`MediaStreamTrack`] discovered by [`RtcPeerConnection`]
-    /// could not be inserted into [`Receiver`].
+    /// Occurs when [`remote::Track`] discovered by [`RtcPeerConnection`] could
+    /// not be inserted into [`Receiver`].
     #[display(
         fmt = "Could not insert remote track with mid: {:?} into media \
                connections",
@@ -245,12 +245,11 @@ pub enum MediaConnectionsError {
     ReceiversWithoutMid,
 
     /// Occurs when inserted [`PeerMediaStream`] dont have all necessary
-    /// [`MediaStreamTrack`]s.
+    /// [`local::Track`]s.
     #[display(fmt = "Provided stream does not have all necessary Tracks")]
     InvalidMediaTracks,
 
-    /// Occurs when [`MediaStreamTrack`] of inserted [`PeerMediaStream`] does
-    /// not satisfy [`Sender`] constraints.
+    /// Occurs when [`local::Track`] does not satisfy [`Sender`] constraints.
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 
@@ -264,8 +263,7 @@ pub enum MediaConnectionsError {
                      expected MediaExchangeState")]
     MediaStateTransitsIntoOppositeState,
 
-    /// Invalid [`medea_client_api_proto::TrackPatch`] for
-    /// [`MediaStreamTrack`].
+    /// Invalid [`medea_client_api_proto::TrackPatch`] for [`local::Track`].
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
 
@@ -421,7 +419,7 @@ impl MediaConnections {
                 continue;
             }
 
-            let is_not_in_state = match state {
+            let not_in_state = match state {
                 MediaState::Mute(mute_state) => {
                     transceiver.mute_state() != mute_state.into()
                 }
@@ -429,7 +427,7 @@ impl MediaConnections {
                     transceiver.media_exchange_state() != media_exchange.into()
                 }
             };
-            if is_not_in_state {
+            if not_in_state {
                 return false;
             }
         }
@@ -457,8 +455,8 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Returns mapping from a [`MediaStreamTrack`] ID to a `mid` of
-    /// this track's [`RtcRtpTransceiver`].
+    /// Returns mapping from a [`proto::Track`] ID to a `mid` of this track's
+    /// [`RtcRtpTransceiver`].
     ///
     /// # Errors
     ///
@@ -624,7 +622,7 @@ impl MediaConnections {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
+    /// [`proto::Track`] with ID from [`proto::TrackPatch`] doesn't exist.
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
@@ -671,9 +669,8 @@ impl MediaConnections {
 
     /// Inserts provided tracks into [`Sender`]s based on track IDs.
     ///
-    ///  [`MediaStreamTrack`]s are inserted into [`Sender`]'s
-    /// [`RtcRtpTransceiver`]s via [`replaceTrack` method][1], changing its
-    /// direction to `sendonly`.
+    /// [`local::Track`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
+    /// via [`replaceTrack` method][1], changing its direction to `sendonly`.
     ///
     /// Returns [`HashMap`] with [`media_exchange_state::Stable`]s updates for
     /// the [`Sender`]s.
@@ -681,14 +678,14 @@ impl MediaConnections {
     /// # Errors
     ///
     /// With [`MediaConnectionsError::InvalidMediaTracks`] if provided
-    /// [`HashMap`] doesn't contain required [`MediaStreamTrack`].
+    /// [`HashMap`] doesn't contain required [`local::Track`].
     ///
     /// With [`MediaConnectionsError::InvalidMediaTrack`] if some
-    /// [`MediaStreamTrack`] cannot be inserted into associated [`Sender`]
-    /// because of constraints mismatch.
+    /// [`local::Track`] cannot be inserted into associated [`Sender`] because
+    /// of constraints mismatch.
     ///
     /// With [`MediaConnectionsError::CouldNotInsertLocalTrack`] if some
-    /// [`MediaStreamTrack`] cannot be inserted into provided [`Sender`]s
+    /// [`local::Track`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack

@@ -1,5 +1,5 @@
 //! Implementation of the wrapper around [`SysMediaStreamTrack`] received from
-//! the remote side.
+//! the remote.
 
 use std::rc::Rc;
 
@@ -12,8 +12,6 @@ use web_sys::MediaStreamTrack as SysMediaStreamTrack;
 
 use crate::{media::MediaKind, utils::Callback0, JsMediaSourceKind};
 
-/// Wrapper around [`SysMediaStreamTrack`] received from the remote side to
-/// track when it's enabled or disabled.
 struct Inner {
     /// Underlying JS-side [`SysMediaStreamTrack`].
     track: SysMediaStreamTrack,
@@ -30,14 +28,14 @@ struct Inner {
     /// Callback to be invoked when this [`remote::Track`] is disabled.
     on_disabled: Callback0,
 
-    /// [enabled] property of [MediaStreamTrack][1].
+    /// [enabled][1] property of [MediaStreamTrack][2].
     ///
-    /// [enabled]: https://tinyurl.com/y5byqdea
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
     enabled: ObservableCell<bool>,
 }
 
-/// Strong reference to [MediaStreamTrack][1].
+/// Wrapper around [MediaStreamTrack][1] received from the remote.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[wasm_bindgen(js_name = RemoteMediaTrack)]
@@ -45,8 +43,8 @@ struct Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`], spawns listener for
-    /// [`Inner::enabled`] state changes.
+    /// Creates new [`Track`], spawns listener for [`Inner::enabled`] state
+    /// changes.
     pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
     where
         SysMediaStreamTrack: From<T>,
@@ -130,8 +128,7 @@ impl Track {
 
 #[wasm_bindgen(js_class = RemoteMediaTrack)]
 impl Track {
-    /// Returns underlying [`SysMediaStreamTrack`] from this
-    /// [`Track`].
+    /// Returns underlying [`SysMediaStreamTrack`] from this [`Track`].
     pub fn get_track(&self) -> SysMediaStreamTrack {
         Clone::clone(&self.0.track)
     }
@@ -142,28 +139,26 @@ impl Track {
         self.0.enabled.get()
     }
 
-    /// Sets callback, which will be invoked when this [`Track`]
-    /// is enabled.
+    /// Sets callback, which will be invoked when this [`Track`] is enabled.
     pub fn on_enabled(&self, callback: js_sys::Function) {
         self.0.on_enabled.set_func(callback);
     }
 
-    /// Sets callback, which will be invoked when this [`Track`]
-    /// is enabled.
+    /// Sets callback, which will be invoked when this [`Track`] is enabled.
     pub fn on_disabled(&self, callback: js_sys::Function) {
         self.0.on_disabled.set_func(callback);
     }
 
-    /// Returns a [`String`] set to `audio` if the track is an audio track
-    /// and to `video`, if it is a video track.
+    /// Returns a [`MediaKind::Audio`] if the track is an audio track and to
+    /// [`MediaKind::Video`], if it is a video track.
     #[wasm_bindgen(js_name = kind)]
     pub fn js_kind(&self) -> MediaKind {
         self.kind()
     }
 
-    /// Returns a [`String`] set to `device` if track is sourced from some
-    /// device (webcam/microphone) and to `display`, if track is captured
-    /// via [MediaDevices.getDisplayMedia()][1].
+    /// Returns [`JsMediaSourceKind::Device`] if track is sourced from some
+    /// device (webcam/microphone) and [`JsMediaSourceKind::Display`], if track
+    /// is captured via [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://tinyurl.com/y2anfntz
     #[wasm_bindgen(js_name = media_source_kind)]
