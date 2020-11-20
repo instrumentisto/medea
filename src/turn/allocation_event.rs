@@ -1,9 +1,10 @@
 //! Implementation of the Coturn events deserialization.
 
-use std::{borrow::Cow, collections::HashMap, time::Duration};
+use std::{
+    borrow::Cow, collections::HashMap, num::ParseIntError, time::Duration,
+};
 
 use derive_more::Display;
-use failure::_core::num::ParseIntError;
 use medea_client_api_proto::{PeerId, RoomId};
 use redis::RedisError;
 
