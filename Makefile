@@ -20,7 +20,7 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.47
+RUST_VER := 1.48
 CHROME_VERSION := 86.0
 FIREFOX_VERSION := 82.0.2
 
