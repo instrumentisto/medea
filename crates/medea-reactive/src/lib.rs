@@ -26,7 +26,10 @@ mod progressable;
 
 #[doc(inline)]
 pub use crate::{
-    collections::{ObservableHashMap, ObservableHashSet, ObservableVec, ProgressableVec, ProgressableHashSet},
+    collections::{
+        ObservableHashMap, ObservableHashSet, ObservableVec,
+        ProgressableHashSet, ProgressableVec,
+    },
     field::{
         cell::ObservableCell, DroppedError, MutObservableFieldGuard,
         Observable, ObservableField, OnObservableFieldModification,

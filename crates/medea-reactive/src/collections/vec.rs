@@ -1,12 +1,14 @@
 //! Reactive vector based on [`Vec`].
 
 use std::{cell::RefCell, slice::Iter};
+use std::marker::PhantomData;
 
 use futures::{channel::mpsc, future::LocalBoxFuture, Stream};
 
-use crate::progressable::{ProgressableManager, ProgressableObservableValue};
-use crate::collections::subscribers_store::{SubscribersStore, ProgressableSubStore};
-use std::marker::PhantomData;
+use crate::{
+    collections::subscribers_store::{ProgressableSubStore, SubscribersStore},
+    progressable::{ProgressableManager, ProgressableObservableValue},
+};
 
 /// Reactive vector based on [`Vec`].
 ///
@@ -60,7 +62,11 @@ pub struct ObservableVec<T: Clone, S: SubscribersStore<T, O>, O> {
     _output: PhantomData<O>,
 }
 
-impl<T> ObservableVec<T, ProgressableSubStore<T>, ProgressableObservableValue<T>> where T: Clone + 'static {
+impl<T>
+    ObservableVec<T, ProgressableSubStore<T>, ProgressableObservableValue<T>>
+where
+    T: Clone + 'static,
+{
     pub fn when_push_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_push_subs.when_all_processed()
     }
@@ -112,19 +118,16 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already pushed values
     /// of this [`ObservableVec`].
-    pub fn on_push(
-        &self,
-    ) -> impl Stream<Item = O> {
-        self.on_push_subs.subscribe(self.store.iter().cloned().collect())
+    pub fn on_push(&self) -> impl Stream<Item = O> {
+        self.on_push_subs
+            .subscribe(self.store.iter().cloned().collect())
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableVec`] on drop.
-    pub fn on_remove(
-        &self,
-    ) -> impl Stream<Item = O> {
+    pub fn on_remove(&self) -> impl Stream<Item = O> {
         self.on_remove_subs.subscribe(Vec::new())
     }
 }
@@ -159,7 +162,8 @@ where
     }
 }
 
-impl<'a, T, S, O> IntoIterator for &'a ObservableVec<T, S, O> where
+impl<'a, T, S, O> IntoIterator for &'a ObservableVec<T, S, O>
+where
     T: Clone,
     S: SubscribersStore<T, O>,
 {

@@ -8,8 +8,14 @@ use std::{
     },
     hash::Hash,
 };
+use std::marker::PhantomData;
 
-use futures::{channel::mpsc, Stream};
+use futures::{channel::mpsc, future::LocalBoxFuture, Stream};
+
+use crate::{
+    collections::subscribers_store::{ProgressableSubStore, SubscribersStore},
+    ProgressableObservableValue,
+};
 
 /// Reactive hash map based on [`HashMap`].
 ///
@@ -54,25 +60,49 @@ use futures::{channel::mpsc, Stream};
 /// # });
 /// ```
 #[derive(Debug, Clone)]
-pub struct ObservableHashMap<K, V>
+pub struct ObservableHashMap<K, V, S, O>
 where
     K: Hash + Eq + Clone,
     V: Clone,
+    S: SubscribersStore<(K, V), O>,
 {
     /// Data stored by this [`ObservableHashMap`].
     store: HashMap<K, V>,
 
     /// Subscribers of the [`ObservableHashMap::on_insert`] method.
-    on_insert_subs: RefCell<Vec<mpsc::UnboundedSender<(K, V)>>>,
+    on_insert_subs: S,
 
     /// Subscribers of the [`ObservableHashMap::on_remove`] method.
-    on_remove_subs: RefCell<Vec<mpsc::UnboundedSender<(K, V)>>>,
+    on_remove_subs: S,
+
+    _output: PhantomData<O>,
 }
 
-impl<K, V> ObservableHashMap<K, V>
+impl<K, V>
+    ObservableHashMap<
+        K,
+        V,
+        ProgressableSubStore<(K, V)>,
+        ProgressableObservableValue<(K, V)>,
+    >
 where
-    K: Clone + Eq + Hash,
+    K: Hash + Eq + Clone + 'static,
+    V: Clone + 'static,
+{
+    pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
+        self.on_insert_subs.when_all_processed()
+    }
+
+    pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
+        self.on_remove_subs.when_all_processed()
+    }
+}
+
+impl<K, V, S, O> ObservableHashMap<K, V, S, O>
+where
+    K: Hash + Eq + Clone,
     V: Clone,
+    S: SubscribersStore<(K, V), O>,
 {
     /// Returns new empty [`ObservableHashMap`].
     #[must_use]
@@ -85,9 +115,7 @@ where
     ///
     /// This action will produce [`ObservableHashMap::on_insert`] event.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        for sub in self.on_insert_subs.borrow().iter() {
-            let _ = sub.unbounded_send((key.clone(), value.clone()));
-        }
+        self.on_insert_subs.send((key.clone(), value.clone()));
 
         self.store.insert(key, value)
     }
@@ -99,9 +127,7 @@ where
     pub fn remove(&mut self, key: &K) -> Option<V> {
         let removed_item = self.store.remove(key);
         if let Some(item) = &removed_item {
-            for sub in self.on_remove_subs.borrow().iter() {
-                let _ = sub.unbounded_send((key.clone(), item.clone()));
-            }
+            self.on_remove_subs.send((key.clone(), item.clone()));
         }
 
         removed_item
@@ -112,15 +138,13 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already inserted key-value
     /// pairs of this [`ObservableHashMap`].
-    pub fn on_insert(&self) -> impl Stream<Item = (K, V)> {
-        let (tx, rx) = mpsc::unbounded();
-
-        for (key, value) in &self.store {
-            let _ = tx.unbounded_send((key.clone(), value.clone()));
-        }
-        self.on_insert_subs.borrow_mut().push(tx);
-
-        rx
+    pub fn on_insert(&self) -> impl Stream<Item = O> {
+        self.on_insert_subs.subscribe(
+            self.store
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     /// Returns the [`Stream`] to which the removed key-value pairs will be
@@ -128,11 +152,8 @@ where
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableHashMap`] on drop.
-    pub fn on_remove(&self) -> impl Stream<Item = (K, V)> {
-        let (tx, rx) = mpsc::unbounded();
-        self.on_remove_subs.borrow_mut().push(tx);
-
-        rx
+    pub fn on_remove(&self) -> impl Stream<Item = O> {
+        self.on_remove_subs.subscribe(Vec::new())
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -166,36 +187,43 @@ where
     }
 }
 
-impl<K, V> Default for ObservableHashMap<K, V>
+impl<K, V, S, O> Default for ObservableHashMap<K, V, S, O>
 where
     K: Hash + Eq + Clone,
     V: Clone,
+    S: SubscribersStore<(K, V), O>,
 {
     fn default() -> Self {
         Self {
             store: HashMap::new(),
-            on_insert_subs: RefCell::new(Vec::new()),
-            on_remove_subs: RefCell::new(Vec::new()),
+            on_insert_subs: S::default(),
+            on_remove_subs: S::default(),
+            _output: PhantomData::default(),
         }
     }
 }
 
-impl<K, V> From<HashMap<K, V>> for ObservableHashMap<K, V>
+impl<K, V, S, O> From<HashMap<K, V>> for ObservableHashMap<K, V, S, O>
 where
     K: Hash + Eq + Clone,
     V: Clone,
+    S: SubscribersStore<(K, V), O>,
 {
     fn from(from: HashMap<K, V>) -> Self {
         Self {
             store: from,
-            on_remove_subs: RefCell::new(Vec::new()),
-            on_insert_subs: RefCell::new(Vec::new()),
+            on_remove_subs: S::default(),
+            on_insert_subs: S::default(),
+            _output: PhantomData::default(),
         }
     }
 }
 
-impl<'a, K: Hash + Eq + Clone, V: Clone> IntoIterator
-    for &'a ObservableHashMap<K, V>
+impl<'a, K, V, S, O> IntoIterator for &'a ObservableHashMap<K, V, S, O>
+where
+    K: Hash + Eq + Clone,
+    V: Clone,
+    S: SubscribersStore<(K, V), O>,
 {
     type IntoIter = Iter<'a, K, V>;
     type Item = (&'a K, &'a V);
@@ -205,16 +233,19 @@ impl<'a, K: Hash + Eq + Clone, V: Clone> IntoIterator
     }
 }
 
-impl<K: Hash + Eq + Clone, V: Clone> Drop for ObservableHashMap<K, V> {
+impl<K, V, S, O> Drop for ObservableHashMap<K, V, S, O>
+where
+    K: Hash + Eq + Clone,
+    V: Clone,
+    S: SubscribersStore<(K, V), O>,
+{
     /// Sends all key-values of a dropped [`ObservableHashMap`] to the
     /// [`ObservableHashMap::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain().for_each(|(key, value)| {
-            for sub in on_remove_subs.borrow().iter() {
-                let _ = sub.unbounded_send((key.clone(), value.clone()));
-            }
+            on_remove_subs.send((key, value));
         });
     }
 }

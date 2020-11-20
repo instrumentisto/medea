@@ -2,15 +2,14 @@ use std::{
     cell::RefCell,
     collections::{hash_set::Iter, HashSet},
     hash::Hash,
+    iter,
+    marker::PhantomData,
 };
-use std::iter;
-use std::marker::PhantomData;
 
-use futures::{channel::mpsc, Stream};
-use futures::stream::LocalBoxStream;
+use futures::{channel::mpsc, stream::LocalBoxStream, Stream};
+use futures::future::LocalBoxFuture;
 
 use crate::{progressable::ProgressableManager, ProgressableObservableValue};
-use futures::future::LocalBoxFuture;
 
 pub trait SubscribersStore<T, O>: Default {
     fn send(&self, value: T);
@@ -27,19 +26,21 @@ impl<T> Default for BasicSubStore<T> {
     }
 }
 
-impl<T> SubscribersStore<T, T> for BasicSubStore<T> where T: Clone + 'static {
+impl<T> SubscribersStore<T, T> for BasicSubStore<T>
+where
+    T: Clone + 'static,
+{
     fn send(&self, value: T) {
-        self.0.borrow_mut().retain(|sub| {
-            sub.unbounded_send(value.clone()).is_ok()
-        });
+        self.0
+            .borrow_mut()
+            .retain(|sub| sub.unbounded_send(value.clone()).is_ok());
     }
 
     fn subscribe(&self, initial_values: Vec<T>) -> LocalBoxStream<'static, T> {
         let (tx, rx) = mpsc::unbounded();
-        initial_values.into_iter()
-            .for_each(|value| {
-                let _ = tx.unbounded_send(value);
-            });
+        initial_values.into_iter().for_each(|value| {
+            let _ = tx.unbounded_send(value);
+        });
 
         Box::pin(rx)
     }
@@ -66,9 +67,10 @@ impl<T> ProgressableSubStore<T> {
     }
 }
 
-impl<T> SubscribersStore<T, ProgressableObservableValue<T>> for ProgressableSubStore<T>
-    where
-        T: Clone + 'static,
+impl<T> SubscribersStore<T, ProgressableObservableValue<T>>
+    for ProgressableSubStore<T>
+where
+    T: Clone + 'static,
 {
     fn send(&self, value: T) {
         self.store.borrow_mut().retain(|sub| {

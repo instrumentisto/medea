@@ -4,12 +4,11 @@ use std::{
     cell::RefCell,
     collections::{hash_set::Iter, HashSet},
     hash::Hash,
+    iter,
+    marker::PhantomData,
 };
-use std::iter;
-use std::marker::PhantomData;
 
-use futures::{channel::mpsc, Stream};
-use futures::stream::LocalBoxStream;
+use futures::{channel::mpsc, stream::LocalBoxStream, Stream};
 
 use crate::{progressable::ProgressableManager, ProgressableObservableValue};
 
@@ -74,7 +73,11 @@ use super::subscribers_store::SubscribersStore;
 /// ```
 
 #[derive(Debug)]
-pub struct ObservableHashSet<T: Clone + Hash + Eq + 'static, S: SubscribersStore<T, O>, O> {
+pub struct ObservableHashSet<
+    T: Clone + Hash + Eq + 'static,
+    S: SubscribersStore<T, O>,
+    O,
+> {
     /// Data stored by this [`ObservableHashSet`].
     store: HashSet<T>,
 
@@ -138,9 +141,7 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already inserted values
     /// of this [`ObservableHashSet`].
-    pub fn on_insert(
-        &self,
-    ) -> impl Stream<Item = O> {
+    pub fn on_insert(&self) -> impl Stream<Item = O> {
         self.on_insert_subs
             .subscribe(self.store.iter().cloned().collect())
     }
@@ -149,9 +150,7 @@ where
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableHashSet`] on drop.
-    pub fn on_remove(
-        &self,
-    ) -> impl Stream<Item = O> {
+    pub fn on_remove(&self) -> impl Stream<Item = O> {
         self.on_remove_subs.subscribe(Vec::new())
     }
 
@@ -199,7 +198,9 @@ where
     }
 }
 
-impl<'a, T: Clone + Eq + Hash, S: SubscribersStore<T, O>, O> IntoIterator for &'a ObservableHashSet<T, S, O> {
+impl<'a, T: Clone + Eq + Hash, S: SubscribersStore<T, O>, O> IntoIterator
+    for &'a ObservableHashSet<T, S, O>
+{
     type IntoIter = Iter<'a, T>;
     type Item = &'a T;
 
