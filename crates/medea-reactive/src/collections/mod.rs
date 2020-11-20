@@ -10,12 +10,14 @@ pub mod vec;
 use self::{
     hash_map::ObservableHashMap as HashMap,
     hash_set::ObservableHashSet as HashSet,
-    subscribers_store::ProgressableSubStore, vec::ObservableVec as Vec,
+    vec::ObservableVec as Vec,
 };
 
 use crate::{
     collections::subscribers_store::BasicSubStore, ProgressableObservableValue,
 };
+
+pub use self::subscribers_store::{ProgressableSubStore, SubscribersStore};
 
 pub type ProgressableHashSet<T> =
     HashSet<T, ProgressableSubStore<T>, ProgressableObservableValue<T>>;

@@ -19,6 +19,9 @@ pub mod progressable;
 
 #[doc(inline)]
 pub use self::{cell::ObservableCell, progressable::ProgressableObservable};
+use crate::collections::ProgressableSubStore;
+use crate::collections::SubscribersStore;
+use crate::ProgressableObservableValue;
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
@@ -27,6 +30,8 @@ type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 /// ([`ObservableField::subscribe`]) and to concrete changes
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
+
+pub type ProgressableObservableField<D> = ObservableField<D, ProgressableSubStore<D>>;
 
 /// Reactive cell which emits all modifications to its subscribers.
 ///
@@ -72,6 +77,16 @@ where
     }
 }
 
+impl<D> ProgressableObservableField<D> where D: 'static {
+    #[inline]
+    pub fn new(data: D) -> Self {
+        Self {
+            data,
+            subs: ProgressableSubStore::default(),
+        }
+    }
+}
+
 impl<D, S> ObservableField<D, S>
 where
     D: 'static,
@@ -106,6 +121,17 @@ where
         } else {
             self.subs.when(Box::new(assert_fn))
         }
+    }
+}
+
+impl<D> ProgressableObservableField<D> where D: Clone + 'static {
+    // TODO: normal naming
+    pub fn osubscribe(&self) -> LocalBoxStream<'static, ProgressableObservableValue<D>> {
+        self.subs.subscribe(vec![self.data.clone()])
+    }
+
+    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+        self.subs.when_all_processed()
     }
 }
 
@@ -286,6 +312,12 @@ impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
         let (tx, rx) = mpsc::unbounded();
         self.borrow_mut().push(UniversalSubscriber::Subscribe(tx));
         Box::pin(rx)
+    }
+}
+
+impl<D: Clone + 'static> OnObservableFieldModification<D> for ProgressableSubStore<D> {
+    fn on_modify(&mut self, data: &D) {
+        self.send(data.clone());
     }
 }
 

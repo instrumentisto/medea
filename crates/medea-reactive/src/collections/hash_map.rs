@@ -7,8 +7,8 @@ use std::{
         HashMap,
     },
     hash::Hash,
+    marker::PhantomData,
 };
-use std::marker::PhantomData;
 
 use futures::{channel::mpsc, future::LocalBoxFuture, Stream};
 

@@ -1,7 +1,6 @@
 //! Reactive vector based on [`Vec`].
 
-use std::{cell::RefCell, slice::Iter};
-use std::marker::PhantomData;
+use std::{cell::RefCell, marker::PhantomData, slice::Iter};
 
 use futures::{channel::mpsc, future::LocalBoxFuture, Stream};
 

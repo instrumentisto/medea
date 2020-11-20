@@ -6,8 +6,9 @@ use std::{
     marker::PhantomData,
 };
 
-use futures::{channel::mpsc, stream::LocalBoxStream, Stream};
-use futures::future::LocalBoxFuture;
+use futures::{
+    channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream, Stream,
+};
 
 use crate::{progressable::ProgressableManager, ProgressableObservableValue};
 
