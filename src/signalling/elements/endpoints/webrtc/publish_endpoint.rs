@@ -50,6 +50,8 @@ struct WebRtcPublishEndpointInner {
     /// Currently this field used for nothing but in future this may be used
     /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
     /// this [`WebRtcPublishEndpoint`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     peer_ids: HashSet<PeerId>,
 }
 

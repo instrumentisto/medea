@@ -73,8 +73,10 @@ impl Repository {
     }
 
     /// Schedules task which will call [`PeerConnection::send_peer_stats`] of
-    /// all [`PeerConnection`]s every second and send updated [`RtcStat`]s
+    /// all [`PeerConnection`]s every second and send updated [`RtcStats`]
     /// to the server.
+    ///
+    /// [`RtcStats`]: crate::peer::RtcStats
     fn schedule_peers_stats_scrape(&mut self) {
         let peers = self.peers.clone();
         let (fut, abort) = future::abortable(async move {

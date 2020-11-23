@@ -111,6 +111,8 @@ impl Service {
 impl TurnAuthService for Service {
     /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
     /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
+    ///
+    /// [`MemberId`]: medea_client_api_proto::MemberId
     async fn create(
         &self,
         room_id: RoomId,

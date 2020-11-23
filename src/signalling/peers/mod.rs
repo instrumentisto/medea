@@ -198,7 +198,7 @@ impl PeersService {
     }
 
     /// Creates interconnected [`Peer`]s for provided endpoints and saves them
-    /// in [`PeerService`].
+    /// in [`PeersService`].
     ///
     /// Returns [`PeerId`]s of the created [`Peer`]s.
     fn create_peers(
@@ -338,10 +338,10 @@ impl PeersService {
     }
 
     /// Returns already created [`Peer`] pair's [`PeerId`]s as
-    /// [`CreatedOrGottenPeer::Gotten`] variant.
+    /// [`GetOrCreatePeersResult::AlreadyExisted`] variant.
     ///
     /// Returns newly created [`Peer`] pair's [`PeerId`]s as
-    /// [`CreatedOrGottenPeer::Created`] variant.
+    /// [`GetOrCreatePeersResult::Created`] variant.
     async fn get_or_create_peers(
         &self,
         src: &WebRtcPublishEndpoint,
@@ -475,6 +475,8 @@ impl PeersService {
 
     /// Creates and sets [`IceUser`], registers [`Peer`] in
     /// [`PeerTrafficWatcher`].
+    ///
+    /// [`IceUser`]: crate::media::ice_user::IceUser
     async fn peer_post_construct(
         &self,
         peer_id: PeerId,
@@ -686,6 +688,8 @@ impl PeerRepository {
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn get_peers_between_members(
         &self,
         member_id: &MemberId,
@@ -708,6 +712,8 @@ impl PeerRepository {
     /// Returns [`HashMap`] with all removed [`Peer`]s:
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     // TODO: remove in #91.
     pub fn remove_peers_related_to_member(
         &self,

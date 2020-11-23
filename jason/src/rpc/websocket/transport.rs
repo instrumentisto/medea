@@ -158,7 +158,7 @@ struct InnerSocket {
     /// [WebSocket]: https://developer.mozilla.org/docs/Web/API/WebSocket
     socket: Rc<SysWebSocket>,
 
-    /// State of [`WebSocketTransport`] connection.
+    /// State of [`WebSocketRpcTransport`] connection.
     socket_state: ObservableCell<TransportState>,
 
     /// Listener for [WebSocket] [open event][1].
@@ -298,9 +298,8 @@ impl WebSocketRpcTransport {
         }
     }
 
-    /// Sets [`WebSocketRpcTransport::on_close_listener`] which will update
-    /// [`RpcTransport`]'s [`State`] to [`State::Closed`] with a
-    /// [`ClosedStateReason::ConnectionLoss`].
+    /// Sets [`InnerSocket::on_close_listener`] which will update
+    /// [`RpcTransport`]'s [`TransportState`] to [`TransportState::Closed`].
     fn set_on_close_listener(&self) -> Result<()> {
         let this = Rc::clone(&self.0);
         let on_close = EventListener::new_once(
@@ -318,7 +317,7 @@ impl WebSocketRpcTransport {
         Ok(())
     }
 
-    /// Sets [`WebSocketRpcTransport::on_message_listener`] which will send
+    /// Sets [`InnerSocket::on_message_listener`] which will send
     /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subscribers.
     fn set_on_message_listener(&self) -> Result<()> {
         let this = Rc::clone(&self.0);

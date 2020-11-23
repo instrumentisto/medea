@@ -185,6 +185,8 @@ pub struct VideoTrackConstraints<C> {
     /// Any action with this flag should be performed only while disable/enable
     /// actions by [`Room`]. This flag can't be changed by
     /// [`MediaStreamSettings`] updating.
+    ///
+    /// [`Room`]: crate::api::Room
     enabled: bool,
 }
 
@@ -200,6 +202,8 @@ impl<C: Default> Default for VideoTrackConstraints<C> {
 impl<C> VideoTrackConstraints<C> {
     /// Returns `true` if this [`VideoTrackConstraints`] are enabled by the
     /// [`Room`] and constrained with [`VideoTrackConstraints::constraints`].
+    ///
+    /// [`Room`]: crate::api::Room
     #[inline]
     fn enabled(&self) -> bool {
         self.enabled && self.is_constrained()

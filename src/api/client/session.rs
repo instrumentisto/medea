@@ -83,7 +83,7 @@ pub struct WsSession {
     idle_timeout: Duration,
 
     /// Timestamp for watchdog which checks whether WebSocket client became
-    /// idle (no messages received during [`idle_timeout`]).
+    /// idle (no messages received during [`WsSession::idle_timeout`]).
     ///
     /// This one should be renewed on any received WebSocket message
     /// from client.
@@ -111,6 +111,8 @@ pub struct WsSession {
 
 impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn new(
         rooms: Box<dyn RpcServerRepository>,
         idle_timeout: Duration,
@@ -278,7 +280,7 @@ impl WsSession {
         }
     }
 
-    /// Handles [`Command::LeftRoom`].
+    /// Handles [`Command::LeaveRoom`].
     ///
     /// Sends [`RpcServer::connection_closed`] to the [`RpcServer`] based on
     /// provided [`RoomId`].
@@ -494,7 +496,7 @@ impl WsSession {
 impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
-    /// Sends default [`RpcSettings`], starts [`Heartbeat`], idle watchdog and
+    /// Sends default [`RpcSettings`], starts heartbeat, idle watchdog and
     /// authentication timeout watchdog.
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("{}: WsSession started", self);
@@ -584,9 +586,13 @@ impl RpcConnection for Addr<WsSession> {
 #[rtype(result = "()")]
 pub struct CloseRoom {
     /// [`RoomId`] of [`Room`] which should be closed.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     room_id: RoomId,
 
     /// [`CloseDescription`] with which this [`Room`] should be closed.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     close_description: CloseDescription,
 }
 

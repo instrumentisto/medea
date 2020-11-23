@@ -29,7 +29,7 @@ pub(super) struct QualityMeterStatsHandler {
     /// All [`PeerMetric`]s registered in this [`QualityMeterStatsHandler`].
     peers: HashMap<PeerId, Rc<RefCell<PeerMetric>>>,
 
-    /// [`PeerMetricsEvent`]s sender.
+    /// [`PeersMetricsEvent`]s sender.
     event_tx: EventSender,
 }
 
@@ -184,6 +184,9 @@ struct PeerMetric {
     id: PeerId,
 
     /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Peer`]: crate::media::peer::Peer
     member_id: MemberId,
 
     /// Weak reference to a [`PeerMetric`] which represents a partner
@@ -231,6 +234,8 @@ impl PeerMetric {
     }
 
     /// Returns [`MemberId`] of the partner [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()

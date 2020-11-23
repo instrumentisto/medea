@@ -41,6 +41,8 @@ impl Controller {
     }
 
     /// Spawns all needed [`Stream`] listeners for this [`Controller`].
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn spawn(self: Rc<Self>) {
         // we don't care about initial state, cause transceiver is inactive atm
         let mut media_exchange_state_changes = self.state.subscribe().skip(1);

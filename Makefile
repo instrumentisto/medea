@@ -325,9 +325,9 @@ docs.rust:
 ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
-	cargo doc \
+	cargo +nightly doc \
 		$(if $(call eq,$(docs-rust-crate),@all),--all,-p $(docs-rust-crate)) \
-		--no-deps \
+		--document-private-items \
 		$(if $(call eq,$(open),no),,--open)
 
 

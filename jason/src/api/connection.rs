@@ -90,12 +90,12 @@ impl Connections {
 #[wasm_bindgen]
 pub struct ConnectionHandle(Weak<InnerConnection>);
 
-/// Actual data of a connection with a specific remote [`Member`].
+/// Actual data of a connection with a specific remote `Member`.
 ///
 /// Shared between JS side ([`ConnectionHandle`]) and Rust side
 /// ([`Connection`]).
 struct InnerConnection {
-    /// Remote [`Member`] ID.
+    /// Remote `Member` ID.
     remote_id: MemberId,
 
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
@@ -146,14 +146,14 @@ impl ConnectionHandle {
     }
 }
 
-/// Connection with a specific remote [`Member`], that is used on Rust side.
+/// Connection with a specific remote `Member`, that is used on Rust side.
 ///
 /// Actually, represents a handle to [`InnerConnection`].
 #[derive(Clone)]
 pub struct Connection(Rc<InnerConnection>);
 
 impl Connection {
-    /// Instantiates new [`Connection`] for a given [`Member`].
+    /// Instantiates new [`Connection`] for a given `Member`.
     #[inline]
     pub fn new(remote_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {

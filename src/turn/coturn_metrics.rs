@@ -72,6 +72,8 @@ impl CoturnMetricsService {
     /// Opens new Redis connection, subscribes to Coturn events and injects
     /// [`Stream`] with these events into the [`CoturnMetricsService`]'s
     /// context.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn connect_and_subscribe(&mut self) -> ActFuture<Result<(), RedisError>> {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();

@@ -24,6 +24,8 @@ use crate::{
 impl Room {
     /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
     /// will be changed to a [`WaitLocalSdp`] state.
+    ///
+    /// [`WaitLocalSdp`]: crate::media::peer::WaitLocalSdp
     fn send_peer_created(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
@@ -252,11 +254,14 @@ impl Handler<NegotiationNeeded> for Room {
     /// Sends [`Event::PeerCreated`] if this [`Peer`] unknown for the remote
     /// side.
     ///
-    /// Sends [`Event::TrackApplied`] if this [`Peer`] known for the remote
+    /// Sends [`Event::TracksApplied`] if this [`Peer`] known for the remote
     /// side.
     ///
     /// If this [`Peer`] or it's partner not [`Stable`] then forcible
-    /// [`TrackChange`]s will be committed.
+    /// track changes will be committed.
+    ///
+    /// [`Event::PeerCreated`]: medea_client_api_proto::Event::PeerCreated
+    /// [`Event::TracksApplied`]: medea_client_api_proto::Event::TracksApplied
     fn handle(
         &mut self,
         msg: NegotiationNeeded,

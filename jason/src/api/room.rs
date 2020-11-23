@@ -35,7 +35,7 @@ use crate::{
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcClientError, RpcSession,
-        SessionError, TransportError,
+        SessionError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
@@ -61,7 +61,7 @@ pub struct RoomCloseReason {
 }
 
 impl RoomCloseReason {
-    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// Creates new [`RoomCloseReason`] with provided [`CloseReason`]
     /// converted into [`String`].
     ///
     /// `is_err` may be `true` only on closing by client.
@@ -109,14 +109,6 @@ enum RoomError {
     #[display(fmt = "`{}` callback isn't set.", _0)]
     CallbackNotSet(&'static str),
 
-    /// Returned if unable to init [`RpcTransport`].
-    #[display(fmt = "Unable to init RPC transport: {}", _0)]
-    InitRpcTransportFailed(#[js(cause)] TransportError),
-
-    /// Returned if [`WebSocketRpcClient`] was unable to connect to RPC server.
-    #[display(fmt = "Unable to connect RPC server: {}", _0)]
-    CouldNotConnectToServer(#[js(cause)] RpcClientError),
-
     /// Returned if the previously added local media tracks does not satisfy
     /// the tracks sent from the media server.
     #[display(fmt = "Invalid local tracks: {}", _0)]
@@ -124,6 +116,8 @@ enum RoomError {
 
     /// Returned if [`PeerConnection`] cannot receive the local tracks from
     /// [`MediaManager`].
+    ///
+    /// [`MediaManager`]: crate::media::MediaManager
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
@@ -131,13 +125,13 @@ enum RoomError {
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
     NoSuchPeer(PeerId),
 
-    /// Returned if an error occurred during the webrtc signaling process
+    /// Returned if an error occurred during the WebRTC signaling process
     /// with remote peer.
     #[display(fmt = "Some PeerConnection error: {}", _0)]
     PeerConnectionError(#[js(cause)] PeerError),
 
-    /// Returned if was received event [`PeerEvent::NewRemoteTracks`] without
-    /// [`Connection`] with remote [`Member`].
+    /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
+    /// connection with remote `Member`.
     #[display(fmt = "Remote stream from unknown member")]
     UnknownRemoteMember,
 
@@ -150,21 +144,9 @@ enum RoomError {
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
 
-    /// [`WebSocketSession`] returned [`SessionError`].
+    /// [`RpcSession`] returned [`SessionError`].
     #[display(fmt = "WebSocketSession error occurred: {}", _0)]
     SessionError(#[js(cause)] SessionError),
-}
-
-impl From<RpcClientError> for RoomError {
-    fn from(err: RpcClientError) -> Self {
-        Self::CouldNotConnectToServer(err)
-    }
-}
-
-impl From<TransportError> for RoomError {
-    fn from(err: TransportError) -> Self {
-        Self::InitRpcTransportFailed(err)
-    }
 }
 
 impl From<PeerError> for RoomError {
@@ -217,7 +199,7 @@ impl RoomHandle {
     /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
     /// `on_connection_loss` callbacks are not set.
     ///
-    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
+    /// With [`RoomError::SessionError`] if cannot connect to media
     /// server.
     pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
@@ -686,11 +668,11 @@ struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
-    /// Constraints to local [`MediaStream`] that is being published by
+    /// Constraints to local `MediaStream` that is being published by
     /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the [`MediaStream`]s received by [`PeerConnection`]s in
+    /// Constraints to the `MediaStream`s received by [`PeerConnection`]s in
     /// this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
@@ -700,15 +682,17 @@ struct InnerRoom {
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Collection of [`Connection`]s with a remote [`Member`]s.
+    /// Collection of connections with a remote `Member`s.
     connections: Connections,
 
     /// Callback to be invoked when new local [`MediaStreamTrack`] will be
     /// added to this [`Room`].
     on_local_track: Callback1<MediaStreamTrack>,
 
-    /// Callback to be invoked when failed obtain [`MediaTrack`]s from
+    /// Callback to be invoked when failed obtain `MediaStreamTrack`s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
+    ///
+    /// [`MediaManager`]: crate::media::MediaManager
     on_failed_local_media: Rc<Callback1<JasonError>>,
 
     /// Callback to be invoked when [`RpcSession`] loses connection.
@@ -722,7 +706,7 @@ struct InnerRoom {
     /// This [`CloseReason`] will be provided into `on_close` JS callback.
     ///
     /// Note that `None` will be considered as error and `is_err` will be
-    /// `true` in [`JsCloseReason`] provided to JS callback.
+    /// `true` in [`CloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
 }
 
@@ -786,6 +770,7 @@ impl InnerRoom {
     /// [`MediaConnectionsError::CannotDisableRequiredSender`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
     async fn toggle_media_exchange(
         &self,
@@ -846,6 +831,8 @@ impl InnerRoom {
     /// Updates [`media_exchange_state::State`]s of the [`TransceiverSide`] with
     /// a provided [`PeerId`] and [`TrackId`] to a provided
     /// [`media_exchange_state::Stable`]s.
+    ///
+    /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
     async fn update_media_exchange_states(
         &self,
@@ -931,6 +918,9 @@ impl InnerRoom {
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
     /// provided [`media_exchange_state::Stable`].
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    /// [`Receiver`]: crate::peer::Receiver
     pub fn is_all_peers_in_media_exchange_state(
         &self,
         kind: MediaKind,
@@ -955,7 +945,7 @@ impl InnerRoom {
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStream`] that corresponds to this settings.
+    /// `MediaStream` that corresponds to this settings.
     /// [`MediaStreamSettings`] update will change [`MediaStreamTrack`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
@@ -965,8 +955,9 @@ impl InnerRoom {
     /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/rnxcavf
+    /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [`Sender`]: crate::peer::Sender
     async fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
@@ -1009,6 +1000,9 @@ impl InnerRoom {
     /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`] in
     /// provided [`PeerConnection`]. Negotiates [`PeerConnection`] if provided
     /// `negotiation_role` is `Some`.
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    /// [`Receiver`]: crate::peer::Receiver
     async fn create_tracks_and_maybe_negotiate(
         &self,
         peer: Rc<PeerConnection>,
@@ -1057,7 +1051,7 @@ impl EventHandler for InnerRoom {
     type Output = Result<(), Traced<RoomError>>;
 
     /// Creates [`PeerConnection`] with a provided ID and all the
-    /// [`Connection`]s basing on provided [`Track`]s.
+    /// connections basing on provided [`Track`]s.
     ///
     /// If provided `sdp_offer` is `Some`, then offer is applied to a created
     /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
@@ -1152,6 +1146,9 @@ impl EventHandler for InnerRoom {
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    /// [`Receiver`]: crate::peer::Receiver
     async fn on_tracks_applied(
         &self,
         peer_id: PeerId,
@@ -1196,8 +1193,8 @@ impl EventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
-    /// [`Connection::update_quality_score`].
+    /// Updates connection's [`ConnectionQualityScore`] by calling
+    /// `Connection::update_quality_score`.
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,
@@ -1249,7 +1246,7 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
-    /// [`MediaStreamTrack`] to the related [`Connection`].
+    /// [`MediaStreamTrack`] to the related connection.
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,
