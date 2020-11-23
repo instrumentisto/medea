@@ -54,6 +54,8 @@ impl Room {
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
     /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStarted`]
     /// message to [`Room`] [`Addr`].
+    ///
+    /// [`Addr`]: actix::Addr
     fn peer_started(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStarted(peer_id));
@@ -62,6 +64,8 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 
     /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStopped`]
     /// message to [`Room`] [`Addr`].
+    ///
+    /// [`Addr`]: actix::Addr
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
@@ -70,8 +74,8 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 }
 
 impl StreamHandler<PeersMetricsEvent> for Room {
-    /// Dispatches received [`PeerMetricsEvent`] with [`Room`]'s
-    /// [`PeerMetricsEventHandler`] implementation.
+    /// Dispatches received [`PeersMetricsEvent`] with [`Room`]'s
+    /// [`PeersMetricsEventHandler`] implementation.
     fn handle(&mut self, event: PeersMetricsEvent, _: &mut Self::Context) {
         if let Err(err) = event.dispatch_with(self) {
             error!("Error handling PeersMetricsEvent: {:?}", err);
@@ -176,6 +180,8 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
     /// [`Addr`] a [`NegotiationNeeded`] [`Message`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
+    ///
+    /// [`Addr`]: actix::Addr
     #[inline]
     fn negotiation_needed(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
@@ -187,6 +193,8 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
     /// [`Addr`] a [`ForceUpdate`] [`Message`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
+    ///
+    /// [`Addr`]: actix::Addr
     #[inline]
     fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
         if let Some(addr) = self.upgrade() {

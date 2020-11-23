@@ -61,7 +61,7 @@ pub enum CoturnEventParseError {
 
     /// No [`MemberId`] metadata.
     ///
-    /// [`MemberId`]: crate::api::control::MemberId
+    /// [`MemberId`]: medea_client_api_proto::MemberId
     #[display(fmt = "No MemberId metadata")]
     NoMemberId,
 

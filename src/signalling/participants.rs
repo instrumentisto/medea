@@ -101,7 +101,7 @@ impl ParticipantService {
     ///
     /// # Errors
     ///
-    /// Errors with [`MemberLoadError`] if [`RoomSpec`] transformation fails.
+    /// Errors with [`MembersLoadError`] if [`RoomSpec`] transformation fails.
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
@@ -198,7 +198,7 @@ impl ParticipantService {
     /// # Errors
     ///
     /// Errors with [`RoomError::ConnectionNotExists`] if unable to find
-    /// [`Connection`] with specified [`Member`].
+    /// [`RpcConnection`] with specified [`Member`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
@@ -308,6 +308,8 @@ impl ParticipantService {
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
     /// deletes all [`IceUser`]s.
+    ///
+    /// [`IceUser`]: crate::media::ice_user::IceUser
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
@@ -373,7 +375,7 @@ impl ParticipantService {
     }
 
     /// Returns [`Iterator`] over [`MemberId`] and [`Member`] which this
-    /// [`ParticipantRepository`] stores.
+    /// [`ParticipantService`] stores.
     pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
         self.members.iter()
     }

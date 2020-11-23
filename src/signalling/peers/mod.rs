@@ -1,4 +1,7 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
+//!
+//! [`Peer`]: crate::media::peer::Peer
+//! [`Room`]: crate::signalling::room::Room
 
 mod media_traffic_state;
 mod metrics;
@@ -45,21 +48,28 @@ pub use self::{
 #[derive(Debug)]
 pub struct PeersService {
     /// [`RoomId`] of the [`Room`] which owns this [`PeerRepository`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     room_id: RoomId,
 
-    /// [`TurnAuthService`] that [`IceUser`]s for the [`PeerConnection`]s from
+    /// [`TurnAuthService`] that [`IceUser`]s for the [`Peer`]s from
     /// this [`PeerRepository`] will be created with.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
+    /// [`IceUser`]: crate::media::ice_user::IceUser
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Peer`]: crate::media::peer::Peer
     /// [`Room`]: crate::signalling::Room
     peers: PeerRepository,
 
     /// Count of [`Peer`]s in this [`Room`].
     ///
     /// [`Room`]: crate::signalling::room::Room
+    /// [`Peer`]: crate::media::peer::Peer
     peers_count: Counter<PeerId>,
 
     /// Count of [`MediaTrack`]s in this [`Room`].
@@ -69,9 +79,12 @@ pub struct PeersService {
     tracks_count: Counter<TrackId>,
 
     /// [`PeerTrafficWatcher`] which analyzes [`Peer`]s traffic metrics.
+    /// [`Peer`]: crate::media::peer::Peer
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     peer_metrics_service: RefCell<Box<dyn RtcStatsHandler>>,
 
     /// Subscriber to the events which indicates that negotiation process
@@ -117,6 +130,8 @@ pub enum ConnectEndpointsResult {
 impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
@@ -246,6 +261,8 @@ impl PeersService {
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     #[inline]
     pub fn get_peers_between_members(
         &self,
@@ -283,6 +300,7 @@ impl PeersService {
     /// __Note:__ this also deletes partner peers.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &self,
         member_id: &MemberId,
@@ -384,6 +402,8 @@ impl PeersService {
     /// # Errors
     ///
     /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
+    ///
+    /// [`IceUser`]: crate::media::ice_user::IceUser
     pub async fn connect_endpoints(
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
@@ -503,6 +523,8 @@ impl PeersService {
     /// Returns [`HashMap`] with all removed [`Peer`]s:
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     // TODO: remove in #91.
     #[inline]
     pub fn remove_peers_related_to_member(
@@ -512,8 +534,8 @@ impl PeersService {
         self.peers.remove_peers_related_to_member(member_id)
     }
 
-    /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the
-    /// [`PeerMetricsService`].
+    /// Updates tracks information of the [`Peer`] with provided [`PeerId`] in
+    /// the [`RtcStatsHandler`].
     ///
     /// # Errors
     ///
@@ -526,22 +548,22 @@ impl PeersService {
         Ok(())
     }
 
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s from underlying
-    /// [`PeerMetricsService`].
+    /// Returns [`Stream`] of [`PeersMetricsEvent`]s from underlying
+    /// [`RtcStatsHandler`].
     pub fn subscribe_to_metrics_events(
         &self,
     ) -> impl Stream<Item = PeersMetricsEvent> {
         self.peer_metrics_service.borrow_mut().subscribe()
     }
 
-    /// Propagates stats to [`PeersMetricsService`].
+    /// Propagates stats to [`RtcStatsHandler`].
     pub fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
         self.peer_metrics_service
             .borrow_mut()
             .add_stats(peer_id, stats);
     }
 
-    /// Propagates [`PeerConnectionState`] to [`PeersMetricsService`].
+    /// Propagates [`PeerConnectionState`] to [`RtcStatsHandler`].
     pub fn update_peer_connection_state(
         &self,
         peer_id: PeerId,
@@ -552,7 +574,7 @@ impl PeersService {
             .update_peer_connection_state(peer_id, state);
     }
 
-    /// Runs [`Peer`]s stats checking in the underlying [`PeerMetricsEvent`]s.
+    /// Runs [`Peer`]s stats checking in the underlying [`PeersMetricsEvent`]s.
     pub fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check();
     }
@@ -836,7 +858,7 @@ mod tests {
     }
 
     /// Checks that newly created [`Peer`] will be created in the
-    /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
+    /// [`RtcStatsHandler`] and [`PeerTrafficWatcher`].
     #[actix_rt::test]
     async fn peer_is_registered_in_metrics_service() {
         let mut mock = MockPeerTrafficWatcher::new();
@@ -939,7 +961,7 @@ mod tests {
     }
 
     /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
-    /// count will be updated in the [`PeerMetricsService`].
+    /// count will be updated in the [`RtcStatsHandler`].
     #[actix_rt::test]
     async fn adding_new_endpoint_updates_peer_metrics() {
         let mut mock = MockPeerTrafficWatcher::new();

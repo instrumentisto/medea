@@ -1,5 +1,7 @@
-//! Service responsible for processing [`PeerConnection`]'s metrics received
+//! Service responsible for processing [`Peer`]'s metrics received
 //! from Coturn.
+//!
+//! [`Peer`]: crate::media::peer::Peer
 
 use std::{
     collections::HashMap,
@@ -32,8 +34,10 @@ const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 pub type ActFuture<O> =
     Pin<Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>>;
 
-/// Service responsible for processing [`PeerConnection`]'s metrics received
+/// Service responsible for processing [`Peer`]'s metrics received
 /// from Coturn.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug)]
 pub struct CoturnMetricsService {
     /// [`PeerTrafficWatcher`] which will be notified of all traffic events.

@@ -57,6 +57,8 @@ pub struct Conf {
     pub control: ControlApi,
 
     /// [`Peer`] media traffic watcher configuration.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub media: Media,
 }
 

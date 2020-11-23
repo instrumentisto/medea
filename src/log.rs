@@ -30,6 +30,9 @@ pub mod prelude {
 ///
 /// __Note:__ You may encounter log drops when running in debug mode, which
 /// should not be the case for release mode.
+///
+/// [`OverflowStrategy::DropAndReport`]:
+/// slog_async::OverflowStrategy::DropAndReport
 pub fn new_dual_logger<W1, W2>(w_out: W1, w_err: W2) -> Logger
 where
     W1: io::Write + Send + 'static,

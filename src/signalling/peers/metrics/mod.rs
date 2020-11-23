@@ -1,13 +1,15 @@
 //! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 //!
-//! 1. You should register [`Peer`] via [`PeersMetricsService::register_peer`].
-//! 2. Use [`PeersMetricsService::subscribe`] to subscribe to stats processing
+//! 1. You should register [`Peer`] via [`RtcStatsHandler::register_peer`].
+//! 2. Use [`RtcStatsHandler::subscribe`] to subscribe to stats processing
 //!    results.
-//! 3. Provide [`Peer`]'s metrics to [`PeersMetricsService::add_stats`].
-//! 4. Call [`PeersMetricsService::check_peers`] with reasonable interval
+//! 3. Provide [`Peer`]'s metrics to [`RtcStatsHandler::add_stats`].
+//! 4. Call [`RtcStatsHandler::check`] with reasonable interval
 //!    (~1-2 sec), to check for stale metrics.
 //!
 //! Stores [`RtcStatsHandler`]s implementors.
+//!
+//! [`Peer`]: crate::media::peer::Peer
 
 mod connection_failure_detector;
 mod flowing_detector;
@@ -39,11 +41,11 @@ use crate::{
     },
 };
 
-/// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
+/// WebRTC statistics analysis results emitted by [`RtcStatsHandler`].
 #[dispatchable]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PeersMetricsEvent {
-    /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
+    /// Some `MediaTrack`s with provided [`MediaType`] doesn't flows.
     NoTrafficFlow {
         peer_id: PeerId,
         was_flowing_at: DateTime<Utc>,
@@ -63,9 +65,13 @@ pub enum PeersMetricsEvent {
     QualityMeterUpdate {
         /// [`MemberId`] of the [`Peer`] which [`ConnectionQualityScore`]
         /// was updated.
+        ///
+        /// [`Peer`]: crate::media::peer::Peer
         member_id: MemberId,
 
         /// [`MemberId`] of the partner [`Peer`].
+        ///
+        /// [`Peer`]: crate::media::peer::Peer
         partner_member_id: MemberId,
 
         /// Actual [`ConnectionQualityScore`].

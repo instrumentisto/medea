@@ -37,7 +37,7 @@ pub struct AppContext {
 
     /// Service for sending [`CallbackEvent`]s.
     ///
-    /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
+    /// [`CallbackEvent`]: crate::api::control::callback::CallbackEvent
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
 }
 

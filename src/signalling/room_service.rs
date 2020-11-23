@@ -127,8 +127,10 @@ pub struct RoomService {
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
-    /// Service which is responsible for processing [`PeerConnection`]'s
+    /// Service which is responsible for processing [`Peer`]'s
     /// metrics received from the Coturn.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     _coturn_metrics: Addr<CoturnMetricsService>,
 }
 
@@ -246,6 +248,8 @@ impl Handler<StartStaticRooms> for RoomService {
 }
 
 /// Type alias for success [`CreateResponse`]'s sids.
+///
+/// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<String, String>;
 
 /// Signal for creating new [`Room`].

@@ -45,10 +45,8 @@ pub use self::{
 pub enum TryFromProtobufError {
     /// Error while parsing [`SrcUri`] of [`WebRtcPlayEndpoint`].
     ///
-    /// [`WebRtcPlayEndpoint`]:
-    /// crate::api::control::endpoints::WebRtcPlayEndpoint
-    /// [`SrcUri`]:
-    /// crate::api::control::endpoints::webrtc_play_endpoint::SrcUri
+    /// [`WebRtcPlayEndpoint`]: self::endpoints::WebRtcPlayEndpoint
+    /// [`SrcUri`]: self::refs::src_uri::SrcUri
     #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
@@ -75,11 +73,15 @@ pub enum TryFromProtobufError {
     UnimplementedEndpoint(String),
 
     /// Error while [`CallbackUrl`] parsing.
+    ///
+    /// [`CallbackUrl`]: crate::api::control::callback::url::CallbackUrl
     #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
 
     /// Some element from a spec contains negative [`Duration`], but it's not
     /// supported.
+    ///
+    /// [`Duration`]: std::time::Duration
     #[display(
         fmt = "Element [id = {}] contains negative duration field `{}`",
         _0,
@@ -191,7 +193,7 @@ impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
 ///
 /// # Errors
 ///
-/// Errors with [`LoadStaticControlSpecError::IoError`] if reading of provided
+/// Errors with [`LoadStaticControlSpecsError::IoError`] if reading of provided
 /// [`Path`] to file fails.
 ///
 /// Errors with [`LoadStaticControlSpecsError::YamlDeserializationError`] if
@@ -214,7 +216,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
 ///
 /// # Errors
 ///
-/// Errors with [`LoadStateControlSpecsError::SpecDirReadError`] if reading
+/// Errors with [`LoadStaticControlSpecsError::SpecDirReadError`] if reading
 /// provided [`Path`] fails.
 pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     path: P,

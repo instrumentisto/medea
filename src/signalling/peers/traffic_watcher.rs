@@ -24,6 +24,8 @@
 //! If some source will report that it observes traffic stopped flowing
 //! (`PeerTrafficWatcher.traffic_stopped()`), then
 //! [`PeerConnectionStateEventsHandler::peer_stopped`] will be called.
+//!
+//! [`Room`]: crate::signalling::room::Room
 
 use std::{
     collections::{HashMap, HashSet},
@@ -77,6 +79,8 @@ pub trait PeerTrafficWatcher: Debug + Send + Sync {
     /// Unregisters [`Room`] as `Peer`s state messages listener.
     ///
     /// All `Peer` subscriptions related to this [`Room`] will be removed.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     fn unregister_room(&self, room_id: RoomId);
 
     /// Registers `Peer`, so that [`PeerTrafficWatcher`] will be able to

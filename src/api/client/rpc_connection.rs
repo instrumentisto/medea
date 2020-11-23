@@ -68,11 +68,11 @@ pub trait RpcConnection: fmt::Debug + Send {
 #[cfg(test)]
 impl_debug_by_struct_name!(MockRpcConnection);
 
-/// Settings of [`WsSession`].
+/// Settings of WebSocket session.
 #[derive(Clone, Copy, Debug)]
 pub struct RpcConnectionSettings {
-    /// [`Duration`], after which [`WsSession`] will be considered idle if no
-    /// heartbeat messages were received.
+    /// [`Duration`], after which WebSocket session will be considered idle if
+    /// no heartbeat messages were received.
     pub idle_timeout: Duration,
 
     /// Interval of sending `Ping`s to remote [`Member`].
@@ -94,6 +94,8 @@ pub struct RpcConnectionEstablished {
     pub member_id: MemberId,
 
     /// Credential of [`Member`] to authorize WebSocket connection with.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub credentials: Credential,
 
     /// Established [`RpcConnection`].

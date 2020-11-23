@@ -90,7 +90,7 @@ impl RpcServer for Addr<Room> {
     ///
     /// # Errors
     ///
-    /// Errors with [`RpcServerError::RoomMailbox`] if [`Message`] sending is
+    /// Errors with [`RpcServerError::RoomMailbox`] if message sending is
     /// failed.
     ///
     /// Errors with [`RpcServerError::RoomError`] if [`Room`] returns error.

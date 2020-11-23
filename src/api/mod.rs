@@ -23,9 +23,13 @@ pub enum RpcServerError {
     Authorization,
 
     /// [`Room`] returned some [`RoomError`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     RoomError(RoomError),
 
     /// [`Room`]s [`MailboxError`] is closed or overflowed.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     RoomMailbox(MailboxError),
 }
 

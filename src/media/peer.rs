@@ -292,6 +292,8 @@ pub struct Context {
     id: Id,
 
     /// [`MemberId`] of a [`Member`] which owns this [`Peer`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     member_id: MemberId,
 
     /// [`PeerId`] of a partner [`Peer`].
@@ -590,6 +592,8 @@ impl<T> Peer<T> {
 
     /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
     /// client in the [`Event::TracksApplied`].
+    ///
+    /// [`Event::TracksApplied`]: medea_client_api_proto::Event::TracksApplied
     pub fn get_updates(&self) -> Vec<TrackUpdate> {
         self.context
             .pending_track_updates
@@ -890,8 +894,6 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Sets [`Context::is_renegotiate`] to `true`.
-    ///
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
@@ -909,8 +911,6 @@ impl Peer<Stable> {
 
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
-    ///
-    /// Sets [`Context::is_renegotiate`] to `true`.
     ///
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
