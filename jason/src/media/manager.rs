@@ -15,7 +15,7 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
     MediaDevices, MediaStream as SysMediaStream,
-    MediaStreamConstraints as SysMediaStreamConstraints,
+    MediaStreamConstraints as SysMediaStreamConstraints, MediaStreamTrackState,
 };
 
 use crate::{
@@ -24,6 +24,7 @@ use crate::{
         MediaStreamSettings, MultiSourceTracksConstraints,
     },
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
+    MediaKind,
 };
 
 use super::InputDeviceInfo;
@@ -58,7 +59,7 @@ pub enum MediaManagerError {
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
     GetUserMediaFailed(JsError),
 
-    /// Occurs if the [MediaDevices.getDisplayMedia()][1] request failed.
+    /// Occurs if the [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
@@ -69,6 +70,24 @@ pub enum MediaManagerError {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(JsError),
+
+    /// Occurs when local track is [muted][1] right after [getUserMedia()][2]
+    /// or [getDisplayMedia()][3] request.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams/#track-muted
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "{} track is muted", _0)]
+    LocalTrackIsMuted(MediaKind),
+
+    /// Occurs when local track is [ended][1] right after [getUserMedia()][2]
+    /// or [getDisplayMedia()][3] request.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "{} track is ended", _0)]
+    LocalTrackIsEnded(MediaKind),
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
@@ -271,19 +290,7 @@ impl InnerMediaManager {
         .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
 
-        let mut storage = self.tracks.borrow_mut();
-        let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
-            .unwrap()
-            .unwrap()
-            .map(|track| {
-                MediaStreamTrack::new(track.unwrap(), MediaSourceKind::Device)
-            })
-            .inspect(|track| {
-                storage.insert(track.id(), track.downgrade());
-            })
-            .collect();
-
-        Ok(tracks)
+        Ok(self.parse_and_save_tracks(stream, MediaSourceKind::Device)?)
     }
 
     /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call, saves
@@ -319,17 +326,53 @@ impl InnerMediaManager {
         .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
 
+        Ok(self.parse_and_save_tracks(stream, MediaSourceKind::Display)?)
+    }
+
+    /// ASDASD
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaManagerError::LocalTrackIsEnded`] if at least on
+    /// track from provided [`SysMediaStream`] is in [ended][1] state.
+    ///
+    /// Errors with [`MediaManagerError::LocalTrackIsMuted`] if at least on
+    /// track from provided [`SysMediaStream`] is in [muted][2] state.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://tinyurl.com/w3-streams/#track-muted
+    fn parse_and_save_tracks(
+        &self,
+        stream: SysMediaStream,
+        kind: MediaSourceKind,
+    ) -> Result<Vec<MediaStreamTrack>> {
+        use MediaManagerError::{LocalTrackIsEnded, LocalTrackIsMuted};
+
         let mut storage = self.tracks.borrow_mut();
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| {
-                MediaStreamTrack::new(tr.unwrap(), MediaSourceKind::Display)
-            })
-            .inspect(|track| {
-                storage.insert(track.id(), track.downgrade());
-            })
+            .map(|tr| MediaStreamTrack::new(tr.unwrap(), kind))
             .collect();
+
+        // Tracks returned by gDM or gUM request should be live && !muted.
+        // Otherwise we should err without caching tracks in MediaManager.
+        // Tracks will be stopped in drop impl.
+        for track in &tracks {
+            if !matches!(
+                track.as_ref().ready_state(),
+                MediaStreamTrackState::Live
+            ) {
+                return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
+            }
+            if track.as_ref().muted() {
+                return Err(tracerr::new!(LocalTrackIsMuted(track.kind())));
+            }
+        }
+
+        for track in &tracks {
+            storage.insert(track.id(), track.downgrade());
+        }
 
         Ok(tracks)
     }

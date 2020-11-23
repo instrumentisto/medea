@@ -7,6 +7,7 @@ mod device_info;
 mod manager;
 mod track;
 
+use derive_more::Display;
 use wasm_bindgen::prelude::*;
 
 #[doc(inline)]
@@ -26,12 +27,14 @@ pub use self::{
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaKind {
     /// Audio track.
+    #[display(fmt = "audio")]
     Audio,
 
     /// Video track.
+    #[display(fmt = "video")]
     Video,
 }
 

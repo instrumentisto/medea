@@ -47,6 +47,14 @@ export class MockNavigator {
     return this.getDisplayMediaInvocations;
   }
 
+  set getUserMediaReturns(tracks) {
+    window.navigator.mediaDevices.getUserMedia = async function() {return tracks};
+  }
+
+  set getDisplayMediaReturns(tracks) {
+    window.navigator.mediaDevices.getDisplayMedia = async function() {return tracks};
+  }
+
   stop() {
     window.navigator.mediaDevices.getUserMedia = this._getUserMedia;
     window.navigator.mediaDevices.getDisplayMedia = this._getDisplayMedia;
