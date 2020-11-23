@@ -47,12 +47,12 @@ export class MockNavigator {
     return this.getDisplayMediaInvocations;
   }
 
-  set getUserMediaReturns(tracks) {
-    window.navigator.mediaDevices.getUserMedia = async function() {return tracks};
+  set setUserMediaReturns(stream) {
+    window.navigator.mediaDevices.getUserMedia = async function() {return stream};
   }
 
-  set getDisplayMediaReturns(tracks) {
-    window.navigator.mediaDevices.getDisplayMedia = async function() {return tracks};
+  set setDisplayMediaReturns(stream) {
+    window.navigator.mediaDevices.getDisplayMedia = async function() {return stream};
   }
 
   stop() {

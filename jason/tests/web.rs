@@ -96,7 +96,6 @@ use medea_jason::{
     DisplayVideoTrackConstraints, MediaStreamSettings,
 };
 use url::Url;
-use web_sys::{MediaStreamTrack as SysMediaStreamTrack};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -125,11 +124,14 @@ extern "C" {
     #[wasm_bindgen(method, getter = getDisplayMediaRequestsCount)]
     fn get_display_media_requests_count(this: &MockNavigator) -> i32;
 
-    #[wasm_bindgen(method, getter = getDisplayMediaRequestsCount)]
-    fn getUserMediaReturns(this: &MockNavigator, tracks: ) -> i32;
+    #[wasm_bindgen(method, setter = setUserMediaReturns)]
+    fn setUserMediaReturns(this: &MockNavigator, stream: web_sys::MediaStream);
 
-    #[wasm_bindgen(method, getter = getDisplayMediaRequestsCount)]
-    fn getDisplayMediaReturns(this: &MockNavigator, ) -> i32;
+    #[wasm_bindgen(method, setter = setDisplayMediaReturns)]
+    fn setDisplayMediaReturns(
+        this: &MockNavigator,
+        stream: web_sys::MediaStream,
+    );
 
     #[wasm_bindgen(method)]
     fn stop(this: &MockNavigator);
