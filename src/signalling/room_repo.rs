@@ -13,7 +13,7 @@ use crate::{
     signalling::Room,
 };
 
-/// Repository that stores [`Room`]s addresses.
+/// Repository that stores `Room`s addresses.
 #[derive(Clone, Debug, Default)]
 pub struct RoomRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.
@@ -23,33 +23,42 @@ pub struct RoomRepository {
     rooms: Arc<Mutex<HashMap<RoomId, Addr<Room>>>>,
 }
 
-impl RoomRepository {
-    /// Creates new [`Room`]s repository with passed-in [`Room`]s.
-    pub fn new(rooms: HashMap<RoomId, Addr<Room>>) -> Self {
+#[cfg(test)]
+impl From<HashMap<RoomId, Addr<Room>>> for RoomRepository {
+    fn from(rooms: HashMap<RoomId, Addr<Room>>) -> Self {
         Self {
             rooms: Arc::new(Mutex::new(rooms)),
         }
     }
+}
+
+impl RoomRepository {
+    /// Creates new empty [`RoomRepository`].
+    pub fn new() -> Self {
+        Self {
+            rooms: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
 
     /// Returns [`Room`] by its ID.
-    pub fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
+    pub(crate) fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
         rooms.get(id).cloned()
     }
 
     /// Removes [`Room`] from [`RoomRepository`] by [`RoomId`].
-    pub fn remove(&self, id: &RoomId) {
+    pub(crate) fn remove(&self, id: &RoomId) {
         self.rooms.lock().unwrap().remove(id);
     }
 
     /// Adds new [`Room`] into [`RoomRepository`].
-    pub fn add(&self, id: RoomId, room: Addr<Room>) {
+    pub(crate) fn add(&self, id: RoomId, room: Addr<Room>) {
         self.rooms.lock().unwrap().insert(id, room);
     }
 
     /// Checks existence of [`Room`] in [`RoomRepository`] by provided
     /// [`RoomId`].
-    pub fn contains_room_with_id(&self, id: &RoomId) -> bool {
+    pub(crate) fn contains_room_with_id(&self, id: &RoomId) -> bool {
         self.rooms.lock().unwrap().contains_key(id)
     }
 }

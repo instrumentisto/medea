@@ -1,12 +1,12 @@
 //! Provides application configuration options.
 
-pub mod control;
-pub mod log;
-pub mod media;
-pub mod rpc;
-pub mod server;
-pub mod shutdown;
-pub mod turn;
+pub(crate) mod control;
+pub(crate) mod log;
+pub(crate) mod media;
+pub(crate) mod rpc;
+pub(crate) mod server;
+pub(crate) mod shutdown;
+pub(crate) mod turn;
 
 use std::env;
 
@@ -15,14 +15,9 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
-pub use self::{
-    control::ControlApi,
-    log::Log,
-    media::Media,
-    rpc::Rpc,
-    server::Server,
-    shutdown::Shutdown,
-    turn::{Redis, Turn},
+pub(crate) use self::{
+    control::ControlApi, log::Log, media::Media, rpc::Rpc, server::Server,
+    shutdown::Shutdown, turn::Turn,
 };
 
 /// CLI argument that is responsible for holding application configuration
@@ -56,9 +51,7 @@ pub struct Conf {
     /// [Control API]: https://tinyurl.com/yxsqplq7
     pub control: ControlApi,
 
-    /// [`Peer`] media traffic watcher configuration.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
+    /// Peer connection media traffic watcher configuration.
     pub media: Media,
 }
 

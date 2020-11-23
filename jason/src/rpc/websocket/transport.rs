@@ -58,7 +58,7 @@ pub enum TransportError {
     #[display(fmt = "Failed to parse client message: {}", _0)]
     ParseClientMessage(JsonParseError),
 
-    /// Occurs when [`ServerMessage`] cannot be parsed.
+    /// Occurs when [`ServerMsg`] cannot be parsed.
     #[display(fmt = "Failed to parse server message: {}", _0)]
     ParseServerMessage(JsonParseError),
 

@@ -14,12 +14,13 @@ use redis::ConnectionInfo;
 
 use crate::{
     conf,
-    media::IceUser,
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         repo::{TurnDatabase, TurnDatabaseErr},
     },
 };
+
+use super::IceUser;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -188,7 +189,7 @@ pub fn new_turn_auth_service<'a>(
 pub mod test {
     use std::sync::Arc;
 
-    use crate::media::IceUser;
+    use crate::turn::IceUser;
 
     use super::*;
 

@@ -175,21 +175,15 @@ pub enum ErrorCode {
     #[display(fmt = "Expected Member element but it's not.")]
     NotMemberInSpec = 1007,
 
-    /// Invalid source URI in [`WebRtcPlayEndpoint`].
+    /// Invalid source URI in `WebRtcPlayEndpoint` element.
     ///
     /// Code: __1008__.
-    ///
-    /// [`WebRtcPlayEndpoint`]:
-    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
     #[display(fmt = "Invalid source URI in 'WebRtcPlayEndpoint'.")]
     InvalidSrcUri = 1008,
 
-    /// Provided not source URI in [`WebRtcPlayEndpoint`].
+    /// Provided not source URI in `WebRtcPlayEndpoint` element.
     ///
     /// Code: __1009__.
-    ///
-    /// [`WebRtcPlayEndpoint`]:
-    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
     #[display(fmt = "Provided not source URI in 'WebRtcPlayEndpoint'.")]
     NotSourceUri = 1009,
 

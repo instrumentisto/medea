@@ -117,16 +117,6 @@ enum GetOrCreatePeersResult {
     AlreadyExisted(PeerId, PeerId),
 }
 
-/// Result of the [`PeersService::connect_endpoints`] function.
-#[derive(Clone, Copy, Debug)]
-pub enum ConnectEndpointsResult {
-    /// New [`Peer`] pair was created.
-    Created(PeerId, PeerId),
-
-    /// [`Peer`] pair was updated.
-    Updated(PeerId, PeerId),
-}
-
 impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].

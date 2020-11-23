@@ -85,12 +85,6 @@ pub trait Disableable {
         Ok(())
     }
 
-    /// Cancels [`media_exchange_state::State`] transition.
-    #[inline]
-    fn cancel_transition(&self) {
-        self.media_exchange_state_controller().cancel_transition()
-    }
-
     /// Returns [`LocalBoxFuture`] which will be resolved when
     /// [`media_exchange_state::State`] of this [`Disableable`] will be
     /// [`media_exchange_state::State::Stable`] or it is dropped.
@@ -126,6 +120,7 @@ pub trait Disableable {
     /// Indicates whether media exchange state of the [`Disableable`] is in
     /// [`media_exchange_state::Stable::Disabled`].
     #[inline]
+    #[cfg(feature = "mockable")]
     fn disabled(&self) -> bool {
         self.media_exchange_state_controller().disabled()
     }
@@ -368,6 +363,7 @@ impl MediaConnections {
 
     /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
     /// enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -378,6 +374,7 @@ impl MediaConnections {
 
     /// Returns `true` if all [`Receiver`]s with [`MediaKind::Audio`] are
     /// enabled or `false` otherwise.
+    #[cfg(feature = "mockable")]
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
             .borrow()

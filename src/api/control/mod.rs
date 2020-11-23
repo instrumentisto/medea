@@ -2,14 +2,14 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-pub mod callback;
-pub mod endpoints;
+pub(crate) mod callback;
+pub(crate) mod endpoints;
 pub mod error_codes;
 pub mod grpc;
-pub mod member;
-pub mod pipeline;
-pub mod refs;
-pub mod room;
+pub(crate) mod member;
+pub(crate) mod pipeline;
+pub(crate) mod refs;
+pub(crate) mod room;
 
 use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
@@ -30,7 +30,7 @@ use crate::{
 use self::{pipeline::Pipeline, refs::src_uri::SrcParseError};
 
 #[doc(inline)]
-pub use self::{
+pub(crate) use self::{
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayId,
         webrtc_publish_endpoint::WebRtcPublishId, EndpointSpec,
@@ -43,10 +43,7 @@ pub use self::{
 /// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]
 pub enum TryFromProtobufError {
-    /// Error while parsing [`SrcUri`] of [`WebRtcPlayEndpoint`].
-    ///
-    /// [`WebRtcPlayEndpoint`]: self::endpoints::WebRtcPlayEndpoint
-    /// [`SrcUri`]: self::refs::src_uri::SrcUri
+    /// Error while parsing Source URI of `WebRtcPlayEndpoint` element.
     #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
@@ -72,10 +69,8 @@ pub enum TryFromProtobufError {
     #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
     UnimplementedEndpoint(String),
 
-    /// Error while [`CallbackUrl`] parsing.
-    ///
-    /// [`CallbackUrl`]: crate::api::control::callback::url::CallbackUrl
-    #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
+    /// Error while Callback API URL parsing.
+    #[display(fmt = "Error while parsing Callback API URL. {:?}", _0)]
     CallbackUrlParseErr(CallbackUrlParseError),
 
     /// Some element from a spec contains negative [`Duration`], but it's not
@@ -107,7 +102,7 @@ impl From<CallbackUrlParseError> for TryFromProtobufError {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum RootElement {
+pub(crate) enum RootElement {
     /// Represents [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room {
@@ -201,7 +196,7 @@ impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
 ///
 /// Errors with [`LoadStaticControlSpecsError::TryFromElementError`] if
 /// [`RoomSpec`] conversation fails.
-pub fn load_from_yaml_file<P: AsRef<Path>>(
+pub(crate) fn load_from_yaml_file<P: AsRef<Path>>(
     path: P,
 ) -> Result<RoomSpec, LoadStaticControlSpecsError> {
     let mut file = File::open(path)?;
@@ -218,7 +213,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
 ///
 /// Errors with [`LoadStaticControlSpecsError::SpecDirReadError`] if reading
 /// provided [`Path`] fails.
-pub fn load_static_specs_from_dir<P: AsRef<Path>>(
+pub(crate) fn load_static_specs_from_dir<P: AsRef<Path>>(
     path: P,
 ) -> Result<Vec<RoomSpec>, LoadStaticControlSpecsError> {
     let mut specs = Vec::new();
@@ -232,14 +227,13 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     Ok(specs)
 }
 
-/// Starts all [`Room`]s from static [Control API] specs.
+/// Starts all Rooms from static [Control API] specs.
 ///
 /// # Errors
 ///
 /// Errors if unable to send message to [`RoomService`] actor.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-/// [`Room`]: crate::signalling::room::Room
 pub async fn start_static_rooms(
     room_service: &Addr<RoomService>,
 ) -> Result<(), Error> {

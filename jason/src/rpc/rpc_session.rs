@@ -600,7 +600,7 @@ impl RpcEventHandler for WebSocketRpcSession {
 /// ```
 #[derive(Clone, Debug, Derivative)]
 #[derivative(PartialEq)]
-enum SessionState {
+pub enum SessionState {
     /// [`WebSocketRpcSession`] currently doesn't have [`ConnectionInfo`] to
     /// authorize with.
     Uninitialized,

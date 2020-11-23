@@ -126,7 +126,7 @@ impl ConnectionHandle {
     }
 
     /// Sets callback, which will be invoked when new remote
-    /// [`MediaStreamTrack`] will be added to this [`Connection`].
+    /// `MediaStreamTrack` will be added to this `Connection`.
     pub fn on_remote_track_added(
         &self,
         f: js_sys::Function,

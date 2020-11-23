@@ -2,18 +2,23 @@
 //!
 //! [TURN]: https://webrtcglossary.com/turn
 
-pub mod allocation_event;
-pub mod cli;
-pub mod coturn_metrics;
-pub mod repo;
-pub mod service;
+pub(crate) mod allocation_event;
+pub(crate) mod cli;
+pub(crate) mod coturn_metrics;
+pub mod ice_user;
+pub(crate) mod repo;
+pub(crate) mod service;
 
 use derive_more::Display;
 use medea_client_api_proto::{PeerId, RoomId};
 
 #[doc(inline)]
-pub use self::service::{
-    new_turn_auth_service, TurnAuthService, TurnServiceErr, UnreachablePolicy,
+pub use self::{
+    ice_user::{IceUser, IceUsername},
+    service::{
+        new_turn_auth_service, TurnAuthService, TurnServiceErr,
+        UnreachablePolicy,
+    },
 };
 
 #[cfg(test)]

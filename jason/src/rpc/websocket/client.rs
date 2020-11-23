@@ -81,7 +81,7 @@ impl From<ClientDisconnect> for CloseReason {
 
 /// State of [`WebSocketRpcClient`] and [`RpcTransport`].
 #[derive(Clone, Debug, PartialEq)]
-enum ClientState {
+pub enum ClientState {
     /// [`WebSocketRpcClient`] is currently establishing a connection to RPC
     /// server.
     Connecting,

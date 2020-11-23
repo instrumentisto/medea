@@ -67,13 +67,14 @@ use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::PublishPolicy,
-    media::{IceUser, MediaTrack},
+    media::MediaTrack,
     signalling::{
         elements::endpoints::{
             webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
         },
         peers::Counter,
     },
+    turn::IceUser,
 };
 
 /// Subscriber to the events indicating that [`Peer`] was updated.

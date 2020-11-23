@@ -11,9 +11,9 @@ pub use self::transport::MockRpcTransport;
 pub use self::{
     client::{
         ClientDisconnect, RpcEvent, RpcEventHandler, RpcTransportFactory,
-        WebSocketRpcClient,
+        WebSocketRpcClient, ClientState
     },
     transport::{
-        RpcTransport, TransportError, TransportState, WebSocketRpcTransport,
+        RpcTransport, TransportError, WebSocketRpcTransport, TransportState
     },
 };

@@ -44,7 +44,7 @@ use crate::{
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Display, Fail, From)]
-pub enum GrpcControlApiError {
+pub(crate) enum GrpcControlApiError {
     /// Error while parsing [`Fid`] of element.
     Fid(ParseFidError),
 

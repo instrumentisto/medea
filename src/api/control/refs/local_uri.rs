@@ -10,8 +10,6 @@ use failure::Fail;
 use medea_client_api_proto::{MemberId, RoomId};
 use url::Url;
 
-use crate::impls_for_stateful_refs;
-
 use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 
 /// URI in format `local://room_id/member_id/endpoint_id`.

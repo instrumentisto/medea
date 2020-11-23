@@ -391,19 +391,6 @@ impl PeerConnection {
         };
     }
 
-    /// Returns [`RtcStats`] of this [`PeerConnection`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
-    /// [`RtcStats`].
-    pub async fn get_stats(&self) -> Result<RtcStats> {
-        self.peer
-            .get_stats()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-    }
-
     /// Returns `true` if all [`TransceiverSide`]s with a provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in the
     /// provided [`media_exchange_state::Stable`].
@@ -449,11 +436,6 @@ impl PeerConnection {
             .patch_tracks(tracks)
             .await
             .map_err(tracerr::map_from_and_wrap!())?)
-    }
-
-    /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
-    pub fn candidates_buffer_len(&self) -> usize {
-        self.ice_candidates_buffer.borrow().len()
     }
 
     /// Handle `icecandidate` event from underlying peer emitting
@@ -509,16 +491,6 @@ impl PeerConnection {
     /// restart.
     pub fn restart_ice(&self) {
         self.peer.restart_ice();
-    }
-
-    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
-    pub fn is_recv_audio_enabled(&self) -> bool {
-        self.media_connections.is_recv_audio_enabled()
-    }
-
-    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
-    pub fn is_recv_video_enabled(&self) -> bool {
-        self.media_connections.is_recv_video_enabled()
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
@@ -934,6 +906,36 @@ impl PeerConnection {
 
 #[cfg(feature = "mockable")]
 impl PeerConnection {
+    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
+    /// [`RtcStats`].
+    pub async fn get_stats(&self) -> Result<RtcStats> {
+        self.peer
+            .get_stats()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
+    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
+    #[cfg(feature = "mockable")]
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.media_connections.is_recv_audio_enabled()
+    }
+
+    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
+    #[cfg(feature = "mockable")]
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.media_connections.is_recv_video_enabled()
+    }
+
+    /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
+    pub fn candidates_buffer_len(&self) -> usize {
+        self.ice_candidates_buffer.borrow().len()
+    }
+
     /// Lookups [`Sender`] by provided [`TrackId`].
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.media_connections.get_sender_by_id(id)

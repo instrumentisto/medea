@@ -26,10 +26,10 @@ pub use self::{
     backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
     reconnect_handle::ReconnectHandle,
-    rpc_session::{RpcSession, SessionError, WebSocketRpcSession},
+    rpc_session::{RpcSession, SessionError, WebSocketRpcSession, SessionState},
     websocket::{
         ClientDisconnect, RpcTransport, TransportError, WebSocketRpcClient,
-        WebSocketRpcTransport,
+        WebSocketRpcTransport
     },
 };
 

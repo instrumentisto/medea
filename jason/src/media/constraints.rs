@@ -80,12 +80,6 @@ impl From<MediaStreamSettings> for LocalTracksConstraints {
 }
 
 impl LocalTracksConstraints {
-    /// Returns new [`LocalTracksConstraints`] with default values.
-    #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
     /// [`MediaStreamSettings`].
     #[inline]
@@ -329,11 +323,9 @@ impl MediaStreamSettings {
 
 impl MediaStreamSettings {
     /// Returns `true` if provided [`SysMediaStreamTrack`] satisfies some of the
-    /// [`VideoTrackConstraints`] from this [`MediaStreamSettings`].
+    /// video constraints from this [`MediaStreamSettings`].
     ///
-    /// Unconstrains [`VideoTrackConstraints`] which this
-    /// [`SysMediaStreamTrack`] satisfies by calling
-    /// [`VideoTrackConstraints::unconstrain`].
+    /// Unconstrains constaints which this [`SysMediaStreamTrack`] satisfies.
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
         T: AsRef<SysMediaStreamTrack>,
@@ -395,15 +387,13 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets the underlying [`AudioMediaTracksSettings::enabled`] to the
-    /// given value.
+    /// Enables or disables audio publishing based on provided value.
     #[inline]
     pub fn toggle_publish_audio(&mut self, enabled: bool) {
         self.audio.enabled = enabled;
     }
 
-    /// Sets underlying [`VideoTrackConstraints::enabled`] based on provided
-    /// [`MediaSourceKind`] to the given value.
+    /// Enables or disables video publishing based on provided [`MediaSourceKind`] and [`bool`].
     #[inline]
     pub fn toggle_publish_video(
         &mut self,
@@ -430,14 +420,14 @@ impl MediaStreamSettings {
         self.audio.enabled
     }
 
-    /// Returns `true` if device [`VideoTrackConstraints`] are currently
+    /// Returns `true` if device video constraints are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.enabled()
     }
 
-    /// Returns `true` if display [`VideoTrackConstraints`] are currently
+    /// Returns `true` if display video constraints are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_display_video_enabled(&self) -> bool {

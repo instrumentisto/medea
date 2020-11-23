@@ -85,15 +85,14 @@ impl Room {
 }
 
 impl RpcServer for Addr<Room> {
-    /// Sends [`RpcConnectionEstablished`] message to [`Room`] actor propagating
-    /// errors.
+    /// Sends [`actix::Message`] to Room actor propagating errors.
     ///
     /// # Errors
     ///
     /// Errors with [`RpcServerError::RoomMailbox`] if message sending is
     /// failed.
     ///
-    /// Errors with [`RpcServerError::RoomError`] if [`Room`] returns error.
+    /// Errors with [`RpcServerError::RoomError`] if Room returns error.
     fn connection_established(
         &self,
         member_id: MemberId,
@@ -113,8 +112,7 @@ impl RpcServer for Addr<Room> {
         .boxed_local()
     }
 
-    /// Sends [`RpcConnectionClosed`] message to [`Room`] actor ignoring any
-    /// errors.
+    /// Sends [`actix::Message`] to Room actor ignoring any errors.
     fn connection_closed(
         &self,
         member_id: MemberId,
@@ -129,7 +127,7 @@ impl RpcServer for Addr<Room> {
             .boxed_local()
     }
 
-    /// Sends [`CommandMessage`] message to [`Room`] actor ignoring any errors.
+    /// Sends [`actix::Message`] message to Room actor ignoring any errors.
     fn send_command(&self, member_id: MemberId, msg: Command) {
         self.do_send(CommandMessage::new(member_id, msg));
     }

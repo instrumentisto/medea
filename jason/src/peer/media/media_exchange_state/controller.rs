@@ -94,6 +94,7 @@ impl Controller {
     /// [`media_exchange_state::Stable::Disabled`].
     #[inline]
     #[must_use]
+    #[cfg(feature = "mockable")]
     pub fn disabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
@@ -162,12 +163,6 @@ impl Controller {
         let current_media_exchange_state = self.state.get();
         self.state
             .set(current_media_exchange_state.transition_to(desired_state));
-    }
-
-    /// Cancels [`Controller::state`] transition.
-    pub(in super::super) fn cancel_transition(&self) {
-        let state = self.state.get();
-        self.state.set(state.cancel_transition());
     }
 
     /// Returns [`Future`] which will be resolved when

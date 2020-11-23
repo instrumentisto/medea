@@ -98,7 +98,7 @@ impl From<LoadStaticControlSpecsError> for RoomServiceError {
     }
 }
 
-/// Service for controlling [`Room`]s.
+/// Service for controlling Rooms.
 pub struct RoomService {
     /// Repository that stores [`Room`]s addresses.
     room_repo: RoomRepository,
@@ -139,8 +139,7 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails to connect to
-    /// Redis stats server.
+    /// Returns [`RedisError`] if fails to connect to Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -732,7 +731,7 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn create_room() {
-        let room_service = room_service(RoomRepository::new(HashMap::new()));
+        let room_service = room_service(RoomRepository::new());
         let spec = room_spec();
         let caller_fid =
             StatefulFid::try_from("pub-sub-video-call/caller".to_string())
@@ -766,7 +765,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id.clone() => room,
         )));
 
@@ -814,7 +813,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id.clone() => room,
         )));
 
@@ -881,7 +880,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 
@@ -902,7 +901,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 
@@ -924,7 +923,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 

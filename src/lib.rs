@@ -2,18 +2,14 @@
 
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::must_use_candidate,
-    private_intra_doc_links
-)]
+#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 
 #[macro_use]
 pub mod utils;
 pub mod api;
 pub mod conf;
 pub mod log;
-pub mod media;
+pub(crate) mod media;
 pub mod shutdown;
 pub mod signalling;
 pub mod turn;
@@ -39,9 +35,7 @@ pub struct AppContext {
     /// Reference to [`TurnAuthService`].
     pub turn_service: Arc<dyn TurnAuthService>,
 
-    /// Service for sending [`CallbackEvent`]s.
-    ///
-    /// [`CallbackEvent`]: crate::api::control::callback::CallbackEvent
+    /// Service for sending Control API Callbacks.
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
 }
 
