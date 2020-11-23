@@ -294,7 +294,7 @@ impl RoomHandle {
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// Sets callback, which will be invoked when new [`Connection`] with some
+    /// Sets callback, which will be invoked when new connection with some
     /// remote `Peer` is established.
     pub fn on_new_connection(
         &self,
@@ -332,7 +332,7 @@ impl RoomHandle {
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on
-    /// [`WebSocketRpcClient`] connection loss.
+    /// [`RpcSession`] connection loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -362,8 +362,8 @@ impl RoomHandle {
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// `MediaStream` that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change `MediaStream` in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`

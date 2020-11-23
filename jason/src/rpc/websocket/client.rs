@@ -479,20 +479,21 @@ impl WebSocketRpcClient {
             })
     }
 
-    /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
+    /// Tries to upgrade [`ClientState`] of this [`WebSocketRpcClient`] to
+    /// [`ClientState::Open`].
     ///
-    /// This function is also used for reconnecting this [`RpcClient`].
+    /// This function is also used for reconnecting this [`WebSocketRpcClient`].
     ///
-    /// If [`RpcClient`] is closed than this function will try to establish
-    /// new RPC connection.
+    /// If [`WebSocketRpcClient`] is closed than this function will try to
+    /// establish new RPC connection.
     ///
-    /// If [`RpcClient`] already in [`State::Connecting`] then this function
-    /// will not perform one more connection try. It will subscribe to [`State`]
-    /// changes and wait for first connection result, and, based on this result,
-    /// this function will be resolved.
+    /// If [`WebSocketRpcClient`] already in [`ClientState::Connecting`] then
+    /// this function will not perform one more connection try. It will
+    /// subscribe to [`ClientState`] changes and wait for first connection
+    /// result, and, based on this result, this function will be resolved.
     ///
-    /// If [`RpcClient`] already in [`State::Open`] then this function will be
-    /// instantly resolved.
+    /// If [`WebSocketRpcClient`] already in [`ClientState::Open`] then this
+    /// function will be instantly resolved.
     ///
     /// # Errors
     ///
@@ -544,7 +545,7 @@ impl WebSocketRpcClient {
     /// closing.
     ///
     /// This [`Future`] wouldn't be resolved on abnormal closes.
-    /// An [`RpcClient::on_connection_loss`] will be thrown instead.
+    /// An [`WebSocketRpcClient::on_connection_loss`] will be thrown instead.
     ///
     /// [`Future`]: std::future::Future
     pub fn on_normal_close(
@@ -563,6 +564,7 @@ impl WebSocketRpcClient {
     ///
     /// [`Room`]: crate::api::Room
     /// [`Stream`]: futures::Stream
+    /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
     pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_subs.push(tx);

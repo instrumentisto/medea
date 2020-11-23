@@ -79,7 +79,7 @@ pub trait RpcSession {
     /// to [`SessionState`] changes and wait for first connection result.
     /// And based on this result - this function will be resolved.
     ///
-    /// If [`RpcSession`] already in [`SessionState::Open`] then this function
+    /// If [`RpcSession`] already in [`SessionState::Opened`] then this function
     /// will be instantly resolved.
     async fn connect(
         self: Rc<Self>,
@@ -118,6 +118,8 @@ pub trait RpcSession {
     ///
     /// [`Room`]: crate::api::Room
     /// [`Stream`]: futures::Stream
+    /// [`ReconnectHandle`]: crate::rpc::RpcTransport
+    /// [`RpcTransport`]: crate::rpc::RpcTransport
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
     /// Subscribe to reconnected events.
@@ -130,6 +132,8 @@ pub trait RpcSession {
 /// Client to talk with server via Client API RPC.
 ///
 /// Responsible for [`Room`] authorization and closing.
+///
+/// [`Room`]: crate::api::Room
 pub struct WebSocketRpcSession {
     /// [WebSocket] based Rpc Client used to .
     ///
@@ -140,7 +144,7 @@ pub struct WebSocketRpcSession {
     state: ObservableCell<SessionState>,
 
     /// Flag which indicates that [`WebSocketRpcSession`] goes to the
-    /// [`SessionState::Lost`] from the [`SessionState::Open`].
+    /// [`SessionState::Lost`] from the [`SessionState::Opened`].
     can_reconnect: Rc<Cell<bool>>,
 
     /// Subscribers of the [`RpcSession::subscribe`].
@@ -151,7 +155,7 @@ impl WebSocketRpcSession {
     /// Returns new uninitialized [`WebSocketRpcSession`] with a provided
     /// [`WebSocketRpcClient`].
     ///
-    /// Spawns all [`WebSocketpRpcSession`] task.
+    /// Spawns all [`WebSocketRpcSession`] task.
     pub fn new(client: Rc<WebSocketRpcClient>) -> Rc<Self> {
         let this = Rc::new(Self {
             client,
@@ -417,9 +421,9 @@ impl RpcSession for WebSocketRpcSession {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`SessionState`] will be
-    /// transited to the [`SessionState::Finished`] or [`WebSocketRpcSession`]
-    /// will be dropped.
+    /// Returns [`LocalBoxFuture`] which will be resolved when [`SessionState`]
+    /// will be transited to the [`SessionState::Finished`] or
+    /// [`WebSocketRpcSession`] will be dropped.
     fn on_normal_close(&self) -> LocalBoxFuture<'static, CloseReason> {
         let mut state_stream = self
             .state
@@ -456,8 +460,8 @@ impl RpcSession for WebSocketRpcSession {
         self.state.set(SessionState::Finished(close_reason.into()));
     }
 
-    /// Returns [`Stream`] which will provided `Some(())` every time when
-    /// [`SessionState`] goes to the [`SessionState::Lost`].
+    /// Returns [`LocalBoxStream`] which will provided `Some(())` every time
+    /// when [`SessionState`] goes to the [`SessionState::Lost`].
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let can_reconnect = Rc::clone(&self.can_reconnect);
         self.state
@@ -474,8 +478,8 @@ impl RpcSession for WebSocketRpcSession {
             .boxed_local()
     }
 
-    /// Returns [`Stream`] which will provided `Some(())` every time when
-    /// [`SessionState`] goes to the [`SessionState::Opened`].
+    /// Returns [`LocalBoxStream`] which will provided `Some(())` every time
+    /// when [`SessionState`] goes to the [`SessionState::Opened`].
     ///
     /// Nothing will be provided if [`SessionState`] goes to the
     /// [`SessionState::Opened`] first time.

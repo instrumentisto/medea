@@ -36,7 +36,7 @@ pub trait RpcTransport {
     /// Errors if sending [`ClientMsg`] fails.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
-    /// Subscribes to a [`RpcTransport`]'s [`State`] changes.
+    /// Subscribes to a [`RpcTransport`]'s [`TransportState`] changes.
     fn on_state_change(&self) -> LocalBoxStream<'static, TransportState>;
 }
 
@@ -136,8 +136,8 @@ pub enum TransportState {
     ///
     /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`][1].
     ///
-    /// [`ClosedStateReason`] is the reason of why [`RpcTransport`] went into
-    /// this [`State`].
+    /// [`CloseMsg`] is the reason of why [`RpcTransport`] went into
+    /// this [`TransportState`].
     ///
     /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Closed(CloseMsg),

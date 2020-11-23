@@ -47,8 +47,8 @@ pub trait TransceiverSide: Disableable {
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn mid(&self) -> Option<String>;
 
-    /// Returns `true` if this [`TransceiverKind`] currently can be
-    /// disabled/enabled without [`LocalMediaStreamConstraints`] updating.
+    /// Returns `true` if this [`TransceiverSide`] currently can be
+    /// disabled/enabled without [`LocalTracksConstraints`] updating.
     fn is_transitable(&self) -> bool;
 }
 
@@ -91,7 +91,7 @@ pub trait Disableable {
         self.media_exchange_state_controller().cancel_transition()
     }
 
-    /// Returns [`Future`] which will be resolved when
+    /// Returns [`LocalBoxFuture`] which will be resolved when
     /// [`media_exchange_state::State`] of this [`Disableable`] will be
     /// [`media_exchange_state::State::Stable`] or it is dropped.
     ///
@@ -166,6 +166,8 @@ pub enum MediaConnectionsError {
     CouldNotInsertRemoteTrack(String),
 
     /// Could not find [`RtcRtpTransceiver`] by `mid`.
+    ///
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
     TransceiverNotFound(String),
 
@@ -177,12 +179,14 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
 
-    /// Occurs when inserted [`PeerMediaStream`] dont have all necessary
+    /// Occurs when inserted [`MediaStreamTrack`]s doesn't have all necessary
     /// [`MediaStreamTrack`]s.
-    #[display(fmt = "Provided stream does not have all necessary Tracks")]
+    #[display(
+        fmt = "Provided stream does not have all necessary MediaStreamTracks"
+    )]
     InvalidMediaTracks,
 
-    /// Occurs when [`MediaStreamTrack`] of inserted [`PeerMediaStream`] does
+    /// Occurs when [`MediaStreamTrack`] of inserted `MediaStream` does
     /// not satisfy [`Sender`] constraints.
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
@@ -197,7 +201,7 @@ pub enum MediaConnectionsError {
                      expected MediaExchangeState")]
     MediaExchangeStateTransitsIntoOppositeState,
 
-    /// Invalid [`medea_client_api_proto::TrackPatch`] for
+    /// Invalid [`medea_client_api_proto::TrackPatchEvent`] for
     /// [`MediaStreamTrack`].
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
@@ -395,6 +399,7 @@ impl MediaConnections {
     ///
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let inner = self.0.borrow();
         let mut mids =
@@ -456,7 +461,7 @@ impl MediaConnections {
             })
     }
 
-    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`proto::Track`].
     ///
     /// # Errors
     ///
@@ -521,7 +526,7 @@ impl MediaConnections {
     }
 
     /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
-    /// with [`proto::TrackPatch`].
+    /// with [`proto::TrackPatchEvent`].
     ///
     /// Returns [`MediaKind`] and [`MediaSourceKind`] for which local media
     /// stream should be updated.
@@ -529,7 +534,8 @@ impl MediaConnections {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
+    /// [`MediaStreamTrack`] with ID from [`proto::TrackPatchEvent`] doesn't
+    /// exist.
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
@@ -597,6 +603,7 @@ impl MediaConnections {
     /// transceiver.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
@@ -674,7 +681,7 @@ impl MediaConnections {
         ))
     }
 
-    /// Iterates over all [`Receivers`] with [`mid`] and without
+    /// Iterates over all [`Receiver`]s with [`mid`] and without
     /// [`Transceiver`], trying to find the corresponding [`Transceiver`] in
     /// [`RtcPeerConnection`] and to insert it into the [`Receiver`].
     ///

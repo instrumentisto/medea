@@ -181,6 +181,8 @@ impl Controller {
     /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
     /// is returned if [`Controller`]'s [`media_exchange_state::State`] transits
     /// into the opposite to the `desired_state`.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_media_exchange_state_stable(
         &self,
         desired_state: media_exchange_state::Stable,

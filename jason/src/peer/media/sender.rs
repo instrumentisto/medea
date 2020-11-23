@@ -155,7 +155,7 @@ impl Sender {
     }
 
     /// Indicates whether this [`Sender`] is enabled in
-    /// [`LocalStreamConstraints`].
+    /// [`LocalTracksConstraints`].
     fn enabled_in_cons(&self) -> bool {
         self.send_constraints.is_track_enabled(
             self.caps.media_kind(),
@@ -200,7 +200,7 @@ impl Sender {
     }
 
     /// Changes underlying transceiver direction to
-    /// [`TransceiverDirection::Sendonly`] if this [`Receiver`]s general media
+    /// [`TransceiverDirection::SEND`] if this [`Sender`]s general media
     /// exchange state is [`media_exchange_state::Stable::Enabled`].
     pub fn maybe_enable(&self) {
         if self.is_general_enabled()
@@ -282,8 +282,8 @@ impl Disableable for Sender {
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
-    /// required for the call and can't be disabled.
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] is returned if
+    /// [`Sender`] is required for the call and can't be disabled.
     fn media_exchange_state_transition_to(
         &self,
         desired_state: media_exchange_state::Stable,

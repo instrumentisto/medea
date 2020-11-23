@@ -1,4 +1,6 @@
 //! Deserialization of the [`RtcStats`] from the [`SysRtcStats`].
+//!
+//! [`SysRtcStats`]: web_sys::RtcStats
 
 use std::{convert::TryFrom, rc::Rc};
 

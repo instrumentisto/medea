@@ -21,6 +21,8 @@ use web_sys::{
 use crate::{media::MediaKind, utils::get_property_by_name};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
+///
+/// [`PeerConnection`]: crate::peer::PeerConnection
 #[derive(Clone, Debug, Default)]
 pub struct LocalTracksConstraints(Rc<RefCell<MediaStreamSettings>>);
 
@@ -78,7 +80,7 @@ impl From<MediaStreamSettings> for LocalTracksConstraints {
 }
 
 impl LocalTracksConstraints {
-    /// Returns new [`LocalStreamConstraints`] with default values.
+    /// Returns new [`LocalTracksConstraints`] with default values.
     #[inline]
     pub fn new() -> Self {
         Self::default()
@@ -281,7 +283,7 @@ pub struct MediaStreamSettings {
 
 #[wasm_bindgen]
 impl MediaStreamSettings {
-    /// Creates new [`MediaStreamConstraints`] with none constraints configured.
+    /// Creates new [`MediaStreamSettings`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
@@ -424,14 +426,14 @@ impl MediaStreamSettings {
         self.audio.enabled
     }
 
-    /// Returns `true` if [`DeviceVideoMediaStreamSettings`] are currently
+    /// Returns `true` if device [`VideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.enabled()
     }
 
-    /// Returns `true` if [`DisplayVideoMediaStreamSettings`] are currently
+    /// Returns `true` if display [`VideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_display_video_enabled(&self) -> bool {
@@ -573,14 +575,20 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
 }
 
 /// Constraints for the [`MediaKind::Video`] [`MediaStreamTrack`].
+///
+/// [`MediaStreamTrack`]: super::track::MediaStreamTrack
 #[derive(Clone, Debug)]
 pub enum VideoSource {
     /// [`MediaStreamTrack`] should be received from the `getUserMedia`
     /// request.
+    ///
+    /// [`MediaStreamTrack`]: super::track::MediaStreamTrack
     Device(DeviceVideoTrackConstraints),
 
     /// [`MediaStreamTrack`] should be received from the `getDisplayMedia`
     /// request.
+    ///
+    /// [`MediaStreamTrack`]: super::track::MediaStreamTrack
     Display(DisplayVideoTrackConstraints),
 }
 
