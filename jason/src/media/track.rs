@@ -78,8 +78,8 @@ struct InnerMediaStreamTrack {
 pub struct MediaStreamTrack(Rc<InnerMediaStreamTrack>);
 
 impl MediaStreamTrack {
-    /// Creates new [`MediaStreamTrack`], spawns listener for
-    /// [`InnerMediaStreamTrack::enabled`] state changes.
+    /// Creates new [`MediaStreamTrack`], spawns listener for `enabled` property
+    /// changes.
     pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
     where
         SysMediaStreamTrack: From<T>,

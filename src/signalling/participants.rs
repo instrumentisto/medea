@@ -3,7 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 //!
-//! [`Member`]: crate::signalling::elements::member::Member
+//! [`Member`]: crate::signalling::elements::Member
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
@@ -79,7 +79,7 @@ pub struct ParticipantService {
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     connections: HashMap<MemberId, Box<dyn RpcConnection>>,
@@ -309,7 +309,7 @@ impl ParticipantService {
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
     /// deletes all [`IceUser`]s.
     ///
-    /// [`IceUser`]: crate::media::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,

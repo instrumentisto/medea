@@ -15,6 +15,7 @@ use crate::api::control::refs::StatefulFid;
 pub use self::{
     clients::{CallbackClientError, CallbackClientFactoryImpl},
     service::CallbackService,
+    url::CallbackUrl,
 };
 
 /// Event for `on_leave` `Member` callback.
@@ -94,9 +95,6 @@ impl Into<proto::request::Event> for CallbackEvent {
 }
 
 /// Media type of the traffic which starts/stops flowing in some `Endpoint`.
-///
-/// This enum is used in `medea::media::track::MediaExchangeState` of
-/// `Endpoint`s. That's why it represents a bitflag enum.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 pub enum MediaType {
     /// Started/stopped audio traffic.

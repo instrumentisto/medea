@@ -5,27 +5,17 @@
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+#![deny(broken_intra_doc_links)]
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 
-/// Exports provided module if `mockable` feature is enabled.
-///
-/// If `mockable` feature is disabled - provided module will be private.
-macro_rules! export {
-    ($module:ident) => {
-        #[cfg(feature = "mockable")]
-        pub mod $module;
-        #[cfg(not(feature = "mockable"))]
-        mod $module;
-    };
-}
-
 #[macro_use]
 pub mod utils;
-export!(media);
-export!(api);
-export!(peer);
-export!(rpc);
+
+pub mod api;
+pub mod media;
+pub mod peer;
+pub mod rpc;
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then

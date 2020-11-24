@@ -3,13 +3,14 @@
 // TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
 //       https://github.com/rust-lang/rust-clippy/issues/4779
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+#![deny(broken_intra_doc_links)]
 
 #[macro_use]
 pub mod utils;
 pub mod api;
 pub mod conf;
 pub mod log;
-pub(crate) mod media;
+pub mod media;
 pub mod shutdown;
 pub mod signalling;
 pub mod turn;

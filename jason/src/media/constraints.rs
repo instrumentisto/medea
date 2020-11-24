@@ -135,7 +135,7 @@ impl LocalTracksConstraints {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[derive(Clone, Debug)]
-struct AudioMediaTracksSettings {
+pub struct AudioMediaTracksSettings {
     /// Constraints applicable to video tracks.
     constraints: AudioTrackConstraints,
 
@@ -323,9 +323,11 @@ impl MediaStreamSettings {
 
 impl MediaStreamSettings {
     /// Returns `true` if provided [`SysMediaStreamTrack`] satisfies some of the
-    /// video constraints from this [`MediaStreamSettings`].
+    /// [`VideoTrackConstraints`] from this [`MediaStreamSettings`].
     ///
-    /// Unconstrains constaints which this [`SysMediaStreamTrack`] satisfies.
+    /// Unconstrains [`VideoTrackConstraints`] which this
+    /// [`SysMediaStreamTrack`] satisfies by calling
+    /// [`VideoTrackConstraints::unconstrain`].
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
         T: AsRef<SysMediaStreamTrack>,
@@ -387,13 +389,15 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Enables or disables audio publishing based on provided value.
+    /// Sets the underlying [`AudioMediaTracksSettings::enabled`] to the
+    /// given value.
     #[inline]
     pub fn toggle_publish_audio(&mut self, enabled: bool) {
         self.audio.enabled = enabled;
     }
 
-    /// Enables or disables video publishing based on provided [`MediaSourceKind`] and [`bool`].
+    /// Sets underlying [`VideoTrackConstraints::enabled`] based on provided
+    /// [`MediaSourceKind`] to the given value.
     #[inline]
     pub fn toggle_publish_video(
         &mut self,
@@ -420,14 +424,14 @@ impl MediaStreamSettings {
         self.audio.enabled
     }
 
-    /// Returns `true` if device video constraints are currently
+    /// Returns `true` if [`DeviceVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.enabled()
     }
 
-    /// Returns `true` if display video constraints are currently
+    /// Returns `true` if [`DisplayVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_display_video_enabled(&self) -> bool {

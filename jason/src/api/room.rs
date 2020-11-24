@@ -40,12 +40,12 @@ use crate::{
     JsMediaSourceKind,
 };
 
-/// Reason of why Room has been closed.
+/// Reason of why [`Room`] has been closed.
 ///
 /// This struct is passed into `on_close_by_server` JS side callback.
 #[wasm_bindgen]
 pub struct RoomCloseReason {
-    /// Indicator if Room is closed by server.
+    /// Indicator if [`Room`] is closed by server.
     ///
     /// `true` if [`CloseReason::ByServer`].
     is_closed_by_server: bool,
@@ -66,7 +66,7 @@ impl RoomCloseReason {
     /// `is_err` may be `true` only on closing by client.
     ///
     /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
-    pub(crate) fn new(reason: CloseReason) -> Self {
+    pub fn new(reason: CloseReason) -> Self {
         match reason {
             CloseReason::ByServer(reason) => Self {
                 reason: reason.to_string(),
@@ -103,7 +103,7 @@ impl RoomCloseReason {
 
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
-enum RoomError {
+pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
     CallbackNotSet(&'static str),
@@ -195,9 +195,10 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// If `on_failed_local_media` or `on_connection_loss` callbacks are not set.
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
+    /// `on_connection_loss` callbacks are not set.
     ///
-    /// If cannot connect to media server.
+    /// With [`RoomError::SessionError`] if cannot connect to media server.
     pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
@@ -273,8 +274,10 @@ impl RoomHandle {
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// Sets callback, which will be invoked when new connection with some
+    /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
+    ///
+    /// [`Connection`]: crate::api::Connection
     pub fn on_new_connection(
         &self,
         f: js_sys::Function,
@@ -283,14 +286,14 @@ impl RoomHandle {
             .map(|inner| inner.connections.on_new_connection(f))
     }
 
-    /// Sets `on_close` callback, which will be invoked on Room close,
+    /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Sets callback, which will be invoked when new local `MediaStreamTrack`
-    /// will be added to this Room.
+    /// Sets callback, which will be invoked when new local [`MediaStreamTrack`]
+    /// will be added to this [`Room`].
     /// This might happen in such cases:
     /// 1. Media server initiates media request.
     /// 2. `disable_audio`/`enable_video` is called.
@@ -310,8 +313,8 @@ impl RoomHandle {
             .map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
-    /// Sets `on_connection_loss` callback, which will be invoked on
-    /// RPC session connection loss.
+    /// Sets `on_connection_loss` callback, which will be invoked on connection
+    /// with server loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -320,7 +323,7 @@ impl RoomHandle {
             .map(|inner| inner.on_connection_loss.set_func(f))
     }
 
-    /// Performs entering to a Room with the preconfigured authorization
+    /// Performs entering to a [`Room`] with the preconfigured authorization
     /// `token` for connection with media server.
     ///
     /// Establishes connection with media server (if it doesn't already exist).
@@ -338,12 +341,12 @@ impl RoomHandle {
         })
     }
 
-    /// Updates this Room's [`MediaStreamSettings`]. This affects all
-    /// Peer connections in this Room. If [`MediaStreamSettings`] is
-    /// configured for some Room, then this Room can only send
-    /// `MediaStream` that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change `MediaStream` in all
-    /// sending peers, so that might cause new [getUserMedia()][1] request.
+    /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
+    /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+    /// configured for some [`Room`], then this [`Room`] can only send media
+    /// tracks that correspond to this settings. [`MediaStreamSettings`]
+    /// update will change media tracks in all sending peers, so that might
+    /// cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
@@ -365,7 +368,7 @@ impl RoomHandle {
         })
     }
 
-    /// Disables outbound audio in this Room.
+    /// Disables outbound audio in this [`Room`].
     pub fn disable_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
@@ -380,7 +383,7 @@ impl RoomHandle {
         })
     }
 
-    /// Enables outbound audio in this Room.
+    /// Enables outbound audio in this [`Room`].
     pub fn enable_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
@@ -435,7 +438,7 @@ impl RoomHandle {
         })
     }
 
-    /// Disables inbound audio in this Room.
+    /// Disables inbound audio in this [`Room`].
     pub fn disable_remote_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
@@ -450,7 +453,7 @@ impl RoomHandle {
         })
     }
 
-    /// Disables inbound video in this Room.
+    /// Disables inbound video in this [`Room`].
     pub fn disable_remote_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
@@ -465,7 +468,7 @@ impl RoomHandle {
         })
     }
 
-    /// Enables inbound audio in this Room.
+    /// Enables inbound audio in this [`Room`].
     pub fn enable_remote_audio(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
@@ -480,7 +483,7 @@ impl RoomHandle {
         })
     }
 
-    /// Enables inbound video in this Room.
+    /// Enables inbound video in this [`Room`].
     pub fn enable_remote_video(&self) -> Promise {
         let this = Self(self.0.clone());
         future_to_promise(async move {
@@ -512,8 +515,6 @@ impl WeakRoom {
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
 /// handles media server events, etc).
-///
-/// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
 ///
@@ -595,23 +596,10 @@ impl Room {
         Self(room)
     }
 
-    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
-    #[inline]
-    pub fn downgrade(&self) -> WeakRoom {
-        WeakRoom(Rc::downgrade(&self.0))
-    }
-
-    /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
+    /// Sets `close_reason` and consumes this [`Room`].
     ///
-    /// Supposed that this function will trigger [`Drop`] implementation of
-    /// [`InnerRoom`] and call JS side `on_close` callback with provided
+    /// [`Room`] [`Drop`] triggers `on_close` callback with provided
     /// [`CloseReason`].
-    ///
-    /// Note that this function __doesn't guarantee__ that [`InnerRoom`] will be
-    /// dropped because theoretically other pointers to the [`InnerRoom`]
-    /// can exist. If you need guarantee of [`InnerRoom`] dropping then you
-    /// may check count of pointers to [`InnerRoom`] with
-    /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
@@ -647,14 +635,19 @@ impl Room {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Indicates whether the provided [`RoomHandle`] points to the same
-    /// [`InnerRoom`] as this [`Room`] does.
+    /// Checks [`RoomHandle`] equality by comparing inner pointers.
     #[inline]
     pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
         handle
             .0
             .upgrade()
             .map_or(false, |handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
+    }
+
+    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
+    #[inline]
+    pub fn downgrade(&self) -> WeakRoom {
+        WeakRoom(Rc::downgrade(&self.0))
     }
 }
 
@@ -665,12 +658,12 @@ struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
-    /// Constraints to local `MediaStream` that is being published by
+    /// Constraints to local [`MediaStreamTrack`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the `MediaStream`s received by [`PeerConnection`]s in
-    /// this [`Room`]. Used to disable or enable media receiving.
+    /// Constraints to the [`MediaStreamTrack`] received by [`PeerConnection`]s in this [`Room`]. Used to disable or enable
+    /// media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
     /// [`PeerConnection`] repository.
@@ -679,14 +672,14 @@ struct InnerRoom {
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Collection of connections with a remote `Member`s.
+    /// Collection of [`Connection`]s with a remote `Member`s.
     connections: Connections,
 
     /// Callback to be invoked when new local [`MediaStreamTrack`] will be
     /// added to this [`Room`].
     on_local_track: Callback1<MediaStreamTrack>,
 
-    /// Callback to be invoked when failed obtain `MediaStreamTrack`s from
+    /// Callback to be invoked when failed obtain [`MediaStreamTrack`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     ///
     /// [`MediaManager`]: crate::media::MediaManager
@@ -942,7 +935,7 @@ impl InnerRoom {
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
-    /// `MediaStream` that corresponds to this settings.
+    /// [`MediaStreamTrack`]s that correspond to provided settings.
     /// [`MediaStreamSettings`] update will change [`MediaStreamTrack`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
@@ -1048,7 +1041,7 @@ impl EventHandler for InnerRoom {
     type Output = Result<(), Traced<RoomError>>;
 
     /// Creates [`PeerConnection`] with a provided ID and all the
-    /// connections basing on provided [`Track`]s.
+    /// [`Connection`]s basing on provided [`Track`]s.
     ///
     /// If provided `sdp_offer` is `Some`, then offer is applied to a created
     /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
@@ -1190,8 +1183,8 @@ impl EventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Updates connection's [`ConnectionQualityScore`] by calling
-    /// `Connection::update_quality_score`.
+    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
+    /// [`Connection::update_quality_score`].
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,
@@ -1243,7 +1236,7 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
-    /// [`MediaStreamTrack`] to the related connection.
+    /// [`MediaStreamTrack`] to the related [`Connection`].
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,

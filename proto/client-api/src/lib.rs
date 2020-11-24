@@ -23,6 +23,8 @@
 //! [2]: https://tinyurl.com/y8bacb93
 //! [3]: https://tinyurl.com/y4j3b4cs
 
+#![deny(broken_intra_doc_links)]
+
 pub mod stats;
 
 use std::collections::HashMap;

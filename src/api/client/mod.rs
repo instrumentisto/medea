@@ -4,7 +4,7 @@
 
 mod session;
 
-pub(crate) mod rpc_connection;
+pub mod rpc_connection;
 pub mod server;
 
 pub use self::session::RpcServerRepository;

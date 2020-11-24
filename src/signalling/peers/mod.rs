@@ -56,12 +56,12 @@ pub struct PeersService {
     /// this [`PeerRepository`] will be created with.
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    /// [`IceUser`]: crate::media::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     /// [`Peer`]: crate::media::peer::Peer
     /// [`Room`]: crate::signalling::Room
     peers: PeerRepository,
@@ -132,7 +132,7 @@ impl PeersService {
         Rc::new(Self {
             room_id: room_id.clone(),
             turn_service,
-            peers: PeerRepository::new(),
+            peers: PeerRepository::default(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
             peers_traffic_watcher: Arc::clone(&peers_traffic_watcher),
@@ -252,7 +252,7 @@ impl PeersService {
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     #[inline]
     pub fn get_peers_between_members(
         &self,
@@ -290,7 +290,7 @@ impl PeersService {
     /// __Note:__ this also deletes partner peers.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &self,
         member_id: &MemberId,
@@ -393,7 +393,7 @@ impl PeersService {
     ///
     /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
     ///
-    /// [`IceUser`]: crate::media::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     pub async fn connect_endpoints(
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
@@ -501,7 +501,10 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn update_peer_tracks(&self, peer_id: PeerId) -> Result<(), RoomError> {
+    pub(super) fn update_peer_tracks(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
             self.peer_metrics_service.borrow_mut().update_peer(peer);
         })?;
@@ -516,10 +519,10 @@ impl PeersService {
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
     #[inline]
-    pub fn remove_peers_related_to_member(
+    pub(super) fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,
     ) -> HashMap<MemberId, Vec<PeerId>> {
@@ -533,7 +536,10 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn sync_peer_spec(&self, peer_id: PeerId) -> Result<(), RoomError> {
+    pub(super) fn sync_peer_spec(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
             self.peer_metrics_service.borrow_mut().update_peer(&peer);
         })?;
@@ -542,21 +548,21 @@ impl PeersService {
 
     /// Returns [`Stream`] of [`PeersMetricsEvent`]s from underlying
     /// [`RtcStatsHandler`].
-    pub fn subscribe_to_metrics_events(
+    pub(super) fn subscribe_to_metrics_events(
         &self,
     ) -> impl Stream<Item = PeersMetricsEvent> {
         self.peer_metrics_service.borrow_mut().subscribe()
     }
 
     /// Propagates stats to [`RtcStatsHandler`].
-    pub fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
+    pub(super) fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
         self.peer_metrics_service
             .borrow_mut()
             .add_stats(peer_id, stats);
     }
 
     /// Propagates [`PeerConnectionState`] to [`RtcStatsHandler`].
-    pub fn update_peer_connection_state(
+    pub(super) fn update_peer_connection_state(
         &self,
         peer_id: PeerId,
         state: PeerConnectionState,
@@ -567,21 +573,16 @@ impl PeersService {
     }
 
     /// Runs [`Peer`]s stats checking in the underlying [`PeersMetricsEvent`]s.
-    pub fn check_peers(&self) {
+    pub(super) fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check();
     }
 }
 
 /// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
-#[derive(Debug)]
-struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
+#[derive(Debug, Default)]
+pub struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
 
 impl PeerRepository {
-    /// Returns empty [`PeerRepository`].
-    pub fn new() -> Self {
-        Self(RefCell::new(HashMap::new()))
-    }
-
     /// Applies a function to the [`PeerStateMachine`] reference with provided
     /// [`PeerId`] (if any found).
     ///
@@ -679,7 +680,7 @@ impl PeerRepository {
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub fn get_peers_between_members(
         &self,
         member_id: &MemberId,
@@ -703,7 +704,7 @@ impl PeerRepository {
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
     pub fn remove_peers_related_to_member(
         &self,
@@ -782,7 +783,7 @@ mod tests {
             Rc::new(Self {
                 room_id,
                 turn_service,
-                peers: PeerRepository::new(),
+                peers: PeerRepository::default(),
                 peers_count: Counter::default(),
                 tracks_count: Counter::default(),
                 peers_traffic_watcher,

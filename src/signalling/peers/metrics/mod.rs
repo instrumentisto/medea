@@ -41,7 +41,7 @@ use crate::{
     },
 };
 
-/// WebRTC statistics analysis results emitted by [`RtcStatsHandler`].
+/// WebRTC statistics analysis results.
 #[dispatchable]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PeersMetricsEvent {

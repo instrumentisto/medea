@@ -15,8 +15,8 @@ use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         media::{media_exchange_state, TransceiverSide},
-        transceiver::Transceiver,
-        Disableable, MediaConnections, PeerEvent, TransceiverDirection,
+        Disableable, MediaConnections, PeerEvent, Transceiver,
+        TransceiverDirection,
     },
 };
 

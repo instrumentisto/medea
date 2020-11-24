@@ -10,10 +10,10 @@ pub use self::transport::MockRpcTransport;
 #[doc(inline)]
 pub use self::{
     client::{
-        ClientDisconnect, RpcEvent, RpcEventHandler, RpcTransportFactory,
-        WebSocketRpcClient, ClientState
+        ClientDisconnect, ClientState, RpcEvent, RpcEventHandler,
+        RpcTransportFactory, WebSocketRpcClient,
     },
     transport::{
-        RpcTransport, TransportError, WebSocketRpcTransport, TransportState
+        RpcTransport, TransportError, TransportState, WebSocketRpcTransport,
     },
 };

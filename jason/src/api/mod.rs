@@ -21,9 +21,9 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{
-    connection::{ConnectionHandle, Connections},
-    room::{Room, RoomCloseReason},
+    connection::{Connection, ConnectionHandle, Connections},
     room::RoomHandle,
+    room::{Room, RoomCloseReason, RoomError, WeakRoom},
 };
 
 /// General library interface.
@@ -67,13 +67,13 @@ impl Jason {
         ))))
     }
 
-    /// Inits new Room and return [`RoomHandle`] for it.
+    /// Creates new [`Room`] and returns its [`RoomHandle`].
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::clone(&self.0.borrow().rpc);
         self.inner_init_room(WebSocketRpcSession::new(rpc))
     }
 
-    /// Returns handle to Media Manager.
+    /// Returns [`MediaManagerHandle`].
     pub fn media_manager(&self) -> MediaManagerHandle {
         self.0.borrow().media_manager.new_handle()
     }
@@ -102,7 +102,7 @@ impl Jason {
 }
 
 impl Jason {
-    /// Returns new [`Jason`] with the provided WebSocket client.
+    /// Returns new [`Jason`] with the provided [`WebSocketRpcClient`].
     #[inline]
     pub fn with_rpc_client(rpc: Rc<WebSocketRpcClient>) -> Self {
         Self(Rc::new(RefCell::new(Inner {
@@ -112,7 +112,7 @@ impl Jason {
         })))
     }
 
-    /// Returns [`RoomHandle`] for Room.
+    /// Returns [`RoomHandle`] for [`Room`].
     pub fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,

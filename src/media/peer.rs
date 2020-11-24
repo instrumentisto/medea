@@ -47,8 +47,6 @@
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
-#![allow(clippy::use_self)]
-
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
@@ -294,7 +292,7 @@ pub struct Context {
 
     /// [`MemberId`] of a [`Member`] which owns this [`Peer`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     member_id: MemberId,
 
     /// [`PeerId`] of a partner [`Peer`].
@@ -565,7 +563,7 @@ pub struct Peer<S> {
 impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     #[inline]
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
@@ -585,7 +583,7 @@ impl<T> Peer<T> {
 
     /// Returns ID of interconnected [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     #[inline]
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
@@ -859,7 +857,7 @@ impl Peer<WaitRemoteSdp> {
 impl Peer<Stable> {
     /// Creates new [`Peer`] for [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub fn new(
         id: Id,
         member_id: MemberId,

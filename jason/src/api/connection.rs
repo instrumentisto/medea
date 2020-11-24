@@ -126,7 +126,7 @@ impl ConnectionHandle {
     }
 
     /// Sets callback, which will be invoked when new remote
-    /// `MediaStreamTrack` will be added to this `Connection`.
+    /// [`MediaStreamTrack`] will be added to this [`Connection`].
     pub fn on_remote_track_added(
         &self,
         f: js_sys::Function,
@@ -147,8 +147,6 @@ impl ConnectionHandle {
 }
 
 /// Connection with a specific remote `Member`, that is used on Rust side.
-///
-/// Actually, represents a handle to [`InnerConnection`].
 #[derive(Clone)]
 pub struct Connection(Rc<InnerConnection>);
 
@@ -165,8 +163,8 @@ impl Connection {
         }))
     }
 
-    /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with the
-    /// provided [`MediaStreamTrack`].
+    /// Invokes `on_remote_track_added` JS callback with the provided
+    /// [`MediaStreamTrack`].
     pub fn add_remote_track(&self, track: MediaStreamTrack) {
         self.0.on_remote_track_added.call(track);
     }

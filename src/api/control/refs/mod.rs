@@ -28,7 +28,7 @@ pub struct ToRoom(RoomId);
 
 /// State of reference which points to [`Member`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ToMember(RoomId, MemberId);
 

@@ -19,8 +19,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
-        TransceiverDirection,
+        LocalStreamUpdateCriteria, PeerEvent, Transceiver, TransceiverDirection,
     },
     utils::{JasonError, JsCaused, JsError},
 };
@@ -174,8 +173,7 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
 
-    /// Occurs when inserted [`MediaStreamTrack`]s doesn't have all necessary
-    /// [`MediaStreamTrack`]s.
+    /// Occurs when not enough [`MediaStreamTrack`]s are inserted into senders.
     #[display(
         fmt = "Provided stream does not have all necessary MediaStreamTracks"
     )]

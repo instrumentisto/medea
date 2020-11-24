@@ -2,12 +2,12 @@
 //!
 //! [TURN]: https://webrtcglossary.com/turn
 
-pub(crate) mod allocation_event;
-pub(crate) mod cli;
-pub(crate) mod coturn_metrics;
+pub mod allocation_event;
+pub mod cli;
+pub mod coturn_metrics;
 pub mod ice_user;
-pub(crate) mod repo;
-pub(crate) mod service;
+pub mod repo;
+pub mod service;
 
 use derive_more::Display;
 use medea_client_api_proto::{PeerId, RoomId};

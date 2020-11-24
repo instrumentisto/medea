@@ -54,20 +54,16 @@ impl Room {
 }
 
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStarted`]
-    /// message to [`Room`] [`Addr`].
-    ///
-    /// [`Addr`]: actix::Addr
+    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that `Peer`
+    /// wit provided [`PeerId`] has started.
     fn peer_started(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStarted(peer_id));
         }
     }
 
-    /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStopped`]
-    /// message to [`Room`] [`Addr`].
-    ///
-    /// [`Addr`]: actix::Addr
+    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that `Peer`
+    /// wit provided [`PeerId`] has stopped.
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
@@ -178,12 +174,10 @@ impl Handler<PeerStopped> for Room {
 }
 
 impl PeerUpdatesSubscriber for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
-    /// [`Addr`] a [`NegotiationNeeded`] [`Message`].
+    /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
+    /// provided [`Peer`] must be negotiated.
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
-    ///
-    /// [`Addr`]: actix::Addr
     #[inline]
     fn negotiation_needed(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
@@ -191,12 +185,11 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
         }
     }
 
-    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
-    /// [`Addr`] a [`ForceUpdate`] [`Message`].
+    /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
+    /// provided [`TrackUpdate`]s were forcibly (without negotiation)
+    /// applied to [`Peer`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
-    ///
-    /// [`Addr`]: actix::Addr
     #[inline]
     fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
         if let Some(addr) = self.upgrade() {

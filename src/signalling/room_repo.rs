@@ -13,7 +13,7 @@ use crate::{
     signalling::Room,
 };
 
-/// Repository that stores `Room`s addresses.
+/// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Debug, Default)]
 pub struct RoomRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.
@@ -41,24 +41,24 @@ impl RoomRepository {
     }
 
     /// Returns [`Room`] by its ID.
-    pub(crate) fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
+    pub fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
         rooms.get(id).cloned()
     }
 
     /// Removes [`Room`] from [`RoomRepository`] by [`RoomId`].
-    pub(crate) fn remove(&self, id: &RoomId) {
+    pub fn remove(&self, id: &RoomId) {
         self.rooms.lock().unwrap().remove(id);
     }
 
     /// Adds new [`Room`] into [`RoomRepository`].
-    pub(crate) fn add(&self, id: RoomId, room: Addr<Room>) {
+    pub fn add(&self, id: RoomId, room: Addr<Room>) {
         self.rooms.lock().unwrap().insert(id, room);
     }
 
     /// Checks existence of [`Room`] in [`RoomRepository`] by provided
     /// [`RoomId`].
-    pub(crate) fn contains_room_with_id(&self, id: &RoomId) -> bool {
+    pub fn contains_room_with_id(&self, id: &RoomId) -> bool {
         self.rooms.lock().unwrap().contains_key(id)
     }
 }

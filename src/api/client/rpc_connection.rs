@@ -18,7 +18,7 @@ use crate::signalling::room::RoomError;
 pub struct CommandMessage {
     /// ID of [`Member`] that sent this [`Command`] to the server.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub member_id: MemberId,
 
     /// Actual [`Command`] being issued.
@@ -43,7 +43,7 @@ pub struct EventMessage {
 
 /// Abstraction over RPC connection with some remote [`Member`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[cfg_attr(test, mockall::automock)]
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`] and sends [`CloseDescription`] to the client
@@ -61,41 +61,41 @@ pub trait RpcConnection: fmt::Debug + Send {
 
     /// Sends [`Event`] to remote [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     fn send_event(&self, room_id: RoomId, event: Event);
 }
 
 #[cfg(test)]
 impl_debug_by_struct_name!(MockRpcConnection);
 
-/// Settings of WebSocket session.
+/// Settings of [`RpcConnection`].
 #[derive(Clone, Copy, Debug)]
 pub struct RpcConnectionSettings {
-    /// [`Duration`], after which WebSocket session will be considered idle if
+    /// [`Duration`], after which [`RpcConnection`] will be considered idle if
     /// no heartbeat messages were received.
     pub idle_timeout: Duration,
 
     /// Interval of sending `Ping`s to remote [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub ping_interval: Duration,
 }
 
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
 /// Transport should consider dropping connection if message result is err.
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Debug, Message)]
 #[rtype(result = "Result<RpcConnectionSettings, RoomError>")]
 pub struct RpcConnectionEstablished {
     /// ID of [`Member`] that establishes [`RpcConnection`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub member_id: MemberId,
 
     /// Credential of [`Member`] to authorize WebSocket connection with.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub credentials: Credential,
 
     /// Established [`RpcConnection`].
@@ -103,13 +103,13 @@ pub struct RpcConnectionEstablished {
 }
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
 pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub member_id: MemberId,
 
     /// Reason of why [`RpcConnection`] is closed.

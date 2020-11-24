@@ -36,7 +36,7 @@ use super::{Room, RoomError};
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
             "Deleting Member [id = {}] in Room [id = {}].",
@@ -124,7 +124,7 @@ impl Room {
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
     /// provided [`MemberId`] was not found in [`ParticipantService`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     /// [`ParticipantService`]:
     /// crate::signalling::participants::ParticipantService
     fn create_src_endpoint(
@@ -183,7 +183,7 @@ impl Room {
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
     /// provided [`MemberId`] doesn't exist.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     /// [`ParticipantService`]:
     /// crate::signalling::participants::ParticipantService
     fn create_sink_endpoint(
@@ -268,7 +268,7 @@ impl Room {
     /// [`Event::PeersRemoved`] event to [`Member`].
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
     fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,

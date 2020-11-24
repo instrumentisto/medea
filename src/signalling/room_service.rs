@@ -98,7 +98,7 @@ impl From<LoadStaticControlSpecsError> for RoomServiceError {
     }
 }
 
-/// Service for controlling Rooms.
+/// Service for controlling [`Room`]s.
 pub struct RoomService {
     /// Repository that stores [`Room`]s addresses.
     room_repo: RoomRepository,
@@ -312,7 +312,7 @@ impl Handler<CreateRoom> for RoomService {
 
 /// Signal for create new [`Member`] in [`Room`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct CreateMemberInRoom {

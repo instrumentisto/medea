@@ -9,6 +9,9 @@ stages:
   - name: check
     if: (branch = master AND type != pull_request)
         OR commit_message =~ /.*\[run ci\]/
+  - name: docs
+    if: (branch = master AND type != pull_request)
+      OR commit_message =~ /.*\[run ci\]/
   - name: build
     if: (branch = master AND type != pull_request)
         OR commit_message =~ /.*\[run ci\]/
@@ -37,6 +40,41 @@ jobs:
       rust: nightly
       before_script: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
       script: make fmt check=yes
+
+    - name: medea docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea open=no
+
+    - name: medea-jason docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea-jason open=no
+
+    - name: medea-coturn-telnet-client docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea-coturn-telnet-client open=no
+
+    - name: medea-macro docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea-macro open=no
+
+    - name: medea-reactive docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea-reactive open=no
+
+    - name: medea-client-api-proto docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea-client-api-proto open=no
+
+    - name: medea-control-api-proto docs
+      stage: docs
+      rust: stable
+      script: make docs.rust crate=medea-control-api-proto open=no
 
     - name: medea-jason (stable)
       stage: build

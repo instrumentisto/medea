@@ -9,10 +9,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
         VideoSource,
     },
-    peer::{
-        media::TransceiverSide,
-        transceiver::{Transceiver, TransceiverDirection},
-    },
+    peer::{media::TransceiverSide, Transceiver, TransceiverDirection},
 };
 
 use super::{

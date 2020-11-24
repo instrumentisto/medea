@@ -56,7 +56,7 @@ pub trait PeerConnectionStateEventsHandler: Send + Debug {
 #[cfg(test)]
 impl_debug_by_struct_name!(MockPeerConnectionStateEventsHandler);
 
-/// Builds [`PeerTrafficWatcher`] backed by [`PeersTrafficWatcherImpl`] actor.
+/// Builds [`PeerTrafficWatcher`].
 pub fn build_peers_traffic_watcher(
     conf: &conf::Media,
 ) -> Arc<dyn PeerTrafficWatcher> {
@@ -130,8 +130,6 @@ fn build_flow_sources(should_watch_turn: bool) -> HashSet<FlowMetricSource> {
 
 #[async_trait(?Send)]
 impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
-    /// Sends [`RegisterRoom`] message to the [`PeersTrafficWatcherImpl`]
-    /// returning send result.
     async fn register_room(
         &self,
         room_id: RoomId,
@@ -140,13 +138,10 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
         self.send(RegisterRoom { room_id, handler }).await
     }
 
-    /// Sends [`UnregisterRoom`] message to [`PeersTrafficWatcherImpl`].
     fn unregister_room(&self, room_id: RoomId) {
         self.do_send(UnregisterRoom(room_id))
     }
 
-    /// Sends [`RegisterPeer`] message to [`PeersTrafficWatcherImpl`] returning
-    /// send result.
     async fn register_peer(
         &self,
         room_id: RoomId,
@@ -161,12 +156,10 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
         .await
     }
 
-    /// Sends [`UnregisterPeers`] message to [`PeersTrafficWatcherImpl`].
     fn unregister_peers(&self, room_id: RoomId, peers_ids: Vec<PeerId>) {
         self.do_send(UnregisterPeers { room_id, peers_ids })
     }
 
-    /// Sends [`TrafficFlows`] message to [`PeersTrafficWatcherImpl`].
     fn traffic_flows(
         &self,
         room_id: RoomId,
@@ -181,7 +174,6 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
         })
     }
 
-    /// Sends [`TrafficStopped`] message to [`PeersTrafficWatcherImpl`].
     fn traffic_stopped(&self, room_id: RoomId, peer_id: PeerId, at: Instant) {
         debug!("TrafficStopped: in {}/{}", room_id, peer_id);
         self.do_send(TrafficStopped {
@@ -195,7 +187,7 @@ impl PeerTrafficWatcher for Addr<PeersTrafficWatcherImpl> {
 /// Service which analyzes `Peer` traffic metrics and notifies about traffic
 /// flowing changes [`PeerConnectionStateEventsHandler`]s.
 #[derive(Debug, Default)]
-struct PeersTrafficWatcherImpl {
+pub struct PeersTrafficWatcherImpl {
     /// All `Room`s which exists on the Medea server.
     stats: HashMap<RoomId, RoomStats>,
 
@@ -402,16 +394,10 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
     }
 }
 
-/// All sources of [`TrafficFlows`] message.
+/// All possible sources of traffic flows signal.
 ///
-/// This is needed for checking that all metrics sources have the same opinion
-/// about current `Peer`s traffic state.
-///
-/// [`PeerTrafficWatcher`] checks that all sources have the same opinion
-/// after [`PeersTrafficWatcherImpl::init_timeout`] from first
-/// [`TrafficFlows`] message received for some [`PeerStat`]. If at least one
-/// [`FlowMetricSource`] doesn't sent [`TrafficFlows`] message, then `Peer`
-/// will be considered as wrong and it will be stopped.
+/// It is considered that traffic is flowing if all listed sources confirm that
+/// it does.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
     /// Metrics from the partner `Peer`.
@@ -450,7 +436,6 @@ enum PeerState {
 ///
 /// Also this structure may be considered as subscription to this `Peer` state
 /// updates.
-
 #[derive(Debug)]
 struct PeerStat {
     /// [`PeerId`] of `Peer` which this [`PeerStat`] represents.

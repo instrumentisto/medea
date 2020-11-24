@@ -1,7 +1,7 @@
 //! Representations of media and media connection establishment objects.
 
-pub(crate) mod peer;
-pub(crate) mod track;
+pub mod peer;
+pub mod track;
 
 #[doc(inline)]
 pub use self::{

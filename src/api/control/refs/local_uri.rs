@@ -64,7 +64,7 @@ use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 /// This is necessary so that it is not possible to get the address in the
 /// wrong state (`local://room_id//endpoint_id` for example).
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 /// [`Room`]: crate::signalling::room::Room
 /// [`WebRtcPlayEndpoint`]:
 /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint

@@ -25,9 +25,7 @@ pub enum Endpoint {
 }
 
 impl Endpoint {
-    /// Returns [`Weak`] reference to this [`Endpoint`].
-    ///
-    /// [`Weak`]: std::rc::Weak
+    /// Downgrades this [`Endpoint`] to [`WeakEndpoint`].
     pub fn downgrade(&self) -> WeakEndpoint {
         match self {
             Self::WebRtcPublishEndpoint(publish) => publish.downgrade().into(),
@@ -50,14 +48,11 @@ impl Into<proto::Element> for Endpoint {
 /// Can be upgraded to an [`Endpoint`] by calling [`WeakEndpoint::upgrade`].
 #[derive(Clone, Debug, From)]
 pub enum WeakEndpoint {
-    /// [`Weak`] pointer to the [`webrtc::WebRtcPublishEndpoint`].
-    ///
-    /// [`Weak`]: std::rc::Weak
+    /// Concrete type of this [`WeakEndpoint`] is
+    /// [`WeakWebRtcPublishEndpoint`].
     WebRtcPublishEndpoint(WeakWebRtcPublishEndpoint),
 
-    /// [`Weak`] pointer to the [`webrtc::WebRtcPlayEndpoint`].
-    ///
-    /// [`Weak`]: std::rc::Weak
+    /// Concrete type of this [`WeakEndpoint`] is [`WeakWebRtcPlayEndpoint`].
     WebRtcPlayEndpoint(WeakWebRtcPlayEndpoint),
 }
 

@@ -54,7 +54,7 @@ pub use self::{
     stats::RtcStats,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
-    transceiver::TransceiverDirection,
+    transceiver::{Transceiver, TransceiverDirection},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -190,7 +190,8 @@ pub struct PeerConnection {
     /// [`Receiver`]: self::media::Receiver
     media_connections: Rc<MediaConnections>,
 
-    /// [`MediaManager`] that will be used to acquire local `MediaStream`s.
+    /// [`MediaManager`] that will be used to acquire local
+    /// [`MediaStreamTrack`]s.
     media_manager: Rc<MediaManager>,
 
     /// [`PeerEvent`]s tx.
@@ -213,7 +214,7 @@ pub struct PeerConnection {
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the `MediaStream`s received by this
+    /// Constraints to the [`MediaStreamTrack`]s received by this
     /// [`PeerConnection`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 }
@@ -420,8 +421,8 @@ impl PeerConnection {
     /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
     /// [`proto::TrackPatchEvent`].
     ///
-    /// Returns [`LocalStreamUpdateCriteria`] with which local `MediaStream`
-    /// updating should be started.
+    /// Returns [`LocalStreamUpdateCriteria`] with which local
+    /// [`MediaStreamTrack`]s updating should be started.
     ///
     /// # Errors
     ///
@@ -602,7 +603,7 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Updates local [MediaStream][1] being used in [`PeerConnection`]
+    /// Updates local [`MediaStreamTrack`]s being used in [`PeerConnection`]s
     /// [`Sender`]s. [`Sender`]s are chosen based on provided
     /// [`LocalStreamUpdateCriteria`].
     ///
@@ -644,8 +645,9 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::InvalidMediaTracks`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
-    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if `MediaStream`
-    /// cannot be inserted into peer's [`Sender`]s.
+    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
+    /// [`MediaStreamTrack`] could not inserted into [`PeerConnection`]s
+    /// [`Sender`]s.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -811,7 +813,7 @@ impl PeerConnection {
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// With [`TracksRequestError`], [`MediaManagerError`] or
-    /// [`MediaConnectionsError`] if cannot get or insert `MediaStream`.
+    /// [`MediaConnectionsError`] if cannot get or insert [`MediaStreamTrack`]s.
     ///
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
     /// [RtcPeerConnection.createAnswer()][3] fails.

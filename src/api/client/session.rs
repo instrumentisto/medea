@@ -112,7 +112,7 @@ pub struct WsSession {
 impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub fn new(
         rooms: Box<dyn RpcServerRepository>,
         idle_timeout: Duration,
@@ -544,8 +544,8 @@ impl Actor for WsSession {
 }
 
 impl RpcConnection for Addr<WsSession> {
-    /// Closes [`WsSession`] by sending itself "normal closure" close message
-    /// with [`CloseDescription`] as description of [Close] frame.
+    /// Closes [`RpcConnection`] by sending itself "normal closure" close
+    /// message with [`CloseDescription`] as description of [Close] frame.
     ///
     /// [Close]:https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(

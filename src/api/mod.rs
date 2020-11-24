@@ -22,10 +22,14 @@ pub enum RpcServerError {
     /// Authorization on the [`RpcServer`] was failed.
     Authorization,
 
-    /// Room returned some error.
+    /// [`Room`] returned some [`RoomError`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     RoomError(RoomError),
 
-    /// Room's actor mailbox is closed or overflowed.
+    /// [`Room`]s [`MailboxError`] is closed or overflowed.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     RoomMailbox(MailboxError),
 }
 
@@ -41,9 +45,11 @@ impl From<RoomError> for RpcServerError {
 /// Server side of Medea RPC protocol.
 #[cfg_attr(test, mockall::automock)]
 pub trait RpcServer: Debug + Send {
-    /// Send signal of new RPC connection being established with specified
-    /// Member. Transport should consider dropping connection if message
+    /// Send signal of new [`RpcConnection`] being established with specified
+    /// [`Member`]. Transport should consider dropping connection if message
     /// result is err.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn connection_established(
         &self,
         member_id: MemberId,
@@ -51,8 +57,10 @@ pub trait RpcServer: Debug + Send {
         connection: Box<dyn RpcConnection>,
     ) -> LocalBoxFuture<'static, Result<RpcConnectionSettings, RpcServerError>>;
 
-    /// Send signal of existing RPC connection of specified Member being
+    /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
     /// closed.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn connection_closed(
         &self,
         member_id: MemberId,

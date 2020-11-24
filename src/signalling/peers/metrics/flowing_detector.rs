@@ -568,7 +568,7 @@ struct PeerStat {
 
     /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     member_id: MemberId,
 
     /// Weak reference to a [`PeerStat`] which represents a partner
@@ -809,7 +809,7 @@ impl PeerStat {
 
     /// Returns [`MemberId`] of the partner [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()

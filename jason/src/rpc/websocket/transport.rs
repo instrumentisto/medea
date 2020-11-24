@@ -227,10 +227,7 @@ impl Drop for InnerSocket {
 /// implementation.
 ///
 /// If you're adding new cyclic dependencies, then don't forget to drop them in
-/// the [`Drop`] implementation and mention in the list below:
-/// 1. [`InnerSocket::on_close_listener`]
-/// 2. [`InnerSocket::on_message_listener`]
-/// 3. [`InnerSocket::on_open_listener`]
+/// the [`Drop`].
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl WebSocketRpcTransport {

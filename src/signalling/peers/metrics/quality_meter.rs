@@ -185,7 +185,7 @@ struct PeerMetric {
 
     /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     /// [`Peer`]: crate::media::peer::Peer
     member_id: MemberId,
 
@@ -235,7 +235,7 @@ impl PeerMetric {
 
     /// Returns [`MemberId`] of the partner [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()

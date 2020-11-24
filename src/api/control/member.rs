@@ -29,7 +29,7 @@ const CREDENTIALS_LEN: usize = 32;
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum MemberElement {
@@ -194,7 +194,7 @@ impl MemberSpec {
 /// [`proto::Member`] implemented for [`MemberSpec`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 fn generate_member_credentials() -> Credential {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)

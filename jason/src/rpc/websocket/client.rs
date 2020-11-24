@@ -95,7 +95,7 @@ pub enum ClientState {
 
 /// Inner state of [`WebSocketRpcClient`].
 struct Inner {
-    /// WebSocket connection to a remote media server.
+    /// Transport connection with remote media server.
     sock: Option<Rc<dyn RpcTransport>>,
 
     /// Connection loss detector via ping/pong mechanism.
@@ -104,11 +104,8 @@ struct Inner {
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<RpcEvent>>,
 
-    /// [`oneshot::Sender`] with which [`CloseReason`] will be sent once
-    /// WebSocket connection is normally closed by server.
-    ///
-    /// Note, that [`CloseReason`] won't be sent if WebSocket replaced with new
-    /// one.
+    /// Subscribers that will be notified with [`CloseReason`] when underlying
+    /// transport is gracefully closed.
     on_close_subscribers: Vec<oneshot::Sender<CloseReason>>,
 
     /// Reason of [`WebSocketRpcClient`] closing.
@@ -116,7 +113,8 @@ struct Inner {
     /// This reason will be provided to the underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Senders for [`WebSocketRpcClient::on_connection_loss`] subscribers.
+    /// Subscribers that will be notified when underlying transport connection
+    /// is lost.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
     /// Closure which will create new [`RpcTransport`]s for this

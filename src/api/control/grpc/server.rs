@@ -44,7 +44,7 @@ use crate::{
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Display, Fail, From)]
-pub(crate) enum GrpcControlApiError {
+pub enum GrpcControlApiError {
     /// Error while parsing [`Fid`] of element.
     Fid(ParseFidError),
 
@@ -79,7 +79,7 @@ impl ControlApiService {
 
     /// Implementation of `Create` method for [`Member`] element.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     async fn create_member(
         &self,
         id: MemberId,
