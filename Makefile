@@ -318,7 +318,7 @@ endif
 # Usage:
 #	make docs.rust [crate=(@all|medea|medea-jason|<crate-name>)]
 #	               [open=(yes|no)] [clean=(no|yes)]
-#                  [dev=(no|yes)]
+#	               [dev=(no|yes)]
 
 docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
