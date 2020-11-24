@@ -2,17 +2,18 @@
 
 use std::{
     cell::{Cell, RefCell},
+    ops,
     rc::Rc,
 };
 
-use derive_more::AsRef;
+use derive_more::{AsRef, Deref};
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaSourceKind,
     MediaType as ProtoTrackConstraints, MediaType, VideoSettings,
 };
 use wasm_bindgen::prelude::*;
 use web_sys::{
-    ConstrainDomStringParameters,
+    ConstrainDomStringParameters, ConstrainLongRange as SysConstrainLongRange,
     MediaStreamConstraints as SysMediaStreamConstraints,
     MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
     MediaTrackConstraints as SysMediaTrackConstraints,
@@ -617,6 +618,8 @@ impl From<VideoSettings> for VideoSource {
                 VideoSource::Device(DeviceVideoTrackConstraints {
                     device_id: None,
                     facing_mode: None,
+                    width: None,
+                    height: None,
                     required: settings.required,
                 })
             }
@@ -797,7 +800,7 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 trait Constraint {
     /// Returns constrained parameter field name.
-    fn track_settings_field_name() -> &'static str;
+    const TRACK_SETTINGS_FIELD_NAME: &'static str;
 }
 
 /// The identifier of the device generating the content of the
@@ -809,9 +812,23 @@ trait Constraint {
 struct DeviceId(String);
 
 impl Constraint for DeviceId {
-    fn track_settings_field_name() -> &'static str {
-        "deviceId"
-    }
+    const TRACK_SETTINGS_FIELD_NAME: &'static str = "deviceId";
+}
+
+/// Height, in pixels, of the video.
+#[derive(Deref, Clone, Copy, Debug)]
+struct Height(i32);
+
+impl Constraint for Height {
+    const TRACK_SETTINGS_FIELD_NAME: &'static str = "height";
+}
+
+/// Width, in pixels, of the video.
+#[derive(Deref, Clone, Copy, Debug)]
+struct Width(i32);
+
+impl Constraint for Width {
+    const TRACK_SETTINGS_FIELD_NAME: &'static str = "width";
 }
 
 /// Describes the directions that the camera can face, as seen from the user's
@@ -846,8 +863,67 @@ impl AsRef<str> for FacingMode {
 }
 
 impl Constraint for FacingMode {
-    fn track_settings_field_name() -> &'static str {
-        "facingMode"
+    const TRACK_SETTINGS_FIELD_NAME: &'static str = "facingMode";
+}
+
+/// Representation of the [ConstrainULong][1].
+///
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/ConstrainULong
+#[derive(Clone, Copy, Debug)]
+enum ConstrainLong<T> {
+    /// Must be the parameter's value.
+    Exact(T),
+
+    /// Should be used if possible.
+    Ideal(T),
+
+    /// Parameter's value must be in this range.
+    Range(T, T),
+}
+
+impl<T: Constraint + ops::Deref<Target = i32>> ConstrainLong<T> {
+    // This is safe cast, because JS will always return i32 accordingly to MDN
+    // Web Docs.
+    #[allow(clippy::cast_possible_truncation)]
+    fn satisfies(this: Option<Self>, track: &SysMediaStreamTrack) -> bool {
+        match this {
+            None | Some(ConstrainLong::Ideal(_)) => true,
+            Some(ConstrainLong::Exact(constrain)) => get_property_by_name(
+                &track.get_settings(),
+                T::TRACK_SETTINGS_FIELD_NAME,
+                |v| v.as_f64(),
+            )
+            .map_or(false, |value| value as i32 == *constrain),
+            Some(ConstrainLong::Range(from, to)) => get_property_by_name(
+                &track.get_settings(),
+                T::TRACK_SETTINGS_FIELD_NAME,
+                |v| v.as_f64(),
+            )
+            .map_or(false, |value| {
+                value as i32 >= *from && value as i32 <= *to
+            }),
+        }
+    }
+}
+
+impl<T: ops::Deref<Target = i32>> From<ConstrainLong<T>>
+    for SysConstrainLongRange
+{
+    fn from(from: ConstrainLong<T>) -> Self {
+        let mut constraint = SysConstrainLongRange::new();
+        match from {
+            ConstrainLong::Exact(val) => {
+                constraint.exact(*val);
+            }
+            ConstrainLong::Ideal(val) => {
+                constraint.ideal(*val);
+            }
+            ConstrainLong::Range(min, max) => {
+                constraint.min(*min).max(*max);
+            }
+        }
+
+        constraint
     }
 }
 
@@ -869,7 +945,7 @@ impl<T: Constraint + AsRef<str>> ConstrainString<T> {
             None | Some(ConstrainString::Ideal(_)) => true,
             Some(ConstrainString::Exact(constrain)) => get_property_by_name(
                 &track.get_settings(),
-                T::track_settings_field_name(),
+                T::TRACK_SETTINGS_FIELD_NAME,
                 |v| v.as_string(),
             )
             .map_or(false, |id| id.as_str() == constrain.as_ref()),
@@ -911,6 +987,12 @@ pub struct DeviceVideoTrackConstraints {
     /// Describes the directions that the camera can face, as seen from the
     /// user's perspective.
     facing_mode: Option<ConstrainString<FacingMode>>,
+
+    /// Height, in pixels, of the video.
+    height: Option<ConstrainLong<Height>>,
+
+    /// Width, in pixels, of the video.
+    width: Option<ConstrainLong<Width>>,
 }
 
 impl DeviceVideoTrackConstraints {
@@ -922,6 +1004,8 @@ impl DeviceVideoTrackConstraints {
         satisfies_track(track, MediaKind::Video)
             && ConstrainString::satisfies(&self.device_id, track)
             && ConstrainString::satisfies(&self.facing_mode, track)
+            && ConstrainLong::satisfies(self.height, track)
+            && ConstrainLong::satisfies(self.width, track)
             && !guess_is_from_display(&track)
     }
 
@@ -937,6 +1021,12 @@ impl DeviceVideoTrackConstraints {
         }
         if self.facing_mode.is_none() && another.facing_mode.is_some() {
             self.facing_mode = another.facing_mode;
+        }
+        if self.height.is_none() && another.height.is_some() {
+            self.height = another.height;
+        }
+        if self.width.is_none() && another.width.is_some() {
+            self.width = another.width;
         }
     }
 
@@ -978,6 +1068,48 @@ impl DeviceVideoTrackConstraints {
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode = Some(ConstrainString::Ideal(facing_mode));
+    }
+
+    /// Sets exact [height][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y3badg9q
+    pub fn exact_height(&mut self, height: i32) {
+        self.height = Some(ConstrainLong::Exact(Height(height)));
+    }
+
+    /// Sets ideal [height][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y3badg9q
+    pub fn ideal_height(&mut self, height: i32) {
+        self.height = Some(ConstrainLong::Ideal(Height(height)));
+    }
+
+    /// Sets range of [height][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y3badg9q
+    pub fn height_in_range(&mut self, min: i32, max: i32) {
+        self.height = Some(ConstrainLong::Range(Height(min), Height(max)));
+    }
+
+    /// Sets exact [width][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y2uhuu47
+    pub fn exact_width(&mut self, width: i32) {
+        self.width = Some(ConstrainLong::Exact(Width(width)));
+    }
+
+    /// Sets ideal [width][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y2uhuu47
+    pub fn ideal_width(&mut self, width: i32) {
+        self.width = Some(ConstrainLong::Ideal(Width(width)));
+    }
+
+    /// Sets range of [width][1] constraint.
+    ///
+    /// [1]: https://tinyurl.com/y2uhuu47
+    pub fn width_in_range(&mut self, min: i32, max: i32) {
+        self.width = Some(ConstrainLong::Range(Width(min), Width(max)));
     }
 }
 
@@ -1066,6 +1198,12 @@ impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
         if let Some(facing_mode) = track_constraints.facing_mode {
             constraints
                 .facing_mode(&ConstrainDomStringParameters::from(&facing_mode));
+        }
+        if let Some(width) = track_constraints.width {
+            constraints.width(&SysConstrainLongRange::from(width));
+        }
+        if let Some(height) = track_constraints.height {
+            constraints.height(&SysConstrainLongRange::from(height));
         }
 
         constraints

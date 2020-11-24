@@ -58,7 +58,7 @@ wee_alloc = { version = "0.4", optional = true }
     version = "0.3"
     features = [
         "console", "ConstrainDomStringParameters",
-        "CloseEvent",
+        "CloseEvent", "ConstrainLongRange",
         "Event", "EventTarget",
         "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
         "MediaTrackConstraints", "MediaTrackSettings",
