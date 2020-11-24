@@ -1,16 +1,12 @@
 //! Reactive hash set based on [`HashSet`].
 
 use std::{
-    cell::RefCell,
     collections::{hash_set::Iter, HashSet},
     hash::Hash,
-    iter,
     marker::PhantomData,
 };
 
-use futures::{channel::mpsc, stream::LocalBoxStream, Stream};
-
-use crate::{progressable::ProgressableManager, ProgressableObservableValue};
+use futures::Stream;
 
 use super::subscribers_store::SubscribersStore;
 

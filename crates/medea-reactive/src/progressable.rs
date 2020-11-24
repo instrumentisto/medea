@@ -1,6 +1,6 @@
-use std::{cell::RefCell, mem, ops::Deref, rc::Rc};
+use std::{ops::Deref, rc::Rc};
 
-use futures::{channel::oneshot, future::LocalBoxFuture};
+use futures::future::LocalBoxFuture;
 
 use super::ObservableCell;
 

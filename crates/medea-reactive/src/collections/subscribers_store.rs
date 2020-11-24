@@ -1,14 +1,6 @@
-use std::{
-    cell::RefCell,
-    collections::{hash_set::Iter, HashSet},
-    hash::Hash,
-    iter,
-    marker::PhantomData,
-};
+use std::cell::RefCell;
 
-use futures::{
-    channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream, Stream,
-};
+use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 
 use crate::{progressable::ProgressableManager, ProgressableObservableValue};
 

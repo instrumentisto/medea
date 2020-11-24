@@ -67,15 +67,6 @@ where
             subs: RefCell::new(Vec::new()),
         }
     }
-
-    fn add_modify_callback<F>(&mut self, callback: F)
-    where
-        F: Fn(usize) + 'static,
-    {
-        self.subs
-            .borrow_mut()
-            .push(UniversalSubscriber::Callback(Box::new(callback)));
-    }
 }
 
 impl<D> ProgressableObservableField<D>
@@ -228,8 +219,6 @@ pub enum UniversalSubscriber<D> {
 
     /// Subscriber for [`Subscribable`].
     Subscribe(mpsc::UnboundedSender<D>),
-
-    Callback(Box<dyn Fn(usize)>),
 }
 
 impl<D> fmt::Debug for UniversalSubscriber<D> {
@@ -240,9 +229,6 @@ impl<D> fmt::Debug for UniversalSubscriber<D> {
             }
             UniversalSubscriber::Subscribe(_) => {
                 write!(f, "UniversalSubscriber::Subscribe")
-            }
-            UniversalSubscriber::Callback(_) => {
-                write!(f, "UniversalSubscriber::Callback")
             }
         }
     }
@@ -307,7 +293,6 @@ impl<D: Clone> OnObservableFieldModification<D>
     for RefCell<Vec<UniversalSubscriber<D>>>
 {
     fn on_modify(&mut self, data: &D) {
-        let mut has_callback = false;
         self.borrow_mut().retain(|sub| match sub {
             UniversalSubscriber::When { assert_fn, sender } => {
                 if (assert_fn)(data) {
@@ -320,28 +305,7 @@ impl<D: Clone> OnObservableFieldModification<D>
             UniversalSubscriber::Subscribe(sender) => {
                 sender.unbounded_send(data.clone()).is_ok()
             }
-            UniversalSubscriber::Callback(_) => {
-                has_callback = true;
-                true
-            }
         });
-
-        if has_callback {
-            let alive_subs_count = self
-                .borrow()
-                .iter()
-                .filter(|s| match s {
-                    UniversalSubscriber::Subscribe(_)
-                    | UniversalSubscriber::When { .. } => true,
-                    _ => false,
-                })
-                .count();
-            for sub in self.borrow().iter() {
-                if let UniversalSubscriber::Callback(f) = sub {
-                    (f)(alive_subs_count);
-                }
-            }
-        }
     }
 }
 
