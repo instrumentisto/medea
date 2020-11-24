@@ -13,10 +13,7 @@ use medea_client_api_proto::MediaSourceKind;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
-use web_sys::{
-    MediaDevices, MediaStream as SysMediaStream,
-    MediaStreamConstraints as SysMediaStreamConstraints, MediaStreamTrackState,
-};
+use web_sys as sys;
 
 use crate::{
     media::{
@@ -39,8 +36,8 @@ extern "C" {
     #[allow(clippy::needless_pass_by_value)]
     #[wasm_bindgen(catch)]
     fn get_display_media(
-        media_devices: &MediaDevices,
-        constraints: &SysMediaStreamConstraints,
+        media_devices: &sys::MediaDevices,
+        constraints: &sys::MediaStreamConstraints,
     ) -> std::result::Result<Promise, JsValue>;
 }
 
@@ -266,7 +263,7 @@ impl InnerMediaManager {
     /// [2]: https://tinyurl.com/rnxcavf
     async fn get_user_media(
         &self,
-        caps: SysMediaStreamConstraints,
+        caps: sys::MediaStreamConstraints,
     ) -> Result<Vec<MediaStreamTrack>> {
         use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
 
@@ -285,7 +282,7 @@ impl InnerMediaManager {
                 .map_err(tracerr::from_and_wrap!())?,
         )
         .await
-        .map(SysMediaStream::from)
+        .map(sys::MediaStream::from)
         .map_err(JsError::from)
         .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
@@ -301,7 +298,7 @@ impl InnerMediaManager {
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     async fn get_display_media(
         &self,
-        caps: SysMediaStreamConstraints,
+        caps: sys::MediaStreamConstraints,
     ) -> Result<Vec<MediaStreamTrack>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
@@ -321,7 +318,7 @@ impl InnerMediaManager {
                 .map_err(tracerr::from_and_wrap!())?,
         )
         .await
-        .map(SysMediaStream::from)
+        .map(sys::MediaStream::from)
         .map_err(JsError::from)
         .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
@@ -329,7 +326,8 @@ impl InnerMediaManager {
         Ok(self.parse_and_save_tracks(stream, MediaSourceKind::Display)?)
     }
 
-    /// ASDASD
+    /// Retrieves tracks from provided [`sys::MediaStream`], saves tracks weak
+    /// references in [`MediaManager`] tracks storage.
     ///
     /// # Errors
     ///
@@ -339,11 +337,14 @@ impl InnerMediaManager {
     /// Errors with [`MediaManagerError::LocalTrackIsMuted`] if at least on
     /// track from provided [`SysMediaStream`] is in [muted][2] state.
     ///
+    /// In case of error all tracks are stopped and are not saves in
+    /// [`MediaManager`] tracks storage.
+    ///
     /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/w3-streams/#track-muted
     fn parse_and_save_tracks(
         &self,
-        stream: SysMediaStream,
+        stream: sys::MediaStream,
         kind: MediaSourceKind,
     ) -> Result<Vec<MediaStreamTrack>> {
         use MediaManagerError::{LocalTrackIsEnded, LocalTrackIsMuted};
@@ -359,10 +360,8 @@ impl InnerMediaManager {
         // Otherwise we should err without caching tracks in MediaManager.
         // Tracks will be stopped in drop impl.
         for track in &tracks {
-            if !matches!(
-                track.as_ref().ready_state(),
-                MediaStreamTrackState::Live
-            ) {
+            if track.as_ref().ready_state() != sys::MediaStreamTrackState::Live
+            {
                 return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
             }
             if track.as_ref().muted() {
