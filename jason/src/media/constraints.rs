@@ -799,7 +799,7 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 trait Constraint {
-    /// Returns constrained parameter field name.
+    /// Constrained parameter field name.
     const TRACK_SETTINGS_FIELD_NAME: &'static str;
 }
 
@@ -817,7 +817,7 @@ impl Constraint for DeviceId {
 
 /// Height, in pixels, of the video.
 #[derive(Deref, Clone, Copy, Debug)]
-struct Height(i32);
+struct Height(u16);
 
 impl Constraint for Height {
     const TRACK_SETTINGS_FIELD_NAME: &'static str = "height";
@@ -825,7 +825,7 @@ impl Constraint for Height {
 
 /// Width, in pixels, of the video.
 #[derive(Deref, Clone, Copy, Debug)]
-struct Width(i32);
+struct Width(u16);
 
 impl Constraint for Width {
     const TRACK_SETTINGS_FIELD_NAME: &'static str = "width";
@@ -881,10 +881,10 @@ enum ConstrainLong<T> {
     Range(T, T),
 }
 
-impl<T: Constraint + ops::Deref<Target = i32>> ConstrainLong<T> {
-    // This is safe cast, because JS will always return i32 accordingly to MDN
-    // Web Docs.
-    #[allow(clippy::cast_possible_truncation)]
+impl<T: Constraint + ops::Deref<Target = u16>> ConstrainLong<T> {
+    // This is safe cast, because JS will always return positive integer
+    // accordingly to MDN Web Docs.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn satisfies(this: Option<Self>, track: &SysMediaStreamTrack) -> bool {
         match this {
             None | Some(ConstrainLong::Ideal(_)) => true,
@@ -893,33 +893,33 @@ impl<T: Constraint + ops::Deref<Target = i32>> ConstrainLong<T> {
                 T::TRACK_SETTINGS_FIELD_NAME,
                 |v| v.as_f64(),
             )
-            .map_or(false, |value| value as i32 == *constrain),
+            .map_or(false, |value| value as u16 == *constrain),
             Some(ConstrainLong::Range(from, to)) => get_property_by_name(
                 &track.get_settings(),
                 T::TRACK_SETTINGS_FIELD_NAME,
                 |v| v.as_f64(),
             )
             .map_or(false, |value| {
-                value as i32 >= *from && value as i32 <= *to
+                value as u16 >= *from && value as u16 <= *to
             }),
         }
     }
 }
 
-impl<T: ops::Deref<Target = i32>> From<ConstrainLong<T>>
+impl<T: ops::Deref<Target = u16>> From<ConstrainLong<T>>
     for SysConstrainLongRange
 {
     fn from(from: ConstrainLong<T>) -> Self {
         let mut constraint = SysConstrainLongRange::new();
         match from {
             ConstrainLong::Exact(val) => {
-                constraint.exact(*val);
+                constraint.exact(i32::from(*val));
             }
             ConstrainLong::Ideal(val) => {
-                constraint.ideal(*val);
+                constraint.ideal(i32::from(*val));
             }
             ConstrainLong::Range(min, max) => {
-                constraint.min(*min).max(*max);
+                constraint.min(i32::from(*min)).max(i32::from(*max));
             }
         }
 
@@ -1073,42 +1073,42 @@ impl DeviceVideoTrackConstraints {
     /// Sets exact [height][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y3badg9q
-    pub fn exact_height(&mut self, height: i32) {
+    pub fn exact_height(&mut self, height: u16) {
         self.height = Some(ConstrainLong::Exact(Height(height)));
     }
 
     /// Sets ideal [height][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y3badg9q
-    pub fn ideal_height(&mut self, height: i32) {
+    pub fn ideal_height(&mut self, height: u16) {
         self.height = Some(ConstrainLong::Ideal(Height(height)));
     }
 
     /// Sets range of [height][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y3badg9q
-    pub fn height_in_range(&mut self, min: i32, max: i32) {
+    pub fn height_in_range(&mut self, min: u16, max: u16) {
         self.height = Some(ConstrainLong::Range(Height(min), Height(max)));
     }
 
     /// Sets exact [width][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2uhuu47
-    pub fn exact_width(&mut self, width: i32) {
+    pub fn exact_width(&mut self, width: u16) {
         self.width = Some(ConstrainLong::Exact(Width(width)));
     }
 
     /// Sets ideal [width][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2uhuu47
-    pub fn ideal_width(&mut self, width: i32) {
+    pub fn ideal_width(&mut self, width: u16) {
         self.width = Some(ConstrainLong::Ideal(Width(width)));
     }
 
     /// Sets range of [width][1] constraint.
     ///
     /// [1]: https://tinyurl.com/y2uhuu47
-    pub fn width_in_range(&mut self, min: i32, max: i32) {
+    pub fn width_in_range(&mut self, min: u16, max: u16) {
         self.width = Some(ConstrainLong::Range(Width(min), Width(max)));
     }
 }
