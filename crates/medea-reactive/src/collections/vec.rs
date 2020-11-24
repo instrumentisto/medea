@@ -200,3 +200,89 @@ where
         &self.store
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod progressable {
+        use std::time::Duration;
+
+        use futures::StreamExt as _;
+        use tokio::time::timeout;
+
+        use crate::collections::ProgressableVec;
+
+        use super::*;
+
+        mod when_push_completed {
+            use super::*;
+
+            #[tokio::test]
+            async fn waits_for_processing() {
+                let mut store = ProgressableVec::new();
+
+                let mut on_push = store.on_push();
+                store.push(0);
+
+                let mut when_push_completed = store.when_push_completed();
+
+                timeout(Duration::from_millis(500), when_push_completed)
+                    .await
+                    .unwrap_err();
+            }
+
+            #[tokio::test]
+            async fn waits_for_value_drop() {
+                let mut store = ProgressableVec::new();
+
+                let mut on_push = store.on_push();
+                store.push(0);
+                let mut when_push_completed = store.when_push_completed();
+                let value = on_push.next().await.unwrap();
+
+                timeout(Duration::from_millis(500), when_push_completed)
+                    .await
+                    .unwrap_err();
+            }
+
+            #[tokio::test]
+            async fn resolved_on_value_drop() {
+                let mut store = ProgressableVec::new();
+
+                let mut on_push = store.on_push();
+                store.push(0);
+                let mut when_push_completed = store.when_push_completed();
+                drop(on_push.next().await.unwrap());
+
+                timeout(Duration::from_millis(500), when_push_completed)
+                    .await
+                    .unwrap();
+            }
+
+            #[tokio::test]
+            async fn resolves_on_empty_sublist() {
+                let mut store = ProgressableVec::new();
+
+                store.push(0);
+                let mut when_push_completed = store.when_push_completed();
+
+                timeout(Duration::from_millis(50), when_push_completed).await.unwrap();
+            }
+
+            #[tokio::test]
+            async fn waits_for_two_subs() {
+                let mut store = ProgressableVec::new();
+
+                let mut first_on_push = store.on_push();
+                let mut second_on_push = store.on_push();
+                store.push(0);
+                let mut when_all_push_processed = store.when_push_completed();
+
+                drop(first_on_push.next().await.unwrap());
+
+                timeout(Duration::from_millis(500), when_all_push_processed).await.unwrap_err();
+            }
+        }
+    }
+}

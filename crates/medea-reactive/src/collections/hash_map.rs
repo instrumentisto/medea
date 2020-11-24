@@ -249,3 +249,164 @@ where
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod progressable {
+        use std::time::Duration;
+
+        use futures::StreamExt as _;
+        use tokio::time::timeout;
+
+        use crate::collections::ProgressableHashMap;
+
+        use super::*;
+
+        mod when_remove_completed {
+            use super::*;
+
+            #[tokio::test]
+            async fn waits_for_processing() {
+                let mut store = ProgressableHashMap::new();
+                store.insert(0, 0);
+
+                let mut on_remove = store.on_remove();
+                store.remove(&0).unwrap();
+
+                let mut when_remove_completed = store.when_remove_completed();
+
+                timeout(Duration::from_millis(500), when_remove_completed)
+                    .await
+                    .unwrap_err();
+            }
+
+            #[tokio::test]
+            async fn waits_for_value_drop() {
+                let mut store = ProgressableHashMap::new();
+                store.insert(0, 0);
+
+                let mut on_remove = store.on_remove();
+                store.remove(&0);
+                let mut when_remove_completed = store.when_remove_completed();
+                let value = on_remove.next().await.unwrap();
+
+                timeout(Duration::from_millis(500), when_remove_completed)
+                    .await
+                    .unwrap_err();
+            }
+
+            #[tokio::test]
+            async fn resolved_on_value_drop() {
+                let mut store = ProgressableHashMap::new();
+                store.insert(0, 0);
+
+                let mut on_remove = store.on_remove();
+                store.remove(&0).unwrap();
+                let mut when_remove_completed = store.when_remove_completed();
+                drop(on_remove.next().await.unwrap());
+
+                timeout(Duration::from_millis(500), when_remove_completed)
+                    .await
+                    .unwrap();
+            }
+
+            #[tokio::test]
+            async fn resolves_on_empty_sublist() {
+                let mut store = ProgressableHashMap::new();
+                store.insert(0, 0);
+
+                store.remove(&0).unwrap();
+                let mut when_remove_completed = store.when_remove_completed();
+
+                timeout(Duration::from_millis(50), when_remove_completed).await.unwrap();
+            }
+
+            #[tokio::test]
+            async fn waits_for_two_subs() {
+                let mut store = ProgressableHashMap::new();
+                store.insert(0, 0);
+
+                let mut first_on_remove = store.on_remove();
+                let mut second_on_remove = store.on_remove();
+                store.remove(&0).unwrap();
+                let mut when_all_remove_processed = store.when_remove_completed();
+
+                drop(first_on_remove.next().await.unwrap());
+
+                timeout(Duration::from_millis(500), when_all_remove_processed).await.unwrap_err();
+            }
+        }
+
+        mod when_insert_completed {
+            use super::*;
+
+            #[tokio::test]
+            async fn waits_for_processing() {
+                let mut store = ProgressableHashMap::new();
+
+                let mut on_insert = store.on_insert();
+                store.insert(0, 0);
+
+                let mut when_insert_completed = store.when_insert_completed();
+
+                timeout(Duration::from_millis(500), when_insert_completed)
+                    .await
+                    .unwrap_err();
+            }
+
+            #[tokio::test]
+            async fn waits_for_value_drop() {
+                let mut store = ProgressableHashMap::new();
+
+                let mut on_insert = store.on_insert();
+                store.insert(0, 0);
+                let mut when_insert_completed = store.when_insert_completed();
+                let value = on_insert.next().await.unwrap();
+
+                timeout(Duration::from_millis(500), when_insert_completed)
+                    .await
+                    .unwrap_err();
+            }
+
+            #[tokio::test]
+            async fn resolved_on_value_drop() {
+                let mut store = ProgressableHashMap::new();
+
+                let mut on_insert = store.on_insert();
+                store.insert(0, 0);
+                let mut when_insert_completed = store.when_insert_completed();
+                drop(on_insert.next().await.unwrap());
+
+                timeout(Duration::from_millis(500), when_insert_completed)
+                    .await
+                    .unwrap();
+            }
+
+            #[tokio::test]
+            async fn resolves_on_empty_sublist() {
+                let mut store = ProgressableHashMap::new();
+
+                store.insert(0, 0);
+                let mut when_insert_completed = store.when_insert_completed();
+
+                timeout(Duration::from_millis(50), when_insert_completed).await.unwrap();
+            }
+
+            #[tokio::test]
+            async fn waits_for_two_subs() {
+                let mut store = ProgressableHashMap::new();
+
+                let mut first_on_insert = store.on_insert();
+                let mut second_on_insert = store.on_insert();
+                store.insert(0, 0);
+                let mut when_all_insert_processed = store.when_insert_completed();
+
+                drop(first_on_insert.next().await.unwrap());
+
+                timeout(Duration::from_millis(500), when_all_insert_processed).await.unwrap_err();
+            }
+        }
+    }
+}

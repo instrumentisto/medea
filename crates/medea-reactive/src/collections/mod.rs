@@ -9,8 +9,7 @@ pub mod vec;
 
 use self::{
     hash_map::ObservableHashMap as HashMap,
-    hash_set::ObservableHashSet as HashSet,
-    vec::ObservableVec as Vec,
+    hash_set::ObservableHashSet as HashSet, vec::ObservableVec as Vec,
 };
 
 use crate::{

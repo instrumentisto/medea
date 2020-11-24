@@ -15,13 +15,13 @@ use futures::{
 };
 
 pub mod cell;
-pub mod progressable;
 
 #[doc(inline)]
-pub use self::{cell::ObservableCell, progressable::ProgressableObservable};
-use crate::collections::ProgressableSubStore;
-use crate::collections::SubscribersStore;
-use crate::ProgressableObservableValue;
+pub use self::cell::ObservableCell;
+use crate::{
+    collections::{ProgressableSubStore, SubscribersStore},
+    ProgressableObservableValue,
+};
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
@@ -31,7 +31,8 @@ type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 
-pub type ProgressableObservableField<D> = ObservableField<D, ProgressableSubStore<D>>;
+pub type ProgressableObservableField<D> =
+    ObservableField<D, ProgressableSubStore<D>>;
 
 /// Reactive cell which emits all modifications to its subscribers.
 ///
@@ -77,26 +78,16 @@ where
     }
 }
 
-impl<D> ProgressableObservableField<D> where D: 'static {
+impl<D> ProgressableObservableField<D>
+where
+    D: 'static,
+{
     #[inline]
     pub fn new(data: D) -> Self {
         Self {
             data,
             subs: ProgressableSubStore::default(),
         }
-    }
-}
-
-impl<D, S> ObservableField<D, S>
-where
-    D: 'static,
-    S: Subscribable<D>,
-{
-    /// Creates new [`ObservableField`] with custom [`Subscribable`]
-    /// implementation.
-    #[inline]
-    pub fn new_with_custom(data: D, subs: S) -> Self {
-        Self { data, subs }
     }
 }
 
@@ -124,9 +115,13 @@ where
     }
 }
 
-impl<D> ProgressableObservableField<D> where D: Clone + 'static {
-    // TODO: normal naming
-    pub fn osubscribe(&self) -> LocalBoxStream<'static, ProgressableObservableValue<D>> {
+impl<D> ProgressableObservableField<D>
+where
+    D: Clone + 'static,
+{
+    pub fn subscribe(
+        &self,
+    ) -> LocalBoxStream<'static, ProgressableObservableValue<D>> {
         self.subs.subscribe(vec![self.data.clone()])
     }
 
@@ -135,9 +130,8 @@ impl<D> ProgressableObservableField<D> where D: Clone + 'static {
     }
 }
 
-impl<D, S> ObservableField<D, S>
+impl<D> Observable<D>
 where
-    S: Subscribable<D>,
     D: Clone + 'static,
 {
     /// Returns [`Stream`] into which underlying data updates will be emitted.
@@ -145,9 +139,12 @@ where
     /// [`Stream`]: futures::Stream
     pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let data = self.data.clone();
-        let subscription = self.subs.subscribe();
+        let (tx, rx) = mpsc::unbounded();
+        self.subs
+            .borrow_mut()
+            .push(UniversalSubscriber::Subscribe(tx));
 
-        Box::pin(stream::once(async move { data }).chain(subscription))
+        Box::pin(stream::once(async move { data }).chain(Box::pin(rx)))
     }
 }
 
@@ -208,15 +205,6 @@ pub trait OnObservableFieldModification<D> {
     /// [`Future`]: std::future::Future
     /// [`Stream`]: futures::Stream
     fn on_modify(&mut self, data: &D);
-}
-
-/// Abstraction of [`ObservableField::subscribe`] implementation for some
-/// custom type.
-pub trait Subscribable<D: 'static> {
-    /// This function will be called on [`ObservableField::subscribe`].
-    ///
-    /// Should return [`LocalBoxStream`] to which data updates will be sent.
-    fn subscribe(&self) -> LocalBoxStream<'static, D>;
 }
 
 /// Subscriber that implements [`Subscribable`] and [`Whenable`] in [`Vec`].
@@ -307,15 +295,9 @@ impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     }
 }
 
-impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
-    fn subscribe(&self) -> LocalBoxStream<'static, D> {
-        let (tx, rx) = mpsc::unbounded();
-        self.borrow_mut().push(UniversalSubscriber::Subscribe(tx));
-        Box::pin(rx)
-    }
-}
-
-impl<D: Clone + 'static> OnObservableFieldModification<D> for ProgressableSubStore<D> {
+impl<D: Clone + 'static> OnObservableFieldModification<D>
+    for ProgressableSubStore<D>
+{
     fn on_modify(&mut self, data: &D) {
         self.send(data.clone());
     }
