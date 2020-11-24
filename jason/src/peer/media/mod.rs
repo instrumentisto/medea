@@ -361,28 +361,6 @@ impl MediaConnections {
         true
     }
 
-    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
-    /// enabled or `false` otherwise.
-    #[cfg(feature = "mockable")]
-    pub fn is_recv_video_enabled(&self) -> bool {
-        self.0
-            .borrow()
-            .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.disabled())
-            .is_none()
-    }
-
-    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Audio`] are
-    /// enabled or `false` otherwise.
-    #[cfg(feature = "mockable")]
-    pub fn is_recv_audio_enabled(&self) -> bool {
-        self.0
-            .borrow()
-            .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.disabled())
-            .is_none()
-    }
-
     /// Returns mapping from a [`MediaStreamTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     ///
@@ -738,6 +716,26 @@ impl MediaConnections {
 
 #[cfg(feature = "mockable")]
 impl MediaConnections {
+    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
+    /// enabled or `false` otherwise.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(MediaKind::Video)
+            .find(|s| s.disabled())
+            .is_none()
+    }
+
+    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Audio`] are
+    /// enabled or `false` otherwise.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(MediaKind::Audio)
+            .find(|s| s.disabled())
+            .is_none()
+    }
+
     /// Returns [`Receiver`] with the provided [`TrackId`].
     pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
         self.0.borrow().receivers.get(&id).cloned()

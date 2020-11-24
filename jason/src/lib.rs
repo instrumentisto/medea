@@ -8,6 +8,9 @@
 #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 
+/// Exports provided module if `mockable` feature is enabled.
+///
+/// If `mockable` feature is disabled - provided module will be private.
 macro_rules! export {
     ($module:ident) => {
         #[cfg(feature = "mockable")]

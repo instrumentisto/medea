@@ -318,6 +318,7 @@ endif
 # Usage:
 #	make docs.rust [crate=(@all|medea|medea-jason|<crate-name>)]
 #	               [open=(yes|no)] [clean=(no|yes)]
+#                  [dev=(no|yes)]
 
 docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
@@ -328,6 +329,7 @@ endif
 	cargo doc \
 		$(if $(call eq,$(docs-rust-crate),@all),--all,-p $(docs-rust-crate)) \
 		--no-deps \
+		$(if $(call eq,$(dev),yes),--document-private-items,) \
 		$(if $(call eq,$(open),no),,--open)
 
 

@@ -195,8 +195,7 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// If `on_failed_local_media` or
-    /// `on_connection_loss` callbacks are not set.
+    /// If `on_failed_local_media` or `on_connection_loss` callbacks are not set.
     ///
     /// If cannot connect to media server.
     pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
