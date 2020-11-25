@@ -29,7 +29,7 @@ pub struct SenderBuilder<'a> {
 }
 
 impl<'a> SenderBuilder<'a> {
-    /// Builds new [`Transceiver`] if provided `mid` is `None`, otherwise
+    /// Builds new [`Transceiver`] if provided `mid` is [`None`], otherwise
     /// retrieves existing [`Transceiver`] via provided `mid` from a
     /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
     /// fails.

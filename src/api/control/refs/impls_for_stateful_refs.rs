@@ -1,3 +1,5 @@
+//! Macro for generating transition.
+
 /// Generates functions for transition between [`ToRoom`],
 /// [`ToMember`] and [`ToEndpoint`] states of Medea references and handy getters
 /// for data of this references.

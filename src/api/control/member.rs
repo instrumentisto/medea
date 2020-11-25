@@ -193,8 +193,8 @@ impl MemberSpec {
 /// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
 /// [`proto::Member`] implemented for [`MemberSpec`].
 ///
-/// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Member`]: crate::signalling::elements::Member
+/// [Control API]: https://tinyurl.com/yxsqplq7
 fn generate_member_credentials() -> Credential {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
@@ -207,12 +207,12 @@ impl TryFrom<proto::Member> for MemberSpec {
     type Error = TryFromProtobufError;
 
     fn try_from(member: proto::Member) -> Result<Self, Self::Error> {
-        #[allow(clippy::map_err_ignore)]
         fn parse_duration<T: TryInto<Duration>>(
             duration: Option<T>,
             member_id: &str,
             field: &'static str,
         ) -> Result<Option<Duration>, TryFromProtobufError> {
+            #[allow(clippy::map_err_ignore)]
             duration.map(TryInto::try_into).transpose().map_err(|_| {
                 TryFromProtobufError::NegativeDuration(member_id.into(), field)
             })

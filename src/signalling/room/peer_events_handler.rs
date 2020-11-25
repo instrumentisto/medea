@@ -54,16 +54,16 @@ impl Room {
 }
 
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that `Peer`
-    /// wit provided [`PeerId`] has started.
+    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that
+    /// [`Peer`] with the provided `peer_id` has started.
     fn peer_started(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStarted(peer_id));
         }
     }
 
-    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that `Peer`
-    /// wit provided [`PeerId`] has stopped.
+    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that
+    /// [`Peer`] with the provided `peer_id` has stopped.
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
@@ -175,7 +175,7 @@ impl Handler<PeerStopped> for Room {
 
 impl PeerUpdatesSubscriber for WeakAddr<Room> {
     /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
-    /// provided [`Peer`] must be negotiated.
+    /// the provided [`Peer`] must be negotiated.
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
@@ -186,8 +186,8 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
     }
 
     /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
-    /// provided [`TrackUpdate`]s were forcibly (without negotiation)
-    /// applied to [`Peer`].
+    /// the provided [`TrackUpdate`]s were forcibly (without negotiation)
+    /// applied to the [`Peer`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]

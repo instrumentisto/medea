@@ -116,10 +116,10 @@ pub trait RpcSession {
     /// connection loss, JS side user should select reconnection strategy with
     /// [`ReconnectHandle`] (or simply close [`Room`]).
     ///
-    /// [`Room`]: crate::api::Room
-    /// [`Stream`]: futures::Stream
     /// [`ReconnectHandle`]: crate::rpc::RpcTransport
+    /// [`Room`]: crate::api::Room
     /// [`RpcTransport`]: crate::rpc::RpcTransport
+    /// [`Stream`]: futures::Stream
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
     /// Subscribe to reconnected events.
@@ -421,9 +421,11 @@ impl RpcSession for WebSocketRpcSession {
         }
     }
 
-    /// Returns [`LocalBoxFuture`] which will be resolved when [`SessionState`]
-    /// will be transited to the [`SessionState::Finished`] or
-    /// [`WebSocketRpcSession`] will be dropped.
+    /// Returns [`Future`] which will be resolved when [`SessionState`] will be
+    /// transited to the [`SessionState::Finished`] or [`WebSocketRpcSession`]
+    /// will be dropped.
+    ///
+    /// [`Future`]: std::future::Future
     fn on_normal_close(&self) -> LocalBoxFuture<'static, CloseReason> {
         let mut state_stream = self
             .state
@@ -460,8 +462,10 @@ impl RpcSession for WebSocketRpcSession {
         self.state.set(SessionState::Finished(close_reason.into()));
     }
 
-    /// Returns [`LocalBoxStream`] which will provided `Some(())` every time
-    /// when [`SessionState`] goes to the [`SessionState::Lost`].
+    /// Returns [`Stream`] which will provided `Some(())` every time when
+    /// [`SessionState`] goes to the [`SessionState::Lost`].
+    ///
+    /// [`Stream`]: futures::Stream
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let can_reconnect = Rc::clone(&self.can_reconnect);
         self.state
@@ -478,11 +482,13 @@ impl RpcSession for WebSocketRpcSession {
             .boxed_local()
     }
 
-    /// Returns [`LocalBoxStream`] which will provided `Some(())` every time
-    /// when [`SessionState`] goes to the [`SessionState::Opened`].
+    /// Returns [`Stream`] which will provided `Some(())` every time when
+    /// [`SessionState`] goes to the [`SessionState::Opened`].
     ///
     /// Nothing will be provided if [`SessionState`] goes to the
     /// [`SessionState::Opened`] first time.
+    ///
+    /// [`Stream`]: futures::Stream
     fn on_reconnected(&self) -> LocalBoxStream<'static, ()> {
         let can_reconnect = Rc::clone(&self.can_reconnect);
         self.state

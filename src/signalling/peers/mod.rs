@@ -68,8 +68,8 @@ pub struct PeersService {
 
     /// Count of [`Peer`]s in this [`Room`].
     ///
-    /// [`Room`]: crate::signalling::room::Room
     /// [`Peer`]: crate::media::peer::Peer
+    /// [`Room`]: crate::signalling::room::Room
     peers_count: Counter<PeerId>,
 
     /// Count of [`MediaTrack`]s in this [`Room`].

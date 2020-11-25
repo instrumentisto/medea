@@ -22,8 +22,7 @@ use crate::{
 #[doc(inline)]
 pub use self::{
     connection::{Connection, ConnectionHandle, Connections},
-    room::RoomHandle,
-    room::{Room, RoomCloseReason, RoomError, WeakRoom},
+    room::{Room, RoomCloseReason, RoomError, RoomHandle, WeakRoom},
 };
 
 /// General library interface.

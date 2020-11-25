@@ -1,3 +1,5 @@
+//! [`MediaKind`] + [`MediaSourceKind`] criteria for local stream updates.
+
 use std::ops::BitOrAssign;
 
 use medea_client_api_proto::{Direction, MediaSourceKind, MediaType, Track};
@@ -13,26 +15,34 @@ bitflags::bitflags! {
     }
 }
 
-/// Used for local stream updates. Allows to specify a set of [`MediaKind`] +
-/// [`MediaSourceKind`] pairs.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+/// Criteria, used for local stream updates, allowing to specify a set of
+/// [`MediaKind`] + [`MediaSourceKind`] pairs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LocalStreamUpdateCriteria(Inner);
 
 impl LocalStreamUpdateCriteria {
-    /// Creates [`LocalStreamUpdateCriteria`] with all [`MediaKind`] +
+    /// Creates [`LocalStreamUpdateCriteria`] with all possible [`MediaKind`] +
     /// [`MediaSourceKind`] combinations.
+    #[inline]
+    #[must_use]
     pub fn all() -> Self {
         Self(Inner::all())
     }
 
     /// Creates empty [`LocalStreamUpdateCriteria`].
+    #[inline]
+    #[must_use]
     pub fn empty() -> Self {
         Self(Inner::empty())
     }
 
-    /// Creates [`LocalStreamUpdateCriteria`] with provided [`MediaKind`] +
-    /// [`MediaSourceKind`] pair. `None` `source_kind` means both
+    /// Creates [`LocalStreamUpdateCriteria`] with the provided [`MediaKind`] +
+    /// [`MediaSourceKind`] pair.
+    ///
+    /// [`None`] `source_kind` means both
     /// [`MediaSourceKind`]s.
+    #[inline]
+    #[must_use]
     pub fn from_kinds(
         media_kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
@@ -51,10 +61,11 @@ impl LocalStreamUpdateCriteria {
         Self(inner)
     }
 
-    /// Builds [`LocalStreamUpdateCriteria`] from provided tracks. Only
-    /// [`Direction::Send`] are taken into account.
-    pub fn from_tracks(tracks: &[Track]) -> LocalStreamUpdateCriteria {
-        let mut result = LocalStreamUpdateCriteria::empty();
+    /// Builds [`LocalStreamUpdateCriteria`] from the provided `tracks`. Only
+    /// [`Direction::Send`] [`Track`]s are taken into account.
+    #[must_use]
+    pub fn from_tracks(tracks: &[Track]) -> Self {
+        let mut result = Self::empty();
         for track in tracks
             .iter()
             .filter(|t| matches!(t.direction, Direction::Send { .. }))
@@ -71,14 +82,18 @@ impl LocalStreamUpdateCriteria {
         result
     }
 
-    /// Adds provided [`MediaKind`] + [`MediaSourceKind`] pair.
+    /// Adds the given [`MediaKind`] + [`MediaSourceKind`] pair to this
+    /// [`LocalStreamUpdateCriteria`].
+    #[inline]
     pub fn add(&mut self, media_kind: MediaKind, source_kind: MediaSourceKind) {
         self.0
             .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
     }
 
-    /// Checks whether this [`LocalStreamUpdateCriteria`] contains provided
+    /// Checks whether this [`LocalStreamUpdateCriteria`] contains the provided
     /// [`MediaKind`] + [`MediaSourceKind`] pair.
+    #[inline]
+    #[must_use]
     pub fn has(
         self,
         media_kind: MediaKind,

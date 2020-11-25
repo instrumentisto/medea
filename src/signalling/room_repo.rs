@@ -34,6 +34,8 @@ impl From<HashMap<RoomId, Addr<Room>>> for RoomRepository {
 
 impl RoomRepository {
     /// Creates new empty [`RoomRepository`].
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             rooms: Arc::new(Mutex::new(HashMap::new())),
@@ -41,6 +43,8 @@ impl RoomRepository {
     }
 
     /// Returns [`Room`] by its ID.
+    #[inline]
+    #[must_use]
     pub fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
         rooms.get(id).cloned()
@@ -58,6 +62,8 @@ impl RoomRepository {
 
     /// Checks existence of [`Room`] in [`RoomRepository`] by provided
     /// [`RoomId`].
+    #[inline]
+    #[must_use]
     pub fn contains_room_with_id(&self, id: &RoomId) -> bool {
         self.rooms.lock().unwrap().contains_key(id)
     }

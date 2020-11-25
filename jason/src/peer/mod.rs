@@ -635,9 +635,10 @@ impl PeerConnection {
     /// [`MediaManager`] does not satisfy [`Sender`]s constraints.
     ///
     /// With [`TracksRequestError::ExpectedAudioTracks`] or
-    /// [`TracksRequestError::ExpectedDeviceVideoTracks`]/[`TracksRequestError::
-    /// ExpectedDisplayVideoTracks`] if provided [`MediaStreamSettings`] are
-    /// incompatible with this peer [`Sender`]s constraints.
+    /// [`TracksRequestError::ExpectedDeviceVideoTracks`] /
+    /// [`TracksRequestError::ExpectedDisplayVideoTracks`] if provided
+    /// [`MediaStreamSettings`] are incompatible with this peer [`Sender`]s
+    /// constraints.
     ///
     /// With [`MediaManagerError::GetUserMediaFailed`] or
     /// [`MediaManagerError::GetDisplayMediaFailed`] if corresponding request to
@@ -646,7 +647,7 @@ impl PeerConnection {
     /// With [`MediaConnectionsError::InvalidMediaTracks`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
     /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
-    /// [`MediaStreamTrack`] could not inserted into [`PeerConnection`]s
+    /// [`MediaStreamTrack`] couldn't inserted into [`PeerConnection`]s
     /// [`Sender`]s.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
@@ -921,19 +922,19 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
+    /// Indicates whether all [`Receiver`]s audio tracks are enabled.
     #[cfg(feature = "mockable")]
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.media_connections.is_recv_audio_enabled()
     }
 
-    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
+    /// Indicates whether all [`Receiver`]s video tracks are enabled.
     #[cfg(feature = "mockable")]
     pub fn is_recv_video_enabled(&self) -> bool {
         self.media_connections.is_recv_video_enabled()
     }
 
-    /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
+    /// Returns inner [`IceCandidate`]'s buffer length. Used in tests.
     pub fn candidates_buffer_len(&self) -> usize {
         self.ice_candidates_buffer.borrow().len()
     }

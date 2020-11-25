@@ -909,8 +909,8 @@ impl InnerRoom {
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
     /// provided [`media_exchange_state::Stable`].
     ///
-    /// [`Sender`]: crate::peer::Sender
     /// [`Receiver`]: crate::peer::Receiver
+    /// [`Sender`]: crate::peer::Sender
     pub fn is_all_peers_in_media_exchange_state(
         &self,
         kind: MediaKind,
@@ -991,8 +991,8 @@ impl InnerRoom {
     /// provided [`PeerConnection`]. Negotiates [`PeerConnection`] if provided
     /// `negotiation_role` is `Some`.
     ///
-    /// [`Sender`]: crate::peer::Sender
     /// [`Receiver`]: crate::peer::Receiver
+    /// [`Sender`]: crate::peer::Sender
     async fn create_tracks_and_maybe_negotiate(
         &self,
         peer: Rc<PeerConnection>,
@@ -1137,8 +1137,8 @@ impl EventHandler for InnerRoom {
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
     ///
-    /// [`Sender`]: crate::peer::Sender
     /// [`Receiver`]: crate::peer::Receiver
+    /// [`Sender`]: crate::peer::Sender
     async fn on_tracks_applied(
         &self,
         peer_id: PeerId,

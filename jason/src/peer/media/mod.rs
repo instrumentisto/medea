@@ -84,7 +84,7 @@ pub trait Disableable {
         Ok(())
     }
 
-    /// Returns [`LocalBoxFuture`] which will be resolved when
+    /// Returns [`Future`] which will be resolved when
     /// [`media_exchange_state::State`] of this [`Disableable`] will be
     /// [`media_exchange_state::State::Stable`] or it is dropped.
     ///
@@ -93,6 +93,8 @@ pub trait Disableable {
     /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
     /// is returned if [`media_exchange_state::State`] transits into the
     /// opposite to the `desired_state`.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     fn when_media_exchange_state_stable(
         &self,
@@ -330,9 +332,9 @@ impl MediaConnections {
         )
     }
 
-    /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
-    /// provided [`media_exchange_state::State`].
+    /// Indicates whether all [`TransceiverSide`]s with provided [`MediaKind`],
+    /// [`TrackDirection`] and [`MediaSourceKind`] is in the provided
+    /// [`media_exchange_state::State`].
     pub fn is_all_tracks_in_media_exchange_state(
         &self,
         kind: MediaKind,
@@ -370,9 +372,9 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let inner = self.0.borrow();
         let mut mids =
@@ -575,8 +577,8 @@ impl MediaConnections {
     /// [`MediaStreamTrack`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, MediaStreamTrack>,
@@ -714,8 +716,8 @@ impl MediaConnections {
 
 #[cfg(feature = "mockable")]
 impl MediaConnections {
-    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
-    /// enabled or `false` otherwise.
+    /// Indicates whether all [`Receiver`]s with [`MediaKind::Video`] are
+    /// enabled.
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -724,8 +726,8 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Audio`] are
-    /// enabled or `false` otherwise.
+    /// Indicates whether if all [`Receiver`]s with [`MediaKind::Audio`] are
+    /// enabled.
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
             .borrow()

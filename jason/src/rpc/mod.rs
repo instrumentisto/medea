@@ -165,11 +165,10 @@ pub enum ClosedStateReason {
     NeverConnected,
 
     /// First received [`ServerMsg`] after [`WebSocketRpcClient::connect`] is
-    /// not [`ServerMsg::RpcSettings`].
+    /// not [`ServerMsg::RpcSettings`][1].
     ///
     /// [`ServerMsg`]: medea_client_api_proto::ServerMsg
-    /// [`ServerMsg::RpcSettings`]:
-    /// medea_client_api_proto::ServerMsg::RpcSettings
+    /// [1]: medea_client_api_proto::ServerMsg::RpcSettings
     FirstServerMsgIsNotRpcSettings,
 
     /// Connection has been inactive for a while and thus considered idle
@@ -195,8 +194,8 @@ pub enum RpcClientError {
     /// Occurs if [`Weak`] pointer to the [`WebSocketRpcClient`] can't be
     /// upgraded to [`Rc`].
     ///
-    /// [`Weak`]: std::rc::Weak
     /// [`Rc`]: std::rc::Rc
+    /// [`Weak`]: std::rc::Weak
     #[display(fmt = "RpcClient unexpectedly gone.")]
     RpcClientGone,
 

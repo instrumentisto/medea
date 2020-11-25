@@ -562,9 +562,9 @@ impl WebSocketRpcClient {
     /// connection loss, JS side user should select reconnection strategy with
     /// [`ReconnectHandle`] (or simply close [`Room`]).
     ///
+    /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
     /// [`Room`]: crate::api::Room
     /// [`Stream`]: futures::Stream
-    /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
     pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_connection_loss_subs.push(tx);

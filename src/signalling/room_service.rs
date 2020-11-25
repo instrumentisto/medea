@@ -127,8 +127,8 @@ pub struct RoomService {
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
-    /// Service which is responsible for processing [`Peer`]'s
-    /// metrics received from the Coturn.
+    /// Service which is responsible for processing [`Peer`]'s metrics received
+    /// from Coturn.
     ///
     /// [`Peer`]: crate::media::peer::Peer
     _coturn_metrics: Addr<CoturnMetricsService>,

@@ -243,8 +243,8 @@ impl RtcPeerConnection {
     /// Errors with [`RTCPeerConnectionError::GetStatsException`] when
     /// [PeerConnection.getStats][1] promise throws exception.
     ///
-    /// [1]: https://tinyurl.com/w6hmt5f
     /// [`PeerConnection`]: super::PeerConnection
+    /// [1]: https://tinyurl.com/w6hmt5f
     pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats =
             JsFuture::from(self.peer.get_stats()).await.map_err(|e| {

@@ -396,7 +396,7 @@ impl Handler<TrafficStopped> for PeersTrafficWatcherImpl {
 
 /// All possible sources of traffic flows signal.
 ///
-/// It is considered that traffic is flowing if all listed sources confirm that
+/// It's considered that traffic is flowing if all listed sources confirm that
 /// it does.
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum FlowMetricSource {
