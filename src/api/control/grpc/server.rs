@@ -68,6 +68,8 @@ struct ControlApiService(Addr<RoomService>);
 
 impl ControlApiService {
     /// Implementation of `Create` method for [`Room`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     async fn create_room(
         &self,
         spec: RoomSpec,
@@ -76,6 +78,8 @@ impl ControlApiService {
     }
 
     /// Implementation of `Create` method for [`Member`] element.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     async fn create_member(
         &self,
         id: MemberId,
@@ -92,7 +96,7 @@ impl ControlApiService {
             .await??)
     }
 
-    /// Implementation of `Create` method for [`Endpoint`] element.
+    /// Implementation of `Create` method for `Endpoint` element.
     async fn create_endpoint(
         &self,
         id: EndpointId,

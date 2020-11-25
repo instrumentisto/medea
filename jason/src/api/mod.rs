@@ -21,9 +21,8 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{
-    connection::{ConnectionHandle, Connections},
-    room::Room,
-    room::RoomHandle,
+    connection::{Connection, ConnectionHandle, Connections},
+    room::{Room, RoomCloseReason, RoomError, RoomHandle, WeakRoom},
 };
 
 /// General library interface.
@@ -67,18 +66,18 @@ impl Jason {
         ))))
     }
 
-    /// Returns [`RoomHandle`] for [`Room`].
+    /// Creates new [`Room`] and returns its [`RoomHandle`].
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::clone(&self.0.borrow().rpc);
         self.inner_init_room(WebSocketRpcSession::new(rpc))
     }
 
-    /// Returns handle to [`MediaManager`].
+    /// Returns [`MediaManagerHandle`].
     pub fn media_manager(&self) -> MediaManagerHandle {
         self.0.borrow().media_manager.new_handle()
     }
 
-    /// Closes the provided [`Room`].
+    /// Closes the provided [`RoomHandle`].
     #[allow(clippy::needless_pass_by_value)]
     pub fn close_room(&self, room_to_delete: RoomHandle) {
         self.0.borrow_mut().rooms.retain(|room| {

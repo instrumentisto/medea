@@ -41,6 +41,8 @@ impl Controller {
     }
 
     /// Spawns all needed [`Stream`] listeners for this [`Controller`].
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn spawn(self: Rc<Self>) {
         // we don't care about initial state, cause transceiver is inactive atm
         let mut media_exchange_state_changes = self.state.subscribe().skip(1);
@@ -92,6 +94,7 @@ impl Controller {
     /// [`media_exchange_state::Stable::Disabled`].
     #[inline]
     #[must_use]
+    #[cfg(feature = "mockable")]
     pub fn disabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
@@ -162,12 +165,6 @@ impl Controller {
             .set(current_media_exchange_state.transition_to(desired_state));
     }
 
-    /// Cancels [`Controller::state`] transition.
-    pub(in super::super) fn cancel_transition(&self) {
-        let state = self.state.get();
-        self.state.set(state.cancel_transition());
-    }
-
     /// Returns [`Future`] which will be resolved when
     /// [`media_exchange_state::State`] of this [`Controller`] will be
     /// [`media_exchange_state::State::Stable`] or the [`Controller`] is
@@ -181,6 +178,8 @@ impl Controller {
     /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
     /// is returned if [`Controller`]'s [`media_exchange_state::State`] transits
     /// into the opposite to the `desired_state`.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_media_exchange_state_stable(
         &self,
         desired_state: media_exchange_state::Stable,

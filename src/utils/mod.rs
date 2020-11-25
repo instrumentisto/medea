@@ -105,6 +105,8 @@ macro_rules! impl_debug_by_struct_name {
 }
 
 /// `?` analog but for the functions which will return boxed [`ActorFuture`].
+///
+/// [`ActorFuture`]: actix::ActorFuture
 #[macro_export]
 macro_rules! actix_try {
     ($e:expr) => {

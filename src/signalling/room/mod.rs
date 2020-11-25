@@ -205,7 +205,7 @@ impl Room {
         )
     }
 
-    /// Connects interconnected [`Endpoint`]s between provided [`Member`]s.
+    /// Connects interconnected `Endpoint`s between provided [`Member`]s.
     fn connect_members(
         &mut self,
         member1: &Member,
@@ -253,12 +253,14 @@ impl Room {
     /// provided [`Member`] have active [`RpcConnection`].
     ///
     /// Availability is determined by checking [`RpcConnection`] of all
-    /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
+    /// [`Member`]s from `WebRtcPlayEndpoint`s and from receivers of
     /// the connected [`Member`].
     ///
     /// Will start (re)negotiation with `MediaTrack`s adding if some not
     /// interconnected `Endpoint`s will be found and if [`Peer`]s pair is
     /// already exists.
+    ///
+    /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     fn init_member_connections(
         &mut self,
         member: &Member,

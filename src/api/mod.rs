@@ -23,9 +23,13 @@ pub enum RpcServerError {
     Authorization,
 
     /// [`Room`] returned some [`RoomError`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     RoomError(RoomError),
 
     /// [`Room`]s [`MailboxError`] is closed or overflowed.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     RoomMailbox(MailboxError),
 }
 
@@ -45,7 +49,7 @@ pub trait RpcServer: Debug + Send {
     /// [`Member`]. Transport should consider dropping connection if message
     /// result is err.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     fn connection_established(
         &self,
         member_id: MemberId,
@@ -56,7 +60,7 @@ pub trait RpcServer: Debug + Send {
     /// Send signal of existing [`RpcConnection`] of specified [`Member`] being
     /// closed.
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     fn connection_closed(
         &self,
         member_id: MemberId,

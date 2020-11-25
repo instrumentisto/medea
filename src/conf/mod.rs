@@ -16,13 +16,8 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
-    control::ControlApi,
-    log::Log,
-    media::Media,
-    rpc::Rpc,
-    server::Server,
-    shutdown::Shutdown,
-    turn::{Redis, Turn},
+    control::ControlApi, log::Log, media::Media, rpc::Rpc, server::Server,
+    shutdown::Shutdown, turn::Turn,
 };
 
 /// CLI argument that is responsible for holding application configuration
@@ -57,6 +52,8 @@ pub struct Conf {
     pub control: ControlApi,
 
     /// [`Peer`] media traffic watcher configuration.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub media: Media,
 }
 

@@ -15,15 +15,15 @@ use crate::{
     media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
     peer::{
         media::{media_exchange_state, TransceiverSide},
-        transceiver::Transceiver,
-        Disableable, MediaConnections, PeerEvent, TransceiverDirection,
+        Disableable, MediaConnections, PeerEvent, Transceiver,
+        TransceiverDirection,
     },
 };
 
 /// Representation of a remote [`MediaStreamTrack`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
 ///
-/// We can save related [`RtcRtpTransceiver`] and the actual
+/// We can save related [`Transceiver`] and the actual
 /// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
@@ -39,12 +39,12 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
-    /// creates [`Receiver`] without [`RtcRtpTransceiver`]. It will be injected
+    /// Creates new [`Transceiver`] if provided `mid` is `None`, otherwise
+    /// creates [`Receiver`] without [`Transceiver`]. It will be injected
     /// when [`MediaStreamTrack`] arrives.
     ///
-    /// Created [`RtcRtpTransceiver`] direction is set to
-    /// [`TransceiverDirection::Inactive`] if media receiving is disabled in
+    /// Created [`Transceiver`] direction is set to
+    /// [`TransceiverDirection::INACTIVE`] if media receiving is disabled in
     /// provided [`RecvConstraints`].
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
@@ -127,7 +127,7 @@ impl Receiver {
         enabled && is_recv_direction
     }
 
-    /// Adds provided [`SysMediaStreamTrack`] and [`RtcRtpTransceiver`] to this
+    /// Adds provided [`SysMediaStreamTrack`] and [`Transceiver`] to this
     /// [`Receiver`].
     ///
     /// Sets [`MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of this
