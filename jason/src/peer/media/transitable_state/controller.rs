@@ -59,6 +59,8 @@ where
 
     /// Spawns all needed [`Stream`] listeners for this
     /// [`TransitableStateController`].
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn spawn(self: Rc<Self>) {
         // we don't care about initial state, cause transceiver is inactive atm
         let mut state_changes = self.state.subscribe().skip(1);

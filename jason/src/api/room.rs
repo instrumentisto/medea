@@ -705,11 +705,11 @@ struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
-    /// Constraints to local [`MediaStreamTrack`]s that are being published by
+    /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the [`MediaStreamTrack`] received by [`PeerConnection`]s
+    /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
     /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
@@ -720,13 +720,15 @@ struct InnerRoom {
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
+    ///
+    /// [`Connection`]: crate::api::Connection
     connections: Connections,
 
     /// Callback to be invoked when new local [`local::JsTrack`] will be added
     /// to this [`Room`].
     on_local_track: Callback1<local::JsTrack>,
 
-    /// Callback to be invoked when failed obtain [`MediaStreamTrack`]s from
+    /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     ///
     /// [`MediaManager`]: crate::media::MediaManager
@@ -912,6 +914,9 @@ impl InnerRoom {
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
     /// provided [`MediaState`].
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    /// [`Receiver`]: crate::peer::Receiver
     pub fn is_all_peers_in_media_state(
         &self,
         kind: MediaKind,
@@ -936,14 +941,14 @@ impl InnerRoom {
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStream`] that corresponds to this settings.
+    /// [`local::Track`]s that corresponds to this settings.
     /// [`MediaStreamSettings`] update will change [`local::Track`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
+    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
@@ -1052,6 +1057,8 @@ impl EventHandler for InnerRoom {
     ///
     /// If provided `sdp_offer` is `Some`, then offer is applied to a created
     /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
+    ///
+    /// [`Connection`]: crate::api::Connection
     async fn on_peer_created(
         &self,
         peer_id: PeerId,
@@ -1192,6 +1199,10 @@ impl EventHandler for InnerRoom {
 
     /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
     /// [`Connection::update_quality_score`].
+    ///
+    /// [`Connection`]: crate::api::Connection
+    /// [`Connection::update_quality_score`]:
+    /// crate::api::Connection::update_quality_score
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,
@@ -1244,6 +1255,9 @@ impl PeerEventHandler for InnerRoom {
 
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
     /// [`remote::Track`] to the related [`Connection`].
+    ///
+    /// [`Stream`]: futures::stream::Stream
+    /// [`Connection`]: crate::api::Connection
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,

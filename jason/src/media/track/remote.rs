@@ -22,10 +22,10 @@ struct Inner {
     /// Underlying [`SysMediaStreamTrack`] source kind.
     media_source_kind: MediaSourceKind,
 
-    /// Callback to be invoked when this [`remote::Track`] is enabled.
+    /// Callback to be invoked when this [`Track`] is enabled.
     on_enabled: Callback0,
 
-    /// Callback to be invoked when this [`remote::Track`] is disabled.
+    /// Callback to be invoked when this [`Track`] is disabled.
     on_disabled: Callback0,
 
     /// [enabled][1] property of [MediaStreamTrack][2].

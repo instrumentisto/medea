@@ -107,15 +107,11 @@ impl Sender {
     }
 
     /// Updates [`Sender`]s general media exchange state based on the provided
-    /// [`StableMediaExchangeState`].
+    /// [`media_exchange_state::Stable`].
     ///
     /// Sets [`Sender`]s underlying transceiver direction to
-    /// [`TransceiverDirection::Inactive`] if provided media exchange state is
-    /// [`StableMediaExchangeState::Disabled`].
-    ///
-    /// Emits [`PeerEvent::NewLocalStreamRequired`] if new state is
-    /// [`StableMediaExchangeState::Enabled`] and [`Sender`] does not have a
-    /// track to send.
+    /// [`TransceiverDirection::INACTIVE`] if provided media exchange state is
+    /// [`media_exchange_state::Stable::Disabled`].
     fn update_general_media_exchange_state(
         &self,
         media_exchange_state: media_exchange_state::Stable,

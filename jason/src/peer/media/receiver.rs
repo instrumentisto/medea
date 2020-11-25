@@ -232,6 +232,8 @@ impl Receiver {
 
     /// Updates [`TransceiverDirection`] and underlying [`local::Track`] based
     /// on the provided [`media_exchange_state::Stable`].
+    ///
+    /// [`local::Track`]: crate::media::track::local::Track
     fn update_general_media_exchange_state(
         &self,
         new_state: media_exchange_state::Stable,
