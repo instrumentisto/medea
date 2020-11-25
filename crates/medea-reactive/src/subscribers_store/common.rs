@@ -5,15 +5,15 @@ use futures::{channel::mpsc, stream::LocalBoxStream};
 use super::SubscribersStore;
 
 #[derive(Debug)]
-pub struct BasicSubStore<T>(RefCell<Vec<mpsc::UnboundedSender<T>>>);
+pub struct SubStore<T>(RefCell<Vec<mpsc::UnboundedSender<T>>>);
 
-impl<T> Default for BasicSubStore<T> {
+impl<T> Default for SubStore<T> {
     fn default() -> Self {
         Self(RefCell::new(Vec::new()))
     }
 }
 
-impl<T> SubscribersStore<T, T> for BasicSubStore<T>
+impl<T> SubscribersStore<T, T> for SubStore<T>
 where
     T: Clone + 'static,
 {

@@ -11,10 +11,7 @@ use std::{
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::subscribers_store::{
-    progressable::{ProgressableObservableValue, ProgressableSubStore},
-    SubscribersStore,
-};
+use crate::subscribers_store::{progressable, SubscribersStore};
 
 /// Reactive hash map based on [`HashMap`].
 ///
@@ -81,8 +78,8 @@ impl<K, V>
     ObservableHashMap<
         K,
         V,
-        ProgressableSubStore<(K, V)>,
-        ProgressableObservableValue<(K, V)>,
+        progressable::SubStore<(K, V)>,
+        progressable::Value<(K, V)>,
     >
 where
     K: Hash + Eq + Clone + 'static,

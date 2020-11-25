@@ -14,10 +14,7 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
-use crate::subscribers_store::{
-    progressable::{ProgressableObservableValue, ProgressableSubStore},
-    SubscribersStore,
-};
+use crate::subscribers_store::{progressable, SubscribersStore};
 
 pub mod cell;
 
@@ -33,7 +30,7 @@ type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 
 pub type ProgressableObservableField<D> =
-    ObservableField<D, ProgressableSubStore<D>>;
+    ObservableField<D, progressable::SubStore<D>>;
 
 /// Reactive cell which emits all modifications to its subscribers.
 ///
@@ -78,7 +75,7 @@ where
     pub fn new(data: D) -> Self {
         Self {
             data,
-            subs: ProgressableSubStore::default(),
+            subs: progressable::SubStore::default(),
         }
     }
 }
@@ -111,9 +108,7 @@ impl<D> ProgressableObservableField<D>
 where
     D: Clone + 'static,
 {
-    pub fn subscribe(
-        &self,
-    ) -> LocalBoxStream<'static, ProgressableObservableValue<D>> {
+    pub fn subscribe(&self) -> LocalBoxStream<'static, progressable::Value<D>> {
         self.subs.new_subscription(vec![self.data.clone()])
     }
 
@@ -283,7 +278,7 @@ impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
 }
 
 impl<D: Clone + 'static> OnObservableFieldModification<D>
-    for ProgressableSubStore<D>
+    for progressable::SubStore<D>
 {
     fn on_modify(&mut self, data: &D) {
         self.send_update(data.clone());

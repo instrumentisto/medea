@@ -4,7 +4,7 @@ use futures::future::LocalBoxFuture;
 
 use crate::ObservableCell;
 
-use super::value::ProgressableObservableValue;
+use super::value::Value;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ProgressableManager {
@@ -22,11 +22,8 @@ impl ProgressableManager {
         self.counter.mutate(|mut c| *c += count);
     }
 
-    pub(crate) fn new_value<D>(
-        &self,
-        value: D,
-    ) -> ProgressableObservableValue<D> {
-        ProgressableObservableValue::new(value, Rc::clone(&self.counter))
+    pub(crate) fn new_value<D>(&self, value: D) -> Value<D> {
+        Value::new(value, Rc::clone(&self.counter))
     }
 
     pub(crate) fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {

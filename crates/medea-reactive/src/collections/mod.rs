@@ -11,23 +11,17 @@ use self::{
     hash_set::ObservableHashSet as HashSet, vec::ObservableVec as Vec,
 };
 
-use crate::subscribers_store::{
-    common::BasicSubStore,
-    progressable::{ProgressableObservableValue, ProgressableSubStore},
-};
+use crate::subscribers_store::{common, progressable};
 
 pub type ProgressableHashSet<T> =
-    HashSet<T, ProgressableSubStore<T>, ProgressableObservableValue<T>>;
-pub type ObservableHashSet<T> = HashSet<T, BasicSubStore<T>, T>;
+    HashSet<T, progressable::SubStore<T>, progressable::Value<T>>;
+pub type ObservableHashSet<T> = HashSet<T, common::SubStore<T>, T>;
 
 pub type ProgressableVec<T> =
-    Vec<T, ProgressableSubStore<T>, ProgressableObservableValue<T>>;
-pub type ObservableVec<T> = Vec<T, BasicSubStore<T>, T>;
+    Vec<T, progressable::SubStore<T>, progressable::Value<T>>;
+pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 
-pub type ProgressableHashMap<K, V> = HashMap<
-    K,
-    V,
-    ProgressableSubStore<(K, V)>,
-    ProgressableObservableValue<(K, V)>,
->;
-pub type ObservableHashMap<K, V> = HashMap<K, V, BasicSubStore<(K, V)>, (K, V)>;
+pub type ProgressableHashMap<K, V> =
+    HashMap<K, V, progressable::SubStore<(K, V)>, progressable::Value<(K, V)>>;
+pub type ObservableHashMap<K, V> =
+    HashMap<K, V, common::SubStore<(K, V)>, (K, V)>;

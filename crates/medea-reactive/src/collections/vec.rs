@@ -4,10 +4,7 @@ use std::{marker::PhantomData, slice::Iter};
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::subscribers_store::{
-    progressable::{ProgressableObservableValue, ProgressableSubStore},
-    SubscribersStore,
-};
+use crate::subscribers_store::{progressable, SubscribersStore};
 
 /// Reactive vector based on [`Vec`].
 ///
@@ -61,8 +58,7 @@ pub struct ObservableVec<T: Clone, S: SubscribersStore<T, O>, O> {
     _output: PhantomData<O>,
 }
 
-impl<T>
-    ObservableVec<T, ProgressableSubStore<T>, ProgressableObservableValue<T>>
+impl<T> ObservableVec<T, progressable::SubStore<T>, progressable::Value<T>>
 where
     T: Clone + 'static,
 {
