@@ -2,22 +2,16 @@
 
 use std::{
     cell::{Cell, RefCell},
-    ops,
     rc::Rc,
 };
 
-use derive_more::{AsRef, Deref};
+use derive_more::{AsRef, Into};
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaSourceKind,
     MediaType as ProtoTrackConstraints, MediaType, VideoSettings,
 };
 use wasm_bindgen::prelude::*;
-use web_sys::{
-    ConstrainDomStringParameters, ConstrainLongRange as SysConstrainLongRange,
-    MediaStreamConstraints as SysMediaStreamConstraints,
-    MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
-    MediaTrackConstraints as SysMediaTrackConstraints,
-};
+use web_sys as sys;
 
 use crate::{media::MediaKind, utils::get_property_by_name};
 
@@ -162,9 +156,9 @@ impl Default for AudioMediaTracksSettings {
 /// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies any
 /// constraints with a provided [`MediaKind`].
 #[inline]
-fn satisfies_track(track: &SysMediaStreamTrack, kind: MediaKind) -> bool {
+fn satisfies_track(track: &sys::MediaStreamTrack, kind: MediaKind) -> bool {
     track.kind() == kind.as_str()
-        && track.ready_state() == MediaStreamTrackState::Live
+        && track.ready_state() == sys::MediaStreamTrackState::Live
 }
 
 /// [MediaStreamConstraints][1] for the video media type.
@@ -237,7 +231,7 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
     /// [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
-    fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
         self.constraints
             .as_ref()
             .filter(|_| self.enabled())
@@ -250,7 +244,7 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
     /// [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
-    fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
         self.constraints
             .as_ref()
             .filter(|_| self.enabled())
@@ -331,7 +325,7 @@ impl MediaStreamSettings {
     /// [`VideoTrackConstraints::unconstrain`].
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
-        T: AsRef<SysMediaStreamTrack>,
+        T: AsRef<sys::MediaStreamTrack>,
     {
         let track = track.as_ref();
         if self.device_video.satisfies(track.as_ref()) {
@@ -497,18 +491,18 @@ pub enum MultiSourceTracksConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    Device(SysMediaStreamConstraints),
+    Device(sys::MediaStreamConstraints),
 
     /// Only [getDisplayMedia()][1] request is required.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    Display(SysMediaStreamConstraints),
+    Display(sys::MediaStreamConstraints),
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
+    DeviceAndDisplay(sys::MediaStreamConstraints, sys::MediaStreamConstraints),
 }
 
 impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
@@ -525,9 +519,9 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
                 constraints.device_video.constraints
             {
                 device_cons
-                    .get_or_insert_with(SysMediaStreamConstraints::new)
+                    .get_or_insert_with(sys::MediaStreamConstraints::new)
                     .video(
-                        &SysMediaTrackConstraints::from(device_video_cons)
+                        &sys::MediaTrackConstraints::from(device_video_cons)
                             .into(),
                     );
             }
@@ -537,18 +531,18 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
                 constraints.display_video.constraints
             {
                 display_cons
-                    .get_or_insert_with(SysMediaStreamConstraints::new)
+                    .get_or_insert_with(sys::MediaStreamConstraints::new)
                     .video(
-                        &SysMediaTrackConstraints::from(display_video_cons)
+                        &sys::MediaTrackConstraints::from(display_video_cons)
                             .into(),
                     );
             }
         }
         if is_device_audio_enabled {
             device_cons
-                .get_or_insert_with(SysMediaStreamConstraints::new)
+                .get_or_insert_with(sys::MediaStreamConstraints::new)
                 .audio(
-                    &SysMediaTrackConstraints::from(
+                    &sys::MediaTrackConstraints::from(
                         constraints.audio.constraints,
                     )
                     .into(),
@@ -602,7 +596,7 @@ impl VideoSource {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
-    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<sys::MediaStreamTrack>>(&self, track: T) -> bool {
         let track = track.as_ref();
         match self {
             VideoSource::Display(display) => display.satisfies(&track),
@@ -648,7 +642,7 @@ impl TrackConstraints {
     /// [`TrackConstraints`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<sys::MediaStreamTrack>>(&self, track: T) -> bool {
         match self {
             Self::Audio(audio) => audio.satisfies(&track),
             Self::Video(video) => video.satisfies(&track),
@@ -740,7 +734,7 @@ impl AudioTrackConstraints {
     /// contained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies<T: AsRef<SysMediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<sys::MediaStreamTrack>>(&self, track: T) -> bool {
         let track = track.as_ref();
         satisfies_track(track, MediaKind::Audio)
             && ConstrainString::satisfies(&self.device_id, track)
@@ -778,13 +772,14 @@ impl From<ProtoAudioConstraints> for AudioTrackConstraints {
     }
 }
 
-impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
+impl From<AudioTrackConstraints> for sys::MediaTrackConstraints {
     fn from(track_constraints: AudioTrackConstraints) -> Self {
         let mut constraints = Self::new();
 
         if let Some(device_id) = track_constraints.device_id {
-            constraints
-                .device_id(&ConstrainDomStringParameters::from(&device_id));
+            constraints.device_id(&sys::ConstrainDomStringParameters::from(
+                &device_id,
+            ));
         }
 
         constraints
@@ -816,16 +811,16 @@ impl Constraint for DeviceId {
 }
 
 /// Height, in pixels, of the video.
-#[derive(Deref, Clone, Copy, Debug)]
-struct Height(u16);
+#[derive(Debug, Clone, Copy, Into)]
+struct Height(u32);
 
 impl Constraint for Height {
     const TRACK_SETTINGS_FIELD_NAME: &'static str = "height";
 }
 
 /// Width, in pixels, of the video.
-#[derive(Deref, Clone, Copy, Debug)]
-struct Width(u16);
+#[derive(Debug, Clone, Copy, Into)]
+struct Width(u32);
 
 impl Constraint for Width {
     const TRACK_SETTINGS_FIELD_NAME: &'static str = "width";
@@ -866,11 +861,12 @@ impl Constraint for FacingMode {
     const TRACK_SETTINGS_FIELD_NAME: &'static str = "facingMode";
 }
 
-/// Representation of the [ConstrainULong][1].
+/// Representation of the [ConstrainULong][1]. Underlying value must fit in [0,
+/// 4294967295] range.
 ///
-/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/ConstrainULong
+/// [1]: https://tinyurl.com/w3-streams#dom-constrainulong
 #[derive(Clone, Copy, Debug)]
-enum ConstrainLong<T> {
+enum ConstrainU32<T> {
     /// Must be the parameter's value.
     Exact(T),
 
@@ -881,45 +877,43 @@ enum ConstrainLong<T> {
     Range(T, T),
 }
 
-impl<T: Constraint + ops::Deref<Target = u16>> ConstrainLong<T> {
-    // This is safe cast, because JS will always return positive integer
-    // accordingly to MDN Web Docs.
+impl<T: Constraint + Into<u32>> ConstrainU32<T> {
+    // Its up to `<T as Constraint>::TRACK_SETTINGS_FIELD_NAME` to guarantee
+    // that such casts are safe.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn satisfies(this: Option<Self>, track: &SysMediaStreamTrack) -> bool {
+    fn satisfies(this: Option<Self>, track: &sys::MediaStreamTrack) -> bool {
         match this {
-            None | Some(ConstrainLong::Ideal(_)) => true,
-            Some(ConstrainLong::Exact(constrain)) => get_property_by_name(
+            None | Some(ConstrainU32::Ideal(_)) => true,
+            Some(ConstrainU32::Exact(exact)) => get_property_by_name(
                 &track.get_settings(),
                 T::TRACK_SETTINGS_FIELD_NAME,
-                |v| v.as_f64(),
+                |v| v.as_f64().map(|v| v as u32),
             )
-            .map_or(false, |value| value as u16 == *constrain),
-            Some(ConstrainLong::Range(from, to)) => get_property_by_name(
+            .map_or(false, |val| val == exact.into()),
+            Some(ConstrainU32::Range(start, end)) => get_property_by_name(
                 &track.get_settings(),
                 T::TRACK_SETTINGS_FIELD_NAME,
-                |v| v.as_f64(),
+                |v| v.as_f64().map(|v| v as u32),
             )
-            .map_or(false, |value| {
-                value as u16 >= *from && value as u16 <= *to
-            }),
+            .map_or(false, |val| val >= start.into() && val <= end.into()),
         }
     }
 }
 
-impl<T: ops::Deref<Target = u16>> From<ConstrainLong<T>>
-    for SysConstrainLongRange
+impl<T: Constraint + Into<u32>> From<ConstrainU32<T>>
+    for sys::ConstrainDoubleRange
 {
-    fn from(from: ConstrainLong<T>) -> Self {
-        let mut constraint = SysConstrainLongRange::new();
+    fn from(from: ConstrainU32<T>) -> Self {
+        let mut constraint = sys::ConstrainDoubleRange::new();
         match from {
-            ConstrainLong::Exact(val) => {
-                constraint.exact(i32::from(*val));
+            ConstrainU32::Exact(val) => {
+                constraint.exact(val.into() as f64);
             }
-            ConstrainLong::Ideal(val) => {
-                constraint.ideal(i32::from(*val));
+            ConstrainU32::Ideal(val) => {
+                constraint.ideal(val.into() as f64);
             }
-            ConstrainLong::Range(min, max) => {
-                constraint.min(i32::from(*min)).max(i32::from(*max));
+            ConstrainU32::Range(min, max) => {
+                constraint.min(min.into() as f64).max(max.into() as f64);
             }
         }
 
@@ -940,7 +934,7 @@ enum ConstrainString<T> {
 }
 
 impl<T: Constraint + AsRef<str>> ConstrainString<T> {
-    fn satisfies(this: &Option<Self>, track: &SysMediaStreamTrack) -> bool {
+    fn satisfies(this: &Option<Self>, track: &sys::MediaStreamTrack) -> bool {
         match this {
             None | Some(ConstrainString::Ideal(_)) => true,
             Some(ConstrainString::Exact(constrain)) => get_property_by_name(
@@ -953,9 +947,11 @@ impl<T: Constraint + AsRef<str>> ConstrainString<T> {
     }
 }
 
-impl<T: AsRef<str>> From<&ConstrainString<T>> for ConstrainDomStringParameters {
+impl<T: AsRef<str>> From<&ConstrainString<T>>
+    for sys::ConstrainDomStringParameters
+{
     fn from(from: &ConstrainString<T>) -> Self {
-        let mut constraint = ConstrainDomStringParameters::new();
+        let mut constraint = sys::ConstrainDomStringParameters::new();
         match from {
             ConstrainString::Exact(val) => {
                 constraint.exact(&JsValue::from_str(val.as_ref()))
@@ -989,10 +985,10 @@ pub struct DeviceVideoTrackConstraints {
     facing_mode: Option<ConstrainString<FacingMode>>,
 
     /// Height, in pixels, of the video.
-    height: Option<ConstrainLong<Height>>,
+    height: Option<ConstrainU32<Height>>,
 
     /// Width, in pixels, of the video.
-    width: Option<ConstrainLong<Width>>,
+    width: Option<ConstrainU32<Width>>,
 }
 
 impl DeviceVideoTrackConstraints {
@@ -1000,12 +996,12 @@ impl DeviceVideoTrackConstraints {
     /// [`DeviceVideoTrackConstraints`] contained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    pub fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
         satisfies_track(track, MediaKind::Video)
             && ConstrainString::satisfies(&self.device_id, track)
             && ConstrainString::satisfies(&self.facing_mode, track)
-            && ConstrainLong::satisfies(self.height, track)
-            && ConstrainLong::satisfies(self.width, track)
+            && ConstrainU32::satisfies(self.height, track)
+            && ConstrainU32::satisfies(self.width, track)
             && !guess_is_from_display(&track)
     }
 
@@ -1072,44 +1068,44 @@ impl DeviceVideoTrackConstraints {
 
     /// Sets exact [height][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y3badg9q
-    pub fn exact_height(&mut self, height: u16) {
-        self.height = Some(ConstrainLong::Exact(Height(height)));
+    /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
+    pub fn exact_height(&mut self, height: u32) {
+        self.height = Some(ConstrainU32::Exact(Height(height)));
     }
 
     /// Sets ideal [height][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y3badg9q
-    pub fn ideal_height(&mut self, height: u16) {
-        self.height = Some(ConstrainLong::Ideal(Height(height)));
+    /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
+    pub fn ideal_height(&mut self, height: u32) {
+        self.height = Some(ConstrainU32::Ideal(Height(height)));
     }
 
     /// Sets range of [height][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y3badg9q
-    pub fn height_in_range(&mut self, min: u16, max: u16) {
-        self.height = Some(ConstrainLong::Range(Height(min), Height(max)));
+    /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
+    pub fn height_in_range(&mut self, min: u32, max: u32) {
+        self.height = Some(ConstrainU32::Range(Height(min), Height(max)));
     }
 
     /// Sets exact [width][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y2uhuu47
-    pub fn exact_width(&mut self, width: u16) {
-        self.width = Some(ConstrainLong::Exact(Width(width)));
+    /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
+    pub fn exact_width(&mut self, width: u32) {
+        self.width = Some(ConstrainU32::Exact(Width(width)));
     }
 
     /// Sets ideal [width][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y2uhuu47
-    pub fn ideal_width(&mut self, width: u16) {
-        self.width = Some(ConstrainLong::Ideal(Width(width)));
+    /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
+    pub fn ideal_width(&mut self, width: u32) {
+        self.width = Some(ConstrainU32::Ideal(Width(width)));
     }
 
     /// Sets range of [width][1] constraint.
     ///
-    /// [1]: https://tinyurl.com/y2uhuu47
-    pub fn width_in_range(&mut self, min: u16, max: u16) {
-        self.width = Some(ConstrainLong::Range(Width(min), Width(max)));
+    /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
+    pub fn width_in_range(&mut self, min: u32, max: u32) {
+        self.width = Some(ConstrainU32::Range(Width(min), Width(max)));
     }
 }
 
@@ -1131,7 +1127,7 @@ impl DisplayVideoTrackConstraints {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[allow(clippy::unused_self)]
     #[inline]
-    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+    pub fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
         satisfies_track(track, MediaKind::Video)
             && guess_is_from_display(&track)
     }
@@ -1170,7 +1166,7 @@ impl DisplayVideoTrackConstraints {
 /// in its settings. Only works in Chrome atm.
 ///
 /// [1]: https://w3.org/TR/screen-capture/#extensions-to-mediatracksettings
-fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {
+fn guess_is_from_display(track: &sys::MediaStreamTrack) -> bool {
     let settings = track.get_settings();
 
     let has_display_surface =
@@ -1187,30 +1183,32 @@ fn guess_is_from_display(track: &SysMediaStreamTrack) -> bool {
     }
 }
 
-impl From<DeviceVideoTrackConstraints> for SysMediaTrackConstraints {
+impl From<DeviceVideoTrackConstraints> for sys::MediaTrackConstraints {
     fn from(track_constraints: DeviceVideoTrackConstraints) -> Self {
         let mut constraints = Self::new();
 
         if let Some(device_id) = track_constraints.device_id {
-            constraints
-                .device_id(&ConstrainDomStringParameters::from(&device_id));
+            constraints.device_id(&sys::ConstrainDomStringParameters::from(
+                &device_id,
+            ));
         }
         if let Some(facing_mode) = track_constraints.facing_mode {
-            constraints
-                .facing_mode(&ConstrainDomStringParameters::from(&facing_mode));
+            constraints.facing_mode(&sys::ConstrainDomStringParameters::from(
+                &facing_mode,
+            ));
         }
         if let Some(width) = track_constraints.width {
-            constraints.width(&SysConstrainLongRange::from(width));
+            constraints.width(&sys::ConstrainDoubleRange::from(width));
         }
         if let Some(height) = track_constraints.height {
-            constraints.height(&SysConstrainLongRange::from(height));
+            constraints.height(&sys::ConstrainDoubleRange::from(height));
         }
 
         constraints
     }
 }
 
-impl From<DisplayVideoTrackConstraints> for SysMediaTrackConstraints {
+impl From<DisplayVideoTrackConstraints> for sys::MediaTrackConstraints {
     fn from(_: DisplayVideoTrackConstraints) -> Self {
         Self::new()
     }

@@ -559,10 +559,7 @@ window.onload = async function() {
           }
         }
       } else {
-        let video = new rust.DeviceVideoTrackConstraints();
-        video.height_in_range(700, 2000);
-        video.width_in_range(700, 2000);
-        constraints.device_video(video);
+        constraints.device_video(new rust.DeviceVideoTrackConstraints());
       }
     }
 
@@ -577,7 +574,7 @@ window.onload = async function() {
       await fillMediaDevicesInputs(audioSelect, videoSelect, null);
       await room.set_local_media_settings(constraints);
     } catch (e) {
-      console.error('Init local video failed: ' + e.message());
+      console.error('Init local video failed: ' + e);
     }
 
     room.on_new_connection( (connection) => {
