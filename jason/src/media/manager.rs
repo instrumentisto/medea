@@ -110,7 +110,7 @@ struct InnerMediaManager {
 }
 
 impl InnerMediaManager {
-    /// Returns the vector of [`MediaDeviceInfo`] objects.
+    /// Returns the vector of [`InputDeviceInfo`] objects.
     async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, EnumerateDevicesFailed,

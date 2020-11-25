@@ -29,7 +29,7 @@ pub(super) struct QualityMeterStatsHandler {
     /// All [`PeerMetric`]s registered in this [`QualityMeterStatsHandler`].
     peers: HashMap<PeerId, Rc<RefCell<PeerMetric>>>,
 
-    /// [`PeerMetricsEvent`]s sender.
+    /// [`PeersMetricsEvent`]s sender.
     event_tx: EventSender,
 }
 
@@ -55,9 +55,9 @@ impl QualityMeterStatsHandler {
             .and_then(|score| {
                 partner_score
                     .map(|partner_score| score.min(partner_score))
-                    .or_else(|| Some(score))
+                    .or(Some(score))
             })
-            .or_else(|| partner_score);
+            .or(partner_score);
 
         if let Some(quality_score) = score {
             if quality_score == peer.last_quality_score {
@@ -184,6 +184,9 @@ struct PeerMetric {
     id: PeerId,
 
     /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [`Peer`]: crate::media::peer::Peer
     member_id: MemberId,
 
     /// Weak reference to a [`PeerMetric`] which represents a partner
@@ -231,6 +234,8 @@ impl PeerMetric {
     }
 
     /// Returns [`MemberId`] of the partner [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()

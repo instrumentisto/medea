@@ -257,7 +257,7 @@ fn local_constraints(
     is_audio_enabled: bool,
     is_video_enabled: bool,
 ) -> LocalTracksConstraints {
-    let constraints = LocalTracksConstraints::new();
+    let constraints = LocalTracksConstraints::default();
     constraints
         .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
 

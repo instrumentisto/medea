@@ -1,4 +1,6 @@
 //! Deserialization of the [`RtcStats`] from the [`SysRtcStats`].
+//!
+//! [`SysRtcStats`]: web_sys::RtcStats
 
 use std::{convert::TryFrom, rc::Rc};
 
@@ -12,7 +14,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::utils::{get_property_by_name, JsCaused, JsError};
 
-/// Entry of the [`SysRtcStats`] dictionary.
+/// Entry of the JS RTC stats dictionary.
 struct RtcStatsReportEntry(JsString, JsValue);
 
 impl TryFrom<JsArray> for RtcStatsReportEntry {
