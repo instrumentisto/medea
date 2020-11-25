@@ -4,9 +4,9 @@ use std::{marker::PhantomData, slice::Iter};
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::{
-    collections::subscribers_store::{ProgressableSubStore, SubscribersStore},
-    progressable::ProgressableObservableValue,
+use crate::subscribers_store::{
+    progressable::{ProgressableObservableValue, ProgressableSubStore},
+    SubscribersStore,
 };
 
 /// Reactive vector based on [`Vec`].
@@ -93,7 +93,7 @@ where
     pub fn push(&mut self, value: T) {
         self.store.push(value.clone());
 
-        self.on_push_subs.send(value);
+        self.on_push_subs.send_update(value);
     }
 
     /// Removes and returns the element at position `index` within the vector,
@@ -102,7 +102,7 @@ where
     /// This will produce [`ObservableVec::on_remove`] event.
     pub fn remove(&mut self, index: usize) -> T {
         let value = self.store.remove(index);
-        self.on_remove_subs.send(value.clone());
+        self.on_remove_subs.send_update(value.clone());
 
         value
     }
@@ -119,7 +119,7 @@ where
     /// of this [`ObservableVec`].
     pub fn on_push(&self) -> impl Stream<Item = O> {
         self.on_push_subs
-            .subscribe(self.store.iter().cloned().collect())
+            .new_subscription(self.store.iter().cloned().collect())
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
@@ -127,7 +127,7 @@ where
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableVec`] on drop.
     pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.subscribe(Vec::new())
+        self.on_remove_subs.new_subscription(Vec::new())
     }
 }
 
@@ -186,7 +186,7 @@ where
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain(..).for_each(|value| {
-            on_remove_subs.send(value);
+            on_remove_subs.send_update(value);
         });
     }
 }

@@ -22,7 +22,7 @@
 
 pub mod collections;
 pub mod field;
-mod progressable;
+mod subscribers_store;
 
 #[doc(inline)]
 pub use crate::{
@@ -35,5 +35,5 @@ pub use crate::{
         Observable, ObservableField, OnObservableFieldModification,
         ProgressableObservableField, UniversalSubscriber, Whenable,
     },
-    progressable::ProgressableObservableValue,
+    subscribers_store::progressable::ProgressableObservableValue,
 };

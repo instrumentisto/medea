@@ -11,9 +11,9 @@ use std::{
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::{
-    collections::subscribers_store::{ProgressableSubStore, SubscribersStore},
-    ProgressableObservableValue,
+use crate::subscribers_store::{
+    progressable::{ProgressableObservableValue, ProgressableSubStore},
+    SubscribersStore,
 };
 
 /// Reactive hash map based on [`HashMap`].
@@ -114,7 +114,8 @@ where
     ///
     /// This action will produce [`ObservableHashMap::on_insert`] event.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.on_insert_subs.send((key.clone(), value.clone()));
+        self.on_insert_subs
+            .send_update((key.clone(), value.clone()));
 
         self.store.insert(key, value)
     }
@@ -126,7 +127,7 @@ where
     pub fn remove(&mut self, key: &K) -> Option<V> {
         let removed_item = self.store.remove(key);
         if let Some(item) = &removed_item {
-            self.on_remove_subs.send((key.clone(), item.clone()));
+            self.on_remove_subs.send_update((key.clone(), item.clone()));
         }
 
         removed_item
@@ -138,7 +139,7 @@ where
     /// Also to this [`Stream`] will be sent all already inserted key-value
     /// pairs of this [`ObservableHashMap`].
     pub fn on_insert(&self) -> impl Stream<Item = O> {
-        self.on_insert_subs.subscribe(
+        self.on_insert_subs.new_subscription(
             self.store
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
@@ -152,7 +153,7 @@ where
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableHashMap`] on drop.
     pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.subscribe(Vec::new())
+        self.on_remove_subs.new_subscription(Vec::new())
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -244,7 +245,7 @@ where
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain().for_each(|(key, value)| {
-            on_remove_subs.send((key, value));
+            on_remove_subs.send_update((key, value));
         });
     }
 }

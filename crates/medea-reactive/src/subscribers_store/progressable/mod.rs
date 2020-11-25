@@ -1,43 +1,15 @@
+mod manager;
+mod value;
+
 use std::cell::RefCell;
 
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 
-use crate::{progressable::ProgressableManager, ProgressableObservableValue};
+use crate::subscribers_store::SubscribersStore;
 
-pub trait SubscribersStore<T, O>: Default {
-    fn send(&self, value: T);
+use self::manager::ProgressableManager;
 
-    fn subscribe(&self, initial_values: Vec<T>) -> LocalBoxStream<'static, O>;
-}
-
-#[derive(Debug)]
-pub struct BasicSubStore<T>(RefCell<Vec<mpsc::UnboundedSender<T>>>);
-
-impl<T> Default for BasicSubStore<T> {
-    fn default() -> Self {
-        Self(RefCell::new(Vec::new()))
-    }
-}
-
-impl<T> SubscribersStore<T, T> for BasicSubStore<T>
-where
-    T: Clone + 'static,
-{
-    fn send(&self, value: T) {
-        self.0
-            .borrow_mut()
-            .retain(|sub| sub.unbounded_send(value.clone()).is_ok());
-    }
-
-    fn subscribe(&self, initial_values: Vec<T>) -> LocalBoxStream<'static, T> {
-        let (tx, rx) = mpsc::unbounded();
-        initial_values.into_iter().for_each(|value| {
-            let _ = tx.unbounded_send(value);
-        });
-
-        Box::pin(rx)
-    }
-}
+pub use self::value::ProgressableObservableValue;
 
 #[derive(Debug)]
 pub struct ProgressableSubStore<T> {
@@ -65,7 +37,7 @@ impl<T> SubscribersStore<T, ProgressableObservableValue<T>>
 where
     T: Clone + 'static,
 {
-    fn send(&self, value: T) {
+    fn send_update(&self, value: T) {
         self.store.borrow_mut().retain(|sub| {
             self.manager.incr_processors_count(1);
             let value = self.manager.new_value(value.clone());
@@ -74,7 +46,7 @@ where
         });
     }
 
-    fn subscribe(
+    fn new_subscription(
         &self,
         initial_values: Vec<T>,
     ) -> LocalBoxStream<'static, ProgressableObservableValue<T>> {

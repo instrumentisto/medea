@@ -8,7 +8,7 @@ use std::{
 
 use futures::Stream;
 
-use super::subscribers_store::SubscribersStore;
+use crate::subscribers_store::SubscribersStore;
 
 /// Reactive hash set based on [`HashSet`].
 ///
@@ -105,7 +105,7 @@ where
     /// This will produce [`ObservableHashSet::on_insert`] event.
     pub fn insert(&mut self, value: T) -> bool {
         if self.store.insert(value.clone()) {
-            self.on_insert_subs.send(value);
+            self.on_insert_subs.send_update(value);
             true
         } else {
             false
@@ -120,7 +120,7 @@ where
         let value = self.store.take(value);
 
         if let Some(value) = &value {
-            self.on_remove_subs.send(value.clone());
+            self.on_remove_subs.send_update(value.clone());
         }
 
         value
@@ -139,7 +139,7 @@ where
     /// of this [`ObservableHashSet`].
     pub fn on_insert(&self) -> impl Stream<Item = O> {
         self.on_insert_subs
-            .subscribe(self.store.iter().cloned().collect())
+            .new_subscription(self.store.iter().cloned().collect())
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
@@ -147,7 +147,7 @@ where
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`ObservableHashSet`] on drop.
     pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.subscribe(Vec::new())
+        self.on_remove_subs.new_subscription(Vec::new())
     }
 
     /// Makes this [`ObservableHashSet`] exactly the same as the passed
@@ -163,11 +163,11 @@ where
         let inserted_elems = updated.difference(&self.store);
 
         for removed_elem in removed_elems {
-            self.on_remove_subs.send(removed_elem.clone());
+            self.on_remove_subs.send_update(removed_elem.clone());
         }
 
         for inserted_elem in inserted_elems {
-            self.on_insert_subs.send(inserted_elem.clone());
+            self.on_insert_subs.send_update(inserted_elem.clone());
         }
 
         self.store = updated;
@@ -217,7 +217,7 @@ where
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
         store.drain().for_each(|value| {
-            on_remove_subs.send(value);
+            on_remove_subs.send_update(value);
         });
     }
 }

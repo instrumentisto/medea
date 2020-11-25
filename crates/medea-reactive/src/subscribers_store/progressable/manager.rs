@@ -1,8 +1,10 @@
-use std::{ops::Deref, rc::Rc};
+use std::rc::Rc;
 
 use futures::future::LocalBoxFuture;
 
-use super::ObservableCell;
+use crate::ObservableCell;
+
+use super::value::ProgressableObservableValue;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ProgressableManager {
@@ -24,10 +26,7 @@ impl ProgressableManager {
         &self,
         value: D,
     ) -> ProgressableObservableValue<D> {
-        ProgressableObservableValue {
-            value,
-            counter: Rc::clone(&self.counter),
-        }
+        ProgressableObservableValue::new(value, Rc::clone(&self.counter))
     }
 
     pub(crate) fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
@@ -35,31 +34,5 @@ impl ProgressableManager {
         Box::pin(async move {
             let _ = fut.await;
         })
-    }
-}
-
-#[derive(Debug)]
-pub struct ProgressableObservableValue<D> {
-    value: D,
-    counter: Rc<ObservableCell<u32>>,
-}
-
-impl<D> Drop for ProgressableObservableValue<D> {
-    fn drop(&mut self) {
-        self.counter.mutate(|mut c| *c -= 1);
-    }
-}
-
-impl<D> AsRef<D> for ProgressableObservableValue<D> {
-    fn as_ref(&self) -> &D {
-        &self.value
-    }
-}
-
-impl<D> Deref for ProgressableObservableValue<D> {
-    type Target = D;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
     }
 }

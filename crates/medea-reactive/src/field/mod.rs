@@ -14,14 +14,15 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
+use crate::subscribers_store::{
+    progressable::{ProgressableObservableValue, ProgressableSubStore},
+    SubscribersStore,
+};
+
 pub mod cell;
 
 #[doc(inline)]
 pub use self::cell::ObservableCell;
-use crate::{
-    collections::{ProgressableSubStore, SubscribersStore},
-    ProgressableObservableValue,
-};
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
@@ -113,7 +114,7 @@ where
     pub fn subscribe(
         &self,
     ) -> LocalBoxStream<'static, ProgressableObservableValue<D>> {
-        self.subs.subscribe(vec![self.data.clone()])
+        self.subs.new_subscription(vec![self.data.clone()])
     }
 
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
@@ -285,7 +286,7 @@ impl<D: Clone + 'static> OnObservableFieldModification<D>
     for ProgressableSubStore<D>
 {
     fn on_modify(&mut self, data: &D) {
-        self.send(data.clone());
+        self.send_update(data.clone());
     }
 }
 
