@@ -4,7 +4,7 @@
 
 mod receiver;
 mod sender;
-pub mod transitable_state;
+mod transitable_state;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
@@ -17,10 +17,7 @@ use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
 use crate::{
-    media::{
-        track::local::{self},
-        LocalTracksConstraints, MediaKind, RecvConstraints,
-    },
+    media::{track::local, LocalTracksConstraints, MediaKind, RecvConstraints},
     peer::{
         transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
         TransceiverDirection,

@@ -1,17 +1,17 @@
-//! Implementation of the wrapper around [`SysMediaStreamTrack`] received from
+//! Implementation of the wrapper around [`sys::MediaStreamTrack`] received from
 //! the gUM/gDM request.
 
 use std::rc::Rc;
 
 use medea_client_api_proto::MediaSourceKind;
 use wasm_bindgen::prelude::*;
-use web_sys::MediaStreamTrack as SysMediaStreamTrack;
+use web_sys as sys;
 
 use crate::{media::MediaKind, JsMediaSourceKind};
 
-/// Wrapper around [`SysMediaStreamTrack`] received from the gUM/gDM request.
+/// Wrapper around [`sys::MediaStreamTrack`] received from the gUM/gDM request.
 ///
-/// Underlying [`SysMediaStreamTrack`] is stopped on [`Track`] [`Drop`].
+/// Underlying [`sys::MediaStreamTrack`] is stopped on [`Track`] [`Drop`].
 #[derive(Debug)]
 pub struct Track {
     /// Reference to the parent [`Track`].
@@ -22,21 +22,21 @@ pub struct Track {
     /// This field used only for holding strong reference to the parent.
     _parent: Option<Rc<Self>>,
 
-    /// Actual [`SysMediaStreamTrack`].
-    track: SysMediaStreamTrack,
+    /// Actual [`sys::MediaStreamTrack`].
+    track: sys::MediaStreamTrack,
 
-    /// Underlying [`SysMediaStreamTrack`] source kind.
+    /// Underlying [`sys::MediaStreamTrack`] source kind.
     source_kind: MediaSourceKind,
 
-    /// Underlying [`SysMediaStreamTrack`] kind.
+    /// Underlying [`sys::MediaStreamTrack`] kind.
     kind: MediaKind,
 }
 
 impl Track {
-    /// Builds [`Track`] from provided [`SysMediaStreamTrack`] and
+    /// Builds [`Track`] from provided [`sys::MediaStreamTrack`] and
     /// [`MediaSourceKind`].
     pub fn new(
-        track: SysMediaStreamTrack,
+        track: sys::MediaStreamTrack,
         source_kind: MediaSourceKind,
     ) -> Self {
         let kind = match track.kind().as_ref() {
@@ -81,15 +81,15 @@ impl Track {
 
     /// Forks this [`Track`].
     ///
-    /// Creates new [`SysMediaStreamTrack`] from this [`Track`]
-    /// [`SysMediaStreamTrack`] using [`clone`][1] method.
+    /// Creates new [`sys::MediaStreamTrack`] from this [`Track`]
+    /// [`sys::MediaStreamTrack`] using [`clone`][1] method.
     ///
     /// Forked [`Track`] holds strong reference to this [`Track`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-clone
     pub fn fork(self: &Rc<Self>) -> Self {
         let parent = Rc::clone(self);
-        let track = SysMediaStreamTrack::clone(&self.track);
+        let track = sys::MediaStreamTrack::clone(&self.track);
         Self {
             _parent: Some(parent),
             track,
@@ -98,8 +98,8 @@ impl Track {
         }
     }
 
-    /// Returns reference to the [`SysMediaStreamTrack`].
-    pub fn sys_track(&self) -> &SysMediaStreamTrack {
+    /// Returns reference to the [`sys::MediaStreamTrack`].
+    pub fn sys_track(&self) -> &sys::MediaStreamTrack {
         &self.track
     }
 }
@@ -123,8 +123,8 @@ impl JsTrack {
 
 #[wasm_bindgen(js_class = LocalMediaTrack)]
 impl JsTrack {
-    /// Returns underlying [`SysMediaStreamTrack`] from this [`JsTrack`].
-    pub fn get_track(&self) -> SysMediaStreamTrack {
+    /// Returns underlying [`sys::MediaStreamTrack`] from this [`JsTrack`].
+    pub fn get_track(&self) -> sys::MediaStreamTrack {
         Clone::clone(self.0.track.as_ref())
     }
 

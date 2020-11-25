@@ -1,5 +1,5 @@
 //! Acquiring and storing [`local::Track`]s.
-/// [`local::Track`]: crate::media::track::local::Track
+
 use std::{
     cell::RefCell,
     collections::HashMap,

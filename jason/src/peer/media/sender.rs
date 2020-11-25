@@ -63,16 +63,15 @@ impl<'a> SenderBuilder<'a> {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let media_exchange_state_controller =
+        let media_exchange_state =
             MediaExchangeStateController::new(self.media_exchange_state);
-        let mute_state_controller = MuteStateController::new(self.mute_state);
         let this = Rc::new(Sender {
             track_id: self.track_id,
             caps: self.caps,
             general_media_exchange_state: Cell::new(self.media_exchange_state),
-            mute_state: mute_state_controller,
+            mute_state: MuteStateController::new(self.mute_state),
             transceiver,
-            media_exchange_state: media_exchange_state_controller,
+            media_exchange_state,
             required: self.required,
             send_constraints: self.send_constraints,
         });
@@ -114,11 +113,11 @@ impl Sender {
     /// [`media_exchange_state::Stable::Disabled`].
     fn update_general_media_exchange_state(
         &self,
-        media_exchange_state: media_exchange_state::Stable,
+        new_state: media_exchange_state::Stable,
     ) {
-        if self.general_media_exchange_state.get() != media_exchange_state {
-            self.general_media_exchange_state.set(media_exchange_state);
-            match media_exchange_state {
+        if self.general_media_exchange_state.get() != new_state {
+            self.general_media_exchange_state.set(new_state);
+            match new_state {
                 media_exchange_state::Stable::Enabled => {
                     if self.enabled_in_cons() {
                         self.transceiver

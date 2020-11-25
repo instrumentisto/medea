@@ -1,4 +1,4 @@
-//! Implementation of the wrapper around [`SysMediaStreamTrack`] received from
+//! Implementation of the wrapper around [`sys::MediaStreamTrack`] received from
 //! the remote.
 
 use std::rc::Rc;
@@ -8,18 +8,18 @@ use medea_client_api_proto::MediaSourceKind;
 use medea_reactive::ObservableCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::MediaStreamTrack as SysMediaStreamTrack;
+use web_sys as sys;
 
 use crate::{media::MediaKind, utils::Callback0, JsMediaSourceKind};
 
 struct Inner {
-    /// Underlying JS-side [`SysMediaStreamTrack`].
-    track: SysMediaStreamTrack,
+    /// Underlying JS-side [`sys::MediaStreamTrack`].
+    track: sys::MediaStreamTrack,
 
-    /// Underlying [`SysMediaStreamTrack`] kind.
+    /// Underlying [`sys::MediaStreamTrack`] kind.
     kind: MediaKind,
 
-    /// Underlying [`SysMediaStreamTrack`] source kind.
+    /// Underlying [`sys::MediaStreamTrack`] source kind.
     media_source_kind: MediaSourceKind,
 
     /// Callback to be invoked when this [`Track`] is enabled.
@@ -47,9 +47,9 @@ impl Track {
     /// changes.
     pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
     where
-        SysMediaStreamTrack: From<T>,
+        sys::MediaStreamTrack: From<T>,
     {
-        let track = SysMediaStreamTrack::from(track);
+        let track = sys::MediaStreamTrack::from(track);
         let kind = match track.kind().as_ref() {
             "audio" => MediaKind::Audio,
             "video" => MediaKind::Video,
@@ -97,7 +97,7 @@ impl Track {
 
     /// Sets [`Track::enabled`] to the provided value.
     ///
-    /// Updates `enabled` in the underlying [`SysMediaStreamTrack`].
+    /// Updates `enabled` in the underlying [`sys::MediaStreamTrack`].
     #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
@@ -128,8 +128,8 @@ impl Track {
 
 #[wasm_bindgen(js_class = RemoteMediaTrack)]
 impl Track {
-    /// Returns underlying [`SysMediaStreamTrack`] from this [`Track`].
-    pub fn get_track(&self) -> SysMediaStreamTrack {
+    /// Returns underlying [`sys::MediaStreamTrack`] from this [`Track`].
+    pub fn get_track(&self) -> sys::MediaStreamTrack {
         Clone::clone(&self.0.track)
     }
 

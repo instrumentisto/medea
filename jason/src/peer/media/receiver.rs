@@ -9,7 +9,7 @@ use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MediaSourceKind, MemberId, TrackPatchEvent};
 use proto::TrackId;
-use web_sys::MediaStreamTrack as SysMediaStreamTrack;
+use web_sys as sys;
 
 use crate::{
     media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
@@ -133,15 +133,15 @@ impl Receiver {
         enabled && is_recv_direction
     }
 
-    /// Adds provided [`SysMediaStreamTrack`] and [`Transceiver`] to this
+    /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this
     /// [`Receiver`].
     ///
-    /// Sets [`SysMediaStreamTrack::enabled`] same as [`Receiver::enabled`] of
+    /// Sets [`sys::MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of
     /// this [`Receiver`].
     pub fn set_remote_track(
         &self,
         transceiver: Transceiver,
-        new_track: SysMediaStreamTrack,
+        new_track: sys::MediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
             if old_track.id() == new_track.id() {
