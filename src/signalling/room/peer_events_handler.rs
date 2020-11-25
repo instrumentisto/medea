@@ -24,6 +24,8 @@ use crate::{
 impl Room {
     /// Sends [`Event::PeerCreated`] specified [`Peer`]. That [`Peer`] state
     /// will be changed to a [`WaitLocalSdp`] state.
+    ///
+    /// [`WaitLocalSdp`]: crate::media::peer::WaitLocalSdp
     fn send_peer_created(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
@@ -52,16 +54,16 @@ impl Room {
 }
 
 impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStarted`]
-    /// message to [`Room`] [`Addr`].
+    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that
+    /// [`Peer`] with the provided `peer_id` has started.
     fn peer_started(&self, peer_id: PeerId) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStarted(peer_id));
         }
     }
 
-    /// Upgrades [`WeakAddr`] of the [`Room`] and sends [`PeerStopped`]
-    /// message to [`Room`] [`Addr`].
+    /// Upgrades [`WeakAddr`] of the [`Room`] and notifies [`Room`] that
+    /// [`Peer`] with the provided `peer_id` has stopped.
     fn peer_stopped(&self, peer_id: PeerId, at: DateTime<Utc>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(PeerStopped { peer_id, at })
@@ -70,8 +72,8 @@ impl PeerConnectionStateEventsHandler for WeakAddr<Room> {
 }
 
 impl StreamHandler<PeersMetricsEvent> for Room {
-    /// Dispatches received [`PeerMetricsEvent`] with [`Room`]'s
-    /// [`PeerMetricsEventHandler`] implementation.
+    /// Dispatches received [`PeersMetricsEvent`] with [`Room`]'s
+    /// [`PeersMetricsEventHandler`] implementation.
     fn handle(&mut self, event: PeersMetricsEvent, _: &mut Self::Context) {
         if let Err(err) = event.dispatch_with(self) {
             error!("Error handling PeersMetricsEvent: {:?}", err);
@@ -172,8 +174,8 @@ impl Handler<PeerStopped> for Room {
 }
 
 impl PeerUpdatesSubscriber for WeakAddr<Room> {
-    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
-    /// [`Addr`] a [`NegotiationNeeded`] [`Message`].
+    /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
+    /// the provided [`Peer`] must be negotiated.
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
@@ -183,8 +185,9 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
         }
     }
 
-    /// Upgrades [`WeakAddr`] and if it's successful then sends to the upgraded
-    /// [`Addr`] a [`ForceUpdate`] [`Message`].
+    /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
+    /// the provided [`TrackUpdate`]s were forcibly (without negotiation)
+    /// applied to the [`Peer`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
@@ -244,11 +247,14 @@ impl Handler<NegotiationNeeded> for Room {
     /// Sends [`Event::PeerCreated`] if this [`Peer`] unknown for the remote
     /// side.
     ///
-    /// Sends [`Event::TrackApplied`] if this [`Peer`] known for the remote
+    /// Sends [`Event::TracksApplied`] if this [`Peer`] known for the remote
     /// side.
     ///
     /// If this [`Peer`] or it's partner not [`Stable`] then forcible
-    /// [`TrackChange`]s will be committed.
+    /// track changes will be committed.
+    ///
+    /// [`Event::PeerCreated`]: medea_client_api_proto::Event::PeerCreated
+    /// [`Event::TracksApplied`]: medea_client_api_proto::Event::TracksApplied
     fn handle(
         &mut self,
         msg: NegotiationNeeded,

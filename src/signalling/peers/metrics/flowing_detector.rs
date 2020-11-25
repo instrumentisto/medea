@@ -58,10 +58,12 @@ pub struct TrafficFlowDetector {
     /// Duration, after which [`Peer`]s stats will be considered as stale.
     stats_ttl: Duration,
 
-    /// Sender of [`PeerMetricsEvent`]s.
+    /// Sender of [`PeersMetricsEvent`]s.
     ///
-    /// Currently [`PeerMetricsEvent`] will receive [`Room`] to which this
+    /// Currently [`PeersMetricsEvent`] will receive [`Room`] to which this
     /// [`TrafficFlowDetector`] belongs to.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     event_tx: EventSender,
 }
 
@@ -80,7 +82,7 @@ impl TrafficFlowDetector {
         }
     }
 
-    /// Sends [`PeerMetricsEvent::NoTrafficFlow`] event to subscriber.
+    /// Sends [`PeersMetricsEvent::NoTrafficFlow`] event to subscriber.
     fn send_no_traffic(
         &self,
         peer: &PeerStat,
@@ -96,7 +98,7 @@ impl TrafficFlowDetector {
         });
     }
 
-    /// Sends [`PeerMetricsEvent::TrafficFlows`] event to subscriber.
+    /// Sends [`PeersMetricsEvent::TrafficFlows`] event to subscriber.
     fn send_traffic_flows(
         &self,
         peer_id: PeerId,
@@ -236,9 +238,9 @@ impl RtcStatsHandler for TrafficFlowDetector {
     ///
     /// Notifies [`PeerTrafficWatcher`] about traffic flowing/stopping.
     ///
-    /// May emit [`PeersMetricsEvent::WrongTrafficFlowing`] or
-    /// [`PeersMetricsEvent::TrackTrafficStarted`] if some [`MediaType`]/
-    /// [`Direction`] has stopped.
+    /// May emit [`PeersMetricsEvent::NoTrafficFlow`] or
+    /// [`PeersMetricsEvent::TrafficFlows`] if some [`MediaType`]/`Direction`
+    /// has stopped.
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         if let Some(peer) = self.peers.get(&peer_id) {
             let mut peer_ref = peer.borrow_mut();
@@ -355,6 +357,8 @@ impl RtcStatsHandler for TrafficFlowDetector {
 }
 
 /// Media type of a [`MediaTrack`].
+///
+/// [`MediaTrack`]: crate::media::track::MediaTrack
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 enum TrackMediaType {
     Audio,
@@ -388,26 +392,36 @@ impl PartialEq<MediaType> for TrackMediaType {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 struct PeerTracks {
-    /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
+    /// Count of the [`MediaTrack`]s with the publish direction and
     /// [`MediaType::Audio`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
     audio_send: usize,
 
-    /// Count of the [`MediaTrack`]s with the [`Direction::Publish`] and
+    /// Count of the [`MediaTrack`]s with the publish direction and
     /// [`MediaType::Video`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
     video_send: usize,
 
-    /// Count of the [`MediaTrack`]s with the [`Direction::Play`] and
+    /// Count of the [`MediaTrack`]s with the receive direction and
     /// [`MediaType::Audio`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
     audio_recv: usize,
 
-    /// Count of the [`MediaTrack`]s with the [`Direction::Play`] and
+    /// Count of the [`MediaTrack`]s with the receive direction and
     /// [`MediaType::Video`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
     video_recv: usize,
 }
 
 impl PeerTracks {
     /// Returns count of [`MediaTrack`]s by provided [`TrackMediaType`] and
     /// [`MediaDirection`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
     fn get_by_kind(
         &self,
         kind: TrackMediaType,
@@ -475,7 +489,7 @@ struct Recv {
     packets_received: u64,
 }
 
-/// Metrics of the `MediaTrack` with [`SendDir`] or [`RecvDir`] state.
+/// Metrics of the `MediaTrack` with [`Send`] or [`Recv`] state.
 #[derive(Debug)]
 struct TrackStat<T> {
     /// Last time when this [`TrackStat`] was updated.
@@ -504,7 +518,7 @@ impl<T> TrackStat<T> {
 impl TrackStat<Send> {
     /// Updates this [`TrackStat`] with provided [`RtcOutboundRtpStreamStats`].
     ///
-    /// [`TrackStat::last_update`] time will be updated.
+    /// [`TrackStat::updated_at`] time will be updated.
     fn update(&mut self, upd: &RtcOutboundRtpStreamStats) {
         self.updated_at = Instant::now();
         self.direction.packets_sent = upd.packets_sent;
@@ -514,7 +528,7 @@ impl TrackStat<Send> {
 impl TrackStat<Recv> {
     /// Updates this [`TrackStat`] with provided [`RtcInboundRtpStreamStats`].
     ///
-    /// [`TrackStat::last_update`] time will be updated.
+    /// [`TrackStat::updated_at`] time will be updated.
     fn update(&mut self, upd: &RtcInboundRtpStreamStats) {
         self.updated_at = Instant::now();
         self.direction.packets_received = upd.packets_received;
@@ -553,6 +567,8 @@ struct PeerStat {
     peer_id: PeerId,
 
     /// [`MemberId`] of the [`Member`] which owns this [`Peer`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     member_id: MemberId,
 
     /// Weak reference to a [`PeerStat`] which represents a partner
@@ -717,7 +733,7 @@ impl PeerStat {
     /// which are currently is stopped.
     ///
     /// This is determined by comparing count of senders/receivers from the
-    /// [`PeerSpec`].
+    /// [`PeerTracks`].
     ///
     /// Also media type of sender/receiver
     /// and activity taken into account.
@@ -792,6 +808,8 @@ impl PeerStat {
     }
 
     /// Returns [`MemberId`] of the partner [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn get_partner_member_id(&self) -> Option<MemberId> {
         self.partner_peer
             .upgrade()
@@ -955,7 +973,7 @@ mod tests {
         traffic_stopped_stream: LocalBoxStream<'static, ()>,
 
         /// Stream to which will [`PeerMetricsService`] will send all his
-        /// [`PeerMetricsEvent`]s.
+        /// [`PeersMetricsEvent`]s.
         peer_events_stream: LocalBoxStream<'static, PeersMetricsEvent>,
 
         /// Actual [`PeerMetricsService`].

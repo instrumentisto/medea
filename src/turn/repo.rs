@@ -10,7 +10,9 @@ use derive_more::{Display, From};
 use failure::Fail;
 use redis::{IntoConnectionInfo, RedisError};
 
-use crate::{log::prelude::*, media::IceUser};
+use crate::log::prelude::*;
+
+use super::IceUser;
 
 #[derive(Debug, Display, Fail, From)]
 pub enum TurnDatabaseErr {

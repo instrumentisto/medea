@@ -33,17 +33,19 @@ struct Inner {
     /// [`RpcTransport`] which heartbeats.
     transport: Rc<dyn RpcTransport>,
 
-    /// Idle timeout of [`WebSocketRpcClient`].
+    /// Idle timeout of [`RpcTransport`].
     idle_timeout: IdleTimeout,
 
-    /// Ping interval of [`WebSocketRpcClient`].
+    /// Ping interval of [`RpcTransport`].
     ping_interval: PingInterval,
 
-    /// [`Abort`] for [`Future`] which sends [`ClientMsg::Pong`] on
+    /// [`TaskHandle`] for [`Future`] which sends [`ClientMsg::Pong`] on
     /// [`ServerMsg::Ping`].
+    ///
+    /// [`Future`]: std::future::Future
     handle_ping_task: Option<TaskHandle>,
 
-    /// [`Abort`] for idle watchdog.
+    /// [`TaskHandle`] for idle watchdog.
     idle_watchdog_task: Option<TaskHandle>,
 
     /// Number of last received [`ServerMsg::Ping`].
@@ -56,7 +58,7 @@ struct Inner {
 impl Inner {
     /// Sends [`ClientMsg::Pong`] to a server.
     ///
-    /// If some error happen then it will be printed with [`console_error`].
+    /// If some error happen then it will be printed with [`log::error`].
     fn send_pong(&self, n: u32) {
         self.transport
             .send(&ClientMsg::Pong(n))

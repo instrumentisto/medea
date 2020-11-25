@@ -31,7 +31,9 @@ impl CommandHandler for Room {
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
     /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`Stable`] and will
-    /// be changed to [`WaitLocalHaveRemote`].
+    /// be changed to [`WaitLocalSdp`].
+    ///
+    /// [`Stable`]: crate::media::peer::Stable
     fn on_make_sdp_offer(
         &mut self,
         from_peer_id: PeerId,
@@ -80,9 +82,11 @@ impl CommandHandler for Room {
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
-    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
+    /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
     /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
     /// be changed to [`Stable`].
+    ///
+    /// [`Stable`]: crate::media::peer::Stable
     fn on_make_sdp_answer(
         &mut self,
         from_peer_id: PeerId,
@@ -115,6 +119,8 @@ impl CommandHandler for Room {
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
     /// Both [`Peer`]s may have any state except [`Stable`].
+    ///
+    /// [`Stable`]: crate::media::peer::Stable
     fn on_set_ice_candidate(
         &mut self,
         from_peer_id: PeerId,
@@ -144,6 +150,8 @@ impl CommandHandler for Room {
     ///
     /// Passes [`PeerMetrics::RtcStats`] to [`PeersService`] for the further
     /// analysis.
+    ///
+    /// [`PeersService`]: crate::signalling::peers::PeersService
     fn on_add_peer_connection_metrics(
         &mut self,
         peer_id: PeerId,

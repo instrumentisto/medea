@@ -14,7 +14,7 @@ use medea_coturn_telnet_client::{
     CoturnTelnetError,
 };
 
-use crate::media::IceUser;
+use super::IceUser;
 
 /// Possible errors returned by [`CoturnTelnetClient`].
 #[derive(Display, Debug, Fail, From)]

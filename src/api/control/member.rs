@@ -29,7 +29,7 @@ const CREDENTIALS_LEN: usize = 32;
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum MemberElement {
@@ -191,8 +191,9 @@ impl MemberSpec {
 ///
 /// This credentials will be generated if in dynamic [Control API] spec not
 /// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
-/// [`MemberProto`] implemented for [`MemberSpec`].
+/// [`proto::Member`] implemented for [`MemberSpec`].
 ///
+/// [`Member`]: crate::signalling::elements::Member
 /// [Control API]: https://tinyurl.com/yxsqplq7
 fn generate_member_credentials() -> Credential {
     rand::thread_rng()
@@ -211,6 +212,7 @@ impl TryFrom<proto::Member> for MemberSpec {
             member_id: &str,
             field: &'static str,
         ) -> Result<Option<Duration>, TryFromProtobufError> {
+            #[allow(clippy::map_err_ignore)]
             duration.map(TryInto::try_into).transpose().map_err(|_| {
                 TryFromProtobufError::NegativeDuration(member_id.into(), field)
             })

@@ -19,8 +19,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, RecvConstraints,
     },
     peer::{
-        transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
-        TransceiverDirection,
+        LocalStreamUpdateCriteria, PeerEvent, Transceiver, TransceiverDirection,
     },
     utils::{JasonError, JsCaused, JsError},
 };
@@ -47,8 +46,8 @@ pub trait TransceiverSide: Disableable {
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn mid(&self) -> Option<String>;
 
-    /// Returns `true` if this [`TransceiverKind`] currently can be
-    /// disabled/enabled without [`LocalMediaStreamConstraints`] updating.
+    /// Returns `true` if this [`TransceiverSide`] currently can be
+    /// disabled/enabled without [`LocalTracksConstraints`] updating.
     fn is_transitable(&self) -> bool;
 }
 
@@ -85,12 +84,6 @@ pub trait Disableable {
         Ok(())
     }
 
-    /// Cancels [`media_exchange_state::State`] transition.
-    #[inline]
-    fn cancel_transition(&self) {
-        self.media_exchange_state_controller().cancel_transition()
-    }
-
     /// Returns [`Future`] which will be resolved when
     /// [`media_exchange_state::State`] of this [`Disableable`] will be
     /// [`media_exchange_state::State::Stable`] or it is dropped.
@@ -100,6 +93,8 @@ pub trait Disableable {
     /// [`MediaConnectionsError::MediaExchangeStateTransitsIntoOppositeState`]
     /// is returned if [`media_exchange_state::State`] transits into the
     /// opposite to the `desired_state`.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     fn when_media_exchange_state_stable(
         &self,
@@ -126,6 +121,7 @@ pub trait Disableable {
     /// Indicates whether media exchange state of the [`Disableable`] is in
     /// [`media_exchange_state::Stable::Disabled`].
     #[inline]
+    #[cfg(feature = "mockable")]
     fn disabled(&self) -> bool {
         self.media_exchange_state_controller().disabled()
     }
@@ -166,6 +162,8 @@ pub enum MediaConnectionsError {
     CouldNotInsertRemoteTrack(String),
 
     /// Could not find [`RtcRtpTransceiver`] by `mid`.
+    ///
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
     TransceiverNotFound(String),
 
@@ -177,12 +175,13 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
 
-    /// Occurs when inserted [`PeerMediaStream`] dont have all necessary
-    /// [`MediaStreamTrack`]s.
-    #[display(fmt = "Provided stream does not have all necessary Tracks")]
+    /// Occurs when not enough [`MediaStreamTrack`]s are inserted into senders.
+    #[display(
+        fmt = "Provided stream does not have all necessary MediaStreamTracks"
+    )]
     InvalidMediaTracks,
 
-    /// Occurs when [`MediaStreamTrack`] of inserted [`PeerMediaStream`] does
+    /// Occurs when [`MediaStreamTrack`] of inserted `MediaStream` does
     /// not satisfy [`Sender`] constraints.
     #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
@@ -197,7 +196,7 @@ pub enum MediaConnectionsError {
                      expected MediaExchangeState")]
     MediaExchangeStateTransitsIntoOppositeState,
 
-    /// Invalid [`medea_client_api_proto::TrackPatch`] for
+    /// Invalid [`medea_client_api_proto::TrackPatchEvent`] for
     /// [`MediaStreamTrack`].
     #[display(fmt = "Invalid TrackPatch for Track with {} ID.", _0)]
     InvalidTrackPatch(TrackId),
@@ -333,9 +332,9 @@ impl MediaConnections {
         )
     }
 
-    /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
-    /// provided [`media_exchange_state::State`].
+    /// Indicates whether all [`TransceiverSide`]s with provided [`MediaKind`],
+    /// [`TrackDirection`] and [`MediaSourceKind`] is in the provided
+    /// [`media_exchange_state::State`].
     pub fn is_all_tracks_in_media_exchange_state(
         &self,
         kind: MediaKind,
@@ -362,26 +361,6 @@ impl MediaConnections {
         true
     }
 
-    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Video`] are
-    /// enabled or `false` otherwise.
-    pub fn is_recv_video_enabled(&self) -> bool {
-        self.0
-            .borrow()
-            .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.disabled())
-            .is_none()
-    }
-
-    /// Returns `true` if all [`Receiver`]s with [`MediaKind::Audio`] are
-    /// enabled or `false` otherwise.
-    pub fn is_recv_audio_enabled(&self) -> bool {
-        self.0
-            .borrow()
-            .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.disabled())
-            .is_none()
-    }
-
     /// Returns mapping from a [`MediaStreamTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     ///
@@ -393,6 +372,7 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
@@ -456,7 +436,7 @@ impl MediaConnections {
             })
     }
 
-    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`proto::Track`].
     ///
     /// # Errors
     ///
@@ -521,7 +501,7 @@ impl MediaConnections {
     }
 
     /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
-    /// with [`proto::TrackPatch`].
+    /// with [`proto::TrackPatchEvent`].
     ///
     /// Returns [`MediaKind`] and [`MediaSourceKind`] for which local media
     /// stream should be updated.
@@ -529,7 +509,8 @@ impl MediaConnections {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`MediaStreamTrack`] with ID from [`proto::TrackPatch`] doesn't exist.
+    /// [`MediaStreamTrack`] with ID from [`proto::TrackPatchEvent`] doesn't
+    /// exist.
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
@@ -596,6 +577,7 @@ impl MediaConnections {
     /// [`MediaStreamTrack`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
+    /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
@@ -674,7 +656,7 @@ impl MediaConnections {
         ))
     }
 
-    /// Iterates over all [`Receivers`] with [`mid`] and without
+    /// Iterates over all [`Receiver`]s with [`mid`] and without
     /// [`Transceiver`], trying to find the corresponding [`Transceiver`] in
     /// [`RtcPeerConnection`] and to insert it into the [`Receiver`].
     ///
@@ -734,6 +716,26 @@ impl MediaConnections {
 
 #[cfg(feature = "mockable")]
 impl MediaConnections {
+    /// Indicates whether all [`Receiver`]s with [`MediaKind::Video`] are
+    /// enabled.
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(MediaKind::Video)
+            .find(|s| s.disabled())
+            .is_none()
+    }
+
+    /// Indicates whether if all [`Receiver`]s with [`MediaKind::Audio`] are
+    /// enabled.
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.0
+            .borrow()
+            .iter_receivers_with_kind(MediaKind::Audio)
+            .find(|s| s.disabled())
+            .is_none()
+    }
+
     /// Returns [`Receiver`] with the provided [`TrackId`].
     pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
         self.0.borrow().receivers.get(&id).cloned()

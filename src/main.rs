@@ -1,7 +1,5 @@
 //! Medea media server application.
 
-use std::collections::HashMap;
-
 use actix::{Actor, Arbiter, System};
 use failure::Error;
 use futures::FutureExt as _;
@@ -10,7 +8,7 @@ use medea::{
     conf::Conf,
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
-    signalling::{room_repo::RoomRepository, room_service::RoomService},
+    signalling::{RoomRepository, RoomService},
     turn::new_turn_auth_service,
     AppContext,
 };
@@ -37,7 +35,7 @@ fn main() -> Result<(), Error> {
                 GracefulShutdown::new(config.shutdown.timeout).start();
             let app_context = AppContext::new(config.clone(), turn_service);
 
-            let room_repo = RoomRepository::new(HashMap::new());
+            let room_repo = RoomRepository::new();
             let room_service = RoomService::new(
                 room_repo.clone(),
                 app_context.clone(),

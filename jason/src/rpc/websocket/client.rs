@@ -81,7 +81,7 @@ impl From<ClientDisconnect> for CloseReason {
 
 /// State of [`WebSocketRpcClient`] and [`RpcTransport`].
 #[derive(Clone, Debug, PartialEq)]
-enum ClientState {
+pub enum ClientState {
     /// [`WebSocketRpcClient`] is currently establishing a connection to RPC
     /// server.
     Connecting,
@@ -93,9 +93,9 @@ enum ClientState {
     Closed(ClosedStateReason),
 }
 
-/// Inner state of [`WebsocketRpcClient`].
+/// Inner state of [`WebSocketRpcClient`].
 struct Inner {
-    /// [`WebSocket`] connection to a remote media server.
+    /// Transport connection with remote media server.
     sock: Option<Rc<dyn RpcTransport>>,
 
     /// Connection loss detector via ping/pong mechanism.
@@ -104,19 +104,17 @@ struct Inner {
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<RpcEvent>>,
 
-    /// [`oneshot::Sender`] with which [`CloseReason`] will be sent once
-    /// [`WebSocket`] connection is normally closed by server.
-    ///
-    /// Note, that [`CloseReason`] won't be sent if [`WebSocket`] closed with
-    /// [`RpcConnectionCloseReason::NewConnection`] reason.
+    /// Subscribers that will be notified with [`CloseReason`] when underlying
+    /// transport is gracefully closed.
     on_close_subscribers: Vec<oneshot::Sender<CloseReason>>,
 
-    /// Reason of [`WebsocketRpcClient`] closing.
+    /// Reason of [`WebSocketRpcClient`] closing.
     ///
     /// This reason will be provided to the underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Senders for [`WebSocketRpcClient::on_connection_loss`] subscribers.
+    /// Subscribers that will be notified when underlying transport connection
+    /// is lost.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
     /// Closure which will create new [`RpcTransport`]s for this
@@ -130,7 +128,7 @@ struct Inner {
     /// a sever.
     url: Option<ApiUrl>,
 
-    /// Current [`State`] of this [`WebSocketRpcClient`].
+    /// Current [`ClientState`] of this [`WebSocketRpcClient`].
     state: ObservableCell<ClientState>,
 }
 
@@ -146,7 +144,7 @@ pub type RpcTransportFactory = Box<
 >;
 
 impl Inner {
-    /// Instantiates new [`Inner`] state of [`WebsocketRpcClient`].
+    /// Instantiates new [`Inner`] state of [`WebSocketRpcClient`].
     fn new(rpc_transport_factory: RpcTransportFactory) -> RefCell<Self> {
         RefCell::new(Self {
             sock: None,
@@ -367,7 +365,7 @@ impl WebSocketRpcClient {
         Ok(())
     }
 
-    /// Tries to establish [`RpcClient`] connection.
+    /// Tries to establish [`WebSocketRpcClient`] connection.
     async fn establish_connection(
         self: Rc<Self>,
         url: ApiUrl,
@@ -441,10 +439,12 @@ impl WebSocketRpcClient {
         Ok(())
     }
 
-    /// Subscribes to [`RpcClient`]'s [`State`] changes and when
-    /// [`State::Connecting`] will be changed to something else, then this
-    /// [`Future`] will be resolved and based on new [`State`] [`Result`]
+    /// Subscribes to [`WebSocketRpcClient`]'s [`ClientState`] changes and when
+    /// [`ClientState::Connecting`] will be changed to something else, then this
+    /// [`Future`] will be resolved and based on new [`ClientState`] [`Result`]
     /// will be returned.
+    ///
+    /// [`Future`]: std::future::Future
     async fn connecting_result(&self) -> Result<(), Traced<RpcClientError>> {
         let mut state_changes = self.0.borrow().state.subscribe();
         while let Some(state) = state_changes.next().await {
@@ -463,7 +463,7 @@ impl WebSocketRpcClient {
         Err(tracerr::new!(RpcClientError::RpcClientGone))
     }
 
-    /// Updates RPC settings of this [`RpcClient`].
+    /// Updates RPC settings of this [`WebSocketRpcClient`].
     fn update_settings(
         &self,
         idle_timeout: IdleTimeout,
@@ -479,20 +479,21 @@ impl WebSocketRpcClient {
             })
     }
 
-    /// Tries to upgrade [`State`] of this [`RpcClient`] to [`State::Open`].
+    /// Tries to upgrade [`ClientState`] of this [`WebSocketRpcClient`] to
+    /// [`ClientState::Open`].
     ///
-    /// This function is also used for reconnecting this [`RpcClient`].
+    /// This function is also used for reconnecting this [`WebSocketRpcClient`].
     ///
-    /// If [`RpcClient`] is closed than this function will try to establish
-    /// new RPC connection.
+    /// If [`WebSocketRpcClient`] is closed than this function will try to
+    /// establish new RPC connection.
     ///
-    /// If [`RpcClient`] already in [`State::Connecting`] then this function
-    /// will not perform one more connection try. It will subscribe to [`State`]
-    /// changes and wait for first connection result, and, based on this result,
-    /// this function will be resolved.
+    /// If [`WebSocketRpcClient`] already in [`ClientState::Connecting`] then
+    /// this function will not perform one more connection try. It will
+    /// subscribe to [`ClientState`] changes and wait for first connection
+    /// result, and, based on this result, this function will be resolved.
     ///
-    /// If [`RpcClient`] already in [`State::Open`] then this function will be
-    /// instantly resolved.
+    /// If [`WebSocketRpcClient`] already in [`ClientState::Open`] then this
+    /// function will be instantly resolved.
     ///
     /// # Errors
     ///
@@ -544,7 +545,7 @@ impl WebSocketRpcClient {
     /// closing.
     ///
     /// This [`Future`] wouldn't be resolved on abnormal closes.
-    /// An [`RpcClient::on_connection_loss`] will be thrown instead.
+    /// An [`WebSocketRpcClient::on_connection_loss`] will be thrown instead.
     ///
     /// [`Future`]: std::future::Future
     pub fn on_normal_close(
@@ -561,6 +562,7 @@ impl WebSocketRpcClient {
     /// connection loss, JS side user should select reconnection strategy with
     /// [`ReconnectHandle`] (or simply close [`Room`]).
     ///
+    /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
     /// [`Room`]: crate::api::Room
     /// [`Stream`]: futures::Stream
     pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {

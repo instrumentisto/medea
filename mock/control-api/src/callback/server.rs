@@ -22,9 +22,9 @@ type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
 /// [`Actor`] wrapper for [`tonic`] gRPC server.
 ///
 /// Also this [`Actor`] can return all received callbacks
-/// with [`GetCallbacks`] [`Message`].
+/// with [`GetCallbackItems`] [`Message`].
 pub struct GrpcCallbackServer {
-    /// All [`Callback`]s which this server received.
+    /// All [`CallbackItem`]s which this server received.
     events: CallbackItems,
 }
 
@@ -35,7 +35,7 @@ impl Actor for GrpcCallbackServer {
 /// Implementation for [`CallbackService`] gRPC service.
 #[derive(Clone)]
 pub struct GrpcCallbackService {
-    /// All [`Callback`]s which this server received.
+    /// All [`CallbackItem`]s which this server received.
     events: CallbackItems,
 }
 
@@ -60,7 +60,7 @@ impl CallbackService for GrpcCallbackService {
     }
 }
 
-/// [`Message`] which returns all [`Callback`]s received by this
+/// [`Message`] which returns all [`CallbackItem`]s received by this
 /// [`GrpcCallbackServer`].
 #[derive(Message)]
 #[rtype(result = "Result<Vec<CallbackItem>, ()>")]

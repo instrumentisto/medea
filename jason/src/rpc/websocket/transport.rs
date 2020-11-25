@@ -36,7 +36,7 @@ pub trait RpcTransport {
     /// Errors if sending [`ClientMsg`] fails.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
-    /// Subscribes to a [`RpcTransport`]'s [`State`] changes.
+    /// Subscribes to a [`RpcTransport`]'s [`TransportState`] changes.
     fn on_state_change(&self) -> LocalBoxStream<'static, TransportState>;
 }
 
@@ -58,7 +58,7 @@ pub enum TransportError {
     #[display(fmt = "Failed to parse client message: {}", _0)]
     ParseClientMessage(JsonParseError),
 
-    /// Occurs when [`ServerMessage`] cannot be parsed.
+    /// Occurs when [`ServerMsg`] cannot be parsed.
     #[display(fmt = "Failed to parse server message: {}", _0)]
     ParseServerMessage(JsonParseError),
 
@@ -136,8 +136,8 @@ pub enum TransportState {
     ///
     /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`][1].
     ///
-    /// [`ClosedStateReason`] is the reason of why [`RpcTransport`] went into
-    /// this [`State`].
+    /// [`CloseMsg`] is the reason of why [`RpcTransport`] went into
+    /// this [`TransportState`].
     ///
     /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Closed(CloseMsg),
@@ -158,7 +158,7 @@ struct InnerSocket {
     /// [WebSocket]: https://developer.mozilla.org/docs/Web/API/WebSocket
     socket: Rc<SysWebSocket>,
 
-    /// State of [`WebSocketTransport`] connection.
+    /// State of [`WebSocketRpcTransport`] connection.
     socket_state: ObservableCell<TransportState>,
 
     /// Listener for [WebSocket] [open event][1].
@@ -227,10 +227,7 @@ impl Drop for InnerSocket {
 /// implementation.
 ///
 /// If you're adding new cyclic dependencies, then don't forget to drop them in
-/// the [`Drop`] implementation and mention in the list below:
-/// 1. [`InnerSocket::on_close_listener`]
-/// 2. [`InnerSocket::on_message_listener`]
-/// 3. [`InnerSocket::on_open_listener`]
+/// the [`Drop`].
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl WebSocketRpcTransport {
@@ -298,9 +295,8 @@ impl WebSocketRpcTransport {
         }
     }
 
-    /// Sets [`WebSocketRpcTransport::on_close_listener`] which will update
-    /// [`RpcTransport`]'s [`State`] to [`State::Closed`] with a
-    /// [`ClosedStateReason::ConnectionLoss`].
+    /// Sets [`InnerSocket::on_close_listener`] which will update
+    /// [`RpcTransport`]'s [`TransportState`] to [`TransportState::Closed`].
     fn set_on_close_listener(&self) -> Result<()> {
         let this = Rc::clone(&self.0);
         let on_close = EventListener::new_once(
@@ -318,7 +314,7 @@ impl WebSocketRpcTransport {
         Ok(())
     }
 
-    /// Sets [`WebSocketRpcTransport::on_message_listener`] which will send
+    /// Sets [`InnerSocket::on_message_listener`] which will send
     /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subscribers.
     fn set_on_message_listener(&self) -> Result<()> {
         let this = Rc::clone(&self.0);

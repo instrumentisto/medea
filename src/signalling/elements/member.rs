@@ -69,6 +69,8 @@ pub struct Member(Rc<RefCell<MemberInner>>);
 #[derive(Debug)]
 struct MemberInner {
     /// [`RoomId`] of [`Room`] to which this [`Member`] relates.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     room_id: RoomId,
 
     /// ID of this [`Member`].

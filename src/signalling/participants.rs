@@ -3,7 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 //!
-//! [`Member`]: crate::signalling::elements::member::Member
+//! [`Member`]: crate::signalling::elements::Member
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
@@ -79,7 +79,7 @@ pub struct ParticipantService {
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     connections: HashMap<MemberId, Box<dyn RpcConnection>>,
@@ -101,7 +101,7 @@ impl ParticipantService {
     ///
     /// # Errors
     ///
-    /// Errors with [`MemberLoadError`] if [`RoomSpec`] transformation fails.
+    /// Errors with [`MembersLoadError`] if [`RoomSpec`] transformation fails.
     pub fn new(
         room_spec: &RoomSpec,
         context: &AppContext,
@@ -176,6 +176,7 @@ impl ParticipantService {
         member_id: &MemberId,
         credentials: &Credential,
     ) -> Result<Member, RoomError> {
+        #[allow(clippy::map_err_ignore)]
         let member = self
             .get_member_by_id(member_id)
             .map_err(|_| RoomError::AuthorizationError)?;
@@ -197,7 +198,7 @@ impl ParticipantService {
     /// # Errors
     ///
     /// Errors with [`RoomError::ConnectionNotExists`] if unable to find
-    /// [`Connection`] with specified [`Member`].
+    /// [`RpcConnection`] with specified [`Member`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
@@ -307,6 +308,8 @@ impl ParticipantService {
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
     /// deletes all [`IceUser`]s.
+    ///
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
@@ -372,7 +375,7 @@ impl ParticipantService {
     }
 
     /// Returns [`Iterator`] over [`MemberId`] and [`Member`] which this
-    /// [`ParticipantRepository`] stores.
+    /// [`ParticipantService`] stores.
     pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
         self.members.iter()
     }
