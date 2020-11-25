@@ -1198,11 +1198,10 @@ impl EventHandler for InnerRoom {
     }
 
     /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
-    /// [`Connection::update_quality_score`].
+    /// [`Connection::update_quality_score`][1].
     ///
     /// [`Connection`]: crate::api::Connection
-    /// [`Connection::update_quality_score`]:
-    /// crate::api::Connection::update_quality_score
+    /// [1]: crate::api::Connection::update_quality_score
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,

@@ -97,13 +97,8 @@ impl LocalTracksConstraints {
         self.0.borrow().clone()
     }
 
-    /// Enables or disables (mutes or unmutes) audio or video type in underlying
-    /// [`MediaStreamSettings`].
-    ///
-    /// Doesn't do anything if no [`MediaStreamSettings`] was set.
-    ///
-    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
-    /// of media won't be published.
+    /// Changes underlying [`MediaStreamSettings`] based on provided
+    /// [`MediaState`].
     #[inline]
     pub fn set_media_state(
         &self,
