@@ -44,7 +44,7 @@ impl Transceiver {
         self.current_direction().contains(direction)
     }
 
-    /// Replaces [`TransceiverDirection::SEND`] [`SysMediaStreamTrack`] of this
+    /// Replaces [`TransceiverDirection::SEND`] [`local::Track`] of this
     /// [`Transceiver`].
     ///
     /// # Errors

@@ -51,7 +51,10 @@ pub struct Repository {
 
     /// [`TaskHandle`] for a task which will call
     /// [`PeerConnection::send_peer_stats`] of all [`PeerConnection`]s
-    /// every second and send updated [`RtcStat`]s to the server.
+    /// every second and send updated [`PeerMetrics::RtcStats`] to the server.
+    ///
+    /// [`PeerMetrics::RtcStats`]:
+    /// medea_client_api_proto::PeerMetrics::RtcStats
     stats_scrape_task: Option<TaskHandle>,
 }
 
@@ -70,8 +73,10 @@ impl Repository {
     }
 
     /// Schedules task which will call [`PeerConnection::send_peer_stats`] of
-    /// all [`PeerConnection`]s every second and send updated [`RtcStat`]s
+    /// all [`PeerConnection`]s every second and send updated [`RtcStats`]
     /// to the server.
+    ///
+    /// [`RtcStats`]: crate::peer::RtcStats
     fn schedule_peers_stats_scrape(&mut self) {
         let peers = self.peers.clone();
         let (fut, abort) = future::abortable(async move {

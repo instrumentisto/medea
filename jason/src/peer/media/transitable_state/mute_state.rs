@@ -6,9 +6,13 @@ use super::{InStable, InTransition};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Stable {
     /// [`MediaStateControllable`] is muted.
+    ///
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Muted,
 
     /// [`MediaStateControllable`] is unmuted.
+    ///
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Unmuted,
 }
 
@@ -45,26 +49,26 @@ impl InStable for Stable {
     }
 }
 
-/// [`MuteState`] in transition to another
-/// [`Stable`].
+/// [`MuteState`] in transition to another [`Stable`].
 ///
-/// [`Stable`] which is stored in
-/// [`Transition`] variants is a state which we already have,
-/// but we still waiting for a desired state update. If desired state update
-/// won't be received, then the stored [`Stable`] will be
+/// [`Stable`] which is stored in [`Transition`] variants is a state which we
+/// already have, but we still waiting for a desired state update. If desired
+/// state update won't be received, then the stored [`Stable`] will be
 /// applied.
+///
+/// [`MuteState`]: super::MuteState
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Transition {
     /// [`MediaStateControllable`] should be muted, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: super::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Muting(Stable),
 
     /// [`MediaStateControllable`] should be unmuted, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: super::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Unmuting(Stable),
 }
 

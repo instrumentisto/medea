@@ -26,7 +26,9 @@ pub use self::{
     backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
     reconnect_handle::ReconnectHandle,
-    rpc_session::{RpcSession, SessionError, WebSocketRpcSession},
+    rpc_session::{
+        RpcSession, SessionError, SessionState, WebSocketRpcSession,
+    },
     websocket::{
         ClientDisconnect, RpcTransport, TransportError, WebSocketRpcClient,
         WebSocketRpcTransport,
@@ -150,7 +152,7 @@ pub enum CloseReason {
 }
 
 /// The reason of why [`WebSocketRpcClient`]/[`RpcTransport`] went into
-/// [`State::Closed`].
+/// closed state.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClosedStateReason {
     /// Connection with server was lost.
@@ -159,16 +161,14 @@ pub enum ClosedStateReason {
     /// Error while creating connection between client and server.
     ConnectionFailed(TransportError),
 
-    /// [`State`] unexpectedly become [`State::Closed`].
-    ///
-    /// Considered that this [`ClosedStateReason`] will be never provided.
-    Unknown,
-
     /// Indicates that connection with server has never been established.
     NeverConnected,
 
     /// First received [`ServerMsg`] after [`WebSocketRpcClient::connect`] is
-    /// not [`ServerMsg::RpcSettings`].
+    /// not [`ServerMsg::RpcSettings`][1].
+    ///
+    /// [`ServerMsg`]: medea_client_api_proto::ServerMsg
+    /// [1]: medea_client_api_proto::ServerMsg::RpcSettings
     FirstServerMsgIsNotRpcSettings,
 
     /// Connection has been inactive for a while and thus considered idle
@@ -191,9 +191,10 @@ pub enum RpcClientError {
     #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
     NoSocket,
 
-    /// Occurs if [`Weak`] pointer to the [`RpcClient`] can't be upgraded to
-    /// [`Rc`].
+    /// Occurs if [`Weak`] pointer to the [`WebSocketRpcClient`] can't be
+    /// upgraded to [`Rc`].
     ///
+    /// [`Rc`]: std::rc::Rc
     /// [`Weak`]: std::rc::Weak
     #[display(fmt = "RpcClient unexpectedly gone.")]
     RpcClientGone,

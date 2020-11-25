@@ -4,6 +4,8 @@
 //!
 //! [Medea]: https://github.com/instrumentisto/medea
 
+#![deny(broken_intra_doc_links)]
+
 mod dispatchable;
 mod enum_delegate;
 mod js_caused;

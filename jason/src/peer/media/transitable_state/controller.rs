@@ -1,4 +1,4 @@
-//! Component that manages [`MediaExchangeState`].
+//! Component that manages [`TransitableState`].
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
@@ -27,7 +27,7 @@ pub type MediaExchangeStateController = TransitableStateController<
     media_exchange_state::Transition,
 >;
 
-/// Component that manages all kinds of [`MediaState`].
+/// Component that manages all kinds of [`TransitableState`].
 pub struct TransitableStateController<S, T> {
     /// Actual [`TransitableState`].
     state: ObservableCell<TransitableState<S, T>>,
@@ -127,14 +127,12 @@ where
         self.state.set(current_state.transition_to(desired_state));
     }
 
-    /// Returns [`Future`] which will be resolved when [`InStable`] state of
-    /// this [`TransitableStateController`] will be
-    /// [`TransitableState::Stable`] or the
-    /// [`TransitableStateController`] is dropped.
+    /// Returns [`Future`] which will be resolved when state of this
+    /// [`TransitableStateController`] will be [`TransitableState::Stable`] or
+    /// the [`TransitableStateController`] is dropped.
     ///
-    /// Succeeds if [`TransitableStateController`]'s [`InStable`] state
-    /// transits into the `desired_state` or the
-    /// [`TransitableStateController`] is dropped.
+    /// Succeeds if [`TransitableStateController`]'s state transits into the
+    /// `desired_state` or the [`TransitableStateController`] is dropped.
     ///
     /// # Errors
     ///
@@ -142,6 +140,9 @@ where
     /// is returned if [`TransitableStateController`]'s
     /// [`MediaState`] transits into the opposite to the
     /// `desired_state`.
+    ///
+    /// [`Future`]: futures::future::Future
+    /// [`MediaState`]: super::MediaState
     pub fn when_media_state_stable(
         &self,
         desired_state: S,

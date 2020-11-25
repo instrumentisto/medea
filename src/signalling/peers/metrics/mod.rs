@@ -1,13 +1,15 @@
 //! Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
 //!
-//! 1. You should register [`Peer`] via [`PeersMetricsService::register_peer`].
-//! 2. Use [`PeersMetricsService::subscribe`] to subscribe to stats processing
+//! 1. You should register [`Peer`] via [`RtcStatsHandler::register_peer`].
+//! 2. Use [`RtcStatsHandler::subscribe`] to subscribe to stats processing
 //!    results.
-//! 3. Provide [`Peer`]'s metrics to [`PeersMetricsService::add_stats`].
-//! 4. Call [`PeersMetricsService::check_peers`] with reasonable interval
+//! 3. Provide [`Peer`]'s metrics to [`RtcStatsHandler::add_stats`].
+//! 4. Call [`RtcStatsHandler::check`] with reasonable interval
 //!    (~1-2 sec), to check for stale metrics.
 //!
 //! Stores [`RtcStatsHandler`]s implementors.
+//!
+//! [`Peer`]: crate::media::peer::Peer
 
 mod connection_failure_detector;
 mod flowing_detector;
@@ -39,11 +41,11 @@ use crate::{
     },
 };
 
-/// WebRTC statistics analysis results emitted by [`PeersMetricsService`].
+/// WebRTC statistics analysis results.
 #[dispatchable]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PeersMetricsEvent {
-    /// Some `MediaTrack`s with provided [`TrackMediaType`] doesn't flows.
+    /// Some `MediaTrack`s with provided [`MediaType`] doesn't flows.
     NoTrafficFlow {
         peer_id: PeerId,
         was_flowing_at: DateTime<Utc>,
@@ -63,9 +65,13 @@ pub enum PeersMetricsEvent {
     QualityMeterUpdate {
         /// [`MemberId`] of the [`Peer`] which [`ConnectionQualityScore`]
         /// was updated.
+        ///
+        /// [`Peer`]: crate::media::peer::Peer
         member_id: MemberId,
 
         /// [`MemberId`] of the partner [`Peer`].
+        ///
+        /// [`Peer`]: crate::media::peer::Peer
         partner_member_id: MemberId,
 
         /// Actual [`ConnectionQualityScore`].
@@ -88,6 +94,8 @@ pub trait RtcStatsHandler: Debug {
     fn register_peer(&mut self, peer_id: &PeerStateMachine);
 
     /// [`RtcStatsHandler`] should stop tracking provided [`Peer`]s.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     fn unregister_peers(&mut self, peers_ids: &[PeerId]);
 
     /// [`RtcStatsHandler`] can update [`PeerStateMachine`]s internal
@@ -98,7 +106,7 @@ pub trait RtcStatsHandler: Debug {
     fn update_peer(&mut self, peer: &PeerStateMachine);
 
     /// [`RtcStatsHandler`] can process all collected stats, re-calculate
-    /// metrics and send [`PeerMetricsEvent`] (if it's needed).
+    /// metrics and send [`PeersMetricsEvent`] (if it's needed).
     ///
     /// Will be called periodically by [`PeerMetricsService`].
     fn check(&mut self);
@@ -107,7 +115,7 @@ pub trait RtcStatsHandler: Debug {
     /// [`RtcStatsHandler`].
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]);
 
-    /// [`PeerMetricService`] provides [`PeerConnectionState`] update for the
+    /// [`PeerMetricsService`] provides [`PeerConnectionState`] update for the
     /// [`RtcStatsHandler`].
     fn update_peer_connection_state(
         &mut self,
@@ -115,11 +123,13 @@ pub trait RtcStatsHandler: Debug {
         state: PeerConnectionState,
     );
 
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
+    /// Returns [`Stream`] of [`PeersMetricsEvent`]s.
     ///
     /// Creating new subscription will invalidate previous, so there may be only
     /// one subscription. Events are not saved or buffered at sending side, so
     /// you won't receive any events happened before subscription was made.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn subscribe(&mut self) -> LocalBoxStream<'static, PeersMetricsEvent>;
 }
 
@@ -127,9 +137,11 @@ pub trait RtcStatsHandler: Debug {
 impl_debug_by_struct_name!(MockRtcStatsHandler);
 
 /// Service which is responsible for processing [`Peer`]s [`RtcStat`] metrics.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug)]
 pub struct PeerMetricsService {
-    /// Sender of the [`PeerMetricsEvent`]s.
+    /// Sender of the [`PeersMetricsEvent`]s.
     event_tx: EventSender,
 
     /// All [`RtcStatsHandler`]s registered in this [`PeerMetricsService`].
@@ -161,15 +173,15 @@ impl PeerMetricsService {
 
 impl RtcStatsHandler for PeerMetricsService {
     /// Calls [`RtcStatsHandler::register_peer`] on all registered
-    /// [`MetricsHandler`]s.
+    /// [`RtcStatsHandler`]s.
     fn register_peer(&mut self, peer: &PeerStateMachine) {
         for handler in &mut self.handlers {
             handler.register_peer(peer);
         }
     }
 
-    /// Calls [`RtcStatsHandler::unregister_peer`] on the all registered
-    /// [`MetricsHandler`]s.
+    /// Calls [`RtcStatsHandler::unregister_peers`] on the all registered
+    /// [`RtcStatsHandler`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         for handler in &mut self.handlers {
             handler.unregister_peers(peers_ids);
@@ -177,7 +189,7 @@ impl RtcStatsHandler for PeerMetricsService {
     }
 
     /// Calls [`RtcStatsHandler::update_peer`] on the all registered
-    /// [`MetricsHandler`]s.
+    /// [`RtcStatsHandler`]s.
     fn update_peer(&mut self, peer: &PeerStateMachine) {
         for handler in &mut self.handlers {
             handler.update_peer(peer);
@@ -185,7 +197,7 @@ impl RtcStatsHandler for PeerMetricsService {
     }
 
     /// Calls [`RtcStatsHandler::check`] on the all registered
-    /// [`MetricsHandler`]s.
+    /// [`RtcStatsHandler`]s.
     fn check(&mut self) {
         for handler in &mut self.handlers {
             handler.check();
@@ -193,7 +205,7 @@ impl RtcStatsHandler for PeerMetricsService {
     }
 
     /// Calls [`RtcStatsHandler::add_stats`] on the all registered
-    /// [`MetricsHandler`]s.
+    /// [`RtcStatsHandler`]s.
     fn add_stats(&mut self, peer_id: PeerId, stats: &[RtcStat]) {
         for handler in &mut self.handlers {
             handler.add_stats(peer_id, stats);
@@ -213,7 +225,7 @@ impl RtcStatsHandler for PeerMetricsService {
     }
 
     /// Calls [`RtcStatsHandler::subscribe`] on the all registered
-    /// [`MetricsHandler`]s returning merged stream.
+    /// [`RtcStatsHandler`]s returning merged stream.
     ///
     /// Creating new subscription will invalidate previous, so there may be only
     /// one subscription. Events are not saved or buffered at sending side, so
@@ -247,11 +259,13 @@ impl EventSender {
         }
     }
 
-    /// Returns [`Stream`] of [`PeerMetricsEvent`]s.
+    /// Returns [`Stream`] of [`PeersMetricsEvent`]s.
     ///
     /// Creating new subscription will invalidate previous, so there may be only
     /// one subscription. Events are not saved or buffered at sending side, so
     /// you won't receive any events happened before subscription was made.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn subscribe(&self) -> LocalBoxStream<'static, PeersMetricsEvent> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().replace(tx);

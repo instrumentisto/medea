@@ -89,13 +89,13 @@ mod peer_state {
 }
 
 /// [`RtcStatsHandler`] responsible for the detecting ICE connection fails and
-/// sending [`PeerMetricEvent::IceRestartNeeded`].
+/// sending [`PeersMetricsEvent::PeerConnectionFailed`].
 #[derive(Debug)]
 pub struct ConnectionFailureDetector {
     /// All [`PeerState`]s registered in this [`ConnectionFailureDetector`].
     peers: HashMap<PeerId, PeerState>,
 
-    /// [`PeerMetricsEvent`]s sender.
+    /// [`PeersMetricsEvent`]s sender.
     event_tx: EventSender,
 }
 
@@ -128,7 +128,7 @@ impl RtcStatsHandler for ConnectionFailureDetector {
         }
     }
 
-    /// Removes [`PeerMetric`]s with the provided [`PeerId`]s.
+    /// Removes [`PeerState`]s with the provided [`PeerId`]s.
     fn unregister_peers(&mut self, peers_ids: &[PeerId]) {
         for peer_id in peers_ids {
             if let Some(peer) = self.peers.remove(peer_id) {
@@ -152,8 +152,8 @@ impl RtcStatsHandler for ConnectionFailureDetector {
     /// Updates [`PeerConnectionState`] in the [`PeerState`] with a provided
     /// [`PeerId`].
     ///
-    /// Sends [`PeerMetricsEvent::IceRestartNeeded`] if [`PeerConnectionState`]
-    /// goes to [`PeerConnectionState::Failed`] from
+    /// Sends [`PeersMetricsEvent::PeerConnectionFailed`] if
+    /// [`PeerConnectionState`] goes to [`PeerConnectionState::Failed`] from
     /// [`PeerConnectionState::Connected`] or
     /// [`PeerConnectionState::Disconnected`].
     fn update_peer_connection_state(

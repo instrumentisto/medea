@@ -7,6 +7,7 @@ mod ice_server;
 mod media;
 mod repo;
 mod stats;
+mod stream_update_criteria;
 mod tracks_request;
 mod transceiver;
 
@@ -47,14 +48,16 @@ pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
         media_exchange_state, mute_state, MediaConnections,
-        MediaConnectionsError, MediaState, MediaStateControllable, Receiver,
-        Sender, TrackDirection, TransceiverSide, TransitableState,
+        MediaConnectionsError, MediaExchangeState,
+        MediaExchangeStateController, MediaState, MediaStateControllable,
+        MuteState, MuteStateController, Receiver, Sender, TrackDirection,
+        TransceiverSide, TransitableState, TransitableStateController,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
-    transceiver::TransceiverDirection,
+    transceiver::{Transceiver, TransceiverDirection},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
@@ -78,7 +81,7 @@ pub enum PeerError {
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or parsing
-    /// [`loca::Track`]s.
+    /// [`local::Track`]s.
     #[display(fmt = "{}", _0)]
     TracksRequest(#[js(cause)] TracksRequestError),
 }
@@ -190,7 +193,7 @@ pub struct PeerConnection {
     /// [`Receiver`]: self::media::Receiver
     media_connections: Rc<MediaConnections>,
 
-    /// [`MediaManager`] that will be used to acquire local [`MediaStream`]s.
+    /// [`MediaManager`] that will be used to acquire [`local::Track`]s.
     media_manager: Rc<MediaManager>,
 
     /// [`PeerEvent`]s tx.
@@ -203,7 +206,7 @@ pub struct PeerConnection {
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 
-    /// Last hashes of the all [`RtcStat`]s which was already sent to the
+    /// Last hashes of the all [`RtcStats`] which was already sent to the
     /// server, so we won't duplicate stats that were already sent.
     ///
     /// Stores precomputed hashes, since we don't need access to actual stats
@@ -213,7 +216,7 @@ pub struct PeerConnection {
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the [`MediaStream`]s received by this
+    /// Constraints to the [`remote::Track`]s received by this
     /// [`PeerConnection`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 }
@@ -323,7 +326,7 @@ impl PeerConnection {
     /// In some cases you might want to stop expiry timers, e.g. when
     /// connection to Medea is temporary lost.
     ///
-    /// This currently affects only [`Senders`] disable/enable transitions.
+    /// This currently affects only [`Sender`]s disable/enable transitions.
     pub fn stop_state_transitions_timers(&self) {
         self.media_connections.stop_state_transitions_timers()
     }
@@ -337,7 +340,7 @@ impl PeerConnection {
     /// In some cases you might want to stop expiry timers, e.g. when
     /// connection to Medea is temporary lost.
     ///
-    /// This currently affects only [`Senders`] disable/enable transitions.
+    /// This currently affects only [`Sender`]s disable/enable transitions.
     pub fn reset_state_transitions_timers(&self) {
         self.media_connections.reset_state_transitions_timers();
     }
@@ -391,22 +394,9 @@ impl PeerConnection {
         };
     }
 
-    /// Returns [`RtcStats`] of this [`PeerConnection`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
-    /// [`RtcStats`].
-    pub async fn get_stats(&self) -> Result<RtcStats> {
-        self.peer
-            .get_stats()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
-    }
-
     /// Returns `true` if all [`TransceiverSide`]s with a provided
     /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in the
-    /// provided [`StableMediaExchangeState`].
+    /// provided [`MediaState`].
     #[inline]
     pub fn is_all_transceiver_sides_in_media_state(
         &self,
@@ -430,15 +420,15 @@ impl PeerConnection {
     }
 
     /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
-    /// [`proto::TrackPatch`].
+    /// [`proto::TrackPatchEvent`].
     ///
-    /// Returns [`MediaKind`]s and [`MediaSourceKinds`] for which local stream
+    /// Returns [`LocalStreamUpdateCriteria`] with which [`local::Track`]s
     /// updating should be started.
     ///
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// provided [`proto::TrackPatch`] contains unknown ID.
+    /// provided [`proto::TrackPatchEvent`] contains unknown ID.
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
@@ -448,11 +438,6 @@ impl PeerConnection {
             .patch_tracks(tracks)
             .await
             .map_err(tracerr::map_from_and_wrap!())?)
-    }
-
-    /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
-    pub fn candidates_buffer_len(&self) -> usize {
-        self.ice_candidates_buffer.borrow().len()
     }
 
     /// Handle `icecandidate` event from underlying peer emitting
@@ -508,16 +493,6 @@ impl PeerConnection {
     /// restart.
     pub fn restart_ice(&self) {
         self.peer.restart_ice();
-    }
-
-    /// Returns `true` if all [`Receiver`]s audio tracks are enabled.
-    pub fn is_recv_audio_enabled(&self) -> bool {
-        self.media_connections.is_recv_audio_enabled()
-    }
-
-    /// Returns `true` if all [`Receiver`]s video tracks are enabled.
-    pub fn is_recv_video_enabled(&self) -> bool {
-        self.media_connections.is_recv_video_enabled()
     }
 
     /// Returns all [`TransceiverSide`]s from this [`PeerConnection`] with
@@ -612,7 +587,7 @@ impl PeerConnection {
         Ok(offer)
     }
 
-    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`].
+    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`proto::Track`].
     ///
     /// # Errors
     ///
@@ -629,7 +604,7 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Updates local [MediaStream][1] being used in [`PeerConnection`]
+    /// Updates [`local::Track`]s being used in [`PeerConnection`]s
     /// [`Sender`]s. [`Sender`]s are chosen based on provided
     /// [`LocalStreamUpdateCriteria`].
     ///
@@ -638,30 +613,31 @@ impl PeerConnection {
     /// there are no senders configured in this [`PeerConnection`], then
     /// this method is no-op.
     ///
-    /// Secondly, make sure that configured [`LocalStreamConstraints`] are up to
+    /// Secondly, make sure that configured [`LocalTracksConstraints`] are up to
     /// date.
     ///
     /// This function requests local stream from [`MediaManager`]. If stream
     /// returned from [`MediaManager`] is considered new, then this function
-    /// will emit [`PeerEvent::NewLocalStream`] event.
+    /// will emit [`PeerEvent::NewLocalTrack`] events.
     ///
     /// Constraints being used when requesting stream from [`MediaManager`] are
     /// a result of merging constraints received from this [`PeerConnection`]
     /// [`Sender`]s, which are configured by server during signalling, and
-    /// [`LocalStreamConstraints`], that are optionally configured by JS-side.
+    /// [`LocalTracksConstraints`], that are optionally configured by JS-side.
     ///
-    /// Returns [`HashMap`] with [`media_exchange_state::State`]s updates for
+    /// Returns [`HashMap`] with [`media_exchange_state::Stable`]s updates for
     /// the [`Sender`]s.
     ///
     /// # Errors
     ///
     /// With [`TracksRequestError`] if current state of peer's [`Sender`]s
     /// cannot be represented as [`SimpleTracksRequest`] (max 1 audio [`Sender`]
-    /// and max 1 video [`Sender`]), or [`MediaStream`] requested from
+    /// and max 1 video [`Sender`]), or [`local::Track`]s requested from
     /// [`MediaManager`] does not satisfy [`Sender`]s constraints.
     ///
     /// With [`TracksRequestError::ExpectedAudioTracks`] or
-    /// [`TracksRequestError::ExpectedVideoTracks`] if provided
+    /// [`TracksRequestError::ExpectedDeviceVideoTracks`] /
+    /// [`TracksRequestError::ExpectedDisplayVideoTracks`] if provided
     /// [`MediaStreamSettings`] are incompatible with this peer [`Sender`]s
     /// constraints.
     ///
@@ -671,8 +647,9 @@ impl PeerConnection {
     ///
     /// With [`MediaConnectionsError::InvalidMediaTracks`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
-    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if [`MediaStream`]
-    /// cannot be inserted into peer's [`Sender`]s.
+    /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
+    /// [`local::Track`] couldn't inserted into [`PeerConnection`]s
+    /// [`Sender`]s.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -838,7 +815,7 @@ impl PeerConnection {
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// With [`TracksRequestError`], [`MediaManagerError`] or
-    /// [`MediaConnectionsError`] if cannot get or insert [`MediaStream`].
+    /// [`MediaConnectionsError`] if cannot get or insert [`local::Track`]s.
     ///
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
     /// [RtcPeerConnection.createAnswer()][3] fails.
@@ -933,6 +910,36 @@ impl PeerConnection {
 
 #[cfg(feature = "mockable")]
 impl PeerConnection {
+    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
+    /// [`RtcStats`].
+    pub async fn get_stats(&self) -> Result<RtcStats> {
+        self.peer
+            .get_stats()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
+    /// Indicates whether all [`Receiver`]s audio tracks are enabled.
+    #[cfg(feature = "mockable")]
+    pub fn is_recv_audio_enabled(&self) -> bool {
+        self.media_connections.is_recv_audio_enabled()
+    }
+
+    /// Indicates whether all [`Receiver`]s video tracks are enabled.
+    #[cfg(feature = "mockable")]
+    pub fn is_recv_video_enabled(&self) -> bool {
+        self.media_connections.is_recv_video_enabled()
+    }
+
+    /// Returns inner [`IceCandidate`]'s buffer length. Used in tests.
+    pub fn candidates_buffer_len(&self) -> usize {
+        self.ice_candidates_buffer.borrow().len()
+    }
+
     /// Lookups [`Sender`] by provided [`TrackId`].
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.media_connections.get_sender_by_id(id)
@@ -972,104 +979,5 @@ impl Drop for PeerConnection {
         let _ = self
             .peer
             .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
-    }
-}
-
-mod stream_update_criteria {
-    use std::ops::BitOrAssign;
-
-    use medea_client_api_proto::{
-        Direction, MediaSourceKind, MediaType, Track,
-    };
-
-    use crate::MediaKind;
-
-    bitflags::bitflags! {
-        pub struct Inner: u8 {
-            const DEVICE_AUDIO =  0b0001;
-            const DISPLAY_AUDIO = 0b0010;
-            const DEVICE_VIDEO =  0b0100;
-            const DISPLAY_VIDEO = 0b1000;
-        }
-    }
-
-    /// [`PeerConnection::update_local_stream`] function argument. Allows to
-    /// specify a set of [`MediaKind`] + [`MediaSourceKind`] pairs.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-    pub struct LocalStreamUpdateCriteria(Inner);
-
-    impl LocalStreamUpdateCriteria {
-        /// Creates [`LocalStreamUpdateCriteria`] with all [`MediaKind`] +
-        /// [`MediaSourceKind`] combinations.
-        pub fn all() -> Self {
-            Self(Inner::all())
-        }
-
-        /// Creates empty [`LocalStreamUpdateCriteria`].
-        pub fn empty() -> Self {
-            Self(Inner::empty())
-        }
-
-        /// Creates [`LocalStreamUpdateCriteria`] with provided [`MediaKind`] +
-        /// [`MediaSourceKind`] pair. `None` `source_kind` means both
-        /// [`MediaSourceKind`]s.
-        pub fn from_kinds(
-            media_kind: MediaKind,
-            source_kind: Option<MediaSourceKind>,
-        ) -> Self {
-            use MediaKind as MK;
-            use MediaSourceKind as SK;
-
-            let inner = match (source_kind, media_kind) {
-                (None, MK::Audio) => Inner::DEVICE_AUDIO | Inner::DISPLAY_AUDIO,
-                (Some(SK::Device), MK::Audio) => Inner::DEVICE_AUDIO,
-                (Some(SK::Display), MK::Audio) => Inner::DISPLAY_AUDIO,
-                (None, MK::Video) => Inner::DEVICE_VIDEO | Inner::DISPLAY_VIDEO,
-                (Some(SK::Device), MK::Video) => Inner::DEVICE_VIDEO,
-                (Some(SK::Display), MK::Video) => Inner::DISPLAY_VIDEO,
-            };
-            Self(inner)
-        }
-
-        /// Builds [`LocalStreamUpdateCriteria`] from provided tracks. Only
-        /// [`Direction::Send`] are taken into account.
-        pub fn from_tracks(tracks: &[Track]) -> LocalStreamUpdateCriteria {
-            let mut result = LocalStreamUpdateCriteria::empty();
-            for track in tracks
-                .iter()
-                .filter(|t| matches!(t.direction, Direction::Send { .. }))
-            {
-                match &track.media_type {
-                    MediaType::Audio(_) => {
-                        result.add(MediaKind::Audio, MediaSourceKind::Device);
-                    }
-                    MediaType::Video(video) => {
-                        result.add(MediaKind::Video, video.source_kind);
-                    }
-                }
-            }
-            result
-        }
-
-        /// Adds provided [`MediaKind`] + [`MediaSourceKind`] pair.
-        pub fn add(
-            &mut self,
-            media_kind: MediaKind,
-            source_kind: MediaSourceKind,
-        ) {
-            self.0
-                .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
-        }
-
-        /// Checks whether this [`LocalStreamUpdateCriteria`] contains provided
-        /// [`MediaKind`] + [`MediaSourceKind`] pair.
-        pub fn has(
-            self,
-            media_kind: MediaKind,
-            source_kind: MediaSourceKind,
-        ) -> bool {
-            self.0
-                .contains(Self::from_kinds(media_kind, Some(source_kind)).0)
-        }
     }
 }

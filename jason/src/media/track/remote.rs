@@ -43,7 +43,7 @@ struct Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`], spawns listener for [`Inner::enabled`] state
+    /// Creates new [`Track`], spawns listener for `enabled` state
     /// changes.
     pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
     where

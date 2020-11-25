@@ -110,7 +110,9 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
-    /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
+    /// Occurs while getting and parsing [`RtcStats`] of [`PeerConnection`].
+    ///
+    /// [`PeerConnection`]: super::PeerConnection
     #[display(fmt = "Failed to get RTCStats: {}", _0)]
     RtcStatsError(#[js(cause)] RtcStatsError),
 
@@ -235,12 +237,13 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`RTCPeerConnectionError::RtcStats`] if getting or parsing
-    /// of [`RtcStats`] fails.
+    /// Errors with [`RTCPeerConnectionError::RtcStatsError`] if getting or
+    /// parsing of [`RtcStats`] fails.
     ///
     /// Errors with [`RTCPeerConnectionError::GetStatsException`] when
     /// [PeerConnection.getStats][1] promise throws exception.
     ///
+    /// [`PeerConnection`]: super::PeerConnection
     /// [1]: https://tinyurl.com/w6hmt5f
     pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats =

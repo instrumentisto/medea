@@ -127,8 +127,10 @@ pub struct RoomService {
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
-    /// Service which is responsible for processing [`PeerConnection`]'s
-    /// metrics received from the Coturn.
+    /// Service which is responsible for processing [`Peer`]'s metrics received
+    /// from Coturn.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     _coturn_metrics: Addr<CoturnMetricsService>,
 }
 
@@ -137,8 +139,7 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails to connect to
-    /// Redis stats server.
+    /// Returns [`RedisError`] if fails to connect to Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -246,6 +247,8 @@ impl Handler<StartStaticRooms> for RoomService {
 }
 
 /// Type alias for success [`CreateResponse`]'s sids.
+///
+/// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<String, String>;
 
 /// Signal for creating new [`Room`].
@@ -309,7 +312,7 @@ impl Handler<CreateRoom> for RoomService {
 
 /// Signal for create new [`Member`] in [`Room`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct CreateMemberInRoom {
@@ -728,7 +731,7 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn create_room() {
-        let room_service = room_service(RoomRepository::new(HashMap::new()));
+        let room_service = room_service(RoomRepository::new());
         let spec = room_spec();
         let caller_fid =
             StatefulFid::try_from("pub-sub-video-call/caller".to_string())
@@ -762,7 +765,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id.clone() => room,
         )));
 
@@ -810,7 +813,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id.clone() => room,
         )));
 
@@ -877,7 +880,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 
@@ -898,7 +901,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 
@@ -920,7 +923,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 

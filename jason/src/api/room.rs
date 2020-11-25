@@ -35,8 +35,7 @@ use crate::{
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
-        ConnectionInfoParseError, ReconnectHandle, RpcClientError, RpcSession,
-        SessionError, TransportError,
+        ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
@@ -62,7 +61,7 @@ pub struct RoomCloseReason {
 }
 
 impl RoomCloseReason {
-    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// Creates new [`RoomCloseReason`] with provided [`CloseReason`]
     /// converted into [`String`].
     ///
     /// `is_err` may be `true` only on closing by client.
@@ -105,18 +104,10 @@ impl RoomCloseReason {
 
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
-enum RoomError {
+pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
     CallbackNotSet(&'static str),
-
-    /// Returned if unable to init [`RpcTransport`].
-    #[display(fmt = "Unable to init RPC transport: {}", _0)]
-    InitRpcTransportFailed(#[js(cause)] TransportError),
-
-    /// Returned if [`WebSocketRpcClient`] was unable to connect to RPC server.
-    #[display(fmt = "Unable to connect RPC server: {}", _0)]
-    CouldNotConnectToServer(#[js(cause)] RpcClientError),
 
     /// Returned if the previously added local media tracks does not satisfy
     /// the tracks sent from the media server.
@@ -125,6 +116,8 @@ enum RoomError {
 
     /// Returned if [`PeerConnection`] cannot receive the local tracks from
     /// [`MediaManager`].
+    ///
+    /// [`MediaManager`]: crate::media::MediaManager
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
@@ -132,17 +125,19 @@ enum RoomError {
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
     NoSuchPeer(PeerId),
 
-    /// Returned if an error occurred during the webrtc signaling process
+    /// Returned if an error occurred during the WebRTC signaling process
     /// with remote peer.
     #[display(fmt = "Some PeerConnection error: {}", _0)]
     PeerConnectionError(#[js(cause)] PeerError),
 
-    /// Returned if was received event [`PeerEvent::NewRemoteTracks`] without
-    /// [`Connection`] with remote [`Member`].
+    /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
+    /// connection with remote `Member`.
     #[display(fmt = "Remote stream from unknown member")]
     UnknownRemoteMember,
 
-    /// Returned if [`Sender`]/[`Receiver`] update failed.
+    /// Returned if [`track`] update failed.
+    ///
+    /// [`track`]: crate::media::track
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
@@ -151,21 +146,9 @@ enum RoomError {
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
 
-    /// [`WebSocketSession`] returned [`SessionError`].
+    /// [`RpcSession`] returned [`SessionError`].
     #[display(fmt = "WebSocketSession error occurred: {}", _0)]
     SessionError(#[js(cause)] SessionError),
-}
-
-impl From<RpcClientError> for RoomError {
-    fn from(err: RpcClientError) -> Self {
-        Self::CouldNotConnectToServer(err)
-    }
-}
-
-impl From<TransportError> for RoomError {
-    fn from(err: TransportError) -> Self {
-        Self::InitRpcTransportFailed(err)
-    }
 }
 
 impl From<PeerError> for RoomError {
@@ -218,8 +201,7 @@ impl RoomHandle {
     /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
     /// `on_connection_loss` callbacks are not set.
     ///
-    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
-    /// server.
+    /// With [`RoomError::SessionError`] if cannot connect to media server.
     pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
@@ -306,6 +288,8 @@ impl RoomHandle {
 impl RoomHandle {
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
+    ///
+    /// [`Connection`]: crate::api::Connection
     pub fn on_new_connection(
         &self,
         f: js_sys::Function,
@@ -341,8 +325,8 @@ impl RoomHandle {
             .map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
-    /// Sets `on_connection_loss` callback, which will be invoked on
-    /// [`WebSocketRpcClient`] connection loss.
+    /// Sets `on_connection_loss` callback, which will be invoked on connection
+    /// with server loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -371,10 +355,10 @@ impl RoomHandle {
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
-    /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
-    /// sending peers, so that might cause new [getUserMedia()][1] request.
+    /// configured for some [`Room`], then this [`Room`] can only send media
+    /// tracks that correspond to this settings. [`MediaStreamSettings`]
+    /// update will change media tracks in all sending peers, so that might
+    /// cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
@@ -579,8 +563,6 @@ impl WeakRoom {
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
 /// handles media server events, etc).
 ///
-/// It's used on Rust side and represents a handle to [`InnerRoom`] data.
-///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
 ///
 /// [`PeerConnection`]: crate::peer::PeerConnection
@@ -661,23 +643,10 @@ impl Room {
         Self(room)
     }
 
-    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
-    #[inline]
-    pub fn downgrade(&self) -> WeakRoom {
-        WeakRoom(Rc::downgrade(&self.0))
-    }
-
-    /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
+    /// Sets `close_reason` and consumes this [`Room`].
     ///
-    /// Supposed that this function will trigger [`Drop`] implementation of
-    /// [`InnerRoom`] and call JS side `on_close` callback with provided
+    /// [`Room`] [`Drop`] triggers `on_close` callback with provided
     /// [`CloseReason`].
-    ///
-    /// Note that this function __doesn't guarantee__ that [`InnerRoom`] will be
-    /// dropped because theoretically other pointers to the [`InnerRoom`]
-    /// can exist. If you need guarantee of [`InnerRoom`] dropping then you
-    /// may check count of pointers to [`InnerRoom`] with
-    /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
@@ -713,14 +682,19 @@ impl Room {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Indicates whether the provided [`RoomHandle`] points to the same
-    /// [`InnerRoom`] as this [`Room`] does.
+    /// Checks [`RoomHandle`] equality by comparing inner pointers.
     #[inline]
     pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
         handle
             .0
             .upgrade()
             .map_or(false, |handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
+    }
+
+    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
+    #[inline]
+    pub fn downgrade(&self) -> WeakRoom {
+        WeakRoom(Rc::downgrade(&self.0))
     }
 }
 
@@ -731,12 +705,12 @@ struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
-    /// Constraints to local [`MediaStream`] that is being published by
+    /// Constraints to local [`MediaStreamTrack`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the [`MediaStream`]s received by [`PeerConnection`]s in
-    /// this [`Room`]. Used to disable or enable media receiving.
+    /// Constraints to the [`MediaStreamTrack`] received by [`PeerConnection`]s
+    /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
     /// [`PeerConnection`] repository.
@@ -745,15 +719,17 @@ struct InnerRoom {
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Collection of [`Connection`]s with a remote [`Member`]s.
+    /// Collection of [`Connection`]s with a remote `Member`s.
     connections: Connections,
 
     /// Callback to be invoked when new local [`local::JsTrack`] will be added
     /// to this [`Room`].
     on_local_track: Callback1<local::JsTrack>,
 
-    /// Callback to be invoked when failed obtain [`MediaTrack`]s from
+    /// Callback to be invoked when failed obtain [`MediaStreamTrack`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
+    ///
+    /// [`MediaManager`]: crate::media::MediaManager
     on_failed_local_media: Rc<Callback1<JasonError>>,
 
     /// Callback to be invoked when [`RpcSession`] loses connection.
@@ -767,7 +743,7 @@ struct InnerRoom {
     /// This [`CloseReason`] will be provided into `on_close` JS callback.
     ///
     /// Note that `None` will be considered as error and `is_err` will be
-    /// `true` in [`JsCloseReason`] provided to JS callback.
+    /// `true` in [`CloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
 }
 
@@ -837,6 +813,7 @@ impl InnerRoom {
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
     async fn toggle_media_state(
         &self,
@@ -866,6 +843,8 @@ impl InnerRoom {
     /// Updates [`MediaState`]s of the [`TransceiverSide`] with a
     /// provided [`PeerId`] and [`TrackId`] to a provided
     /// [`MediaState`]s.
+    ///
+    /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
     async fn update_media_states(
         &self,
@@ -932,7 +911,7 @@ impl InnerRoom {
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
-    /// provided `media_exchange_state`.
+    /// provided [`MediaState`].
     pub fn is_all_peers_in_media_state(
         &self,
         kind: MediaKind,
@@ -967,8 +946,9 @@ impl InnerRoom {
     /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
     ///
+    /// [1]: https://tinyurl.com/rnxcavf
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [`Sender`]: crate::peer::Sender
     async fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
@@ -1017,6 +997,9 @@ impl InnerRoom {
     /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`] in
     /// provided [`PeerConnection`]. Negotiates [`PeerConnection`] if provided
     /// `negotiation_role` is `Some`.
+    ///
+    /// [`Receiver`]: crate::peer::Receiver
+    /// [`Sender`]: crate::peer::Sender
     async fn create_tracks_and_maybe_negotiate(
         &self,
         peer: Rc<PeerConnection>,
@@ -1160,6 +1143,9 @@ impl EventHandler for InnerRoom {
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
+    ///
+    /// [`Receiver`]: crate::peer::Receiver
+    /// [`Sender`]: crate::peer::Sender
     async fn on_tracks_applied(
         &self,
         peer_id: PeerId,

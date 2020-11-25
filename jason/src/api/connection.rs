@@ -90,12 +90,12 @@ impl Connections {
 #[wasm_bindgen]
 pub struct ConnectionHandle(Weak<InnerConnection>);
 
-/// Actual data of a connection with a specific remote [`Member`].
+/// Actual data of a connection with a specific remote `Member`.
 ///
 /// Shared between JS side ([`ConnectionHandle`]) and Rust side
 /// ([`Connection`]).
 struct InnerConnection {
-    /// Remote [`Member`] ID.
+    /// Remote `Member` ID.
     remote_id: MemberId,
 
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
@@ -146,14 +146,12 @@ impl ConnectionHandle {
     }
 }
 
-/// Connection with a specific remote [`Member`], that is used on Rust side.
-///
-/// Actually, represents a handle to [`InnerConnection`].
+/// Connection with a specific remote `Member`, that is used on Rust side.
 #[derive(Clone)]
 pub struct Connection(Rc<InnerConnection>);
 
 impl Connection {
-    /// Instantiates new [`Connection`] for a given [`Member`].
+    /// Instantiates new [`Connection`] for a given `Member`.
     #[inline]
     pub fn new(remote_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
@@ -165,8 +163,8 @@ impl Connection {
         }))
     }
 
-    /// Invokes [`InnerConnection::on_remote_track_added`] JS callback with the
-    /// provided [`remote::Track`].
+    /// Invokes `on_remote_track_added` JS callback with the provided
+    /// [`remote::Track`].
     pub fn add_remote_track(&self, track: remote::Track) {
         self.0.on_remote_track_added.call(track);
     }

@@ -20,7 +20,7 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.47
+RUST_VER := 1.48
 CHROME_VERSION := 87.0
 FIREFOX_VERSION := 83.0
 
@@ -318,6 +318,7 @@ endif
 # Usage:
 #	make docs.rust [crate=(@all|medea|medea-jason|<crate-name>)]
 #	               [open=(yes|no)] [clean=(no|yes)]
+#	               [dev=(no|yes)]
 
 docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
@@ -325,9 +326,10 @@ docs.rust:
 ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
-	cargo +nightly doc \
+	cargo doc \
 		$(if $(call eq,$(docs-rust-crate),@all),--all,-p $(docs-rust-crate)) \
 		--no-deps \
+		$(if $(call eq,$(dev),yes),--document-private-items,) \
 		$(if $(call eq,$(open),no),,--open)
 
 

@@ -7,12 +7,12 @@ use super::{InStable, InTransition};
 pub enum Stable {
     /// [`MediaStateControllable`] is enabled.
     ///
-    /// [`MediaStateControllable`]: super::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Enabled,
 
     /// [`MediaStateControllable`] is disabled.
     ///
-    /// [`MediaStateControllable`]: super::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Disabled,
 }
 
@@ -57,26 +57,26 @@ impl From<bool> for Stable {
     }
 }
 
-/// [`MediaExchangeState`] in transition to another
-/// [`Stable`].
+/// [`MediaExchangeState`] in transition to another [`Stable`].
 ///
-/// [`Stable`] which is stored in
-/// [`Transition`] variants is a state which we already have,
-/// but we still waiting for a desired state update. If desired state update
-/// won't be received, then the stored [`Stable`] will be
+/// [`Stable`] which is stored in [`Transition`] variants is a state which we
+/// already have, but we still waiting for a desired state update. If desired
+/// state update won't be received, then the stored [`Stable`] will be
 /// applied.
+///
+/// [`MediaExchangeState`]: super::MediaExchangeState
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Transition {
     /// [`MediaStateControllable`] should be enabled, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: super::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Enabling(Stable),
 
     /// [`MediaStateControllable`] should be disabled, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: super::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
     Disabling(Stable),
 }
 

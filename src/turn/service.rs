@@ -14,12 +14,13 @@ use redis::ConnectionInfo;
 
 use crate::{
     conf,
-    media::IceUser,
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         repo::{TurnDatabase, TurnDatabaseErr},
     },
 };
+
+use super::IceUser;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -111,6 +112,8 @@ impl Service {
 impl TurnAuthService for Service {
     /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
     /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
+    ///
+    /// [`MemberId`]: medea_client_api_proto::MemberId
     async fn create(
         &self,
         room_id: RoomId,
@@ -186,7 +189,7 @@ pub fn new_turn_auth_service<'a>(
 pub mod test {
     use std::sync::Arc;
 
-    use crate::media::IceUser;
+    use crate::turn::IceUser;
 
     use super::*;
 

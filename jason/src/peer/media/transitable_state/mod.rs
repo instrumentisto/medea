@@ -1,6 +1,6 @@
 //! [`MediaStateControllable`]s media exchange state.
 //!
-//! [`MediaStateControllable`]: super::MediaStateControllable
+//! [`MediaStateControllable`]: crate::peer::MediaStateControllable
 
 mod controller;
 pub mod media_exchange_state;
@@ -24,9 +24,12 @@ pub type MuteState =
     TransitableState<mute_state::Stable, mute_state::Transition>;
 
 /// All media states which can be toggled in the [`MediaStateControllable`].
+///
+/// [`MediaStateControllable`]: crate::peer::MediaStateControllable
 #[derive(Clone, Copy, Debug, From)]
 pub enum MediaState {
-    /// Responsible for changing [enabled][1] property of [MediaStreamTrack][2].
+    /// Responsible for changing [enabled][1] property of
+    /// [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
@@ -49,7 +52,7 @@ impl MediaState {
     /// [`TrackPatchCommand::muted`] will be [`Some`].
     ///
     /// If [`MediaState`] is [`MediaState::MediaExchange`] then
-    /// [`TrackPatchCommand::disabled`] will be [`Some`].
+    /// [`TrackPatchCommand::enabled`] will be [`Some`].
     pub fn generate_track_patch(self, track_id: TrackId) -> TrackPatchCommand {
         match self {
             Self::Mute(mute) => TrackPatchCommand {
@@ -105,7 +108,7 @@ pub trait InTransition: Clone + Copy + PartialEq {
 
 /// All media exchange states in which [`MediaStateControllable`] can be.
 ///
-/// [`MediaStateControllable`]: super::MediaStateControllable
+/// [`MediaStateControllable`]: crate::peer::MediaStateControllable
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitableState<S, T> {
     /// State of transition.

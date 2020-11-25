@@ -43,6 +43,8 @@ struct WebRtcPlayEndpointInner {
     ///
     /// In future this may be used for removing [`WebRtcPlayEndpoint`]
     /// and related peer.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     peer_id: Option<PeerId>,
 
     /// Indicator whether only `relay` ICE candidates are allowed for this

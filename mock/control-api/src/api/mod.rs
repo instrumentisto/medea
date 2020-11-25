@@ -142,8 +142,8 @@ macro_rules! gen_request_macro {
     };
 }
 
-/// [`actix_web`] REST API endpoint which returns all
-/// [`Callback`]s received by this mock server.
+/// [`actix_web`] REST API endpoint which returns all Control API Callbacks
+/// received by this mock server.
 ///
 /// # Errors
 ///

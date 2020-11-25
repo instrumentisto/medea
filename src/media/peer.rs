@@ -47,8 +47,6 @@
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
-#![allow(clippy::use_self)]
-
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
@@ -67,13 +65,14 @@ use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
     api::control::endpoints::webrtc_publish_endpoint::PublishPolicy,
-    media::{IceUser, MediaTrack},
+    media::MediaTrack,
     signalling::{
         elements::endpoints::{
             webrtc::WebRtcPublishEndpoint, Endpoint, WeakEndpoint,
         },
         peers::Counter,
     },
+    turn::IceUser,
 };
 
 /// Subscriber to the events indicating that [`Peer`] was updated.
@@ -292,6 +291,8 @@ pub struct Context {
     id: Id,
 
     /// [`MemberId`] of a [`Member`] which owns this [`Peer`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     member_id: MemberId,
 
     /// [`PeerId`] of a partner [`Peer`].
@@ -575,7 +576,7 @@ pub struct Peer<S> {
 impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     #[inline]
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
@@ -595,7 +596,7 @@ impl<T> Peer<T> {
 
     /// Returns ID of interconnected [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     #[inline]
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
@@ -603,6 +604,8 @@ impl<T> Peer<T> {
 
     /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
     /// client in the [`Event::TracksApplied`].
+    ///
+    /// [`Event::TracksApplied`]: medea_client_api_proto::Event::TracksApplied
     pub fn get_updates(&self) -> Vec<TrackUpdate> {
         self.context
             .pending_track_updates
@@ -815,9 +818,8 @@ impl Peer<WaitLocalSdp> {
             .chain(self.context.receivers.iter_mut());
 
         for (id, track) in tracks {
-            let mid = mids
-                .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
+            let mid =
+                mids.remove(&id).ok_or(PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
 
@@ -868,7 +870,7 @@ impl Peer<WaitRemoteSdp> {
 impl Peer<Stable> {
     /// Creates new [`Peer`] for [`Member`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
     pub fn new(
         id: Id,
         member_id: MemberId,
@@ -904,8 +906,6 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Sets [`Context::is_renegotiate`] to `true`.
-    ///
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
@@ -923,8 +923,6 @@ impl Peer<Stable> {
 
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
-    ///
-    /// Sets [`Context::is_renegotiate`] to `true`.
     ///
     /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
     ///
@@ -955,9 +953,7 @@ impl Peer<Stable> {
         for (track_id, track) in &self.context.senders {
             mids.insert(
                 *track_id,
-                track
-                    .mid()
-                    .ok_or_else(|| PeerError::MidsMismatch(track.id))?,
+                track.mid().ok_or(PeerError::MidsMismatch(track.id))?,
             );
         }
         Ok(mids)

@@ -9,8 +9,6 @@ use derive_more::{Display, From};
 use failure::Fail;
 use medea_client_api_proto::RoomId;
 
-use crate::impls_for_stateful_refs;
-
 use super::{ToEndpoint, ToMember, ToRoom};
 
 /// Errors which can happen while parsing [`Fid`].

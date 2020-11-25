@@ -54,9 +54,7 @@ impl TryFrom<String> for CallbackUrl {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let url = Url::parse(&value)?;
         let url_scheme = url.scheme();
-        let host = url
-            .host()
-            .ok_or_else(|| CallbackUrlParseError::MissingHost)?;
+        let host = url.host().ok_or(CallbackUrlParseError::MissingHost)?;
         let host = if let Some(port) = url.port() {
             format!("{}:{}", host, port)
         } else {

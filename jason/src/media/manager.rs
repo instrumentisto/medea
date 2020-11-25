@@ -1,5 +1,5 @@
-//! Acquiring and storing [`local:Track`]s.
-
+//! Acquiring and storing [`local::Track`]s.
+/// [`local::Track`]: crate::media::track::local::Track
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -91,7 +91,7 @@ struct InnerMediaManager {
 }
 
 impl InnerMediaManager {
-    /// Returns the vector of [`MediaDeviceInfo`] objects.
+    /// Returns the vector of [`InputDeviceInfo`] objects.
     async fn enumerate_devices() -> Result<Vec<InputDeviceInfo>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, EnumerateDevicesFailed,

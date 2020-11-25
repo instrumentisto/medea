@@ -35,9 +35,9 @@ pub struct SenderBuilder<'a> {
 }
 
 impl<'a> SenderBuilder<'a> {
-    /// Builds new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
-    /// retrieves existing [`RtcRtpTransceiver`] via provided `mid` from a
-    /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
+    /// Builds new [`Transceiver`] if provided `mid` is [`None`], otherwise
+    /// retrieves existing [`Transceiver`] via provided `mid` from a
+    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
         let connections = self.media_connections.0.borrow();
@@ -168,7 +168,7 @@ impl Sender {
     }
 
     /// Indicates whether this [`Sender`] is enabled in
-    /// [`LocalStreamConstraints`].
+    /// [`LocalTracksConstraints`].
     fn enabled_in_cons(&self) -> bool {
         self.send_constraints.is_track_enabled(
             self.caps.media_kind(),
@@ -225,7 +225,7 @@ impl Sender {
     }
 
     /// Changes underlying transceiver direction to
-    /// [`TransceiverDirection::Sendonly`] if this [`Receiver`]s general media
+    /// [`TransceiverDirection::SEND`] if this [`Sender`]s general media
     /// exchange state is [`media_exchange_state::Stable::Enabled`].
     pub fn maybe_enable(&self) {
         if self.is_general_enabled()
@@ -325,12 +325,12 @@ impl MediaStateControllable for Sender {
     }
 
     /// Sets current [`MediaExchangeState`] to
-    /// [`MediaExchangeState::Transition`].
+    /// [`media_exchange_state::Transition`].
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
-    /// required for the call and can't be disabled.
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] is returned if
+    /// [`Sender`] is required for the call and can't be disabled.
     fn media_state_transition_to(
         &self,
         desired_state: MediaState,

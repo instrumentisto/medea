@@ -25,6 +25,8 @@ use crate::{
 };
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
+///
+/// [`PeerConnection`]: crate::peer::PeerConnection
 #[derive(Clone, Debug, Default)]
 pub struct LocalTracksConstraints(Rc<RefCell<MediaStreamSettings>>);
 
@@ -82,12 +84,6 @@ impl From<MediaStreamSettings> for LocalTracksConstraints {
 }
 
 impl LocalTracksConstraints {
-    /// Returns new [`LocalStreamConstraints`] with default values.
-    #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
     /// [`MediaStreamSettings`].
     #[inline]
@@ -150,7 +146,7 @@ impl LocalTracksConstraints {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[derive(Clone, Debug)]
-struct AudioMediaTracksSettings {
+pub struct AudioMediaTracksSettings {
     /// Constraints applicable to video tracks.
     constraints: AudioTrackConstraints,
 
@@ -198,6 +194,8 @@ pub struct VideoTrackConstraints<C> {
     /// Any action with this flag should be performed only while disable/enable
     /// actions by [`Room`]. This flag can't be changed by
     /// [`MediaStreamSettings`] updating.
+    ///
+    /// [`Room`]: crate::api::Room
     enabled: bool,
 
     /// Indicator whether video should be muted.
@@ -217,6 +215,8 @@ impl<C: Default> Default for VideoTrackConstraints<C> {
 impl<C> VideoTrackConstraints<C> {
     /// Returns `true` if this [`VideoTrackConstraints`] are enabled by the
     /// [`Room`] and constrained with [`VideoTrackConstraints::constraints`].
+    ///
+    /// [`Room`]: crate::api::Room
     #[inline]
     fn enabled(&self) -> bool {
         self.enabled && self.is_constrained()
@@ -300,7 +300,7 @@ pub struct MediaStreamSettings {
 
 #[wasm_bindgen]
 impl MediaStreamSettings {
-    /// Creates new [`MediaStreamConstraints`] with none constraints configured.
+    /// Creates new [`MediaStreamSettings`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
@@ -492,14 +492,14 @@ impl MediaStreamSettings {
         self.audio.enabled
     }
 
-    /// Returns `true` if [`DeviceVideoMediaStreamSettings`] are currently
+    /// Returns `true` if [`DeviceVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.enabled()
     }
 
-    /// Returns `true` if [`DisplayVideoMediaStreamSettings`] are currently
+    /// Returns `true` if [`DisplayVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
     pub fn is_display_video_enabled(&self) -> bool {
@@ -654,12 +654,18 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
 }
 
 /// Constraints for the [`MediaKind::Video`] [`local::Track`].
+///
+/// [`local::Track`]: crate::media::track::local::Track
 #[derive(Clone, Debug)]
 pub enum VideoSource {
     /// [`local::Track`] should be received from the `getUserMedia` request.
+    ///
+    /// [`local::Track`]: crate::media::track::local::Track
     Device(DeviceVideoTrackConstraints),
 
     /// [`local::Track`] should be received from the `getDisplayMedia` request.
+    ///
+    /// [`local::Track`]: crate::media::track::local::Track
     Display(DisplayVideoTrackConstraints),
 }
 

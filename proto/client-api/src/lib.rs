@@ -23,6 +23,8 @@
 //! [2]: https://tinyurl.com/y8bacb93
 //! [3]: https://tinyurl.com/y4j3b4cs
 
+#![deny(broken_intra_doc_links)]
+
 pub mod stats;
 
 use std::collections::HashMap;
@@ -169,7 +171,7 @@ pub struct RpcSettings {
 pub enum Command {
     /// Request of `Client` to join `Room`.
     JoinRoom {
-        /// ID of `Member` with which [`Credentials`] `Client` want to join.
+        /// ID of `Member` with which [`Credential`] `Client` want to join.
         member_id: MemberId,
 
         /// [`Credential`] of `Client`'s `Member`.
@@ -302,8 +304,8 @@ pub enum IceConnectionState {
 pub enum PeerConnectionState {
     /// At least one of the connection's ICE transports are in the
     /// [`IceConnectionState::New`] state, and none of them are in one
-    /// of the following states: [`IceConnectionState::Connecting`],
-    /// [`IceConnectionState::Checking`], [`IceConnectionState::Failed`], or
+    /// of the following states: [`IceConnectionState::Checking`],
+    /// [`IceConnectionState::Failed`], or
     /// [`IceConnectionState::Disconnected`], or all of the connection's
     /// transports are in the [`IceConnectionState::Closed`] state.
     New,
@@ -324,8 +326,7 @@ pub enum PeerConnectionState {
 
     /// At least one of the ICE transports for the connection is in the
     /// [`IceConnectionState::Disconnected`] state and none of the other
-    /// transports are in the state [`IceConnectionState::Failed`],
-    /// [`IceConnectionState::Connecting`], or
+    /// transports are in the state [`IceConnectionState::Failed`] or
     /// [`IceConnectionState::Checking`].
     Disconnected,
 
@@ -450,7 +451,7 @@ pub enum Event {
 
     /// Media Server notifies about connection quality score update.
     ConnectionQualityUpdated {
-        /// Partner [`MemberId`] of the [`Peer`].
+        /// Partner [`MemberId`] of the `Peer`.
         partner_member_id: MemberId,
 
         /// Estimated connection quality.
@@ -487,7 +488,7 @@ pub enum TrackUpdate {
     /// Can only refer tracks already known to the `Peer`.
     Updated(TrackPatchEvent),
 
-    /// [`Peer`] should start ICE restart process on the next renegotiation.
+    /// `Peer` should start ICE restart process on the next renegotiation.
     IceRestart,
 }
 

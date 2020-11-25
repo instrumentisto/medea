@@ -26,7 +26,7 @@ struct NoTokenError;
 pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
 impl ReconnectHandle {
-    /// Instantiates new [`ReconnectHandle`] from the given [`RpcSesion`]
+    /// Instantiates new [`ReconnectHandle`] from the given [`RpcSession`]
     /// reference.
     pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
