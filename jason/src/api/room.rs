@@ -662,8 +662,8 @@ struct InnerRoom {
     /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the [`MediaStreamTrack`] received by [`PeerConnection`]s in this [`Room`]. Used to disable or enable
-    /// media receiving.
+    /// Constraints to the [`MediaStreamTrack`] received by [`PeerConnection`]s
+    /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
     /// [`PeerConnection`] repository.
