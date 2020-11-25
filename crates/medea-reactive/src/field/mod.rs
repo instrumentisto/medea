@@ -2,6 +2,8 @@
 
 #![allow(clippy::module_name_repetitions)]
 
+pub mod cell;
+
 use std::{
     cell::RefCell,
     fmt,
@@ -15,8 +17,6 @@ use futures::{
 };
 
 use crate::subscribers_store::{progressable, SubscribersStore};
-
-pub mod cell;
 
 #[doc(inline)]
 pub use self::cell::ObservableCell;

@@ -56,12 +56,7 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 /// # });
 /// ```
 #[derive(Debug, Clone)]
-pub struct ObservableHashMap<K, V, S, O>
-where
-    K: Hash + Eq + Clone,
-    V: Clone,
-    S: SubscribersStore<(K, V), O>,
-{
+pub struct ObservableHashMap<K, V, S: SubscribersStore<(K, V), O>, O> {
     /// Data stored by this [`ObservableHashMap`].
     store: HashMap<K, V>,
 
@@ -71,6 +66,8 @@ where
     /// Subscribers of the [`ObservableHashMap::on_remove`] method.
     on_remove_subs: S,
 
+    /// Phantom type of [`ObservableHashMap::on_insert`] and
+    /// [`ObservableHashMap::on_remove`] output.
     _output: PhantomData<O>,
 }
 
@@ -87,14 +84,97 @@ where
 {
     /// Returns [`Future`] which will be resolved when all insertion updates
     /// will be processed by [`ObservableHashMap::on_insert`] subscribers.
+    #[inline]
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
     /// be processed by [`ObservableHashMap::on_remove`] subscribers.
+    #[inline]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_remove_subs.when_all_processed()
+    }
+}
+
+impl<K, V, S: SubscribersStore<(K, V), O>, O> ObservableHashMap<K, V, S, O> {
+    /// Returns new empty [`ObservableHashMap`].
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// An iterator visiting all key-value pairs in arbitrary order. The
+    /// iterator element type is `(&'a K, &'a V)`.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+        self.into_iter()
+    }
+
+    /// An iterator visiting all values in arbitrary order. The iterator element
+    /// type is `&'a V`.
+    #[inline]
+    pub fn values(&self) -> Values<'_, K, V> {
+        self.store.values()
+    }
+
+    /// Returns the [`Stream`] to which the removed key-value pairs will be
+    /// sent.
+    ///
+    /// Note that to this [`Stream`] will be sent all items of the
+    /// [`ObservableHashMap`] on drop.
+    #[inline]
+    pub fn on_remove(&self) -> impl Stream<Item = O> {
+        self.on_remove_subs.new_subscription(Vec::new())
+    }
+}
+
+impl<K, V, S, O> ObservableHashMap<K, V, S, O>
+where
+    K: Clone,
+    V: Clone,
+    S: SubscribersStore<(K, V), O>,
+{
+    /// Returns the [`Stream`] to which the inserted key-value pairs will be
+    /// sent.
+    ///
+    /// Also to this [`Stream`] will be sent all already inserted key-value
+    /// pairs of this [`ObservableHashMap`].
+    #[inline]
+    pub fn on_insert(&self) -> impl Stream<Item = O> {
+        self.on_insert_subs.new_subscription(
+            self.store
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
+    }
+}
+
+impl<K, V, S, O> ObservableHashMap<K, V, S, O>
+where
+    K: Hash + Eq,
+    S: SubscribersStore<(K, V), O>,
+{
+    /// Returns a reference to the value corresponding to the key.
+    #[inline]
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.store.get(key)
+    }
+
+    /// Returns a mutable reference to the value corresponding to the key.
+    ///
+    /// Note that mutating of the returned value wouldn't work same as
+    /// [`Observable`]s and doesn't spawns [`ObservableHashMap::on_insert`] or
+    /// [`ObservableHashMap::on_remove`] events. If you need subscriptions on
+    /// value changes then just wrap value to the [`Observable`] and subscribe
+    /// to it.
+    ///
+    /// [`Observable`]: crate::Observable
+    #[inline]
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.store.get_mut(key)
     }
 }
 
@@ -104,13 +184,6 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    /// Returns new empty [`ObservableHashMap`].
-    #[must_use]
-    #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Inserts a key-value pair into the [`ObservableHashMap`].
     ///
     /// This action will produce [`ObservableHashMap::on_insert`] event.
@@ -133,67 +206,12 @@ where
 
         removed_item
     }
-
-    /// Returns the [`Stream`] to which the inserted key-value pairs will be
-    /// sent.
-    ///
-    /// Also to this [`Stream`] will be sent all already inserted key-value
-    /// pairs of this [`ObservableHashMap`].
-    pub fn on_insert(&self) -> impl Stream<Item = O> {
-        self.on_insert_subs.new_subscription(
-            self.store
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
-        )
-    }
-
-    /// Returns the [`Stream`] to which the removed key-value pairs will be
-    /// sent.
-    ///
-    /// Note that to this [`Stream`] will be sent all items of the
-    /// [`ObservableHashMap`] on drop.
-    pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.new_subscription(Vec::new())
-    }
-
-    /// Returns a reference to the value corresponding to the key.
-    pub fn get(&self, key: &K) -> Option<&V> {
-        self.store.get(key)
-    }
-
-    /// Returns a mutable reference to the value corresponding to the key.
-    ///
-    /// Note that mutating of the returned value wouldn't work same as
-    /// [`Observable`]s and doesn't spawns [`ObservableHashMap::on_insert`] or
-    /// [`ObservableHashMap::on_remove`] events. If you need subscriptions on
-    /// value changes then just wrap value to the [`Observable`] and subscribe
-    /// to it.
-    ///
-    /// [`Observable`]: crate::Observable
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.store.get_mut(key)
-    }
-
-    /// An iterator visiting all key-value pairs in arbitrary order. The
-    /// iterator element type is `(&'a K, &'a V)`.
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
-        self.into_iter()
-    }
-
-    /// An iterator visiting all values in arbitrary order. The iterator element
-    /// type is `&'a V`.
-    pub fn values(&self) -> Values<'_, K, V> {
-        self.store.values()
-    }
 }
 
-impl<K, V, S, O> Default for ObservableHashMap<K, V, S, O>
-where
-    K: Hash + Eq + Clone,
-    V: Clone,
-    S: SubscribersStore<(K, V), O>,
+impl<K, V, S: SubscribersStore<(K, V), O>, O> Default
+    for ObservableHashMap<K, V, S, O>
 {
+    #[inline]
     fn default() -> Self {
         Self {
             store: HashMap::new(),
@@ -204,12 +222,10 @@ where
     }
 }
 
-impl<K, V, S, O> From<HashMap<K, V>> for ObservableHashMap<K, V, S, O>
-where
-    K: Hash + Eq + Clone,
-    V: Clone,
-    S: SubscribersStore<(K, V), O>,
+impl<K, V, S: SubscribersStore<(K, V), O>, O> From<HashMap<K, V>>
+    for ObservableHashMap<K, V, S, O>
 {
+    #[inline]
     fn from(from: HashMap<K, V>) -> Self {
         Self {
             store: from,
@@ -220,25 +236,20 @@ where
     }
 }
 
-impl<'a, K, V, S, O> IntoIterator for &'a ObservableHashMap<K, V, S, O>
-where
-    K: Hash + Eq + Clone,
-    V: Clone,
-    S: SubscribersStore<(K, V), O>,
+impl<'a, K, V, S: SubscribersStore<(K, V), O>, O> IntoIterator
+    for &'a ObservableHashMap<K, V, S, O>
 {
     type IntoIter = Iter<'a, K, V>;
     type Item = (&'a K, &'a V);
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.store.iter()
     }
 }
 
-impl<K, V, S, O> Drop for ObservableHashMap<K, V, S, O>
-where
-    K: Hash + Eq + Clone,
-    V: Clone,
-    S: SubscribersStore<(K, V), O>,
+impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop
+    for ObservableHashMap<K, V, S, O>
 {
     /// Sends all key-values of a dropped [`ObservableHashMap`] to the
     /// [`ObservableHashMap::on_remove`] subs.

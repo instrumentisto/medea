@@ -1,3 +1,5 @@
+//! Implementation of the progressable [`SubscribersStore`].
+
 mod manager;
 mod value;
 

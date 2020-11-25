@@ -1,3 +1,6 @@
+//! Implementation of the wrapper around data which will decrement underlying
+//! counter on [`Drop`].
+
 use std::{ops::Deref, rc::Rc};
 
 use crate::ObservableCell;

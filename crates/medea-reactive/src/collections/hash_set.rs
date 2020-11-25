@@ -67,37 +67,80 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 /// assert!(set.contains(&"foo-4"));
 /// # });
 /// ```
-
 #[derive(Debug)]
-pub struct ObservableHashSet<
-    T: Clone + Hash + Eq + 'static,
-    S: SubscribersStore<T, O>,
-    O,
-> {
+pub struct ObservableHashSet<T, S: SubscribersStore<T, O>, O> {
     /// Data stored by this [`ObservableHashSet`].
     store: HashSet<T>,
 
+    /// Subscribers of the [`ObservableHashSet::on_insert`] method.
     on_insert_subs: S,
 
+    /// Subscribers of the [`ObservableHashSet::on_remove`] method.
     on_remove_subs: S,
 
+    /// Phantom type of [`ObservableHashSet::on_insert`] and
+    /// [`ObservableHashSet::on_remove`] output.
     _output: PhantomData<O>,
 }
 
 impl<T> ObservableHashSet<T, progressable::SubStore<T>, progressable::Value<T>>
 where
-    T: Clone + Hash + Eq + 'static,
+    T: Clone + 'static,
 {
     /// Returns [`Future`] which will be resolved when all push updates will be
     /// processed by [`ObservableHashSet::on_insert`] subscribers.
+    #[inline]
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
     /// be processed by [`ObservableHashSet::on_remove`] subscribers.
+    #[inline]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_remove_subs.when_all_processed()
+    }
+}
+
+impl<T, S: SubscribersStore<T, O>, O> ObservableHashSet<T, S, O> {
+    /// Returns new empty [`ObservableHashSet`].
+    #[must_use]
+    #[inline]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// An iterator visiting all elements in arbitrary order. The iterator
+    /// element type is `&'a T`.
+    #[inline]
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.into_iter()
+    }
+
+    /// Returns the [`Stream`] to which the removed values will be sent.
+    ///
+    /// Note that to this [`Stream`] will be sent all items of the
+    /// [`ObservableHashSet`] on drop.
+    #[inline]
+    pub fn on_remove(&self) -> impl Stream<Item = O> {
+        self.on_remove_subs.new_subscription(Vec::new())
+    }
+}
+
+impl<T, S, O> ObservableHashSet<T, S, O>
+where
+    T: Clone + 'static,
+    S: SubscribersStore<T, O>,
+{
+    /// Returns the [`Stream`] to which the inserted values will be
+    /// sent.
+    ///
+    /// Also to this [`Stream`] will be sent all already inserted values
+    /// of this [`ObservableHashSet`].
+    #[inline]
+    pub fn on_insert(&self) -> impl Stream<Item = O> {
+        self.on_insert_subs
+            .new_subscription(self.store.iter().cloned().collect())
     }
 }
 
@@ -106,13 +149,6 @@ where
     T: Clone + Hash + Eq + 'static,
     S: SubscribersStore<T, O>,
 {
-    /// Returns new empty [`ObservableHashSet`].
-    #[must_use]
-    #[inline]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Adds a value to the set.
     ///
     /// If the set did not have this value present, `true` is returned.
@@ -143,30 +179,6 @@ where
         value
     }
 
-    /// An iterator visiting all elements in arbitrary order. The iterator
-    /// element type is `&'a T`.
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.into_iter()
-    }
-
-    /// Returns the [`Stream`] to which the inserted values will be
-    /// sent.
-    ///
-    /// Also to this [`Stream`] will be sent all already inserted values
-    /// of this [`ObservableHashSet`].
-    pub fn on_insert(&self) -> impl Stream<Item = O> {
-        self.on_insert_subs
-            .new_subscription(self.store.iter().cloned().collect())
-    }
-
-    /// Returns the [`Stream`] to which the removed values will be sent.
-    ///
-    /// Note that to this [`Stream`] will be sent all items of the
-    /// [`ObservableHashSet`] on drop.
-    pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.new_subscription(Vec::new())
-    }
-
     /// Makes this [`ObservableHashSet`] exactly the same as the passed
     /// [`HashSet`].
     ///
@@ -191,6 +203,7 @@ where
     }
 
     /// Returns `true` if the set contains a value.
+    #[inline]
     pub fn contains(&self, value: &T) -> bool {
         self.store.contains(value)
     }
@@ -198,9 +211,9 @@ where
 
 impl<T, S, O> Default for ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq + 'static,
     S: SubscribersStore<T, O>,
 {
+    #[inline]
     fn default() -> Self {
         Self {
             store: HashSet::new(),
@@ -211,7 +224,7 @@ where
     }
 }
 
-impl<'a, T: Clone + Eq + Hash, S: SubscribersStore<T, O>, O> IntoIterator
+impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator
     for &'a ObservableHashSet<T, S, O>
 {
     type IntoIter = Iter<'a, T>;
@@ -225,7 +238,6 @@ impl<'a, T: Clone + Eq + Hash, S: SubscribersStore<T, O>, O> IntoIterator
 
 impl<T, S, O> Drop for ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq + 'static,
     S: SubscribersStore<T, O>,
 {
     /// Sends all values of a dropped [`ObservableHashSet`] to the
@@ -241,9 +253,9 @@ where
 
 impl<T, S, O> From<HashSet<T>> for ObservableHashSet<T, S, O>
 where
-    T: Clone + Hash + Eq + 'static,
     S: SubscribersStore<T, O>,
 {
+    #[inline]
     fn from(from: HashSet<T>) -> Self {
         Self {
             store: from,

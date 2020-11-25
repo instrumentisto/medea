@@ -1,10 +1,12 @@
+//! Implementation of the default [`SubscribersStore`] for collections.
+
 use std::cell::RefCell;
 
 use futures::{channel::mpsc, stream::LocalBoxStream};
 
 use super::SubscribersStore;
 
-/// Default [`SubsribersStore`] for collections.
+/// Default [`SubscribersStore`] for collections.
 #[derive(Debug)]
 pub struct SubStore<T>(RefCell<Vec<mpsc::UnboundedSender<T>>>);
 
