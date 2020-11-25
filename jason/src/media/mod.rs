@@ -12,10 +12,11 @@ use wasm_bindgen::prelude::*;
 #[doc(inline)]
 pub use self::{
     constraints::{
-        AudioTrackConstraints, DeviceVideoTrackConstraints,
-        DisplayVideoTrackConstraints, FacingMode, LocalTracksConstraints,
-        MediaStreamSettings, MultiSourceTracksConstraints, RecvConstraints,
-        TrackConstraints, VideoSource,
+        AudioMediaTracksSettings, AudioTrackConstraints,
+        DeviceVideoTrackConstraints, DisplayVideoTrackConstraints, FacingMode,
+        LocalTracksConstraints, MediaStreamSettings,
+        MultiSourceTracksConstraints, RecvConstraints, TrackConstraints,
+        VideoSource, VideoTrackConstraints,
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},

@@ -9,10 +9,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaStreamTrack, TrackConstraints,
         VideoSource,
     },
-    peer::{
-        media::TransceiverSide,
-        transceiver::{Transceiver, TransceiverDirection},
-    },
+    peer::{media::TransceiverSide, Transceiver, TransceiverDirection},
 };
 
 use super::{
@@ -32,9 +29,9 @@ pub struct SenderBuilder<'a> {
 }
 
 impl<'a> SenderBuilder<'a> {
-    /// Builds new [`RtcRtpTransceiver`] if provided `mid` is `None`, otherwise
-    /// retrieves existing [`RtcRtpTransceiver`] via provided `mid` from a
-    /// provided [`RtcPeerConnection`]. Errors if [`RtcRtpTransceiver`] lookup
+    /// Builds new [`Transceiver`] if provided `mid` is [`None`], otherwise
+    /// retrieves existing [`Transceiver`] via provided `mid` from a
+    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
     /// fails.
     pub fn build(self) -> Result<Rc<Sender>> {
         let connections = self.media_connections.0.borrow();
@@ -104,12 +101,8 @@ impl Sender {
     /// [`media_exchange_state::Stable`].
     ///
     /// Sets [`Sender`]s underlying transceiver direction to
-    /// [`TransceiverDirection::Inactive`] if provided media exchange state is
+    /// [`TransceiverDirection::INACTIVE`] if provided media exchange state is
     /// [`media_exchange_state::Stable::Disabled`].
-    ///
-    /// Emits [`PeerEvent::NewLocalStreamRequired`] if new state is
-    /// [`media_exchange_state::Stable::Enabled`] and [`Sender`] does not have a
-    /// track to send.
     fn update_general_media_exchange_state(
         &self,
         new_state: media_exchange_state::Stable,
@@ -155,7 +148,7 @@ impl Sender {
     }
 
     /// Indicates whether this [`Sender`] is enabled in
-    /// [`LocalStreamConstraints`].
+    /// [`LocalTracksConstraints`].
     fn enabled_in_cons(&self) -> bool {
         self.send_constraints.is_track_enabled(
             self.caps.media_kind(),
@@ -200,7 +193,7 @@ impl Sender {
     }
 
     /// Changes underlying transceiver direction to
-    /// [`TransceiverDirection::Sendonly`] if this [`Receiver`]s general media
+    /// [`TransceiverDirection::SEND`] if this [`Sender`]s general media
     /// exchange state is [`media_exchange_state::Stable::Enabled`].
     pub fn maybe_enable(&self) {
         if self.is_general_enabled()
@@ -282,8 +275,8 @@ impl Disableable for Sender {
     ///
     /// # Errors
     ///
-    /// [`MediaConnectionsError::SenderIsRequired`] is returned if [`Sender`] is
-    /// required for the call and can't be disabled.
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] is returned if
+    /// [`Sender`] is required for the call and can't be disabled.
     fn media_exchange_state_transition_to(
         &self,
         desired_state: media_exchange_state::Stable,

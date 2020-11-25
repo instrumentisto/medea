@@ -71,7 +71,7 @@ type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 /// Representation of [MediaStreamConstraints][1] object.
 ///
 /// It's used for invoking [getUserMedia()][2] to specify what kinds of tracks
-/// should be included into returned [`MediaStream`], and, optionally,
+/// should be included into returned `MediaStream`, and, optionally,
 /// to establish constraints for those track's settings.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
@@ -118,12 +118,12 @@ pub struct SimpleTracksRequest {
 
 impl SimpleTracksRequest {
     /// Parses [`MediaStreamTrack`]s and returns [`HashMap`] with [`TrackId`]s
-    /// and [`MediaStreamTracks`]s.
+    /// and [`MediaStreamTrack`]s.
     ///
     /// # Errors
     ///
     /// - [`TracksRequestError::InvalidAudioTrack`] when some audio track from
-    ///   the provided [`MediaStream`] not satisfies contained constrains.
+    ///   the provided [`MediaStreamTrack`]s not satisfies contained constrains.
     /// - [`TracksRequestError::ExpectedAudioTracks`] when the provided
     ///   [`HashMap`] doesn't have the expected audio track.
     /// - [`TracksRequestError::InvalidVideoTrack`] when some device video track

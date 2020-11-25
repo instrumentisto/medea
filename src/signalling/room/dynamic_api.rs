@@ -35,6 +35,8 @@ use super::{Room, RoomError};
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
             "Deleting Member [id = {}] in Room [id = {}].",
@@ -112,7 +114,7 @@ impl Room {
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
     ///
     /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
-    /// present in [`ParticipantService`].
+    /// present in [`ParticipantService`][1].
     ///
     /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
@@ -120,7 +122,10 @@ impl Room {
     /// # Errors
     ///
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
-    /// provided [`MemberId`] was not found in [`ParticipantService`].
+    /// provided [`MemberId`] was not found in [`ParticipantService`][1].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [1]: crate::signalling::participants::ParticipantService
     fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -167,7 +172,7 @@ impl Room {
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
     ///
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
-    /// present in [`ParticipantService`].
+    /// present in [`ParticipantService`][1].
     ///
     /// # Errors
     ///
@@ -176,6 +181,9 @@ impl Room {
     ///
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
     /// provided [`MemberId`] doesn't exist.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [1]: crate::signalling::participants::ParticipantService
     fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -254,8 +262,12 @@ impl Room {
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
     /// [`Member`].
     ///
-    /// This will delete [`Peer`]s from [`PeerRepository`] and send
+    /// This will delete [`Peer`]s from [`Room::peers`] and send
     /// [`Event::PeersRemoved`] event to [`Member`].
+    ///
+    /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [`Peer`]: crate::media::peer::Peer
     fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &mut self,
         member_id: &MemberId,

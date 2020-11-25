@@ -160,6 +160,8 @@ pub async fn delay_for(delay_ms: JsDuration) {
 }
 
 /// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
+///
+/// [`Future`]: std::future::Future
 #[derive(Debug, From)]
 pub struct TaskHandle(AbortHandle);
 

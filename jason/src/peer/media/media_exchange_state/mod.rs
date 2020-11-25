@@ -21,16 +21,6 @@ pub enum State {
 }
 
 impl State {
-    /// Indicates whether [`State`] is stable (not in transition).
-    #[inline]
-    #[must_use]
-    pub fn is_stable(self) -> bool {
-        match self {
-            State::Stable(_) => true,
-            State::Transition(_) => false,
-        }
-    }
-
     /// Starts transition into the `desired_state` changing the state to
     /// [`State::Transition`].
     ///
