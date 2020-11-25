@@ -6,9 +6,9 @@ use std::{
     marker::PhantomData,
 };
 
-use futures::Stream;
+use futures::{future::LocalBoxFuture, Stream};
 
-use crate::subscribers_store::SubscribersStore;
+use crate::subscribers_store::{progressable, SubscribersStore};
 
 /// Reactive hash set based on [`HashSet`].
 ///
@@ -82,6 +82,23 @@ pub struct ObservableHashSet<
     on_remove_subs: S,
 
     _output: PhantomData<O>,
+}
+
+impl<T> ObservableHashSet<T, progressable::SubStore<T>, progressable::Value<T>>
+where
+    T: Clone + Hash + Eq + 'static,
+{
+    /// Returns [`Future`] which will be resolved when all push updates will be
+    /// processed by [`ObservableHashSet::on_insert`] subscribers.
+    pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
+        self.on_insert_subs.when_all_processed()
+    }
+
+    /// Returns [`Future`] which will be resolved when all remove updates will
+    /// be processed by [`ObservableHashSet::on_remove`] subscribers.
+    pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
+        self.on_remove_subs.when_all_processed()
+    }
 }
 
 impl<T, S, O> ObservableHashSet<T, S, O>

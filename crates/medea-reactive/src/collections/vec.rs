@@ -62,10 +62,14 @@ impl<T> ObservableVec<T, progressable::SubStore<T>, progressable::Value<T>>
 where
     T: Clone + 'static,
 {
+    /// Returns [`Future`] which will be resolved when all push updates will be
+    /// processed by [`ObservableVec::on_push`] subscribers.
     pub fn when_push_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_push_subs.when_all_processed()
     }
 
+    /// Returns [`Future`] which will be resolved when all remove updates will
+    /// be processed by [`ObservableVec::on_remove`] subscribers.
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_push_subs.when_all_processed()
     }

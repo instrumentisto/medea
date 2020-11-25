@@ -85,10 +85,14 @@ where
     K: Hash + Eq + Clone + 'static,
     V: Clone + 'static,
 {
+    /// Returns [`Future`] which will be resolved when all insertion updates
+    /// will be processed by [`ObservableHashMap::on_insert`] subscribers.
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
+    /// Returns [`Future`] which will be resolved when all remove updates will
+    /// be processed by [`ObservableHashMap::on_remove`] subscribers.
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_remove_subs.when_all_processed()
     }

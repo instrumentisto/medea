@@ -4,6 +4,7 @@ use futures::{channel::mpsc, stream::LocalBoxStream};
 
 use super::SubscribersStore;
 
+/// Default [`SubsribersStore`] for collections.
 #[derive(Debug)]
 pub struct SubStore<T>(RefCell<Vec<mpsc::UnboundedSender<T>>>);
 
@@ -31,6 +32,7 @@ where
         initial_values.into_iter().for_each(|value| {
             let _ = tx.unbounded_send(value);
         });
+        self.0.borrow_mut().push(tx);
 
         Box::pin(rx)
     }

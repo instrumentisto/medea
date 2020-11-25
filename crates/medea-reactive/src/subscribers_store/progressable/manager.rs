@@ -7,27 +7,20 @@ use crate::ObservableCell;
 use super::value::Value;
 
 #[derive(Clone, Debug)]
-pub(crate) struct ProgressableManager {
-    counter: Rc<ObservableCell<u32>>,
-}
+pub(crate) struct Manager(Rc<ObservableCell<u32>>);
 
-impl ProgressableManager {
+impl Manager {
     pub(crate) fn new() -> Self {
-        Self {
-            counter: Rc::new(ObservableCell::new(0)),
-        }
-    }
-
-    pub(crate) fn incr_processors_count(&self, count: u32) {
-        self.counter.mutate(|mut c| *c += count);
+        Self(Rc::new(ObservableCell::new(0)))
     }
 
     pub(crate) fn new_value<D>(&self, value: D) -> Value<D> {
-        Value::new(value, Rc::clone(&self.counter))
+        self.0.mutate(|mut c| *c += 1);
+        Value::new(value, Rc::clone(&self.0))
     }
 
     pub(crate) fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = self.counter.when_eq(0);
+        let fut = self.0.when_eq(0);
         Box::pin(async move {
             let _ = fut.await;
         })

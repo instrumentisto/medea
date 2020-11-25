@@ -29,6 +29,11 @@ type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 
+/// [`ObservableField`] that allows to subscribe to all changes
+/// ([`ObservableField::subscribe`]) and to concrete changes
+/// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
+///
+/// Can recognise when all updates was processed by subscribers.
 pub type ProgressableObservableField<D> =
     ObservableField<D, progressable::SubStore<D>>;
 
@@ -71,6 +76,10 @@ impl<D> ProgressableObservableField<D>
 where
     D: 'static,
 {
+    /// Returns new [`ObservableField`] with subscribable mutations.
+    ///
+    /// Also you can wait for all updates processing by awaiting on
+    /// [`ProgressableObservableField::when_all_processed`].
     #[inline]
     pub fn new(data: D) -> Self {
         Self {
@@ -108,10 +117,16 @@ impl<D> ProgressableObservableField<D>
 where
     D: Clone + 'static,
 {
+    /// Returns [`Stream`] into which underlying data updates wrapped to the
+    /// [`progressable::Value`] will be emitted.
+    ///
+    /// [`Stream`]: futures::Stream
     pub fn subscribe(&self) -> LocalBoxStream<'static, progressable::Value<D>> {
         self.subs.new_subscription(vec![self.data.clone()])
     }
 
+    /// Returns [`Future`] which will be resolved when all data updates will be
+    /// processed by subscribers.
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.subs.when_all_processed()
     }
