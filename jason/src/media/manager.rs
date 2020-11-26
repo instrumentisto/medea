@@ -337,8 +337,8 @@ impl InnerMediaManager {
     /// Errors with [`MediaManagerError::LocalTrackIsMuted`] if at least on
     /// track from provided [`SysMediaStream`] is in [muted][2] state.
     ///
-    /// In case of error all tracks are stopped and are not saves in
-    /// [`MediaManager`] tracks storage.
+    /// In case of error all tracks are stopped and are not saved in
+    /// [`MediaManager`]s tracks storage.
     ///
     /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/w3-streams/#track-muted
