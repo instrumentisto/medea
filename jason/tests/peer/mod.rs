@@ -28,8 +28,8 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_media_stream_settings, get_test_unrequired_tracks,
-    local_constraints, timeout,
+    delay_for, get_media_stream_settings, get_test_recv_tracks,
+    get_test_unrequired_tracks, local_constraints, timeout,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -44,6 +44,7 @@ fn toggle_disable_tracks_updates(
             id: TrackId(*track_id),
             enabled_individual: Some(enabled),
             enabled_general: Some(enabled),
+            muted: None,
         })
         .collect()
 }
@@ -876,7 +877,7 @@ mod peer_stats_caching {
 async fn reset_transition_timers() {
     let (tx, _) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_unrequired_tracks();
+
     let peer = PeerConnection::new(
         PeerId(1),
         tx,
@@ -887,7 +888,10 @@ async fn reset_transition_timers() {
         Rc::new(RecvConstraints::default()),
     )
     .unwrap();
-    peer.get_offer(vec![audio_track, video_track], true)
+
+    let (audio_tx, video_tx) = get_test_unrequired_tracks();
+    let (audio_rx, video_rx) = get_test_recv_tracks();
+    peer.get_offer(vec![audio_tx, video_tx, audio_rx, video_rx], true)
         .await
         .unwrap();
 
@@ -907,13 +911,13 @@ async fn reset_transition_timers() {
             .into_iter(),
         )
         .map(|s| {
-            s.media_exchange_state_transition_to(
-                media_exchange_state::Stable::Disabled,
+            s.media_state_transition_to(
+                media_exchange_state::Stable::Disabled.into(),
             )
             .unwrap();
 
-            s.when_media_exchange_state_stable(
-                media_exchange_state::Stable::Enabled,
+            s.when_media_state_stable(
+                media_exchange_state::Stable::Enabled.into(),
             )
         }),
     )
@@ -949,8 +953,16 @@ async fn new_remote_track() {
         let manager = Rc::new(MediaManager::default());
 
         let tx_caps = LocalTracksConstraints::default();
-        tx_caps.set_enabled(audio_tx_enabled, MediaKind::Audio, None);
-        tx_caps.set_enabled(video_tx_enabled, MediaKind::Video, None);
+        tx_caps.set_media_state(
+            media_exchange_state::Stable::from(audio_tx_enabled).into(),
+            MediaKind::Audio,
+            None,
+        );
+        tx_caps.set_media_state(
+            media_exchange_state::Stable::from(video_tx_enabled).into(),
+            MediaKind::Video,
+            None,
+        );
         let sender_peer = PeerConnection::new(
             PeerId(1),
             tx1,

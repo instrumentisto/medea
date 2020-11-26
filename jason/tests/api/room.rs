@@ -629,11 +629,11 @@ mod disable_send_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Disabled
+            media_exchange_state::Stable::Disabled.into()
         ));
     }
 
@@ -666,11 +666,11 @@ mod disable_send_tracks {
         first.unwrap();
         second.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Disabled
+            media_exchange_state::Stable::Disabled.into()
         ));
     }
 
@@ -696,11 +696,11 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Enabled
+            media_exchange_state::Stable::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -713,11 +713,11 @@ mod disable_send_tracks {
         disable_audio_result.unwrap_err();
         enable_audio_result.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Enabled
+            media_exchange_state::Stable::Enabled.into()
         ));
     }
 
@@ -743,11 +743,11 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Enabled
+            media_exchange_state::Stable::Enabled.into()
         ));
 
         let handle = room.new_handle();
@@ -760,11 +760,11 @@ mod disable_send_tracks {
         disable_video_result.unwrap_err();
         enable_video_result.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Video,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Enabled
+            media_exchange_state::Stable::Enabled.into()
         ));
     }
 
@@ -792,21 +792,21 @@ mod disable_send_tracks {
         )
         .await;
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Enabled
+            media_exchange_state::Stable::Enabled.into()
         ));
 
         let handle = room.new_handle();
         JsFuture::from(handle.disable_audio()).await.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Disabled
+            media_exchange_state::Stable::Disabled.into()
         ));
 
         let (disable_audio_result, enable_audio_result) =
@@ -818,11 +818,11 @@ mod disable_send_tracks {
         disable_audio_result.unwrap();
         enable_audio_result.unwrap();
 
-        assert!(peer.is_all_transceiver_sides_in_media_exchange_state(
+        assert!(peer.is_all_transceiver_sides_in_media_state(
             MediaKind::Audio,
             TrackDirection::Send,
             None,
-            media_exchange_state::Stable::Enabled
+            media_exchange_state::Stable::Enabled.into()
         ));
     }
 
@@ -1130,7 +1130,11 @@ mod patches_generation {
         AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
         TrackPatchCommand, VideoSettings,
     };
-    use medea_jason::{media::RecvConstraints, JsMediaSourceKind};
+    use medea_jason::{
+        media::RecvConstraints,
+        peer::{media_exchange_state, mute_state, MediaState},
+        JsMediaSourceKind,
+    };
     use wasm_bindgen_futures::spawn_local;
 
     use crate::{is_firefox, timeout};
@@ -1167,7 +1171,7 @@ mod patches_generation {
     /// value for all audio [`Track`]s.
     async fn get_room_and_commands_receiver(
         peers_count: u32,
-        audio_track_enabled_state_fn: impl Fn(u32) -> bool,
+        audio_track_media_state_fn: impl Fn(u32) -> MediaState,
         tracks_content: Vec<(MediaType, Direction)>,
     ) -> (Room, mpsc::UnboundedReceiver<Command>) {
         let mut repo = Box::new(MockPeerRepository::new());
@@ -1187,8 +1191,8 @@ mod patches_generation {
             let peer_id = PeerId(i + 1);
 
             let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_enabled(
-                (audio_track_enabled_state_fn)(i),
+            local_stream.set_track_media_state(
+                (audio_track_media_state_fn)(i),
                 MediaKind::Audio,
                 None,
             );
@@ -1248,7 +1252,7 @@ mod patches_generation {
     async fn track_patch_for_all_video() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             1,
-            |_| true,
+            |_| media_exchange_state::Stable::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1267,6 +1271,7 @@ mod patches_generation {
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
                     enabled: Some(false),
+                    muted: None,
                 }]
             }
         );
@@ -1289,7 +1294,7 @@ mod patches_generation {
     async fn track_patch_for_many_tracks() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |_| true,
+            |_| media_exchange_state::Stable::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1320,6 +1325,7 @@ mod patches_generation {
             vec![TrackPatchCommand {
                 id: TrackId(0),
                 enabled: Some(false),
+                muted: None,
             }]
         );
 
@@ -1328,6 +1334,7 @@ mod patches_generation {
             vec![TrackPatchCommand {
                 id: TrackId(0),
                 enabled: Some(false),
+                muted: None,
             }]
         );
     }
@@ -1348,7 +1355,7 @@ mod patches_generation {
     async fn try_to_enable_enabled() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |_| true,
+            |_| media_exchange_state::Stable::Enabled.into(),
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1377,7 +1384,13 @@ mod patches_generation {
     async fn disable_room_with_one_disabled_track() {
         let (room, mut command_rx) = get_room_and_commands_receiver(
             2,
-            |i| i % 2 == 1,
+            |i| {
+                if i % 2 == 1 {
+                    media_exchange_state::Stable::Enabled.into()
+                } else {
+                    media_exchange_state::Stable::Disabled.into()
+                }
+            },
             audio_and_device_video_tracks_content(),
         )
         .await;
@@ -1396,6 +1409,7 @@ mod patches_generation {
                 tracks_patches: vec![TrackPatchCommand {
                     id: TrackId(0),
                     enabled: Some(false),
+                    muted: None,
                 }]
             }
         );
@@ -1422,8 +1436,12 @@ mod patches_generation {
                 receivers: vec![],
             },
         ));
-        let (room, command_rx) =
-            get_room_and_commands_receiver(2, |_| true, tracks).await;
+        let (room, command_rx) = get_room_and_commands_receiver(
+            2,
+            |_| media_exchange_state::Stable::Enabled.into(),
+            tracks,
+        )
+        .await;
 
         let room_handle = room.new_handle();
 
@@ -1443,6 +1461,7 @@ mod patches_generation {
                     vec![TrackPatchCommand {
                         id: TrackId(1),
                         enabled: Some(false),
+                        muted: None,
                     }]
                 ),
                 _ => {
@@ -1473,8 +1492,12 @@ mod patches_generation {
                 receivers: vec![],
             },
         ));
-        let (room, command_rx) =
-            get_room_and_commands_receiver(2, |_| true, tracks).await;
+        let (room, command_rx) = get_room_and_commands_receiver(
+            2,
+            |_| media_exchange_state::Stable::Enabled.into(),
+            tracks,
+        )
+        .await;
 
         let room_handle = room.new_handle();
 
@@ -1494,6 +1517,7 @@ mod patches_generation {
                     vec![TrackPatchCommand {
                         id: TrackId(2),
                         enabled: Some(false),
+                        muted: None,
                     }]
                 ),
                 _ => {
@@ -1502,6 +1526,81 @@ mod patches_generation {
             }
         }
     }
+
+    /// Checks that correct [`TrackPatchCommand`] generated on muting.
+    #[wasm_bindgen_test]
+    async fn track_patch_on_muting() {
+        let (room, mut command_rx) = get_room_and_commands_receiver(
+            1,
+            |_| mute_state::Stable::Unmuted.into(),
+            audio_and_device_video_tracks_content(),
+        )
+        .await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.mute_audio()).await.unwrap_err();
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatchCommand {
+                    id: TrackId(0),
+                    enabled: None,
+                    muted: Some(true),
+                }]
+            }
+        );
+    }
+
+    /// Checks that correct [`TrackPatchCommand`] generated on unmuting.
+    #[wasm_bindgen_test]
+    async fn track_patch_on_unmuting() {
+        let (room, mut command_rx) = get_room_and_commands_receiver(
+            1,
+            |_| mute_state::Stable::Muted.into(),
+            audio_and_device_video_tracks_content(),
+        )
+        .await;
+        let room_handle = room.new_handle();
+
+        spawn_local(async move {
+            JsFuture::from(room_handle.unmute_audio())
+                .await
+                .unwrap_err();
+        });
+
+        assert_eq!(
+            command_rx.next().await.unwrap(),
+            Command::UpdateTracks {
+                peer_id: PeerId(1),
+                tracks_patches: vec![TrackPatchCommand {
+                    id: TrackId(0),
+                    enabled: None,
+                    muted: Some(false),
+                }]
+            }
+        );
+    }
+}
+
+/// Checks that muting and unmuting of audio works.
+#[wasm_bindgen_test]
+async fn mute_unmute_audio() {
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (room, peer, _) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(true, true)),
+    )
+    .await;
+
+    let handle = room.new_handle();
+    assert!(JsFuture::from(handle.mute_audio()).await.is_ok());
+    assert!(!peer.is_send_audio_unmuted());
+    assert!(JsFuture::from(handle.unmute_audio()).await.is_ok());
+    assert!(peer.is_send_audio_unmuted());
 }
 
 /// Tests that disabling and enabling of remote audio works.
@@ -1557,6 +1656,7 @@ async fn disable_by_server() {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1587,6 +1687,7 @@ async fn enable_by_server() {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1603,6 +1704,7 @@ async fn enable_by_server() {
                 id: audio_track_id,
                 enabled_general: Some(true),
                 enabled_individual: Some(true),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1638,6 +1740,7 @@ async fn only_one_gum_performed_on_enable() {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1655,6 +1758,7 @@ async fn only_one_gum_performed_on_enable() {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1689,6 +1793,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1706,6 +1811,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             })],
         })
         .unwrap();
@@ -1756,8 +1862,8 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
         assert_eq!(err.name(), "MediaConnections");
         assert_eq!(
             err.message(),
-            "Some MediaConnectionsError: MediaExchangeState of Sender \
-             transits into opposite to expected MediaExchangeState"
+            "Some MediaConnectionsError: MediaState of Sender transits into \
+             opposite to expected MediaExchangeState"
         );
     });
     yield_now().await;

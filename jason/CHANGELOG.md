@@ -47,8 +47,8 @@ All user visible changes to this project will be documented in this file. This p
                 - `DeviceVideoTrackConstraints.exact_height`;
                 - `DeviceVideoTrackConstraints.height_in_range`.
             - `FacingMode` enum ([#137]).
-        - `MediaKind` enum that provides `MediaTrack` and `InputDeviceInfo` kind ([#146]);
-        - `MediaSourceKind` enum that provides `MediaTrack` media source kind (`Device` or `Display`) ([#146]);
+        - `MediaKind` enum that provides `LocalMediaTrack`/`RemoteMediaTrack` and `InputDeviceInfo` kind ([#146]);
+        - `MediaSourceKind` enum that provides `MediaTrack` media source kind (`Device` or `Display`) ([#146], [#156]);
         - Room management:
             - `Jason.init_room()` ([#46]);
             - `Room.join()` ([#46]);
@@ -56,14 +56,21 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145]);
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `MediaTrack.on_enabled` and `MediaTrack.on_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123], [#143]);
-        - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `MediaTrack` is added ([#123], [#143]);
+        - `RemoteMediaTrack.on_enabled` and `RemoteMediaTrack.on_disabled` callbacks being called when `RemoteMediaTrack` is enabled or disabled ([#123], [#143], [#156]);
+        - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `RemoteMediaTrack` is added ([#123], [#143], [#156]);
         - Enabling/disabling remote video/audio ([#127], [#155]):
             - `Room.disable_remote_audio`;
             - `Room.enable_remote_audio`;
             - `Room.disable_remote_video`;
             - `Room.enable_remote_video`.
-        - `MediaTrack.media_source_kind` function ([#145], [#146]).
+        - Muting/unmuting audio/video send ([#156]):
+            - `Room.mute_audio`;
+            - `Room.unmute_audio`;
+            - `Room.mute_video`;
+            - `Room.unmute_video`.
+        - `RemoteMediaTrack`/`LocalMediaTrack` `media_source_kind` function ([#145], [#146], [#156]);
+        - `RemoteMediaTrack` class ([#156]);
+        - `LocalMediaTrack` class ([#156]).
     - Optional tracks support ([#106]);
     - Simultaneous device and display video tracks publishing and receiving ([#144]);
     - `RtcIceTransportPolicy` configuration ([#79]).
@@ -80,8 +87,9 @@ All user visible changes to this project will be documented in this file. This p
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
-        - `ApplyTracks` for enabling/disabling ([#81], [#155]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
+        - Enabling/disabling audio/video send/receive via `UpdateTracks` command ([#81], [#155]);
+        - Muting/unmuting audio/video send via `UpdateTracks` ([#156]).
     - Handling of RPC events:
         - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
         - `ConnectionQualityUpdated` ([#132]).
@@ -122,6 +130,7 @@ All user visible changes to this project will be documented in this file. This p
 [#146]: /../../pull/146
 [#147]: /../../pull/147
 [#155]: /../../pull/155
+[#156]: /../../pull/156
 [#158]: /../../pull/158
 
 

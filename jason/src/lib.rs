@@ -30,6 +30,7 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 pub use self::{
     api::{ConnectionHandle, Jason, RoomCloseReason, RoomHandle},
     media::{
+        track::{local::JsTrack, remote::Track},
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, FacingMode, JsMediaSourceKind, MediaKind,
         MediaStreamSettings,

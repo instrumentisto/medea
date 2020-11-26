@@ -1,5 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
+use std::rc::{Rc, Weak};
+
 use futures::channel::oneshot;
 use medea_jason::{
     media::MediaManager, DeviceVideoTrackConstraints, MediaStreamSettings,
@@ -22,13 +24,13 @@ async fn track_autostop() {
     assert_eq!(1, tracks.len());
     let (strong_track, strong_track_is_new) = tracks.pop().unwrap();
     assert!(strong_track_is_new);
-    let sys_track = Clone::clone(strong_track.as_ref());
-    let weak_track = strong_track.downgrade();
+    let sys_track = Clone::clone(strong_track.sys_track());
+    let weak_track = Rc::downgrade(&strong_track);
 
     assert!(sys_track.ready_state() == MediaStreamTrackState::Live);
     drop(strong_track);
     assert!(sys_track.ready_state() == MediaStreamTrackState::Ended);
-    assert!(!weak_track.can_be_upgraded());
+    assert_eq!(Weak::strong_count(&weak_track), 0);
 }
 
 #[wasm_bindgen_test]

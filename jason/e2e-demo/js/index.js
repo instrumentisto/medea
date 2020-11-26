@@ -13,6 +13,8 @@ let disableAudioSend = document.getElementById('control__disable_audio_send');
 let disableVideoSend = document.getElementById('control__disable_video_send');
 let disableAudioRecv = document.getElementById('control__disable_audio_recv');
 let disableVideoRecv = document.getElementById('control__disable_video_recv');
+let muteAudioSend = document.getElementById('control__mute_audio_send');
+let muteVideoSend = document.getElementById('control__mute_video_send');
 let closeApp = document.getElementById('control__close_app');
 let audioSelect = document.getElementById('connect__select-device_audio');
 let videoSelect = document.getElementById('connect__select-device_video');
@@ -453,6 +455,8 @@ window.onload = async function() {
   let isVideoSendEnabled = true;
   let isAudioRecvEnabled = true;
   let isVideoRecvEnabled = true;
+  let isAudioMuted = false;
+  let isVideoMuted = false;
   let room = await newRoom();
 
   async function initLocalStream() {
@@ -813,6 +817,36 @@ window.onload = async function() {
           if (!isCallStarted) {
             await initLocalStream();
           }
+        }
+      } catch (e) {
+        console.error(e.trace());
+      }
+    });
+    muteAudioSend.addEventListener('click', async () => {
+      try {
+        if (isAudioMuted) {
+          await room.unmute_audio();
+          isAudioMuted = false;
+          muteAudioSend.textContent = 'Mute audio send';
+        } else {
+          await room.mute_audio();
+          isAudioMuted = true;
+          muteAudioSend.textContent = 'Unmute audio send';
+        }
+      } catch (e) {
+        console.error(e.trace());
+      }
+    });
+    muteVideoSend.addEventListener('click', async () => {
+      try {
+        if (isVideoMuted) {
+          await room.unmute_video();
+          isVideoMuted = false;
+          muteVideoSend.textContent = 'Mute video send';
+        } else {
+          await room.mute_video();
+          isVideoMuted = true;
+          muteVideoSend.textContent = 'Unmute video send';
         }
       } catch (e) {
         console.error(e.trace());
