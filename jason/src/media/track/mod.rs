@@ -1,6 +1,6 @@
 //! [MediaStreamTrack][1] related objects.
 //!
-//! [1]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
+//! [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
 
 pub mod local;
 pub mod remote;
@@ -20,6 +20,7 @@ pub enum JsMediaSourceKind {
 }
 
 impl From<JsMediaSourceKind> for MediaSourceKind {
+    #[inline]
     fn from(val: JsMediaSourceKind) -> Self {
         match val {
             JsMediaSourceKind::Device => Self::Device,
@@ -29,6 +30,7 @@ impl From<JsMediaSourceKind> for MediaSourceKind {
 }
 
 impl From<MediaSourceKind> for JsMediaSourceKind {
+    #[inline]
     fn from(val: MediaSourceKind) -> Self {
         match val {
             MediaSourceKind::Device => Self::Device,

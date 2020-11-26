@@ -253,24 +253,32 @@ impl Sender {
 
 #[cfg(feature = "mockable")]
 impl Sender {
-    /// Checks whether general media exchange state of the [`Sender`] is in
+    /// Indicates whether general media exchange state of this [`Sender`] is in
     /// [`StableMediaExchangeState::Disabled`].
+    #[inline]
+    #[must_use]
     pub fn general_disabled(&self) -> bool {
         self.general_media_exchange_state.get()
             == media_exchange_state::Stable::Disabled
     }
 
-    /// Returns `true` if this [`Sender`] is disabled.
+    /// Indicates whether this [`Sender`] is disabled.
+    #[inline]
+    #[must_use]
     pub fn disabled(&self) -> bool {
         self.media_exchange_state.disabled()
     }
 
-    /// Returns `true` if this [`Sender`] is muted.
+    /// Indicates whether this [`Sender`] is muted.
+    #[inline]
+    #[must_use]
     pub fn muted(&self) -> bool {
         self.mute_state.muted()
     }
 
-    /// Returns `true` if this [`Sender`] is enabled.
+    /// Indicates whether this [`Sender`] is enabled.
+    #[inline]
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.media_exchange_state.enabled()
     }

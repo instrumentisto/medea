@@ -262,12 +262,16 @@ impl Receiver {
         }
     }
 
-    /// Returns `true` if this [`Receiver`] is enabled.
+    /// Indicates whether this [`Receiver`] is enabled.
+    #[inline]
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.media_exchange_state_controller.enabled()
     }
 
-    /// Returns `true` if this [`Receiver`] is disabled.
+    /// Indicates whether this [`Receiver`] is disabled.
+    #[inline]
+    #[must_use]
     pub fn disabled(&self) -> bool {
         self.media_exchange_state_controller.disabled()
     }

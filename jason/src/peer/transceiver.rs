@@ -76,7 +76,8 @@ impl Transceiver {
         self.send_track.borrow().clone()
     }
 
-    /// Sets underlying [`local::Track`] `enabled` field to the provided if any.
+    /// Sets the underlying [`local::Track`]'s `enabled` field to the provided
+    /// value, if any.
     pub fn set_send_track_enabled(&self, enabled: bool) {
         if let Some(track) = self.send_track.borrow().as_ref() {
             track.set_enabled(enabled);

@@ -17,7 +17,9 @@ pub enum Stable {
 }
 
 impl Stable {
-    /// Returns opposite to this [`Stable`].
+    /// Returns the opposite value to this [`Stable`].
+    #[inline]
+    #[must_use]
     pub fn opposite(self) -> Self {
         match self {
             Self::Enabled => Self::Disabled,
@@ -60,8 +62,8 @@ impl From<bool> for Stable {
 /// [`MediaExchangeState`] in transition to another [`Stable`].
 ///
 /// [`Stable`] which is stored in [`Transition`] variants is a state which we
-/// already have, but we still waiting for a desired state update. If desired
-/// state update won't be received, then the stored [`Stable`] will be
+/// have already, but we still waiting for the desired state update. If the
+/// desired state update won't be received, then the stored [`Stable`] will be
 /// applied.
 ///
 /// [`MediaExchangeState`]: super::MediaExchangeState
@@ -109,9 +111,8 @@ impl InTransition for Transition {
         }
     }
 
-    /// Converts [`Transition`] to the opposite
-    /// [`Transition`] with a same inner
-    /// [`Stable`].
+    /// Converts [`Transition`] to the opposite [`Transition`] with the same
+    /// inner [`Stable`].
     #[inline]
     fn opposite(self) -> Self {
         match self {

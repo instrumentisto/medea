@@ -28,7 +28,7 @@ pub type MuteState =
 /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
 #[derive(Clone, Copy, Debug, From)]
 pub enum MediaState {
-    /// Responsible for changing [enabled][1] property of
+    /// Responsible for changing [`enabled`][1] property of
     /// [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
@@ -38,14 +38,14 @@ pub enum MediaState {
     /// Responsible for changing [RTCRtpTransceiverDirection][1] to stop
     /// traffic flow.
     ///
-    /// Requires renegotiation for changes to take effect.
+    /// Requires renegotiation for changes to take an effect.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
     MediaExchange(media_exchange_state::Stable),
 }
 
 impl MediaState {
-    /// Generates [`TrackPatchCommand`] with a provided [`TrackId`] based on
+    /// Generates [`TrackPatchCommand`] with a provided [`TrackId`] basing on
     /// this [`MediaState`].
     ///
     /// If [`MediaState`] is [`MediaState::Mute`] then
@@ -53,6 +53,7 @@ impl MediaState {
     ///
     /// If [`MediaState`] is [`MediaState::MediaExchange`] then
     /// [`TrackPatchCommand::enabled`] will be [`Some`].
+    #[must_use]
     pub fn generate_track_patch(self, track_id: TrackId) -> TrackPatchCommand {
         match self {
             Self::Mute(mute) => TrackPatchCommand {
@@ -70,7 +71,9 @@ impl MediaState {
         }
     }
 
-    /// Returns opposite to this [`mute_state::Stable`].
+    /// Returns the opposite value to this [`mute_state::Stable`].
+    #[inline]
+    #[must_use]
     pub fn opposite(self) -> Self {
         match self {
             Self::Mute(mute) => Self::Mute(mute.opposite()),
@@ -86,6 +89,7 @@ pub trait InStable: Clone + Copy + PartialEq {
     type Transition: InTransition;
 
     /// Converts this [`InStable`] into [`InStable::Transition`].
+    #[must_use]
     fn start_transition(self) -> Self::Transition;
 }
 
@@ -94,15 +98,19 @@ pub trait InTransition: Clone + Copy + PartialEq {
     type Stable: InStable;
 
     /// Returns intention which this state indicates.
+    #[must_use]
     fn intended(self) -> Self::Stable;
 
     /// Sets inner [`InTransition::Stable`] state.
+    #[must_use]
     fn set_inner(self, inner: Self::Stable) -> Self;
 
     /// Returns inner [`InTransition::Stable`] state.
+    #[must_use]
     fn into_inner(self) -> Self::Stable;
 
     /// Returns opposite to this [`InTransition`].
+    #[must_use]
     fn opposite(self) -> Self;
 }
 
@@ -127,6 +135,7 @@ where
     /// [`TransitableState::Transition`].
     ///
     /// No-op if already in the `desired_state`.
+    #[must_use]
     pub fn transition_to(self, desired_state: S) -> Self {
         if self == desired_state.into() {
             return self;
@@ -143,8 +152,9 @@ where
         }
     }
 
-    /// Cancels ongoing transition if any.
+    /// Cancels an ongoing transition, if any.
     #[inline]
+    #[must_use]
     pub fn cancel_transition(self) -> Self {
         match self {
             Self::Stable(_) => self,
@@ -154,24 +164,28 @@ where
 }
 
 impl From<media_exchange_state::Stable> for MediaExchangeState {
+    #[inline]
     fn from(from: media_exchange_state::Stable) -> Self {
         Self::Stable(from)
     }
 }
 
 impl From<media_exchange_state::Transition> for MediaExchangeState {
+    #[inline]
     fn from(from: media_exchange_state::Transition) -> Self {
         Self::Transition(from)
     }
 }
 
 impl From<mute_state::Stable> for MuteState {
+    #[inline]
     fn from(from: mute_state::Stable) -> Self {
         Self::Stable(from)
     }
 }
 
 impl From<mute_state::Transition> for MuteState {
+    #[inline]
     fn from(from: mute_state::Transition) -> Self {
         Self::Transition(from)
     }

@@ -1,4 +1,4 @@
-//! Component that manages [`TransitableState`].
+//! Component managing [`TransitableState`].
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
@@ -21,13 +21,14 @@ use super::TransitableState;
 /// [`TransitableStateController`] for the [`mute_state`].
 pub type MuteStateController =
     TransitableStateController<mute_state::Stable, mute_state::Transition>;
+
 /// [`TransitableStateController`] for the [`media_exchange_state`].
 pub type MediaExchangeStateController = TransitableStateController<
     media_exchange_state::Stable,
     media_exchange_state::Transition,
 >;
 
-/// Component that manages all kinds of [`TransitableState`].
+/// Component managing all kinds of [`TransitableState`].
 pub struct TransitableStateController<S, T> {
     /// Actual [`TransitableState`].
     state: ObservableCell<TransitableState<S, T>>,
@@ -46,8 +47,9 @@ where
     #[cfg(feature = "mockable")]
     const TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
 
-    /// Returns new [`TransitableStateController`] with a provided
+    /// Returns new [`TransitableStateController`] with the provided
     /// [`InStable`] state.
+    #[must_use]
     pub(in super::super) fn new(state: S) -> Rc<Self> {
         let this = Rc::new(Self {
             state: ObservableCell::new(state.into()),
@@ -57,12 +59,13 @@ where
         this
     }
 
-    /// Spawns all needed [`Stream`] listeners for this
+    /// Spawns all the required [`Stream`] listeners for this
     /// [`TransitableStateController`].
     ///
-    /// [`Stream`]: futures::stream::Stream
+    /// [`Stream`]: futures::Stream
     fn spawn(self: Rc<Self>) {
-        // we don't care about initial state, cause transceiver is inactive atm
+        // We don't care about initial state, be cause transceiver is inactive
+        // at that moment.
         let mut state_changes = self.state.subscribe().skip(1);
         let weak_this = Rc::downgrade(&self);
         spawn_local(async move {
@@ -118,12 +121,14 @@ where
     }
 
     /// Returns current [`TransitableStateController::state`].
+    #[inline]
+    #[must_use]
     pub fn state(&self) -> TransitableState<S, T> {
         self.state.get()
     }
 
-    /// Starts transition of the [`TransitableStateController::state`] to
-    /// the provided one.
+    /// Starts transition of the [`TransitableStateController::state`] to the
+    /// provided one.
     pub(in super::super) fn transition_to(&self, desired_state: S) {
         let current_state = self.state.get();
         self.state.set(current_state.transition_to(desired_state));
@@ -139,11 +144,10 @@ where
     /// # Errors
     ///
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`]
-    /// is returned if [`TransitableStateController`]'s
-    /// [`MediaState`] transits into the opposite to the
-    /// `desired_state`.
+    /// is returned if [`TransitableStateController`]'s [`MediaState`] transits
+    /// into the opposite to the `desired_state`.
     ///
-    /// [`Future`]: futures::future::Future
+    /// [`Future`]: std::future::Future
     /// [`MediaState`]: super::MediaState
     pub fn when_media_state_stable(
         &self,
@@ -191,28 +195,36 @@ where
 }
 
 impl MuteStateController {
-    /// Checks whether [`TransitableStateController`]'s mute state
-    /// is in [`mute_state::Stable::Muted`].
+    /// Indicates whether [`TransitableStateController`]'s mute state is in
+    /// [`mute_state::Stable::Muted`].
+    #[inline]
+    #[must_use]
     pub fn muted(&self) -> bool {
         self.state.get() == mute_state::Stable::Muted.into()
     }
 
-    /// Checks whether [`TransitableStateController`]'s mute state
-    /// is in [`mute_state::Stable::Unmuted`].
+    /// Indicates whether [`TransitableStateController`]'s mute state is in
+    /// [`mute_state::Stable::Unmuted`].
+    #[inline]
+    #[must_use]
     pub fn unmuted(&self) -> bool {
         self.state.get() == mute_state::Stable::Unmuted.into()
     }
 }
 
 impl MediaExchangeStateController {
-    /// Checks whether [`TransitableStateController`]'s media exchange state
+    /// Indicates whether [`TransitableStateController`]'s media exchange state
     /// is in [`media_exchange_state::Stable::Disabled`].
+    #[inline]
+    #[must_use]
     pub fn disabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Disabled.into()
     }
 
-    /// Checks whether [`TransitableStateController`]'s media exchange state
+    /// Indicates whether [`TransitableStateController`]'s media exchange state
     /// is in [`media_exchange_state::Stable::Enabled`].
+    #[inline]
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.state.get() == media_exchange_state::Stable::Enabled.into()
     }

@@ -394,10 +394,11 @@ impl PeerConnection {
         };
     }
 
-    /// Returns `true` if all [`TransceiverSide`]s with a provided
-    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in the
+    /// Indicates whether all [`TransceiverSide`]s with the provided
+    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] are in the
     /// provided [`MediaState`].
     #[inline]
+    #[must_use]
     pub fn is_all_transceiver_sides_in_media_state(
         &self,
         kind: MediaKind,
@@ -604,9 +605,8 @@ impl PeerConnection {
         Ok(())
     }
 
-    /// Updates [`local::Track`]s being used in [`PeerConnection`]s
-    /// [`Sender`]s. [`Sender`]s are chosen based on provided
-    /// [`LocalStreamUpdateCriteria`].
+    /// Updates [`local::Track`]s being used in [`PeerConnection`]s [`Sender`]s.
+    /// [`Sender`]s are chosen based on provided [`LocalStreamUpdateCriteria`].
     ///
     /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
     /// date (you set those with [`PeerConnection::create_tracks`]). If
@@ -648,8 +648,7 @@ impl PeerConnection {
     /// With [`MediaConnectionsError::InvalidMediaTracks`],
     /// [`MediaConnectionsError::InvalidMediaTrack`] or
     /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
-    /// [`local::Track`] couldn't inserted into [`PeerConnection`]s
-    /// [`Sender`]s.
+    /// [`local::Track`] couldn't inserted into [`PeerConnection`]s [`Sender`]s.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -923,34 +922,46 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Indicates whether all [`Receiver`]s audio tracks are enabled.
     #[cfg(feature = "mockable")]
+    /// Indicates whether all [`Receiver`]s audio tracks are enabled.
+    #[inline]
+    #[must_use]
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.media_connections.is_recv_audio_enabled()
     }
 
-    /// Indicates whether all [`Receiver`]s video tracks are enabled.
     #[cfg(feature = "mockable")]
+    /// Indicates whether all [`Receiver`]s video tracks are enabled.
+    #[inline]
+    #[must_use]
     pub fn is_recv_video_enabled(&self) -> bool {
         self.media_connections.is_recv_video_enabled()
     }
 
     /// Returns inner [`IceCandidate`]'s buffer length. Used in tests.
+    #[inline]
+    #[must_use]
     pub fn candidates_buffer_len(&self) -> usize {
         self.ice_candidates_buffer.borrow().len()
     }
 
     /// Lookups [`Sender`] by provided [`TrackId`].
+    #[inline]
+    #[must_use]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
         self.media_connections.get_sender_by_id(id)
     }
 
     /// Indicates whether all [`Sender`]s audio tracks are enabled.
+    #[inline]
+    #[must_use]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.media_connections.is_send_audio_enabled()
     }
 
     /// Indicates whether all [`Sender`]s video tracks are enabled.
+    #[inline]
+    #[must_use]
     pub fn is_send_video_enabled(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -958,7 +969,9 @@ impl PeerConnection {
         self.media_connections.is_send_video_enabled(source_kind)
     }
 
-    /// Returns `true` if all [`Sender`]s video tracks are unmuted.
+    /// Indicates whether all [`Sender`]s video tracks are unmuted.
+    #[inline]
+    #[must_use]
     pub fn is_send_video_unmuted(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -966,14 +979,17 @@ impl PeerConnection {
         self.media_connections.is_send_video_unmuted(source_kind)
     }
 
-    /// Returns `true` if all [`Sender`]s audio tracks are unmuted.
+    /// Indicates whether all [`Sender`]s audio tracks are unmuted.
+    #[inline]
+    #[must_use]
     pub fn is_send_audio_unmuted(&self) -> bool {
         self.media_connections.is_send_audio_unmuted()
     }
 }
 
 impl Drop for PeerConnection {
-    /// Drops `on_track` and `on_ice_candidate` callbacks to prevent leak.
+    /// Drops `on_track` and `on_ice_candidate` callbacks to prevent possible
+    /// leaks.
     fn drop(&mut self) {
         let _ = self.peer.on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);
         let _ = self

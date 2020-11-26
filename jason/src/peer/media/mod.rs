@@ -65,21 +65,25 @@ pub trait TransceiverSide: MediaStateControllable {
 /// [`MuteStateController`] for objects that use it.
 pub trait MediaStateControllable {
     /// Returns reference to the [`MediaExchangeStateController`].
+    #[must_use]
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController>;
 
-    /// Returns reference to the [`MuteStateController`].
+    /// Returns a reference to the [`MuteStateController`].
+    #[must_use]
     fn mute_state_controller(&self) -> Rc<MuteStateController>;
 
     /// Returns [`MediaExchangeState`] of this [`MediaStateControllable`].
     #[inline]
+    #[must_use]
     fn media_exchange_state(&self) -> MediaExchangeState {
         self.media_exchange_state_controller().state()
     }
 
     /// Returns [`MuteState`] of this [`MediaStateControllable`].
     #[inline]
+    #[must_use]
     fn mute_state(&self) -> MuteState {
         self.mute_state_controller().state()
     }
@@ -108,10 +112,11 @@ pub trait MediaStateControllable {
         Ok(())
     }
 
-    /// Returns `true` if [`Room`] should subscribe to the [`MediaState`] update
+    /// Indicates whether [`Room`] should subscribe to the [`MediaState`] update
     /// when updating [`MediaStateControllable`] to the provided [`MediaState`].
     ///
     /// [`Room`]: crate::api::Room
+    #[must_use]
     fn is_subscription_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
             MediaState::MediaExchange(media_exchange) => {
@@ -133,12 +138,13 @@ pub trait MediaStateControllable {
         }
     }
 
-    /// Returns `true` if [`Room`] should send [`TrackPatchCommand`] to the
+    /// Indicates whether [`Room`] should send [`TrackPatchCommand`] to the
     /// server when updating [`MediaStateControllable`] to the provided
     /// [`MediaState`].
     ///
     /// [`TrackPatchCommand`]: medea_client_api_proto::TrackPatchCommand
     /// [`Room`]: crate::api::Room
+    #[must_use]
     fn is_track_patch_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
             MediaState::MediaExchange(media_exchange) => {
@@ -164,17 +170,17 @@ pub trait MediaStateControllable {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`MediaState`] of
-    /// this [`MediaStateControllable`] will be [`TransitableState::Stable`] or
-    /// it is dropped.
+    /// Returns [`Future`] which will be resolved when [`MediaState`] of this
+    /// [`MediaStateControllable`] will be [`TransitableState::Stable`] or it's
+    /// dropped.
     ///
     /// # Errors
     ///
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`]
-    /// is returned if [`MediaState`] transits into the opposite to
-    /// the `desired_state`.
+    /// is returned if [`MediaState`] transits into the opposite to the
+    /// `desired_state`.
     ///
-    /// [`Future`]: futures::future::Future
+    /// [`Future`]: std::future::Future
     #[inline]
     fn when_media_state_stable(
         &self,
@@ -405,9 +411,10 @@ impl MediaConnections {
         )
     }
 
-    /// Returns `true` if all [`TransceiverSide`]s with provided
-    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] is in
-    /// provided [`MediaExchangeState`].
+    /// Indicates whether all [`TransceiverSide`]s with provided [`MediaKind`],
+    /// [`TrackDirection`] and [`MediaSourceKind`] is in the provided
+    /// [`MediaExchangeState`].
+    #[must_use]
     pub fn is_all_tracks_in_media_state(
         &self,
         kind: MediaKind,
@@ -817,6 +824,7 @@ impl MediaConnections {
 impl MediaConnections {
     /// Indicates whether all [`Receiver`]s with [`MediaKind::Video`] are
     /// enabled.
+    #[must_use]
     pub fn is_recv_video_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -827,6 +835,7 @@ impl MediaConnections {
 
     /// Indicates whether if all [`Receiver`]s with [`MediaKind::Audio`] are
     /// enabled.
+    #[must_use]
     pub fn is_recv_audio_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -836,11 +845,13 @@ impl MediaConnections {
     }
 
     /// Returns [`Receiver`] with the provided [`TrackId`].
+    #[must_use]
     pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
         self.0.borrow().receivers.get(&id).cloned()
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
+    #[must_use]
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -849,6 +860,7 @@ impl MediaConnections {
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Video`] are enabled.
+    #[must_use]
     pub fn is_send_video_enabled(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -862,7 +874,8 @@ impl MediaConnections {
             .all(|s| s.enabled())
     }
 
-    /// Returns `true` if all [`Sender`]s video tracks are unmuted.
+    /// Indicates whether all [`Sender`]'s video tracks are unmuted.
+    #[must_use]
     pub fn is_send_video_unmuted(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -877,7 +890,8 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Returns `true` if all [`Sender`]s audio tracks are unmuted.
+    /// Indicates whether all [`Sender`]'s audio tracks are unmuted.
+    #[must_use]
     pub fn is_send_audio_unmuted(&self) -> bool {
         self.0
             .borrow()

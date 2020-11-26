@@ -304,8 +304,8 @@ impl RoomHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Sets callback, which will be invoked when new [`local::Track`]
-    /// will be added to this [`Room`].
+    /// Sets callback, which will be invoked when new [`local::Track`] will be
+    /// added to this [`Room`].
     /// This might happen in such cases:
     /// 1. Media server initiates media request.
     /// 2. `disable_audio`/`enable_video` is called.
@@ -384,8 +384,8 @@ impl RoomHandle {
     /// [`MediaKind`], [`TrackDirection`] and [`JsMediaSourceKind`] to the
     /// provided [`MediaState`].
     ///
-    /// Helper function for all exported mute/unmute/enable/disable audio/video
-    /// send/receive methods.
+    /// Helper function for all the exported mute/unmute/enable/disable
+    /// audio/video send/receive methods.
     fn change_media_state<S>(
         &self,
         media_state: S,
@@ -1198,7 +1198,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
-    /// [`Connection::update_quality_score`][1].
+    /// [`Connection::update_quality_score()`][1].
     ///
     /// [`Connection`]: crate::api::Connection
     /// [1]: crate::api::Connection::update_quality_score
@@ -1255,8 +1255,8 @@ impl PeerEventHandler for InnerRoom {
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
     /// [`remote::Track`] to the related [`Connection`].
     ///
-    /// [`Stream`]: futures::stream::Stream
     /// [`Connection`]: crate::api::Connection
+    /// [`Stream`]: futures::Stream
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,

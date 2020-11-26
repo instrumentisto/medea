@@ -91,13 +91,14 @@ impl LocalTracksConstraints {
         self.0.borrow_mut().constrain(other)
     }
 
-    /// Clones underlying [`MediaStreamSettings`].
+    /// Clones the underlying [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn inner(&self) -> MediaStreamSettings {
         self.0.borrow().clone()
     }
 
-    /// Changes underlying [`MediaStreamSettings`] based on provided
+    /// Changes the underlying [`MediaStreamSettings`] basing on the provided
     /// [`MediaState`].
     #[inline]
     pub fn set_media_state(
@@ -114,6 +115,7 @@ impl LocalTracksConstraints {
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
     /// [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow().enabled(kind)
     }
@@ -121,6 +123,7 @@ impl LocalTracksConstraints {
     /// Indicates whether provided [`MediaType`] is muted in the underlying
     /// [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn muted(&self, kind: &MediaType) -> bool {
         self.0.borrow().muted(kind)
     }
@@ -128,6 +131,7 @@ impl LocalTracksConstraints {
     /// Indicates whether provided [`MediaKind`] and [`MediaSourceKind`] are
     /// enabled in this [`LocalTracksConstraints`].
     #[inline]
+    #[must_use]
     pub fn is_track_enabled(
         &self,
         kind: MediaKind,
@@ -425,14 +429,14 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets the underlying [`AudioMediaTracksSettings::muted`] to the
-    /// given value.
+    /// Sets the underlying [`AudioMediaTracksSettings::muted`] to the provided
+    /// value.
     fn set_audio_muted(&mut self, muted: bool) {
         self.audio.muted = muted;
     }
 
-    /// Sets underlying [`VideoTrackConstraints::muted`] based on provided
-    /// [`MediaSourceKind`] to the given value.
+    /// Sets the underlying [`VideoTrackConstraints::muted`] basing on the
+    /// provided [`MediaSourceKind`] to the given value.
     fn set_video_muted(
         &mut self,
         muted: bool,
@@ -518,6 +522,7 @@ impl MediaStreamSettings {
     /// Indicates whether the given [`MediaType`] is muted in this
     /// [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn muted(&self, kind: &MediaType) -> bool {
         match kind {
             MediaType::Video(video) => match video.source_kind {
@@ -530,6 +535,8 @@ impl MediaStreamSettings {
 
     /// Indicates whether the given [`MediaKind`] and [`MediaSourceKind`] are
     /// enabled in this [`MediaStreamSettings`].
+    #[inline]
+    #[must_use]
     pub fn is_track_enabled(
         &self,
         kind: MediaKind,

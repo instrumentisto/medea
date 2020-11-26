@@ -366,7 +366,9 @@ pub enum TrackChange {
 }
 
 impl TrackChange {
-    /// Returns `true` if this [`TrackChange`] doesn't requires renegotiation.
+    /// Indicates whether this [`TrackChange`] doesn't require renegotiation.
+    #[inline]
+    #[must_use]
     fn is_negotiation_state_agnostic(&self) -> bool {
         matches!(
             self,
@@ -964,7 +966,7 @@ impl Peer<Stable> {
     /// [`PeerStateMachine::get_updates`]. Calls
     /// [`PeerUpdatesSubscriber::negotiation_needed`] notifying subscriber that
     /// this [`Peer`] has changes to negotiate. Changes that can be applied
-    /// regardless of negotiation state will be immediately force pushed to
+    /// regardless of negotiation state will be immediately force-pushed to
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty() {

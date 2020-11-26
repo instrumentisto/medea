@@ -1,8 +1,8 @@
-//! State of the media mute state.
+//! State of media mute state.
 
 use super::{InStable, InTransition};
 
-/// State of the media mute state.
+/// State of media mute state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Stable {
     /// [`MediaStateControllable`] is muted.
@@ -17,7 +17,9 @@ pub enum Stable {
 }
 
 impl Stable {
-    /// Returns opposite to this [`Stable`].
+    /// Returns the opposite value to this [`Stable`].
+    #[inline]
+    #[must_use]
     pub fn opposite(self) -> Self {
         match self {
             Self::Muted => Self::Unmuted,
@@ -52,8 +54,8 @@ impl InStable for Stable {
 /// [`MuteState`] in transition to another [`Stable`].
 ///
 /// [`Stable`] which is stored in [`Transition`] variants is a state which we
-/// already have, but we still waiting for a desired state update. If desired
-/// state update won't be received, then the stored [`Stable`] will be
+/// have already, but we still waiting for the desired state update. If the
+/// desired state update won't be received, then the stored [`Stable`] will be
 /// applied.
 ///
 /// [`MuteState`]: super::MuteState
