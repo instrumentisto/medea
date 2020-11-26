@@ -466,7 +466,7 @@ impl PeersService {
     /// Creates and sets [`IceUser`], registers [`Peer`] in
     /// [`PeerTrafficWatcher`].
     ///
-    /// [`IceUser`]: crate::media::ice_user::IceUser
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     async fn peer_post_construct(
         &self,
         peer_id: PeerId,

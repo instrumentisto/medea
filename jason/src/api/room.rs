@@ -15,7 +15,7 @@ use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
     MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
-    TrackId, TrackPatchCommand, TrackUpdate,
+    TrackId, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -24,13 +24,14 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
+        track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaStreamSettings,
-        MediaStreamTrack, RecvConstraints,
+        RecvConstraints,
     },
     peer::{
-        media_exchange_state, LocalStreamUpdateCriteria, MediaConnectionsError,
-        PeerConnection, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
-        RtcStats, TrackDirection,
+        media_exchange_state, mute_state, LocalStreamUpdateCriteria,
+        MediaConnectionsError, MediaState, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -134,7 +135,9 @@ pub enum RoomError {
     #[display(fmt = "Remote stream from unknown member")]
     UnknownRemoteMember,
 
-    /// Returned if [`MediaStreamTrack`] update failed.
+    /// Returned if [`track`] update failed.
+    ///
+    /// [`track`]: crate::media::track
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     FailedTrackPatch(TrackId),
 
@@ -228,27 +231,32 @@ impl RoomHandle {
 
     /// Enables or disables specified media and source types publish or receival
     /// in all [`PeerConnection`]s.
-    async fn set_track_enabled(
+    async fn set_track_media_state(
         &self,
-        enabled: bool,
+        new_state: MediaState,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.toggle_enable_constraints(enabled, kind, direction, source_kind);
-        while !inner.is_all_peers_in_media_exchange_state(
+        inner.set_constraints_media_state(
+            new_state,
             kind,
             direction,
             source_kind,
-            media_exchange_state::Stable::from(enabled),
+        );
+        while !inner.is_all_peers_in_media_state(
+            kind,
+            direction,
+            source_kind,
+            new_state,
         ) {
             inner
-                .toggle_media_exchange(enabled, kind, direction, source_kind)
+                .toggle_media_state(new_state, kind, direction, source_kind)
                 .await
                 .map_err::<Traced<RoomError>, _>(|e| {
-                    inner.toggle_enable_constraints(
-                        !enabled,
+                    inner.set_constraints_media_state(
+                        new_state.opposite(),
                         kind,
                         direction,
                         source_kind,
@@ -258,7 +266,11 @@ impl RoomHandle {
         }
 
         // Enabled senders may require new tracks to be inserted.
-        if let (true, TrackDirection::Send) = (enabled, direction) {
+        if let (
+            MediaState::MediaExchange(media_exchange_state::Stable::Enabled),
+            TrackDirection::Send,
+        ) = (new_state, direction)
+        {
             for peer in inner.peers.get_all() {
                 peer.update_local_stream(
                     LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
@@ -292,8 +304,8 @@ impl RoomHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Sets callback, which will be invoked when new local [`MediaStreamTrack`]
-    /// will be added to this [`Room`].
+    /// Sets callback, which will be invoked when new [`local::Track`] will be
+    /// added to this [`Room`].
     /// This might happen in such cases:
     /// 1. Media server initiates media request.
     /// 2. `disable_audio`/`enable_video` is called.
@@ -352,7 +364,7 @@ impl RoomHandle {
     /// callback.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
@@ -368,34 +380,99 @@ impl RoomHandle {
         })
     }
 
-    /// Disables outbound audio in this [`Room`].
-    pub fn disable_audio(&self) -> Promise {
+    /// Returns [`Promise`] which will switch [`MediaState`] of the provided
+    /// [`MediaKind`], [`TrackDirection`] and [`JsMediaSourceKind`] to the
+    /// provided [`MediaState`].
+    ///
+    /// Helper function for all the exported mute/unmute/enable/disable
+    /// audio/video send/receive methods.
+    fn change_media_state<S>(
+        &self,
+        media_state: S,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise
+    where
+        S: Into<MediaState> + 'static,
+    {
         let this = Self(self.0.clone());
         future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                MediaKind::Audio,
-                TrackDirection::Send,
-                None,
+            this.set_track_media_state(
+                media_state.into(),
+                kind,
+                direction,
+                source_kind.map(Into::into),
             )
             .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
+    /// Mutes outbound audio in this [`Room`].
+    pub fn mute_audio(&self) -> Promise {
+        self.change_media_state(
+            mute_state::Stable::Muted,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+    }
+
+    /// Unmutes outbound audio in this [`Room`].
+    pub fn unmute_audio(&self) -> Promise {
+        self.change_media_state(
+            mute_state::Stable::Unmuted,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+    }
+
+    /// Mutes outbound video in this [`Room`].
+    pub fn mute_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        self.change_media_state(
+            mute_state::Stable::Muted,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
+    }
+
+    /// Unmutes outbound video in this [`Room`].
+    pub fn unmute_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        self.change_media_state(
+            mute_state::Stable::Unmuted,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
+    }
+
+    /// Disables outbound audio in this [`Room`].
+    pub fn disable_audio(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+    }
+
     /// Enables outbound audio in this [`Room`].
     pub fn enable_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                MediaKind::Audio,
-                TrackDirection::Send,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
     /// Disables outbound video.
@@ -405,17 +482,12 @@ impl RoomHandle {
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                MediaKind::Video,
-                TrackDirection::Send,
-                source_kind.map(Into::into),
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
     /// Enables outbound video.
@@ -425,77 +497,52 @@ impl RoomHandle {
         &self,
         source_kind: Option<JsMediaSourceKind>,
     ) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                MediaKind::Video,
-                TrackDirection::Send,
-                source_kind.map(Into::into),
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
     /// Disables inbound audio in this [`Room`].
     pub fn disable_remote_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                MediaKind::Audio,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Audio,
+            TrackDirection::Recv,
+            None,
+        )
     }
 
     /// Disables inbound video in this [`Room`].
     pub fn disable_remote_video(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                false,
-                MediaKind::Video,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Video,
+            TrackDirection::Recv,
+            None,
+        )
     }
 
     /// Enables inbound audio in this [`Room`].
     pub fn enable_remote_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                MediaKind::Audio,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Audio,
+            TrackDirection::Recv,
+            None,
+        )
     }
 
     /// Enables inbound video in this [`Room`].
     pub fn enable_remote_video(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.set_track_enabled(
-                true,
-                MediaKind::Video,
-                TrackDirection::Recv,
-                None,
-            )
-            .await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Video,
+            TrackDirection::Recv,
+            None,
+        )
     }
 }
 
@@ -658,11 +705,11 @@ struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
 
-    /// Constraints to local [`MediaStreamTrack`]s that are being published by
+    /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 
-    /// Constraints to the [`MediaStreamTrack`] received by [`PeerConnection`]s
+    /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
     /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
@@ -673,13 +720,15 @@ struct InnerRoom {
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
+    ///
+    /// [`Connection`]: crate::api::Connection
     connections: Connections,
 
-    /// Callback to be invoked when new local [`MediaStreamTrack`] will be
-    /// added to this [`Room`].
-    on_local_track: Callback1<MediaStreamTrack>,
+    /// Callback to be invoked when new local [`local::JsTrack`] will be added
+    /// to this [`Room`].
+    on_local_track: Callback1<local::JsTrack>,
 
-    /// Callback to be invoked when failed obtain [`MediaStreamTrack`]s from
+    /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     ///
     /// [`MediaManager`]: crate::media::MediaManager
@@ -729,18 +778,28 @@ impl InnerRoom {
     /// Toggles [`InnerRoom::recv_constraints`] or
     /// [`InnerRoom::send_constraints`] media exchange status based on the
     /// provided [`TrackDirection`], [`MediaKind`] and [`MediaSourceKind`].
-    fn toggle_enable_constraints(
+    fn set_constraints_media_state(
         &self,
-        enabled: bool,
+        state: MediaState,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
     ) {
-        if let TrackDirection::Recv = direction {
-            self.recv_constraints.set_enabled(enabled, kind);
-        } else {
-            self.send_constraints
-                .set_enabled(enabled, kind, source_kind);
+        use media_exchange_state::Stable::Enabled;
+        use MediaState::{MediaExchange, Mute};
+        use TrackDirection::{Recv, Send};
+
+        match (direction, state) {
+            (Send, _) => {
+                self.send_constraints
+                    .set_media_state(state, kind, source_kind);
+            }
+            (Recv, MediaExchange(exchange)) => {
+                self.recv_constraints.set_enabled(exchange == Enabled, kind);
+            }
+            (Recv, Mute(_)) => {
+                unreachable!("Receivers muting is not implemented")
+            }
         }
     }
 
@@ -752,90 +811,47 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`TransceiverSide`]s [`media_exchange_state::State`] by provided
+    /// Toggles [`TransceiverSide`]s [`MediaState`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
-    ///
-    /// Will fallback to the previous [`media_exchange_state::State`]s if some
-    /// [`TransceiverSide`] can't be disabled because
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
-    async fn toggle_media_exchange(
+    async fn toggle_media_state(
         &self,
-        enabled: bool,
+        state: MediaState,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
-        let mut states_backup = HashMap::new();
-        let tracks_to_disable: HashMap<_, _> = self
+        let disable_tracks: HashMap<_, _> = self
             .peers
             .get_all()
             .into_iter()
             .map(|peer| {
-                let mut trnscvrs_backup_media_exchange_state = HashMap::new();
-                let new_states = peer
+                let new_media_exchange_states = peer
                     .get_transceivers_sides(kind, direction, source_kind)
                     .into_iter()
                     .filter(|transceiver| transceiver.is_transitable())
-                    .map(|transceiver| {
-                        let backup_stable_media_exchange_state =
-                            match transceiver.media_exchange_state() {
-                                media_exchange_state::State::Stable(stable) => {
-                                    stable
-                                }
-                                media_exchange_state::State::Transition(
-                                    transition,
-                                ) => transition.intended(),
-                            };
-                        trnscvrs_backup_media_exchange_state.insert(
-                            transceiver.track_id(),
-                            backup_stable_media_exchange_state,
-                        );
-                        (
-                            transceiver.track_id(),
-                            media_exchange_state::Stable::from(enabled),
-                        )
-                    })
+                    .map(|transceiver| (transceiver.track_id(), state))
                     .collect();
-                states_backup
-                    .insert(peer.id(), trnscvrs_backup_media_exchange_state);
-                (peer.id(), new_states)
+                (peer.id(), new_media_exchange_states)
             })
             .collect();
 
-        let update_result =
-            self.update_media_exchange_states(tracks_to_disable).await;
-        if let Err(RoomError::MediaConnections(
-            MediaConnectionsError::CannotDisableRequiredSender,
-        )) = &update_result.as_ref().map_err(AsRef::as_ref)
-        {
-            self.update_media_exchange_states(states_backup).await?;
-        }
-
-        update_result
+        self.update_media_states(disable_tracks).await
     }
 
-    /// Updates [`media_exchange_state::State`]s of the [`TransceiverSide`] with
-    /// a provided [`PeerId`] and [`TrackId`] to a provided
-    /// [`media_exchange_state::Stable`]s.
+    /// Updates [`MediaState`]s of the [`TransceiverSide`] with a
+    /// provided [`PeerId`] and [`TrackId`] to a provided
+    /// [`MediaState`]s.
     ///
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
-    async fn update_media_exchange_states(
+    async fn update_media_states(
         &self,
-        desired_states: HashMap<
-            PeerId,
-            HashMap<TrackId, media_exchange_state::Stable>,
-        >,
+        desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
     ) -> Result<(), Traced<RoomError>> {
-        use media_exchange_state::{
-            Stable::Enabled,
-            State::{Stable, Transition},
-        };
-
         future::try_join_all(
             desired_states
                 .into_iter()
@@ -853,35 +869,25 @@ impl InnerRoom {
                                 .map(|trnscvr| (trnscvr, desired_state))
                         })
                         .filter_map(|(trnscvr, desired_state)| {
-                            match trnscvr.media_exchange_state() {
-                                Transition(transition) => Some((
-                                    trnscvr,
-                                    desired_state,
-                                    transition.intended() != desired_state,
-                                )),
-                                Stable(stable) => {
-                                    if stable == desired_state {
-                                        None
-                                    } else {
-                                        Some((trnscvr, desired_state, true))
-                                    }
-                                }
+                            if trnscvr.is_subscription_needed(desired_state) {
+                                let need_patch = trnscvr
+                                    .is_track_patch_needed(desired_state);
+                                Some((trnscvr, desired_state, need_patch))
+                            } else {
+                                None
                             }
                         })
-                        .map(|(trnscvr, desired_state, should_be_patched)| {
-                            trnscvr.media_exchange_state_transition_to(
-                                desired_state,
-                            )?;
+                        .map(|(trnscvr, desired_state, need_patch)| {
+                            trnscvr.media_state_transition_to(desired_state)?;
                             transitions_futs.push(
-                                trnscvr.when_media_exchange_state_stable(
-                                    desired_state,
-                                ),
+                                trnscvr.when_media_state_stable(desired_state),
                             );
-                            if should_be_patched {
-                                tracks_patches.push(TrackPatchCommand {
-                                    id: trnscvr.track_id(),
-                                    enabled: Some(desired_state == Enabled),
-                                });
+                            if need_patch {
+                                tracks_patches.push(
+                                    desired_state.generate_track_patch(
+                                        trnscvr.track_id(),
+                                    ),
+                                );
                             }
 
                             Ok(())
@@ -907,22 +913,22 @@ impl InnerRoom {
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
     /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
-    /// provided [`media_exchange_state::Stable`].
+    /// provided [`MediaState`].
     ///
-    /// [`Receiver`]: crate::peer::Receiver
     /// [`Sender`]: crate::peer::Sender
-    pub fn is_all_peers_in_media_exchange_state(
+    /// [`Receiver`]: crate::peer::Receiver
+    pub fn is_all_peers_in_media_state(
         &self,
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-        state: media_exchange_state::Stable,
+        state: MediaState,
     ) -> bool {
         self.peers
             .get_all()
             .into_iter()
             .find(|p| {
-                !p.is_all_transceiver_sides_in_media_exchange_state(
+                !p.is_all_transceiver_sides_in_media_state(
                     kind,
                     direction,
                     source_kind,
@@ -935,14 +941,14 @@ impl InnerRoom {
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStreamTrack`]s that correspond to provided settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStreamTrack`]s in all
+    /// [`local::Track`]s that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change [`local::Track`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// Will update [`media_exchange_state::State`]s of the [`Sender`]s which
+    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
@@ -960,11 +966,17 @@ impl InnerRoom {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_media_exchange_states| {
-                    states_update.insert(peer.id(), new_media_exchange_states)
+                    states_update.insert(
+                        peer.id(),
+                        new_media_exchange_states
+                            .into_iter()
+                            .map(|(id, s)| (id, s.into()))
+                            .collect(),
+                    );
                 })?;
         }
 
-        self.update_media_exchange_states(states_update)
+        self.update_media_states(states_update)
             .await
             .map_err(tracerr::map_from_and_wrap!())
     }
@@ -1045,6 +1057,8 @@ impl EventHandler for InnerRoom {
     ///
     /// If provided `sdp_offer` is `Some`, then offer is applied to a created
     /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
+    ///
+    /// [`Connection`]: crate::api::Connection
     async fn on_peer_created(
         &self,
         peer_id: PeerId,
@@ -1184,7 +1198,10 @@ impl EventHandler for InnerRoom {
     }
 
     /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
-    /// [`Connection::update_quality_score`].
+    /// [`Connection::update_quality_score()`][1].
+    ///
+    /// [`Connection`]: crate::api::Connection
+    /// [1]: crate::api::Connection::update_quality_score
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,
@@ -1236,11 +1253,14 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
-    /// [`MediaStreamTrack`] to the related [`Connection`].
+    /// [`remote::Track`] to the related [`Connection`].
+    ///
+    /// [`Connection`]: crate::api::Connection
+    /// [`Stream`]: futures::Stream
     async fn on_new_remote_track(
         &self,
         sender_id: MemberId,
-        track: MediaStreamTrack,
+        track: remote::Track,
     ) -> Self::Output {
         let conn = self
             .connections
@@ -1251,12 +1271,12 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Invokes `on_local_stream` [`Room`]'s callback.
+    /// Invokes `on_local_track` [`Room`]'s callback.
     async fn on_new_local_track(
         &self,
-        track: MediaStreamTrack,
+        track: Rc<local::Track>,
     ) -> Self::Output {
-        self.on_local_track.call(track);
+        self.on_local_track.call(local::JsTrack::new(track));
         Ok(())
     }
 

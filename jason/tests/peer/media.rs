@@ -7,8 +7,8 @@ use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        media_exchange_state, Disableable, LocalStreamUpdateCriteria,
-        MediaConnections, RtcPeerConnection, SimpleTracksRequest,
+        media_exchange_state, LocalStreamUpdateCriteria, MediaConnections,
+        MediaStateControllable, RtcPeerConnection, SimpleTracksRequest,
     },
 };
 use wasm_bindgen_test::*;
@@ -58,16 +58,16 @@ async fn get_test_media_connections(
     media_connections
         .get_sender_by_id(audio_track_id)
         .unwrap()
-        .media_exchange_state_transition_to(media_exchange_state::Stable::from(
-            enabled_audio,
-        ))
+        .media_state_transition_to(
+            media_exchange_state::Stable::from(enabled_audio).into(),
+        )
         .unwrap();
     media_connections
         .get_sender_by_id(video_track_id)
         .unwrap()
-        .media_exchange_state_transition_to(media_exchange_state::Stable::from(
-            enabled_video,
-        ))
+        .media_state_transition_to(
+            media_exchange_state::Stable::from(enabled_video).into(),
+        )
         .unwrap();
 
     (media_connections, audio_track_id, video_track_id)
@@ -135,64 +135,68 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_general_disabled());
-    assert!(!video_track.is_general_disabled());
+    assert!(!audio_track.general_disabled());
+    assert!(!video_track.general_disabled());
 
     audio_track
-        .media_exchange_state_transition_to(Disabled)
+        .media_state_transition_to(Disabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
             enabled_general: Some(false),
             enabled_individual: Some(false),
+            muted: None,
         }])
         .await
         .unwrap();
-    assert!(audio_track.is_general_disabled());
-    assert!(!video_track.is_general_disabled());
+    assert!(audio_track.general_disabled());
+    assert!(!video_track.general_disabled());
 
     video_track
-        .media_exchange_state_transition_to(Disabled)
+        .media_state_transition_to(Disabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
             enabled_general: Some(false),
             enabled_individual: Some(false),
+            muted: None,
         }])
         .await
         .unwrap();
-    assert!(audio_track.is_general_disabled());
-    assert!(video_track.is_general_disabled());
+    assert!(audio_track.general_disabled());
+    assert!(video_track.general_disabled());
 
     audio_track
-        .media_exchange_state_transition_to(Enabled)
+        .media_state_transition_to(Enabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: audio_track_id,
             enabled_individual: Some(true),
             enabled_general: Some(true),
+            muted: None,
         }])
         .await
         .unwrap();
-    assert!(!audio_track.is_general_disabled());
-    assert!(video_track.is_general_disabled());
+    assert!(!audio_track.general_disabled());
+    assert!(video_track.general_disabled());
 
     video_track
-        .media_exchange_state_transition_to(Enabled)
+        .media_state_transition_to(Enabled.into())
         .unwrap();
     media_connections
         .patch_tracks(vec![TrackPatchEvent {
             id: video_track_id,
             enabled_individual: Some(true),
             enabled_general: Some(true),
+            muted: None,
         }])
         .await
         .unwrap();
-    assert!(!audio_track.is_general_disabled());
-    assert!(!video_track.is_general_disabled());
+    assert!(!audio_track.general_disabled());
+    assert!(!video_track.general_disabled());
 }
 
 #[wasm_bindgen_test]
@@ -205,8 +209,8 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(audio_track.is_general_disabled());
-    assert!(!video_track.is_general_disabled());
+    assert!(audio_track.general_disabled());
+    assert!(!video_track.general_disabled());
 }
 
 #[wasm_bindgen_test]
@@ -219,8 +223,8 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let video_track =
         media_connections.get_sender_by_id(video_track_id).unwrap();
 
-    assert!(!audio_track.is_general_disabled());
-    assert!(video_track.is_general_disabled());
+    assert!(!audio_track.general_disabled());
+    assert!(video_track.general_disabled());
 }
 
 /// Tests for [`Sender::update`] function.
@@ -249,10 +253,11 @@ mod sender_patch {
                 id: TrackId(track_id.0 + 100),
                 enabled_individual: Some(false),
                 enabled_general: Some(false),
+                muted: None,
             })
             .await;
 
-        assert!(!sender.is_general_disabled());
+        assert!(!sender.general_disabled());
     }
 
     #[wasm_bindgen_test]
@@ -263,10 +268,11 @@ mod sender_patch {
                 id: track_id,
                 enabled_individual: Some(false),
                 enabled_general: Some(false),
+                muted: None,
             })
             .await;
 
-        assert!(sender.is_general_disabled());
+        assert!(sender.general_disabled());
     }
 
     #[wasm_bindgen_test]
@@ -277,10 +283,11 @@ mod sender_patch {
                 id: track_id,
                 enabled_individual: Some(true),
                 enabled_general: Some(true),
+                muted: None,
             })
             .await;
 
-        assert!(!sender.is_general_disabled());
+        assert!(!sender.general_disabled());
     }
 
     #[wasm_bindgen_test]
@@ -291,19 +298,21 @@ mod sender_patch {
                 id: track_id,
                 enabled_individual: Some(false),
                 enabled_general: Some(false),
+                muted: None,
             })
             .await;
-        assert!(sender.is_general_disabled());
+        assert!(sender.general_disabled());
 
         sender
             .update(&TrackPatchEvent {
                 id: track_id,
                 enabled_individual: Some(false),
                 enabled_general: Some(false),
+                muted: None,
             })
             .await;
 
-        assert!(sender.is_general_disabled());
+        assert!(sender.general_disabled());
     }
 
     #[wasm_bindgen_test]
@@ -314,10 +323,11 @@ mod sender_patch {
                 id: track_id,
                 enabled_individual: None,
                 enabled_general: None,
+                muted: None,
             })
             .await;
 
-        assert!(!sender.is_general_disabled());
+        assert!(!sender.general_disabled());
     }
 }
 
@@ -359,6 +369,7 @@ mod receiver_patch {
             id: TrackId(TRACK_ID.0 + 100),
             enabled_individual: Some(false),
             enabled_general: Some(false),
+            muted: None,
         });
 
         assert!(!receiver.is_general_disabled());
@@ -371,6 +382,7 @@ mod receiver_patch {
             id: TRACK_ID,
             enabled_individual: Some(false),
             enabled_general: Some(false),
+            muted: None,
         });
 
         assert!(receiver.is_general_disabled());
@@ -383,6 +395,7 @@ mod receiver_patch {
             id: TRACK_ID,
             enabled_individual: Some(true),
             enabled_general: Some(true),
+            muted: None,
         });
 
         assert!(!receiver.is_general_disabled());
@@ -395,6 +408,7 @@ mod receiver_patch {
             id: TRACK_ID,
             enabled_individual: Some(false),
             enabled_general: Some(false),
+            muted: None,
         });
         assert!(receiver.is_general_disabled());
 
@@ -402,6 +416,7 @@ mod receiver_patch {
             id: TRACK_ID,
             enabled_individual: Some(false),
             enabled_general: Some(false),
+            muted: None,
         });
 
         assert!(receiver.is_general_disabled());
@@ -414,6 +429,7 @@ mod receiver_patch {
             id: TRACK_ID,
             enabled_individual: None,
             enabled_general: None,
+            muted: None,
         });
 
         assert!(!receiver.is_general_disabled());

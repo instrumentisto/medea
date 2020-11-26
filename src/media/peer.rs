@@ -366,6 +366,21 @@ pub enum TrackChange {
 }
 
 impl TrackChange {
+    /// Indicates whether this [`TrackChange`] doesn't require renegotiation.
+    #[inline]
+    #[must_use]
+    fn is_negotiation_state_agnostic(&self) -> bool {
+        matches!(
+            self,
+            Self::TrackPatch(TrackPatchEvent {
+                id: _,
+                enabled_individual: None,
+                enabled_general: None,
+                muted: Some(_),
+            })
+        )
+    }
+
     /// Tries to return new [`Track`] based on this [`TrackChange`].
     ///
     /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
@@ -950,17 +965,37 @@ impl Peer<Stable> {
     /// those changes as applied, so they can be retrieved via
     /// [`PeerStateMachine::get_updates`]. Calls
     /// [`PeerUpdatesSubscriber::negotiation_needed`] notifying subscriber that
-    /// this [`Peer`] has changes to negotiate.
+    /// this [`Peer`] has changes to negotiate. Changes that can be applied
+    /// regardless of negotiation state will be immediately force-pushed to
+    /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty() {
+            let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
                 let change = task.dispatch_with(self);
-                self.context.pending_track_updates.push(change);
+                if change.is_negotiation_state_agnostic() {
+                    negotiationless_changes.push(change);
+                } else {
+                    self.context.pending_track_updates.push(change);
+                }
             }
 
             self.dedup_pending_track_updates();
 
-            self.context.peer_updates_sub.negotiation_needed(self.id());
+            if self.context.pending_track_updates.is_empty() {
+                self.context.peer_updates_sub.force_update(
+                    self.id(),
+                    negotiationless_changes
+                        .into_iter()
+                        .map(|c| c.as_track_update(self.partner_member_id()))
+                        .collect(),
+                );
+            } else {
+                self.context
+                    .pending_track_updates
+                    .append(&mut negotiationless_changes);
+                self.context.peer_updates_sub.negotiation_needed(self.id());
+            }
         }
     }
 
@@ -1278,10 +1313,12 @@ pub mod tests {
             TrackPatchCommand {
                 id: TrackId(0),
                 enabled: Some(false),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
                 enabled: Some(false),
+                muted: None,
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1320,30 +1357,37 @@ pub mod tests {
             TrackPatchCommand {
                 id: TrackId(1),
                 enabled: Some(false),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 enabled: None,
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
                 enabled: Some(true),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 enabled: Some(false),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 enabled: Some(true),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(2),
                 enabled: None,
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(1),
                 enabled: None,
+                muted: None,
             },
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
@@ -1388,12 +1432,14 @@ pub mod tests {
                 id: TrackId(0),
                 enabled_individual: None,
                 enabled_general: None,
+                muted: None,
             }),
             TrackChange::IceRestart,
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 enabled_individual: None,
                 enabled_general: None,
+                muted: None,
             }),
         ];
 
@@ -1454,30 +1500,36 @@ pub mod tests {
                 id: TrackId(0),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 enabled_general: Some(true),
                 enabled_individual: Some(true),
+                muted: None,
             }),
             TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             }),
         ];
         peer.as_changes_scheduler().patch_tracks(vec![
             TrackPatchCommand {
                 id: TrackId(0),
                 enabled: Some(false),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(0),
                 enabled: Some(true),
+                muted: None,
             },
             TrackPatchCommand {
                 id: TrackId(0),
                 enabled: Some(false),
+                muted: None,
             },
         ]);
         peer.inner_force_commit_scheduled_changes();
@@ -1508,11 +1560,13 @@ pub mod tests {
                 id: TrackId(2),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             });
             let whitelisted_patch = TrackChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
+                muted: None,
             });
             let mut patches =
                 vec![whitelisted_patch.clone(), filtered_patch.clone()];
@@ -1535,26 +1589,31 @@ pub mod tests {
                     id: TrackId(1),
                     enabled_general: Some(true),
                     enabled_individual: Some(true),
+                    muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
                     enabled_general: Some(false),
                     enabled_individual: Some(false),
+                    muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
                     enabled_general: Some(false),
                     enabled_individual: Some(false),
+                    muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(1),
                     enabled_general: None,
                     enabled_individual: None,
+                    muted: None,
                 },
                 TrackPatchEvent {
                     id: TrackId(2),
                     enabled_general: Some(true),
                     enabled_individual: Some(true),
+                    muted: None,
                 },
             ]
             .into_iter()
@@ -1591,6 +1650,126 @@ pub mod tests {
                 let track_2 = merged_changes.get(&TrackId(2)).unwrap();
                 assert_eq!(track_2.enabled_general, Some(true));
             }
+        }
+    }
+
+    mod negotiation_state_agnostic_patches {
+        use super::*;
+
+        /// Checks that negotiation state agnostic changes will not start
+        /// renegotiation.
+        #[test]
+        fn negotiation_state_agnostic_change_dont_trigger_negotiation() {
+            let track_patch = TrackPatchEvent {
+                id: TrackId(0),
+                muted: Some(true),
+                enabled_individual: None,
+                enabled_general: None,
+            };
+            let changes = vec![TrackChange::TrackPatch(track_patch.clone())];
+
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub.expect_force_update().times(1).return_once(
+                move |peer_id: PeerId, updates: Vec<TrackUpdate>| {
+                    assert_eq!(peer_id, PeerId(0));
+                    assert_eq!(
+                        updates,
+                        vec![TrackUpdate::Updated(track_patch)]
+                    );
+                },
+            );
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(1),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+
+            peer.context.track_changes_queue = changes;
+            peer.commit_scheduled_changes();
+        }
+
+        /// Checks that [`TrackChange`] which doesn't requires negotiation with
+        /// [`TrackChange`] which requires negotiation will trigger negotiation.
+        #[test]
+        fn mixed_changeset_will_trigger_negotiation() {
+            let changes = vec![
+                TrackChange::TrackPatch(TrackPatchEvent {
+                    id: TrackId(0),
+                    muted: Some(true),
+                    enabled_individual: None,
+                    enabled_general: None,
+                }),
+                TrackChange::TrackPatch(TrackPatchEvent {
+                    id: TrackId(1),
+                    muted: None,
+                    enabled_individual: Some(true),
+                    enabled_general: Some(true),
+                }),
+            ];
+
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub
+                .expect_negotiation_needed()
+                .times(1)
+                .return_once(move |peer_id: PeerId| {
+                    assert_eq!(peer_id, PeerId(0));
+                });
+
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(1),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+
+            peer.context.track_changes_queue = changes.clone();
+            peer.commit_scheduled_changes();
+
+            let reversed_changes = {
+                let mut changes = changes;
+                changes.reverse();
+                changes
+            };
+            assert_eq!(peer.context.pending_track_updates, reversed_changes);
+        }
+
+        /// Checks that [`TrackChange`] which changes negotiationless property
+        /// and negotiationful property will trigger negotiation.
+        #[test]
+        fn mixed_change_will_trigger_negotiation() {
+            let changes = vec![TrackChange::TrackPatch(TrackPatchEvent {
+                id: TrackId(0),
+                muted: Some(true),
+                enabled_individual: Some(true),
+                enabled_general: Some(true),
+            })];
+
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub
+                .expect_negotiation_needed()
+                .times(1)
+                .return_once(move |peer_id: PeerId| {
+                    assert_eq!(peer_id, PeerId(0));
+                });
+
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(1),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+
+            peer.context.track_changes_queue = changes.clone();
+            peer.commit_scheduled_changes();
+
+            assert_eq!(peer.context.pending_track_updates, changes);
         }
     }
 }

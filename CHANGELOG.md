@@ -42,7 +42,8 @@ All user visible changes to this project will be documented in this file. This p
     - Calculate and send call quality score based on RTC stats ([#132]);
     - Enabling/disabling `MediaTrack`s by receiver ([#127], [#155]);
     - Send `TrackUpdate::IceRestart` based on RTC stats analysis ([#138]);
-    - Multiple `Room`s served by one RPC connection support ([#147]).
+    - Multiple `Room`s served by one RPC connection support ([#147]);
+    - Muting/unmuting `MediaTrack`s ([#156]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -85,6 +86,7 @@ All user visible changes to this project will be documented in this file. This p
 [#147]: /../../pull/147
 [#153]: /../../pull/153
 [#155]: /../../pull/155
+[#156]: /../../pull/156
 
 
 
