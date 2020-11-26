@@ -1,6 +1,6 @@
-const controlDomain = 'http://127.0.0.1:8000';
+const controlDomain = 'http://192.168.1.158:8000';
 const controlUrl = controlDomain + '/control-api/';
-const baseUrl = 'ws://127.0.0.1:8080/ws/';
+const baseUrl = 'ws://192.168.1.158:8080/ws/';
 
 let rust;
 let roomId = window.location.hash.replace('#', '');
@@ -761,10 +761,10 @@ window.onload = async function() {
             track.free();
           }
         }
+        await room.set_local_media_settings(constraints);
         if (isVideoSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints);
       } catch (e) {
         console.error('Changing video source failed: ' + e.message());
       }

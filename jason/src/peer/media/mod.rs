@@ -818,6 +818,10 @@ impl MediaConnections {
             .into_iter()
             .for_each(|t| t.reset_media_state_transition_timeout());
     }
+
+    pub fn get_all_senders(&self) -> Vec<Rc<Sender>> {
+        self.0.borrow().senders.values().cloned().collect()
+    }
 }
 
 #[cfg(feature = "mockable")]

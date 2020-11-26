@@ -684,11 +684,32 @@ impl PeerConnection {
 
             let used_caps = MediaStreamSettings::from(&required_caps);
 
-            let media_tracks = self
-                .media_manager
-                .get_tracks(used_caps)
+            let senders = self.media_connections.get_all_senders();
+            use future::FutureExt as _;
+            let dropped_tracks: HashMap<_, _> =
+                future::join_all(senders.iter().map(|s| {
+                    let track_id = s.track_id();
+                    s.remove_track().map(move |res| (track_id, res))
+                }))
                 .await
-                .map_err(tracerr::map_from_and_wrap!())?;
+                .into_iter()
+                .filter_map(|(track_id, is_dropped)| {
+                    if is_dropped {
+                        Some((track_id, media_exchange_state::Stable::Disabled))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            let media_tracks =
+                match self.media_manager.get_tracks(used_caps).await {
+                    Ok(tracks) => tracks,
+                    Err(_) => {
+                        return Ok(dropped_tracks);
+                    }
+                };
+
             let peer_tracks = required_caps
                 .parse_tracks(
                     media_tracks.iter().map(|(t, _)| t).cloned().collect(),
