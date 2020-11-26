@@ -338,11 +338,11 @@ impl MediaStreamSettings {
 }
 
 impl MediaStreamSettings {
-    /// Returns `true` if provided [`SysMediaStreamTrack`] satisfies some of the
-    /// [`VideoTrackConstraints`] from this [`MediaStreamSettings`].
+    /// Returns `true` if provided [`sys::MediaStreamTrack`] satisfies some of
+    /// the [`VideoTrackConstraints`] from this [`MediaStreamSettings`].
     ///
     /// Unconstrains [`VideoTrackConstraints`] which this
-    /// [`SysMediaStreamTrack`] satisfies by calling
+    /// [`sys::MediaStreamTrack`] satisfies by calling
     /// [`VideoTrackConstraints::unconstrain`].
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
@@ -994,13 +994,15 @@ impl<T: Constraint + Into<u32>> From<ConstrainU32<T>>
         let mut constraint = sys::ConstrainDoubleRange::new();
         match from {
             ConstrainU32::Exact(val) => {
-                constraint.exact(val.into() as f64);
+                constraint.exact(f64::from(val.into()));
             }
             ConstrainU32::Ideal(val) => {
-                constraint.ideal(val.into() as f64);
+                constraint.ideal(f64::from(val.into()));
             }
             ConstrainU32::Range(min, max) => {
-                constraint.min(min.into() as f64).max(max.into() as f64);
+                constraint
+                    .min(f64::from(min.into()))
+                    .max(f64::from(max.into()));
             }
         }
 
@@ -1153,42 +1155,42 @@ impl DeviceVideoTrackConstraints {
         self.facing_mode = Some(ConstrainString::Ideal(facing_mode));
     }
 
-    /// Sets exact [height][1] constraint.
+    /// Sets exact [`height`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
     pub fn exact_height(&mut self, height: u32) {
         self.height = Some(ConstrainU32::Exact(Height(height)));
     }
 
-    /// Sets ideal [height][1] constraint.
+    /// Sets ideal [`height`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
     pub fn ideal_height(&mut self, height: u32) {
         self.height = Some(ConstrainU32::Ideal(Height(height)));
     }
 
-    /// Sets range of [height][1] constraint.
+    /// Sets range of [`height`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
     pub fn height_in_range(&mut self, min: u32, max: u32) {
         self.height = Some(ConstrainU32::Range(Height(min), Height(max)));
     }
 
-    /// Sets exact [width][1] constraint.
+    /// Sets exact [`width`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
     pub fn exact_width(&mut self, width: u32) {
         self.width = Some(ConstrainU32::Exact(Width(width)));
     }
 
-    /// Sets ideal [width][1] constraint.
+    /// Sets ideal [`width`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
     pub fn ideal_width(&mut self, width: u32) {
         self.width = Some(ConstrainU32::Ideal(Width(width)));
     }
 
-    /// Sets range of [width][1] constraint.
+    /// Sets range of [`width`][1] constraint.
     ///
     /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
     pub fn width_in_range(&mut self, min: u32, max: u32) {
