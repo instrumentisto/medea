@@ -5,7 +5,7 @@
 mod constraints;
 mod device_info;
 mod manager;
-mod track;
+pub mod track;
 
 use wasm_bindgen::prelude::*;
 
@@ -20,7 +20,7 @@ pub use self::{
     },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
-    track::{JsMediaSourceKind, MediaStreamTrack},
+    track::JsMediaSourceKind,
 };
 
 /// [MediaStreamTrack.kind][1] representation.

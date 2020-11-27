@@ -41,6 +41,8 @@
     let disableVideoSendBtn = document.getElementById('control__disable_video_send');
     let disableAudioRecvBtn = document.getElementById('control__disable_audio_recv');
     let disableVideoRecvBtn = document.getElementById('control__disable_video_recv');
+    let muteAudioSendBtn = document.getElementById('control__mute_audio_send');
+    let muteVideoSendBtn = document.getElementById('control__mute_video_send');
     let joinCallerButton = document.getElementById('join__join');
     let connectionState = document.getElementById('connection-state__state');
     let videoDiv = document.getElementById('remote-videos');
@@ -60,6 +62,8 @@
     let isVideoSendEnabled = true;
     let isAudioRecvEnabled = true;
     let isVideoRecvEnabled = true;
+    let isAudioMuted = false;
+    let isVideoMuted = false;
     let isPublishingEnabled = true;
     let remote_videos = [];
 
@@ -718,6 +722,36 @@
           disableVideoRecvBtn.textContent = 'Disable video recv';
         }
       });
+      muteAudioSendBtn.addEventListener('click', async () => {
+        try {
+          if (isAudioMuted) {
+            await room.unmute_audio();
+            isAudioMuted = false;
+            muteAudioSendBtn.textContent = 'Mute audio send';
+          } else {
+            await room.mute_audio();
+            isAudioMuted = true;
+            muteAudioSendBtn.textContent = 'Unmute audio send';
+          }
+        } catch (e) {
+          console.error(e.trace());
+        }
+      });
+      muteVideoSendBtn.addEventListener('click', async () => {
+        try {
+          if (isVideoMuted) {
+            await room.unmute_video();
+            isVideoMuted = false;
+            muteVideoSendBtn.textContent = 'Mute video send';
+          } else {
+            await room.mute_video();
+            isVideoMuted = true;
+            muteVideoSendBtn.textContent = 'Unmute video send';
+          }
+        } catch (e) {
+          console.error(e.trace());
+        }
+      });
 
       let roomId = window.location.hash.replace('#', '');
 
@@ -853,6 +887,10 @@
           <div>
             <button class="btn btn-info" id="control__disable_audio_recv">Disable audio recv</button>
             <button class="btn btn-info" id="control__disable_video_recv">Disable video recv</button>
+          </div>
+          <div>
+            <button class="btn btn-info" id="control__mute_audio_send">Mute audio send</button>
+            <button class="btn btn-info" id="control__mute_video_send">Mute video send</button>
           </div>
         </div>
 

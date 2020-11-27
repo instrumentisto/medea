@@ -527,6 +527,7 @@ impl Track {
 pub struct TrackPatchCommand {
     pub id: TrackId,
     pub enabled: Option<bool>,
+    pub muted: Option<bool>,
 }
 
 /// Patch of the [`Track`] which Media Server can send with
@@ -551,6 +552,11 @@ pub struct TrackPatchEvent {
     /// So intention of this `Member` (`enabled_individual`) can be
     /// `false`, but real media exchange state can be `true`.
     pub enabled_general: Option<bool>,
+
+    /// `Track` mute state. Muting and unmuting can be performed without adding
+    /// / removing tracks from transceivers, hence renegotiation is not
+    /// required.
+    pub muted: Option<bool>,
 }
 
 impl From<TrackPatchCommand> for TrackPatchEvent {
@@ -559,6 +565,7 @@ impl From<TrackPatchCommand> for TrackPatchEvent {
             id: from.id,
             enabled_individual: from.enabled,
             enabled_general: None,
+            muted: from.muted,
         }
     }
 }
@@ -572,6 +579,7 @@ impl TrackPatchEvent {
             id,
             enabled_general: None,
             enabled_individual: None,
+            muted: None,
         }
     }
 
@@ -590,6 +598,10 @@ impl TrackPatchEvent {
 
         if let Some(enabled_individual) = another.enabled_individual {
             self.enabled_individual = Some(enabled_individual);
+        }
+
+        if let Some(muted) = another.muted {
+            self.muted = Some(muted);
         }
     }
 }
@@ -715,32 +727,38 @@ mod test {
                         id: TrackId(1),
                         enabled_general: Some(true),
                         enabled_individual: Some(true),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
                         enabled_general: Some(false),
                         enabled_individual: Some(false),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
                         enabled_general: None,
                         enabled_individual: None,
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
                         enabled_general: Some(true),
                         enabled_individual: Some(true),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
                         enabled_general: Some(true),
                         enabled_individual: Some(true),
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
                     enabled_general: Some(true),
                     enabled_individual: Some(true),
+                    muted: None,
                 },
             ),
             (
@@ -749,17 +767,20 @@ mod test {
                         id: TrackId(1),
                         enabled_general: None,
                         enabled_individual: None,
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
                         enabled_general: Some(true),
                         enabled_individual: Some(true),
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
                     enabled_general: Some(true),
                     enabled_individual: Some(true),
+                    muted: None,
                 },
             ),
             (
@@ -768,17 +789,20 @@ mod test {
                         id: TrackId(1),
                         enabled_general: Some(true),
                         enabled_individual: Some(true),
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(1),
                         enabled_general: None,
                         enabled_individual: None,
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
                     enabled_general: Some(true),
                     enabled_individual: Some(true),
+                    muted: None,
                 },
             ),
             (
@@ -787,17 +811,20 @@ mod test {
                         id: TrackId(1),
                         enabled_general: None,
                         enabled_individual: None,
+                        muted: None,
                     },
                     TrackPatchEvent {
                         id: TrackId(2),
                         enabled_general: Some(true),
                         enabled_individual: Some(true),
+                        muted: None,
                     },
                 ],
                 TrackPatchEvent {
                     id: TrackId(1),
                     enabled_general: None,
                     enabled_individual: None,
+                    muted: None,
                 },
             ),
         ] {
