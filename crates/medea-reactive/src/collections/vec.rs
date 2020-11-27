@@ -4,7 +4,14 @@ use std::{marker::PhantomData, slice::Iter};
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::subscribers_store::{progressable, SubscribersStore};
+use crate::subscribers_store::{common, progressable, SubscribersStore};
+
+/// Reactive vector based on [`Vec`] with ability to recognise when all updates
+/// was processed by subscribers.
+pub type ProgressableVec<T> =
+    Vec<T, progressable::SubStore<T>, progressable::Value<T>>;
+/// Reactive vector based on [`Vec`].
+pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 
 /// Reactive vector based on [`Vec`].
 ///
@@ -44,28 +51,51 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 /// assert_eq!(removed_items[1], "foo-2");
 /// # });
 /// ```
+///
+/// # Usage of when all completed functions
+///
+/// ```rust
+/// # use futures::{executor, StreamExt as _, Stream};
+/// use medea_reactive::collections::ProgressableVec;
+///
+/// # executor::block_on(async {
+/// let mut vec = ProgressableVec::new();
+///
+/// let mut on_push = vec.on_push();
+/// vec.push(1);
+///
+/// // vec.when_push_completed().await; <- wouldn't be resolved
+/// let value = on_push.next().await.unwrap();
+/// // vec.when_push_completed().await; <- wouldn't be resolved
+/// drop(value);
+///
+/// vec.when_push_completed().await; // will be resolved
+/// # });
+/// ```
 #[derive(Debug)]
-pub struct ObservableVec<T, S: SubscribersStore<T, O>, O> {
-    /// Data stored by this [`ObservableVec`].
-    store: Vec<T>,
+pub struct Vec<T, S: SubscribersStore<T, O>, O> {
+    /// Data stored by this [`Vec`].
+    store: std::vec::Vec<T>,
 
-    /// Subscribers of the [`ObservableVec::on_push`] method.
+    /// Subscribers of the [`Vec::on_push`] method.
     on_push_subs: S,
 
-    /// Subscribers of the [`ObservableVec::on_remove`] method.
+    /// Subscribers of the [`Vec::on_remove`] method.
     on_remove_subs: S,
 
-    /// Phantom type of [`ObservableVec::on_push`] and
-    /// [`ObservableVec::on_remove`] output.
+    /// Phantom type of [`Vec::on_push`] and
+    /// [`Vec::on_remove`] output.
     _output: PhantomData<O>,
 }
 
-impl<T> ObservableVec<T, progressable::SubStore<T>, progressable::Value<T>>
+impl<T> ProgressableVec<T>
 where
     T: Clone + 'static,
 {
     /// Returns [`Future`] which will be resolved when all push updates will be
-    /// processed by [`ObservableVec::on_push`] subscribers.
+    /// processed by [`Vec::on_push`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
     pub fn when_push_completed(&self) -> LocalBoxFuture<'static, ()> {
@@ -73,7 +103,9 @@ where
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
-    /// be processed by [`ObservableVec::on_remove`] subscribers.
+    /// be processed by [`Vec::on_remove`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
@@ -81,8 +113,8 @@ where
     }
 }
 
-impl<T, S: SubscribersStore<T, O>, O> ObservableVec<T, S, O> {
-    /// Returns new empty [`ObservableVec`].
+impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
+    /// Returns new empty [`Vec`].
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -99,21 +131,21 @@ impl<T, S: SubscribersStore<T, O>, O> ObservableVec<T, S, O> {
     /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
-    /// [`ObservableVec`] on drop.
+    /// [`Vec`] on drop.
     #[inline]
     pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.new_subscription(Vec::new())
+        self.on_remove_subs.new_subscription(std::vec::Vec::new())
     }
 }
 
-impl<T, S, O> ObservableVec<T, S, O>
+impl<T, S, O> Vec<T, S, O>
 where
     T: Clone,
     S: SubscribersStore<T, O>,
 {
     /// Appends an element to the back of a collection.
     ///
-    /// This will produce [`ObservableVec::on_push`] event.
+    /// This will produce [`Vec::on_push`] event.
     pub fn push(&mut self, value: T) {
         self.store.push(value.clone());
 
@@ -123,7 +155,7 @@ where
     /// Removes and returns the element at position `index` within the vector,
     /// shifting all elements after it to the left.
     ///
-    /// This will produce [`ObservableVec::on_remove`] event.
+    /// This will produce [`Vec::on_remove`] event.
     pub fn remove(&mut self, index: usize) -> T {
         let value = self.store.remove(index);
         self.on_remove_subs.send_update(value.clone());
@@ -134,18 +166,18 @@ where
     /// Returns the [`Stream`] to which the pushed values will be sent.
     ///
     /// Also to this [`Stream`] will be sent all already pushed values
-    /// of this [`ObservableVec`].
+    /// of this [`Vec`].
     #[inline]
     pub fn on_push(&self) -> impl Stream<Item = O> {
         self.on_push_subs.new_subscription(self.store.to_vec())
     }
 }
 
-impl<T, S: SubscribersStore<T, O>, O> Default for ObservableVec<T, S, O> {
+impl<T, S: SubscribersStore<T, O>, O> Default for Vec<T, S, O> {
     #[inline]
     fn default() -> Self {
         Self {
-            store: Vec::new(),
+            store: std::vec::Vec::new(),
             on_push_subs: S::default(),
             on_remove_subs: S::default(),
             _output: PhantomData::default(),
@@ -153,9 +185,9 @@ impl<T, S: SubscribersStore<T, O>, O> Default for ObservableVec<T, S, O> {
     }
 }
 
-impl<T, S: SubscribersStore<T, O>, O> From<Vec<T>> for ObservableVec<T, S, O> {
+impl<T, S: SubscribersStore<T, O>, O> From<std::vec::Vec<T>> for Vec<T, S, O> {
     #[inline]
-    fn from(from: Vec<T>) -> Self {
+    fn from(from: std::vec::Vec<T>) -> Self {
         Self {
             store: from,
             on_push_subs: S::default(),
@@ -165,9 +197,7 @@ impl<T, S: SubscribersStore<T, O>, O> From<Vec<T>> for ObservableVec<T, S, O> {
     }
 }
 
-impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator
-    for &'a ObservableVec<T, S, O>
-{
+impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator for &'a Vec<T, S, O> {
     type IntoIter = Iter<'a, T>;
     type Item = &'a T;
 
@@ -177,9 +207,9 @@ impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator
     }
 }
 
-impl<T, S: SubscribersStore<T, O>, O> Drop for ObservableVec<T, S, O> {
-    /// Sends all items of a dropped [`ObservableVec`] to the
-    /// [`ObservableVec::on_remove`] subs.
+impl<T, S: SubscribersStore<T, O>, O> Drop for Vec<T, S, O> {
+    /// Sends all items of a dropped [`Vec`] to the
+    /// [`Vec::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
@@ -189,7 +219,7 @@ impl<T, S: SubscribersStore<T, O>, O> Drop for ObservableVec<T, S, O> {
     }
 }
 
-impl<T, S, O> AsRef<[T]> for ObservableVec<T, S, O>
+impl<T, S, O> AsRef<[T]> for Vec<T, S, O>
 where
     T: Clone,
     S: SubscribersStore<T, O>,

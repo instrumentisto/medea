@@ -27,6 +27,8 @@ impl Manager {
 
     /// Returns [`Future`] which will be resolved when all subscribers will
     /// process update events.
+    ///
+    /// [`Future`]: std::future::Future
     pub(crate) fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         let fut = self.0.when_eq(0);
         Box::pin(async move {

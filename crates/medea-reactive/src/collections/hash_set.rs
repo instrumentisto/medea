@@ -1,14 +1,17 @@
 //! Reactive hash set based on [`HashSet`].
 
-use std::{
-    collections::{hash_set::Iter, HashSet},
-    hash::Hash,
-    marker::PhantomData,
-};
+use std::{collections::hash_set::Iter, hash::Hash, marker::PhantomData};
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::subscribers_store::{progressable, SubscribersStore};
+use crate::subscribers_store::{common, progressable, SubscribersStore};
+
+/// Reactive hash set based on [`HashSet`] with ability to recognise when all
+/// updates was processed by subscribers.
+pub type ProgressableHashSet<T> =
+    HashSet<T, progressable::SubStore<T>, progressable::Value<T>>;
+/// Reactive hash set based on [`HashSet`].
+pub type ObservableHashSet<T> = HashSet<T, common::SubStore<T>, T>;
 
 /// Reactive hash set based on [`HashSet`].
 ///
@@ -42,7 +45,7 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 ///     .unwrap();
 /// assert_eq!(removed_item, "foo");
 ///
-/// // When you update ObservableHashSet by another HashSet all events will
+/// // When you update HashSet by another HashSet all events will
 /// // work fine:
 /// set.insert("foo-1");
 /// set.insert("foo-2");
@@ -67,43 +70,68 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 /// assert!(set.contains(&"foo-4"));
 /// # });
 /// ```
+///
+/// # Usage of when all completed functions
+///
+/// ```rust
+/// # use futures::{executor, StreamExt as _, Stream};
+/// use medea_reactive::collections::ProgressableHashSet;
+///
+/// # executor::block_on(async {
+/// let mut hash_set = ProgressableHashSet::new();
+///
+/// let mut on_insert = hash_set.on_insert();
+/// hash_set.insert(1);
+///
+/// // hash_set.when_insert_completed().await; <- wouldn't be resolved
+/// let value = on_insert.next().await.unwrap();
+/// // hash_set.when_insert_completed().await; <- wouldn't be resolved
+/// drop(value);
+///
+/// hash_set.when_insert_completed().await; // will be resolved
+/// # });
+/// ```
 #[derive(Debug)]
-pub struct ObservableHashSet<T, S: SubscribersStore<T, O>, O> {
-    /// Data stored by this [`ObservableHashSet`].
-    store: HashSet<T>,
+pub struct HashSet<T, S: SubscribersStore<T, O>, O> {
+    /// Data stored by this [`HashSet`].
+    store: std::collections::HashSet<T>,
 
-    /// Subscribers of the [`ObservableHashSet::on_insert`] method.
+    /// Subscribers of the [`HashSet::on_insert`] method.
     on_insert_subs: S,
 
-    /// Subscribers of the [`ObservableHashSet::on_remove`] method.
+    /// Subscribers of the [`HashSet::on_remove`] method.
     on_remove_subs: S,
 
-    /// Phantom type of [`ObservableHashSet::on_insert`] and
-    /// [`ObservableHashSet::on_remove`] output.
+    /// Phantom type of [`HashSet::on_insert`] and
+    /// [`HashSet::on_remove`] output.
     _output: PhantomData<O>,
 }
 
-impl<T> ObservableHashSet<T, progressable::SubStore<T>, progressable::Value<T>>
+impl<T> ProgressableHashSet<T>
 where
     T: Clone + 'static,
 {
     /// Returns [`Future`] which will be resolved when all push updates will be
-    /// processed by [`ObservableHashSet::on_insert`] subscribers.
+    /// processed by [`HashSet::on_insert`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
-    /// be processed by [`ObservableHashSet::on_remove`] subscribers.
+    /// be processed by [`HashSet::on_remove`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_remove_subs.when_all_processed()
     }
 }
 
-impl<T, S: SubscribersStore<T, O>, O> ObservableHashSet<T, S, O> {
-    /// Returns new empty [`ObservableHashSet`].
+impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
+    /// Returns new empty [`HashSet`].
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -120,14 +148,14 @@ impl<T, S: SubscribersStore<T, O>, O> ObservableHashSet<T, S, O> {
     /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
-    /// [`ObservableHashSet`] on drop.
+    /// [`HashSet`] on drop.
     #[inline]
     pub fn on_remove(&self) -> impl Stream<Item = O> {
         self.on_remove_subs.new_subscription(Vec::new())
     }
 }
 
-impl<T, S, O> ObservableHashSet<T, S, O>
+impl<T, S, O> HashSet<T, S, O>
 where
     T: Clone + 'static,
     S: SubscribersStore<T, O>,
@@ -136,7 +164,7 @@ where
     /// sent.
     ///
     /// Also to this [`Stream`] will be sent all already inserted values
-    /// of this [`ObservableHashSet`].
+    /// of this [`HashSet`].
     #[inline]
     pub fn on_insert(&self) -> impl Stream<Item = O> {
         self.on_insert_subs
@@ -144,7 +172,7 @@ where
     }
 }
 
-impl<T, S, O> ObservableHashSet<T, S, O>
+impl<T, S, O> HashSet<T, S, O>
 where
     T: Clone + Hash + Eq + 'static,
     S: SubscribersStore<T, O>,
@@ -155,7 +183,7 @@ where
     ///
     /// If the set did have this value present, `false` is returned.
     ///
-    /// This will produce [`ObservableHashSet::on_insert`] event.
+    /// This will produce [`HashSet::on_insert`] event.
     pub fn insert(&mut self, value: T) -> bool {
         if self.store.insert(value.clone()) {
             self.on_insert_subs.send_update(value);
@@ -168,7 +196,7 @@ where
     /// Removes a value from the set. Returns whether the value was present in
     /// the set.
     ///
-    /// This will produce [`ObservableHashSet::on_remove`] event.
+    /// This will produce [`HashSet::on_remove`] event.
     pub fn remove(&mut self, value: &T) -> Option<T> {
         let value = self.store.take(value);
 
@@ -179,15 +207,15 @@ where
         value
     }
 
-    /// Makes this [`ObservableHashSet`] exactly the same as the passed
+    /// Makes this [`HashSet`] exactly the same as the passed
     /// [`HashSet`].
     ///
-    /// This function will calculate diff between [`ObservableHashSet`] and
-    /// provided [`HashSet`] and will spawn [`ObservableHashSet::on_insert`]
-    /// and [`ObservableHashSet::on_remove`] if set is changed.
+    /// This function will calculate diff between [`HashSet`] and
+    /// provided [`HashSet`] and will spawn [`HashSet::on_insert`]
+    /// and [`HashSet::on_remove`] if set is changed.
     ///
-    /// For the usage example you can read [`ObservableHashSet`] doc.
-    pub fn update(&mut self, updated: HashSet<T>) {
+    /// For the usage example you can read [`HashSet`] doc.
+    pub fn update(&mut self, updated: std::collections::HashSet<T>) {
         let removed_elems = self.store.difference(&updated);
         let inserted_elems = updated.difference(&self.store);
 
@@ -209,14 +237,14 @@ where
     }
 }
 
-impl<T, S, O> Default for ObservableHashSet<T, S, O>
+impl<T, S, O> Default for HashSet<T, S, O>
 where
     S: SubscribersStore<T, O>,
 {
     #[inline]
     fn default() -> Self {
         Self {
-            store: HashSet::new(),
+            store: std::collections::HashSet::new(),
             on_insert_subs: S::default(),
             on_remove_subs: S::default(),
             _output: PhantomData::default(),
@@ -225,7 +253,7 @@ where
 }
 
 impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator
-    for &'a ObservableHashSet<T, S, O>
+    for &'a HashSet<T, S, O>
 {
     type IntoIter = Iter<'a, T>;
     type Item = &'a T;
@@ -236,12 +264,12 @@ impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator
     }
 }
 
-impl<T, S, O> Drop for ObservableHashSet<T, S, O>
+impl<T, S, O> Drop for HashSet<T, S, O>
 where
     S: SubscribersStore<T, O>,
 {
-    /// Sends all values of a dropped [`ObservableHashSet`] to the
-    /// [`ObservableHashSet::on_remove`] subs.
+    /// Sends all values of a dropped [`HashSet`] to the
+    /// [`HashSet::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;
@@ -251,12 +279,12 @@ where
     }
 }
 
-impl<T, S, O> From<HashSet<T>> for ObservableHashSet<T, S, O>
+impl<T, S, O> From<std::collections::HashSet<T>> for HashSet<T, S, O>
 where
     S: SubscribersStore<T, O>,
 {
     #[inline]
-    fn from(from: HashSet<T>) -> Self {
+    fn from(from: std::collections::HashSet<T>) -> Self {
         Self {
             store: from,
             on_insert_subs: S::default(),

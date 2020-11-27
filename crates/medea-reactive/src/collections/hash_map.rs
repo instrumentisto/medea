@@ -1,17 +1,22 @@
 //! Reactive hash map based on [`HashMap`].
 
 use std::{
-    collections::{
-        hash_map::{Iter, Values},
-        HashMap,
-    },
+    collections::hash_map::{Iter, Values},
     hash::Hash,
     marker::PhantomData,
 };
 
 use futures::{future::LocalBoxFuture, Stream};
 
-use crate::subscribers_store::{progressable, SubscribersStore};
+use crate::subscribers_store::{common, progressable, SubscribersStore};
+
+/// Reactive hash map based on [`HashMap`] with ability to recognise when all
+/// updates was processed by subscribers.
+pub type ProgressableHashMap<K, V> =
+    HashMap<K, V, progressable::SubStore<(K, V)>, progressable::Value<(K, V)>>;
+/// Reactive hash map based on [`HashMap`].
+pub type ObservableHashMap<K, V> =
+    HashMap<K, V, common::SubStore<(K, V)>, (K, V)>;
 
 /// Reactive hash map based on [`HashMap`].
 ///
@@ -55,50 +60,69 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 /// assert_eq!(removed_items["foo-2"], "bar-2");
 /// # });
 /// ```
+///
+/// # Usage of when all completed functions
+///
+/// ```rust
+/// # use futures::{executor, StreamExt as _, Stream};
+/// use medea_reactive::collections::ProgressableHashMap;
+///
+/// # executor::block_on(async {
+/// let mut hash_map = ProgressableHashMap::new();
+///
+/// let mut on_insert = hash_map.on_insert();
+/// hash_map.insert(1, 1);
+///
+/// // hash_map.when_insert_completed().await; <- wouldn't be resolved
+/// let value = on_insert.next().await.unwrap();
+/// // hash_map.when_insert_completed().await; <- wouldn't be resolved
+/// drop(value);
+///
+/// hash_map.when_insert_completed().await; // will be resolved
+/// # });
+/// ```
 #[derive(Debug, Clone)]
-pub struct ObservableHashMap<K, V, S: SubscribersStore<(K, V), O>, O> {
-    /// Data stored by this [`ObservableHashMap`].
-    store: HashMap<K, V>,
+pub struct HashMap<K, V, S: SubscribersStore<(K, V), O>, O> {
+    /// Data stored by this [`HashMap`].
+    store: std::collections::HashMap<K, V>,
 
-    /// Subscribers of the [`ObservableHashMap::on_insert`] method.
+    /// Subscribers of the [`HashMap::on_insert`] method.
     on_insert_subs: S,
 
-    /// Subscribers of the [`ObservableHashMap::on_remove`] method.
+    /// Subscribers of the [`HashMap::on_remove`] method.
     on_remove_subs: S,
 
-    /// Phantom type of [`ObservableHashMap::on_insert`] and
-    /// [`ObservableHashMap::on_remove`] output.
+    /// Phantom type of [`HashMap::on_insert`] and
+    /// [`HashMap::on_remove`] output.
     _output: PhantomData<O>,
 }
 
-impl<K, V>
-    ObservableHashMap<
-        K,
-        V,
-        progressable::SubStore<(K, V)>,
-        progressable::Value<(K, V)>,
-    >
+impl<K, V> ProgressableHashMap<K, V>
 where
     K: Hash + Eq + Clone + 'static,
     V: Clone + 'static,
 {
     /// Returns [`Future`] which will be resolved when all insertion updates
-    /// will be processed by [`ObservableHashMap::on_insert`] subscribers.
+    /// will be processed by [`HashMap::on_insert`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
-    /// be processed by [`ObservableHashMap::on_remove`] subscribers.
+    /// be processed by [`HashMap::on_remove`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.on_remove_subs.when_all_processed()
     }
 }
 
-impl<K, V, S: SubscribersStore<(K, V), O>, O> ObservableHashMap<K, V, S, O> {
-    /// Returns new empty [`ObservableHashMap`].
+impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
+    /// Returns new empty [`HashMap`].
     #[must_use]
     #[inline]
     pub fn new() -> Self {
@@ -123,14 +147,14 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> ObservableHashMap<K, V, S, O> {
     /// sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
-    /// [`ObservableHashMap`] on drop.
+    /// [`HashMap`] on drop.
     #[inline]
     pub fn on_remove(&self) -> impl Stream<Item = O> {
         self.on_remove_subs.new_subscription(Vec::new())
     }
 }
 
-impl<K, V, S, O> ObservableHashMap<K, V, S, O>
+impl<K, V, S, O> HashMap<K, V, S, O>
 where
     K: Clone,
     V: Clone,
@@ -140,7 +164,7 @@ where
     /// sent.
     ///
     /// Also to this [`Stream`] will be sent all already inserted key-value
-    /// pairs of this [`ObservableHashMap`].
+    /// pairs of this [`HashMap`].
     #[inline]
     pub fn on_insert(&self) -> impl Stream<Item = O> {
         self.on_insert_subs.new_subscription(
@@ -152,7 +176,7 @@ where
     }
 }
 
-impl<K, V, S, O> ObservableHashMap<K, V, S, O>
+impl<K, V, S, O> HashMap<K, V, S, O>
 where
     K: Hash + Eq,
     S: SubscribersStore<(K, V), O>,
@@ -166,8 +190,8 @@ where
     /// Returns a mutable reference to the value corresponding to the key.
     ///
     /// Note that mutating of the returned value wouldn't work same as
-    /// [`Observable`]s and doesn't spawns [`ObservableHashMap::on_insert`] or
-    /// [`ObservableHashMap::on_remove`] events. If you need subscriptions on
+    /// [`Observable`]s and doesn't spawns [`HashMap::on_insert`] or
+    /// [`HashMap::on_remove`] events. If you need subscriptions on
     /// value changes then just wrap value to the [`Observable`] and subscribe
     /// to it.
     ///
@@ -178,15 +202,15 @@ where
     }
 }
 
-impl<K, V, S, O> ObservableHashMap<K, V, S, O>
+impl<K, V, S, O> HashMap<K, V, S, O>
 where
     K: Hash + Eq + Clone,
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    /// Inserts a key-value pair into the [`ObservableHashMap`].
+    /// Inserts a key-value pair into the [`HashMap`].
     ///
-    /// This action will produce [`ObservableHashMap::on_insert`] event.
+    /// This action will produce [`HashMap::on_insert`] event.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         self.on_insert_subs
             .send_update((key.clone(), value.clone()));
@@ -194,10 +218,10 @@ where
         self.store.insert(key, value)
     }
 
-    /// Removes a key from the [`ObservableHashMap`], returning the value at
-    /// the key if the key was previously in the [`ObservableHashMap`].
+    /// Removes a key from the [`HashMap`], returning the value at
+    /// the key if the key was previously in the [`HashMap`].
     ///
-    /// This action will produce [`ObservableHashMap::on_remove`] event.
+    /// This action will produce [`HashMap::on_remove`] event.
     pub fn remove(&mut self, key: &K) -> Option<V> {
         let removed_item = self.store.remove(key);
         if let Some(item) = &removed_item {
@@ -208,13 +232,11 @@ where
     }
 }
 
-impl<K, V, S: SubscribersStore<(K, V), O>, O> Default
-    for ObservableHashMap<K, V, S, O>
-{
+impl<K, V, S: SubscribersStore<(K, V), O>, O> Default for HashMap<K, V, S, O> {
     #[inline]
     fn default() -> Self {
         Self {
-            store: HashMap::new(),
+            store: std::collections::HashMap::new(),
             on_insert_subs: S::default(),
             on_remove_subs: S::default(),
             _output: PhantomData::default(),
@@ -222,11 +244,11 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Default
     }
 }
 
-impl<K, V, S: SubscribersStore<(K, V), O>, O> From<HashMap<K, V>>
-    for ObservableHashMap<K, V, S, O>
+impl<K, V, S: SubscribersStore<(K, V), O>, O>
+    From<std::collections::HashMap<K, V>> for HashMap<K, V, S, O>
 {
     #[inline]
-    fn from(from: HashMap<K, V>) -> Self {
+    fn from(from: std::collections::HashMap<K, V>) -> Self {
         Self {
             store: from,
             on_remove_subs: S::default(),
@@ -237,7 +259,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> From<HashMap<K, V>>
 }
 
 impl<'a, K, V, S: SubscribersStore<(K, V), O>, O> IntoIterator
-    for &'a ObservableHashMap<K, V, S, O>
+    for &'a HashMap<K, V, S, O>
 {
     type IntoIter = Iter<'a, K, V>;
     type Item = (&'a K, &'a V);
@@ -248,11 +270,9 @@ impl<'a, K, V, S: SubscribersStore<(K, V), O>, O> IntoIterator
     }
 }
 
-impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop
-    for ObservableHashMap<K, V, S, O>
-{
-    /// Sends all key-values of a dropped [`ObservableHashMap`] to the
-    /// [`ObservableHashMap::on_remove`] subs.
+impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
+    /// Sends all key-values of a dropped [`HashMap`] to the
+    /// [`HashMap::on_remove`] subs.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;

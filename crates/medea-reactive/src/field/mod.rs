@@ -79,7 +79,7 @@ where
     /// Returns new [`ObservableField`] with subscribable mutations.
     ///
     /// Also you can wait for all updates processing by awaiting on
-    /// [`ProgressableObservableField::when_all_processed`].
+    /// [`ObservableField::when_all_processed`].
     #[inline]
     pub fn new(data: D) -> Self {
         Self {
@@ -127,6 +127,8 @@ where
 
     /// Returns [`Future`] which will be resolved when all data updates will be
     /// processed by subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.subs.when_all_processed()
     }
@@ -209,7 +211,7 @@ pub trait OnObservableFieldModification<D> {
     fn on_modify(&mut self, data: &D);
 }
 
-/// Subscriber that implements [`Subscribable`] and [`Whenable`] in [`Vec`].
+/// Subscriber that implements subscribing and [`Whenable`] in [`Vec`].
 ///
 /// This structure should be wrapped into [`Vec`].
 pub enum UniversalSubscriber<D> {
@@ -228,7 +230,7 @@ pub enum UniversalSubscriber<D> {
         assert_fn: Box<dyn Fn(&D) -> bool>,
     },
 
-    /// Subscriber for [`Subscribable`].
+    /// Subscriber for data updates.
     Subscribe(mpsc::UnboundedSender<D>),
 }
 

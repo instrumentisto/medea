@@ -15,7 +15,7 @@ pub use self::value::Value;
 
 /// [`SubscribersStore`] for progressable collections/field.
 ///
-/// Will provided [`ProgressableValue`] with updated data to the
+/// Will provided [`Value`] with updated data to the
 /// [`SubscribersStore::new_subscription`] [`Stream`].
 ///
 /// You can wait for updates processing with a [`SubStore::when_all_processed`]
@@ -43,6 +43,8 @@ impl<T> Default for SubStore<T> {
 impl<T> SubStore<T> {
     /// Returns [`Future`] which will be resolved when all subscribers processes
     /// updates.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.manager.when_all_processed()
     }
