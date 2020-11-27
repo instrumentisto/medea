@@ -18,9 +18,16 @@ All user visible changes to this project will be documented in this file. This p
     - `ObservableVec`;
     - `ObservableHashMap`;
     - `ObservableHashSet`.
+- Progressable collections ([#159]):
+    - `ProgressableVec`;
+    - `ProgressableHashMap`;
+    - `ProgressableHashSet`.
+- `ProgressableField` container ([#159]);
+- `ProgressableValue` data holder ([#159]).
 
 [#81]: /../../pull/81
 [#103]: /../../pull/103
+[#159]: /../../pull/159
 
 
 

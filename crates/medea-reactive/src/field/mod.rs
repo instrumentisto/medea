@@ -34,8 +34,7 @@ pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 ///
 /// Can recognise when all updates was processed by subscribers.
-pub type ProgressableObservableField<D> =
-    ObservableField<D, progressable::SubStore<D>>;
+pub type ProgressableField<D> = ObservableField<D, progressable::SubStore<D>>;
 
 /// Reactive cell which emits all modifications to its subscribers.
 ///
@@ -72,7 +71,7 @@ where
     }
 }
 
-impl<D> ProgressableObservableField<D>
+impl<D> ProgressableField<D>
 where
     D: 'static,
 {
@@ -113,7 +112,7 @@ where
     }
 }
 
-impl<D> ProgressableObservableField<D>
+impl<D> ProgressableField<D>
 where
     D: Clone + 'static,
 {
