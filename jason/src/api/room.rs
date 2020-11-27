@@ -958,11 +958,16 @@ impl InnerRoom {
         &self,
         settings: MediaStreamSettings,
     ) -> Result<(), Traced<RoomError>> {
+        let constraints_before = self.send_constraints.clone();
         self.send_constraints.constrain(settings);
+
+        let media = constraints_before.calculate_diff(&self.send_constraints);
 
         let mut states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            peer.update_local_stream(LocalStreamUpdateCriteria::all())
+            let removed = peer.drop_senders(&media);
+            if let Err(e) = peer
+                .update_local_stream(LocalStreamUpdateCriteria::all())
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map(|new_media_exchange_states| {
@@ -973,7 +978,37 @@ impl InnerRoom {
                             .map(|(id, s)| (id, s.into()))
                             .collect(),
                     );
-                })?;
+                })
+            {
+                for (kind, source_kind) in &media {
+                    self.send_constraints.set_media_state(
+                        MediaState::from(
+                            media_exchange_state::Stable::Disabled,
+                        ),
+                        *kind,
+                        Some(*source_kind),
+                    );
+                }
+                states_update.insert(
+                    peer.id(),
+                    removed
+                        .into_iter()
+                        .map(|id| {
+                            (
+                                id,
+                                MediaState::from(
+                                    media_exchange_state::Stable::Disabled,
+                                ),
+                            )
+                        })
+                        .collect(),
+                );
+                self.update_media_states(states_update)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
+
+                return Err(e);
+            }
         }
 
         self.update_media_states(states_update)

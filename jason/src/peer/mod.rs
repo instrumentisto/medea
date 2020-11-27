@@ -317,6 +317,24 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
+    pub fn drop_senders(
+        &self,
+        media: &Vec<(MediaKind, MediaSourceKind)>,
+    ) -> Vec<TrackId> {
+        let mut out = Vec::new();
+        for sender in self.media_connections.get_all_senders() {
+            for (kind, source_kind) in media {
+                if kind == &sender.kind()
+                    && source_kind == &sender.source_kind()
+                {
+                    sender.remove_track();
+                    out.push(sender.track_id());
+                }
+            }
+        }
+        out
+    }
+
     /// Stops inner state transitions expiry timers.
     ///
     /// Inner state transitions initiated via external APIs that can not be
@@ -685,28 +703,21 @@ impl PeerConnection {
             let used_caps = MediaStreamSettings::from(&required_caps);
 
             let senders = self.media_connections.get_all_senders();
-            use future::FutureExt as _;
-            let dropped_tracks: HashMap<_, _> =
-                future::join_all(senders.iter().map(|s| {
-                    let track_id = s.track_id();
-                    s.remove_track().map(move |res| (track_id, res))
-                }))
-                .await
-                .into_iter()
-                .filter_map(|(track_id, is_dropped)| {
-                    if is_dropped {
-                        Some((track_id, media_exchange_state::Stable::Disabled))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let unsatisfied_tracks = required_caps.unsatisfied_tracks(senders);
+            let mut disable_tracks = HashMap::new();
+            for sender in unsatisfied_tracks {
+                sender.remove_track().await;
+                disable_tracks.insert(
+                    sender.track_id(),
+                    media_exchange_state::Stable::Disabled,
+                );
+            }
 
             let media_tracks =
                 match self.media_manager.get_tracks(used_caps).await {
                     Ok(tracks) => tracks,
                     Err(_) => {
-                        return Ok(dropped_tracks);
+                        return Ok(disable_tracks);
                     }
                 };
 

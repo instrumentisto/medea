@@ -264,8 +264,22 @@ impl InnerMediaManager {
         )
         .await
         .map(SysMediaStream::from)
+        .map_err(|e| {
+            log::debug!("{:?}", e);
+            let qq =
+                crate::utils::get_property_by_name(&e, "message", |v| Some(v))
+                    .unwrap();
+            log::debug!("{:?}", qq);
+            let qq =
+                crate::utils::get_property_by_name(&e, "constraint", |v| {
+                    Some(v)
+                })
+                .unwrap();
+            log::debug!("{:?}", qq);
+            e
+        })
         .map_err(JsError::from)
-        .map_err(GetUserMediaFailed)
+        .map_err(|e| GetUserMediaFailed(e))
         .map_err(tracerr::from_and_wrap!())?;
 
         let mut storage = self.tracks.borrow_mut();
