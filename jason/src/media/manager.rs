@@ -339,35 +339,37 @@ impl InnerMediaManager {
     ///
     /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/w3-streams/#track-muted
+    #[allow(clippy::needless_pass_by_value)]
     fn parse_and_save_tracks(
         &self,
         stream: sys::MediaStream,
         kind: MediaSourceKind,
-    ) -> Result<Vec<MediaStreamTrack>> {
+    ) -> Result<Vec<Rc<local::Track>>> {
         use MediaManagerError::{LocalTrackIsEnded, LocalTrackIsMuted};
 
         let mut storage = self.tracks.borrow_mut();
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| MediaStreamTrack::new(tr.unwrap(), kind))
+            .map(|tr| Rc::new(local::Track::new(tr.unwrap().into(), kind)))
             .collect();
 
         // Tracks returned by gDM or gUM request should be live && !muted.
         // Otherwise we should err without caching tracks in MediaManager.
         // Tracks will be stopped in drop impl.
         for track in &tracks {
-            if track.as_ref().ready_state() != sys::MediaStreamTrackState::Live
+            if track.sys_track().ready_state()
+                != sys::MediaStreamTrackState::Live
             {
                 return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
             }
-            if track.as_ref().muted() {
+            if track.sys_track().muted() {
                 return Err(tracerr::new!(LocalTrackIsMuted(track.kind())));
             }
         }
 
         for track in &tracks {
-            storage.insert(track.id(), track.downgrade());
+            storage.insert(track.id(), Rc::downgrade(&track));
         }
 
         Ok(tracks)

@@ -5,7 +5,7 @@ use std::iter::FromIterator;
 use js_sys::Array as JsArray;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
-use web_sys::{MediaStream as SysMediaStream, MediaStreamTrackState};
+use web_sys as sys;
 
 use medea_jason::{
     media::{MediaKind, MediaManager, MediaManagerError},
@@ -321,14 +321,14 @@ async fn new_tracks_should_be_live() {
             .pop()
             .unwrap()
             .0
-            .as_ref(),
+            .sys_track(),
     );
     let ended_track = track.clone();
     ended_track.stop();
 
     let mock_navigator = MockNavigator::new();
     let return_stream =
-        SysMediaStream::new_with_tracks(&JsArray::from_iter(vec![
+        sys::MediaStream::new_with_tracks(&JsArray::from_iter(vec![
             Clone::clone(&track),
             ended_track,
         ]))
@@ -345,7 +345,7 @@ async fn new_tracks_should_be_live() {
         panic!("expected err");
     }
     // Second track was stopped.
-    assert_eq!(track.ready_state(), MediaStreamTrackState::Ended);
+    assert_eq!(track.ready_state(), sys::MediaStreamTrackState::Ended);
 
     mock_navigator.stop();
 }
