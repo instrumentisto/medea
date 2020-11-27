@@ -7,6 +7,7 @@ mod pub_sub_signallng;
 mod rpc_settings;
 mod three_pubs;
 mod track_disable;
+mod track_mute;
 
 use std::{
     collections::{HashMap, HashSet},

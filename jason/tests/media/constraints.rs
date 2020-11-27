@@ -3,9 +3,9 @@
 use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
     media::{
-        AudioTrackConstraints, DeviceVideoTrackConstraints, JsMediaSourceKind,
-        MediaKind, MediaManager, MediaStreamSettings,
-        MultiSourceTracksConstraints, VideoSource,
+        AudioTrackConstraints, DeviceVideoTrackConstraints, MediaKind,
+        MediaManager, MediaStreamSettings, MultiSourceTracksConstraints,
+        VideoSource,
     },
     utils::{get_property_by_name, window},
     DisplayVideoTrackConstraints,
@@ -41,7 +41,7 @@ async fn video_constraints_satisfies() {
     let track = tracks.pop().unwrap().0;
 
     assert_eq!(track.kind(), MediaKind::Video);
-    assert!(track_constraints.satisfies(track.as_ref()));
+    assert!(track_constraints.satisfies(track.sys_track()));
 }
 
 // 1. Get device id of non default audio device from enumerate_devices();
@@ -66,7 +66,7 @@ async fn audio_constraints_satisfies() {
     let track = tracks.pop().unwrap().0;
 
     assert_eq!(track.kind(), MediaKind::Audio);
-    assert!(track_constraints.satisfies(&track));
+    assert!(track_constraints.satisfies(track.sys_track()));
 }
 
 // 1. Get device id of non default video device from enumerate_devices();
@@ -115,10 +115,10 @@ async fn both_constraints_satisfies() {
     let video_track = video.pop().unwrap().0;
 
     assert_eq!(audio_track.kind(), MediaKind::Audio);
-    assert!(audio_constraints.satisfies(&audio_track));
+    assert!(audio_constraints.satisfies(audio_track.sys_track()));
 
     assert_eq!(video_track.kind(), MediaKind::Video);
-    assert!(video_constraints.satisfies(video_track.as_ref()));
+    assert!(video_constraints.satisfies(video_track.sys_track()));
 }
 
 // 1. Get device id of non default audio and video device from
@@ -530,21 +530,23 @@ async fn simultaneous_device_and_display() {
 
     let audio_track = audio.pop().unwrap().0;
     assert_eq!(audio_track.kind(), MediaKind::Audio);
-    assert!(audio_constraints.satisfies(&audio_track));
+    assert!(audio_constraints.satisfies(audio_track.sys_track()));
 
     let display_video_track = video.pop().unwrap().0;
     assert_eq!(display_video_track.kind(), MediaKind::Video);
-    assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
+    assert!(
+        display_video_constraints.satisfies(display_video_track.sys_track())
+    );
     assert_eq!(
-        display_video_track.js_media_source_kind(),
-        JsMediaSourceKind::Display
+        display_video_track.media_source_kind(),
+        MediaSourceKind::Display
     );
 
     let device_video_track = video.pop().unwrap().0;
     assert_eq!(device_video_track.kind(), MediaKind::Video);
-    assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
+    assert!(device_video_constraints.satisfies(device_video_track.sys_track()));
     assert_eq!(
-        device_video_track.js_media_source_kind(),
-        JsMediaSourceKind::Device
+        device_video_track.media_source_kind(),
+        MediaSourceKind::Device
     );
 }

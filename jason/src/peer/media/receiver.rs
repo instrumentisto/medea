@@ -9,46 +9,53 @@ use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{MediaSourceKind, MemberId, TrackPatchEvent};
 use proto::TrackId;
-use web_sys::MediaStreamTrack as SysMediaStreamTrack;
+use web_sys as sys;
 
 use crate::{
-    media::{MediaKind, MediaStreamTrack, RecvConstraints, TrackConstraints},
+    media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
     peer::{
-        media::{media_exchange_state, TransceiverSide},
-        Disableable, MediaConnections, PeerEvent, Transceiver,
-        TransceiverDirection,
+        transceiver::Transceiver, MediaConnections, MediaStateControllable,
+        PeerEvent, TransceiverDirection,
     },
 };
 
-/// Representation of a remote [`MediaStreamTrack`] that is being received from
+use super::{
+    transitable_state::{
+        media_exchange_state, MediaExchangeStateController,
+        MuteStateController, TransitableStateController,
+    },
+    TransceiverSide,
+};
+
+/// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
 ///
 /// We can save related [`Transceiver`] and the actual
-/// [`MediaStreamTrack`] only when [`MediaStreamTrack`] data arrives.
+/// [`remote::Track`] only when [`remote::Track`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
     caps: TrackConstraints,
     sender_id: MemberId,
     transceiver: RefCell<Option<Transceiver>>,
     mid: RefCell<Option<String>>,
-    track: RefCell<Option<MediaStreamTrack>>,
+    track: RefCell<Option<remote::Track>>,
     general_media_exchange_state: Cell<media_exchange_state::Stable>,
     is_track_notified: Cell<bool>,
-    media_exchange_state_controller: Rc<media_exchange_state::Controller>,
+    media_exchange_state_controller: Rc<MediaExchangeStateController>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 }
 
 impl Receiver {
     /// Creates new [`Transceiver`] if provided `mid` is `None`, otherwise
     /// creates [`Receiver`] without [`Transceiver`]. It will be injected
-    /// when [`MediaStreamTrack`] arrives.
+    /// when [`remote::Track`] arrives.
     ///
     /// Created [`Transceiver`] direction is set to
     /// [`TransceiverDirection::INACTIVE`] if media receiving is disabled in
     /// provided [`RecvConstraints`].
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
-    /// [`Receiver`] must be created before the actual [`MediaStreamTrack`] data
+    /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
     pub fn new(
         media_connections: &MediaConnections,
@@ -102,10 +109,9 @@ impl Receiver {
                 media_exchange_state::Stable::from(enabled),
             ),
             is_track_notified: Cell::new(false),
-            media_exchange_state_controller:
-                media_exchange_state::Controller::new(
-                    media_exchange_state::Stable::from(enabled),
-                ),
+            media_exchange_state_controller: TransitableStateController::new(
+                media_exchange_state::Stable::from(enabled),
+            ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }
     }
@@ -127,15 +133,15 @@ impl Receiver {
         enabled && is_recv_direction
     }
 
-    /// Adds provided [`SysMediaStreamTrack`] and [`Transceiver`] to this
+    /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this
     /// [`Receiver`].
     ///
-    /// Sets [`MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of this
-    /// [`Receiver`].
+    /// Sets [`sys::MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of
+    /// this [`Receiver`].
     pub fn set_remote_track(
         &self,
         transceiver: Transceiver,
-        new_track: SysMediaStreamTrack,
+        new_track: sys::MediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
             if old_track.id() == new_track.id() {
@@ -144,7 +150,7 @@ impl Receiver {
         }
 
         let new_track =
-            MediaStreamTrack::new(new_track, self.caps.media_source_kind());
+            remote::Track::new(new_track, self.caps.media_source_kind());
 
         if self.enabled() {
             transceiver.add_direction(TransceiverDirection::RECV);
@@ -175,12 +181,16 @@ impl Receiver {
         if self.track_id != track_patch.id {
             return;
         }
-        if let Some(enabled_general) = track_patch.enabled_general {
-            self.update_general_media_exchange_state(enabled_general.into());
+        if let Some(enabled) = track_patch.enabled_general {
+            self.update_general_media_exchange_state(enabled.into());
         }
-        if let Some(enabled_individual) = track_patch.enabled_individual {
-            self.media_exchange_state_controller
-                .update(enabled_individual);
+        if let Some(enabled) = track_patch.enabled_individual {
+            self.media_exchange_state_controller.update(enabled.into());
+        }
+        if let Some(muted) = track_patch.muted {
+            if let Some(track) = self.track.borrow().as_ref() {
+                track.set_enabled(!muted);
+            }
         }
     }
 
@@ -220,8 +230,10 @@ impl Receiver {
         }
     }
 
-    /// Updates [`TransceiverDirection`] and underlying [`MediaStreamTrack`]
-    /// based on the provided [`media_exchange_state::Stable`].
+    /// Updates [`TransceiverDirection`] and underlying [`local::Track`] based
+    /// on the provided [`media_exchange_state::Stable`].
+    ///
+    /// [`local::Track`]: crate::media::track::local::Track
     fn update_general_media_exchange_state(
         &self,
         new_state: media_exchange_state::Stable,
@@ -250,20 +262,56 @@ impl Receiver {
         }
     }
 
-    /// Checks whether general media exchange state of this [`Receiver`] is in
-    /// [`media_exchange_state::Stable::Enabled`].
-    fn enabled(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == media_exchange_state::Stable::Enabled
+    /// Indicates whether this [`Receiver`] is enabled.
+    #[inline]
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.media_exchange_state_controller.enabled()
+    }
+
+    /// Indicates whether this [`Receiver`] is disabled.
+    #[inline]
+    #[must_use]
+    pub fn disabled(&self) -> bool {
+        self.media_exchange_state_controller.disabled()
     }
 }
 
-impl Disableable for Receiver {
+impl MediaStateControllable for Receiver {
     #[inline]
     fn media_exchange_state_controller(
         &self,
-    ) -> Rc<media_exchange_state::Controller> {
-        self.media_exchange_state_controller.clone()
+    ) -> Rc<MediaExchangeStateController> {
+        Rc::clone(&self.media_exchange_state_controller)
+    }
+
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        // Receivers can be muted, but currently they are muted directly by
+        // server events.
+        //
+        // There is no point to provide external API for muting receivers, since
+        // muting is pipelined after demuxing and decoding, so it wont reduce
+        // incoming traffic or CPU usage. Therefore receivers muting do not
+        // require MuteStateController's state management.
+        //
+        // Removing this unreachable! would require abstracting
+        // MuteStateController to some trait and creating some dummy
+        // implementation. Not worth it atm.
+        unreachable!("Receivers muting is not implemented");
+    }
+
+    /// Stops only [`MediaExchangeStateController`]'s state transition timer.
+    #[inline]
+    fn stop_media_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .stop_transition_timeout();
+    }
+
+    /// Resets only [`MediaExchangeStateController`]'s state transition timer.
+    #[inline]
+    fn reset_media_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .reset_transition_timeout();
     }
 }
 

@@ -18,7 +18,11 @@ use web_sys::{
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
-use crate::{media::MediaKind, utils::get_property_by_name};
+use crate::{
+    media::MediaKind,
+    peer::{media_exchange_state, mute_state, MediaState},
+    utils::get_property_by_name,
+};
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 ///
@@ -87,41 +91,47 @@ impl LocalTracksConstraints {
         self.0.borrow_mut().constrain(other)
     }
 
-    /// Clones underlying [`MediaStreamSettings`].
+    /// Clones the underlying [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn inner(&self) -> MediaStreamSettings {
         self.0.borrow().clone()
     }
 
-    /// Enables or disables audio or video type in underlying
-    /// [`MediaStreamSettings`].
-    ///
-    /// Doesn't do anything if no [`MediaStreamSettings`] was set.
-    ///
-    /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
-    /// of media won't be published.
+    /// Changes the underlying [`MediaStreamSettings`] basing on the provided
+    /// [`MediaState`].
     #[inline]
-    pub fn set_enabled(
+    pub fn set_media_state(
         &self,
-        enabled: bool,
+        state: MediaState,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
         self.0
             .borrow_mut()
-            .set_track_enabled(enabled, kind, source_kind);
+            .set_track_media_state(state, kind, source_kind);
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
     /// [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn enabled(&self, kind: &MediaType) -> bool {
         self.0.borrow().enabled(kind)
+    }
+
+    /// Indicates whether provided [`MediaType`] is muted in the underlying
+    /// [`MediaStreamSettings`].
+    #[inline]
+    #[must_use]
+    pub fn muted(&self, kind: &MediaType) -> bool {
+        self.0.borrow().muted(kind)
     }
 
     /// Indicates whether provided [`MediaKind`] and [`MediaSourceKind`] are
     /// enabled in this [`LocalTracksConstraints`].
     #[inline]
+    #[must_use]
     pub fn is_track_enabled(
         &self,
         kind: MediaKind,
@@ -142,6 +152,9 @@ pub struct AudioMediaTracksSettings {
     /// Indicator whether audio is enabled and this constraints should be
     /// injected into `Peer`.
     enabled: bool,
+
+    /// Indicator whether audio should be muted.
+    muted: bool,
 }
 
 impl Default for AudioMediaTracksSettings {
@@ -150,6 +163,7 @@ impl Default for AudioMediaTracksSettings {
         Self {
             constraints: AudioTrackConstraints::default(),
             enabled: true,
+            muted: false,
         }
     }
 }
@@ -182,6 +196,9 @@ pub struct VideoTrackConstraints<C> {
     ///
     /// [`Room`]: crate::api::Room
     enabled: bool,
+
+    /// Indicator whether video should be muted.
+    muted: bool,
 }
 
 impl<C: Default> Default for VideoTrackConstraints<C> {
@@ -189,6 +206,7 @@ impl<C: Default> Default for VideoTrackConstraints<C> {
         Self {
             constraints: Some(C::default()),
             enabled: true,
+            muted: false,
         }
     }
 }
@@ -288,14 +306,17 @@ impl MediaStreamSettings {
             audio: AudioMediaTracksSettings {
                 constraints: AudioTrackConstraints::default(),
                 enabled: false,
+                muted: false,
             },
             display_video: VideoTrackConstraints {
                 enabled: true,
                 constraints: None,
+                muted: false,
             },
             device_video: VideoTrackConstraints {
                 enabled: true,
                 constraints: None,
+                muted: false,
             },
         }
     }
@@ -368,23 +389,69 @@ impl MediaStreamSettings {
         self.device_video.constraints.as_ref()
     }
 
-    /// Enables or disables audio or video type in this [`MediaStreamSettings`].
+    /// Changes [`MediaState`] of audio or video type in this
+    /// [`MediaStreamSettings`].
     ///
     /// If some type of the [`MediaStreamSettings`] is disabled, then this kind
     /// of media won't be published.
     #[inline]
-    pub fn set_track_enabled(
+    pub fn set_track_media_state(
         &mut self,
-        enabled: bool,
+        state: MediaState,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
         match kind {
-            MediaKind::Audio => {
-                self.toggle_publish_audio(enabled);
+            MediaKind::Audio => match state {
+                MediaState::Mute(muted) => {
+                    self.set_audio_muted(muted == mute_state::Stable::Muted);
+                }
+                MediaState::MediaExchange(media_exchange) => {
+                    self.set_audio_publish(
+                        media_exchange == media_exchange_state::Stable::Enabled,
+                    );
+                }
+            },
+            MediaKind::Video => match state {
+                MediaState::Mute(muted) => {
+                    self.set_video_muted(
+                        muted == mute_state::Stable::Muted,
+                        source_kind,
+                    );
+                }
+                MediaState::MediaExchange(media_exchange) => {
+                    self.set_video_publish(
+                        media_exchange == media_exchange_state::Stable::Enabled,
+                        source_kind,
+                    );
+                }
+            },
+        }
+    }
+
+    /// Sets the underlying [`AudioMediaTracksSettings::muted`] to the provided
+    /// value.
+    fn set_audio_muted(&mut self, muted: bool) {
+        self.audio.muted = muted;
+    }
+
+    /// Sets the underlying [`VideoTrackConstraints::muted`] basing on the
+    /// provided [`MediaSourceKind`] to the given value.
+    fn set_video_muted(
+        &mut self,
+        muted: bool,
+        source_kind: Option<MediaSourceKind>,
+    ) {
+        match source_kind {
+            None => {
+                self.display_video.muted = muted;
+                self.device_video.muted = muted;
             }
-            MediaKind::Video => {
-                self.toggle_publish_video(enabled, source_kind);
+            Some(MediaSourceKind::Device) => {
+                self.device_video.muted = muted;
+            }
+            Some(MediaSourceKind::Display) => {
+                self.display_video.muted = muted;
             }
         }
     }
@@ -392,14 +459,14 @@ impl MediaStreamSettings {
     /// Sets the underlying [`AudioMediaTracksSettings::enabled`] to the
     /// given value.
     #[inline]
-    pub fn toggle_publish_audio(&mut self, enabled: bool) {
+    pub fn set_audio_publish(&mut self, enabled: bool) {
         self.audio.enabled = enabled;
     }
 
     /// Sets underlying [`VideoTrackConstraints::enabled`] based on provided
     /// [`MediaSourceKind`] to the given value.
     #[inline]
-    pub fn toggle_publish_video(
+    pub fn set_video_publish(
         &mut self,
         enabled: bool,
         source_kind: Option<MediaSourceKind>,
@@ -452,8 +519,24 @@ impl MediaStreamSettings {
         }
     }
 
+    /// Indicates whether the given [`MediaType`] is muted in this
+    /// [`MediaStreamSettings`].
+    #[inline]
+    #[must_use]
+    pub fn muted(&self, kind: &MediaType) -> bool {
+        match kind {
+            MediaType::Video(video) => match video.source_kind {
+                MediaSourceKind::Device => self.device_video.muted,
+                MediaSourceKind::Display => self.display_video.muted,
+            },
+            MediaType::Audio(_) => self.audio.muted,
+        }
+    }
+
     /// Indicates whether the given [`MediaKind`] and [`MediaSourceKind`] are
     /// enabled in this [`MediaStreamSettings`].
+    #[inline]
+    #[must_use]
     pub fn is_track_enabled(
         &self,
         kind: MediaKind,
@@ -495,7 +578,7 @@ impl MediaStreamSettings {
 pub enum MultiSourceTracksConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     Device(SysMediaStreamConstraints),
 
     /// Only [getDisplayMedia()][1] request is required.
@@ -505,7 +588,7 @@ pub enum MultiSourceTracksConstraints {
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     DeviceAndDisplay(SysMediaStreamConstraints, SysMediaStreamConstraints),
 }
@@ -572,21 +655,19 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
     }
 }
 
-/// Constraints for the [`MediaKind::Video`] [`MediaStreamTrack`].
+/// Constraints for the [`MediaKind::Video`] [`local::Track`].
 ///
-/// [`MediaStreamTrack`]: super::track::MediaStreamTrack
+/// [`local::Track`]: crate::media::track::local::Track
 #[derive(Clone, Debug)]
 pub enum VideoSource {
-    /// [`MediaStreamTrack`] should be received from the `getUserMedia`
-    /// request.
+    /// [`local::Track`] should be received from the `getUserMedia` request.
     ///
-    /// [`MediaStreamTrack`]: super::track::MediaStreamTrack
+    /// [`local::Track`]: crate::media::track::local::Track
     Device(DeviceVideoTrackConstraints),
 
-    /// [`MediaStreamTrack`] should be received from the `getDisplayMedia`
-    /// request.
+    /// [`local::Track`] should be received from the `getDisplayMedia` request.
     ///
-    /// [`MediaStreamTrack`]: super::track::MediaStreamTrack
+    /// [`local::Track`]: crate::media::track::local::Track
     Display(DisplayVideoTrackConstraints),
 }
 

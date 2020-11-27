@@ -87,9 +87,8 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
-    media::{
-        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamTrack,
-    },
+    media::{track::remote, LocalTracksConstraints, MediaKind, MediaManager},
+    peer::media_exchange_state,
     rpc::ApiUrl,
     utils::{window, JasonError},
     AudioTrackConstraints, DeviceVideoTrackConstraints,
@@ -155,8 +154,16 @@ pub fn get_media_stream_settings(
     video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.set_track_enabled(audio_enabled, MediaKind::Audio, None);
-    settings.set_track_enabled(video_enabled, MediaKind::Video, None);
+    settings.set_track_media_state(
+        media_exchange_state::Stable::from(audio_enabled).into(),
+        MediaKind::Audio,
+        None,
+    );
+    settings.set_track_media_state(
+        media_exchange_state::Stable::from(video_enabled).into(),
+        MediaKind::Video,
+        None,
+    );
 
     settings
 }
@@ -286,20 +293,22 @@ async fn wait_and_check_test_result(
     };
 }
 
-async fn get_video_track() -> MediaStreamTrack {
+async fn get_video_track() -> remote::Track {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
     let stream = manager.get_tracks(settings).await.unwrap();
-    stream.into_iter().next().unwrap().0
+    let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
+    remote::Track::new(track, MediaSourceKind::Device)
 }
 
-async fn get_audio_track() -> MediaStreamTrack {
+async fn get_audio_track() -> remote::Track {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
     let stream = manager.get_tracks(settings).await.unwrap();
-    stream.into_iter().next().unwrap().0
+    let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
+    remote::Track::new(track, MediaSourceKind::Device)
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
