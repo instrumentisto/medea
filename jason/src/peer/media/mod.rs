@@ -819,9 +819,37 @@ impl MediaConnections {
             .for_each(|t| t.reset_media_state_transition_timeout());
     }
 
-    /// Returns all [`Sender`]s from this [`MediaConnections`].
-    pub fn get_all_senders(&self) -> Vec<Rc<Sender>> {
-        self.0.borrow().senders.values().cloned().collect()
+    /// Returns all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    pub fn get_senders_without_tracks(
+        &self,
+        criteria: LocalStreamUpdateCriteria,
+    ) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .filter(|s| {
+                criteria.has(s.kind(), s.source_kind())
+                    && s.enabled()
+                    && !s.has_track()
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`].
+    pub async fn drop_send_tracks(&self, criteria: LocalStreamUpdateCriteria) {
+        for sender in self
+            .0
+            .borrow()
+            .senders
+            .values()
+            .filter(|s| criteria.has(s.kind(), s.source_kind()))
+        {
+            sender.remove_track().await;
+        }
     }
 }
 

@@ -319,32 +319,19 @@ impl PeerConnection {
 
     /// Returns all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    #[inline]
     pub fn get_senders_without_tracks(
         &self,
         criteria: LocalStreamUpdateCriteria,
     ) -> Vec<Rc<Sender>> {
-        self.media_connections
-            .get_all_senders()
-            .into_iter()
-            .filter(|s| {
-                criteria.has(s.kind(), s.source_kind())
-                    && s.enabled()
-                    && !s.has_track()
-            })
-            .collect()
+        self.media_connections.get_senders_without_tracks(criteria)
     }
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`].
+    #[inline]
     pub async fn drop_send_tracks(&self, criteria: LocalStreamUpdateCriteria) {
-        for sender in self
-            .media_connections
-            .get_all_senders()
-            .into_iter()
-            .filter(|s| criteria.has(s.kind(), s.source_kind()))
-        {
-            sender.remove_track().await;
-        }
+        self.media_connections.drop_send_tracks(criteria).await
     }
 
     /// Stops inner state transitions expiry timers.
