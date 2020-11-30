@@ -19,7 +19,7 @@ use web_sys::RtcTrackEvent;
 use crate::{
     media::{track::local, LocalTracksConstraints, MediaKind, RecvConstraints},
     peer::{
-        transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
+        transceiver::Transceiver, LocalStreamKinds, PeerEvent,
         TransceiverDirection,
     },
     utils::{JasonError, JsCaused, JsError},
@@ -621,8 +621,8 @@ impl MediaConnections {
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<LocalStreamUpdateCriteria> {
-        let mut result = LocalStreamUpdateCriteria::empty();
+    ) -> Result<LocalStreamKinds> {
+        let mut result = LocalStreamKinds::empty();
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
                 if sender.update(&track_proto).await {
@@ -643,10 +643,10 @@ impl MediaConnections {
 
     /// Returns [`TracksRequest`] based on [`Sender`]s in this
     /// [`MediaConnections`]. [`Sender`]s are chosen based on provided
-    /// [`LocalStreamUpdateCriteria`].
+    /// [`LocalStreamKinds`].
     pub fn get_tracks_request(
         &self,
-        kinds: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
@@ -820,17 +820,17 @@ impl MediaConnections {
     }
 
     /// Returns all [`Sender`]s which are matches provided
-    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    /// [`LocalStreamKinds`] and doesn't have [`local::Track`].
     pub fn get_senders_without_tracks(
         &self,
-        criteria: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
             .senders
             .values()
             .filter(|s| {
-                criteria.has(s.kind(), s.source_kind())
+                kinds.has(s.kind(), s.source_kind())
                     && s.enabled()
                     && !s.has_track()
             })
@@ -839,14 +839,14 @@ impl MediaConnections {
     }
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
-    /// [`LocalStreamUpdateCriteria`].
-    pub async fn drop_send_tracks(&self, criteria: LocalStreamUpdateCriteria) {
+    /// [`LocalStreamKinds`].
+    pub async fn drop_send_tracks(&self, kinds: LocalStreamKinds) {
         for sender in self
             .0
             .borrow()
             .senders
             .values()
-            .filter(|s| criteria.has(s.kind(), s.source_kind()))
+            .filter(|s| kinds.has(s.kind(), s.source_kind()))
         {
             sender.remove_track().await;
         }

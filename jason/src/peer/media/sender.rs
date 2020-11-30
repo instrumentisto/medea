@@ -245,6 +245,7 @@ impl Sender {
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to `None`.
+    #[inline]
     pub async fn remove_track(&self) {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
@@ -252,6 +253,7 @@ impl Sender {
 
     /// Returns `true` if this [`Sender`] has [`local::Track`].
     #[inline]
+    #[must_use]
     pub fn has_track(&self) -> bool {
         self.transceiver.has_send_track()
     }

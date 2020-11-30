@@ -9,7 +9,7 @@ use std::{
 
 use async_trait::async_trait;
 use derive_more::Display;
-use futures::{channel::mpsc, future, StreamExt as _};
+use futures::{channel::mpsc, future, future::LocalBoxFuture, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
@@ -29,7 +29,7 @@ use crate::{
         MediaStreamSettings, RecvConstraints,
     },
     peer::{
-        media_exchange_state, mute_state, LocalStreamUpdateCriteria,
+        media_exchange_state, mute_state, LocalStreamKinds,
         MediaConnectionsError, MediaState, PeerConnection, PeerError,
         PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
         TransceiverSide,
@@ -41,7 +41,6 @@ use crate::{
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
 };
-use futures::future::LocalBoxFuture;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -274,9 +273,10 @@ impl RoomHandle {
         ) = (new_state, direction)
         {
             for peer in inner.peers.get_all() {
-                peer.update_local_stream(
-                    LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
-                )
+                peer.update_local_stream(LocalStreamKinds::from_kinds(
+                    kind,
+                    source_kind,
+                ))
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
             }
@@ -966,17 +966,14 @@ impl InnerRoom {
             use media_exchange_state::Stable::Disabled;
             let constraints_before = self.send_constraints.clone_settings();
             self.send_constraints.constrain(settings);
-            let criteria = self
+            let kinds = self
                 .send_constraints
-                .calculate_criteria_change(&constraints_before);
+                .calculate_kinds_diff(&constraints_before);
 
             let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
             for peer in self.peers.get_all() {
-                peer.drop_send_tracks(criteria).await;
-                match peer
-                    .update_local_stream(LocalStreamUpdateCriteria::all())
-                    .await
-                {
+                peer.drop_send_tracks(kinds).await;
+                match peer.update_local_stream(LocalStreamKinds::all()).await {
                     Ok(states) => {
                         states_update.entry(peer.id()).or_default().extend(
                             states.into_iter().map(|(id, s)| (id, s.into())),
@@ -995,11 +992,11 @@ impl InnerRoom {
                                 .await?;
                             } else {
                                 self.send_constraints
-                                    .set_media_exchange_state_by_criteria(
-                                        Disabled, criteria,
+                                    .set_media_exchange_state_by_kinds(
+                                        Disabled, kinds,
                                     );
                                 let senders_to_disable =
-                                    peer.get_senders_without_tracks(criteria);
+                                    peer.get_senders_without_tracks(kinds);
 
                                 states_update
                                     .entry(peer.id())

@@ -20,9 +20,7 @@ use web_sys::{
 
 use crate::{
     media::MediaKind,
-    peer::{
-        media_exchange_state, mute_state, LocalStreamUpdateCriteria, MediaState,
-    },
+    peer::{media_exchange_state, mute_state, LocalStreamKinds, MediaState},
     utils::get_property_by_name,
 };
 
@@ -92,14 +90,14 @@ impl LocalTracksConstraints {
         self.0.borrow().clone()
     }
 
-    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
+    /// Returns [`LocalStreamKinds`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
-    pub fn calculate_criteria_change(
+    pub fn calculate_kinds_diff(
         &self,
         settings: &MediaStreamSettings,
-    ) -> LocalStreamUpdateCriteria {
-        self.0.borrow().calculate_diff(&settings)
+    ) -> LocalStreamKinds {
+        self.0.borrow().calculate_kinds_diff(&settings)
     }
 
     /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
@@ -130,17 +128,17 @@ impl LocalTracksConstraints {
             .set_track_media_state(state, kind, source_kind);
     }
 
-    /// Enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// Enables/disables provided [`LocalStreamKinds`] based on
     /// provided [`media_exchange_state`].
     #[inline]
-    pub fn set_media_exchange_state_by_criteria(
+    pub fn set_media_exchange_state_by_kinds(
         &self,
         state: media_exchange_state::Stable,
-        criteria: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) {
         self.0
             .borrow_mut()
-            .set_media_exchange_state_by_criteria(state, criteria)
+            .set_media_exchange_state_by_kinds(state, kinds)
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -396,22 +394,22 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
+    /// Returns [`LocalStreamKinds`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
-    pub fn calculate_diff(&self, another: &Self) -> LocalStreamUpdateCriteria {
-        let mut criteria = LocalStreamUpdateCriteria::empty();
+    pub fn calculate_kinds_diff(&self, another: &Self) -> LocalStreamKinds {
+        let mut kinds = LocalStreamKinds::empty();
         if self.device_video != another.device_video {
-            criteria.add(MediaKind::Video, MediaSourceKind::Device);
+            kinds.add(MediaKind::Video, MediaSourceKind::Device);
         }
         if self.display_video != another.display_video {
-            criteria.add(MediaKind::Video, MediaSourceKind::Display);
+            kinds.add(MediaKind::Video, MediaSourceKind::Display);
         }
         if self.audio != another.audio {
-            criteria.add(MediaKind::Audio, MediaSourceKind::Device);
+            kinds.add(MediaKind::Audio, MediaSourceKind::Device);
         }
 
-        criteria
+        kinds
     }
 
     /// Returns only audio constraints.
@@ -478,22 +476,22 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// Sets enables/disables provided [`LocalStreamKinds`] based on
     /// provided [`media_exchange_state`].
     #[inline]
-    pub fn set_media_exchange_state_by_criteria(
+    pub fn set_media_exchange_state_by_kinds(
         &mut self,
         state: media_exchange_state::Stable,
-        criteria: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) {
         let enabled = state == media_exchange_state::Stable::Enabled;
-        if criteria.has(MediaKind::Audio, MediaSourceKind::Device) {
+        if kinds.has(MediaKind::Audio, MediaSourceKind::Device) {
             self.set_audio_publish(enabled);
         }
-        if criteria.has(MediaKind::Video, MediaSourceKind::Device) {
+        if kinds.has(MediaKind::Video, MediaSourceKind::Device) {
             self.set_video_publish(enabled, Some(MediaSourceKind::Device));
         }
-        if criteria.has(MediaKind::Video, MediaSourceKind::Display) {
+        if kinds.has(MediaKind::Video, MediaSourceKind::Display) {
             self.set_video_publish(enabled, Some(MediaSourceKind::Display));
         }
     }

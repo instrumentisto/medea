@@ -4,10 +4,10 @@
 
 mod conn;
 mod ice_server;
+mod local_stream_kinds;
 mod media;
 mod repo;
 mod stats;
-mod stream_update_criteria;
 mod tracks_request;
 mod transceiver;
 
@@ -46,6 +46,7 @@ pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
+    local_stream_kinds::LocalStreamKinds,
     media::{
         media_exchange_state, mute_state, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
@@ -55,7 +56,6 @@ pub use self::{
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
-    stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
@@ -318,20 +318,20 @@ impl PeerConnection {
     }
 
     /// Returns all [`Sender`]s which are matches provided
-    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    /// [`LocalStreamKinds`] and doesn't have [`local::Track`].
     #[inline]
     pub fn get_senders_without_tracks(
         &self,
-        criteria: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) -> Vec<Rc<Sender>> {
-        self.media_connections.get_senders_without_tracks(criteria)
+        self.media_connections.get_senders_without_tracks(kinds)
     }
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
-    /// [`LocalStreamUpdateCriteria`].
+    /// [`LocalStreamKinds`].
     #[inline]
-    pub async fn drop_send_tracks(&self, criteria: LocalStreamUpdateCriteria) {
-        self.media_connections.drop_send_tracks(criteria).await
+    pub async fn drop_send_tracks(&self, kinds: LocalStreamKinds) {
+        self.media_connections.drop_send_tracks(kinds).await
     }
 
     /// Stops inner state transitions expiry timers.
@@ -440,7 +440,7 @@ impl PeerConnection {
     /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
     /// [`proto::TrackPatchEvent`].
     ///
-    /// Returns [`LocalStreamUpdateCriteria`] with which [`local::Track`]s
+    /// Returns [`LocalStreamKinds`] with which [`local::Track`]s
     /// updating should be started.
     ///
     /// # Errors
@@ -450,7 +450,7 @@ impl PeerConnection {
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<LocalStreamUpdateCriteria> {
+    ) -> Result<LocalStreamKinds> {
         Ok(self
             .media_connections
             .patch_tracks(tracks)
@@ -578,8 +578,8 @@ impl PeerConnection {
         tracks: Vec<proto::Track>,
         maybe_update_local_media: bool,
     ) -> Result<String> {
-        let stream_update_criteria = if maybe_update_local_media {
-            Some(LocalStreamUpdateCriteria::from_tracks(&tracks))
+        let stream_update_kinds = if maybe_update_local_media {
+            Some(LocalStreamKinds::from_tracks(&tracks))
         } else {
             None
         };
@@ -592,8 +592,8 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if let Some(criteria) = stream_update_criteria {
-            let _ = self.update_local_stream(criteria).await;
+        if let Some(kinds) = stream_update_kinds {
+            let _ = self.update_local_stream(kinds).await;
         }
 
         let offer = self
@@ -623,7 +623,7 @@ impl PeerConnection {
     }
 
     /// Updates [`local::Track`]s being used in [`PeerConnection`]s [`Sender`]s.
-    /// [`Sender`]s are chosen based on provided [`LocalStreamUpdateCriteria`].
+    /// [`Sender`]s are chosen based on provided [`LocalStreamKinds`].
     ///
     /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
     /// date (you set those with [`PeerConnection::create_tracks`]). If
@@ -671,9 +671,9 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-        criteria: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        self.inner_update_local_stream(criteria).await.map_err(|e| {
+        self.inner_update_local_stream(kinds).await.map_err(|e| {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
                     error: JasonError::from(e.clone()),
@@ -687,10 +687,9 @@ impl PeerConnection {
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
-        criteria: LocalStreamUpdateCriteria,
+        kinds: LocalStreamKinds,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        if let Some(request) =
-            self.media_connections.get_tracks_request(criteria)
+        if let Some(request) = self.media_connections.get_tracks_request(kinds)
         {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
@@ -867,8 +866,8 @@ impl PeerConnection {
             .await
             .map_err(tracerr::wrap!())?;
 
-        let stream_update_criteria = if maybe_update_local_media {
-            Some(LocalStreamUpdateCriteria::from_tracks(&send))
+        let stream_update_kinds = if maybe_update_local_media {
+            Some(LocalStreamKinds::from_tracks(&send))
         } else {
             None
         };
@@ -878,8 +877,8 @@ impl PeerConnection {
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if let Some(criteria) = stream_update_criteria {
-            let _ = self.update_local_stream(criteria).await;
+        if let Some(kinds) = stream_update_kinds {
+            let _ = self.update_local_stream(kinds).await;
         }
 
         let answer = self

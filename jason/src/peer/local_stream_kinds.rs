@@ -1,4 +1,4 @@
-//! [`MediaKind`] + [`MediaSourceKind`] criteria for local stream updates.
+//! [`MediaKind`] + [`MediaSourceKind`] kinds for local stream updates.
 
 use std::ops::BitOrAssign;
 
@@ -15,13 +15,13 @@ bitflags::bitflags! {
     }
 }
 
-/// Criteria, used for local stream updates, allowing to specify a set of
-/// [`MediaKind`] + [`MediaSourceKind`] pairs.
+/// Kinds allowing to specify a set of [`MediaKind`] + [`MediaSourceKind`]
+/// pairs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct LocalStreamUpdateCriteria(Inner);
+pub struct LocalStreamKinds(Inner);
 
-impl LocalStreamUpdateCriteria {
-    /// Creates [`LocalStreamUpdateCriteria`] with all possible [`MediaKind`] +
+impl LocalStreamKinds {
+    /// Creates [`LocalStreamKinds`] with all possible [`MediaKind`] +
     /// [`MediaSourceKind`] combinations.
     #[inline]
     #[must_use]
@@ -29,14 +29,14 @@ impl LocalStreamUpdateCriteria {
         Self(Inner::all())
     }
 
-    /// Creates empty [`LocalStreamUpdateCriteria`].
+    /// Creates empty [`LocalStreamKinds`].
     #[inline]
     #[must_use]
     pub fn empty() -> Self {
         Self(Inner::empty())
     }
 
-    /// Creates [`LocalStreamUpdateCriteria`] with the provided [`MediaKind`] +
+    /// Creates [`LocalStreamKinds`] with the provided [`MediaKind`] +
     /// [`MediaSourceKind`] pair.
     ///
     /// [`None`] `source_kind` means both
@@ -61,7 +61,7 @@ impl LocalStreamUpdateCriteria {
         Self(inner)
     }
 
-    /// Builds [`LocalStreamUpdateCriteria`] from the provided `tracks`. Only
+    /// Builds [`LocalStreamKinds`] from the provided `tracks`. Only
     /// [`Direction::Send`] [`Track`]s are taken into account.
     #[must_use]
     pub fn from_tracks(tracks: &[Track]) -> Self {
@@ -83,14 +83,14 @@ impl LocalStreamUpdateCriteria {
     }
 
     /// Adds the given [`MediaKind`] + [`MediaSourceKind`] pair to this
-    /// [`LocalStreamUpdateCriteria`].
+    /// [`LocalStreamKinds`].
     #[inline]
     pub fn add(&mut self, media_kind: MediaKind, source_kind: MediaSourceKind) {
         self.0
             .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
     }
 
-    /// Checks whether this [`LocalStreamUpdateCriteria`] contains the provided
+    /// Checks whether this [`LocalStreamKinds`] contains the provided
     /// [`MediaKind`] + [`MediaSourceKind`] pair.
     #[inline]
     #[must_use]

@@ -7,7 +7,7 @@ use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        media_exchange_state, LocalStreamUpdateCriteria, MediaConnections,
+        media_exchange_state, LocalStreamKinds, MediaConnections,
         MediaStateControllable, RtcPeerConnection, SimpleTracksRequest,
     },
 };
@@ -40,7 +40,7 @@ async fn get_test_media_connections(
         )
         .unwrap();
     let request = media_connections
-        .get_tracks_request(LocalStreamUpdateCriteria::all())
+        .get_tracks_request(LocalStreamKinds::all())
         .unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
@@ -89,8 +89,7 @@ fn get_tracks_request1() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request =
-        media_connections.get_tracks_request(LocalStreamUpdateCriteria::all());
+    let request = media_connections.get_tracks_request(LocalStreamKinds::all());
     assert!(request.is_some());
 }
 
@@ -109,8 +108,7 @@ fn get_tracks_request2() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let request =
-        media_connections.get_tracks_request(LocalStreamUpdateCriteria::all());
+    let request = media_connections.get_tracks_request(LocalStreamKinds::all());
     assert!(request.is_none());
 }
 
