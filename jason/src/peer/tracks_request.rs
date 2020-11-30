@@ -116,45 +116,7 @@ pub struct SimpleTracksRequest {
     device_video: Option<(TrackId, DeviceVideoTrackConstraints)>,
 }
 
-use crate::peer::{Sender, TransceiverSide};
-
 impl SimpleTracksRequest {
-    pub fn unsatisfied_tracks(
-        &self,
-        tracks: Vec<Rc<Sender>>,
-    ) -> Vec<Rc<Sender>> {
-        let mut out = Vec::new();
-        for track in tracks {
-            match track.caps() {
-                TrackConstraints::Audio(audio) => {
-                    if let Some((id, cons)) = &self.audio {
-                        if !cons.same_as(audio) {
-                            out.push(track);
-                        }
-                    }
-                }
-                TrackConstraints::Video(video) => match video {
-                    VideoSource::Display(display) => {
-                        if let Some((id, cons)) = &self.display_video {
-                            if !cons.same_as(display) {
-                                out.push(track);
-                            }
-                        }
-                    }
-                    VideoSource::Device(device) => {
-                        if let Some((id, cons)) = &self.device_video {
-                            if !cons.same_as(device) {
-                                out.push(track);
-                            }
-                        }
-                    }
-                },
-            }
-        }
-
-        out
-    }
-
     /// Parses [`local::Track`]s and returns [`HashMap`] with [`TrackId`]s
     /// and [`local::Track`]s.
     ///

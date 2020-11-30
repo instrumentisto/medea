@@ -245,12 +245,22 @@ impl Sender {
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to `None`.
-    pub async fn remove_track(&self) -> bool {
-        let has_track = self.transceiver.send_track().is_some();
+    pub async fn remove_track(&self) {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
+    }
 
-        has_track
+    /// Returns `true` if this [`Sender`] has [`local::Track`].
+    #[inline]
+    pub fn has_track(&self) -> bool {
+        self.transceiver.has_send_track()
+    }
+
+    /// Indicates whether this [`Sender`] is enabled.
+    #[inline]
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.media_exchange_state.enabled()
     }
 }
 
@@ -277,13 +287,6 @@ impl Sender {
     #[must_use]
     pub fn muted(&self) -> bool {
         self.mute_state.muted()
-    }
-
-    /// Indicates whether this [`Sender`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.media_exchange_state.enabled()
     }
 }
 

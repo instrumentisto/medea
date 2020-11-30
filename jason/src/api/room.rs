@@ -32,6 +32,7 @@ use crate::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
         MediaConnectionsError, MediaState, PeerConnection, PeerError,
         PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
+        TransceiverSide,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -938,6 +939,58 @@ impl InnerRoom {
             .is_none()
     }
 
+    /// Rollbacks [`LocalTracksConstraints`] to the provided
+    /// [`MediaStreamSettings`].
+    ///
+    /// If rollback fails, then all [`Sender`]s with a provided
+    /// [`LocalStreamUpdateCriteria`] and without [`local::Track`] will be
+    /// disabled.
+    async fn set_rollbacked_local_media_settings(
+        &self,
+        settings: MediaStreamSettings,
+        criteria: LocalStreamUpdateCriteria,
+    ) -> Result<(), Traced<RoomError>> {
+        use media_exchange_state::Stable::Disabled;
+        self.send_constraints.constrain(settings);
+
+        let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
+        for peer in self.peers.get_all() {
+            peer.drop_send_tracks(criteria).await;
+            match peer
+                .update_local_stream(LocalStreamUpdateCriteria::all())
+                .await
+            {
+                Ok(states) => {
+                    states_update.entry(peer.id()).or_default().extend(
+                        states.into_iter().map(|(id, s)| (id, s.into())),
+                    );
+                }
+                Err(e) => {
+                    self.send_constraints.set_media_exchange_state_by_criteria(
+                        Disabled, criteria,
+                    );
+                    let senders_to_disable =
+                        peer.get_senders_without_tracks(criteria);
+
+                    states_update.entry(peer.id()).or_default().extend(
+                        senders_to_disable.into_iter().map(|s| {
+                            (s.track_id(), MediaState::from(Disabled))
+                        }),
+                    );
+                    self.update_media_states(states_update)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+
+                    return Err(tracerr::map_from_and_wrap!()(e));
+                }
+            }
+        }
+
+        self.update_media_states(states_update)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
@@ -958,56 +1011,33 @@ impl InnerRoom {
         &self,
         settings: MediaStreamSettings,
     ) -> Result<(), Traced<RoomError>> {
-        let constraints_before = self.send_constraints.clone();
+        let constraints_before = self.send_constraints.clone_settings();
         self.send_constraints.constrain(settings);
-
-        let media = constraints_before.calculate_diff(&self.send_constraints);
+        let criteria = self
+            .send_constraints
+            .calculate_criteria_change(&constraints_before);
 
         let mut states_update = HashMap::new();
         for peer in self.peers.get_all() {
-            let removed = peer.drop_senders(&media);
-            if let Err(e) = peer
-                .update_local_stream(LocalStreamUpdateCriteria::all())
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map(|new_media_exchange_states| {
+            peer.drop_send_tracks(criteria).await;
+            match peer.update_local_stream(criteria).await {
+                Ok(states) => {
                     states_update.insert(
                         peer.id(),
-                        new_media_exchange_states
+                        states
                             .into_iter()
                             .map(|(id, s)| (id, s.into()))
                             .collect(),
                     );
-                })
-            {
-                for (kind, source_kind) in &media {
-                    self.send_constraints.set_media_state(
-                        MediaState::from(
-                            media_exchange_state::Stable::Disabled,
-                        ),
-                        *kind,
-                        Some(*source_kind),
-                    );
                 }
-                states_update.insert(
-                    peer.id(),
-                    removed
-                        .into_iter()
-                        .map(|id| {
-                            (
-                                id,
-                                MediaState::from(
-                                    media_exchange_state::Stable::Disabled,
-                                ),
-                            )
-                        })
-                        .collect(),
-                );
-                self.update_media_states(states_update)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-
-                return Err(e);
+                Err(e) => {
+                    self.set_rollbacked_local_media_settings(
+                        constraints_before.clone(),
+                        criteria,
+                    )
+                    .await?;
+                    return Err(tracerr::map_from_and_wrap!()(e));
+                }
             }
         }
 

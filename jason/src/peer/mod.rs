@@ -317,22 +317,34 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
-    pub fn drop_senders(
+    /// Returns all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    pub fn get_senders_without_tracks(
         &self,
-        media: &Vec<(MediaKind, MediaSourceKind)>,
-    ) -> Vec<TrackId> {
-        let mut out = Vec::new();
-        for sender in self.media_connections.get_all_senders() {
-            for (kind, source_kind) in media {
-                if kind == &sender.kind()
-                    && source_kind == &sender.source_kind()
-                {
-                    sender.remove_track();
-                    out.push(sender.track_id());
-                }
-            }
+        criteria: LocalStreamUpdateCriteria,
+    ) -> Vec<Rc<Sender>> {
+        self.media_connections
+            .get_all_senders()
+            .into_iter()
+            .filter(|s| {
+                criteria.has(s.kind(), s.source_kind())
+                    && s.enabled()
+                    && !s.has_track()
+            })
+            .collect()
+    }
+
+    /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`].
+    pub async fn drop_send_tracks(&self, criteria: LocalStreamUpdateCriteria) {
+        for sender in self
+            .media_connections
+            .get_all_senders()
+            .into_iter()
+            .filter(|s| criteria.has(s.kind(), s.source_kind()))
+        {
+            sender.remove_track().await;
         }
-        out
     }
 
     /// Stops inner state transitions expiry timers.
@@ -702,25 +714,11 @@ impl PeerConnection {
 
             let used_caps = MediaStreamSettings::from(&required_caps);
 
-            let senders = self.media_connections.get_all_senders();
-            let unsatisfied_tracks = required_caps.unsatisfied_tracks(senders);
-            let mut disable_tracks = HashMap::new();
-            for sender in unsatisfied_tracks {
-                sender.remove_track().await;
-                disable_tracks.insert(
-                    sender.track_id(),
-                    media_exchange_state::Stable::Disabled,
-                );
-            }
-
-            let media_tracks =
-                match self.media_manager.get_tracks(used_caps).await {
-                    Ok(tracks) => tracks,
-                    Err(_) => {
-                        return Ok(disable_tracks);
-                    }
-                };
-
+            let media_tracks = self
+                .media_manager
+                .get_tracks(used_caps)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
             let peer_tracks = required_caps
                 .parse_tracks(
                     media_tracks.iter().map(|(t, _)| t).cloned().collect(),

@@ -20,7 +20,9 @@ use web_sys::{
 
 use crate::{
     media::MediaKind,
-    peer::{media_exchange_state, mute_state, MediaState},
+    peer::{
+        media_exchange_state, mute_state, LocalStreamUpdateCriteria, MediaState,
+    },
     utils::get_property_by_name,
 };
 
@@ -84,11 +86,20 @@ impl From<MediaStreamSettings> for LocalTracksConstraints {
 }
 
 impl LocalTracksConstraints {
-    pub fn calculate_diff(
+    /// Returns cloned [`MediaStreamSettings`] of this
+    /// [`LocalTracksConstraints`].
+    pub fn clone_settings(&self) -> MediaStreamSettings {
+        self.0.borrow().clone()
+    }
+
+    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
+    /// [`MediaSourceKind`] which are different in the provided
+    /// [`MediaStreamSettings`].
+    pub fn calculate_criteria_change(
         &self,
-        another: &Self,
-    ) -> Vec<(MediaKind, MediaSourceKind)> {
-        self.0.borrow().calculate_diff(&another.0.borrow())
+        settings: &MediaStreamSettings,
+    ) -> LocalStreamUpdateCriteria {
+        self.0.borrow().calculate_diff(&settings)
     }
 
     /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
@@ -117,6 +128,19 @@ impl LocalTracksConstraints {
         self.0
             .borrow_mut()
             .set_track_media_state(state, kind, source_kind);
+    }
+
+    /// Sets enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// provided [`media_exchange_state`].
+    #[inline]
+    pub fn set_media_exchange_state_by_criteria(
+        &self,
+        state: media_exchange_state::Stable,
+        criteria: LocalStreamUpdateCriteria,
+    ) {
+        self.0
+            .borrow_mut()
+            .set_media_exchange_state_by_criteria(state, criteria)
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -372,22 +396,22 @@ impl MediaStreamSettings {
         }
     }
 
-    pub fn calculate_diff(
-        &self,
-        another: &Self,
-    ) -> Vec<(MediaKind, MediaSourceKind)> {
-        let mut diff = Vec::new();
+    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
+    /// [`MediaSourceKind`] which are different in the provided
+    /// [`MediaStreamSettings`].
+    pub fn calculate_diff(&self, another: &Self) -> LocalStreamUpdateCriteria {
+        let mut criteria = LocalStreamUpdateCriteria::empty();
         if self.device_video != another.device_video {
-            diff.push((MediaKind::Video, MediaSourceKind::Device));
+            criteria.add(MediaKind::Video, MediaSourceKind::Device);
         }
         if self.display_video != another.display_video {
-            diff.push((MediaKind::Video, MediaSourceKind::Display));
+            criteria.add(MediaKind::Video, MediaSourceKind::Display);
         }
         if self.audio != another.audio {
-            diff.push((MediaKind::Audio, MediaSourceKind::Device));
+            criteria.add(MediaKind::Audio, MediaSourceKind::Device);
         }
 
-        diff
+        criteria
     }
 
     /// Returns only audio constraints.
@@ -451,6 +475,26 @@ impl MediaStreamSettings {
                     );
                 }
             },
+        }
+    }
+
+    /// Sets enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// provided [`media_exchange_state`].
+    #[inline]
+    pub fn set_media_exchange_state_by_criteria(
+        &mut self,
+        state: media_exchange_state::Stable,
+        criteria: LocalStreamUpdateCriteria,
+    ) {
+        let enabled = state == media_exchange_state::Stable::Enabled;
+        if criteria.has(MediaKind::Audio, MediaSourceKind::Device) {
+            self.set_audio_publish(enabled);
+        }
+        if criteria.has(MediaKind::Video, MediaSourceKind::Device) {
+            self.set_video_publish(enabled, Some(MediaSourceKind::Device));
+        }
+        if criteria.has(MediaKind::Video, MediaSourceKind::Display) {
+            self.set_video_publish(enabled, Some(MediaSourceKind::Display));
         }
     }
 
@@ -845,10 +889,6 @@ impl AudioTrackConstraints {
 }
 
 impl AudioTrackConstraints {
-    pub fn same_as(&self, another: &Self) -> bool {
-        self.device_id == another.device_id
-    }
-
     /// Checks if provided [MediaStreamTrack][1] satisfies constraints
     /// contained.
     ///
@@ -1030,11 +1070,6 @@ pub struct DeviceVideoTrackConstraints {
 }
 
 impl DeviceVideoTrackConstraints {
-    pub fn same_as(&self, another: &Self) -> bool {
-        self.device_id == another.device_id
-            && self.facing_mode == another.facing_mode
-    }
-
     /// Checks if provided [MediaStreamTrack][1] satisfies
     /// [`DeviceVideoTrackConstraints`] contained.
     ///
@@ -1114,10 +1149,6 @@ pub struct DisplayVideoTrackConstraints {
 }
 
 impl DisplayVideoTrackConstraints {
-    pub fn same_as(&self, _: &Self) -> bool {
-        true
-    }
-
     /// Checks if provided [MediaStreamTrack][1] satisfies
     /// [`DisplayVideoTrackConstraints`] contained.
     ///

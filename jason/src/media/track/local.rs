@@ -127,11 +127,6 @@ impl Track {
 impl Drop for Track {
     #[inline]
     fn drop(&mut self) {
-        log::debug!(
-            "Drop. Kind: {:?}; Source: {:?}",
-            self.kind,
-            self.source_kind
-        );
         self.track.stop();
     }
 }

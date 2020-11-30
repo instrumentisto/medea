@@ -76,6 +76,12 @@ impl Transceiver {
         self.send_track.borrow().clone()
     }
 
+    /// Returns `true` if this [`Transceiver`] has [`local::Track`].
+    #[inline]
+    pub fn has_send_track(&self) -> bool {
+        self.send_track.borrow().is_some()
+    }
+
     /// Sets the underlying [`local::Track`]'s `enabled` field to the provided
     /// value, if any.
     pub fn set_send_track_enabled(&self, enabled: bool) {

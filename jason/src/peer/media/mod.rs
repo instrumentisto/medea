@@ -819,6 +819,7 @@ impl MediaConnections {
             .for_each(|t| t.reset_media_state_transition_timeout());
     }
 
+    /// Returns all [`Sender`]s from this [`MediaConnections`].
     pub fn get_all_senders(&self) -> Vec<Rc<Sender>> {
         self.0.borrow().senders.values().cloned().collect()
     }

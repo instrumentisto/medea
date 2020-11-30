@@ -9,7 +9,6 @@ use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
 pub use medea_macro::JsCaused;
-use std::convert::TryFrom;
 
 /// Prints provided message with [`Console.error()`].
 ///
@@ -37,45 +36,6 @@ pub trait JsCaused {
 
     /// Returns JS error if it is the cause.
     fn js_cause(self) -> Option<Self::Error>;
-}
-
-pub enum OverconstrainedErrorParseError {
-    NoMessageField,
-    NoConstraintsField,
-    UnknownConstraint,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Constraint {
-    FacingMode,
-}
-
-pub struct OverconstrainedError {
-    pub message: String,
-    pub constraint: Constraint,
-}
-
-impl TryFrom<JsValue> for OverconstrainedError {
-    type Error = OverconstrainedErrorParseError;
-
-    fn try_from(val: JsValue) -> Result<Self, Self::Error> {
-        let constraint =
-            super::get_property_by_name(&val, "constraint", |v| v.as_string())
-                .ok_or(OverconstrainedErrorParseError::NoConstraintsField)?;
-        let constraint = match constraint.as_str() {
-            "facingMode" => Constraint::FacingMode,
-            _ => return Err(OverconstrainedErrorParseError::UnknownConstraint),
-        };
-
-        let message =
-            super::get_property_by_name(&val, "message", |v| v.as_string())
-                .ok_or(OverconstrainedErrorParseError::NoMessageField)?;
-
-        Ok(Self {
-            message,
-            constraint,
-        })
-    }
 }
 
 /// Wrapper for JS value which returned from JS side as error.
