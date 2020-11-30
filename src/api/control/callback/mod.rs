@@ -18,7 +18,7 @@ pub use self::{
     url::CallbackUrl,
 };
 
-/// Event for `on_leave` `Member` callbackcallbackcallbackcallbackcallbackcallbackcallback.
+/// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
 pub struct OnLeaveEvent {
     /// Reason of why `Member` was lost.
