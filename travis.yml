@@ -77,55 +77,55 @@ jobs:
 #      rust: nightly
 #      script: make cargo.build crate=medea dockerized=no
 
-    - name: rustdoc medea-macro (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea-macro open=no
+#    - name: rustdoc medea-macro (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea-macro open=no
+#
+#    - name: rustdoc medea-reactive (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea-reactive open=no
+#
+#    - name: rustdoc medea-coturn-telnet-client (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea-coturn-telnet-client open=no
+#
+#    - name: rustdoc medea-client-api-proto (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea-client-api-proto open=no
+#
+#    - name: rustdoc medea-control-api-proto (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea-control-api-proto open=no
+#
+#    - name: rustdoc medea (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea open=no
+#
+#    - name: rustdoc medea-jason (stable)
+#      stage: doc
+#      rust: stable
+#      script: make docs.rust crate=medea-jason open=no
 
-    - name: rustdoc medea-reactive (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea-reactive open=no
-
-    - name: rustdoc medea-coturn-telnet-client (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea-coturn-telnet-client open=no
-
-    - name: rustdoc medea-client-api-proto (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea-client-api-proto open=no
-
-    - name: rustdoc medea-control-api-proto (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea-control-api-proto open=no
-
-    - name: rustdoc medea (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea open=no
-
-    - name: rustdoc medea-jason (stable)
-      stage: doc
-      rust: stable
-      script: make docs.rust crate=medea-jason open=no
-
-    - name: unit medea-macro (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=medea-macro
-
-    - name: unit medea-reactive (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=medea-reactive
-
-    - name: unit medea-coturn-telnet-client (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=medea-coturn-telnet-client
+#    - name: unit medea-macro (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=medea-macro
+#
+#    - name: unit medea-reactive (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=medea-reactive
+#
+#    - name: unit medea-coturn-telnet-client (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=medea-coturn-telnet-client
 
     - name: unit medea-client-api-proto (stable)
       stage: test
