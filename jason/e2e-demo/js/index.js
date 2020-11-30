@@ -1,6 +1,6 @@
-const controlDomain = 'http://192.168.1.158:8000';
+const controlDomain = 'http://127.0.0.1:8000';
 const controlUrl = controlDomain + '/control-api/';
-const baseUrl = 'ws://192.168.1.158:8080/ws/';
+const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let rust;
 let roomId = window.location.hash.replace('#', '');

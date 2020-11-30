@@ -945,6 +945,8 @@ impl InnerRoom {
     /// If rollback fails, then all [`Sender`]s with a provided
     /// [`LocalStreamUpdateCriteria`] and without [`local::Track`] will be
     /// disabled.
+    ///
+    /// [`Sender`]: crate::peer::Sender
     async fn set_rollbacked_local_media_settings(
         &self,
         settings: MediaStreamSettings,

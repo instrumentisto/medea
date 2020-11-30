@@ -130,7 +130,7 @@ impl LocalTracksConstraints {
             .set_track_media_state(state, kind, source_kind);
     }
 
-    /// Sets enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// Enables/disables provided [`LocalStreamUpdateCriteria`] based on
     /// provided [`media_exchange_state`].
     #[inline]
     pub fn set_media_exchange_state_by_criteria(
