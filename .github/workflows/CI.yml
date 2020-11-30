@@ -6,19 +6,19 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  lint:
-    name: Lint Rust code with Clippy
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: clippy
-      - run: make lint
+#  lint:
+#    name: Lint Rust code with Clippy
+#    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          override: true
+#          components: clippy
+#      - run: make lint
   rustfmt:
     name: Verify Rust code style with rustfmt
     if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
