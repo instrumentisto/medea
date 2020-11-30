@@ -6,9 +6,9 @@ install:
   - cargo -vV
 
 stages:
-  - name: check
-    if: (branch = master AND type != pull_request)
-        OR commit_message =~ /.*\[run ci\]/
+#  - name: check
+#    if: (branch = master AND type != pull_request)
+#        OR commit_message =~ /.*\[run ci\]/
   - name: build
     if: (branch = master AND type != pull_request)
         OR commit_message =~ /.*\[run ci\]/
@@ -41,41 +41,41 @@ jobs:
 #      before_script: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
 #      script: make fmt check=yes
 
-    - name: medea-jason (stable)
-      stage: build
-      rust: stable
-      before_script:
-        - rm -f /home/travis/.cargo/bin/wasm-pack
-        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script: make cargo.build crate=medea-jason dockerized=no debug=no
+#    - name: medea-jason (stable)
+#      stage: build
+#      rust: stable
+#      before_script:
+#        - rm -f /home/travis/.cargo/bin/wasm-pack
+#        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+#      script: make cargo.build crate=medea-jason dockerized=no debug=no
 
-    - name: medea docker (stable)
-      stage: build
-      rust: stable
-      services: ["docker"]
-      script: make docker.build.medea debug=no
-              TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
-      before_deploy: echo "$QUAYIO_PASS"
-                     | make docker.auth registry=quay.io
-                                        user=$QUAYIO_USER pass-stdin=yes
-      deploy:
-        provider: script
-        script: make docker.push IMAGE=medea registry=quay.io
-                                 TAGS=build-${TRAVIS_BUILD_ID}
-        on:
-          all_branches: true
+#    - name: medea docker (stable)
+#      stage: build
+#      rust: stable
+#      services: ["docker"]
+#      script: make docker.build.medea debug=no
+#              TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+#      before_deploy: echo "$QUAYIO_PASS"
+#                     | make docker.auth registry=quay.io
+#                                        user=$QUAYIO_USER pass-stdin=yes
+#      deploy:
+#        provider: script
+#        script: make docker.push IMAGE=medea registry=quay.io
+#                                 TAGS=build-${TRAVIS_BUILD_ID}
+#        on:
+#          all_branches: true
 
-    - name: medea (beta)
-      stage: build
-      if: branch = master
-      rust: beta
-      script: make cargo.build crate=medea dockerized=no
+#    - name: medea (beta)
+#      stage: build
+#      if: branch = master
+#      rust: beta
+#      script: make cargo.build crate=medea dockerized=no
 
-    - name: medea (nightly)
-      stage: build
-      if: branch = master
-      rust: nightly
-      script: make cargo.build crate=medea dockerized=no
+#    - name: medea (nightly)
+#      stage: build
+#      if: branch = master
+#      rust: nightly
+#      script: make cargo.build crate=medea dockerized=no
 
     - name: rustdoc medea-macro (stable)
       stage: doc

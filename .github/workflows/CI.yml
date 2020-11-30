@@ -19,7 +19,7 @@ jobs:
 #          override: true
 #          components: clippy
 #      - run: make lint
-  rustfmt:
+  fmt:
     name: Verify Rust code style with rustfmt
     if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
     runs-on: ubuntu-latest
@@ -32,3 +32,32 @@ jobs:
           override: true
           components: rustfmt
       - run: make fmt check=yes
+
+  build-jason:
+    name: Build medea-jason (stable)
+    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+#    needs: [lint, fmt]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: jetli/wasm-pack-action@v0.3.0
+      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
+
+  build-medea:
+    name: Build medea (stable)
+    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    #    needs: [lint, fmt]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: make cargo.build crate=medea dockerized=no debug=yes
