@@ -107,7 +107,7 @@ async fn get_test_room_and_exist_peer(
     if let Some(media_stream_settings) = &media_stream_settings {
         JsFuture::from(
             room.new_handle()
-                .set_local_media_settings(&media_stream_settings),
+                .set_local_media_settings(&media_stream_settings, false),
         )
         .await
         .unwrap();
@@ -157,7 +157,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
 
-    JsFuture::from(room_handle.set_local_media_settings(&constraints))
+    JsFuture::from(room_handle.set_local_media_settings(&constraints, false))
         .await
         .unwrap();
 
@@ -201,9 +201,11 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let room_handle = room.new_handle();
     room_handle.on_failed_local_media(cb.into()).unwrap();
     let err = get_jason_error(
-        JsFuture::from(room_handle.set_local_media_settings(&constraints))
-            .await
-            .unwrap_err(),
+        JsFuture::from(
+            room_handle.set_local_media_settings(&constraints, false),
+        )
+        .await
+        .unwrap_err(),
     );
     assert_eq!(err.name(), "InvalidLocalTracks");
     assert_eq!(
@@ -247,9 +249,11 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         let is_should_be_ok =
             audio_required == add_audio || video_required == add_video;
         assert_eq!(
-            JsFuture::from(room_handle.set_local_media_settings(&constraints))
-                .await
-                .is_ok(),
+            JsFuture::from(
+                room_handle.set_local_media_settings(&constraints, false)
+            )
+            .await
+            .is_ok(),
             is_should_be_ok,
             "audio_required: {}; add_audio: {}; video_required: {}; \
              add_video: {}",
@@ -283,7 +287,7 @@ async fn error_get_local_stream_on_new_peer() {
     let room_handle = room.new_handle();
     JsFuture::from(
         room_handle
-            .set_local_media_settings(&media_stream_settings(true, true)),
+            .set_local_media_settings(&media_stream_settings(true, true), true),
     )
     .await
     .unwrap();
@@ -830,10 +834,10 @@ mod disable_send_tracks {
     async fn disable_audio_room_before_init_peer() {
         let (event_tx, event_rx) = mpsc::unbounded();
         let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
-        JsFuture::from(
-            room.new_handle()
-                .set_local_media_settings(&media_stream_settings(true, true)),
-        )
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+        ))
         .await
         .unwrap();
 
@@ -880,10 +884,10 @@ mod disable_send_tracks {
     async fn enable_video_room_before_init_peer() {
         let (event_tx, event_rx) = mpsc::unbounded();
         let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
-        JsFuture::from(
-            room.new_handle()
-                .set_local_media_settings(&media_stream_settings(true, true)),
-        )
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+        ))
         .await
         .unwrap();
 
@@ -1832,8 +1836,10 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
         .on_failed_local_media(js_sys::Function::new_no_args(""))
         .unwrap();
     JsFuture::from(
-        room_handle
-            .set_local_media_settings(&media_stream_settings(true, false)),
+        room_handle.set_local_media_settings(
+            &media_stream_settings(true, false),
+            false,
+        ),
     )
     .await
     .unwrap();
@@ -1851,14 +1857,14 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
     delay_for(10).await;
 
     spawn_local(async move {
-        let err =
-            get_jason_error(
-                JsFuture::from(room_handle.set_local_media_settings(
-                    &media_stream_settings(true, true),
-                ))
-                .await
-                .unwrap_err(),
-            );
+        let err = get_jason_error(
+            JsFuture::from(room_handle.set_local_media_settings(
+                &media_stream_settings(true, true),
+                false,
+            ))
+            .await
+            .unwrap_err(),
+        );
         assert_eq!(err.name(), "MediaConnections");
         assert_eq!(
             err.message(),

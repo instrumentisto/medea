@@ -25,8 +25,8 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaStreamSettings,
-        RecvConstraints,
+        LocalTracksConstraints, MediaKind, MediaManagerError,
+        MediaStreamSettings, RecvConstraints,
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
@@ -973,35 +973,51 @@ impl InnerRoom {
             let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
             for peer in self.peers.get_all() {
                 peer.drop_send_tracks(criteria).await;
-                match peer.update_local_stream(criteria).await {
+                match peer
+                    .update_local_stream(LocalStreamUpdateCriteria::all())
+                    .await
+                {
                     Ok(states) => {
                         states_update.entry(peer.id()).or_default().extend(
                             states.into_iter().map(|(id, s)| (id, s.into())),
                         );
                     }
                     Err(e) => {
-                        if rollback_on_fail {
-                            self.set_local_media_settings(
-                                constraints_before,
-                                false,
-                            )
-                            .await?;
-                        } else {
-                            self.send_constraints
-                                .set_media_exchange_state_by_criteria(
-                                    Disabled, criteria,
-                                );
-                            let senders_to_disable =
-                                peer.get_senders_without_tracks(criteria);
+                        if let PeerError::MediaManager(
+                            MediaManagerError::GetUserMediaFailed(_),
+                        ) = e.as_ref()
+                        {
+                            if rollback_on_fail {
+                                self.set_local_media_settings(
+                                    constraints_before,
+                                    false,
+                                )
+                                .await?;
+                            } else {
+                                self.send_constraints
+                                    .set_media_exchange_state_by_criteria(
+                                        Disabled, criteria,
+                                    );
+                                let senders_to_disable =
+                                    peer.get_senders_without_tracks(criteria);
 
-                            states_update.entry(peer.id()).or_default().extend(
-                                senders_to_disable.into_iter().map(|s| {
-                                    (s.track_id(), MediaState::from(Disabled))
-                                }),
-                            );
-                            self.update_media_states(states_update)
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
+                                states_update
+                                    .entry(peer.id())
+                                    .or_default()
+                                    .extend(
+                                        senders_to_disable.into_iter().map(
+                                            |s| {
+                                                (
+                                                    s.track_id(),
+                                                    MediaState::from(Disabled),
+                                                )
+                                            },
+                                        ),
+                                    );
+                                self.update_media_states(states_update)
+                                    .await
+                                    .map_err(tracerr::map_from_and_wrap!())?;
+                            }
                         }
                         return Err(tracerr::map_from_and_wrap!()(e));
                     }
