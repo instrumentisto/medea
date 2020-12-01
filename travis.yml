@@ -127,27 +127,27 @@ jobs:
 #      rust: stable
 #      script: make test.unit crate=medea-coturn-telnet-client
 
-    - name: unit medea-client-api-proto (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=medea-client-api-proto
+#    - name: unit medea-client-api-proto (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=medea-client-api-proto
 
-    - name: unit medea (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=medea
+#    - name: unit medea (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=medea
 
-    - name: unit medea-jason (stable, Chrome)
-      stage: test
-      rust: stable
-      services: ["docker"]
-      before_script:
-        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
-        - cargo install -f wasm-bindgen-cli
-                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
-                                                    | grep -o '[0-9\.]*'`
-        - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason browser=chrome
+#    - name: unit medea-jason (stable, Chrome)
+#      stage: test
+#      rust: stable
+#      services: ["docker"]
+#      before_script:
+#        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
+#        - cargo install -f wasm-bindgen-cli
+#                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
+#                                                    | grep -o '[0-9\.]*'`
+#        - rustup target add wasm32-unknown-unknown
+#      script: make test.unit crate=medea-jason browser=chrome
 
     - name: unit medea-jason (stable, Firefox)
       stage: test
