@@ -2,7 +2,7 @@
 
 use std::{marker::PhantomData, slice::Iter};
 
-use futures::{future::LocalBoxFuture, Stream};
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
@@ -75,13 +75,13 @@ pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 #[derive(Debug)]
 pub struct Vec<T, S: SubscribersStore<T, O>, O> {
     /// Data stored by this [`Vec`].
-    store: std::vec::Vec<T>,
+    inner: std::vec::Vec<T>,
 
     /// Subscribers of the [`Vec::on_push`] method.
-    on_push_subs: S,
+    push_subs: S,
 
     /// Subscribers of the [`Vec::on_remove`] method.
-    on_remove_subs: S,
+    remove_subs: S,
 
     /// Phantom type of [`Vec::on_push`] and
     /// [`Vec::on_remove`] output.
@@ -99,7 +99,7 @@ where
     #[inline]
     #[must_use]
     pub fn when_push_completed(&self) -> LocalBoxFuture<'static, ()> {
-        self.on_push_subs.when_all_processed()
+        self.push_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
@@ -109,8 +109,10 @@ where
     #[inline]
     #[must_use]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
-        self.on_push_subs.when_all_processed()
+        self.remove_subs.when_all_processed()
     }
+
+    // TODO: why no when_all_processed?
 }
 
 impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
@@ -133,8 +135,8 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`Vec`] on drop.
     #[inline]
-    pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.new_subscription(std::vec::Vec::new())
+    pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
+        self.remove_subs.new_subscription(std::vec::Vec::new())
     }
 }
 
@@ -147,9 +149,9 @@ where
     ///
     /// This will produce [`Vec::on_push`] event.
     pub fn push(&mut self, value: T) {
-        self.store.push(value.clone());
+        self.inner.push(value.clone());
 
-        self.on_push_subs.send_update(value);
+        self.push_subs.send_update(value);
     }
 
     /// Removes and returns the element at position `index` within the vector,
@@ -157,8 +159,8 @@ where
     ///
     /// This will produce [`Vec::on_remove`] event.
     pub fn remove(&mut self, index: usize) -> T {
-        let value = self.store.remove(index);
-        self.on_remove_subs.send_update(value.clone());
+        let value = self.inner.remove(index);
+        self.remove_subs.send_update(value.clone());
 
         value
     }
@@ -168,8 +170,8 @@ where
     /// Also to this [`Stream`] will be sent all already pushed values
     /// of this [`Vec`].
     #[inline]
-    pub fn on_push(&self) -> impl Stream<Item = O> {
-        self.on_push_subs.new_subscription(self.store.to_vec())
+    pub fn on_push(&self) -> LocalBoxStream<'static, O> {
+        self.push_subs.new_subscription(self.inner.to_vec())
     }
 }
 
@@ -177,9 +179,9 @@ impl<T, S: SubscribersStore<T, O>, O> Default for Vec<T, S, O> {
     #[inline]
     fn default() -> Self {
         Self {
-            store: std::vec::Vec::new(),
-            on_push_subs: S::default(),
-            on_remove_subs: S::default(),
+            inner: std::vec::Vec::new(),
+            push_subs: S::default(),
+            remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -189,9 +191,9 @@ impl<T, S: SubscribersStore<T, O>, O> From<std::vec::Vec<T>> for Vec<T, S, O> {
     #[inline]
     fn from(from: std::vec::Vec<T>) -> Self {
         Self {
-            store: from,
-            on_push_subs: S::default(),
-            on_remove_subs: S::default(),
+            inner: from,
+            push_subs: S::default(),
+            remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -203,7 +205,7 @@ impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator for &'a Vec<T, S, O> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.store.iter()
+        self.inner.iter()
     }
 }
 
@@ -211,8 +213,8 @@ impl<T, S: SubscribersStore<T, O>, O> Drop for Vec<T, S, O> {
     /// Sends all items of a dropped [`Vec`] to the
     /// [`Vec::on_remove`] subs.
     fn drop(&mut self) {
-        let store = &mut self.store;
-        let on_remove_subs = &self.on_remove_subs;
+        let store = &mut self.inner;
+        let on_remove_subs = &self.remove_subs;
         store.drain(..).for_each(|value| {
             on_remove_subs.send_update(value);
         });
@@ -226,7 +228,7 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        &self.store
+        &self.inner
     }
 }
 
@@ -234,7 +236,7 @@ where
 mod tests {
     use std::time::Duration;
 
-    use futures::StreamExt as _;
+    use futures::{poll, task::Poll, StreamExt as _};
     use tokio::time::timeout;
 
     use crate::collections::ProgressableVec;
@@ -243,53 +245,36 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn waits_for_processing() {
-            let mut store = ProgressableVec::new();
+        async fn wait_for_push() {
+            let mut vec = ProgressableVec::new();
 
-            let _on_push = store.on_push();
-            store.push(0);
+            let on_push = vec.on_push();
+            vec.push(0);
 
-            let when_push_completed = store.when_push_completed();
-
-            let _ = timeout(Duration::from_millis(500), when_push_completed)
-                .await
-                .unwrap_err();
+            assert_eq!(poll!(vec.when_push_completed()), Poll::Pending);
+            drop(on_push);
+            assert_eq!(poll!(vec.when_push_completed()), Poll::Ready(()));
         }
 
         #[tokio::test]
-        async fn waits_for_value_drop() {
-            let mut store = ProgressableVec::new();
+        async fn wait_for_remove() {
+            let mut vec = ProgressableVec::new();
 
-            let mut on_push = store.on_push();
-            store.push(0);
-            let when_push_completed = store.when_push_completed();
-            let _value = on_push.next().await.unwrap();
+            let on_remove = vec.on_remove();
+            vec.push(0);
+            let _ = vec.remove(0);
 
-            let _ = timeout(Duration::from_millis(500), when_push_completed)
-                .await
-                .unwrap_err();
-        }
-
-        #[tokio::test]
-        async fn resolved_on_value_drop() {
-            let mut store = ProgressableVec::new();
-
-            let mut on_push = store.on_push();
-            store.push(0);
-            let when_push_completed = store.when_push_completed();
-            drop(on_push.next().await.unwrap());
-
-            timeout(Duration::from_millis(500), when_push_completed)
-                .await
-                .unwrap();
+            assert_eq!(poll!(vec.when_remove_completed()), Poll::Pending);
+            drop(on_remove);
+            assert_eq!(poll!(vec.when_remove_completed()), Poll::Ready(()));
         }
 
         #[tokio::test]
         async fn resolves_on_empty_sublist() {
-            let mut store = ProgressableVec::new();
+            let mut vec = ProgressableVec::new();
 
-            store.push(0);
-            let when_push_completed = store.when_push_completed();
+            vec.push(0);
+            let when_push_completed = vec.when_push_completed();
 
             timeout(Duration::from_millis(50), when_push_completed)
                 .await
@@ -298,12 +283,12 @@ mod tests {
 
         #[tokio::test]
         async fn waits_for_two_subs() {
-            let mut store = ProgressableVec::new();
+            let mut vec = ProgressableVec::new();
 
-            let mut first_on_push = store.on_push();
-            let _second_on_push = store.on_push();
-            store.push(0);
-            let when_all_push_processed = store.when_push_completed();
+            let mut first_on_push = vec.on_push();
+            let _second_on_push = vec.on_push();
+            vec.push(0);
+            let when_all_push_processed = vec.when_push_completed();
 
             drop(first_on_push.next().await.unwrap());
 

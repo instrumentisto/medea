@@ -6,7 +6,7 @@ use std::{
     marker::PhantomData,
 };
 
-use futures::{future::LocalBoxFuture, Stream};
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
@@ -84,13 +84,13 @@ pub type ObservableHashMap<K, V> =
 #[derive(Debug, Clone)]
 pub struct HashMap<K, V, S: SubscribersStore<(K, V), O>, O> {
     /// Data stored by this [`HashMap`].
-    store: std::collections::HashMap<K, V>,
+    inner: std::collections::HashMap<K, V>,
 
     /// Subscribers of the [`HashMap::on_insert`] method.
-    on_insert_subs: S,
+    insert_subs: S,
 
     /// Subscribers of the [`HashMap::on_remove`] method.
-    on_remove_subs: S,
+    remove_subs: S,
 
     /// Phantom type of [`HashMap::on_insert`] and
     /// [`HashMap::on_remove`] output.
@@ -108,7 +108,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
-        self.on_insert_subs.when_all_processed()
+        self.insert_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
@@ -117,7 +117,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
-        self.on_remove_subs.when_all_processed()
+        self.remove_subs.when_all_processed()
     }
 }
 
@@ -140,7 +140,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     /// type is `&'a V`.
     #[inline]
     pub fn values(&self) -> Values<'_, K, V> {
-        self.store.values()
+        self.inner.values()
     }
 
     /// Returns the [`Stream`] to which the removed key-value pairs will be
@@ -149,8 +149,8 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`HashMap`] on drop.
     #[inline]
-    pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.new_subscription(Vec::new())
+    pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
+        self.remove_subs.new_subscription(Vec::new())
     }
 }
 
@@ -166,9 +166,9 @@ where
     /// Also to this [`Stream`] will be sent all already inserted key-value
     /// pairs of this [`HashMap`].
     #[inline]
-    pub fn on_insert(&self) -> impl Stream<Item = O> {
-        self.on_insert_subs.new_subscription(
-            self.store
+    pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
+        self.insert_subs.new_subscription(
+            self.inner
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
@@ -184,7 +184,7 @@ where
     /// Returns a reference to the value corresponding to the key.
     #[inline]
     pub fn get(&self, key: &K) -> Option<&V> {
-        self.store.get(key)
+        self.inner.get(key)
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
@@ -198,7 +198,7 @@ where
     /// [`Observable`]: crate::Observable
     #[inline]
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.store.get_mut(key)
+        self.inner.get_mut(key)
     }
 }
 
@@ -212,10 +212,9 @@ where
     ///
     /// This action will produce [`HashMap::on_insert`] event.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.on_insert_subs
-            .send_update((key.clone(), value.clone()));
+        self.insert_subs.send_update((key.clone(), value.clone()));
 
-        self.store.insert(key, value)
+        self.inner.insert(key, value)
     }
 
     /// Removes a key from the [`HashMap`], returning the value at
@@ -223,9 +222,9 @@ where
     ///
     /// This action will produce [`HashMap::on_remove`] event.
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        let removed_item = self.store.remove(key);
+        let removed_item = self.inner.remove(key);
         if let Some(item) = &removed_item {
-            self.on_remove_subs.send_update((key.clone(), item.clone()));
+            self.remove_subs.send_update((key.clone(), item.clone()));
         }
 
         removed_item
@@ -236,9 +235,9 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Default for HashMap<K, V, S, O> {
     #[inline]
     fn default() -> Self {
         Self {
-            store: std::collections::HashMap::new(),
-            on_insert_subs: S::default(),
-            on_remove_subs: S::default(),
+            inner: std::collections::HashMap::new(),
+            insert_subs: S::default(),
+            remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -250,9 +249,9 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O>
     #[inline]
     fn from(from: std::collections::HashMap<K, V>) -> Self {
         Self {
-            store: from,
-            on_remove_subs: S::default(),
-            on_insert_subs: S::default(),
+            inner: from,
+            remove_subs: S::default(),
+            insert_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -266,7 +265,7 @@ impl<'a, K, V, S: SubscribersStore<(K, V), O>, O> IntoIterator
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.store.iter()
+        self.inner.iter()
     }
 }
 
@@ -274,8 +273,8 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
     /// Sends all key-values of a dropped [`HashMap`] to the
     /// [`HashMap::on_remove`] subs.
     fn drop(&mut self) {
-        let store = &mut self.store;
-        let on_remove_subs = &self.on_remove_subs;
+        let store = &mut self.inner;
+        let on_remove_subs = &self.remove_subs;
         store.drain().for_each(|(key, value)| {
             on_remove_subs.send_update((key, value));
         });
@@ -286,7 +285,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
 mod tests {
     use std::time::Duration;
 
-    use futures::StreamExt as _;
+    use futures::{poll, task::Poll, StreamExt as _};
     use tokio::time::timeout;
 
     use crate::collections::ProgressableHashMap;
@@ -295,28 +294,26 @@ mod tests {
         use super::*;
 
         #[tokio::test]
-        async fn waits_for_processing() {
-            let mut store = ProgressableHashMap::new();
-            let _ = store.insert(0, 0);
+        async fn waits_for_push() {
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
 
-            let _on_remove = store.on_remove();
-            let _ = store.remove(&0).unwrap();
+            let _on_remove = map.on_remove();
+            let _ = map.remove(&0).unwrap();
 
-            let when_remove_completed = store.when_remove_completed();
-
-            let _ = timeout(Duration::from_millis(500), when_remove_completed)
-                .await
-                .unwrap_err();
+            assert_eq!(poll!(map.when_remove_completed()), Poll::Pending);
+            drop(_on_remove);
+            assert_eq!(poll!(map.when_remove_completed()), Poll::Ready(()));
         }
 
         #[tokio::test]
         async fn waits_for_value_drop() {
-            let mut store = ProgressableHashMap::new();
-            let _ = store.insert(0, 0);
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
 
-            let mut on_remove = store.on_remove();
-            let _ = store.remove(&0);
-            let when_remove_completed = store.when_remove_completed();
+            let mut on_remove = map.on_remove();
+            let _ = map.remove(&0);
+            let when_remove_completed = map.when_remove_completed();
             let _value = on_remove.next().await.unwrap();
 
             let _ = timeout(Duration::from_millis(500), when_remove_completed)
@@ -326,12 +323,12 @@ mod tests {
 
         #[tokio::test]
         async fn resolved_on_value_drop() {
-            let mut store = ProgressableHashMap::new();
-            let _ = store.insert(0, 0);
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
 
-            let mut on_remove = store.on_remove();
-            let _ = store.remove(&0).unwrap();
-            let when_remove_completed = store.when_remove_completed();
+            let mut on_remove = map.on_remove();
+            let _ = map.remove(&0).unwrap();
+            let when_remove_completed = map.when_remove_completed();
             drop(on_remove.next().await.unwrap());
 
             timeout(Duration::from_millis(500), when_remove_completed)
@@ -341,11 +338,11 @@ mod tests {
 
         #[tokio::test]
         async fn resolves_on_empty_sublist() {
-            let mut store = ProgressableHashMap::new();
-            let _ = store.insert(0, 0);
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
 
-            let _ = store.remove(&0).unwrap();
-            let when_remove_completed = store.when_remove_completed();
+            let _ = map.remove(&0).unwrap();
+            let when_remove_completed = map.when_remove_completed();
 
             timeout(Duration::from_millis(50), when_remove_completed)
                 .await
@@ -354,13 +351,13 @@ mod tests {
 
         #[tokio::test]
         async fn waits_for_two_subs() {
-            let mut store = ProgressableHashMap::new();
-            let _ = store.insert(0, 0);
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
 
-            let mut first_on_remove = store.on_remove();
-            let _second_on_remove = store.on_remove();
-            let _ = store.remove(&0).unwrap();
-            let when_all_remove_processed = store.when_remove_completed();
+            let mut first_on_remove = map.on_remove();
+            let _second_on_remove = map.on_remove();
+            let _ = map.remove(&0).unwrap();
+            let when_all_remove_processed = map.when_remove_completed();
 
             drop(first_on_remove.next().await.unwrap());
 
@@ -376,12 +373,12 @@ mod tests {
 
         #[tokio::test]
         async fn waits_for_processing() {
-            let mut store = ProgressableHashMap::new();
+            let mut map = ProgressableHashMap::new();
 
-            let _on_insert = store.on_insert();
-            let _ = store.insert(0, 0);
+            let _on_insert = map.on_insert();
+            let _ = map.insert(0, 0);
 
-            let when_insert_completed = store.when_insert_completed();
+            let when_insert_completed = map.when_insert_completed();
 
             let _ = timeout(Duration::from_millis(500), when_insert_completed)
                 .await
@@ -390,11 +387,11 @@ mod tests {
 
         #[tokio::test]
         async fn waits_for_value_drop() {
-            let mut store = ProgressableHashMap::new();
+            let mut map = ProgressableHashMap::new();
 
-            let mut on_insert = store.on_insert();
-            let _ = store.insert(0, 0);
-            let when_insert_completed = store.when_insert_completed();
+            let mut on_insert = map.on_insert();
+            let _ = map.insert(0, 0);
+            let when_insert_completed = map.when_insert_completed();
             let _value = on_insert.next().await.unwrap();
 
             let _ = timeout(Duration::from_millis(500), when_insert_completed)
@@ -404,11 +401,11 @@ mod tests {
 
         #[tokio::test]
         async fn resolved_on_value_drop() {
-            let mut store = ProgressableHashMap::new();
+            let mut map = ProgressableHashMap::new();
 
-            let mut on_insert = store.on_insert();
-            let _ = store.insert(0, 0);
-            let when_insert_completed = store.when_insert_completed();
+            let mut on_insert = map.on_insert();
+            let _ = map.insert(0, 0);
+            let when_insert_completed = map.when_insert_completed();
             drop(on_insert.next().await.unwrap());
 
             timeout(Duration::from_millis(500), when_insert_completed)
@@ -418,10 +415,10 @@ mod tests {
 
         #[tokio::test]
         async fn resolves_on_empty_sublist() {
-            let mut store = ProgressableHashMap::new();
+            let mut map = ProgressableHashMap::new();
 
-            let _ = store.insert(0, 0);
-            let when_insert_completed = store.when_insert_completed();
+            let _ = map.insert(0, 0);
+            let when_insert_completed = map.when_insert_completed();
 
             timeout(Duration::from_millis(50), when_insert_completed)
                 .await
@@ -430,12 +427,12 @@ mod tests {
 
         #[tokio::test]
         async fn waits_for_two_subs() {
-            let mut store = ProgressableHashMap::new();
+            let mut map = ProgressableHashMap::new();
 
-            let mut first_on_insert = store.on_insert();
-            let _second_on_insert = store.on_insert();
-            let _ = store.insert(0, 0);
-            let when_all_insert_processed = store.when_insert_completed();
+            let mut first_on_insert = map.on_insert();
+            let _second_on_insert = map.on_insert();
+            let _ = map.insert(0, 0);
+            let when_all_insert_processed = map.when_insert_completed();
 
             drop(first_on_insert.next().await.unwrap());
 

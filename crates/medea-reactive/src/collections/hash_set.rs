@@ -2,7 +2,7 @@
 
 use std::{collections::hash_set::Iter, hash::Hash, marker::PhantomData};
 
-use futures::{future::LocalBoxFuture, Stream};
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
@@ -94,13 +94,13 @@ pub type ObservableHashSet<T> = HashSet<T, common::SubStore<T>, T>;
 #[derive(Debug)]
 pub struct HashSet<T, S: SubscribersStore<T, O>, O> {
     /// Data stored by this [`HashSet`].
-    store: std::collections::HashSet<T>,
+    inner: std::collections::HashSet<T>,
 
     /// Subscribers of the [`HashSet::on_insert`] method.
-    on_insert_subs: S,
+    insert_subs: S,
 
     /// Subscribers of the [`HashSet::on_remove`] method.
-    on_remove_subs: S,
+    remove_subs: S,
 
     /// Phantom type of [`HashSet::on_insert`] and
     /// [`HashSet::on_remove`] output.
@@ -117,7 +117,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
-        self.on_insert_subs.when_all_processed()
+        self.insert_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
@@ -126,7 +126,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
-        self.on_remove_subs.when_all_processed()
+        self.remove_subs.when_all_processed()
     }
 }
 
@@ -150,8 +150,8 @@ impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`HashSet`] on drop.
     #[inline]
-    pub fn on_remove(&self) -> impl Stream<Item = O> {
-        self.on_remove_subs.new_subscription(Vec::new())
+    pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
+        self.remove_subs.new_subscription(Vec::new())
     }
 }
 
@@ -166,9 +166,9 @@ where
     /// Also to this [`Stream`] will be sent all already inserted values
     /// of this [`HashSet`].
     #[inline]
-    pub fn on_insert(&self) -> impl Stream<Item = O> {
-        self.on_insert_subs
-            .new_subscription(self.store.iter().cloned().collect())
+    pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
+        self.insert_subs
+            .new_subscription(self.inner.iter().cloned().collect())
     }
 }
 
@@ -185,8 +185,8 @@ where
     ///
     /// This will produce [`HashSet::on_insert`] event.
     pub fn insert(&mut self, value: T) -> bool {
-        if self.store.insert(value.clone()) {
-            self.on_insert_subs.send_update(value);
+        if self.inner.insert(value.clone()) {
+            self.insert_subs.send_update(value);
             true
         } else {
             false
@@ -198,10 +198,10 @@ where
     ///
     /// This will produce [`HashSet::on_remove`] event.
     pub fn remove(&mut self, value: &T) -> Option<T> {
-        let value = self.store.take(value);
+        let value = self.inner.take(value);
 
         if let Some(value) = &value {
-            self.on_remove_subs.send_update(value.clone());
+            self.remove_subs.send_update(value.clone());
         }
 
         value
@@ -216,24 +216,24 @@ where
     ///
     /// For the usage example you can read [`HashSet`] doc.
     pub fn update(&mut self, updated: std::collections::HashSet<T>) {
-        let removed_elems = self.store.difference(&updated);
-        let inserted_elems = updated.difference(&self.store);
+        let removed_elems = self.inner.difference(&updated);
+        let inserted_elems = updated.difference(&self.inner);
 
         for removed_elem in removed_elems {
-            self.on_remove_subs.send_update(removed_elem.clone());
+            self.remove_subs.send_update(removed_elem.clone());
         }
 
         for inserted_elem in inserted_elems {
-            self.on_insert_subs.send_update(inserted_elem.clone());
+            self.insert_subs.send_update(inserted_elem.clone());
         }
 
-        self.store = updated;
+        self.inner = updated;
     }
 
     /// Returns `true` if the set contains a value.
     #[inline]
     pub fn contains(&self, value: &T) -> bool {
-        self.store.contains(value)
+        self.inner.contains(value)
     }
 }
 
@@ -244,9 +244,9 @@ where
     #[inline]
     fn default() -> Self {
         Self {
-            store: std::collections::HashSet::new(),
-            on_insert_subs: S::default(),
-            on_remove_subs: S::default(),
+            inner: std::collections::HashSet::new(),
+            insert_subs: S::default(),
+            remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -260,7 +260,7 @@ impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.store.iter()
+        self.inner.iter()
     }
 }
 
@@ -271,8 +271,8 @@ where
     /// Sends all values of a dropped [`HashSet`] to the
     /// [`HashSet::on_remove`] subs.
     fn drop(&mut self) {
-        let store = &mut self.store;
-        let on_remove_subs = &self.on_remove_subs;
+        let store = &mut self.inner;
+        let on_remove_subs = &self.remove_subs;
         store.drain().for_each(|value| {
             on_remove_subs.send_update(value);
         });
@@ -286,9 +286,9 @@ where
     #[inline]
     fn from(from: std::collections::HashSet<T>) -> Self {
         Self {
-            store: from,
-            on_insert_subs: S::default(),
-            on_remove_subs: S::default(),
+            inner: from,
+            insert_subs: S::default(),
+            remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }

@@ -14,7 +14,7 @@ pub struct Value<D> {
 
 impl<D> Value<D> {
     /// Returns new [`Value`] with a provided data and counter.
-    pub fn new(value: D, counter: Rc<ObservableCell<u32>>) -> Value<D> {
+    pub(crate) fn new(value: D, counter: Rc<ObservableCell<u32>>) -> Value<D> {
         Self { value, counter }
     }
 }

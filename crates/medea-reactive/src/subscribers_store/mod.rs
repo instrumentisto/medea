@@ -16,6 +16,6 @@ pub trait SubscribersStore<T, O>: Default {
     /// [`Stream`]: futures::stream::Stream
     fn new_subscription(
         &self,
-        initial_values: Vec<T>,
+        initial_values: Vec<T>, // TODO: do we really need this?
     ) -> LocalBoxStream<'static, O>;
 }

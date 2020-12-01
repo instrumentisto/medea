@@ -71,23 +71,6 @@ where
     }
 }
 
-impl<D> ProgressableField<D>
-where
-    D: 'static,
-{
-    /// Returns new [`ObservableField`] with subscribable mutations.
-    ///
-    /// Also you can wait for all updates processing by awaiting on
-    /// [`ObservableField::when_all_processed`].
-    #[inline]
-    pub fn new(data: D) -> Self {
-        Self {
-            data,
-            subs: progressable::SubStore::default(),
-        }
-    }
-}
-
 impl<D, S> ObservableField<D, S>
 where
     D: 'static,
@@ -108,6 +91,20 @@ where
             Box::pin(future::ok(()))
         } else {
             self.subs.when(Box::new(assert_fn))
+        }
+    }
+}
+
+impl<D: 'static> ProgressableField<D> {
+    /// Returns new [`ObservableField`] with subscribable mutations.
+    ///
+    /// Also you can wait for all updates processing by awaiting on
+    /// [`ObservableField::when_all_processed`].
+    #[inline]
+    pub fn new(data: D) -> Self {
+        Self {
+            data,
+            subs: progressable::SubStore::default(),
         }
     }
 }
@@ -414,10 +411,10 @@ where
 mod tests {
     use std::{cell::RefCell, time::Duration};
 
-    use futures::StreamExt as _;
+    use futures::{poll, task::Poll, StreamExt as _};
     use tokio::time::timeout;
 
-    use crate::Observable;
+    use crate::{Observable, ProgressableField};
 
     #[tokio::test]
     async fn subscriber_receives_current_data() {
@@ -557,5 +554,22 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn when_all_processed_works() {
+        let mut field = ProgressableField::new(1);
+        assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
+        *field.borrow_mut() = 2;
+        assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
+
+        let mut subscribe = field.subscribe();
+        assert_eq!(poll!(field.when_all_processed()), Poll::Pending);
+
+        assert_eq!(*subscribe.next().await.unwrap(), 2);
+        *field.borrow_mut() = 3;
+        assert_eq!(poll!(field.when_all_processed()), Poll::Pending);
+        assert_eq!(*subscribe.next().await.unwrap(), 3);
+        assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
     }
 }
