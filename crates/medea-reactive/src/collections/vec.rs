@@ -2,7 +2,9 @@
 
 use std::{marker::PhantomData, slice::Iter};
 
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::{
+    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt as _,
+};
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
@@ -112,7 +114,21 @@ where
         self.remove_subs.when_all_processed()
     }
 
-    // TODO: why no when_all_processed?
+    /// Returns [`Future`] which will be resolved when all push and remove
+    /// updates will be processed by subscribers.
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    #[must_use]
+    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+        Box::pin(
+            future::join(
+                self.when_remove_completed(),
+                self.when_push_completed(),
+            )
+            .map(|(_, _)| ()),
+        )
+    }
 }
 
 impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
@@ -134,6 +150,8 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`Vec`] on drop.
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
         self.remove_subs.new_subscription(std::vec::Vec::new())
@@ -169,6 +187,8 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already pushed values
     /// of this [`Vec`].
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_push(&self) -> LocalBoxStream<'static, O> {
         self.push_subs.new_subscription(self.inner.to_vec())

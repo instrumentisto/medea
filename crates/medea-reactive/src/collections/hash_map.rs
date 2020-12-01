@@ -6,7 +6,9 @@ use std::{
     marker::PhantomData,
 };
 
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::{
+    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt,
+};
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
@@ -119,6 +121,22 @@ where
     pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
         self.remove_subs.when_all_processed()
     }
+
+    /// Returns [`Future`] which will be resolved when all insert and remove
+    /// updates will be processed by subscribers.
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    #[must_use]
+    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+        Box::pin(
+            future::join(
+                self.when_remove_completed(),
+                self.when_insert_completed(),
+            )
+            .map(|(_, _)| ()),
+        )
+    }
 }
 
 impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
@@ -148,6 +166,8 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     ///
     /// Note that to this [`Stream`] will be sent all items of the
     /// [`HashMap`] on drop.
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
         self.remove_subs.new_subscription(Vec::new())
@@ -165,6 +185,8 @@ where
     ///
     /// Also to this [`Stream`] will be sent all already inserted key-value
     /// pairs of this [`HashMap`].
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
         self.insert_subs.new_subscription(
