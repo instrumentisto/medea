@@ -15,7 +15,6 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #          components: clippy
 #      - run: make lint
 #
@@ -29,7 +28,6 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
-          override: true
           components: rustfmt
       - run: make fmt check=yes
 #
@@ -42,7 +40,6 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - uses: jetli/wasm-pack-action@v0.3.0
 #      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
 #
@@ -55,7 +52,6 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - run: make cargo.build crate=medea dockerized=no debug=yes
 #
 #  # Run all task sequentially to not flood jobs list.
@@ -68,7 +64,6 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - run: make docs.rust crate=medea-macro open=no
 #      - run: make docs.rust crate=medea-reactive open=no
 #      - run: make docs.rust crate=medea-coturn-telnet-client open=no
@@ -78,7 +73,7 @@ jobs:
 #      - run: make docs.rust crate=medea-jason open=no
 #
 #  unit-medea-macro:
-#    name: medea-macro unit tests
+#    name: Run medea-macro unit tests
 #    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
 #    runs-on: ubuntu-latest
 #    steps:
@@ -86,11 +81,10 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - run: make test.unit crate=medea-macro
 #
 #  unit-medea-reactive:
-#    name: medea-reactive unit tests
+#    name: Run medea-reactive unit tests
 #    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
 #    runs-on: ubuntu-latest
 #    steps:
@@ -98,11 +92,10 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - run: make test.unit crate=medea-reactive
 #
 #  unit-medea-coturn-telnet-client:
-#    name: medea-coturn-telnet-client unit tests
+#    name: Run medea-coturn-telnet-client unit tests
 #    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
 #    runs-on: ubuntu-latest
 #    steps:
@@ -110,11 +103,10 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - run: make test.unit crate=medea-coturn-telnet-client
 #
 #  unit-medea-client-api-proto:
-#    name: medea-client-api-proto unit tests
+#    name: Run medea-client-api-proto unit tests
 #    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
 #    runs-on: ubuntu-latest
 #    steps:
@@ -122,23 +114,10 @@ jobs:
 #      - uses: actions-rs/toolchain@v1
 #        with:
 #          profile: minimal
-#          override: true
 #      - run: make test.unit crate=medea-client-api-proto
 #
-#  unit-medea:
-#    name: medea unit tests
-#    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v2
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          override: true
-#      - run: make test.unit crate=medea
-#
-  unit-medea-jason:
-    name: medea-jason unit tests in Chrome
+  unit-medea:
+    name: Run medea unit tests
     if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
     runs-on: ubuntu-latest
     steps:
@@ -146,7 +125,17 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          override: true
+      - run: make test.unit crate=medea
+
+  unit-medea-jason:
+    name: Run medea-jason unit tests in Chrome
+    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
       - run: exit 0
 #      run: |
 #        echo ::set-env name=WASM_CLI_VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')
