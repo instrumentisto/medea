@@ -136,22 +136,22 @@ jobs:
 #          profile: minimal
 #          override: true
 #      - run: make test.unit crate=medea
-
-  unit-medea-jason:
-    name: medea-jason unit tests in Chrome
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          override: true
-      run: |
-        echo ::set-env name=WASM_CLI_VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')
-      - uses: actions-rs/install@v0.1
-        with:
-          crate: wasm-bindgen-cli
-          version: ${{ env.WASM_CLI_VERSION }}
-          use-tool-cache: true
-      - run: make test.unit crate=medea-jason browser=chrome
+#
+#  unit-medea-jason:
+#    name: medea-jason unit tests in Chrome
+#    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          override: true
+#      run: |
+#        echo ::set-env name=WASM_CLI_VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')
+#      - uses: actions-rs/install@v0.1
+#        with:
+#          crate: wasm-bindgen-cli
+#          version: ${{ env.WASM_CLI_VERSION }}
+#          use-tool-cache: true
+#      - run: make test.unit crate=medea-jason browser=chrome
