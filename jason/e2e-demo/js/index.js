@@ -761,10 +761,10 @@ window.onload = async function() {
             track.free();
           }
         }
-        await room.set_local_media_settings(constraints, true);
         if (isVideoSendEnabled) {
           constraints = await initLocalStream();
         }
+        await room.set_local_media_settings(constraints, true);
       } catch (e) {
         console.error('Changing video source failed: ' + e.message());
       }

@@ -372,7 +372,7 @@
         .media_manager()
         .init_local_tracks(constraints);
       await updateLocalVideo(localTracks);
-      await room.set_local_media_settings(constraints);
+      await room.set_local_media_settings(constraints, true);
     }
 
     async function isVideoEnabledListener(e) {
@@ -398,7 +398,7 @@
         .media_manager()
         .init_local_tracks(constraints);
       await updateLocalVideo(localTracks);
-      await room.set_local_media_settings(constraints);
+      await room.set_local_media_settings(constraints, true);
     }
 
     function bindJoinButtons(roomId) {
@@ -512,7 +512,7 @@
         if (isAudioSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, true);
       });
 
       let videoSwitch = async () => {
@@ -525,7 +525,7 @@
         if (isVideoSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, true);
       };
       videoSelect.addEventListener('change', videoSwitch);
       screenshareSwitchEl.addEventListener('change', videoSwitch);
@@ -762,7 +762,7 @@
 
         const constraints = await initLocalStream();
         await fillMediaDevicesInputs(audioSelect, videoSelect);
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, true);
       } else {
         chooseRoomButton.onclick = async function () {
           let roomId = roomIdInput.value;
@@ -772,7 +772,7 @@
 
           const constraints = await initLocalStream();
           await fillMediaDevicesInputs(audioSelect, videoSelect);
-          await room.set_local_media_settings(constraints);
+          await room.set_local_media_settings(constraints, true);
 
           chooseRoomDiv.style.display = 'none';
           videoCallDiv.style.display = '';
