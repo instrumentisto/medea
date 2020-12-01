@@ -85,12 +85,12 @@ pub type ObservableHashSet<T> = HashSet<T, common::SubStore<T>, T>;
 /// let mut on_insert = hash_set.on_insert();
 /// hash_set.insert(1);
 ///
-/// // hash_set.when_insert_completed().await; <- wouldn't be resolved
+/// // hash_set.when_insert_processed().await; <- wouldn't be resolved
 /// let value = on_insert.next().await.unwrap();
-/// // hash_set.when_insert_completed().await; <- wouldn't be resolved
+/// // hash_set.when_insert_processed().await; <- wouldn't be resolved
 /// drop(value);
 ///
-/// hash_set.when_insert_completed().await; // will be resolved
+/// hash_set.when_insert_processed().await; // will be resolved
 /// # });
 /// ```
 #[derive(Debug)]
@@ -118,7 +118,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_insert_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.insert_subs.when_all_processed()
     }
 
@@ -127,7 +127,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.remove_subs.when_all_processed()
     }
 
@@ -140,8 +140,8 @@ where
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         Box::pin(
             future::join(
-                self.when_remove_completed(),
-                self.when_insert_completed(),
+                self.when_remove_processed(),
+                self.when_insert_processed(),
             )
             .map(|(_, _)| ()),
         )

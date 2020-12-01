@@ -66,12 +66,12 @@ pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 /// let mut on_push = vec.on_push();
 /// vec.push(1);
 ///
-/// // vec.when_push_completed().await; <- wouldn't be resolved
+/// // vec.when_push_processed().await; <- wouldn't be resolved
 /// let value = on_push.next().await.unwrap();
-/// // vec.when_push_completed().await; <- wouldn't be resolved
+/// // vec.when_push_processed().await; <- wouldn't be resolved
 /// drop(value);
 ///
-/// vec.when_push_completed().await; // will be resolved
+/// vec.when_push_processed().await; // will be resolved
 /// # });
 /// ```
 #[derive(Debug)]
@@ -100,7 +100,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_push_completed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_push_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.push_subs.when_all_processed()
     }
 
@@ -110,7 +110,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.remove_subs.when_all_processed()
     }
 
@@ -123,8 +123,8 @@ where
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         Box::pin(
             future::join(
-                self.when_remove_completed(),
-                self.when_push_completed(),
+                self.when_remove_processed(),
+                self.when_push_processed(),
             )
             .map(|(_, _)| ()),
         )
@@ -261,7 +261,7 @@ mod tests {
 
     use crate::collections::ProgressableVec;
 
-    mod when_push_completed {
+    mod when_push_processed {
         use super::*;
 
         #[tokio::test]
@@ -271,9 +271,9 @@ mod tests {
             let on_push = vec.on_push();
             vec.push(0);
 
-            assert_eq!(poll!(vec.when_push_completed()), Poll::Pending);
+            assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
             drop(on_push);
-            assert_eq!(poll!(vec.when_push_completed()), Poll::Ready(()));
+            assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
         }
 
         #[tokio::test]
@@ -284,9 +284,9 @@ mod tests {
             vec.push(0);
             let _ = vec.remove(0);
 
-            assert_eq!(poll!(vec.when_remove_completed()), Poll::Pending);
+            assert_eq!(poll!(vec.when_remove_processed()), Poll::Pending);
             drop(on_remove);
-            assert_eq!(poll!(vec.when_remove_completed()), Poll::Ready(()));
+            assert_eq!(poll!(vec.when_remove_processed()), Poll::Ready(()));
         }
 
         #[tokio::test]
@@ -294,9 +294,9 @@ mod tests {
             let mut vec = ProgressableVec::new();
 
             vec.push(0);
-            let when_push_completed = vec.when_push_completed();
+            let when_push_processed = vec.when_push_processed();
 
-            timeout(Duration::from_millis(50), when_push_completed)
+            timeout(Duration::from_millis(50), when_push_processed)
                 .await
                 .unwrap();
         }
@@ -308,7 +308,7 @@ mod tests {
             let mut first_on_push = vec.on_push();
             let _second_on_push = vec.on_push();
             vec.push(0);
-            let when_all_push_processed = vec.when_push_completed();
+            let when_all_push_processed = vec.when_push_processed();
 
             drop(first_on_push.next().await.unwrap());
 

@@ -75,12 +75,12 @@ pub type ObservableHashMap<K, V> =
 /// let mut on_insert = hash_map.on_insert();
 /// hash_map.insert(1, 1);
 ///
-/// // hash_map.when_insert_completed().await; <- wouldn't be resolved
+/// // hash_map.when_insert_processed().await; <- wouldn't be resolved
 /// let value = on_insert.next().await.unwrap();
-/// // hash_map.when_insert_completed().await; <- wouldn't be resolved
+/// // hash_map.when_insert_processed().await; <- wouldn't be resolved
 /// drop(value);
 ///
-/// hash_map.when_insert_completed().await; // will be resolved
+/// hash_map.when_insert_processed().await; // will be resolved
 /// # });
 /// ```
 #[derive(Debug, Clone)]
@@ -109,7 +109,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_insert_completed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_insert_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.insert_subs.when_all_processed()
     }
 
@@ -118,7 +118,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_remove_completed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.remove_subs.when_all_processed()
     }
 
@@ -131,8 +131,8 @@ where
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         Box::pin(
             future::join(
-                self.when_remove_completed(),
-                self.when_insert_completed(),
+                self.when_remove_processed(),
+                self.when_insert_processed(),
             )
             .map(|(_, _)| ()),
         )
@@ -312,7 +312,7 @@ mod tests {
 
     use crate::collections::ProgressableHashMap;
 
-    mod when_remove_completed {
+    mod when_remove_processed {
         use super::*;
 
         #[tokio::test]
@@ -323,9 +323,9 @@ mod tests {
             let _on_remove = map.on_remove();
             let _ = map.remove(&0).unwrap();
 
-            assert_eq!(poll!(map.when_remove_completed()), Poll::Pending);
+            assert_eq!(poll!(map.when_remove_processed()), Poll::Pending);
             drop(_on_remove);
-            assert_eq!(poll!(map.when_remove_completed()), Poll::Ready(()));
+            assert_eq!(poll!(map.when_remove_processed()), Poll::Ready(()));
         }
 
         #[tokio::test]
@@ -335,10 +335,10 @@ mod tests {
 
             let mut on_remove = map.on_remove();
             let _ = map.remove(&0);
-            let when_remove_completed = map.when_remove_completed();
+            let when_remove_processed = map.when_remove_processed();
             let _value = on_remove.next().await.unwrap();
 
-            let _ = timeout(Duration::from_millis(500), when_remove_completed)
+            let _ = timeout(Duration::from_millis(500), when_remove_processed)
                 .await
                 .unwrap_err();
         }
@@ -350,10 +350,10 @@ mod tests {
 
             let mut on_remove = map.on_remove();
             let _ = map.remove(&0).unwrap();
-            let when_remove_completed = map.when_remove_completed();
+            let when_remove_processed = map.when_remove_processed();
             drop(on_remove.next().await.unwrap());
 
-            timeout(Duration::from_millis(500), when_remove_completed)
+            timeout(Duration::from_millis(500), when_remove_processed)
                 .await
                 .unwrap();
         }
@@ -364,9 +364,9 @@ mod tests {
             let _ = map.insert(0, 0);
 
             let _ = map.remove(&0).unwrap();
-            let when_remove_completed = map.when_remove_completed();
+            let when_remove_processed = map.when_remove_processed();
 
-            timeout(Duration::from_millis(50), when_remove_completed)
+            timeout(Duration::from_millis(50), when_remove_processed)
                 .await
                 .unwrap();
         }
@@ -379,7 +379,7 @@ mod tests {
             let mut first_on_remove = map.on_remove();
             let _second_on_remove = map.on_remove();
             let _ = map.remove(&0).unwrap();
-            let when_all_remove_processed = map.when_remove_completed();
+            let when_all_remove_processed = map.when_remove_processed();
 
             drop(first_on_remove.next().await.unwrap());
 
@@ -390,7 +390,7 @@ mod tests {
         }
     }
 
-    mod when_insert_completed {
+    mod when_insert_processed {
         use super::*;
 
         #[tokio::test]
@@ -400,9 +400,9 @@ mod tests {
             let _on_insert = map.on_insert();
             let _ = map.insert(0, 0);
 
-            let when_insert_completed = map.when_insert_completed();
+            let when_insert_processed = map.when_insert_processed();
 
-            let _ = timeout(Duration::from_millis(500), when_insert_completed)
+            let _ = timeout(Duration::from_millis(500), when_insert_processed)
                 .await
                 .unwrap_err();
         }
@@ -413,10 +413,10 @@ mod tests {
 
             let mut on_insert = map.on_insert();
             let _ = map.insert(0, 0);
-            let when_insert_completed = map.when_insert_completed();
+            let when_insert_processed = map.when_insert_processed();
             let _value = on_insert.next().await.unwrap();
 
-            let _ = timeout(Duration::from_millis(500), when_insert_completed)
+            let _ = timeout(Duration::from_millis(500), when_insert_processed)
                 .await
                 .unwrap_err();
         }
@@ -427,10 +427,10 @@ mod tests {
 
             let mut on_insert = map.on_insert();
             let _ = map.insert(0, 0);
-            let when_insert_completed = map.when_insert_completed();
+            let when_insert_processed = map.when_insert_processed();
             drop(on_insert.next().await.unwrap());
 
-            timeout(Duration::from_millis(500), when_insert_completed)
+            timeout(Duration::from_millis(500), when_insert_processed)
                 .await
                 .unwrap();
         }
@@ -440,9 +440,9 @@ mod tests {
             let mut map = ProgressableHashMap::new();
 
             let _ = map.insert(0, 0);
-            let when_insert_completed = map.when_insert_completed();
+            let when_insert_processed = map.when_insert_processed();
 
-            timeout(Duration::from_millis(50), when_insert_completed)
+            timeout(Duration::from_millis(50), when_insert_processed)
                 .await
                 .unwrap();
         }
@@ -454,7 +454,7 @@ mod tests {
             let mut first_on_insert = map.on_insert();
             let _second_on_insert = map.on_insert();
             let _ = map.insert(0, 0);
-            let when_all_insert_processed = map.when_insert_completed();
+            let when_all_insert_processed = map.when_insert_processed();
 
             drop(first_on_insert.next().await.unwrap());
 
