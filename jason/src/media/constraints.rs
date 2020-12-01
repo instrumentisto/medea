@@ -948,8 +948,8 @@ impl Constraint for FacingMode {
     const TRACK_SETTINGS_FIELD_NAME: &'static str = "facingMode";
 }
 
-/// Representation of the [ConstrainULong][1]. Underlying value must fit in [0,
-/// 4294967295] range.
+/// Representation of the [ConstrainULong][1]. Underlying value must fit in
+/// `[0, 4294967295]` range.
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-constrainulong
 #[derive(Clone, Copy, Debug)]
@@ -965,7 +965,7 @@ enum ConstrainU32<T> {
 }
 
 impl<T: Constraint + Into<u32>> ConstrainU32<T> {
-    // Its up to `<T as Constraint>::TRACK_SETTINGS_FIELD_NAME` to guarantee
+    // It's up to `<T as Constraint>::TRACK_SETTINGS_FIELD_NAME` to guarantee
     // that such casts are safe.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn satisfies(this: Option<Self>, track: &sys::MediaStreamTrack) -> bool {
@@ -1073,10 +1073,10 @@ pub struct DeviceVideoTrackConstraints {
     /// user's perspective.
     facing_mode: Option<ConstrainString<FacingMode>>,
 
-    /// Height, in pixels, of the video.
+    /// Height of the video in pixels.
     height: Option<ConstrainU32<Height>>,
 
-    /// Width, in pixels, of the video.
+    /// Width of the video in pixels.
     width: Option<ConstrainU32<Width>>,
 }
 
