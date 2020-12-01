@@ -1945,7 +1945,6 @@ mod set_local_media_settings {
 
         let peer = room.get_peer_by_id(PeerId(1)).unwrap();
         assert!(peer.is_send_video_enabled(None));
-        assert!(peer.is_send_video_enabled(None));
 
         (room, peer)
     }
@@ -1986,7 +1985,6 @@ mod set_local_media_settings {
         );
 
         assert!(!peer.is_send_video_enabled(None));
-        assert!(!peer.is_send_video_enabled(None));
     }
 
     /// Checks that [`RoomHandle::set_local_media_settings`] will rollback
@@ -2017,7 +2015,6 @@ mod set_local_media_settings {
         mock_navigator.stop();
 
         assert!(peer.is_send_video_enabled(None));
-        assert!(peer.is_send_video_enabled(None));
     }
 
     /// Checks that [`RoomHandle::set_local_media_settings`] will disable media
@@ -2046,7 +2043,6 @@ mod set_local_media_settings {
         assert_eq!(err.name(), "CouldNotGetLocalMedia");
         mock_navigator.stop();
 
-        assert!(!peer.is_send_video_enabled(None));
         assert!(!peer.is_send_video_enabled(None));
     }
 }
