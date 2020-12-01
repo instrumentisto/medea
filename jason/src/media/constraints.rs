@@ -476,7 +476,7 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Sets enables/disables provided [`LocalStreamKinds`] based on
+    /// Enables/disables provided [`LocalStreamKinds`] based on
     /// provided [`media_exchange_state`].
     #[inline]
     pub fn set_media_exchange_state_by_kinds(

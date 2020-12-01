@@ -365,6 +365,12 @@ impl RoomHandle {
     /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
+    /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
+    /// rollbacked on gUM request fail.
+    ///
+    /// If recovering from fail state isn't possible then affected media types
+    /// will be disabled.
+    ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
@@ -953,6 +959,12 @@ impl InnerRoom {
     ///
     /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
+    ///
+    /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
+    /// rollbacked on `getUserMedia` request fail.
+    ///
+    /// If recovering from fail state isn't possible then affected media types
+    /// will be disabled.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [`PeerConnection`]: crate::peer::PeerConnection

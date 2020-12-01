@@ -1888,3 +1888,165 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
         }
     }
 }
+
+/// Tests for [`RoomHandle::set_local_media_settings`].
+mod set_local_media_settings {
+    use super::*;
+
+    async fn helper() -> (Room, Rc<PeerConnection>) {
+        let mut rpc = MockRpcSession::new();
+
+        let (event_tx, event_rx) = mpsc::unbounded();
+
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc.expect_on_connection_loss()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_close_with_reason().return_const(());
+        rpc.expect_send_command().returning({
+            let event_tx = event_tx.clone();
+            move |cmd| match cmd {
+                Command::UpdateTracks {
+                    peer_id,
+                    tracks_patches,
+                } => {
+                    event_tx
+                        .unbounded_send(Event::TracksApplied {
+                            peer_id,
+                            updates: tracks_patches
+                                .into_iter()
+                                .map(|p| TrackUpdate::Updated(p.into()))
+                                .collect(),
+                            negotiation_role: None,
+                        })
+                        .unwrap();
+                }
+                _ => (),
+            }
+        });
+
+        let room =
+            Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())));
+        let (audio, video) = get_test_tracks(false, false);
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![audio, video],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        // wait until Event::PeerCreated is handled
+        delay_for(200).await;
+
+        let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+        assert!(peer.is_send_video_enabled(None));
+        assert!(peer.is_send_video_enabled(None));
+
+        (room, peer)
+    }
+
+    /// Returns [`MediaStreamSettings`] which requires that device ID should be
+    /// `foobar`.
+    fn media_settings_with_device_id() -> MediaStreamSettings {
+        let mut settings = MediaStreamSettings::new();
+        let mut device_video = DeviceVideoTrackConstraints::new();
+        device_video.device_id("foobar".to_string());
+        settings.device_video(device_video);
+
+        settings
+    }
+
+    /// Checks that [`RoomHandle::set_local_media_settings`] will disable media
+    /// types on fail.
+    #[wasm_bindgen_test]
+    async fn disables_on_fail() {
+        let (room, peer) = helper().await;
+
+        let mock_navigator = MockNavigator::new();
+        mock_navigator.error_get_user_media("disables_on_fail".into());
+        let err = get_jason_error(
+            JsFuture::from(room.new_handle().set_local_media_settings(
+                &media_settings_with_device_id(),
+                false,
+            ))
+            .await
+            .unwrap_err(),
+        );
+        mock_navigator.stop();
+        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+        assert_eq!(
+            err.message(),
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: disables_on_fail"
+        );
+
+        assert!(!peer.is_send_video_enabled(None));
+        assert!(!peer.is_send_video_enabled(None));
+    }
+
+    /// Checks that [`RoomHandle::set_local_media_settings`] will rollback
+    /// [`MediaStreamSettings`] to the previous one on fail.
+    #[wasm_bindgen_test]
+    async fn tries_to_rollback_on_fail() {
+        let (room, peer) = helper().await;
+
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+        ))
+        .await
+        .unwrap();
+
+        let mock_navigator = MockNavigator::new();
+        let err = get_jason_error(
+            JsFuture::from(room.new_handle().set_local_media_settings(
+                &media_settings_with_device_id(),
+                true,
+            ))
+            .await
+            .unwrap_err(),
+        );
+        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+
+        assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
+        mock_navigator.stop();
+
+        assert!(peer.is_send_video_enabled(None));
+        assert!(peer.is_send_video_enabled(None));
+    }
+
+    /// Checks that [`RoomHandle::set_local_media_settings`] will disable media
+    /// types on rollback fail.
+    #[wasm_bindgen_test]
+    async fn disables_on_rollback_fail() {
+        let (room, peer) = helper().await;
+
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+        ))
+        .await
+        .unwrap();
+
+        let mock_navigator = MockNavigator::new();
+        mock_navigator.error_get_user_media("disables_on_rollback_fail".into());
+        let err = get_jason_error(
+            JsFuture::from(room.new_handle().set_local_media_settings(
+                &media_settings_with_device_id(),
+                true,
+            ))
+            .await
+            .unwrap_err(),
+        );
+        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+        mock_navigator.stop();
+
+        assert!(!peer.is_send_video_enabled(None));
+        assert!(!peer.is_send_video_enabled(None));
+    }
+}
