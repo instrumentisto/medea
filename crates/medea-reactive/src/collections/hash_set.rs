@@ -163,6 +163,15 @@ impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
         self.into_iter()
     }
 
+    /// Returns the [`Stream`] to which the inserted values will be
+    /// sent.
+    ///
+    /// [`Stream`]: futures::Stream
+    #[inline]
+    pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
+        self.insert_subs.new_subscription()
+    }
+
     /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
@@ -171,7 +180,7 @@ impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.new_subscription(Vec::new())
+        self.remove_subs.new_subscription()
     }
 }
 
@@ -180,17 +189,19 @@ where
     T: Clone + 'static,
     S: SubscribersStore<T, O>,
 {
-    /// Returns the [`Stream`] to which the inserted values will be
-    /// sent.
+    /// Returns the [`Stream`] with all already inserted values of this
+    /// [`HashSet`].
     ///
-    /// Also to this [`Stream`] will be sent all already inserted values
-    /// of this [`HashSet`].
+    /// This [`Stream`] will have only current values. It doesn't updates on new
+    /// inserts, but you can merge ([`stream::select`]) this [`Stream`] with a
+    /// [`HashSet::on_insert`] [`Stream`] for that.
     ///
     /// [`Stream`]: futures::Stream
+    /// [`stream::select`]: futures::stream::select
     #[inline]
-    pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
+    pub fn replay_on_insert(&self) -> LocalBoxStream<'static, O> {
         self.insert_subs
-            .new_subscription(self.inner.iter().cloned().collect())
+            .replay(self.inner.iter().cloned().collect())
     }
 }
 

@@ -26,16 +26,13 @@ where
             .retain(|sub| sub.unbounded_send(value.clone()).is_ok());
     }
 
-    fn new_subscription(
-        &self,
-        initial_values: Vec<T>,
-    ) -> LocalBoxStream<'static, T> {
+    fn new_subscription(&self) -> LocalBoxStream<'static, T> {
         let (tx, rx) = mpsc::unbounded();
-        initial_values.into_iter().for_each(|value| {
-            let _ = tx.unbounded_send(value);
-        });
         self.0.borrow_mut().push(tx);
-
         Box::pin(rx)
+    }
+
+    fn replay(&self, values: Vec<T>) -> LocalBoxStream<'static, T> {
+        Box::pin(futures::stream::iter(values.into_iter()))
     }
 }

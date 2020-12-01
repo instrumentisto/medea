@@ -118,7 +118,10 @@ where
     ///
     /// [`Stream`]: futures::Stream
     pub fn subscribe(&self) -> LocalBoxStream<'static, progressable::Value<D>> {
-        self.subs.new_subscription(vec![self.data.clone()])
+        Box::pin(stream::select(
+            self.subs.replay(vec![self.data.clone()]),
+            self.subs.new_subscription(),
+        ))
     }
 
     /// Returns [`Future`] which will be resolved when all data updates will be

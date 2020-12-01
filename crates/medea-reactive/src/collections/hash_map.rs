@@ -161,6 +161,15 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
         self.inner.values()
     }
 
+    /// Returns the [`Stream`] to which the inserted key-value pairs will be
+    /// sent.
+    ///
+    /// [`Stream`]: futures::Stream
+    #[inline]
+    pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
+        self.insert_subs.new_subscription()
+    }
+
     /// Returns the [`Stream`] to which the removed key-value pairs will be
     /// sent.
     ///
@@ -170,7 +179,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.new_subscription(Vec::new())
+        self.remove_subs.new_subscription()
     }
 }
 
@@ -180,16 +189,18 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    /// Returns the [`Stream`] to which the inserted key-value pairs will be
-    /// sent.
+    /// Returns the [`Stream`] with all already inserted values of this
+    /// [`HashMap`].
     ///
-    /// Also to this [`Stream`] will be sent all already inserted key-value
-    /// pairs of this [`HashMap`].
+    /// This [`Stream`] will have only current values. It doesn't updates on new
+    /// inserts, but you can merge ([`stream::select`]) this [`Stream`] with a
+    /// [`HashMap::on_insert`] [`Stream`] for that.
     ///
     /// [`Stream`]: futures::Stream
+    /// [`stream::select`]: futures::stream::select
     #[inline]
-    pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
-        self.insert_subs.new_subscription(
+    pub fn replay_on_insert(&self) -> LocalBoxStream<'static, O> {
+        self.insert_subs.replay(
             self.inner
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
@@ -392,6 +403,19 @@ mod tests {
 
     mod when_insert_processed {
         use super::*;
+
+        #[tokio::test]
+        async fn wait_for_replay() {
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Ready(()));
+
+            let replay = map.replay_on_insert();
+
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Pending);
+            drop(replay);
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Ready(()));
+        }
 
         #[tokio::test]
         async fn waits_for_processing() {

@@ -146,6 +146,14 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
         self.into_iter()
     }
 
+    /// Returns the [`Stream`] to which the pushed values will be sent.
+    ///
+    /// [`Stream`]: futures::Stream
+    #[inline]
+    pub fn on_push(&self) -> LocalBoxStream<'static, O> {
+        self.push_subs.new_subscription()
+    }
+
     /// Returns the [`Stream`] to which the removed values will be sent.
     ///
     /// Note that to this [`Stream`] will be sent all items of the
@@ -154,7 +162,7 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.new_subscription(std::vec::Vec::new())
+        self.remove_subs.new_subscription()
     }
 }
 
@@ -183,15 +191,17 @@ where
         value
     }
 
-    /// Returns the [`Stream`] to which the pushed values will be sent.
+    /// Returns the [`Stream`] with all already pushed values of this [`Vec`].
     ///
-    /// Also to this [`Stream`] will be sent all already pushed values
-    /// of this [`Vec`].
+    /// This [`Stream`] will have only current values. It doesn't updates on new
+    /// pushes, but you can merge ([`stream::select`]) this [`Stream`] with a
+    /// [`Vec::on_push`] [`Stream`] for that.
     ///
     /// [`Stream`]: futures::Stream
+    /// [`stream::select`]: futures::stream::select
     #[inline]
-    pub fn on_push(&self) -> LocalBoxStream<'static, O> {
-        self.push_subs.new_subscription(self.inner.to_vec())
+    pub fn replay_on_push(&self) -> LocalBoxStream<'static, O> {
+        self.push_subs.replay(self.inner.to_vec())
     }
 }
 
@@ -263,6 +273,17 @@ mod tests {
 
     mod when_push_processed {
         use super::*;
+
+        #[tokio::test]
+        async fn wait_for_replay() {
+            let vec = ProgressableVec::from(vec![1]);
+
+            let replay = vec.replay_on_push();
+
+            assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
+            drop(replay);
+            assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
+        }
 
         #[tokio::test]
         async fn wait_for_push() {

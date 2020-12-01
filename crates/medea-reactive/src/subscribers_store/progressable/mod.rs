@@ -61,18 +61,19 @@ where
         });
     }
 
-    fn new_subscription(
-        &self,
-        initial_values: Vec<T>,
-    ) -> LocalBoxStream<'static, Value<T>> {
+    fn new_subscription(&self) -> LocalBoxStream<'static, Value<T>> {
         let (tx, rx) = mpsc::unbounded();
-
-        initial_values.into_iter().for_each(|value| {
-            let _ = tx.unbounded_send(self.manager.new_value(value));
-        });
-
         self.store.borrow_mut().push(tx);
-
         Box::pin(rx)
+    }
+
+    fn replay(&self, values: Vec<T>) -> LocalBoxStream<'static, Value<T>> {
+        Box::pin(futures::stream::iter(
+            values
+                .into_iter()
+                .map(|value| self.manager.new_value(value))
+                .collect::<Vec<_>>()
+                .into_iter(),
+        ))
     }
 }
