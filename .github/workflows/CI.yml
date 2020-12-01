@@ -147,6 +147,7 @@ jobs:
         with:
           profile: minimal
           override: true
+      - run: exit 0
 #      run: |
 #        echo ::set-env name=WASM_CLI_VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')
 #      - uses: actions-rs/install@v0.1
