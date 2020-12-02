@@ -4,10 +4,10 @@
 mod errors;
 
 mod callback;
-mod event_listener;
 mod component;
-mod task_spawner;
+mod event_listener;
 mod resettable_delay;
+mod task_spawner;
 
 use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
@@ -23,12 +23,12 @@ pub use self::errors::console_error;
 #[doc(inline)]
 pub use self::{
     callback::{Callback0, Callback1, Callback2},
+    component::Component,
     errors::{
         HandlerDetachedError, JasonError, JsCaused, JsError, JsonParseError,
     },
     event_listener::{EventListener, EventListenerBindError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
-    component::Component,
     task_spawner::ObservableSpawner,
 };
 

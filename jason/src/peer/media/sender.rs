@@ -171,6 +171,14 @@ impl Sender {
         )
     }
 
+    pub fn set_enabled_individual(&self, enabled: bool) {
+        self.media_exchange_state.update(enabled.into());
+    }
+
+    pub fn set_enabled_general(&self, enabled: bool) {
+        self.update_general_media_exchange_state(enabled.into());
+    }
+
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
     ///

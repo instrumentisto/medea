@@ -1,12 +1,14 @@
-use medea_client_api_proto::{TrackId, MediaType, MemberId, Track};
-use medea_reactive::{ObservableCell, Observable};
+use medea_client_api_proto::{MediaType, MemberId, Track, TrackId};
+use medea_reactive::{Observable, ObservableCell};
 
-use crate::utils::{Component};
+use crate::utils::Component;
 
-use crate::peer::{Receiver, TransceiverSide, MediaConnections};
+use crate::{
+    media::{RecvConstraints, TrackConstraints},
+    peer::{MediaConnections, Receiver, TransceiverSide},
+    utils::ObservableSpawner as _,
+};
 use std::rc::Rc;
-use crate::media::{TrackConstraints, RecvConstraints};
-use crate::utils::ObservableSpawner as _;
 
 pub type ReceiverComponent = Component<ReceiverState, Receiver>;
 
@@ -49,7 +51,10 @@ impl ReceiverComponent {
         );
     }
 
-    async fn handle_enabled_individual(ctx: Rc<Receiver>, enabled_individual: bool) {
+    async fn handle_enabled_individual(
+        ctx: Rc<Receiver>,
+        enabled_individual: bool,
+    ) {
         ctx.set_enabled_individual_state(enabled_individual);
     }
 

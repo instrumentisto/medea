@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
-use crate::utils::task_spawner::{TaskHandlesStorage, HasTaskHandlesStorage};
-use futures::{Stream, Future, StreamExt};
-use futures::future;
+use crate::utils::task_spawner::{HasTaskHandlesStorage, TaskHandlesStorage};
+use futures::{future, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;
 
 pub struct Component<S, C> {
@@ -12,10 +11,10 @@ pub struct Component<S, C> {
 }
 
 impl<S, C: 'static> Component<S, C> {
-    pub fn new_component(state: Rc<S>, ctx: C) -> Self {
+    pub fn new_component(state: Rc<S>, ctx: Rc<C>) -> Self {
         Self {
             state,
-            ctx: Rc::new(ctx),
+            ctx,
             task_handles: TaskHandlesStorage::new(),
         }
     }
@@ -34,10 +33,10 @@ impl<S, C: 'static> Component<S, C> {
     /// You can stop all listeners tasks spawned by this function by calling
     /// [`TaskDisposer::dispose_tasks`]
     pub fn spawn_task<R, V, F, O>(&self, mut rx: R, handle: F)
-        where
-            F: Fn(Rc<C>, V) -> O + 'static,
-            R: Stream<Item = V> + Unpin + 'static,
-            O: Future<Output = ()> + 'static,
+    where
+        F: Fn(Rc<C>, V) -> O + 'static,
+        R: Stream<Item = V> + Unpin + 'static,
+        O: Future<Output = ()> + 'static,
     {
         let ctx = Rc::clone(&self.ctx);
         let (fut, handle) = future::abortable(async move {

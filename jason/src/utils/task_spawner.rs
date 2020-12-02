@@ -32,8 +32,8 @@ impl TaskHandlesStorage {
 pub struct RootComponent<T: TaskDisposer>(Rc<T>);
 
 impl<T> RootComponent<T>
-    where
-        T: TaskDisposer,
+where
+    T: TaskDisposer,
 {
     pub fn new(component: T) -> Self {
         Self(Rc::new(component))
@@ -50,8 +50,8 @@ impl<T> RootComponent<T>
 }
 
 impl<T> Drop for RootComponent<T>
-    where
-        T: TaskDisposer,
+where
+    T: TaskDisposer,
 {
     fn drop(&mut self) {
         self.0.dispose_tasks();
@@ -59,8 +59,8 @@ impl<T> Drop for RootComponent<T>
 }
 
 impl<T> Deref for RootComponent<T>
-    where
-        T: TaskDisposer,
+where
+    T: TaskDisposer,
 {
     type Target = T;
 
@@ -91,11 +91,11 @@ pub trait ObservableSpawner: HasTaskHandlesStorage {
     /// You can stop all listeners tasks spawned by this function by calling
     /// [`TaskDisposer::dispose_tasks`]
     fn spawn_task<S, V, F, C, O>(&self, mut rx: S, ctx: C, handle: F)
-        where
-            F: Fn(Rc<C>, V) -> O + 'static,
-            S: Stream<Item = V> + Unpin + 'static,
-            O: Future<Output = ()> + 'static,
-            C: 'static,
+    where
+        F: Fn(Rc<C>, V) -> O + 'static,
+        S: Stream<Item = V> + Unpin + 'static,
+        O: Future<Output = ()> + 'static,
+        C: 'static,
     {
         let (fut, handle) = future::abortable(async move {
             let ctx = Rc::new(ctx);
