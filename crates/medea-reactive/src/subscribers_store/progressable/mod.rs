@@ -1,17 +1,14 @@
 //! Implementation of the progressable [`SubscribersStore`].
 
-mod manager;
-mod value;
+mod guarded;
 
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 
-use crate::subscribers_store::SubscribersStore;
+use crate::{subscribers_store::SubscribersStore, ObservableCell};
 
-use self::manager::Manager;
-
-pub use self::value::Value;
+pub use self::guarded::{Guard, Guarded};
 
 /// [`SubscribersStore`] for progressable collections/field.
 ///
@@ -25,17 +22,17 @@ pub use self::value::Value;
 #[derive(Debug)]
 pub struct SubStore<T> {
     /// All subscribers of this store.
-    store: RefCell<Vec<mpsc::UnboundedSender<Value<T>>>>,
+    store: RefCell<Vec<mpsc::UnboundedSender<Guarded<T>>>>,
 
     /// Manager which will recognise when all sent updates are processed.
-    manager: Manager,
+    counter: Rc<ObservableCell<u32>>,
 }
 
 impl<T> Default for SubStore<T> {
     fn default() -> Self {
         Self {
             store: RefCell::new(Vec::new()),
-            manager: Manager::new(),
+            counter: Rc::new(ObservableCell::new(0)),
         }
     }
 }
@@ -46,34 +43,30 @@ impl<T> SubStore<T> {
     ///
     /// [`Future`]: std::future::Future
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        self.manager.when_all_processed()
+        let fut = self.counter.when_eq(0);
+        Box::pin(async move {
+            let _ = fut.await;
+        })
     }
 }
 
-impl<T> SubscribersStore<T, Value<T>> for SubStore<T>
+impl<T> SubscribersStore<T, Guarded<T>> for SubStore<T>
 where
     T: Clone + 'static,
 {
     fn send_update(&self, value: T) {
-        self.store.borrow_mut().retain(|sub| {
-            sub.unbounded_send(self.manager.new_value(value.clone()))
-                .is_ok()
-        });
+        self.store
+            .borrow_mut()
+            .retain(|sub| sub.unbounded_send(self.wrap(value.clone())).is_ok());
     }
 
-    fn new_subscription(&self) -> LocalBoxStream<'static, Value<T>> {
+    fn subscribe(&self) -> LocalBoxStream<'static, Guarded<T>> {
         let (tx, rx) = mpsc::unbounded();
         self.store.borrow_mut().push(tx);
         Box::pin(rx)
     }
 
-    fn replay(&self, values: Vec<T>) -> LocalBoxStream<'static, Value<T>> {
-        Box::pin(futures::stream::iter(
-            values
-                .into_iter()
-                .map(|value| self.manager.new_value(value))
-                .collect::<Vec<_>>()
-                .into_iter(),
-        ))
+    fn wrap(&self, value: T) -> Guarded<T> {
+        Guarded::new(value, Rc::clone(&self.counter))
     }
 }

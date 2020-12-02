@@ -36,5 +36,5 @@ pub use crate::{
         Observable, ObservableField, OnObservableFieldModification,
         ProgressableField, UniversalSubscriber, Whenable,
     },
-    subscribers_store::progressable::Value as ProgressableValue,
+    subscribers_store::progressable::{Guard, Guarded},
 };

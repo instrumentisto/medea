@@ -11,7 +11,7 @@ use crate::subscribers_store::{common, progressable, SubscribersStore};
 /// Reactive hash set based on [`HashSet`] with ability to recognise when all
 /// updates was processed by subscribers.
 pub type ProgressableHashSet<T> =
-    HashSet<T, progressable::SubStore<T>, progressable::Value<T>>;
+    HashSet<T, progressable::SubStore<T>, progressable::Guarded<T>>;
 /// Reactive hash set based on [`HashSet`].
 pub type ObservableHashSet<T> = HashSet<T, common::SubStore<T>, T>;
 
@@ -171,7 +171,7 @@ impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
-        self.insert_subs.new_subscription()
+        self.insert_subs.subscribe()
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
@@ -182,7 +182,7 @@ impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.new_subscription()
+        self.remove_subs.subscribe()
     }
 }
 
@@ -190,6 +190,7 @@ impl<T, S, O> HashSet<T, S, O>
 where
     T: Clone + 'static,
     S: SubscribersStore<T, O>,
+    O: 'static,
 {
     /// Returns the [`Stream`] with all already inserted values of this
     /// [`HashSet`].
@@ -202,8 +203,13 @@ where
     /// [`stream::select`]: futures::stream::select
     #[inline]
     pub fn replay_on_insert(&self) -> LocalBoxStream<'static, O> {
-        self.insert_subs
-            .replay(self.inner.iter().cloned().collect())
+        Box::pin(futures::stream::iter(
+            self.inner
+                .clone()
+                .into_iter()
+                .map(|val| self.insert_subs.wrap(val))
+                .collect::<Vec<_>>(),
+        ))
     }
 }
 
