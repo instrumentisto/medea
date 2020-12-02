@@ -5,6 +5,7 @@
 mod receiver;
 mod sender;
 mod transitable_state;
+mod component;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 

@@ -176,6 +176,14 @@ impl Receiver {
         }
     }
 
+    pub fn set_enabled_general_state(&self, enabled: bool) {
+        self.update_general_media_exchange_state(enabled.into());
+    }
+
+    pub fn set_enabled_individual_state(&self, enabled: bool) {
+        self.media_exchange_state_controller.update(enabled.into());
+    }
+
     /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.track_id != track_patch.id {
