@@ -1,4 +1,4 @@
-use medea_client_api_proto::{TrackId, MediaType, MemberId};
+use medea_client_api_proto::{TrackId, MediaType, MemberId, Track};
 use medea_reactive::{ObservableCell, Observable};
 
 use crate::utils::{Component};
@@ -17,6 +17,24 @@ pub struct ReceiverState {
     sender: MemberId,
     enabled_individual: ObservableCell<bool>,
     enabled_general: ObservableCell<bool>,
+}
+
+impl ReceiverState {
+    pub fn new(
+        id: TrackId,
+        mid: Option<String>,
+        media_type: MediaType,
+        sender: MemberId,
+    ) -> Self {
+        Self {
+            id,
+            mid,
+            media_type,
+            sender,
+            enabled_general: ObservableCell::new(true),
+            enabled_individual: ObservableCell::new(true),
+        }
+    }
 }
 
 impl ReceiverComponent {

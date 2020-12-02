@@ -6,13 +6,13 @@ use futures::future;
 use wasm_bindgen_futures::spawn_local;
 
 pub struct Component<S, C> {
-    state: S,
+    state: Rc<S>,
     ctx: Rc<C>,
     task_handles: TaskHandlesStorage,
 }
 
 impl<S, C: 'static> Component<S, C> {
-    pub fn new_component(state: S, ctx: C) -> Self {
+    pub fn new_component(state: Rc<S>, ctx: C) -> Self {
         Self {
             state,
             ctx: Rc::new(ctx),

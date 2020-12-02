@@ -48,11 +48,11 @@ impl<'a> SenderBuilder<'a> {
                 .receivers
                 .values()
                 .find(|rcvr| {
-                    rcvr.caps().media_kind() == self.caps.media_kind()
-                        && rcvr.caps().media_source_kind()
+                    rcvr.ctx().caps().media_kind() == self.caps.media_kind()
+                        && rcvr.ctx().caps().media_source_kind()
                             == self.caps.media_source_kind()
                 })
-                .and_then(|rcvr| rcvr.transceiver())
+                .and_then(|rcvr| rcvr.ctx().transceiver())
                 .unwrap_or_else(|| {
                     connections
                         .add_transceiver(kind, TransceiverDirection::INACTIVE)

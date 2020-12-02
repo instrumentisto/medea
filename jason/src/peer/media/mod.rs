@@ -39,7 +39,9 @@ pub use self::{
         MuteState, MuteStateController, TransitableState,
         TransitableStateController,
     },
+    component::{ReceiverComponent, ReceiverState},
 };
+use crate::utils::Component;
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: MediaStateControllable {
@@ -309,7 +311,7 @@ struct InnerMediaConnections {
     senders: HashMap<TrackId, Rc<Sender>>,
 
     /// [`TrackId`] to its [`Receiver`].
-    receivers: HashMap<TrackId, Rc<Receiver>>,
+    receivers: HashMap<TrackId, ReceiverComponent>,
 }
 
 impl InnerMediaConnections {
@@ -336,8 +338,8 @@ impl InnerMediaConnections {
     fn iter_receivers_with_kind(
         &self,
         kind: MediaKind,
-    ) -> impl Iterator<Item = &Rc<Receiver>> {
-        self.receivers.values().filter(move |s| s.kind() == kind)
+    ) -> impl Iterator<Item = &ReceiverComponent> {
+        self.receivers.values().filter(move |s| s.ctx().kind() == kind)
     }
 
     /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],
@@ -355,7 +357,7 @@ impl InnerMediaConnections {
                 .collect(),
             TrackDirection::Recv => self
                 .iter_receivers_with_kind(kind)
-                .map(|rx| Rc::clone(&rx) as Rc<dyn TransceiverSide>)
+                .map(|rx| rx.ctx() as Rc<dyn TransceiverSide>)
                 .collect(),
         }
     }
@@ -481,6 +483,7 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 receiver
+                    .ctx()
                     .mid()
                     .ok_or(MediaConnectionsError::ReceiversWithoutMid)
                     .map_err(tracerr::wrap!())?,
@@ -499,7 +502,7 @@ impl MediaConnections {
             out.insert(*track_id, sender.is_publishing());
         }
         for (track_id, receiver) in &inner.receivers {
-            out.insert(*track_id, receiver.is_receiving());
+            out.insert(*track_id, receiver.ctx().is_receiving());
         }
         out
     }
@@ -521,7 +524,7 @@ impl MediaConnections {
                 inner
                     .receivers
                     .get(&track_id)
-                    .map(|rcvr| Rc::clone(&rcvr) as Rc<dyn TransceiverSide>)
+                    .map(|rcvr| rcvr.ctx() as Rc<dyn TransceiverSide>)
             })
     }
 
@@ -594,15 +597,23 @@ impl MediaConnections {
                     self.0.borrow_mut().senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
-                    let recv = Rc::new(Receiver::new(
+                    let recv = Receiver::new(
                         self,
                         track.id,
-                        track.media_type.into(),
-                        sender,
-                        mid,
+                        track.media_type.clone().into(),
+                        sender.clone(),
+                        mid.clone(),
                         recv_constraints,
+                    );
+                    let state = Rc::new(ReceiverState::new(
+                        track.id,
+                        mid,
+                        track.media_type,
+                        sender,
                     ));
-                    self.0.borrow_mut().receivers.insert(track.id, recv);
+                    let component = Component::new_component(state, recv);
+                    component.spawn();
+                    self.0.borrow_mut().receivers.insert(track.id, component);
                 }
             }
         }
@@ -632,7 +643,8 @@ impl MediaConnections {
             } else if let Some(receiver) =
                 self.0.borrow_mut().receivers.get_mut(&track_proto.id)
             {
-                receiver.update(&track_proto);
+                // Patch state
+                receiver.ctx().update(&track_proto);
             } else {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidTrackPatch(track_proto.id)
@@ -751,9 +763,9 @@ impl MediaConnections {
         let mid = transceiver.mid().unwrap();
 
         for receiver in inner.receivers.values() {
-            if let Some(recv_mid) = &receiver.mid() {
+            if let Some(recv_mid) = &receiver.ctx().mid() {
                 if recv_mid == &mid {
-                    receiver.set_remote_track(transceiver, track);
+                    receiver.ctx().set_remote_track(transceiver, track);
                     return Ok(());
                 }
             }
@@ -773,11 +785,11 @@ impl MediaConnections {
         for receiver in inner
             .receivers
             .values()
-            .filter(|rcvr| rcvr.transceiver().is_none())
+            .filter(|rcvr| rcvr.ctx().transceiver().is_none())
         {
-            if let Some(mid) = receiver.mid() {
+            if let Some(mid) = receiver.ctx().mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
-                    receiver.replace_transceiver(trnscvr.into())
+                    receiver.ctx().replace_transceiver(trnscvr.into())
                 }
             }
         }
@@ -801,7 +813,7 @@ impl MediaConnections {
                 inner
                     .receivers
                     .values()
-                    .map(|r| Rc::clone(&r) as Rc<dyn TransceiverSide>),
+                    .map(|r| r.ctx() as Rc<dyn TransceiverSide>),
             )
             .collect()
     }
@@ -830,7 +842,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.disabled())
+            .find(|s| s.ctx().disabled())
             .is_none()
     }
 
@@ -841,14 +853,14 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.disabled())
+            .find(|s| s.ctx().disabled())
             .is_none()
     }
 
     /// Returns [`Receiver`] with the provided [`TrackId`].
     #[must_use]
     pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
-        self.0.borrow().receivers.get(&id).cloned()
+        self.0.borrow().receivers.get(&id).map(|r| r.ctx())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
