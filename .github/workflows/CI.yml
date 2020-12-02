@@ -122,10 +122,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: cat Cargo.toml
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
+          toolchain: stable
       - run: make test.unit crate=medea
 
 #  unit-medea-jason:
