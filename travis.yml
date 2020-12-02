@@ -148,27 +148,27 @@ jobs:
 #                                                    | grep -o '[0-9\.]*'`
 #        - rustup target add wasm32-unknown-unknown
 #      script: make test.unit crate=medea-jason browser=chrome
-
-    - name: unit medea-jason (stable, Firefox)
-      stage: test
-      rust: stable
-      services: ["docker"]
-      before_script:
-        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
-        - cargo install -f wasm-bindgen-cli
-                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
-                                                    | grep -o '[0-9\.]*'`
-        - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason browser=firefox
-
-    - name: E2E (stable)
-      stage: test
-      rust: stable
-      services: ["docker"]
-      before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
-                                      registry=quay.io
-      script: make test.e2e up=yes dockerized=yes log=yes wait=30
-                            TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+#
+#    - name: unit medea-jason (stable, Firefox)
+#      stage: test
+#      rust: stable
+#      services: ["docker"]
+#      before_script:
+#        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
+#        - cargo install -f wasm-bindgen-cli
+#                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
+#                                                    | grep -o '[0-9\.]*'`
+#        - rustup target add wasm32-unknown-unknown
+#      script: make test.unit crate=medea-jason browser=firefox
+#
+#    - name: E2E (stable)
+#      stage: test
+#      rust: stable
+#      services: ["docker"]
+#      before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
+#                                      registry=quay.io
+#      script: make test.e2e up=yes dockerized=yes log=yes wait=30
+#                            TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release
