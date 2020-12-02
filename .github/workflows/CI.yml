@@ -18,18 +18,18 @@ jobs:
 #          components: clippy
 #      - run: make lint
 #
-  fmt:
-    name: Verify Rust code style with rustfmt
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt
-      - run: make fmt check=yes
+#  fmt:
+#    name: Verify Rust code style with rustfmt
+#    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: nightly
+#          components: rustfmt
+#      - run: make fmt check=yes
 #
 #  build-jason:
 #    name: Build medea-jason (stable)
@@ -122,21 +122,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - run: cat Cargo.toml
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
       - run: make test.unit crate=medea
 
-  unit-medea-jason:
-    name: Run medea-jason unit tests in Chrome
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-      - run: exit 0
+#  unit-medea-jason:
+#    name: Run medea-jason unit tests in Chrome
+#    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#      - run: exit 0
 #      run: |
 #        echo ::set-env name=WASM_CLI_VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')
 #      - uses: actions-rs/install@v0.1
