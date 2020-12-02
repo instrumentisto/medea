@@ -146,7 +146,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-      - run: echo ::set-env name=WASM_CLI_VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')
+      - run: echo "WASM_CLI_VERSION=$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')" >> $GITHUB_ENV
       - uses: actions-rs/install@v0.1
         with:
           crate: wasm-bindgen-cli
