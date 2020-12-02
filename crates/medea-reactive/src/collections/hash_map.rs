@@ -248,14 +248,20 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    // TODO: insert may replace
     /// Inserts a key-value pair into the [`HashMap`].
     ///
-    /// This action will produce [`HashMap::on_insert`] event.
+    /// This action will produce [`HashMap::on_insert`] and maybe
+    /// [`HashMap::on_remove`] (if this is replace action) event.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.insert_subs.send_update((key.clone(), value.clone()));
+        let removed_value = self.inner.insert(key.clone(), value.clone());
+        if let Some(removed_value) = &removed_value {
+            self.remove_subs
+                .send_update((key.clone(), removed_value.clone()));
+        }
 
-        self.inner.insert(key, value)
+        self.insert_subs.send_update((key, value));
+
+        removed_value
     }
 
     /// Removes a key from the [`HashMap`], returning the value at
@@ -330,6 +336,20 @@ mod tests {
     use tokio::time::timeout;
 
     use crate::collections::ProgressableHashMap;
+
+    #[tokio::test]
+    async fn replace_triggers_on_remove() {
+        let mut map = ProgressableHashMap::new();
+        let _ = map.insert(0u32, 0u32);
+
+        let mut on_insert = map.on_insert();
+        let mut on_remove = map.on_remove();
+
+        assert_eq!(map.insert(0, 1).unwrap(), 0);
+
+        assert_eq!(*on_insert.next().await.unwrap(), (0, 1));
+        assert_eq!(*on_remove.next().await.unwrap(), (0, 0));
+    }
 
     mod when_remove_processed {
         use super::*;
