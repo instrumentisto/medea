@@ -39,6 +39,13 @@ All user visible changes to this project will be documented in this file. This p
             - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
             - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
             - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
+            - `DeviceVideoTrackConstraints` width and height configuration ([#158]):
+                - `DeviceVideoTrackConstraints.ideal_width`;
+                - `DeviceVideoTrackConstraints.exact_width`;
+                - `DeviceVideoTrackConstraints.width_in_range`;
+                - `DeviceVideoTrackConstraints.ideal_height`;
+                - `DeviceVideoTrackConstraints.exact_height`;
+                - `DeviceVideoTrackConstraints.height_in_range`.
             - `FacingMode` enum ([#137]).
         - `MediaKind` enum that provides `LocalMediaTrack`/`RemoteMediaTrack` and `InputDeviceInfo` kind ([#146]);
         - `MediaSourceKind` enum that provides `MediaTrack` media source kind (`Device` or `Display`) ([#146], [#156]);
@@ -124,6 +131,7 @@ All user visible changes to this project will be documented in this file. This p
 [#147]: /../../pull/147
 [#155]: /../../pull/155
 [#156]: /../../pull/156
+[#158]: /../../pull/158
 
 
 

@@ -1,11 +1,14 @@
 #![cfg(target_arch = "wasm32")]
 
-use js_sys::Array;
+use std::iter::FromIterator;
+
+use js_sys::Array as JsArray;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
+use web_sys as sys;
 
 use medea_jason::{
-    media::{MediaKind, MediaManager},
+    media::{MediaKind, MediaManager, MediaManagerError},
     AudioTrackConstraints, DeviceVideoTrackConstraints,
     DisplayVideoTrackConstraints, MediaStreamSettings,
 };
@@ -22,7 +25,7 @@ async fn get_media_devices_info() {
             .await
             .unwrap();
 
-    let devices = Array::from(&devices);
+    let devices = JsArray::from(&devices);
     assert!(devices.length() >= 2);
 }
 
@@ -299,5 +302,50 @@ async fn display_track_is_cached() {
 
     assert_eq!(mock_navigator.get_display_media_requests_count(), 1);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
+    mock_navigator.stop();
+}
+
+/// Check that error is thrown if stream obtained via gUM request contains ended
+/// track.
+#[wasm_bindgen_test]
+async fn new_tracks_should_be_live() {
+    let media_manager = MediaManager::default();
+    let mut constraints = MediaStreamSettings::new();
+    constraints.audio(AudioTrackConstraints::new());
+
+    let track = Clone::clone(
+        media_manager
+            .get_tracks(constraints.clone())
+            .await
+            .unwrap()
+            .pop()
+            .unwrap()
+            .0
+            .sys_track(),
+    );
+    let ended_track = track.clone();
+    ended_track.stop();
+
+    let mock_navigator = MockNavigator::new();
+    let return_stream =
+        sys::MediaStream::new_with_tracks(&JsArray::from_iter(vec![
+            Clone::clone(&track),
+            ended_track,
+        ]))
+        .unwrap();
+    mock_navigator.setUserMediaReturns(return_stream);
+
+    if let Err(err) = media_manager.get_tracks(constraints).await {
+        let err = err.into_inner();
+        assert!(matches!(
+            err,
+            MediaManagerError::LocalTrackIsEnded(MediaKind::Audio)
+        ));
+    } else {
+        panic!("expected err");
+    }
+    // Second track was stopped.
+    assert_eq!(track.ready_state(), sys::MediaStreamTrackState::Ended);
+
     mock_navigator.stop();
 }
