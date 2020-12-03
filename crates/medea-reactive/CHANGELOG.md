@@ -23,7 +23,6 @@ All user visible changes to this project will be documented in this file. This p
     - `ProgressableHashMap`;
     - `ProgressableHashSet`.
 - `ProgressableField` container ([#159]);
-- `ProgressableValue` data holder ([#159]).
 
 [#81]: /../../pull/81
 [#103]: /../../pull/103

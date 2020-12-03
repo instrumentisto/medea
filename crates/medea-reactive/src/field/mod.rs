@@ -12,7 +12,7 @@ use std::{
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, LocalBoxFuture},
+    future::LocalBoxFuture,
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
@@ -46,6 +46,7 @@ pub type ProgressableField<D> = ObservableField<D, progressable::SubStore<D>>;
 /// [`ObservableField::when`] or [`ObservableField::when_eq`] methods.
 ///
 /// [`Future`]: std::future::Future
+#[derive(Debug)]
 pub struct ObservableField<D, S> {
     /// Data which is stored by this [`ObservableField`].
     data: D,
@@ -87,8 +88,14 @@ where
     where
         F: Fn(&D) -> bool + 'static,
     {
+        // TODO: This is kinda broken.
+        //       1. Inner value is 0.
+        //       2. let fut = field.when_eq(0).
+        //       3. Change value to 1.
+        //       4. fut.await = Poll::Ready.
+        //       I suggest interior mutability + async fn's.
         if (assert_fn)(&self.data) {
-            Box::pin(future::ok(()))
+            Box::pin(futures::future::ok(()))
         } else {
             self.subs.when(Box::new(assert_fn))
         }
@@ -114,7 +121,7 @@ where
     D: Clone + 'static,
 {
     /// Returns [`Stream`] into which underlying data updates wrapped to the
-    /// [`progressable::Value`] will be emitted.
+    /// [`progressable::Guarded`] will be emitted.
     ///
     /// [`Stream`]: futures::Stream
     pub fn subscribe(
@@ -327,17 +334,6 @@ impl<D, S> Deref for ObservableField<D, S> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.data
-    }
-}
-
-impl<D, S> fmt::Debug for ObservableField<D, S>
-where
-    D: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ObservableField")
-            .field("data", &self.data)
-            .finish()
     }
 }
 
