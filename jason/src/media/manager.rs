@@ -13,14 +13,12 @@ use medea_client_api_proto::MediaSourceKind;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
-use web_sys::{
-    MediaDevices, MediaStream as SysMediaStream,
-    MediaStreamConstraints as SysMediaStreamConstraints,
-};
+use web_sys as sys;
 
 use crate::{
     media::{MediaStreamSettings, MultiSourceTracksConstraints},
     utils::{window, HandlerDetachedError, JasonError, JsCaused, JsError},
+    MediaKind,
 };
 
 use super::{track::local, InputDeviceInfo};
@@ -35,8 +33,8 @@ extern "C" {
     #[allow(clippy::needless_pass_by_value)]
     #[wasm_bindgen(catch)]
     fn get_display_media(
-        media_devices: &MediaDevices,
-        constraints: &SysMediaStreamConstraints,
+        media_devices: &sys::MediaDevices,
+        constraints: &sys::MediaStreamConstraints,
     ) -> std::result::Result<Promise, JsValue>;
 }
 
@@ -55,7 +53,7 @@ pub enum MediaManagerError {
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
     GetUserMediaFailed(JsError),
 
-    /// Occurs if the [MediaDevices.getDisplayMedia()][1] request failed.
+    /// Occurs if the [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
@@ -66,6 +64,24 @@ pub enum MediaManagerError {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(JsError),
+
+    /// Occurs when local track is [`muted`][1] right after [getUserMedia()][2]
+    /// or [getDisplayMedia()][3] request.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams#track-muted
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "{} track is muted", _0)]
+    LocalTrackIsMuted(MediaKind),
+
+    /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
+    /// or [getDisplayMedia()][3] request.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+    #[display(fmt = "{} track is ended", _0)]
+    LocalTrackIsEnded(MediaKind),
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
@@ -244,7 +260,7 @@ impl InnerMediaManager {
     /// [2]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     async fn get_user_media(
         &self,
-        caps: SysMediaStreamConstraints,
+        caps: sys::MediaStreamConstraints,
     ) -> Result<Vec<Rc<local::Track>>> {
         use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
 
@@ -263,27 +279,12 @@ impl InnerMediaManager {
                 .map_err(tracerr::from_and_wrap!())?,
         )
         .await
-        .map(SysMediaStream::from)
+        .map(sys::MediaStream::from)
         .map_err(JsError::from)
         .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
 
-        let mut storage = self.tracks.borrow_mut();
-        let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
-            .unwrap()
-            .unwrap()
-            .map(|track| {
-                Rc::new(local::Track::new(
-                    track.unwrap().into(),
-                    MediaSourceKind::Device,
-                ))
-            })
-            .inspect(|track| {
-                storage.insert(track.id(), Rc::downgrade(track));
-            })
-            .collect();
-
-        Ok(tracks)
+        Ok(self.parse_and_save_tracks(stream, MediaSourceKind::Device)?)
     }
 
     /// Obtains new [MediaStream][1] making [getDisplayMedia()][2] call, saves
@@ -294,7 +295,7 @@ impl InnerMediaManager {
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     async fn get_display_media(
         &self,
-        caps: SysMediaStreamConstraints,
+        caps: sys::MediaStreamConstraints,
     ) -> Result<Vec<Rc<local::Track>>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
@@ -314,25 +315,62 @@ impl InnerMediaManager {
                 .map_err(tracerr::from_and_wrap!())?,
         )
         .await
-        .map(SysMediaStream::from)
+        .map(sys::MediaStream::from)
         .map_err(JsError::from)
         .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
+
+        Ok(self.parse_and_save_tracks(stream, MediaSourceKind::Display)?)
+    }
+
+    /// Retrieves tracks from provided [`sys::MediaStream`], saves tracks weak
+    /// references in [`MediaManager`] tracks storage.
+    ///
+    /// # Errors
+    ///
+    /// - [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
+    ///   the provided [`SysMediaStream`] is in [`ended`][1] state.
+    ///
+    /// - [`MediaManagerError::LocalTrackIsMuted`] if at least one track from
+    ///   the provided [`SysMediaStream`] is in [`muted`][2] state.
+    ///
+    /// In case of error all tracks are stopped and are not saved in
+    /// [`MediaManager`]'s tracks storage.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://w3.org/TR/mediacapture-streams#track-muted
+    #[allow(clippy::needless_pass_by_value)]
+    fn parse_and_save_tracks(
+        &self,
+        stream: sys::MediaStream,
+        kind: MediaSourceKind,
+    ) -> Result<Vec<Rc<local::Track>>> {
+        use MediaManagerError::{LocalTrackIsEnded, LocalTrackIsMuted};
 
         let mut storage = self.tracks.borrow_mut();
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
             .unwrap()
             .unwrap()
-            .map(|tr| {
-                Rc::new(local::Track::new(
-                    tr.unwrap().into(),
-                    MediaSourceKind::Display,
-                ))
-            })
-            .inspect(|track| {
-                storage.insert(track.id(), Rc::downgrade(track));
-            })
+            .map(|tr| Rc::new(local::Track::new(tr.unwrap().into(), kind)))
             .collect();
+
+        // Tracks returned by getDisplayMedia()/getUserMedia() request should be
+        // `live` and `!muted`. Otherwise, we should err without caching tracks
+        // in `MediaManager`. Tracks will be stopped on ``Drop`.
+        for track in &tracks {
+            if track.sys_track().ready_state()
+                != sys::MediaStreamTrackState::Live
+            {
+                return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
+            }
+            if track.sys_track().muted() {
+                return Err(tracerr::new!(LocalTrackIsMuted(track.kind())));
+            }
+        }
+
+        for track in &tracks {
+            storage.insert(track.id(), Rc::downgrade(&track));
+        }
 
         Ok(tracks)
     }
