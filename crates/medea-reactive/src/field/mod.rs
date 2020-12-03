@@ -117,11 +117,11 @@ where
     /// [`progressable::Value`] will be emitted.
     ///
     /// [`Stream`]: futures::Stream
-    pub fn subscribe(&self) -> LocalBoxStream<'static, progressable::Value<D>> {
-        Box::pin(stream::select(
-            self.subs.replay(vec![self.data.clone()]),
-            self.subs.new_subscription(),
-        ))
+    pub fn subscribe(
+        &self,
+    ) -> LocalBoxStream<'static, progressable::Guarded<D>> {
+        let data = self.subs.wrap(self.data.clone());
+        Box::pin(stream::once(async move { data }).chain(self.subs.subscribe()))
     }
 
     /// Returns [`Future`] which will be resolved when all data updates will be
@@ -569,10 +569,10 @@ mod tests {
         let mut subscribe = field.subscribe();
         assert_eq!(poll!(field.when_all_processed()), Poll::Pending);
 
-        assert_eq!(*subscribe.next().await.unwrap(), 2);
+        assert_eq!(subscribe.next().await.unwrap().into_inner(), 2);
         *field.borrow_mut() = 3;
         assert_eq!(poll!(field.when_all_processed()), Poll::Pending);
-        assert_eq!(*subscribe.next().await.unwrap(), 3);
+        assert_eq!(subscribe.next().await.unwrap().into_inner(), 3);
         assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
     }
 }

@@ -14,8 +14,12 @@ use crate::subscribers_store::{common, progressable, SubscribersStore};
 
 /// Reactive hash map based on [`HashMap`] with ability to recognise when all
 /// updates was processed by subscribers.
-pub type ProgressableHashMap<K, V> =
-    HashMap<K, V, progressable::SubStore<(K, V)>, progressable::Value<(K, V)>>;
+pub type ProgressableHashMap<K, V> = HashMap<
+    K,
+    V,
+    progressable::SubStore<(K, V)>,
+    progressable::Guarded<(K, V)>,
+>;
 /// Reactive hash map based on [`HashMap`].
 pub type ObservableHashMap<K, V> =
     HashMap<K, V, common::SubStore<(K, V)>, (K, V)>;
@@ -169,7 +173,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
-        self.insert_subs.new_subscription()
+        self.insert_subs.subscribe()
     }
 
     /// Returns the [`Stream`] to which the removed key-value pairs will be
@@ -181,7 +185,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.new_subscription()
+        self.remove_subs.subscribe()
     }
 }
 
@@ -190,6 +194,7 @@ where
     K: Clone,
     V: Clone,
     S: SubscribersStore<(K, V), O>,
+    O: 'static,
 {
     /// Returns the [`Stream`] with all already inserted values of this
     /// [`HashMap`].
@@ -202,12 +207,12 @@ where
     /// [`stream::select`]: futures::stream::select
     #[inline]
     pub fn replay_on_insert(&self) -> LocalBoxStream<'static, O> {
-        self.insert_subs.replay(
+        Box::pin(futures::stream::iter(
             self.inner
                 .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
-        )
+                .map(|(k, v)| self.insert_subs.wrap((k.clone(), v.clone())))
+                .collect::<Vec<_>>(),
+        ))
     }
 }
 
@@ -245,11 +250,18 @@ where
 {
     /// Inserts a key-value pair into the [`HashMap`].
     ///
-    /// This action will produce [`HashMap::on_insert`] event.
+    /// This action will produce [`HashMap::on_insert`] and maybe
+    /// [`HashMap::on_remove`] (if this is replace action) event.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        self.insert_subs.send_update((key.clone(), value.clone()));
+        let removed_value = self.inner.insert(key.clone(), value.clone());
+        if let Some(removed_value) = &removed_value {
+            self.remove_subs
+                .send_update((key.clone(), removed_value.clone()));
+        }
 
-        self.inner.insert(key, value)
+        self.insert_subs.send_update((key, value));
+
+        removed_value
     }
 
     /// Removes a key from the [`HashMap`], returning the value at
@@ -325,19 +337,71 @@ mod tests {
 
     use crate::collections::ProgressableHashMap;
 
+    #[tokio::test]
+    async fn replace_triggers_on_remove() {
+        let mut map = ProgressableHashMap::new();
+        let _ = map.insert(0u32, 0u32);
+
+        let mut on_insert = map.on_insert();
+        let mut on_remove = map.on_remove();
+
+        assert_eq!(map.insert(0, 1).unwrap(), 0);
+
+        assert_eq!(*on_insert.next().await.unwrap(), (0, 1));
+        assert_eq!(*on_remove.next().await.unwrap(), (0, 0));
+    }
+
     mod when_remove_processed {
         use super::*;
 
         #[tokio::test]
-        async fn waits_for_push() {
+        async fn replay_on_insert() {
+            // let mut map = ProgressableHashMap::new();
+            //
+            // let _ = map.insert(0, 0);
+            // let _ = map.insert(1, 2);
+            // let _ = map.insert(1, 2);
+            // let _ = map.insert(2, 3);
+            //
+            // let inserts: Vec<_> = map.replay_on_insert().collect().await;
+            // let inserts = inserts.into_iter().map(|val|val.into_inner());
+        }
+
+        #[tokio::test]
+        async fn when_insert_processed() {
             let mut map = ProgressableHashMap::new();
             let _ = map.insert(0, 0);
 
-            let _on_remove = map.on_remove();
-            let _ = map.remove(&0).unwrap();
+            let mut on_insert = map.on_insert();
 
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Ready(()));
+            let _ = map.insert(2, 3);
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Pending);
+
+            let (val, guard) = on_insert.next().await.unwrap().into_parts();
+
+            assert_eq!(val, (2, 3));
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Pending);
+            drop(guard);
+            assert_eq!(poll!(map.when_insert_processed()), Poll::Ready(()));
+        }
+
+        #[tokio::test]
+        async fn when_remove_processed() {
+            let mut map = ProgressableHashMap::new();
+            let _ = map.insert(0, 0);
+
+            let mut on_remove = map.on_remove();
+
+            assert_eq!(poll!(map.when_remove_processed()), Poll::Ready(()));
+            map.remove(&0);
             assert_eq!(poll!(map.when_remove_processed()), Poll::Pending);
-            drop(_on_remove);
+
+            let (val, guard) = on_remove.next().await.unwrap().into_parts();
+
+            assert_eq!(val, (0, 0));
+            assert_eq!(poll!(map.when_remove_processed()), Poll::Pending);
+            drop(guard);
             assert_eq!(poll!(map.when_remove_processed()), Poll::Ready(()));
         }
 

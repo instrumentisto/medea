@@ -11,7 +11,7 @@ use crate::subscribers_store::{common, progressable, SubscribersStore};
 /// Reactive vector based on [`Vec`] with ability to recognise when all updates
 /// was processed by subscribers.
 pub type ProgressableVec<T> =
-    Vec<T, progressable::SubStore<T>, progressable::Value<T>>;
+    Vec<T, progressable::SubStore<T>, progressable::Guarded<T>>;
 /// Reactive vector based on [`Vec`].
 pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 
@@ -151,7 +151,7 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_push(&self) -> LocalBoxStream<'static, O> {
-        self.push_subs.new_subscription()
+        self.push_subs.subscribe()
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
@@ -162,7 +162,7 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.new_subscription()
+        self.remove_subs.subscribe()
     }
 }
 
@@ -170,6 +170,7 @@ impl<T, S, O> Vec<T, S, O>
 where
     T: Clone,
     S: SubscribersStore<T, O>,
+    O: 'static,
 {
     /// Appends an element to the back of a collection.
     ///
@@ -201,7 +202,13 @@ where
     /// [`stream::select`]: futures::stream::select
     #[inline]
     pub fn replay_on_push(&self) -> LocalBoxStream<'static, O> {
-        self.push_subs.replay(self.inner.to_vec())
+        Box::pin(futures::stream::iter(
+            self.inner
+                .clone()
+                .into_iter()
+                .map(|val| self.push_subs.wrap(val))
+                .collect::<std::vec::Vec<_>>(),
+        ))
     }
 }
 

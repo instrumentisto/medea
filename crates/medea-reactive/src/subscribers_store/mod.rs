@@ -10,15 +10,14 @@ pub trait SubscribersStore<T, O>: Default {
     /// Sends data update to the all subscribers.
     fn send_update(&self, value: T);
 
-    /// Returns [`Stream`] into which all sent with
-    /// [`SubscribersStore::send_update`] updates will be sent.
+    /// Creates new updates subscription.
+    ///
+    /// Returns [`Stream`] that will yield elements sent with
+    /// [`SubscribersStore::send_update`] calls.
     ///
     /// [`Stream`]: futures::stream::Stream
-    fn new_subscription(&self) -> LocalBoxStream<'static, O>;
+    fn subscribe(&self) -> LocalBoxStream<'static, O>;
 
-    /// Returns [`Stream`] into which all provided `values` will be sent wrapped
-    /// to the output type.
-    ///
-    /// [`Stream`]: futures::stream::Stream
-    fn replay(&self, values: Vec<T>) -> LocalBoxStream<'static, O>;
+    /// Wraps provided value to output type.
+    fn wrap(&self, value: T) -> O;
 }
