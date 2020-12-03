@@ -7,7 +7,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_reactive::ObservableHashMap;
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, StreamExt as _};
@@ -18,6 +17,7 @@ use medea_client_api_proto::{
     MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
     TrackId, TrackUpdate,
 };
+use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -31,43 +31,56 @@ use crate::{
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
-        MediaConnectionsError, MediaState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
+        MediaConnectionsError, MediaState, PeerComponent, PeerConnection,
+        PeerError, PeerEvent, PeerEventHandler, PeerRepository, PeerState,
+        ReceiverState, RtcStats, SenderState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
-    utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
+    utils::{
+        Callback1, Component, HandlerDetachedError, JasonError, JsCaused,
+        JsError,
+    },
     JsMediaSourceKind,
 };
-use crate::peer::PeerComponent;
-use crate::peer::{PeerState};
-use crate::utils::Component;
+use medea_client_api_proto::stats::TrackStats;
+use medea_reactive::collections::ProgressableHashMap;
+
+pub struct RoomCtx {
+    pub rpc: Rc<dyn RpcSession>,
+}
 
 pub struct RoomState {
-    peers: ObservableHashMap<PeerId, Rc<PeerState>>,
+    peers: RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>,
 }
 
 impl RoomState {
     pub fn new() -> Self {
         Self {
-            peers: ObservableHashMap::new(),
+            peers: RefCell::new(ObservableHashMap::new()),
         }
     }
 }
 
-type RoomComponent = Component<RoomState, RefCell<Weak<InnerRoom>>>;
+type RoomComponent = Component<RoomState, RefCell<Weak<InnerRoom>>, RoomCtx>;
 
 impl RoomComponent {
     pub fn spawn(&self) {
         self.spawn_task(
-            self.state().peers.on_insert(),
+            self.state().peers.borrow().on_insert(),
             Self::handle_insert_peer,
         );
     }
 
-    async fn handle_insert_peer(ctx: RefCell<Weak<InnerRoom>>, (peer_id, new_peer): (PeerId, Rc<PeerState>)) {
+    async fn handle_insert_peer(
+        ctx: RefCell<Weak<InnerRoom>>,
+        global_ctx: Rc<RoomCtx>,
+        state: Rc<RoomState>,
+        (peer_id, new_peer): (PeerId, Rc<PeerState>),
+    ) {
+        log::debug!("Peer inserted");
         let room = ctx.borrow().upgrade().unwrap();
         let peer = PeerConnection::new(
             peer_id,
@@ -78,9 +91,11 @@ impl RoomComponent {
             room.send_constraints.clone(),
             room.recv_constraints.clone(),
         )
-            .unwrap();
+        .unwrap();
 
-        let component = Component::new_component(new_peer, peer);
+        let component =
+            Component::new_component(new_peer, peer, global_ctx.clone());
+        component.spawn();
 
         room.peers.insert_peer(peer_id, component);
     }
@@ -811,7 +826,10 @@ impl InnerRoom {
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Rc<Self> {
         let room_state = Rc::new(RoomState::new());
-        let room_component = RoomComponent::without_context(Rc::clone(&room_state));
+        let room_component = RoomComponent::without_context(
+            Rc::clone(&room_state),
+            Rc::new(RoomCtx { rpc: rpc.clone() }),
+        );
         let this = Rc::new(Self {
             rpc,
             send_constraints: LocalTracksConstraints::default(),
@@ -1128,17 +1146,58 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let peer = self
+        // let peer = self
+        //     .peers
+        //     .create_peer(
+        //         peer_id,
+        //         ice_servers,
+        //         self.peer_event_sender.clone(),
+        //         is_force_relayed,
+        //         self.send_constraints.clone(),
+        //         Rc::clone(&self.recv_constraints),
+        //     )
+        //     .map_err(tracerr::map_from_and_wrap!())?;
+
+        let mut senders = ProgressableHashMap::new();
+        let mut receivers = ProgressableHashMap::new();
+        for track in &tracks {
+            match &track.direction {
+                Direction::Send { receivers, mid } => {
+                    senders.insert(
+                        track.id,
+                        Rc::new(SenderState::new(
+                            track.id,
+                            mid.clone(),
+                            track.media_type.clone(),
+                            receivers.clone(),
+                        )),
+                    );
+                }
+                Direction::Recv { sender, mid } => {
+                    receivers.insert(
+                        track.id,
+                        Rc::new(ReceiverState::new(
+                            track.id,
+                            mid.clone(),
+                            track.media_type.clone(),
+                            sender.clone(),
+                        )),
+                    );
+                }
+            }
+        }
+        let peer_state = PeerState::new(
+            senders,
+            receivers,
+            peer_id,
+            ice_servers,
+            is_force_relayed,
+            Some(negotiation_role),
+        );
+        self.state
             .peers
-            .create_peer(
-                peer_id,
-                ice_servers,
-                self.peer_event_sender.clone(),
-                is_force_relayed,
-                self.send_constraints.clone(),
-                Rc::clone(&self.recv_constraints),
-            )
-            .map_err(tracerr::map_from_and_wrap!())?;
+            .borrow_mut()
+            .insert(peer_id, Rc::new(peer_state));
 
         for track in &tracks {
             match &track.direction {
@@ -1152,14 +1211,17 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
-        self.create_tracks_and_maybe_negotiate(
-            peer,
-            tracks,
-            Some(negotiation_role),
-            true,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())
+
+        Ok(())
+
+        // self.create_tracks_and_maybe_negotiate(
+        //     peer,
+        //     tracks,
+        //     Some(negotiation_role),
+        //     true,
+        // )
+        // .await
+        // .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
@@ -1224,37 +1286,69 @@ impl EventHandler for InnerRoom {
             .peers
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        let mut new_tracks = Vec::new();
-        let mut patches = Vec::new();
+        // let mut new_tracks = Vec::new();
+        // let mut patches = Vec::new();
+        let peer_state =
+            self.state.peers.borrow().get(&peer_id).unwrap().clone();
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => {
-                    new_tracks.push(track);
-                }
+                TrackUpdate::Added(track) => match track.direction {
+                    Direction::Send { receivers, mid } => {
+                        let sender_state = SenderState::new(
+                            track.id,
+                            mid,
+                            track.media_type,
+                            receivers,
+                        );
+                        peer_state
+                            .insert_sender(track.id, Rc::new(sender_state));
+                    }
+                    Direction::Recv { sender, mid } => {
+                        let receiver_state = ReceiverState::new(
+                            track.id,
+                            mid,
+                            track.media_type,
+                            sender,
+                        );
+                        peer_state
+                            .insert_receiver(track.id, Rc::new(receiver_state));
+                    }
+                },
                 TrackUpdate::Updated(track_patch) => {
-                    patches.push(track_patch);
+                    if let Some(sender) = peer_state.get_sender(track_patch.id)
+                    {
+                        sender.update(track_patch);
+                    } else if let Some(receiver) =
+                        peer_state.get_receiver(track_patch.id)
+                    {
+                        receiver.update(track_patch);
+                    }
                 }
                 TrackUpdate::IceRestart => {
                     peer.restart_ice();
                 }
             }
         }
-        let kinds = peer
-            .patch_tracks(patches)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        peer.update_local_stream(kinds)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        self.create_tracks_and_maybe_negotiate(
-            peer,
-            new_tracks,
-            negotiation_role,
-            false,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())?;
+        if let Some(negotiation_role) = negotiation_role {
+            peer_state.set_negotiation_role(negotiation_role);
+        }
+
+        // let kinds = peer
+        //     .patch_tracks(patches)
+        //     .await
+        //     .map_err(tracerr::map_from_and_wrap!())?;
+        // peer.update_local_stream(kinds)
+        //     .await
+        //     .map_err(tracerr::map_from_and_wrap!())?;
+        // self.create_tracks_and_maybe_negotiate(
+        //     peer,
+        //     new_tracks,
+        //     negotiation_role,
+        //     false,
+        // )
+        // .await
+        // .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
 

@@ -1,16 +1,19 @@
-use medea_client_api_proto::{MediaType, MemberId, Track, TrackId};
+use medea_client_api_proto::{
+    MediaType, MemberId, Track, TrackId, TrackPatchEvent,
+};
 use medea_reactive::{Observable, ObservableCell};
 
 use crate::utils::Component;
 
 use crate::{
+    api::RoomCtx,
     media::{RecvConstraints, TrackConstraints},
     peer::{MediaConnections, Receiver, TransceiverSide},
     utils::ObservableSpawner as _,
 };
 use std::rc::Rc;
 
-pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>>;
+pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>, RoomCtx>;
 
 pub struct ReceiverState {
     id: TrackId,
@@ -61,6 +64,15 @@ impl ReceiverState {
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
+
+    pub fn update(&self, track_patch: TrackPatchEvent) {
+        if let Some(enabled_general) = track_patch.enabled_general {
+            self.enabled_general.set(enabled_general);
+        }
+        if let Some(enabled_individual) = track_patch.enabled_individual {
+            self.enabled_individual.set(enabled_individual);
+        }
+    }
 }
 
 impl ReceiverComponent {
@@ -77,12 +89,19 @@ impl ReceiverComponent {
 
     async fn handle_enabled_individual(
         ctx: Rc<Receiver>,
+        global_ctx: Rc<RoomCtx>,
+        state: Rc<ReceiverState>,
         enabled_individual: bool,
     ) {
         ctx.set_enabled_individual_state(enabled_individual);
     }
 
-    async fn handle_enabled_general(ctx: Rc<Receiver>, enabled_general: bool) {
+    async fn handle_enabled_general(
+        ctx: Rc<Receiver>,
+        global_ctx: Rc<RoomCtx>,
+        state: Rc<ReceiverState>,
+        enabled_general: bool,
+    ) {
         ctx.set_enabled_general_state(enabled_general);
     }
 }

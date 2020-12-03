@@ -2,20 +2,22 @@ use std::rc::{Rc, Weak};
 
 use crate::utils::task_spawner::{HasTaskHandlesStorage, TaskHandlesStorage};
 use futures::{future, Future, Stream, StreamExt};
-use wasm_bindgen_futures::spawn_local;
 use std::cell::RefCell;
+use wasm_bindgen_futures::spawn_local;
 
-pub struct Component<S, C> {
+pub struct Component<S, C, G> {
     state: Rc<S>,
     ctx: C,
+    global_ctx: Rc<G>,
     task_handles: TaskHandlesStorage,
 }
 
-impl<S, C> Component<S, RefCell<Weak<C>>> {
-    pub fn without_context(state: Rc<S>) -> Self {
+impl<S, C, G> Component<S, RefCell<Weak<C>>, G> {
+    pub fn without_context(state: Rc<S>, global_ctx: Rc<G>) -> Self {
         Self {
             state,
             ctx: RefCell::new(Weak::new()),
+            global_ctx,
             task_handles: TaskHandlesStorage::new(),
         }
     }
@@ -25,11 +27,12 @@ impl<S, C> Component<S, RefCell<Weak<C>>> {
     }
 }
 
-impl<S, C: 'static> Component<S, Rc<C>> {
-    pub fn new_component(state: Rc<S>, ctx: Rc<C>) -> Self {
+impl<S, C: 'static, G> Component<S, Rc<C>, G> {
+    pub fn new_component(state: Rc<S>, ctx: Rc<C>, global_ctx: Rc<G>) -> Self {
         Self {
             state,
             ctx,
+            global_ctx,
             task_handles: TaskHandlesStorage::new(),
         }
     }
@@ -40,21 +43,29 @@ impl<S, C: 'static> Component<S, Rc<C>> {
     }
 }
 
-impl<S, C: 'static + Clone> Component<S, C> {
+impl<S: 'static, C: 'static + Clone, G: 'static> Component<S, C, G> {
     /// Spawns listener for the [`Observable`].
     ///
     /// You can stop all listeners tasks spawned by this function by calling
     /// [`TaskDisposer::dispose_tasks`]
     pub fn spawn_task<R, V, F, O>(&self, mut rx: R, handle: F)
-        where
-            F: Fn(C, V) -> O + 'static,
-            R: Stream<Item = V> + Unpin + 'static,
-            O: Future<Output = ()> + 'static,
+    where
+        F: Fn(C, Rc<G>, Rc<S>, V) -> O + 'static,
+        R: Stream<Item = V> + Unpin + 'static,
+        O: Future<Output = ()> + 'static,
     {
         let ctx = self.ctx.clone();
+        let global_ctx = Rc::clone(&self.global_ctx);
+        let state = Rc::clone(&self.state);
         let (fut, handle) = future::abortable(async move {
             while let Some(value) = rx.next().await {
-                (handle)(ctx.clone(), value).await;
+                (handle)(
+                    ctx.clone(),
+                    Rc::clone(&global_ctx),
+                    Rc::clone(&state),
+                    value,
+                )
+                .await;
             }
         });
         spawn_local(async move {
@@ -64,13 +75,13 @@ impl<S, C: 'static + Clone> Component<S, C> {
     }
 }
 
-impl<S, C> Component<S, C> {
+impl<S, C, G> Component<S, C, G> {
     pub fn state(&self) -> &S {
         &self.state
     }
 }
 
-impl<S, C> HasTaskHandlesStorage for Component<S, C> {
+impl<S, C, G> HasTaskHandlesStorage for Component<S, C, G> {
     fn task_handles_storage(&self) -> &TaskHandlesStorage {
         &self.task_handles
     }

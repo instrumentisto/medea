@@ -23,16 +23,15 @@ use crate::{
         transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
         TransceiverDirection,
     },
-    utils::{JasonError, JsCaused, JsError},
-};
-use crate::{
-    utils::Component,
+    utils::{Component, JasonError, JsCaused, JsError},
 };
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
 pub use self::{
-    component::{ReceiverComponent, ReceiverState, SenderState, SenderComponent},
+    component::{
+        ReceiverComponent, ReceiverState, SenderComponent, SenderState,
+    },
     receiver::Receiver,
     sender::{Sender, SenderBuilder},
     transitable_state::{
@@ -532,11 +531,17 @@ impl MediaConnections {
     }
 
     pub fn insert_sender(&self, sender: SenderComponent) {
-        self.0.borrow_mut().senders.insert(sender.ctx().track_id(), sender);
+        self.0
+            .borrow_mut()
+            .senders
+            .insert(sender.ctx().track_id(), sender);
     }
 
     pub fn insert_receiver(&self, receiver: ReceiverComponent) {
-        self.0.borrow_mut().receivers.insert(receiver.ctx().track_id(), receiver);
+        self.0
+            .borrow_mut()
+            .receivers
+            .insert(receiver.ctx().track_id(), receiver);
     }
 
     /// Creates new [`Sender`]s and [`Receiver`]s for each new [`proto::Track`].
@@ -552,92 +557,96 @@ impl MediaConnections {
         send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
-        for track in tracks {
-            let required = track.required();
-            match track.direction {
-                Direction::Send { mid, receivers } => {
-                    let media_exchange_state = if send_constraints
-                        .enabled(&track.media_type)
-                    {
-                        media_exchange_state::Stable::Enabled
-                    } else if required {
-                        let e = tracerr::new!(
-                            MediaConnectionsError::CannotDisableRequiredSender
-                        );
-                        let _ =
-                            self.0.borrow().peer_events_sender.unbounded_send(
-                                PeerEvent::FailedLocalMedia {
-                                    error: JasonError::from(e.clone()),
-                                },
-                            );
-
-                        return Err(e);
-                    } else {
-                        media_exchange_state::Stable::Disabled
-                    };
-                    let mute_state = if !send_constraints
-                        .muted(&track.media_type)
-                    {
-                        mute_state::Stable::Unmuted
-                    } else if required {
-                        let e = tracerr::new!(
-                            MediaConnectionsError::CannotDisableRequiredSender
-                        );
-                        let _ =
-                            self.0.borrow().peer_events_sender.unbounded_send(
-                                PeerEvent::FailedLocalMedia {
-                                    error: JasonError::from(e.clone()),
-                                },
-                            );
-                        return Err(e);
-                    } else {
-                        mute_state::Stable::Muted
-                    };
-                    let sndr = SenderBuilder {
-                        media_connections: self,
-                        track_id: track.id,
-                        caps: track.media_type.clone().into(),
-                        mute_state,
-                        mid: mid.clone(),
-                        media_exchange_state,
-                        required,
-                        send_constraints: send_constraints.clone(),
-                    }
-                    .build()
-                    .map_err(tracerr::wrap!())?;
-                    let state = Rc::new(SenderState::new(
-                        track.id,
-                        mid,
-                        track.media_type,
-                        receivers,
-                    ));
-                    self.0.borrow_mut().senders.insert(
-                        track.id,
-                        Component::new_component(state, sndr),
-                    );
-                }
-                Direction::Recv { sender, mid } => {
-                    let recv = Receiver::new(
-                        self,
-                        track.id,
-                        track.media_type.clone().into(),
-                        sender.clone(),
-                        mid.clone(),
-                        recv_constraints,
-                    );
-                    let state = Rc::new(ReceiverState::new(
-                        track.id,
-                        mid,
-                        track.media_type,
-                        sender,
-                    ));
-                    let component =
-                        Component::new_component(state, Rc::new(recv));
-                    component.spawn();
-                    self.0.borrow_mut().receivers.insert(track.id, component);
-                }
-            }
-        }
+        // for track in tracks {
+        //     let required = track.required();
+        //     match track.direction {
+        //         Direction::Send { mid, receivers } => {
+        //             let media_exchange_state = if send_constraints
+        //                 .enabled(&track.media_type)
+        //             {
+        //                 media_exchange_state::Stable::Enabled
+        //             } else if required {
+        //                 let e = tracerr::new!(
+        //
+        // MediaConnectionsError::CannotDisableRequiredSender
+        //                 );
+        //                 let _ =
+        //
+        // self.0.borrow().peer_events_sender.unbounded_send(
+        //                         PeerEvent::FailedLocalMedia {
+        //                             error: JasonError::from(e.clone()),
+        //                         },
+        //                     );
+        //
+        //                 return Err(e);
+        //             } else {
+        //                 media_exchange_state::Stable::Disabled
+        //             };
+        //             let mute_state = if !send_constraints
+        //                 .muted(&track.media_type)
+        //             {
+        //                 mute_state::Stable::Unmuted
+        //             } else if required {
+        //                 let e = tracerr::new!(
+        //
+        // MediaConnectionsError::CannotDisableRequiredSender
+        //                 );
+        //                 let _ =
+        //
+        // self.0.borrow().peer_events_sender.unbounded_send(
+        //                         PeerEvent::FailedLocalMedia {
+        //                             error: JasonError::from(e.clone()),
+        //                         },
+        //                     );
+        //                 return Err(e);
+        //             } else {
+        //                 mute_state::Stable::Muted
+        //             };
+        //             let sndr = SenderBuilder {
+        //                 media_connections: self,
+        //                 track_id: track.id,
+        //                 caps: track.media_type.clone().into(),
+        //                 mute_state,
+        //                 mid: mid.clone(),
+        //                 media_exchange_state,
+        //                 required,
+        //                 send_constraints: send_constraints.clone(),
+        //             }
+        //             .build()
+        //             .map_err(tracerr::wrap!())?;
+        //             let state = Rc::new(SenderState::new(
+        //                 track.id,
+        //                 mid,
+        //                 track.media_type,
+        //                 receivers,
+        //             ));
+        //             self.0.borrow_mut().senders.insert(
+        //                 track.id,
+        //                 Component::new_component(state, sndr, ),
+        //             );
+        //         }
+        //         Direction::Recv { sender, mid } => {
+        //             let recv = Receiver::new(
+        //                 self,
+        //                 track.id,
+        //                 track.media_type.clone().into(),
+        //                 sender.clone(),
+        //                 mid.clone(),
+        //                 recv_constraints,
+        //             );
+        //             let state = Rc::new(ReceiverState::new(
+        //                 track.id,
+        //                 mid,
+        //                 track.media_type,
+        //                 sender,
+        //             ));
+        //             let component =
+        //                 Component::new_component(state, Rc::new(recv));
+        //             component.spawn();
+        //             self.0.borrow_mut().receivers.insert(track.id,
+        // component);         }
+        //     }
+        // }
         Ok(())
     }
 

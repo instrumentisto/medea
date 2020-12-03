@@ -1,11 +1,11 @@
 use crate::utils::{Component, ObservableSpawner};
-use medea_client_api_proto::{MediaType, MemberId, TrackId};
+use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
 use medea_reactive::ObservableCell;
 
-use crate::peer::Sender;
+use crate::{api::RoomCtx, peer::Sender};
 use std::rc::Rc;
 
-pub type SenderComponent = Component<SenderState, Rc<Sender>>;
+pub type SenderComponent = Component<SenderState, Rc<Sender>, RoomCtx>;
 
 pub struct SenderState {
     id: TrackId,
@@ -28,8 +28,8 @@ impl SenderState {
             mid,
             media_type,
             receivers,
-            enabled_general: ObservableCell::new(false),
-            enabled_individual: ObservableCell::new(false),
+            enabled_general: ObservableCell::new(true),
+            enabled_individual: ObservableCell::new(true),
         }
     }
 
@@ -56,6 +56,16 @@ impl SenderState {
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
+
+    pub fn update(&self, track_patch: TrackPatchEvent) {
+        log::debug!("Updating Sender");
+        if let Some(enabled_general) = track_patch.enabled_general {
+            self.enabled_general.set(enabled_general);
+        }
+        if let Some(enabled_individual) = track_patch.enabled_individual {
+            self.enabled_individual.set(enabled_individual);
+        }
+    }
 }
 
 impl SenderComponent {
@@ -72,12 +82,22 @@ impl SenderComponent {
 
     async fn handle_enabled_individual(
         ctx: Rc<Sender>,
+        global_ctx: Rc<RoomCtx>,
+        state: Rc<SenderState>,
         enabled_individual: bool,
     ) {
         ctx.set_enabled_individual(enabled_individual);
+        if !enabled_individual {
+            ctx.remove_track().await;
+        }
     }
 
-    async fn handle_enabled_general(ctx: Rc<Sender>, enabled_general: bool) {
+    async fn handle_enabled_general(
+        ctx: Rc<Sender>,
+        global_ctx: Rc<RoomCtx>,
+        state: Rc<SenderState>,
+        enabled_general: bool,
+    ) {
         ctx.set_enabled_general(enabled_general);
     }
 }

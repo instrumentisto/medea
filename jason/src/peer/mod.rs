@@ -2,6 +2,7 @@
 //!
 //! [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
 
+mod component;
 mod conn;
 mod ice_server;
 mod media;
@@ -10,7 +11,6 @@ mod stats;
 mod stream_update_criteria;
 mod tracks_request;
 mod transceiver;
-mod component;
 
 use std::{
     cell::RefCell,
@@ -46,20 +46,21 @@ use crate::{
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
+    component::{PeerComponent, PeerState},
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
         media_exchange_state, mute_state, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
         MediaExchangeStateController, MediaState, MediaStateControllable,
-        MuteState, MuteStateController, Receiver, Sender, TrackDirection,
-        TransceiverSide, TransitableState, TransitableStateController,
+        MuteState, MuteStateController, Receiver, ReceiverState, Sender,
+        SenderState, TrackDirection, TransceiverSide, TransitableState,
+        TransitableStateController,
     },
     repo::{PeerRepository, Repository},
     stats::RtcStats,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
-    component::{PeerComponent, PeerState},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].

@@ -89,8 +89,11 @@ impl Repository {
             loop {
                 delay_for(Duration::from_secs(1).into()).await;
 
-                let peers =
-                    peers.borrow().values().map(|p| p.ctx()).collect::<Vec<_>>();
+                let peers = peers
+                    .borrow()
+                    .values()
+                    .map(|p| p.ctx())
+                    .collect::<Vec<_>>();
                 future::join_all(
                     peers.iter().map(|p| p.scrape_and_send_peer_stats()),
                 )
