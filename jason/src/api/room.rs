@@ -7,6 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use medea_reactive::ObservableHashMap;
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::{channel::mpsc, future, StreamExt as _};
@@ -40,6 +41,50 @@ use crate::{
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
     JsMediaSourceKind,
 };
+use crate::peer::PeerComponent;
+use crate::peer::{PeerState};
+use crate::utils::Component;
+
+pub struct RoomState {
+    peers: ObservableHashMap<PeerId, Rc<PeerState>>,
+}
+
+impl RoomState {
+    pub fn new() -> Self {
+        Self {
+            peers: ObservableHashMap::new(),
+        }
+    }
+}
+
+type RoomComponent = Component<RoomState, RefCell<Weak<InnerRoom>>>;
+
+impl RoomComponent {
+    pub fn spawn(&self) {
+        self.spawn_task(
+            self.state().peers.on_insert(),
+            Self::handle_insert_peer,
+        );
+    }
+
+    async fn handle_insert_peer(ctx: RefCell<Weak<InnerRoom>>, (peer_id, new_peer): (PeerId, Rc<PeerState>)) {
+        let room = ctx.borrow().upgrade().unwrap();
+        let peer = PeerConnection::new(
+            peer_id,
+            room.peer_event_sender.clone(),
+            new_peer.ice_servers().clone(),
+            room.peers.media_manager(),
+            new_peer.force_relay(),
+            room.send_constraints.clone(),
+            room.recv_constraints.clone(),
+        )
+            .unwrap();
+
+        let component = Component::new_component(new_peer, peer);
+
+        room.peers.insert_peer(peer_id, component);
+    }
+}
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -597,7 +642,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = Rc::new(InnerRoom::new(rpc, peers, tx));
+        let room = InnerRoom::new(rpc, peers, tx);
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -641,6 +686,10 @@ impl Room {
         });
 
         Self(room)
+    }
+
+    pub fn insert_peer(&self, peer_id: PeerId, peer: PeerComponent) {
+        self.0.peers.insert_peer(peer_id, peer)
     }
 
     /// Sets `close_reason` and consumes this [`Room`].
@@ -719,6 +768,10 @@ struct InnerRoom {
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
+    state: Rc<RoomState>,
+
+    component: RoomComponent,
+
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
     /// [`Connection`]: crate::api::Connection
@@ -756,13 +809,17 @@ impl InnerRoom {
         rpc: Rc<dyn RpcSession>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-    ) -> Self {
-        Self {
+    ) -> Rc<Self> {
+        let room_state = Rc::new(RoomState::new());
+        let room_component = RoomComponent::without_context(Rc::clone(&room_state));
+        let this = Rc::new(Self {
             rpc,
             send_constraints: LocalTracksConstraints::default(),
             recv_constraints: Rc::new(RecvConstraints::default()),
             peers,
             peer_event_sender,
+            state: room_state,
+            component: room_component,
             connections: Connections::default(),
             on_connection_loss: Callback1::default(),
             on_failed_local_media: Rc::new(Callback1::default()),
@@ -772,7 +829,11 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
-        }
+        });
+        this.component.replace_context(Rc::downgrade(&this));
+        this.component.spawn();
+
+        this
     }
 
     /// Toggles [`InnerRoom::recv_constraints`] or

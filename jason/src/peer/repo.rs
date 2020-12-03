@@ -11,6 +11,8 @@ use crate::{
 };
 
 use super::{PeerConnection, PeerError, PeerEvent};
+use crate::peer::component::PeerComponent;
+use futures::future::LocalBoxFuture;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -31,6 +33,10 @@ pub trait PeerRepository {
         recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
+    fn insert_peer(&self, peer_id: PeerId, component: PeerComponent);
+
+    fn media_manager(&self) -> Rc<MediaManager>;
+
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
 
@@ -47,7 +53,7 @@ pub struct Repository {
     media_manager: Rc<MediaManager>,
 
     /// Peer id to [`PeerConnection`],
-    peers: Rc<RefCell<HashMap<PeerId, Rc<PeerConnection>>>>,
+    peers: Rc<RefCell<HashMap<PeerId, PeerComponent>>>,
 
     /// [`TaskHandle`] for a task which will call
     /// [`PeerConnection::send_peer_stats`] of all [`PeerConnection`]s
@@ -84,7 +90,7 @@ impl Repository {
                 delay_for(Duration::from_secs(1).into()).await;
 
                 let peers =
-                    peers.borrow().values().cloned().collect::<Vec<_>>();
+                    peers.borrow().values().map(|p| p.ctx()).collect::<Vec<_>>();
                 future::join_all(
                     peers.iter().map(|p| p.scrape_and_send_peer_stats()),
                 )
@@ -121,14 +127,22 @@ impl PeerRepository for Repository {
             recv_constraints,
         )
         .map_err(tracerr::map_from_and_wrap!())?;
-        self.peers.borrow_mut().insert(id, Rc::clone(&peer));
+        // self.peers.borrow_mut().insert(id, Rc::clone(&peer));
         Ok(peer)
+    }
+
+    fn insert_peer(&self, peer_id: PeerId, component: PeerComponent) {
+        self.peers.borrow_mut().insert(peer_id, component);
+    }
+
+    fn media_manager(&self) -> Rc<MediaManager> {
+        self.media_manager.clone()
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
-        self.peers.borrow().get(&id).cloned()
+        self.peers.borrow().get(&id).map(|p| p.ctx())
     }
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
@@ -140,6 +154,6 @@ impl PeerRepository for Repository {
     /// Returns all [`PeerConnection`]s stored in a repository.
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
-        self.peers.borrow().values().cloned().collect()
+        self.peers.borrow().values().map(|p| p.ctx()).collect()
     }
 }

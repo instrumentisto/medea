@@ -5,7 +5,7 @@ use medea_reactive::ObservableCell;
 use crate::peer::Sender;
 use std::rc::Rc;
 
-pub type SenderComponent = Component<SenderState, Sender>;
+pub type SenderComponent = Component<SenderState, Rc<Sender>>;
 
 pub struct SenderState {
     id: TrackId,
@@ -31,6 +31,30 @@ impl SenderState {
             enabled_general: ObservableCell::new(false),
             enabled_individual: ObservableCell::new(false),
         }
+    }
+
+    pub fn id(&self) -> TrackId {
+        self.id
+    }
+
+    pub fn mid(&self) -> &Option<String> {
+        &self.mid
+    }
+
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
+    }
+
+    pub fn receivers(&self) -> &Vec<MemberId> {
+        &self.receivers
+    }
+
+    pub fn enabled_individual(&self) -> bool {
+        self.enabled_individual.get()
+    }
+
+    pub fn enabled_general(&self) -> bool {
+        self.enabled_general.get()
     }
 }
 

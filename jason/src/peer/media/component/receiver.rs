@@ -10,7 +10,7 @@ use crate::{
 };
 use std::rc::Rc;
 
-pub type ReceiverComponent = Component<ReceiverState, Receiver>;
+pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>>;
 
 pub struct ReceiverState {
     id: TrackId,
@@ -36,6 +36,30 @@ impl ReceiverState {
             enabled_general: ObservableCell::new(true),
             enabled_individual: ObservableCell::new(true),
         }
+    }
+
+    pub fn id(&self) -> TrackId {
+        self.id
+    }
+
+    pub fn mid(&self) -> &Option<String> {
+        &self.mid
+    }
+
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
+    }
+
+    pub fn sender(&self) -> &MemberId {
+        &self.sender
+    }
+
+    pub fn enabled_individual(&self) -> bool {
+        self.enabled_individual.get()
+    }
+
+    pub fn enabled_general(&self) -> bool {
+        self.enabled_general.get()
     }
 }
 

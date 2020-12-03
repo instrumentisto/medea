@@ -25,25 +25,22 @@ use crate::{
     },
     utils::{JasonError, JsCaused, JsError},
 };
+use crate::{
+    utils::Component,
+};
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
-use self::sender::SenderBuilder;
-
 pub use self::{
-    component::{ReceiverComponent, ReceiverState},
+    component::{ReceiverComponent, ReceiverState, SenderState, SenderComponent},
     receiver::Receiver,
-    sender::Sender,
+    sender::{Sender, SenderBuilder},
     transitable_state::{
         media_exchange_state, mute_state, InStable, InTransition,
         MediaExchangeState, MediaExchangeStateController, MediaState,
         MuteState, MuteStateController, TransitableState,
         TransitableStateController,
     },
-};
-use crate::{
-    peer::media::component::{SenderComponent, SenderState},
-    utils::Component,
 };
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
@@ -532,6 +529,14 @@ impl MediaConnections {
                     .get(&track_id)
                     .map(|rcvr| rcvr.ctx() as Rc<dyn TransceiverSide>)
             })
+    }
+
+    pub fn insert_sender(&self, sender: SenderComponent) {
+        self.0.borrow_mut().senders.insert(sender.ctx().track_id(), sender);
+    }
+
+    pub fn insert_receiver(&self, receiver: ReceiverComponent) {
+        self.0.borrow_mut().receivers.insert(receiver.ctx().track_id(), receiver);
     }
 
     /// Creates new [`Sender`]s and [`Receiver`]s for each new [`proto::Track`].

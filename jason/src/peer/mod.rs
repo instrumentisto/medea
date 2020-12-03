@@ -10,6 +10,7 @@ mod stats;
 mod stream_update_criteria;
 mod tracks_request;
 mod transceiver;
+mod component;
 
 use std::{
     cell::RefCell,
@@ -58,6 +59,7 @@ pub use self::{
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
+    component::{PeerComponent, PeerState},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
