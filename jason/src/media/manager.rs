@@ -68,18 +68,18 @@ pub enum MediaManagerError {
     /// Occurs when local track is [`muted`][1] right after [getUserMedia()][2]
     /// or [getDisplayMedia()][3] request.
     ///
-    /// [1]: https://tinyurl.com/w3-streams/#track-muted
+    /// [1]: https://w3.org/TR/mediacapture-streams#track-muted
     /// [2]: https://tinyurl.com/rnxcavf
-    /// [3]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     #[display(fmt = "{} track is muted", _0)]
     LocalTrackIsMuted(MediaKind),
 
     /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
     /// or [getDisplayMedia()][3] request.
     ///
-    /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
+    /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
     /// [2]: https://tinyurl.com/rnxcavf
-    /// [3]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     #[display(fmt = "{} track is ended", _0)]
     LocalTrackIsEnded(MediaKind),
 }
@@ -328,17 +328,17 @@ impl InnerMediaManager {
     ///
     /// # Errors
     ///
-    /// Errors with [`MediaManagerError::LocalTrackIsEnded`] if at least on
-    /// track from provided [`SysMediaStream`] is in [ended][1] state.
+    /// - [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
+    ///   the provided [`SysMediaStream`] is in [`ended`][1] state.
     ///
-    /// Errors with [`MediaManagerError::LocalTrackIsMuted`] if at least on
-    /// track from provided [`SysMediaStream`] is in [muted][2] state.
+    /// - [`MediaManagerError::LocalTrackIsMuted`] if at least one track from
+    ///   the provided [`SysMediaStream`] is in [`muted`][2] state.
     ///
     /// In case of error all tracks are stopped and are not saved in
-    /// [`MediaManager`]s tracks storage.
+    /// [`MediaManager`]'s tracks storage.
     ///
-    /// [1]: https://tinyurl.com/w3-streams/#idl-def-MediaStreamTrackState.ended
-    /// [2]: https://tinyurl.com/w3-streams/#track-muted
+    /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://w3.org/TR/mediacapture-streams#track-muted
     #[allow(clippy::needless_pass_by_value)]
     fn parse_and_save_tracks(
         &self,
@@ -354,9 +354,9 @@ impl InnerMediaManager {
             .map(|tr| Rc::new(local::Track::new(tr.unwrap().into(), kind)))
             .collect();
 
-        // Tracks returned by gDM or gUM request should be live && !muted.
-        // Otherwise we should err without caching tracks in MediaManager.
-        // Tracks will be stopped in drop impl.
+        // Tracks returned by getDisplayMedia()/getUserMedia() request should be
+        // `live` and `!muted`. Otherwise, we should err without caching tracks
+        // in `MediaManager`. Tracks will be stopped on ``Drop`.
         for track in &tracks {
             if track.sys_track().ready_state()
                 != sys::MediaStreamTrackState::Live
