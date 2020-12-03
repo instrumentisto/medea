@@ -1,0 +1,63 @@
+language: rust
+os: linux
+
+install:
+  - rustc -vV
+  - cargo -vV
+
+stages:
+  - name: release
+    if: tag IS present
+
+jobs:
+  include:
+    - name: crates.io
+      stage: release
+      if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
+      before_script:
+        - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+      script:
+        - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
+      deploy:
+        provider: script
+        script: make release.crates crate=$MEDEA_CRATE_NAME publish=yes
+        on:
+          tags: true
+
+    - name: NPM
+      stage: release
+      if: tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+      before_script:
+        - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+      script:
+        - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
+      before_deploy:
+        - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      deploy:
+        provider: script
+        script: make release.npm crate=$MEDEA_CRATE_NAME publish=yes
+        on:
+          tags: true
+
+    - name: GitHub
+      stage: release
+      if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
+      before_script:
+        - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+      script:
+        - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
+      deploy:
+        provider: releases
+        token: $GH_TOKEN
+        name: $TRAVIS_TAG
+        on:
+          tags: true
+
+notifications:
+  email:
+    on_success: never
+    on_failure: always

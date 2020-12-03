@@ -8,7 +8,9 @@ env:
 jobs:
   lint:
     name: Lint Rust code with Clippy
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -21,7 +23,9 @@ jobs:
 
   fmt:
     name: Verify Rust code style with rustfmt
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -34,7 +38,9 @@ jobs:
 
   build-jason:
     name: Build medea-jason (stable)
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -47,7 +53,9 @@ jobs:
 
   build-medea:
     name: Build medea (stable)
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -60,7 +68,9 @@ jobs:
   # Run all task sequentially to not flood jobs list.
   rustdoc:
     name: Check rust docs of all crates
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -78,7 +88,9 @@ jobs:
 
   unit-medea-macro:
     name: Run medea-macro unit tests
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -90,7 +102,9 @@ jobs:
 
   unit-medea-reactive:
     name: Run medea-reactive unit tests
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -102,7 +116,9 @@ jobs:
 
   unit-medea-coturn-telnet-client:
     name: Run medea-coturn-telnet-client unit tests
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -114,7 +130,9 @@ jobs:
 
   unit-medea-client-api-proto:
     name: Run medea-client-api-proto unit tests
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -126,7 +144,9 @@ jobs:
 
   unit-medea:
     name: Run medea unit tests
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -138,7 +158,9 @@ jobs:
 
   unit-medea-jason:
     name: Run medea-jason unit tests in Chrome and Firefox
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -148,7 +170,9 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
       - name: Get wasm-bindgen-cli version from Cargo.lock
-        run: echo "WASM_CLI_VERSION=$(cargo pkgid wasm-bindgen | grep -o '#.*' | grep -o '[0-9\.]*')" >> $GITHUB_ENV
+        run: |
+          echo "WASM_CLI_VERSION=$(cargo pkgid wasm-bindgen \
+            | grep -o '#.*' | grep -o '[0-9\.]*')" >> $GITHUB_ENV
       - uses: actions-rs/install@v0.1
         with:
           crate: wasm-bindgen-cli
@@ -161,7 +185,9 @@ jobs:
 
   e2e:
     name: Run medea e2e tests
-    if: "github.ref == 'refs/heads/master' || contains(github.event.head_commit.message, '[run ci]')"
+    if: |
+      github.ref == 'refs/heads/master' ||
+      contains(github.event.head_commit.message, '[run ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
