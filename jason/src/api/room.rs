@@ -971,10 +971,11 @@ impl InnerRoom {
     // TODO: 1. boolean for stop_first behaviour?
     //       2. there are multiple possible outcomes:
     //          1. changed successfully
-    //          2. change failed, rolled back successfully, should carry change error
-    //          3. change failed, rollback failed, should carry change err and rollback err
-    //          fn result should explicitly specify what exactly happened.
-    //       3. properly update demos for new behaviour
+    //          2. change failed, rolled back successfully, should carry change
+    // error          3. change failed, rollback failed, should carry change
+    // err and rollback err          fn result should explicitly specify
+    // what exactly happened.       3. properly update demos for new
+    // behaviour
     fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
@@ -989,10 +990,13 @@ impl InnerRoom {
                 .send_constraints
                 .calculate_kinds_diff(&constraints_before);
 
-            // TODO: first drop from all peers
-            let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
-            for peer in self.peers.get_all() {
+            let peers = self.peers.get_all();
+            for peer in &peers {
                 peer.drop_send_tracks(kinds).await;
+            }
+
+            let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
+            for peer in peers {
                 match peer
                     .update_local_stream(LocalStreamUpdateCriteria::all())
                     .await
@@ -1003,11 +1007,7 @@ impl InnerRoom {
                         );
                     }
                     Err(e) => {
-                        // TODO: any variant?
-                        if let PeerError::MediaManager(
-                            MediaManagerError::GetUserMediaFailed(_),
-                        ) = e.as_ref()
-                        {
+                        if let PeerError::MediaManager(_) = e.as_ref() {
                             if rollback_on_fail {
                                 self.set_local_media_settings(
                                     constraints_before,
