@@ -2084,6 +2084,8 @@ mod set_local_media_settings {
         assert!(!peer.is_send_video_enabled(None));
     }
 
+    /// Checks that [`RoomHandle::set_local_media_settings`] with `stop_first`
+    /// set to `false` will not disable media types on rollback fail.
     #[wasm_bindgen_test]
     async fn doesnt_disables_if_not_stop_first() {
         let (room, peer) = helper().await;

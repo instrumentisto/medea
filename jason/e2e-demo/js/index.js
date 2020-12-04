@@ -747,7 +747,7 @@ window.onload = async function() {
         if (!isAudioSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints, true, true);
+        await room.set_local_media_settings(constraints, false, true);
       } catch (e) {
         console.error('Changing audio source failed: ' + e);
       }
@@ -762,12 +762,9 @@ window.onload = async function() {
           }
         }
         try {
-          await room.set_local_media_settings(constraints, false, true);
+          await room.set_local_media_settings(constraints, true, true);
         } catch (e) {
           console.error("Changing video source failed: " + e.name());
-        }
-        if (isVideoSendEnabled) {
-          constraints = await initLocalStream();
         }
       } catch (e) {
         console.error('Changing video source failed: ' + e.message());
