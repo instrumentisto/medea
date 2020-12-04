@@ -18,10 +18,10 @@ bitflags::bitflags! {
 /// Kinds allowing to specify a set of [`MediaKind`] + [`MediaSourceKind`]
 /// pairs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct LocalStreamKinds(Inner);
+pub struct LocalStreamUpdateCriteria(Inner);
 
-impl LocalStreamKinds {
-    /// Creates [`LocalStreamKinds`] with all possible [`MediaKind`] +
+impl LocalStreamUpdateCriteria {
+    /// Creates [`LocalStreamUpdateCriteria`] with all possible [`MediaKind`] +
     /// [`MediaSourceKind`] combinations.
     #[inline]
     #[must_use]
@@ -29,14 +29,14 @@ impl LocalStreamKinds {
         Self(Inner::all())
     }
 
-    /// Creates empty [`LocalStreamKinds`].
+    /// Creates empty [`LocalStreamUpdateCriteria`].
     #[inline]
     #[must_use]
     pub fn empty() -> Self {
         Self(Inner::empty())
     }
 
-    /// Creates [`LocalStreamKinds`] with the provided [`MediaKind`] +
+    /// Creates [`LocalStreamUpdateCriteria`] with the provided [`MediaKind`] +
     /// [`MediaSourceKind`] pair.
     ///
     /// [`None`] `source_kind` means both
@@ -61,7 +61,7 @@ impl LocalStreamKinds {
         Self(inner)
     }
 
-    /// Builds [`LocalStreamKinds`] from the provided `tracks`. Only
+    /// Builds [`LocalStreamUpdateCriteria`] from the provided `tracks`. Only
     /// [`Direction::Send`] [`Track`]s are taken into account.
     #[must_use]
     pub fn from_tracks(tracks: &[Track]) -> Self {
@@ -83,14 +83,14 @@ impl LocalStreamKinds {
     }
 
     /// Adds the given [`MediaKind`] + [`MediaSourceKind`] pair to this
-    /// [`LocalStreamKinds`].
+    /// [`LocalStreamUpdateCriteria`].
     #[inline]
     pub fn add(&mut self, media_kind: MediaKind, source_kind: MediaSourceKind) {
         self.0
             .bitor_assign(Self::from_kinds(media_kind, Some(source_kind)).0)
     }
 
-    /// Checks whether this [`LocalStreamKinds`] contains the provided
+    /// Checks whether this [`LocalStreamUpdateCriteria`] contains the provided
     /// [`MediaKind`] + [`MediaSourceKind`] pair.
     #[inline]
     #[must_use]

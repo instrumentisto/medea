@@ -11,7 +11,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     media::{MediaManager, RecvConstraints},
     peer::{
-        LocalStreamKinds, MediaConnections, RtcPeerConnection,
+        LocalStreamUpdateCriteria, MediaConnections, RtcPeerConnection,
         SimpleTracksRequest, TransceiverDirection,
     },
 };
@@ -52,7 +52,7 @@ async fn sendrecv_works() {
         )
         .unwrap();
     let request = media_connections
-        .get_tracks_request(LocalStreamKinds::all())
+        .get_tracks_request(LocalStreamUpdateCriteria::all())
         .unwrap();
     let caps = SimpleTracksRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());

@@ -576,7 +576,7 @@ window.onload = async function() {
     try {
       const constraints = await initLocalStream();
       await fillMediaDevicesInputs(audioSelect, videoSelect, null);
-      await room.set_local_media_settings(constraints, false);
+      await room.set_local_media_settings(constraints, true);
     } catch (e) {
       console.error('Init local video failed: ' + e);
     }

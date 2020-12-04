@@ -19,7 +19,7 @@ use web_sys::RtcTrackEvent;
 use crate::{
     media::{track::local, LocalTracksConstraints, MediaKind, RecvConstraints},
     peer::{
-        transceiver::Transceiver, LocalStreamKinds, PeerEvent,
+        transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
         TransceiverDirection,
     },
     utils::{JasonError, JsCaused, JsError},
@@ -621,8 +621,8 @@ impl MediaConnections {
     pub async fn patch_tracks(
         &self,
         tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<LocalStreamKinds> {
-        let mut result = LocalStreamKinds::empty();
+    ) -> Result<LocalStreamUpdateCriteria> {
+        let mut result = LocalStreamUpdateCriteria::empty();
         for track_proto in tracks {
             if let Some(sender) = self.get_sender_by_id(track_proto.id) {
                 if sender.update(&track_proto).await {
@@ -643,10 +643,10 @@ impl MediaConnections {
 
     /// Returns [`TracksRequest`] based on [`Sender`]s in this
     /// [`MediaConnections`]. [`Sender`]s are chosen based on provided
-    /// [`LocalStreamKinds`].
+    /// [`LocalStreamUpdateCriteria`].
     pub fn get_tracks_request(
         &self,
-        kinds: LocalStreamKinds,
+        kinds: LocalStreamUpdateCriteria,
     ) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
@@ -820,10 +820,10 @@ impl MediaConnections {
     }
 
     /// Returns all [`Sender`]s which are matches provided
-    /// [`LocalStreamKinds`] and doesn't have [`local::Track`].
+    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
     pub fn get_senders_without_tracks(
         &self,
-        kinds: LocalStreamKinds,
+        kinds: LocalStreamUpdateCriteria,
     ) -> Vec<Rc<Sender>> {
         self.0
             .borrow()
@@ -839,8 +839,8 @@ impl MediaConnections {
     }
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
-    /// [`LocalStreamKinds`].
-    pub async fn drop_send_tracks(&self, kinds: LocalStreamKinds) {
+    /// [`LocalStreamUpdateCriteria`].
+    pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
         for sender in self
             .0
             .borrow()

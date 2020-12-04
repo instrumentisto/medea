@@ -29,7 +29,7 @@ use crate::{
         MediaStreamSettings, RecvConstraints,
     },
     peer::{
-        media_exchange_state, mute_state, LocalStreamKinds,
+        media_exchange_state, mute_state, LocalStreamUpdateCriteria,
         MediaConnectionsError, MediaState, PeerConnection, PeerError,
         PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
         TransceiverSide,
@@ -273,10 +273,9 @@ impl RoomHandle {
         ) = (new_state, direction)
         {
             for peer in inner.peers.get_all() {
-                peer.update_local_stream(LocalStreamKinds::from_kinds(
-                    kind,
-                    source_kind,
-                ))
+                peer.update_local_stream(
+                    LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
+                )
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
             }
@@ -366,7 +365,7 @@ impl RoomHandle {
     /// callback.
     ///
     /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
-    /// rollbacked on gUM request fail.
+    /// rolled back on [getUserMedia()][1] request fail.
     ///
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
@@ -969,29 +968,42 @@ impl InnerRoom {
     /// [1]: https://tinyurl.com/rnxcavf
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Sender`]: crate::peer::Sender
+    // TODO: 1. boolean for stop_first behaviour?
+    //       2. there are multiple possible outcomes:
+    //          1. changed successfully
+    //          2. change failed, rolled back successfully, should carry change error
+    //          3. change failed, rollback failed, should carry change err and rollback err
+    //          fn result should explicitly specify what exactly happened.
+    //       3. properly update demos for new behaviour
     fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
         rollback_on_fail: bool,
     ) -> LocalBoxFuture<Result<(), Traced<RoomError>>> {
+        use media_exchange_state::Stable::Disabled;
+
         Box::pin(async move {
-            use media_exchange_state::Stable::Disabled;
-            let constraints_before = self.send_constraints.clone_settings();
+            let constraints_before = self.send_constraints.inner();
             self.send_constraints.constrain(settings);
             let kinds = self
                 .send_constraints
                 .calculate_kinds_diff(&constraints_before);
 
+            // TODO: first drop from all peers
             let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
             for peer in self.peers.get_all() {
                 peer.drop_send_tracks(kinds).await;
-                match peer.update_local_stream(LocalStreamKinds::all()).await {
+                match peer
+                    .update_local_stream(LocalStreamUpdateCriteria::all())
+                    .await
+                {
                     Ok(states) => {
                         states_update.entry(peer.id()).or_default().extend(
                             states.into_iter().map(|(id, s)| (id, s.into())),
                         );
                     }
                     Err(e) => {
+                        // TODO: any variant?
                         if let PeerError::MediaManager(
                             MediaManagerError::GetUserMediaFailed(_),
                         ) = e.as_ref()

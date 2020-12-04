@@ -15,7 +15,9 @@ use web_sys as sys;
 
 use crate::{
     media::MediaKind,
-    peer::{media_exchange_state, mute_state, LocalStreamKinds, MediaState},
+    peer::{
+        media_exchange_state, mute_state, LocalStreamUpdateCriteria, MediaState,
+    },
     utils::get_property_by_name,
 };
 
@@ -79,19 +81,13 @@ impl From<MediaStreamSettings> for LocalTracksConstraints {
 }
 
 impl LocalTracksConstraints {
-    /// Returns cloned [`MediaStreamSettings`] of this
-    /// [`LocalTracksConstraints`].
-    pub fn clone_settings(&self) -> MediaStreamSettings {
-        self.0.borrow().clone()
-    }
-
-    /// Returns [`LocalStreamKinds`] with [`MediaKind`] and
+    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
     pub fn calculate_kinds_diff(
         &self,
         settings: &MediaStreamSettings,
-    ) -> LocalStreamKinds {
+    ) -> LocalStreamUpdateCriteria {
         self.0.borrow().calculate_kinds_diff(&settings)
     }
 
@@ -123,13 +119,13 @@ impl LocalTracksConstraints {
             .set_track_media_state(state, kind, source_kind);
     }
 
-    /// Enables/disables provided [`LocalStreamKinds`] based on
+    /// Enables/disables provided [`LocalStreamUpdateCriteria`] based on
     /// provided [`media_exchange_state`].
     #[inline]
     pub fn set_media_exchange_state_by_kinds(
         &self,
         state: media_exchange_state::Stable,
-        kinds: LocalStreamKinds,
+        kinds: LocalStreamUpdateCriteria,
     ) {
         self.0
             .borrow_mut()
@@ -389,11 +385,14 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Returns [`LocalStreamKinds`] with [`MediaKind`] and
+    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
-    pub fn calculate_kinds_diff(&self, another: &Self) -> LocalStreamKinds {
-        let mut kinds = LocalStreamKinds::empty();
+    pub fn calculate_kinds_diff(
+        &self,
+        another: &Self,
+    ) -> LocalStreamUpdateCriteria {
+        let mut kinds = LocalStreamUpdateCriteria::empty();
         if self.device_video != another.device_video {
             kinds.add(MediaKind::Video, MediaSourceKind::Device);
         }
@@ -471,13 +470,13 @@ impl MediaStreamSettings {
         }
     }
 
-    /// Enables/disables provided [`LocalStreamKinds`] based on
+    /// Enables/disables provided [`LocalStreamUpdateCriteria`] based on
     /// provided [`media_exchange_state`].
     #[inline]
     pub fn set_media_exchange_state_by_kinds(
         &mut self,
         state: media_exchange_state::Stable,
-        kinds: LocalStreamKinds,
+        kinds: LocalStreamUpdateCriteria,
     ) {
         let enabled = state == media_exchange_state::Stable::Enabled;
         if kinds.has(MediaKind::Audio, MediaSourceKind::Device) {
@@ -965,7 +964,7 @@ impl Constraint for DeviceId {
 }
 
 /// Height, in pixels, of the video.
-#[derive(Debug, Clone, Copy, Into)]
+#[derive(Debug, Clone, Copy, Into, PartialEq, Eq)]
 struct Height(u32);
 
 impl Constraint for Height {
@@ -973,7 +972,7 @@ impl Constraint for Height {
 }
 
 /// Width, in pixels, of the video.
-#[derive(Debug, Clone, Copy, Into)]
+#[derive(Debug, Clone, Copy, Into, PartialEq, Eq)]
 struct Width(u32);
 
 impl Constraint for Width {
@@ -1019,7 +1018,7 @@ impl Constraint for FacingMode {
 /// `[0, 4294967295]` range.
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-constrainulong
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ConstrainU32<T> {
     /// Must be the parameter's value.
     Exact(T),
