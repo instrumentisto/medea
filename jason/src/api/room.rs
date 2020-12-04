@@ -1077,53 +1077,6 @@ impl InnerRoom {
             peer.reset_state_transitions_timers();
         }
     }
-
-    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`] in
-    /// provided [`PeerConnection`]. Negotiates [`PeerConnection`] if provided
-    /// `negotiation_role` is `Some`.
-    ///
-    /// [`Receiver`]: crate::peer::Receiver
-    /// [`Sender`]: crate::peer::Sender
-    async fn create_tracks_and_maybe_negotiate(
-        &self,
-        peer: Rc<PeerConnection>,
-        tracks: Vec<Track>,
-        negotiation_role: Option<NegotiationRole>,
-        maybe_update_local_media: bool,
-    ) -> Result<(), Traced<RoomError>> {
-        match negotiation_role {
-            None => {
-                peer.create_tracks(tracks)
-                    .map_err(tracerr::map_from_and_wrap!())?;
-            }
-            Some(NegotiationRole::Offerer) => {
-                let sdp_offer = peer
-                    .get_offer(tracks, maybe_update_local_media)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                let mids =
-                    peer.get_mids().map_err(tracerr::map_from_and_wrap!())?;
-                self.rpc.send_command(Command::MakeSdpOffer {
-                    peer_id: peer.id(),
-                    sdp_offer,
-                    transceivers_statuses: peer.get_transceivers_statuses(),
-                    mids,
-                });
-            }
-            Some(NegotiationRole::Answerer(offer)) => {
-                let sdp_answer = peer
-                    .process_offer(offer, tracks, maybe_update_local_media)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                self.rpc.send_command(Command::MakeSdpAnswer {
-                    peer_id: peer.id(),
-                    sdp_answer,
-                    transceivers_statuses: peer.get_transceivers_statuses(),
-                });
-            }
-        };
-        Ok(())
-    }
 }
 
 /// RPC events handling.
@@ -1146,18 +1099,6 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        // let peer = self
-        //     .peers
-        //     .create_peer(
-        //         peer_id,
-        //         ice_servers,
-        //         self.peer_event_sender.clone(),
-        //         is_force_relayed,
-        //         self.send_constraints.clone(),
-        //         Rc::clone(&self.recv_constraints),
-        //     )
-        //     .map_err(tracerr::map_from_and_wrap!())?;
-
         let mut senders = ProgressableHashMap::new();
         let mut receivers = ProgressableHashMap::new();
         for track in &tracks {
@@ -1213,15 +1154,6 @@ impl EventHandler for InnerRoom {
         }
 
         Ok(())
-
-        // self.create_tracks_and_maybe_negotiate(
-        //     peer,
-        //     tracks,
-        //     Some(negotiation_role),
-        //     true,
-        // )
-        // .await
-        // .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
@@ -1230,13 +1162,10 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         sdp_answer: String,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.set_remote_answer(sdp_answer)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+        let peer = self.state.peers.borrow().get(&peer_id).unwrap().clone();
+        peer.set_remote_sdp_answer(sdp_answer);
+
+        Ok(())
     }
 
     /// Applies specified [`IceCandidate`] to a specified [`PeerConnection`].
@@ -1245,18 +1174,10 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         candidate: IceCandidate,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        let peer = self.state.peers.borrow().get(&peer_id).unwrap().clone();
+        peer.add_ice_candidate(candidate);
 
-        peer.add_ice_candidate(
-            candidate.candidate,
-            candidate.sdp_m_line_index,
-            candidate.sdp_mid,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())
+        Ok(())
     }
 
     /// Disposes specified [`PeerConnection`]s.
@@ -1282,12 +1203,6 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        // let mut new_tracks = Vec::new();
-        // let mut patches = Vec::new();
         let peer_state =
             self.state.peers.borrow().get(&peer_id).unwrap().clone();
 
@@ -1326,7 +1241,7 @@ impl EventHandler for InnerRoom {
                     }
                 }
                 TrackUpdate::IceRestart => {
-                    peer.restart_ice();
+                    peer_state.restart_ice();
                 }
             }
         }
@@ -1334,21 +1249,6 @@ impl EventHandler for InnerRoom {
             peer_state.set_negotiation_role(negotiation_role);
         }
 
-        // let kinds = peer
-        //     .patch_tracks(patches)
-        //     .await
-        //     .map_err(tracerr::map_from_and_wrap!())?;
-        // peer.update_local_stream(kinds)
-        //     .await
-        //     .map_err(tracerr::map_from_and_wrap!())?;
-        // self.create_tracks_and_maybe_negotiate(
-        //     peer,
-        //     new_tracks,
-        //     negotiation_role,
-        //     false,
-        // )
-        // .await
-        // .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
 

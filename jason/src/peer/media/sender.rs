@@ -179,6 +179,18 @@ impl Sender {
         self.update_general_media_exchange_state(enabled.into());
     }
 
+    pub fn set_muted(&self, muted: bool) {
+        self.mute_state.update(muted.into());
+        match mute_state::Stable::from(muted) {
+            mute_state::Stable::Unmuted => {
+                self.transceiver.set_send_track_enabled(true);
+            }
+            mute_state::Stable::Muted => {
+                self.transceiver.set_send_track_enabled(false);
+            }
+        }
+    }
+
     /// Updates this [`Sender`]s tracks based on the provided
     /// [`TrackPatchEvent`].
     ///

@@ -202,6 +202,12 @@ impl Receiver {
         }
     }
 
+    pub fn set_muted(&self, muted: bool) {
+        if let Some(track) = self.track.borrow().as_ref() {
+            track.set_enabled(!muted);
+        }
+    }
+
     /// Checks whether general media exchange state of the [`Receiver`] is in
     /// [`media_exchange_state::Stable::Disabled`].
     #[cfg(feature = "mockable")]

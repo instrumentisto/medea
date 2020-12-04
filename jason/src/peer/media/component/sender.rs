@@ -14,6 +14,7 @@ pub struct SenderState {
     receivers: Vec<MemberId>,
     enabled_individual: ObservableCell<bool>,
     enabled_general: ObservableCell<bool>,
+    muted: ObservableCell<bool>,
 }
 
 impl SenderState {
@@ -30,6 +31,7 @@ impl SenderState {
             receivers,
             enabled_general: ObservableCell::new(true),
             enabled_individual: ObservableCell::new(true),
+            muted: ObservableCell::new(false),
         }
     }
 
@@ -58,12 +60,14 @@ impl SenderState {
     }
 
     pub fn update(&self, track_patch: TrackPatchEvent) {
-        log::debug!("Updating Sender");
         if let Some(enabled_general) = track_patch.enabled_general {
             self.enabled_general.set(enabled_general);
         }
         if let Some(enabled_individual) = track_patch.enabled_individual {
             self.enabled_individual.set(enabled_individual);
+        }
+        if let Some(muted) = track_patch.muted {
+            self.muted.set(muted);
         }
     }
 }
@@ -78,6 +82,16 @@ impl SenderComponent {
             self.state().enabled_general.subscribe(),
             Self::handle_enabled_general,
         );
+        self.spawn_task(self.state().muted.subscribe(), Self::handle_muted);
+    }
+
+    async fn handle_muted(
+        ctx: Rc<Sender>,
+        global_ctx: Rc<RoomCtx>,
+        state: Rc<SenderState>,
+        muted: bool,
+    ) {
+        ctx.set_muted(muted);
     }
 
     async fn handle_enabled_individual(
