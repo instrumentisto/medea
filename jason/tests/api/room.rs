@@ -27,10 +27,10 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
 
 use crate::{
-    delay_for, get_jason_error, get_test_recv_tracks, get_test_required_tracks,
-    get_test_tracks, get_test_unrequired_tracks, media_stream_settings,
-    timeout, wait_and_check_test_result, yield_now, MockNavigator,
-    TEST_ROOM_URL,
+    delay_for, get_constraints_update_exception, get_jason_error,
+    get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
+    get_test_unrequired_tracks, media_stream_settings, timeout,
+    wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -105,10 +105,11 @@ async fn get_test_room_and_exist_peer(
     let room =
         Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())));
     if let Some(media_stream_settings) = &media_stream_settings {
-        JsFuture::from(
-            room.new_handle()
-                .set_local_media_settings(&media_stream_settings, false),
-        )
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings,
+            false,
+            false,
+        ))
         .await
         .unwrap();
     }
@@ -157,9 +158,13 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
 
-    JsFuture::from(room_handle.set_local_media_settings(&constraints, false))
-        .await
-        .unwrap();
+    JsFuture::from(room_handle.set_local_media_settings(
+        &constraints,
+        false,
+        false,
+    ))
+    .await
+    .unwrap();
 
     event_tx
         .unbounded_send(Event::PeerCreated {
@@ -200,13 +205,16 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     constraints.audio(AudioTrackConstraints::new());
     let room_handle = room.new_handle();
     room_handle.on_failed_local_media(cb.into()).unwrap();
-    let err = get_jason_error(
-        JsFuture::from(
-            room_handle.set_local_media_settings(&constraints, false),
-        )
+    let err = get_constraints_update_exception(
+        JsFuture::from(room_handle.set_local_media_settings(
+            &constraints,
+            false,
+            false,
+        ))
         .await
         .unwrap_err(),
     );
+    let err = get_jason_error(err.error());
     assert_eq!(err.name(), "InvalidLocalTracks");
     assert_eq!(
         err.message(),
@@ -249,9 +257,11 @@ async fn no_errors_if_track_not_provided_when_its_optional() {
         let is_should_be_ok =
             audio_required == add_audio || video_required == add_video;
         assert_eq!(
-            JsFuture::from(
-                room_handle.set_local_media_settings(&constraints, false)
-            )
+            JsFuture::from(room_handle.set_local_media_settings(
+                &constraints,
+                false,
+                false
+            ))
             .await
             .is_ok(),
             is_should_be_ok,
@@ -285,10 +295,11 @@ async fn error_get_local_stream_on_new_peer() {
     let (event_tx, event_rx) = mpsc::unbounded();
     let (room, _) = get_test_room(Box::pin(event_rx));
     let room_handle = room.new_handle();
-    JsFuture::from(
-        room_handle
-            .set_local_media_settings(&media_stream_settings(true, true), true),
-    )
+    JsFuture::from(room_handle.set_local_media_settings(
+        &media_stream_settings(true, true),
+        true,
+        true,
+    ))
     .await
     .unwrap();
 
@@ -837,6 +848,7 @@ mod disable_send_tracks {
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings(true, true),
             false,
+            false,
         ))
         .await
         .unwrap();
@@ -886,6 +898,7 @@ mod disable_send_tracks {
         let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings(true, true),
+            false,
             false,
         ))
         .await
@@ -1835,12 +1848,11 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
     room_handle
         .on_failed_local_media(js_sys::Function::new_no_args(""))
         .unwrap();
-    JsFuture::from(
-        room_handle.set_local_media_settings(
-            &media_stream_settings(true, false),
-            false,
-        ),
-    )
+    JsFuture::from(room_handle.set_local_media_settings(
+        &media_stream_settings(true, false),
+        false,
+        false,
+    ))
     .await
     .unwrap();
 
@@ -1857,14 +1869,16 @@ async fn set_local_media_stream_settings_updates_media_exchange_state() {
     delay_for(10).await;
 
     spawn_local(async move {
-        let err = get_jason_error(
+        let err = get_constraints_update_exception(
             JsFuture::from(room_handle.set_local_media_settings(
                 &media_stream_settings(true, true),
+                false,
                 false,
             ))
             .await
             .unwrap_err(),
         );
+        let err = get_jason_error(err.error());
         assert_eq!(err.name(), "MediaConnections");
         assert_eq!(
             err.message(),
@@ -1968,14 +1982,17 @@ mod set_local_media_settings {
 
         let mock_navigator = MockNavigator::new();
         mock_navigator.error_get_user_media("disables_on_fail".into());
-        let err = get_jason_error(
+        let err = get_constraints_update_exception(
             JsFuture::from(room.new_handle().set_local_media_settings(
                 &media_settings_with_device_id(),
+                true,
                 false,
             ))
             .await
             .unwrap_err(),
         );
+        assert_eq!(&err.name(), "DisabledException");
+        let err = get_jason_error(err.disable_reason());
         mock_navigator.stop();
         assert_eq!(err.name(), "CouldNotGetLocalMedia");
         assert_eq!(
@@ -1996,20 +2013,24 @@ mod set_local_media_settings {
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings(true, true),
             false,
+            false,
         ))
         .await
         .unwrap();
 
         let mock_navigator = MockNavigator::new();
-        let err = get_jason_error(
+        let err = get_constraints_update_exception(
             JsFuture::from(room.new_handle().set_local_media_settings(
                 &media_settings_with_device_id(),
+                true,
                 true,
             ))
             .await
             .unwrap_err(),
         );
-        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+        assert_eq!(err.name(), "RollbackedException");
+        let rollback_reason = get_jason_error(err.rollback_reason());
+        assert_eq!(rollback_reason.name(), "CouldNotGetLocalMedia");
 
         assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
         mock_navigator.stop();
@@ -2026,23 +2047,74 @@ mod set_local_media_settings {
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings(true, true),
             false,
+            false,
         ))
         .await
         .unwrap();
 
         let mock_navigator = MockNavigator::new();
         mock_navigator.error_get_user_media("disables_on_rollback_fail".into());
-        let err = get_jason_error(
+        let err = get_constraints_update_exception(
             JsFuture::from(room.new_handle().set_local_media_settings(
                 &media_settings_with_device_id(),
+                true,
                 true,
             ))
             .await
             .unwrap_err(),
         );
-        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+        assert_eq!(err.name(), "RollbackFailedException");
+        let rollback_reason = get_jason_error(err.rollback_reason());
+        assert_eq!(rollback_reason.name(), "CouldNotGetLocalMedia");
+        assert_eq!(
+            rollback_reason.message(),
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: disables_on_rollback_fail"
+        );
+        let rollback_fail_reason = get_jason_error(err.rollback_fail_reason());
+        assert_eq!(rollback_fail_reason.name(), "CouldNotGetLocalMedia");
+        assert_eq!(
+            rollback_reason.message(),
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: disables_on_rollback_fail"
+        );
+
         mock_navigator.stop();
 
         assert!(!peer.is_send_video_enabled(None));
+    }
+
+    #[wasm_bindgen_test]
+    async fn doesnt_disables_if_not_stop_first() {
+        let (room, peer) = helper().await;
+
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+            false,
+        ))
+        .await
+        .unwrap();
+
+        let mock_navigator = MockNavigator::new();
+        mock_navigator
+            .error_get_user_media("doesnt_disables_if_not_stop_first".into());
+
+        let err = get_constraints_update_exception(
+            JsFuture::from(room.new_handle().set_local_media_settings(
+                &media_settings_with_device_id(),
+                false,
+                true,
+            ))
+            .await
+            .unwrap_err(),
+        );
+        assert_eq!(err.name(), "RollbackedException");
+        let err = get_jason_error(err.rollback_reason());
+        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+
+        mock_navigator.stop();
+
+        assert!(peer.is_send_video_enabled(None));
     }
 }

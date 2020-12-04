@@ -838,7 +838,7 @@ impl ConstraintsUpdateException {
 pub enum JsConstraintsUpdateError {
     /// Indicates that new [`MediaStreamSettings`] setting failed and current
     /// [`MediaStreamSettings`] was successfully rollbacked.
-    #[display(fmt = "RollbackException")]
+    #[display(fmt = "RollbackedException")]
     Rollbacked { rollback_reason: JsValue },
 
     /// Indicates that new [`MediaStreamSettings`] setting failed and
@@ -853,11 +853,11 @@ pub enum JsConstraintsUpdateError {
     /// without [`local::Track`]s was disabled.
     ///
     /// [`Sender`]: crate::peer::Sender
-    #[display(fmt = "DisableException")]
+    #[display(fmt = "DisabledException")]
     Disabled { disable_reason: JsValue },
 
     /// Indicates that some error occurred.
-    #[display(fmt = "FailedException")]
+    #[display(fmt = "ErroredException")]
     Errored { reason: JsValue },
 }
 

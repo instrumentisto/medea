@@ -22,6 +22,7 @@ use crate::{
 #[doc(inline)]
 pub use self::{
     connection::{Connection, ConnectionHandle, Connections},
+    room::ConstraintsUpdateException,
     room::{Room, RoomCloseReason, RoomError, RoomHandle, WeakRoom},
 };
 
