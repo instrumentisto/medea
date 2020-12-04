@@ -188,7 +188,7 @@ impl Default for AudioMediaTracksSettings {
     }
 }
 
-/// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies any
+/// Returns `true` if provided [`sys::MediaStreamTrack`] basically satisfies any
 /// constraints with a provided [`MediaKind`].
 #[inline]
 fn satisfies_track(track: &sys::MediaStreamTrack, kind: MediaKind) -> bool {
@@ -270,8 +270,8 @@ impl<C> VideoTrackConstraints<C> {
 }
 
 impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
-    /// Returns `true` if the provided [`SysMediaStreamTrack`] satisfies device
-    /// [`VideoTrackConstraints::constraints`].
+    /// Returns `true` if the provided [`sys::MediaStreamTrack`] satisfies
+    /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
     fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
@@ -283,8 +283,8 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
 }
 
 impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
-    /// Returns `true` if the provided [`SysMediaStreamTrack`] satisfies device
-    /// [`VideoTrackConstraints::constraints`].
+    /// Returns `true` if the provided [`sys::MediaStreamTrack`] satisfies
+    /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
     fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {

@@ -10,7 +10,7 @@ use std::{
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future, future::LocalBoxFuture, StreamExt as _};
+use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, ConnectionQualityScore, Direction, Event as RpcEvent,
@@ -26,8 +26,8 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaManagerError,
-        MediaStreamSettings, RecvConstraints,
+        LocalTracksConstraints, MediaKind, MediaStreamSettings,
+        RecvConstraints,
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
@@ -40,7 +40,7 @@ use crate::{
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
-    Jason, JsMediaSourceKind,
+    JsMediaSourceKind,
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -389,7 +389,7 @@ impl RoomHandle {
                     rollback_on_fail,
                 )
                 .await
-                .map_err(MediaSettingsError::from)?;
+                .map_err(ConstraintsUpdateException::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -763,33 +763,41 @@ struct InnerRoom {
     close_reason: RefCell<CloseReason>,
 }
 
+/// JS exception for the [`RoomHandle::set_local_media_settings`].
 #[wasm_bindgen]
 #[derive(Debug, From)]
 #[from(forward)]
-pub struct MediaSettingsError(SetLocalMediaSettingsErrorJs);
+pub struct ConstraintsUpdateException(JsConstraintsUpdateError);
 
 #[wasm_bindgen]
-impl MediaSettingsError {
+impl ConstraintsUpdateException {
+    /// Returns name of this [`ConstraintsUpdateException`].
     pub fn name(&self) -> String {
         self.0.to_string()
     }
 
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `RollbackedException` or `RollbackFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
     pub fn rollback_reason(&self) -> JsValue {
+        use JsConstraintsUpdateError as E;
         match &self.0 {
-            SetLocalMediaSettingsErrorJs::Rollback { rollback_reason } => {
-                rollback_reason.clone()
-            }
-            SetLocalMediaSettingsErrorJs::RollbackFailed {
-                rollback_reason,
-                ..
+            E::Rollbacked { rollback_reason }
+            | E::RollbackFailed {
+                rollback_reason, ..
             } => rollback_reason.clone(),
             _ => JsValue::UNDEFINED,
         }
     }
 
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `RollbackFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
     pub fn rollback_fail_reason(&self) -> JsValue {
         match &self.0 {
-            SetLocalMediaSettingsErrorJs::RollbackFailed {
+            JsConstraintsUpdateError::RollbackFailed {
                 rollback_fail_reason,
                 ..
             } => rollback_fail_reason.clone(),
@@ -797,74 +805,113 @@ impl MediaSettingsError {
         }
     }
 
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `DisabledException`.
+    ///
+    /// Returns `undefined` otherwise.
     pub fn disable_reason(&self) -> JsValue {
         match &self.0 {
-            SetLocalMediaSettingsErrorJs::Disable { disable_reason } => {
+            JsConstraintsUpdateError::Disabled { disable_reason } => {
                 disable_reason.clone()
             }
             _ => JsValue::UNDEFINED,
         }
     }
 
-    pub fn fail_reason(&self) -> JsValue {
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `ErroredException`.
+    ///
+    /// Returns `undefined` otherwise.
+    pub fn error(&self) -> JsValue {
         match &self.0 {
-            SetLocalMediaSettingsErrorJs::Failed { reason } => reason.clone(),
+            JsConstraintsUpdateError::Errored { reason } => reason.clone(),
             _ => JsValue::UNDEFINED,
         }
     }
 }
 
+/// [`ConstraintsUpdateError`] for JS side.
+///
+/// Should be wrapped to [`ConstraintsUpdateException`] before returning to the
+/// JS side.
 #[derive(Debug, Display)]
-pub enum SetLocalMediaSettingsErrorJs {
+pub enum JsConstraintsUpdateError {
+    /// Indicates that new [`MediaStreamSettings`] setting failed and current
+    /// [`MediaStreamSettings`] was successfully rollbacked.
     #[display(fmt = "RollbackException")]
-    Rollback { rollback_reason: JsValue },
+    Rollbacked { rollback_reason: JsValue },
+
+    /// Indicates that new [`MediaStreamSettings`] setting failed and
+    /// [`MediaStreamSettings`] rollback was failed.
     #[display(fmt = "RollbackFailedException")]
     RollbackFailed {
         rollback_reason: JsValue,
         rollback_fail_reason: JsValue,
     },
+
+    /// Indicates that [`MediaStreamSettings`] set failed affected [`Sender`]s
+    /// without [`local::Track`]s was disabled.
+    ///
+    /// [`Sender`]: crate::peer::Sender
     #[display(fmt = "DisableException")]
-    Disable { disable_reason: JsValue },
+    Disabled { disable_reason: JsValue },
+
+    /// Indicates that some error occurred.
     #[display(fmt = "FailedException")]
-    Failed { reason: JsValue },
+    Errored { reason: JsValue },
 }
 
+/// Constraints errors which are can occur while updating
+/// [`MediaStreamSettings`] by [`InnerRoom::set_local_media_settings`] call.
 #[derive(Debug)]
-enum SetLocalMediaSettingsError {
-    Rollback {
-        rollback_reason: Traced<RoomError>,
-    },
+enum ConstraintsUpdateError {
+    /// Indicates that new [`MediaStreamSettings`] setting failed and current
+    /// [`MediaStreamSettings`] was successfully rollbacked.
+    Rollbacked { rollback_reason: Traced<RoomError> },
+
+    /// Indicates that new [`MediaStreamSettings`] setting failed and
+    /// [`MediaStreamSettings`] rollback was failed.
     RollbackFailed {
         rollback_reason: Traced<RoomError>,
         rollback_fail_reason: Traced<RoomError>,
     },
-    Disable {
-        disable_reason: Traced<RoomError>,
-    },
-    Failed {
-        reason: Traced<RoomError>,
-    },
+
+    /// Indicates that [`MediaStreamSettings`] set failed affected [`Sender`]s
+    /// without [`local::Track`]s was disabled.
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    Disabled { disable_reason: Traced<RoomError> },
+
+    /// Indicates that some error occurred.
+    Errored { reason: Traced<RoomError> },
 }
 
-impl SetLocalMediaSettingsError {
-    pub fn rollback(rollback_reason: Traced<RoomError>) -> Self {
-        Self::Rollback { rollback_reason }
+impl ConstraintsUpdateError {
+    /// Returns new [`ConstraintsUpdateError::Rollbacked`].
+    pub fn rollbacked(rollback_reason: Traced<RoomError>) -> Self {
+        Self::Rollbacked { rollback_reason }
     }
 
-    pub fn rollback_failed(self, rollback_reason: Traced<RoomError>) -> Self {
+    /// Tries to convert this [`ConstraintsUpdateError`] from
+    /// [`ConstraintsUpdateError::Disabled`] to the
+    /// [`ConstraintsUpdateError::Disabled`].
+    ///
+    /// If conversion failed then old [`ConstraintsUpdateError`] will be
+    /// returned.
+    pub fn into_rollback_failed(
+        self,
+        rollback_reason: Traced<RoomError>,
+    ) -> Self {
         match self {
-            Self::Disable { disable_reason } => Self::RollbackFailed {
+            Self::Disabled { disable_reason } => Self::RollbackFailed {
                 rollback_reason,
                 rollback_fail_reason: disable_reason,
             },
-            _ => unreachable!(
-                "{:?} variant is unreachable while rollbacking.",
-                self
-            ),
+            _ => self,
         }
     }
 
-    pub fn rollback_error(
+    pub fn rollback_failed(
         rollback_reason: Traced<RoomError>,
         rollback_fail_reason: Traced<RoomError>,
     ) -> Self {
@@ -874,41 +921,36 @@ impl SetLocalMediaSettingsError {
         }
     }
 
-    pub fn disable(disable_reason: Traced<RoomError>) -> Self {
-        Self::Disable { disable_reason }
+    pub fn disabled(disable_reason: Traced<RoomError>) -> Self {
+        Self::Disabled { disable_reason }
     }
 
-    pub fn error(error: Traced<RoomError>) -> Self {
-        SetLocalMediaSettingsError::Failed { reason: error }
+    pub fn errored(reason: Traced<RoomError>) -> Self {
+        Self::Errored { reason }
     }
 }
 
-impl From<SetLocalMediaSettingsError> for SetLocalMediaSettingsErrorJs {
-    fn from(from: SetLocalMediaSettingsError) -> Self {
+impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
+    fn from(from: ConstraintsUpdateError) -> Self {
+        use ConstraintsUpdateError as E;
         match from {
-            SetLocalMediaSettingsError::Rollback { rollback_reason } => {
-                SetLocalMediaSettingsErrorJs::Rollback {
-                    rollback_reason: JasonError::from(rollback_reason).into(),
-                }
-            }
-            SetLocalMediaSettingsError::RollbackFailed {
+            E::Rollbacked { rollback_reason } => Self::Rollbacked {
+                rollback_reason: JasonError::from(rollback_reason).into(),
+            },
+            E::RollbackFailed {
                 rollback_reason,
                 rollback_fail_reason,
-            } => SetLocalMediaSettingsErrorJs::RollbackFailed {
+            } => Self::RollbackFailed {
                 rollback_reason: JasonError::from(rollback_reason).into(),
                 rollback_fail_reason: JasonError::from(rollback_fail_reason)
                     .into(),
             },
-            SetLocalMediaSettingsError::Disable { disable_reason } => {
-                SetLocalMediaSettingsErrorJs::Disable {
-                    disable_reason: JasonError::from(disable_reason).into(),
-                }
-            }
-            SetLocalMediaSettingsError::Failed { reason } => {
-                SetLocalMediaSettingsErrorJs::Failed {
-                    reason: JasonError::from(reason).into(),
-                }
-            }
+            E::Disabled { disable_reason } => Self::Disabled {
+                disable_reason: JasonError::from(disable_reason).into(),
+            },
+            E::Errored { reason } => Self::Errored {
+                reason: JasonError::from(reason).into(),
+            },
         }
     }
 }
@@ -1104,15 +1146,17 @@ impl InnerRoom {
 
     /// Updates [`MediaState`]s to the provided `states_update` and disables all
     /// [`Sender`]s which are doesn't have [`local::Track`].
+    ///
+    /// [`Sender`]: crate::peer::Sender
     async fn disable_senders_without_tracks(
         &self,
         peer: &Rc<PeerConnection>,
         reason: Traced<PeerError>,
         kinds: LocalStreamUpdateCriteria,
         mut states_update: HashMap<PeerId, HashMap<TrackId, MediaState>>,
-    ) -> Result<(), SetLocalMediaSettingsError> {
+    ) -> Result<(), ConstraintsUpdateError> {
         use media_exchange_state::Stable::Disabled;
-        use SetLocalMediaSettingsError as E;
+        use ConstraintsUpdateError as E;
 
         self.send_constraints
             .set_media_exchange_state_by_kinds(Disabled, kinds);
@@ -1126,7 +1170,7 @@ impl InnerRoom {
         self.update_media_states(states_update)
             .await
             .map_err(|err| {
-                E::rollback_error(
+                E::rollback_failed(
                     tracerr::new!(tracerr::map_from(reason.clone())),
                     err,
                 )
@@ -1151,8 +1195,11 @@ impl InnerRoom {
     /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
     /// rollbacked on `getUserMedia` request fail.
     ///
-    /// If recovering from fail state isn't possible then affected media types
-    /// will be disabled.
+    /// If `stop_first` set to `true` then [`Sender`]s [`local::Track`]s will be
+    /// dropped before [`MediaStreamSettings`] update.
+    ///
+    /// If recovering from fail state isn't possible and `stop_first` set to
+    /// `true` then affected media types will be disabled.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [`PeerConnection`]: crate::peer::PeerConnection
@@ -1163,9 +1210,8 @@ impl InnerRoom {
         settings: MediaStreamSettings,
         stop_first: bool,
         rollback_on_fail: bool,
-    ) -> Result<(), SetLocalMediaSettingsError> {
-        use media_exchange_state::Stable::Disabled;
-        use SetLocalMediaSettingsError as E;
+    ) -> Result<(), ConstraintsUpdateError> {
+        use ConstraintsUpdateError as E;
 
         let old_media_settings = self.send_constraints.inner();
         self.send_constraints.constrain(settings);
@@ -1193,7 +1239,7 @@ impl InnerRoom {
                 }
                 Err(e) => {
                     if !matches!(e.as_ref(), PeerError::MediaManager(_)) {
-                        return Err(E::error(tracerr::map_from_and_wrap!()(
+                        return Err(E::errored(tracerr::map_from_and_wrap!()(
                             e.clone(),
                         )));
                     }
@@ -1206,12 +1252,12 @@ impl InnerRoom {
                         )
                         .await
                         .map_err(|err| {
-                            err.rollback_failed(tracerr::map_from_and_wrap!()(
-                                e.clone(),
-                            ))
+                            err.into_rollback_failed(
+                                tracerr::map_from_and_wrap!()(e.clone()),
+                            )
                         })?;
 
-                        E::rollback(tracerr::map_from_and_wrap!()(e.clone()))
+                        E::rollbacked(tracerr::map_from_and_wrap!()(e.clone()))
                     } else {
                         self.disable_senders_without_tracks(
                             &peer,
@@ -1222,9 +1268,11 @@ impl InnerRoom {
                         .await?;
 
                         if stop_first {
-                            E::disable(tracerr::map_from_and_wrap!()(e.clone()))
+                            E::disabled(tracerr::map_from_and_wrap!()(
+                                e.clone(),
+                            ))
                         } else {
-                            E::error(tracerr::map_from_and_wrap!()(e.clone()))
+                            E::errored(tracerr::map_from_and_wrap!()(e.clone()))
                         }
                     };
 
@@ -1235,7 +1283,7 @@ impl InnerRoom {
 
         self.update_media_states(states_update)
             .await
-            .map_err(|e| E::error(tracerr::map_from_and_wrap!()(e)))
+            .map_err(|e| E::errored(tracerr::map_from_and_wrap!()(e)))
     }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this
