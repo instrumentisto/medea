@@ -7,6 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use async_recursion::async_recursion;
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future, future::LocalBoxFuture, StreamExt as _};
@@ -1101,6 +1102,39 @@ impl InnerRoom {
             .is_none()
     }
 
+    /// Updates [`MediaState`]s to the provided `states_update` and disables all
+    /// [`Sender`]s which are doesn't have [`local::Track`].
+    async fn disable_senders_without_tracks(
+        &self,
+        peer: &Rc<PeerConnection>,
+        reason: Traced<PeerError>,
+        kinds: LocalStreamUpdateCriteria,
+        mut states_update: HashMap<PeerId, HashMap<TrackId, MediaState>>,
+    ) -> Result<(), SetLocalMediaSettingsError> {
+        use media_exchange_state::Stable::Disabled;
+        use SetLocalMediaSettingsError as E;
+
+        self.send_constraints
+            .set_media_exchange_state_by_kinds(Disabled, kinds);
+        let senders_to_disable = peer.get_senders_without_tracks(kinds);
+
+        states_update.entry(peer.id()).or_default().extend(
+            senders_to_disable
+                .into_iter()
+                .map(|s| (s.track_id(), MediaState::from(Disabled))),
+        );
+        self.update_media_states(states_update)
+            .await
+            .map_err(|err| {
+                E::rollback_error(
+                    tracerr::new!(tracerr::map_from(reason.clone())),
+                    err,
+                )
+            })?;
+
+        Ok(())
+    }
+
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
@@ -1123,129 +1157,85 @@ impl InnerRoom {
     /// [1]: https://tinyurl.com/rnxcavf
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Sender`]: crate::peer::Sender
-    // TODO: 1. boolean for stop_first behaviour?
-    //       2. there are multiple possible outcomes:
-    //          1. changed successfully
-    //          2. change failed, rolled back successfully, should carry change
-    // error          3. change failed, rollback failed, should carry change
-    // err and rollback err          fn result should explicitly specify
-    // what exactly happened.       3. properly update demos for new
-    // behaviour
-    fn set_local_media_settings(
+    #[async_recursion(?Send)]
+    async fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
         stop_first: bool,
         rollback_on_fail: bool,
-    ) -> LocalBoxFuture<Result<(), SetLocalMediaSettingsError>> {
+    ) -> Result<(), SetLocalMediaSettingsError> {
         use media_exchange_state::Stable::Disabled;
         use SetLocalMediaSettingsError as E;
 
-        Box::pin(async move {
-            let constraints_before = self.send_constraints.inner();
-            self.send_constraints.constrain(settings);
-            let kinds = self
-                .send_constraints
-                .calculate_kinds_diff(&constraints_before);
+        let old_media_settings = self.send_constraints.inner();
+        self.send_constraints.constrain(settings);
+        let kinds = self
+            .send_constraints
+            .calculate_kinds_diff(&old_media_settings);
+        let peers = self.peers.get_all();
 
-            let peers = self.peers.get_all();
-            if stop_first {
-                for peer in &peers {
-                    peer.drop_send_tracks(kinds).await;
-                }
+        if stop_first {
+            for peer in &peers {
+                peer.drop_send_tracks(kinds).await;
             }
+        }
 
-            let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
-            for peer in peers {
-                match peer
-                    .update_local_stream(LocalStreamUpdateCriteria::all())
-                    .await
-                {
-                    Ok(states) => {
-                        states_update.entry(peer.id()).or_default().extend(
-                            states.into_iter().map(|(id, s)| (id, s.into())),
-                        );
+        let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
+        for peer in peers {
+            match peer
+                .update_local_stream(LocalStreamUpdateCriteria::all())
+                .await
+            {
+                Ok(states) => {
+                    states_update.entry(peer.id()).or_default().extend(
+                        states.into_iter().map(|(id, s)| (id, s.into())),
+                    );
+                }
+                Err(e) => {
+                    if !matches!(e.as_ref(), PeerError::MediaManager(_)) {
+                        return Err(E::error(tracerr::map_from_and_wrap!()(
+                            e.clone(),
+                        )));
                     }
-                    Err(e) => {
-                        let err = if let PeerError::MediaManager(_) = e.as_ref()
-                        {
-                            if rollback_on_fail {
-                                self.set_local_media_settings(
-                                    constraints_before,
-                                    stop_first,
-                                    false,
-                                )
-                                .await
-                                .map_err(
-                                    |err| {
-                                        err.rollback_failed(
-                                            tracerr::map_from_and_wrap!()(
-                                                e.clone(),
-                                            ),
-                                        )
-                                    },
-                                )?;
 
-                                E::rollback(tracerr::map_from_and_wrap!()(
-                                    e.clone(),
-                                ))
-                            } else {
-                                self.send_constraints
-                                    .set_media_exchange_state_by_kinds(
-                                        Disabled, kinds,
-                                    );
-                                let senders_to_disable =
-                                    peer.get_senders_without_tracks(kinds);
+                    let err = if rollback_on_fail {
+                        self.set_local_media_settings(
+                            old_media_settings,
+                            stop_first,
+                            false,
+                        )
+                        .await
+                        .map_err(|err| {
+                            err.rollback_failed(tracerr::map_from_and_wrap!()(
+                                e.clone(),
+                            ))
+                        })?;
 
-                                states_update
-                                    .entry(peer.id())
-                                    .or_default()
-                                    .extend(
-                                        senders_to_disable.into_iter().map(
-                                            |s| {
-                                                (
-                                                    s.track_id(),
-                                                    MediaState::from(Disabled),
-                                                )
-                                            },
-                                        ),
-                                    );
-                                self.update_media_states(states_update)
-                                    .await
-                                    .map_err(|err| {
-                                    E::rollback_error(
-                                        tracerr::map_from_and_wrap!()(
-                                            e.clone(),
-                                        ),
-                                        tracerr::map_from_and_wrap!()(err),
-                                    )
-                                })?;
+                        E::rollback(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else {
+                        self.disable_senders_without_tracks(
+                            &peer,
+                            e.clone(),
+                            kinds,
+                            states_update,
+                        )
+                        .await?;
 
-                                if stop_first {
-                                    E::disable(tracerr::map_from_and_wrap!()(
-                                        e.clone(),
-                                    ))
-                                } else {
-                                    E::Failed {
-                                        reason: tracerr::map_from_and_wrap!()(
-                                            e.clone(),
-                                        ),
-                                    }
-                                }
-                            }
+                        if stop_first {
+                            E::disable(tracerr::map_from_and_wrap!()(e.clone()))
                         } else {
                             E::error(tracerr::map_from_and_wrap!()(e.clone()))
-                        };
-                        return Err(err);
-                    }
+                        }
+                    };
+
+                    return Err(err);
                 }
             }
+        }
 
-            self.update_media_states(states_update).await.map_err(|e| {
-                SetLocalMediaSettingsError::error(
-                    tracerr::map_from_and_wrap!()(e),
-                )
-            })
-        })
+        self.update_media_states(states_update)
+            .await
+            .map_err(|e| E::error(tracerr::map_from_and_wrap!()(e)))
     }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this
