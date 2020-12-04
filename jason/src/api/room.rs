@@ -8,7 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::{channel::mpsc, future, future::LocalBoxFuture, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -39,7 +39,7 @@ use crate::{
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
     utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
-    JsMediaSourceKind,
+    Jason, JsMediaSourceKind,
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -104,7 +104,7 @@ impl RoomCloseReason {
 }
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display, JsCaused)]
+#[derive(Debug, Clone, Display, JsCaused)]
 pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
@@ -383,7 +383,7 @@ impl RoomHandle {
             inner?
                 .set_local_media_settings(settings, rollback_on_fail)
                 .await
-                .map_err(JasonError::from)?;
+                .map_err(MediaSettingsError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -757,6 +757,156 @@ struct InnerRoom {
     close_reason: RefCell<CloseReason>,
 }
 
+#[wasm_bindgen]
+#[derive(Debug, From)]
+#[from(forward)]
+pub struct MediaSettingsError(SetLocalMediaSettingsErrorJs);
+
+#[wasm_bindgen]
+impl MediaSettingsError {
+    pub fn name(&self) -> String {
+        self.0.to_string()
+    }
+
+    pub fn rollback_reason(&self) -> JsValue {
+        match &self.0 {
+            SetLocalMediaSettingsErrorJs::Rollback { rollback_reason } => {
+                rollback_reason.clone()
+            }
+            SetLocalMediaSettingsErrorJs::RollbackFailed {
+                rollback_reason,
+                ..
+            } => rollback_reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    pub fn rollback_fail_reason(&self) -> JsValue {
+        match &self.0 {
+            SetLocalMediaSettingsErrorJs::RollbackFailed {
+                rollback_fail_reason,
+                ..
+            } => rollback_fail_reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    pub fn disable_reason(&self) -> JsValue {
+        match &self.0 {
+            SetLocalMediaSettingsErrorJs::Disable { disable_reason } => {
+                disable_reason.clone()
+            }
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    pub fn fail_reason(&self) -> JsValue {
+        match &self.0 {
+            SetLocalMediaSettingsErrorJs::Failed { reason } => reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+}
+
+#[derive(Debug, Display)]
+pub enum SetLocalMediaSettingsErrorJs {
+    #[display(fmt = "RollbackException")]
+    Rollback { rollback_reason: JsValue },
+    #[display(fmt = "RollbackFailedException")]
+    RollbackFailed {
+        rollback_reason: JsValue,
+        rollback_fail_reason: JsValue,
+    },
+    #[display(fmt = "DisableException")]
+    Disable { disable_reason: JsValue },
+    #[display(fmt = "FailedException")]
+    Failed { reason: JsValue },
+}
+
+#[derive(Debug)]
+enum SetLocalMediaSettingsError {
+    Rollback {
+        rollback_reason: Traced<RoomError>,
+    },
+    RollbackFailed {
+        rollback_reason: Traced<RoomError>,
+        rollback_fail_reason: Traced<RoomError>,
+    },
+    Disable {
+        disable_reason: Traced<RoomError>,
+    },
+    Failed {
+        reason: Traced<RoomError>,
+    },
+}
+
+impl SetLocalMediaSettingsError {
+    pub fn rollback(rollback_reason: Traced<RoomError>) -> Self {
+        Self::Rollback { rollback_reason }
+    }
+
+    pub fn rollback_failed(self, rollback_reason: Traced<RoomError>) -> Self {
+        match self {
+            Self::Disable { disable_reason } => Self::RollbackFailed {
+                rollback_reason,
+                rollback_fail_reason: disable_reason,
+            },
+            _ => unreachable!(
+                "{:?} variant is unreachable while rollbacking.",
+                self
+            ),
+        }
+    }
+
+    pub fn rollback_error(
+        rollback_reason: Traced<RoomError>,
+        rollback_fail_reason: Traced<RoomError>,
+    ) -> Self {
+        Self::RollbackFailed {
+            rollback_fail_reason,
+            rollback_reason,
+        }
+    }
+
+    pub fn disable(disable_reason: Traced<RoomError>) -> Self {
+        Self::Disable { disable_reason }
+    }
+
+    pub fn error(error: Traced<RoomError>) -> Self {
+        SetLocalMediaSettingsError::Failed { reason: error }
+    }
+}
+
+impl From<SetLocalMediaSettingsError> for SetLocalMediaSettingsErrorJs {
+    fn from(from: SetLocalMediaSettingsError) -> Self {
+        match from {
+            SetLocalMediaSettingsError::Rollback { rollback_reason } => {
+                SetLocalMediaSettingsErrorJs::Rollback {
+                    rollback_reason: JasonError::from(rollback_reason).into(),
+                }
+            }
+            SetLocalMediaSettingsError::RollbackFailed {
+                rollback_reason,
+                rollback_fail_reason,
+            } => SetLocalMediaSettingsErrorJs::RollbackFailed {
+                rollback_reason: JasonError::from(rollback_reason).into(),
+                rollback_fail_reason: JasonError::from(rollback_fail_reason)
+                    .into(),
+            },
+            SetLocalMediaSettingsError::Disable { disable_reason } => {
+                SetLocalMediaSettingsErrorJs::Disable {
+                    disable_reason: JasonError::from(disable_reason).into(),
+                }
+            }
+            SetLocalMediaSettingsError::Failed { reason } => {
+                SetLocalMediaSettingsErrorJs::Failed {
+                    reason: JasonError::from(reason).into(),
+                }
+            }
+        }
+    }
+}
+
 impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
@@ -980,8 +1130,9 @@ impl InnerRoom {
         &self,
         settings: MediaStreamSettings,
         rollback_on_fail: bool,
-    ) -> LocalBoxFuture<Result<(), Traced<RoomError>>> {
+    ) -> LocalBoxFuture<Result<(), SetLocalMediaSettingsError>> {
         use media_exchange_state::Stable::Disabled;
+        use SetLocalMediaSettingsError as E;
 
         Box::pin(async move {
             let constraints_before = self.send_constraints.inner();
@@ -1013,7 +1164,16 @@ impl InnerRoom {
                                     constraints_before,
                                     false,
                                 )
-                                .await?;
+                                .await
+                                .map_err(
+                                    |err| {
+                                        err.rollback_failed(
+                                            tracerr::map_from_and_wrap!()(
+                                                e.clone(),
+                                            ),
+                                        )
+                                    },
+                                )?;
                             } else {
                                 self.send_constraints
                                     .set_media_exchange_state_by_kinds(
@@ -1037,17 +1197,31 @@ impl InnerRoom {
                                     );
                                 self.update_media_states(states_update)
                                     .await
-                                    .map_err(tracerr::map_from_and_wrap!())?;
+                                    .map_err(|err| {
+                                        E::rollback_error(
+                                            tracerr::map_from_and_wrap!()(
+                                                e.clone(),
+                                            ),
+                                            tracerr::map_from_and_wrap!()(err),
+                                        )
+                                    });
                             }
                         }
-                        return Err(tracerr::map_from_and_wrap!()(e));
+
+                        return Err(E::Rollback {
+                            rollback_reason: tracerr::map_from_and_wrap!()(
+                                e.clone(),
+                            ),
+                        });
                     }
                 }
             }
 
-            self.update_media_states(states_update)
-                .await
-                .map_err(tracerr::map_from_and_wrap!())
+            self.update_media_states(states_update).await.map_err(|e| {
+                SetLocalMediaSettingsError::error(
+                    tracerr::map_from_and_wrap!()(e),
+                )
+            })
         })
     }
 
