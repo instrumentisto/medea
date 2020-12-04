@@ -576,7 +576,7 @@ window.onload = async function() {
     try {
       const constraints = await initLocalStream();
       await fillMediaDevicesInputs(audioSelect, videoSelect, null);
-      await room.set_local_media_settings(constraints, true);
+      await room.set_local_media_settings(constraints, false, false);
     } catch (e) {
       console.error('Init local video failed: ' + e);
     }
@@ -747,7 +747,7 @@ window.onload = async function() {
         if (!isAudioSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints, true);
+        await room.set_local_media_settings(constraints, true, true);
       } catch (e) {
         console.error('Changing audio source failed: ' + e);
       }
@@ -761,10 +761,14 @@ window.onload = async function() {
             track.free();
           }
         }
+        try {
+          await room.set_local_media_settings(constraints, false, true);
+        } catch (e) {
+          console.error("Changing video source failed: " + e.name());
+        }
         if (isVideoSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints, true);
       } catch (e) {
         console.error('Changing video source failed: ' + e.message());
       }

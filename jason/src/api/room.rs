@@ -375,13 +375,18 @@ impl RoomHandle {
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
+        stop_first: bool,
         rollback_on_fail: bool,
     ) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
         future_to_promise(async move {
             inner?
-                .set_local_media_settings(settings, rollback_on_fail)
+                .set_local_media_settings(
+                    settings,
+                    stop_first,
+                    rollback_on_fail,
+                )
                 .await
                 .map_err(MediaSettingsError::from)?;
             Ok(JsValue::UNDEFINED)
@@ -1129,6 +1134,7 @@ impl InnerRoom {
     fn set_local_media_settings(
         &self,
         settings: MediaStreamSettings,
+        stop_first: bool,
         rollback_on_fail: bool,
     ) -> LocalBoxFuture<Result<(), SetLocalMediaSettingsError>> {
         use media_exchange_state::Stable::Disabled;
@@ -1142,8 +1148,10 @@ impl InnerRoom {
                 .calculate_kinds_diff(&constraints_before);
 
             let peers = self.peers.get_all();
-            for peer in &peers {
-                peer.drop_send_tracks(kinds).await;
+            if stop_first {
+                for peer in &peers {
+                    peer.drop_send_tracks(kinds).await;
+                }
             }
 
             let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
@@ -1158,10 +1166,12 @@ impl InnerRoom {
                         );
                     }
                     Err(e) => {
-                        if let PeerError::MediaManager(_) = e.as_ref() {
+                        let err = if let PeerError::MediaManager(_) = e.as_ref()
+                        {
                             if rollback_on_fail {
                                 self.set_local_media_settings(
                                     constraints_before,
+                                    stop_first,
                                     false,
                                 )
                                 .await
@@ -1174,6 +1184,10 @@ impl InnerRoom {
                                         )
                                     },
                                 )?;
+
+                                E::rollback(tracerr::map_from_and_wrap!()(
+                                    e.clone(),
+                                ))
                             } else {
                                 self.send_constraints
                                     .set_media_exchange_state_by_kinds(
@@ -1198,21 +1212,30 @@ impl InnerRoom {
                                 self.update_media_states(states_update)
                                     .await
                                     .map_err(|err| {
-                                        E::rollback_error(
-                                            tracerr::map_from_and_wrap!()(
-                                                e.clone(),
-                                            ),
-                                            tracerr::map_from_and_wrap!()(err),
-                                        )
-                                    });
-                            }
-                        }
+                                    E::rollback_error(
+                                        tracerr::map_from_and_wrap!()(
+                                            e.clone(),
+                                        ),
+                                        tracerr::map_from_and_wrap!()(err),
+                                    )
+                                })?;
 
-                        return Err(E::Rollback {
-                            rollback_reason: tracerr::map_from_and_wrap!()(
-                                e.clone(),
-                            ),
-                        });
+                                if stop_first {
+                                    E::disable(tracerr::map_from_and_wrap!()(
+                                        e.clone(),
+                                    ))
+                                } else {
+                                    E::Failed {
+                                        reason: tracerr::map_from_and_wrap!()(
+                                            e.clone(),
+                                        ),
+                                    }
+                                }
+                            }
+                        } else {
+                            E::error(tracerr::map_from_and_wrap!()(e.clone()))
+                        };
+                        return Err(err);
                     }
                 }
             }
