@@ -105,7 +105,7 @@ impl RoomCloseReason {
 }
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Clone, Display, JsCaused)]
+#[derive(Debug, Display, JsCaused)]
 pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
@@ -367,6 +367,9 @@ impl RoomHandle {
     ///
     /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
     /// rolled back on [getUserMedia()][1] request fail.
+    ///
+    /// If `stop_first` set to `true` then affected [`local::Track`]s will be
+    /// dropped before [`MediaStreamSettings`] set.
     ///
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
@@ -836,25 +839,34 @@ impl ConstraintsUpdateException {
 /// JS side.
 #[derive(Debug, Display)]
 pub enum JsConstraintsUpdateError {
-    /// Indicates that new [`MediaStreamSettings`] setting failed and current
+    /// Indicates that new [`MediaStreamSettings`] set failed and current
     /// [`MediaStreamSettings`] was successfully rollbacked.
     #[display(fmt = "RollbackedException")]
-    Rollbacked { rollback_reason: JsValue },
+    Rollbacked {
+        /// [`JasonError`] due to which rollback happened.
+        rollback_reason: JsValue,
+    },
 
     /// Indicates that new [`MediaStreamSettings`] setting failed and
     /// [`MediaStreamSettings`] rollback was failed.
     #[display(fmt = "RollbackFailedException")]
     RollbackFailed {
+        /// [`JasonError`] due to which rollback happened.
         rollback_reason: JsValue,
+
+        /// [`JasonError`] due to which rollback failed.
         rollback_fail_reason: JsValue,
     },
 
-    /// Indicates that [`MediaStreamSettings`] set failed affected [`Sender`]s
-    /// without [`local::Track`]s was disabled.
+    /// Indicates that [`MediaStreamSettings`] set failed and affected
+    /// [`Sender`]s without [`local::Track`]s was disabled.
     ///
     /// [`Sender`]: crate::peer::Sender
     #[display(fmt = "DisabledException")]
-    Disabled { disable_reason: JsValue },
+    Disabled {
+        /// [`JasonError`] due to which disable happened.
+        disable_reason: JsValue,
+    },
 
     /// Indicates that some error occurred.
     #[display(fmt = "ErroredException")]
@@ -867,12 +879,17 @@ pub enum JsConstraintsUpdateError {
 enum ConstraintsUpdateError {
     /// Indicates that new [`MediaStreamSettings`] setting failed and current
     /// [`MediaStreamSettings`] was successfully rollbacked.
-    Rollbacked { rollback_reason: Traced<RoomError> },
+    Rollbacked {
+        /// [`RoomError`] due to which rollback happened.
+        rollback_reason: Traced<RoomError>,
+    },
 
     /// Indicates that new [`MediaStreamSettings`] setting failed and
     /// [`MediaStreamSettings`] rollback was failed.
     RollbackFailed {
+        /// [`RoomError`] due to which rollback happened.
         rollback_reason: Traced<RoomError>,
+        /// [`RoomError`] due to which rollback failed.
         rollback_fail_reason: Traced<RoomError>,
     },
 
@@ -880,7 +897,10 @@ enum ConstraintsUpdateError {
     /// without [`local::Track`]s was disabled.
     ///
     /// [`Sender`]: crate::peer::Sender
-    Disabled { disable_reason: Traced<RoomError> },
+    Disabled {
+        /// [`RoomError`] due to which disable happened.
+        disable_reason: Traced<RoomError>,
+    },
 
     /// Indicates that some error occurred.
     Errored { reason: Traced<RoomError> },
@@ -911,6 +931,8 @@ impl ConstraintsUpdateError {
         }
     }
 
+    /// Returns [`ConstraintsUpdateError::RollbackFailed`] with a provided
+    /// parameters.
     pub fn rollback_failed(
         rollback_reason: Traced<RoomError>,
         rollback_fail_reason: Traced<RoomError>,
@@ -921,10 +943,12 @@ impl ConstraintsUpdateError {
         }
     }
 
+    /// Returns [`ConstraintsUpdateError::Disabled`] with a provided parameter.
     pub fn disabled(disable_reason: Traced<RoomError>) -> Self {
         Self::Disabled { disable_reason }
     }
 
+    /// Returns [`ConstraintsUpdateError::Errored`] with a provided parameter.
     pub fn errored(reason: Traced<RoomError>) -> Self {
         Self::Errored { reason }
     }

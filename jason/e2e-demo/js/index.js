@@ -764,7 +764,17 @@ window.onload = async function() {
         try {
           await room.set_local_media_settings(constraints, true, true);
         } catch (e) {
-          console.error("Changing video source failed: " + e.name());
+          let name = e.name();
+          if (name === 'RollbackedException') {
+            alert('MediaStreamSettings set failed and current MediaStreamSettings was successfully rollbacked.');
+          } else if (name === 'RollbackFailedException') {
+            alert('MediaStreamSettings set failed and MediaStreamSettings rollback failed.');
+          } else if (name === 'DisabledException') {
+            alert('MediaStreamSettings set failed and affected Senders disabled.');
+          } else if (name === 'ErroredException') {
+            alert('Fatal error occured while MediaStreamSettings update.');
+          }
+          console.error("Changing video source failed: " + name);
         }
       } catch (e) {
         console.error('Changing video source failed: ' + e.message());
