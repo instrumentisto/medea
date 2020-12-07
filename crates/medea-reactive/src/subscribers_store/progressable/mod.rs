@@ -8,6 +8,7 @@ use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 
 use crate::{subscribers_store::SubscribersStore, ObservableCell};
 
+#[allow(unreachable_pub)] // false positive
 pub use self::guarded::{Guard, Guarded};
 
 /// [`SubscribersStore`] for progressable collections/field.
@@ -43,9 +44,9 @@ impl<T> SubStore<T> {
     ///
     /// [`Future`]: std::future::Future
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = self.counter.when_eq(0);
+        let counter = Rc::clone(&self.counter);
         Box::pin(async move {
-            let _ = fut.await;
+            let _ = counter.when_eq(0).await;
         })
     }
 }

@@ -29,7 +29,7 @@ mod subscribers_store;
 pub use crate::{
     collections::{
         ObservableHashMap, ObservableHashSet, ObservableVec,
-        ProgressableHashSet, ProgressableVec,
+        ProgressableHashMap, ProgressableHashSet, ProgressableVec,
     },
     field::{
         cell::ObservableCell, DroppedError, MutObservableFieldGuard,

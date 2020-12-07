@@ -6,7 +6,8 @@ pub mod hash_map;
 pub mod hash_set;
 pub mod vec;
 
-pub use self::{
+#[doc(inline)]
+pub use {
     hash_map::{ObservableHashMap, ProgressableHashMap},
     hash_set::{ObservableHashSet, ProgressableHashSet},
     vec::{ObservableVec, ProgressableVec},

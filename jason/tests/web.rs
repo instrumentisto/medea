@@ -123,6 +123,15 @@ extern "C" {
     #[wasm_bindgen(method, getter = getDisplayMediaRequestsCount)]
     fn get_display_media_requests_count(this: &MockNavigator) -> i32;
 
+    #[wasm_bindgen(method, setter = setUserMediaReturns)]
+    fn setUserMediaReturns(this: &MockNavigator, stream: web_sys::MediaStream);
+
+    #[wasm_bindgen(method, setter = setDisplayMediaReturns)]
+    fn setDisplayMediaReturns(
+        this: &MockNavigator,
+        stream: web_sys::MediaStream,
+    );
+
     #[wasm_bindgen(method)]
     fn stop(this: &MockNavigator);
 }

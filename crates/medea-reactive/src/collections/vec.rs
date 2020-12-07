@@ -8,8 +8,11 @@ use futures::{
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
-/// Reactive vector based on [`Vec`] with ability to recognise when all updates
-/// was processed by subscribers.
+/// Reactive vector based on [`Vec`] with additional functionality of tracking
+/// progress made by its subscribers. Its [`Vec::on_push`] and
+/// [`Vec::on_remove`] subscriptions return values wrapped in
+/// [`progressable::Guarded`], and implementation tracks all
+/// [`progressable::Guard`]'s
 pub type ProgressableVec<T> =
     Vec<T, progressable::SubStore<T>, progressable::Guarded<T>>;
 /// Reactive vector based on [`Vec`].
@@ -54,7 +57,7 @@ pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 /// # });
 /// ```
 ///
-/// # Usage of when all completed functions
+/// # Waiting for subscribers to complete
 ///
 /// ```rust
 /// # use futures::{executor, StreamExt as _, Stream};
@@ -77,16 +80,15 @@ pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 #[derive(Debug)]
 pub struct Vec<T, S: SubscribersStore<T, O>, O> {
     /// Data stored by this [`Vec`].
-    inner: std::vec::Vec<T>,
+    store: std::vec::Vec<T>,
 
     /// Subscribers of the [`Vec::on_push`] method.
-    push_subs: S,
+    on_push_subs: S,
 
     /// Subscribers of the [`Vec::on_remove`] method.
-    remove_subs: S,
+    on_remove_subs: S,
 
-    /// Phantom type of [`Vec::on_push`] and
-    /// [`Vec::on_remove`] output.
+    /// Phantom type of [`Vec::on_push`] and [`Vec::on_remove`] output.
     _output: PhantomData<O>,
 }
 
@@ -101,7 +103,7 @@ where
     #[inline]
     #[must_use]
     pub fn when_push_processed(&self) -> LocalBoxFuture<'static, ()> {
-        self.push_subs.when_all_processed()
+        self.on_push_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all remove updates will
@@ -111,7 +113,7 @@ where
     #[inline]
     #[must_use]
     pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
-        self.remove_subs.when_all_processed()
+        self.on_remove_subs.when_all_processed()
     }
 
     /// Returns [`Future`] which will be resolved when all push and remove
@@ -151,7 +153,7 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_push(&self) -> LocalBoxStream<'static, O> {
-        self.push_subs.subscribe()
+        self.on_push_subs.subscribe()
     }
 
     /// Returns the [`Stream`] to which the removed values will be sent.
@@ -162,7 +164,7 @@ impl<T, S: SubscribersStore<T, O>, O> Vec<T, S, O> {
     /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
-        self.remove_subs.subscribe()
+        self.on_remove_subs.subscribe()
     }
 }
 
@@ -176,9 +178,9 @@ where
     ///
     /// This will produce [`Vec::on_push`] event.
     pub fn push(&mut self, value: T) {
-        self.inner.push(value.clone());
+        self.store.push(value.clone());
 
-        self.push_subs.send_update(value);
+        self.on_push_subs.send_update(value);
     }
 
     /// Removes and returns the element at position `index` within the vector,
@@ -186,27 +188,27 @@ where
     ///
     /// This will produce [`Vec::on_remove`] event.
     pub fn remove(&mut self, index: usize) -> T {
-        let value = self.inner.remove(index);
-        self.remove_subs.send_update(value.clone());
+        let value = self.store.remove(index);
+        self.on_remove_subs.send_update(value.clone());
 
         value
     }
 
-    /// Returns the [`Stream`] with all already pushed values of this [`Vec`].
+    /// Returns [`Stream`] that contains values from this [`Vec`].
     ///
-    /// This [`Stream`] will have only current values. It doesn't updates on new
-    /// pushes, but you can merge ([`stream::select`]) this [`Stream`] with a
-    /// [`Vec::on_push`] [`Stream`] for that.
+    /// Returned [`Stream`] contains only current values. It won't update on new
+    /// pushes, but you can merge returned [`Stream`] with a [`Vec::on_push`]
+    /// [`Stream`] if you want to process current values and values that will be
+    /// inserted.
     ///
     /// [`Stream`]: futures::Stream
-    /// [`stream::select`]: futures::stream::select
     #[inline]
     pub fn replay_on_push(&self) -> LocalBoxStream<'static, O> {
         Box::pin(futures::stream::iter(
-            self.inner
+            self.store
                 .clone()
                 .into_iter()
-                .map(|val| self.push_subs.wrap(val))
+                .map(|val| self.on_push_subs.wrap(val))
                 .collect::<std::vec::Vec<_>>(),
         ))
     }
@@ -216,9 +218,9 @@ impl<T, S: SubscribersStore<T, O>, O> Default for Vec<T, S, O> {
     #[inline]
     fn default() -> Self {
         Self {
-            inner: std::vec::Vec::new(),
-            push_subs: S::default(),
-            remove_subs: S::default(),
+            store: std::vec::Vec::new(),
+            on_push_subs: S::default(),
+            on_remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -228,9 +230,9 @@ impl<T, S: SubscribersStore<T, O>, O> From<std::vec::Vec<T>> for Vec<T, S, O> {
     #[inline]
     fn from(from: std::vec::Vec<T>) -> Self {
         Self {
-            inner: from,
-            push_subs: S::default(),
-            remove_subs: S::default(),
+            store: from,
+            on_push_subs: S::default(),
+            on_remove_subs: S::default(),
             _output: PhantomData::default(),
         }
     }
@@ -242,7 +244,7 @@ impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator for &'a Vec<T, S, O> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.inner.iter()
+        self.store.iter()
     }
 }
 
@@ -250,8 +252,8 @@ impl<T, S: SubscribersStore<T, O>, O> Drop for Vec<T, S, O> {
     /// Sends all items of a dropped [`Vec`] to the
     /// [`Vec::on_remove`] subs.
     fn drop(&mut self) {
-        let store = &mut self.inner;
-        let on_remove_subs = &self.remove_subs;
+        let store = &mut self.store;
+        let on_remove_subs = &self.on_remove_subs;
         store.drain(..).for_each(|value| {
             on_remove_subs.send_update(value);
         });
@@ -265,85 +267,115 @@ where
 {
     #[inline]
     fn as_ref(&self) -> &[T] {
-        &self.inner
+        &self.store
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use futures::{poll, task::Poll, StreamExt as _};
-    use tokio::time::timeout;
 
-    use crate::collections::ProgressableVec;
+    use super::ProgressableVec;
 
-    mod when_push_processed {
-        use super::*;
+    #[tokio::test]
+    async fn replay_on_push() {
+        let mut vec = ProgressableVec::from(vec![1, 2, 3]);
 
-        #[tokio::test]
-        async fn wait_for_replay() {
-            let vec = ProgressableVec::from(vec![1]);
+        let replay_on_push = vec.replay_on_push();
+        let on_push = vec.on_push();
 
-            let replay = vec.replay_on_push();
+        vec.push(4);
 
-            assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
-            drop(replay);
-            assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
-        }
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
+        let replayed: Vec<_> = replay_on_push.collect().await;
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
 
-        #[tokio::test]
-        async fn wait_for_push() {
-            let mut vec = ProgressableVec::new();
+        let replayed: Vec<_> =
+            replayed.into_iter().map(|val| val.into_inner()).collect();
 
-            let on_push = vec.on_push();
-            vec.push(0);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
+        drop(on_push);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
 
-            assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
-            drop(on_push);
-            assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
-        }
+        assert_eq!(replayed.len(), 3);
+        assert!(replayed.contains(&1));
+        assert!(replayed.contains(&2));
+        assert!(replayed.contains(&3));
+    }
 
-        #[tokio::test]
-        async fn wait_for_remove() {
-            let mut vec = ProgressableVec::new();
+    #[tokio::test]
+    async fn when_push_processed() {
+        let mut vec = ProgressableVec::new();
+        let _ = vec.push(0);
 
-            let on_remove = vec.on_remove();
-            vec.push(0);
-            let _ = vec.remove(0);
+        let mut on_push = vec.on_push();
 
-            assert_eq!(poll!(vec.when_remove_processed()), Poll::Pending);
-            drop(on_remove);
-            assert_eq!(poll!(vec.when_remove_processed()), Poll::Ready(()));
-        }
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
+        let _ = vec.push(1);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
+        //
+        let (val, guard) = on_push.next().await.unwrap().into_parts();
 
-        #[tokio::test]
-        async fn resolves_on_empty_sublist() {
-            let mut vec = ProgressableVec::new();
+        assert_eq!(val, 1);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
+        drop(guard);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
+    }
 
-            vec.push(0);
-            let when_push_processed = vec.when_push_processed();
+    #[tokio::test]
+    async fn multiple_when_push_processed_subs() {
+        let mut vec = ProgressableVec::new();
+        let _ = vec.push(0);
 
-            timeout(Duration::from_millis(50), when_push_processed)
-                .await
-                .unwrap();
-        }
+        let mut on_push1 = vec.on_push();
+        let mut on_push2 = vec.on_push();
 
-        #[tokio::test]
-        async fn waits_for_two_subs() {
-            let mut vec = ProgressableVec::new();
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
+        vec.push(0);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
 
-            let mut first_on_push = vec.on_push();
-            let _second_on_push = vec.on_push();
-            vec.push(0);
-            let when_all_push_processed = vec.when_push_processed();
+        assert_eq!(on_push1.next().await.unwrap().into_inner(), 0);
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Pending);
+        assert_eq!(on_push2.next().await.unwrap().into_inner(), 0);
 
-            drop(first_on_push.next().await.unwrap());
+        assert_eq!(poll!(vec.when_push_processed()), Poll::Ready(()));
+    }
 
-            let _ =
-                timeout(Duration::from_millis(500), when_all_push_processed)
-                    .await
-                    .unwrap_err();
-        }
+    #[tokio::test]
+    async fn when_remove_processed() {
+        let mut vec = ProgressableVec::new();
+        let _ = vec.push(10);
+
+        let mut on_remove = vec.on_remove();
+
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Ready(()));
+        assert_eq!(vec.remove(0), 10);
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Pending);
+
+        let (val, guard) = on_remove.next().await.unwrap().into_parts();
+
+        assert_eq!(val, 10);
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Pending);
+        drop(guard);
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Ready(()));
+    }
+
+    #[tokio::test]
+    async fn multiple_when_remove_processed_subs() {
+        let mut vec = ProgressableVec::new();
+        let _ = vec.push(10);
+
+        let mut on_remove1 = vec.on_remove();
+        let mut on_remove2 = vec.on_remove();
+
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Ready(()));
+        assert_eq!(vec.remove(0), 10);
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Pending);
+
+        assert_eq!(on_remove1.next().await.unwrap().into_inner(), 10);
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Pending);
+        assert_eq!(on_remove2.next().await.unwrap().into_inner(), 10);
+
+        assert_eq!(poll!(vec.when_remove_processed()), Poll::Ready(()));
     }
 }
