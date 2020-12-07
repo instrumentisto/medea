@@ -34,7 +34,7 @@ pub use crate::{
     field::{
         cell::ObservableCell, DroppedError, MutObservableFieldGuard,
         Observable, ObservableField, OnObservableFieldModification,
-        ProgressableField, UniversalSubscriber, Whenable,
+        ProgressableCell, ProgressableField, UniversalSubscriber, Whenable,
     },
     subscribers_store::progressable::{Guard, Guarded},
 };

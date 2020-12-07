@@ -3,6 +3,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 pub mod cell;
+pub mod progressable_cell;
 
 use std::{
     cell::RefCell,
@@ -19,7 +20,7 @@ use futures::{
 use crate::subscribers_store::{progressable, SubscribersStore};
 
 #[doc(inline)]
-pub use self::cell::ObservableCell;
+pub use self::{cell::ObservableCell, progressable_cell::ProgressableCell};
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;

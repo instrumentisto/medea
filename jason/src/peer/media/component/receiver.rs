@@ -1,7 +1,7 @@
 use medea_client_api_proto::{
     MediaType, MemberId, Track, TrackId, TrackPatchEvent,
 };
-use medea_reactive::{Observable, ObservableCell};
+use medea_reactive::{Guarded, Observable, ObservableCell, ProgressableCell};
 
 use crate::utils::Component;
 
@@ -11,6 +11,7 @@ use crate::{
     peer::{MediaConnections, Receiver, TransceiverSide},
     utils::ObservableSpawner as _,
 };
+use futures::future::LocalBoxFuture;
 use std::rc::Rc;
 
 pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>, RoomCtx>;
@@ -20,9 +21,9 @@ pub struct ReceiverState {
     mid: Option<String>,
     media_type: MediaType,
     sender: MemberId,
-    enabled_individual: ObservableCell<bool>,
-    enabled_general: ObservableCell<bool>,
-    muted: ObservableCell<bool>,
+    enabled_individual: ProgressableCell<bool>,
+    enabled_general: ProgressableCell<bool>,
+    muted: ProgressableCell<bool>,
 }
 
 impl ReceiverState {
@@ -37,9 +38,9 @@ impl ReceiverState {
             mid,
             media_type,
             sender,
-            enabled_general: ObservableCell::new(true),
-            enabled_individual: ObservableCell::new(true),
-            muted: ObservableCell::new(false),
+            enabled_general: ProgressableCell::new(true),
+            enabled_individual: ProgressableCell::new(true),
+            muted: ProgressableCell::new(false),
         }
     }
 
@@ -78,6 +79,17 @@ impl ReceiverState {
             self.muted.set(muted);
         }
     }
+
+    pub fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
+        let fut = futures::future::join_all(vec![
+            self.enabled_general.when_all_processed(),
+            self.enabled_individual.when_all_processed(),
+            self.muted.when_all_processed(),
+        ]);
+        Box::pin(async move {
+            fut.await;
+        })
+    }
 }
 
 impl ReceiverComponent {
@@ -97,26 +109,26 @@ impl ReceiverComponent {
         ctx: Rc<Receiver>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<ReceiverState>,
-        muted: bool,
+        muted: Guarded<bool>,
     ) {
-        ctx.set_muted(muted);
+        ctx.set_muted(*muted);
     }
 
     async fn handle_enabled_individual(
         ctx: Rc<Receiver>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<ReceiverState>,
-        enabled_individual: bool,
+        enabled_individual: Guarded<bool>,
     ) {
-        ctx.set_enabled_individual_state(enabled_individual);
+        ctx.set_enabled_individual_state(*enabled_individual);
     }
 
     async fn handle_enabled_general(
         ctx: Rc<Receiver>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<ReceiverState>,
-        enabled_general: bool,
+        enabled_general: Guarded<bool>,
     ) {
-        ctx.set_enabled_general_state(enabled_general);
+        ctx.set_enabled_general_state(*enabled_general);
     }
 }

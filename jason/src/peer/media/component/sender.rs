@@ -1,9 +1,15 @@
 use crate::utils::{Component, ObservableSpawner};
-use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
-use medea_reactive::ObservableCell;
+use medea_client_api_proto::{
+    MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
+};
+use medea_reactive::{Guarded, ObservableCell, ProgressableCell};
 
-use crate::{api::RoomCtx, peer::Sender};
-use std::rc::Rc;
+use crate::{api::RoomCtx, peer::Sender, MediaKind};
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream, StreamExt};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 pub type SenderComponent = Component<SenderState, Rc<Sender>, RoomCtx>;
 
@@ -12,9 +18,10 @@ pub struct SenderState {
     mid: Option<String>,
     media_type: MediaType,
     receivers: Vec<MemberId>,
-    enabled_individual: ObservableCell<bool>,
-    enabled_general: ObservableCell<bool>,
-    muted: ObservableCell<bool>,
+    enabled_individual: ProgressableCell<bool>,
+    enabled_general: ProgressableCell<bool>,
+    muted: ProgressableCell<bool>,
+    need_local_stream_update: Cell<bool>,
 }
 
 impl SenderState {
@@ -29,9 +36,10 @@ impl SenderState {
             mid,
             media_type,
             receivers,
-            enabled_general: ObservableCell::new(true),
-            enabled_individual: ObservableCell::new(true),
-            muted: ObservableCell::new(false),
+            enabled_general: ProgressableCell::new(true),
+            enabled_individual: ProgressableCell::new(true),
+            muted: ProgressableCell::new(false),
+            need_local_stream_update: Cell::new(false),
         }
     }
 
@@ -70,6 +78,39 @@ impl SenderState {
             self.muted.set(muted);
         }
     }
+
+    pub fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
+        let fut = futures::future::join_all(vec![
+            self.enabled_general.when_all_processed(),
+            self.enabled_individual.when_all_processed(),
+            self.muted.when_all_processed(),
+        ]);
+        Box::pin(async move {
+            fut.await;
+        })
+    }
+
+    pub fn is_local_stream_update_needed(&self) -> bool {
+        self.need_local_stream_update.get()
+    }
+
+    pub fn local_stream_updated(&self) {
+        self.need_local_stream_update.set(false);
+    }
+
+    pub fn media_kind(&self) -> MediaKind {
+        match &self.media_type {
+            MediaType::Audio(_) => MediaKind::Audio,
+            MediaType::Video(_) => MediaKind::Video,
+        }
+    }
+
+    pub fn media_source(&self) -> MediaSourceKind {
+        match &self.media_type {
+            MediaType::Audio(_) => MediaSourceKind::Device,
+            MediaType::Video(video) => video.source_kind,
+        }
+    }
 }
 
 impl SenderComponent {
@@ -89,20 +130,22 @@ impl SenderComponent {
         ctx: Rc<Sender>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<SenderState>,
-        muted: bool,
+        muted: Guarded<bool>,
     ) {
-        ctx.set_muted(muted);
+        ctx.set_muted(*muted);
     }
 
     async fn handle_enabled_individual(
         ctx: Rc<Sender>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<SenderState>,
-        enabled_individual: bool,
+        enabled_individual: Guarded<bool>,
     ) {
-        ctx.set_enabled_individual(enabled_individual);
-        if !enabled_individual {
+        ctx.set_enabled_individual(*enabled_individual);
+        if !*enabled_individual {
             ctx.remove_track().await;
+        } else {
+            state.need_local_stream_update.set(true);
         }
     }
 
@@ -110,8 +153,8 @@ impl SenderComponent {
         ctx: Rc<Sender>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<SenderState>,
-        enabled_general: bool,
+        enabled_general: Guarded<bool>,
     ) {
-        ctx.set_enabled_general(enabled_general);
+        ctx.set_enabled_general(*enabled_general);
     }
 }
