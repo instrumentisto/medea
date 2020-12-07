@@ -1163,7 +1163,7 @@ impl EventHandler for InnerRoom {
         sdp_answer: String,
     ) -> Self::Output {
         let peer = self.state.peers.borrow().get(&peer_id).unwrap().clone();
-        peer.set_remote_sdp_answer(sdp_answer);
+        peer.set_remote_sdp_offer(sdp_answer);
 
         Ok(())
     }

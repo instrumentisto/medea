@@ -8,14 +8,11 @@ use crate::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, Receiver,
     },
 };
-use futures::stream;
+use futures::{stream, StreamExt};
 use medea_client_api_proto::{
     Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
 };
-use medea_reactive::{
-    collections::ProgressableHashMap, Guarded, ObservableCell,
-    ObservableHashMap, ObservableVec,
-};
+use medea_reactive::{collections::ProgressableHashMap, Guarded, ObservableCell, ObservableHashMap, ObservableVec, ProgressableField};
 use std::{cell::RefCell, rc::Rc};
 
 #[derive(Clone, Copy, Debug)]
@@ -32,9 +29,10 @@ pub struct PeerState {
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
+    sdp_offer: ObservableCell<Option<String>>,
+    remote_sdp_offer: RefCell<ProgressableField<Option<String>>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
-    remote_sdp_answer: ObservableCell<Option<String>>,
 }
 
 impl PeerState {
@@ -52,10 +50,11 @@ impl PeerState {
             peer_id,
             ice_servers,
             force_relay,
+            sdp_offer: ObservableCell::new(None),
+            remote_sdp_offer: RefCell::new(ProgressableField::new(None)),
             negotiation_role: ObservableCell::new(negotiation_role),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
-            remote_sdp_answer: ObservableCell::new(None),
         }
     }
 
@@ -95,8 +94,8 @@ impl PeerState {
         self.restart_ice.set(true);
     }
 
-    pub fn set_remote_sdp_answer(&self, new_remote_sdp_offer: String) {
-        self.remote_sdp_answer.set(Some(new_remote_sdp_offer));
+    pub fn set_remote_sdp_offer(&self, new_remote_sdp_offer: String) {
+        *self.remote_sdp_offer.borrow_mut().borrow_mut() = Some(new_remote_sdp_offer);
     }
 
     pub fn add_ice_candidate(&self, ice_candidate: IceCandidate) {
@@ -126,9 +125,10 @@ impl PeerComponent {
             self.state().negotiation_role.subscribe(),
             Self::handle_negotiation_role,
         );
+        let foo = self.state().remote_sdp_offer.borrow().subscribe();
         self.spawn_task(
-            self.state().remote_sdp_answer.subscribe(),
-            Self::handle_remove_sdp_answer,
+            foo,
+            Self::handle_remote_sdp_offer,
         );
         self.spawn_task(
             self.state().ice_candidates.borrow().on_push(),
@@ -151,15 +151,22 @@ impl PeerComponent {
         .unwrap();
     }
 
-    async fn handle_remove_sdp_answer(
+    async fn handle_remote_sdp_offer(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<PeerState>,
-        remote_sdp_answer: Option<String>,
+        remote_sdp_answer: Guarded<Option<String>>,
     ) {
+        let (remote_sdp_answer, _guard) = remote_sdp_answer.into_parts();
         if let Some(remote_sdp_answer) = remote_sdp_answer {
-            ctx.set_remote_answer(remote_sdp_answer).await.unwrap();
-            state.negotiation_role.set(None);
+            if matches!(state.negotiation_role.get(), Some(NegotiationRole::Offerer)) {
+                ctx.set_remote_answer(remote_sdp_answer).await.unwrap();
+                // state.negotiation_role.set(None);
+                log::debug!("Remote offer set.");
+            } else if matches!(state.negotiation_role.get(), Some(NegotiationRole::Answerer(_))) {
+                log::debug!("Remote answer set.");
+                ctx.set_remote_offer(remote_sdp_answer).await.unwrap();
+            }
         }
     }
 
@@ -181,7 +188,13 @@ impl PeerComponent {
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) {
-        state.receivers.borrow().when_all_processed().await;
+        let fut = state.receivers.borrow().when_all_processed();
+        fut.await;
+        if matches!(state.negotiation_role.get(), Some(NegotiationRole::Answerer(_))) {
+            let fut = state.remote_sdp_offer.borrow().when_all_processed();
+            fut.await;
+        }
+
         log::debug!("Sender inserted");
         let ((track_id, new_sender), _guard) = val.into_parts();
         // TODO: Unwrap here
@@ -268,7 +281,7 @@ impl PeerComponent {
                 ctx.media_connections.sync_receivers();
                 // set offer, which will create transceivers and discover remote
                 // tracks in receivers
-                ctx.set_remote_offer(remote_sdp_offer).await.unwrap();
+                state.set_remote_sdp_offer(remote_sdp_offer);
                 state.senders.borrow().when_all_processed().await;
                 let _ = ctx
                     .update_local_stream(LocalStreamUpdateCriteria::all())
