@@ -8,10 +8,11 @@ use futures::{
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
-/// Reactive hash set based on [`HashSet`] with ability to recognise when all
+/// Reactive hash set based on [`HashSet`] with an ability to recognize when all
 /// updates was processed by subscribers.
 pub type ProgressableHashSet<T> =
     HashSet<T, progressable::SubStore<T>, progressable::Guarded<T>>;
+
 /// Reactive hash set based on [`HashSet`].
 pub type ObservableHashSet<T> = HashSet<T, common::SubStore<T>, T>;
 
@@ -98,14 +99,14 @@ pub struct HashSet<T, S: SubscribersStore<T, O>, O> {
     /// Data stored by this [`HashSet`].
     store: std::collections::HashSet<T>,
 
-    /// Subscribers of the [`HashSet::on_insert`] method.
+    /// Subscribers of the [`HashSet::on_insert()`] method.
     on_insert_subs: S,
 
-    /// Subscribers of the [`HashSet::on_remove`] method.
+    /// Subscribers of the [`HashSet::on_remove()`] method.
     on_remove_subs: S,
 
-    /// Phantom type of [`HashSet::on_insert`] and
-    /// [`HashSet::on_remove`] output.
+    /// Phantom type of [`HashSet::on_insert()`] and [`HashSet::on_remove()`]
+    /// output.
     _output: PhantomData<O>,
 }
 
@@ -113,8 +114,8 @@ impl<T> ProgressableHashSet<T>
 where
     T: Clone + 'static,
 {
-    /// Returns [`Future`] which will be resolved when all push updates will be
-    /// processed by [`HashSet::on_insert`] subscribers.
+    /// Returns [`Future`] resolving when all push updates will be processed by
+    /// [`HashSet::on_insert()`] subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -123,8 +124,8 @@ where
         self.on_insert_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when all remove updates will
-    /// be processed by [`HashSet::on_remove`] subscribers.
+    /// Returns [`Future`] resolving when all remove updates will be processed
+    /// by [`HashSet::on_remove()`] subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -133,8 +134,8 @@ where
         self.on_remove_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when all insert and remove
-    /// updates will be processed by subscribers.
+    /// Returns [`Future`] resolving when all insert and remove updates will be
+    /// processed by subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -151,36 +152,36 @@ where
 }
 
 impl<T, S: SubscribersStore<T, O>, O> HashSet<T, S, O> {
-    /// Returns new empty [`HashSet`].
-    #[must_use]
+    /// Creates new empty [`HashSet`].
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// An iterator visiting all elements in arbitrary order. The iterator
-    /// element type is `&'a T`.
+    /// Returns [`Iterator`] visiting all values in an arbitrary order.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.into_iter()
     }
 
-    /// Returns the [`Stream`] to which the inserted values will be
-    /// sent.
+    /// Returns [`Stream`] yielding inserted values to this [`HashSet`].
     ///
     /// [`Stream`]: futures::Stream
     #[inline]
+    #[must_use]
     pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
         self.on_insert_subs.subscribe()
     }
 
-    /// Returns the [`Stream`] to which the removed values will be sent.
+    /// Returns the [`Stream`] yielding removed values from this [`HashSet`].
     ///
-    /// Note that to this [`Stream`] will be sent all items of the
-    /// [`HashSet`] on drop.
+    /// Note, that this [`Stream`] will yield all values of this [`HashSet`] on
+    /// [`Drop`].
     ///
     /// [`Stream`]: futures::Stream
     #[inline]
+    #[must_use]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
         self.on_remove_subs.subscribe()
     }
@@ -192,12 +193,12 @@ where
     S: SubscribersStore<T, O>,
     O: 'static,
 {
-    /// Returns [`Stream`] that contains values from this [`HashSet`].
+    /// Returns [`Stream`] containing values from this [`HashSet`].
     ///
     /// Returned [`Stream`] contains only current values. It won't update on new
     /// inserts, but you can merge returned [`Stream`] with a
-    /// [`HashSet::on_insert`] [`Stream`] if you want to process current values
-    /// and values that will be inserted.
+    /// [`HashSet::on_insert()`] [`Stream`] if you want to process current
+    /// values and values that will be inserted.
     ///
     /// [`Stream`]: futures::Stream
     #[inline]
@@ -217,13 +218,13 @@ where
     T: Clone + Hash + Eq + 'static,
     S: SubscribersStore<T, O>,
 {
-    /// Adds a value to the set.
+    /// Adds the `value` to this [`HashSet`].
     ///
-    /// If the set did not have this value present, `true` is returned.
+    /// If it didn't have such `value` present, `true` is returned.
     ///
-    /// If the set did have this value present, `false` is returned.
+    /// If it did have such `value` present, `false` is returned.
     ///
-    /// This will produce [`HashSet::on_insert`] event.
+    /// This will produce [`HashSet::on_inser()t`] event.
     pub fn insert(&mut self, value: T) -> bool {
         if self.store.insert(value.clone()) {
             self.on_insert_subs.send_update(value);
@@ -233,10 +234,9 @@ where
         }
     }
 
-    /// Removes a value from the set. Returns whether the value was present in
-    /// the set.
+    /// Removes the `value` from this [`HashSet`] and returns it, if any.
     ///
-    /// This will produce [`HashSet::on_remove`] event.
+    /// This will produce [`HashSet::on_remove()`] event.
     pub fn remove(&mut self, value: &T) -> Option<T> {
         let value = self.store.take(value);
 
@@ -247,14 +247,13 @@ where
         value
     }
 
-    /// Makes this [`HashSet`] exactly the same as the passed
-    /// [`HashSet`].
+    /// Makes this [`HashSet`] exactly the same as the `updated` one.
     ///
-    /// This function will calculate diff between [`HashSet`] and
-    /// provided [`HashSet`] and will spawn [`HashSet::on_insert`]
-    /// and [`HashSet::on_remove`] if set is changed.
+    /// It will calculate a diff between this [`HashSet`] and the `updated`, and
+    /// will spawn [`HashSet::on_insert()`] and [`HashSet::on_remove()`] if the
+    /// diff is not empty.
     ///
-    /// For the usage example you can read [`HashSet`] doc.
+    /// For the usage example you can read [`HashSet`] docs.
     pub fn update(&mut self, updated: std::collections::HashSet<T>) {
         let removed_elems = self.store.difference(&updated);
         let inserted_elems = updated.difference(&self.store);
@@ -270,8 +269,9 @@ where
         self.store = updated;
     }
 
-    /// Returns `true` if the set contains a value.
+    /// Indicates whether this [`HashSet`] contains the `value`.
     #[inline]
+    #[must_use]
     pub fn contains(&self, value: &T) -> bool {
         self.store.contains(value)
     }
@@ -309,7 +309,7 @@ where
     S: SubscribersStore<T, O>,
 {
     /// Sends all values of a dropped [`HashSet`] to the
-    /// [`HashSet::on_remove`] subs.
+    /// [`HashSet::on_remove()`] subscriptions.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;

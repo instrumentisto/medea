@@ -81,8 +81,6 @@ where
     /// the given `assert_fn` returns `true` on.
     ///
     /// [`Future`]: std::future::Future
-    // TODO: This is kinda broken.
-    //       See https://github.com/instrumentisto/medea/issues/163 issue.
     pub fn when<F>(
         &self,
         assert_fn: F,
@@ -90,6 +88,8 @@ where
     where
         F: Fn(&D) -> bool + 'static,
     {
+        // TODO: This is kinda broken.
+        //       See https://github.com/instrumentisto/medea/issues/163 issue.
         if (assert_fn)(&self.data) {
             Box::pin(futures::future::ok(()))
         } else {
@@ -101,8 +101,8 @@ where
 impl<D: 'static> Progressable<D> {
     /// Returns new [`ObservableField`] with subscribable mutations.
     ///
-    /// Also you can wait for all updates processing by awaiting on
-    /// [`ObservableField::when_all_processed`].
+    /// Also, you can wait for all updates processing by awaiting on
+    /// [`ObservableField::when_all_processed()`].
     #[inline]
     pub fn new(data: D) -> Self {
         Self {
@@ -116,8 +116,8 @@ impl<D> Progressable<D>
 where
     D: Clone + 'static,
 {
-    /// Returns [`Stream`] into which underlying data updates wrapped to the
-    /// [`progressable::Guarded`] will be emitted.
+    /// Returns [`Stream`] into which underlying data updates (wrapped in the
+    /// [`progressable::Guarded`]) will be emitted.
     ///
     /// [`Stream`]: futures::Stream
     pub fn subscribe(
@@ -127,8 +127,8 @@ where
         Box::pin(stream::once(async move { data }).chain(self.subs.subscribe()))
     }
 
-    /// Returns [`Future`] which will be resolved when all data updates will be
-    /// processed by subscribers.
+    /// Returns [`Future`] resolving when all data updates will be processed by
+    /// subscribers.
     ///
     /// [`Future`]: std::future::Future
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {

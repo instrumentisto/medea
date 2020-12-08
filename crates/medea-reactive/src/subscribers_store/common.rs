@@ -33,6 +33,7 @@ where
         Box::pin(rx)
     }
 
+    #[inline]
     fn wrap(&self, value: T) -> T {
         value
     }

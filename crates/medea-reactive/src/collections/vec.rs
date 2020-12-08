@@ -9,12 +9,13 @@ use futures::{
 use crate::subscribers_store::{common, progressable, SubscribersStore};
 
 /// Reactive vector based on [`Vec`] with additional functionality of tracking
-/// progress made by its subscribers. Its [`Vec::on_push`] and
-/// [`Vec::on_remove`] subscriptions return values wrapped in
-/// [`progressable::Guarded`], and implementation tracks all
-/// [`progressable::Guard`]'s
+/// progress made by its subscribers. Its [`Vec::on_push()`] and
+/// [`Vec::on_remove()`] subscriptions return values wrapped in a
+/// [`progressable::Guarded`], and the implementation tracks all
+/// [`progressable::Guard`]s.
 pub type ProgressableVec<T> =
     Vec<T, progressable::SubStore<T>, progressable::Guarded<T>>;
+
 /// Reactive vector based on [`Vec`].
 pub type ObservableVec<T> = Vec<T, common::SubStore<T>, T>;
 
@@ -88,7 +89,7 @@ pub struct Vec<T, S: SubscribersStore<T, O>, O> {
     /// Subscribers of the [`Vec::on_remove`] method.
     on_remove_subs: S,
 
-    /// Phantom type of [`Vec::on_push`] and [`Vec::on_remove`] output.
+    /// Phantom type of [`Vec::on_push()`] and [`Vec::on_remove()`] output.
     _output: PhantomData<O>,
 }
 
@@ -96,8 +97,8 @@ impl<T> ProgressableVec<T>
 where
     T: Clone + 'static,
 {
-    /// Returns [`Future`] which will be resolved when all push updates will be
-    /// processed by [`Vec::on_push`] subscribers.
+    /// Returns [`Future`] resolving when all push updates will be processed by
+    /// [`Vec::on_push()`] subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -106,8 +107,8 @@ where
         self.on_push_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when all remove updates will
-    /// be processed by [`Vec::on_remove`] subscribers.
+    /// Returns [`Future`] resolving when all remove updates will be processed
+    /// by [`Vec::on_remove()`] subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -116,8 +117,8 @@ where
         self.on_remove_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when all push and remove
-    /// updates will be processed by subscribers.
+    /// Returns [`Future`] resolving when all push and remove updates will be
+    /// processed by subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -174,19 +175,19 @@ where
     S: SubscribersStore<T, O>,
     O: 'static,
 {
-    /// Appends an element to the back of a collection.
+    /// Appends a value to the back of this [`Vec`].
     ///
-    /// This will produce [`Vec::on_push`] event.
+    /// This will produce [`Vec::on_push()`] event.
     pub fn push(&mut self, value: T) {
         self.store.push(value.clone());
 
         self.on_push_subs.send_update(value);
     }
 
-    /// Removes and returns the element at position `index` within the vector,
-    /// shifting all elements after it to the left.
+    /// Removes and returns the value at position `index` within this [`Vec`],
+    /// shifting all values after it to the left.
     ///
-    /// This will produce [`Vec::on_remove`] event.
+    /// This will produce [`Vec::on_remove()`] event.
     pub fn remove(&mut self, index: usize) -> T {
         let value = self.store.remove(index);
         self.on_remove_subs.send_update(value.clone());
@@ -194,7 +195,7 @@ where
         value
     }
 
-    /// Returns [`Stream`] that contains values from this [`Vec`].
+    /// Returns [`Stream`] containing values from this [`Vec`].
     ///
     /// Returned [`Stream`] contains only current values. It won't update on new
     /// pushes, but you can merge returned [`Stream`] with a [`Vec::on_push`]
@@ -249,8 +250,8 @@ impl<'a, T, S: SubscribersStore<T, O>, O> IntoIterator for &'a Vec<T, S, O> {
 }
 
 impl<T, S: SubscribersStore<T, O>, O> Drop for Vec<T, S, O> {
-    /// Sends all items of a dropped [`Vec`] to the
-    /// [`Vec::on_remove`] subs.
+    /// Sends all items of a dropped [`Vec`] to the [`Vec::on_remove()`]
+    /// subscriptions.
     fn drop(&mut self) {
         let store = &mut self.store;
         let on_remove_subs = &self.on_remove_subs;

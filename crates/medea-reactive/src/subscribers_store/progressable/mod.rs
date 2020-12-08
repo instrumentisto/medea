@@ -66,6 +66,7 @@ where
         Box::pin(rx)
     }
 
+    #[inline]
     fn wrap(&self, value: T) -> Guarded<T> {
         Guarded::wrap(value, Rc::clone(&self.counter))
     }
