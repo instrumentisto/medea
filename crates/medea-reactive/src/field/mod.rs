@@ -34,7 +34,7 @@ pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 ///
 /// Can recognise when all updates was processed by subscribers.
-pub type ProgressableField<D> = ObservableField<D, progressable::SubStore<D>>;
+pub type Progressable<D> = ObservableField<D, progressable::SubStore<D>>;
 
 /// Reactive cell which emits all modifications to its subscribers.
 ///
@@ -102,7 +102,7 @@ where
     }
 }
 
-impl<D: 'static> ProgressableField<D> {
+impl<D: 'static> Progressable<D> {
     /// Returns new [`ObservableField`] with subscribable mutations.
     ///
     /// Also you can wait for all updates processing by awaiting on
@@ -116,7 +116,7 @@ impl<D: 'static> ProgressableField<D> {
     }
 }
 
-impl<D> ProgressableField<D>
+impl<D> Progressable<D>
 where
     D: Clone + 'static,
 {
@@ -413,7 +413,7 @@ mod tests {
     use futures::{poll, task::Poll, StreamExt as _};
     use tokio::time::timeout;
 
-    use crate::{Observable, ProgressableField};
+    use crate::{Observable, Progressable};
 
     #[tokio::test]
     async fn subscriber_receives_current_data() {
@@ -557,7 +557,7 @@ mod tests {
 
     #[tokio::test]
     async fn when_all_processed_works() {
-        let mut field = ProgressableField::new(1);
+        let mut field = Progressable::new(1);
         assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
         *field.borrow_mut() = 2;
         assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
