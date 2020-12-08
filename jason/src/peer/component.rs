@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::{future::LocalBoxFuture, stream};
 use medea_client_api_proto::{
-    Command, IceCandidate, IceServer, NegotiationRole, TrackId,
+    Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
 };
 use medea_reactive::{
     collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
@@ -21,6 +21,7 @@ use crate::{
 use super::PeerConnection;
 
 pub struct PeerState {
+    id: PeerId,
     senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
     receivers: ProgressableHashMap<TrackId, Rc<ReceiverState>>,
     ice_servers: Vec<IceServer>,
@@ -33,6 +34,7 @@ pub struct PeerState {
 
 impl PeerState {
     pub fn new(
+        id: PeerId,
         senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
         receivers: ProgressableHashMap<TrackId, Rc<ReceiverState>>,
         ice_servers: Vec<IceServer>,
@@ -40,6 +42,7 @@ impl PeerState {
         negotiation_role: Option<NegotiationRole>,
     ) -> Self {
         Self {
+            id,
             senders,
             receivers,
             ice_servers,
@@ -149,34 +152,34 @@ impl PeerComponent {
                 self.state().senders.replay_on_insert(),
                 self.state().senders.on_insert(),
             ),
-            Self::handle_sender_insert,
+            Self::observe_sender_insert,
         );
         self.spawn_observer(
             stream::select(
                 self.state().receivers.replay_on_insert(),
                 self.state().receivers.on_insert(),
             ),
-            Self::handle_receiver_insert,
+            Self::observe_receiver_insert,
         );
         self.spawn_observer(
             self.state().negotiation_role.subscribe(),
-            Self::handle_negotiation_role,
+            Self::observe_negotiation_role,
         );
         self.spawn_observer(
             self.state().remote_sdp_offer.subscribe(),
-            Self::handle_remote_sdp_offer,
+            Self::observe_remote_sdp_offer,
         );
         self.spawn_observer(
             self.state().ice_candidates.borrow().on_push(),
-            Self::handle_ice_candidate_push,
+            Self::observe_ice_candidate_push,
         );
         self.spawn_observer(
             self.state().restart_ice.subscribe(),
-            Self::handle_ice_restart,
+            Self::observe_ice_restart,
         );
     }
 
-    async fn handle_ice_candidate_push(
+    async fn observe_ice_candidate_push(
         ctx: Rc<PeerConnection>,
         _: Rc<RoomCtx>,
         _: Rc<PeerState>,
@@ -191,7 +194,7 @@ impl PeerComponent {
         .unwrap();
     }
 
-    async fn handle_remote_sdp_offer(
+    async fn observe_remote_sdp_offer(
         ctx: Rc<PeerConnection>,
         _: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -214,7 +217,7 @@ impl PeerComponent {
         }
     }
 
-    async fn handle_ice_restart(
+    async fn observe_ice_restart(
         ctx: Rc<PeerConnection>,
         _: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -226,7 +229,7 @@ impl PeerComponent {
         }
     }
 
-    async fn handle_sender_insert(
+    async fn observe_sender_insert(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -242,6 +245,9 @@ impl PeerComponent {
         }
 
         let ((track_id, new_sender), _guard) = val.into_parts();
+        for receiver in new_sender.receivers() {
+            global_ctx.connections.create_connection(state.id, receiver);
+        }
         let sndr = SenderBuilder {
             media_connections: &ctx.media_connections,
             track_id,
@@ -262,13 +268,16 @@ impl PeerComponent {
         ctx.media_connections.insert_sender(component);
     }
 
-    async fn handle_receiver_insert(
+    async fn observe_receiver_insert(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
-        _: Rc<PeerState>,
+        state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) {
         let ((track_id, new_receiver), _guard) = val.into_parts();
+        global_ctx
+            .connections
+            .create_connection(state.id, new_receiver.sender());
         let recv = Receiver::new(
             &ctx.media_connections,
             track_id,
@@ -286,7 +295,7 @@ impl PeerComponent {
         ctx.media_connections.insert_receiver(component);
     }
 
-    async fn handle_negotiation_role(
+    async fn observe_negotiation_role(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<PeerState>,

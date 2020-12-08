@@ -423,27 +423,6 @@ impl PeerConnection {
         self.id
     }
 
-    /// Updates [`Sender`]s and [`Receiver`]s of this [`PeerConnection`] with
-    /// [`proto::TrackPatchEvent`].
-    ///
-    /// Returns [`LocalStreamUpdateCriteria`] with which [`local::Track`]s
-    /// updating should be started.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// provided [`proto::TrackPatchEvent`] contains unknown ID.
-    pub async fn patch_tracks(
-        &self,
-        tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<LocalStreamUpdateCriteria> {
-        Ok(self
-            .media_connections
-            .patch_tracks(tracks)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?)
-    }
-
     /// Handle `icecandidate` event from underlying peer emitting
     /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
     /// `peer_events_sender`.

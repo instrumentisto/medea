@@ -48,6 +48,10 @@ use crate::{
 
 pub struct RoomCtx {
     pub rpc: Rc<dyn RpcSession>,
+    /// Collection of [`Connection`]s with a remote `Member`s.
+    ///
+    /// [`Connection`]: crate::api::Connection
+    pub connections: Rc<Connections>,
 }
 
 pub struct RoomState {
@@ -68,11 +72,15 @@ impl RoomComponent {
     pub fn spawn(&self) {
         self.spawn_observer(
             self.state().peers.on_insert(),
-            Self::handle_insert_peer,
+            Self::observe_insert_peer,
+        );
+        self.spawn_observer(
+            self.state().peers.on_remove(),
+            Self::observe_remove_peer,
         );
     }
 
-    async fn handle_insert_peer(
+    async fn observe_insert_peer(
         ctx: RefCell<Weak<InnerRoom>>,
         global_ctx: Rc<RoomCtx>,
         _: Rc<RoomState>,
@@ -95,6 +103,15 @@ impl RoomComponent {
         component.spawn();
 
         room.peers.insert_peer(peer_id, component);
+    }
+
+    async fn observe_remove_peer(
+        _: RefCell<Weak<InnerRoom>>,
+        global_ctx: Rc<RoomCtx>,
+        _: Rc<RoomState>,
+        (peer_id, _): (PeerId, Rc<PeerState>),
+    ) {
+        global_ctx.connections.close_connection(peer_id);
     }
 }
 
@@ -700,10 +717,6 @@ impl Room {
         Self(room)
     }
 
-    pub fn insert_peer(&self, peer_id: PeerId, peer: PeerComponent) {
-        self.0.peers.insert_peer(peer_id, peer)
-    }
-
     /// Sets `close_reason` and consumes this [`Room`].
     ///
     /// [`Room`] [`Drop`] triggers `on_close` callback with provided
@@ -787,7 +800,7 @@ struct InnerRoom {
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
     /// [`Connection`]: crate::api::Connection
-    connections: Connections,
+    connections: Rc<Connections>,
 
     /// Callback to be invoked when new local [`local::JsTrack`] will be added
     /// to this [`Room`].
@@ -823,9 +836,13 @@ impl InnerRoom {
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Rc<Self> {
         let room_state = Rc::new(RoomState::new());
+        let connections = Rc::new(Connections::default());
         let room_component = RoomComponent::without_context(
             Rc::clone(&room_state),
-            Rc::new(RoomCtx { rpc: rpc.clone() }),
+            Rc::new(RoomCtx {
+                rpc: rpc.clone(),
+                connections: Rc::clone(&connections),
+            }),
         );
         let this = Rc::new(Self {
             rpc,
@@ -835,7 +852,7 @@ impl InnerRoom {
             peer_event_sender,
             state: room_state,
             component: room_component,
-            connections: Connections::default(),
+            connections,
             on_connection_loss: Callback1::default(),
             on_failed_local_media: Rc::new(Callback1::default()),
             on_local_track: Callback1::default(),
@@ -1126,6 +1143,7 @@ impl EventHandler for InnerRoom {
             }
         }
         let peer_state = PeerState::new(
+            peer_id,
             senders,
             receivers,
             ice_servers,
@@ -1133,20 +1151,6 @@ impl EventHandler for InnerRoom {
             Some(negotiation_role),
         );
         self.state.peers.insert(peer_id, Rc::new(peer_state));
-
-        // TODO: move this to the SenderComponent/ReceiverComponent observers
-        for track in &tracks {
-            match &track.direction {
-                Direction::Recv { sender, .. } => {
-                    self.connections.create_connection(peer_id, sender);
-                }
-                Direction::Send { receivers, .. } => {
-                    for receiver in receivers {
-                        self.connections.create_connection(peer_id, receiver);
-                    }
-                }
-            }
-        }
 
         Ok(())
     }
@@ -1178,8 +1182,6 @@ impl EventHandler for InnerRoom {
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         peer_ids.iter().for_each(|id| {
-            // TODO: do this in observer
-            self.connections.close_connection(*id);
             self.peers.remove(*id);
         });
         Ok(())

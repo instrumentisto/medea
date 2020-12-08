@@ -534,48 +534,14 @@ impl MediaConnections {
         self.0
             .borrow_mut()
             .senders
-            .insert(sender.ctx().track_id(), sender);
+            .insert(sender.state().id(), sender);
     }
 
     pub fn insert_receiver(&self, receiver: ReceiverComponent) {
         self.0
             .borrow_mut()
             .receivers
-            .insert(receiver.ctx().track_id(), receiver);
-    }
-
-    /// Updates [`Sender`]s and [`Receiver`]s of this [`super::PeerConnection`]
-    /// with [`proto::TrackPatchEvent`].
-    ///
-    /// Returns [`MediaKind`] and [`MediaSourceKind`] for which local media
-    /// stream should be updated.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`MediaConnectionsError::InvalidTrackPatch`] if
-    /// [`proto::Track`] with ID from [`proto::TrackPatchEvent`] doesn't exist.
-    pub async fn patch_tracks(
-        &self,
-        tracks: Vec<proto::TrackPatchEvent>,
-    ) -> Result<LocalStreamUpdateCriteria> {
-        let mut result = LocalStreamUpdateCriteria::empty();
-        for track_proto in tracks {
-            if let Some(sender) = self.get_sender_by_id(track_proto.id) {
-                if sender.update(&track_proto).await {
-                    result.add(sender.kind(), sender.source_kind());
-                }
-            } else if let Some(receiver) =
-                self.0.borrow_mut().receivers.get_mut(&track_proto.id)
-            {
-                // Patch state
-                receiver.ctx().update(&track_proto);
-            } else {
-                return Err(tracerr::new!(
-                    MediaConnectionsError::InvalidTrackPatch(track_proto.id)
-                ));
-            }
-        }
-        Ok(result)
+            .insert(receiver.state().id(), receiver);
     }
 
     /// Returns [`TracksRequest`] based on [`Sender`]s in this
@@ -587,7 +553,9 @@ impl MediaConnections {
     ) -> Option<TracksRequest> {
         let mut stream_request = None;
         for sender in self.0.borrow().senders.values() {
-            if kinds.has(sender.ctx().kind(), sender.ctx().source_kind()) {
+            if kinds
+                .has(sender.state().media_kind(), sender.state().media_source())
+            {
                 stream_request
                     .get_or_insert_with(TracksRequest::default)
                     .add_track_request(
@@ -717,12 +685,6 @@ impl MediaConnections {
                 }
             }
         }
-    }
-
-    /// Returns [`Sender`] from this [`MediaConnections`] by [`TrackId`].
-    #[inline]
-    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
-        self.0.borrow().senders.get(&id).map(|s| s.ctx())
     }
 
     /// Returns all references to the [`TransceiverSide`]s from this

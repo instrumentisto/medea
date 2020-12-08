@@ -184,24 +184,6 @@ impl Receiver {
         self.media_exchange_state_controller.update(enabled.into());
     }
 
-    /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].
-    pub fn update(&self, track_patch: &TrackPatchEvent) {
-        if self.track_id != track_patch.id {
-            return;
-        }
-        if let Some(enabled) = track_patch.enabled_general {
-            self.update_general_media_exchange_state(enabled.into());
-        }
-        if let Some(enabled) = track_patch.enabled_individual {
-            self.media_exchange_state_controller.update(enabled.into());
-        }
-        if let Some(muted) = track_patch.muted {
-            if let Some(track) = self.track.borrow().as_ref() {
-                track.set_enabled(!muted);
-            }
-        }
-    }
-
     pub fn set_muted(&self, muted: bool) {
         if let Some(track) = self.track.borrow().as_ref() {
             track.set_enabled(!muted);
@@ -281,13 +263,6 @@ impl Receiver {
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.media_exchange_state_controller.enabled()
-    }
-
-    /// Indicates whether this [`Receiver`] is disabled.
-    #[inline]
-    #[must_use]
-    pub fn disabled(&self) -> bool {
-        self.media_exchange_state_controller.disabled()
     }
 }
 

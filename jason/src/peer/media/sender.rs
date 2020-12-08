@@ -191,54 +191,6 @@ impl Sender {
         }
     }
 
-    /// Updates this [`Sender`]s tracks based on the provided
-    /// [`TrackPatchEvent`].
-    ///
-    /// Returns `true` if media stream update should be performed for this
-    /// [`Sender`].
-    pub async fn update(&self, track: &TrackPatchEvent) -> bool {
-        if track.id != self.track_id {
-            return false;
-        }
-
-        if let Some(muted) = track.muted {
-            self.mute_state.update(muted.into());
-            match mute_state::Stable::from(muted) {
-                mute_state::Stable::Unmuted => {
-                    self.transceiver.set_send_track_enabled(true);
-                }
-                mute_state::Stable::Muted => {
-                    self.transceiver.set_send_track_enabled(false);
-                }
-            }
-        }
-        let mut requires_media_update = false;
-        if let Some(enabled) = track.enabled_individual {
-            let mute_state_before = self.media_exchange_state.state();
-            self.media_exchange_state.update(enabled.into());
-            if let (
-                MediaExchangeState::Stable(before),
-                MediaExchangeState::Stable(after),
-            ) = (mute_state_before, self.media_exchange_state.state())
-            {
-                requires_media_update = before != after
-                    && after == media_exchange_state::Stable::Enabled;
-            }
-
-            if !enabled {
-                self.remove_track().await;
-            }
-        }
-        if let Some(enabled) = track.enabled_individual {
-            self.media_exchange_state.update(enabled.into());
-        }
-        if let Some(enabled) = track.enabled_general {
-            self.update_general_media_exchange_state(enabled.into());
-        }
-
-        requires_media_update
-    }
-
     /// Changes underlying transceiver direction to
     /// [`TransceiverDirection::SEND`] if this [`Sender`]s general media
     /// exchange state is [`media_exchange_state::Stable::Enabled`].

@@ -88,16 +88,16 @@ impl ReceiverComponent {
     pub fn spawn(&self) {
         self.spawn_observer(
             self.state().enabled_individual.subscribe(),
-            Self::handle_enabled_individual,
+            Self::observe_enabled_individual,
         );
         self.spawn_observer(
             self.state().enabled_general.subscribe(),
-            Self::handle_enabled_general,
+            Self::observe_enabled_general,
         );
-        self.spawn_observer(self.state().muted.subscribe(), Self::handle_muted);
+        self.spawn_observer(self.state().muted.subscribe(), Self::observe_muted);
     }
 
-    async fn handle_muted(
+    async fn observe_muted(
         ctx: Rc<Receiver>,
         _: Rc<RoomCtx>,
         _: Rc<ReceiverState>,
@@ -106,7 +106,7 @@ impl ReceiverComponent {
         ctx.set_muted(*muted);
     }
 
-    async fn handle_enabled_individual(
+    async fn observe_enabled_individual(
         ctx: Rc<Receiver>,
         _: Rc<RoomCtx>,
         _: Rc<ReceiverState>,
@@ -115,7 +115,7 @@ impl ReceiverComponent {
         ctx.set_enabled_individual_state(*enabled_individual);
     }
 
-    async fn handle_enabled_general(
+    async fn observe_enabled_general(
         ctx: Rc<Receiver>,
         _: Rc<RoomCtx>,
         _: Rc<ReceiverState>,
