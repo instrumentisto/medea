@@ -66,7 +66,7 @@ type RoomComponent = Component<RoomState, RefCell<Weak<InnerRoom>>, RoomCtx>;
 
 impl RoomComponent {
     pub fn spawn(&self) {
-        self.spawn_task(
+        self.spawn_observer(
             self.state().peers.on_insert(),
             Self::handle_insert_peer,
         );
@@ -78,7 +78,6 @@ impl RoomComponent {
         _: Rc<RoomState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
     ) {
-        log::debug!("Peer inserted");
         let room = ctx.borrow().upgrade().unwrap();
         let peer = PeerConnection::new(
             peer_id,
@@ -1109,6 +1108,7 @@ impl EventHandler for InnerRoom {
                             mid.clone(),
                             track.media_type.clone(),
                             receivers.clone(),
+                            &self.send_constraints,
                         )),
                     );
                 }
@@ -1134,6 +1134,7 @@ impl EventHandler for InnerRoom {
         );
         self.state.peers.insert(peer_id, Rc::new(peer_state));
 
+        // TODO: move this to the SenderComponent/ReceiverComponent observers
         for track in &tracks {
             match &track.direction {
                 Direction::Recv { sender, .. } => {
@@ -1177,6 +1178,7 @@ impl EventHandler for InnerRoom {
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         peer_ids.iter().for_each(|id| {
+            // TODO: do this in observer
             self.connections.close_connection(*id);
             self.peers.remove(*id);
         });
@@ -1208,6 +1210,7 @@ impl EventHandler for InnerRoom {
                             mid,
                             track.media_type,
                             receivers,
+                            &self.send_constraints,
                         );
                         peer_state
                             .insert_sender(track.id, Rc::new(sender_state));

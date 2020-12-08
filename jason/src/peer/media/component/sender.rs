@@ -6,7 +6,16 @@ use medea_client_api_proto::{
 };
 use medea_reactive::{Guarded, ProgressableCell};
 
-use crate::{api::RoomCtx, peer::Sender, utils::Component, MediaKind};
+use crate::{
+    api::RoomCtx,
+    media::LocalTracksConstraints,
+    peer::{
+        media::transitable_state::{media_exchange_state, mute_state},
+        PeerEvent, Sender,
+    },
+    utils::Component,
+    MediaKind,
+};
 
 pub type SenderComponent = Component<SenderState, Rc<Sender>, RoomCtx>;
 
@@ -27,15 +36,54 @@ impl SenderState {
         mid: Option<String>,
         media_type: MediaType,
         receivers: Vec<MemberId>,
+        send_constraints: &LocalTracksConstraints,
     ) -> Self {
+        let enabled = if send_constraints.enabled(&media_type) {
+            true
+        } else if media_type.required() {
+            unreachable!()
+            // let e = tracerr::new!(
+            //                 
+            // MediaConnectionsError::CannotDisableRequiredSender
+            //             );
+            // let _ =
+            //     self.0.borrow().peer_events_sender.unbounded_send(
+            //         PeerEvent::FailedLocalMedia {
+            //             error: JasonError::from(e.clone()),
+            //         },
+            //     );
+            //
+            // return Err(e);
+        } else {
+            false
+        };
+        let muted = if !send_constraints.muted(&media_type) {
+            false
+        } else if media_type.required() {
+            unreachable!()
+            // let e = tracerr::new!(
+            //                 
+            // MediaConnectionsError::CannotDisableRequiredSender
+            //             );
+            // let _ =
+            //     self.0.borrow().peer_events_sender.unbounded_send(
+            //         PeerEvent::FailedLocalMedia {
+            //             error: JasonError::from(e.clone()),
+            //         },
+            //     );
+            // return Err(e);
+        } else {
+            true
+        };
+
         Self {
             id,
             mid,
             media_type,
             receivers,
-            enabled_general: ProgressableCell::new(true),
-            enabled_individual: ProgressableCell::new(true),
-            muted: ProgressableCell::new(false),
+            enabled_general: ProgressableCell::new(enabled),
+            enabled_individual: ProgressableCell::new(enabled),
+            muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
         }
     }
@@ -56,11 +104,15 @@ impl SenderState {
         &self.receivers
     }
 
-    pub fn enabled_individual(&self) -> bool {
+    pub fn is_enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
-    pub fn enabled_general(&self) -> bool {
+    pub fn is_muted(&self) -> bool {
+        self.muted.get()
+    }
+
+    pub fn is_enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
 
@@ -112,15 +164,15 @@ impl SenderState {
 
 impl SenderComponent {
     pub fn spawn(&self) {
-        self.spawn_task(
+        self.spawn_observer(
             self.state().enabled_individual.subscribe(),
             Self::handle_enabled_individual,
         );
-        self.spawn_task(
+        self.spawn_observer(
             self.state().enabled_general.subscribe(),
             Self::handle_enabled_general,
         );
-        self.spawn_task(self.state().muted.subscribe(), Self::handle_muted);
+        self.spawn_observer(self.state().muted.subscribe(), Self::handle_muted);
     }
 
     async fn handle_muted(

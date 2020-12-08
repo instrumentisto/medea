@@ -86,15 +86,15 @@ impl ReceiverState {
 
 impl ReceiverComponent {
     pub fn spawn(&self) {
-        self.spawn_task(
+        self.spawn_observer(
             self.state().enabled_individual.subscribe(),
             Self::handle_enabled_individual,
         );
-        self.spawn_task(
+        self.spawn_observer(
             self.state().enabled_general.subscribe(),
             Self::handle_enabled_general,
         );
-        self.spawn_task(self.state().muted.subscribe(), Self::handle_muted);
+        self.spawn_observer(self.state().muted.subscribe(), Self::handle_muted);
     }
 
     async fn handle_muted(

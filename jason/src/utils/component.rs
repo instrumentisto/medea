@@ -51,7 +51,7 @@ impl<S: 'static, C: 'static + Clone, G: 'static> Component<S, C, G> {
     ///
     /// You can stop all listeners tasks spawned by this function by calling
     /// [`TaskDisposer::dispose_tasks`]
-    pub fn spawn_task<R, V, F, O>(&self, mut rx: R, handle: F)
+    pub fn spawn_observer<R, V, F, O>(&self, mut rx: R, handle: F)
     where
         F: Fn(C, Rc<G>, Rc<S>, V) -> O + 'static,
         R: Stream<Item = V> + Unpin + 'static,
@@ -81,12 +81,6 @@ impl<S: 'static, C: 'static + Clone, G: 'static> Component<S, C, G> {
 impl<S, C, G> Component<S, C, G> {
     pub fn state(&self) -> &S {
         &self.state
-    }
-}
-
-impl<S, C, G> HasTaskHandlesStorage for Component<S, C, G> {
-    fn task_handles_storage(&self) -> &TaskHandlesStorage {
-        &self.task_handles
     }
 }
 
