@@ -1,4 +1,4 @@
-use super::ProgressableField;
+use super::Progressable;
 use crate::{
     subscribers_store::progressable, Guarded, MutObservableFieldGuard,
 };
@@ -6,7 +6,7 @@ use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 use std::cell::{Ref, RefCell};
 
 #[derive(Debug)]
-pub struct ProgressableCell<D>(RefCell<ProgressableField<D>>);
+pub struct ProgressableCell<D>(RefCell<Progressable<D>>);
 
 impl<D> ProgressableCell<D>
 where
@@ -14,7 +14,7 @@ where
 {
     #[inline]
     pub fn new(data: D) -> Self {
-        Self(RefCell::new(ProgressableField::new(data)))
+        Self(RefCell::new(Progressable::new(data)))
     }
 
     /// Returns immutable reference to an underlying data.

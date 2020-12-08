@@ -23,7 +23,7 @@
 
 pub mod collections;
 pub mod field;
-mod subscribers_store;
+pub mod subscribers_store;
 
 #[doc(inline)]
 pub use crate::{
@@ -34,7 +34,7 @@ pub use crate::{
     field::{
         cell::ObservableCell, DroppedError, MutObservableFieldGuard,
         Observable, ObservableField, OnObservableFieldModification,
-        ProgressableCell, ProgressableField, UniversalSubscriber, Whenable,
+        Progressable, ProgressableCell, UniversalSubscriber, Whenable,
     },
     subscribers_store::progressable::{Guard, Guarded},
 };
