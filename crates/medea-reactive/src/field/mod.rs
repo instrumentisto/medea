@@ -81,6 +81,8 @@ where
     /// the given `assert_fn` returns `true` on.
     ///
     /// [`Future`]: std::future::Future
+    // TODO: This is kinda broken.
+    //       See https://github.com/instrumentisto/medea/issues/163 issue.
     pub fn when<F>(
         &self,
         assert_fn: F,
@@ -88,12 +90,6 @@ where
     where
         F: Fn(&D) -> bool + 'static,
     {
-        // TODO: This is kinda broken.
-        //       1. Inner value is 0.
-        //       2. let fut = field.when_eq(0).
-        //       3. Change value to 1.
-        //       4. fut.await = Poll::Ready.
-        //       I suggest interior mutability + async fn's.
         if (assert_fn)(&self.data) {
             Box::pin(futures::future::ok(()))
         } else {
@@ -168,6 +164,8 @@ where
     /// value.
     ///
     /// [`Future`]: std::future::Future
+    // TODO: This is kinda broken.
+    //       See https://github.com/instrumentisto/medea/issues/163 issue.
     #[inline]
     pub fn when_eq(
         &self,
