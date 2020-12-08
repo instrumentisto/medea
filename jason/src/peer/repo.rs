@@ -7,12 +7,11 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
+    peer::component::PeerComponent,
     utils::{delay_for, TaskHandle},
 };
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::peer::component::PeerComponent;
-use futures::future::LocalBoxFuture;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]

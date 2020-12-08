@@ -13,17 +13,17 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
 use medea_reactive::DroppedError;
-use proto::{Direction, MediaSourceKind, TrackId};
+use proto::{MediaSourceKind, TrackId};
 use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
 use crate::{
-    media::{track::local, LocalTracksConstraints, MediaKind, RecvConstraints},
+    media::{track::local, MediaKind},
     peer::{
         transceiver::Transceiver, LocalStreamUpdateCriteria, PeerEvent,
         TransceiverDirection,
     },
-    utils::{Component, JasonError, JsCaused, JsError},
+    utils::{JsCaused, JsError},
 };
 
 use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};

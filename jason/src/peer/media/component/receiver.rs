@@ -1,18 +1,10 @@
-use medea_client_api_proto::{
-    MediaType, MemberId, Track, TrackId, TrackPatchEvent,
-};
-use medea_reactive::{Guarded, Observable, ObservableCell, ProgressableCell};
-
-use crate::utils::Component;
-
-use crate::{
-    api::RoomCtx,
-    media::{RecvConstraints, TrackConstraints},
-    peer::{MediaConnections, Receiver, TransceiverSide},
-    utils::ObservableSpawner as _,
-};
-use futures::future::LocalBoxFuture;
 use std::rc::Rc;
+
+use futures::future::LocalBoxFuture;
+use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
+use medea_reactive::{Guarded, ProgressableCell};
+
+use crate::{api::RoomCtx, peer::Receiver, utils::Component};
 
 pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>, RoomCtx>;
 
@@ -107,8 +99,8 @@ impl ReceiverComponent {
 
     async fn handle_muted(
         ctx: Rc<Receiver>,
-        global_ctx: Rc<RoomCtx>,
-        state: Rc<ReceiverState>,
+        _: Rc<RoomCtx>,
+        _: Rc<ReceiverState>,
         muted: Guarded<bool>,
     ) {
         ctx.set_muted(*muted);
@@ -116,8 +108,8 @@ impl ReceiverComponent {
 
     async fn handle_enabled_individual(
         ctx: Rc<Receiver>,
-        global_ctx: Rc<RoomCtx>,
-        state: Rc<ReceiverState>,
+        _: Rc<RoomCtx>,
+        _: Rc<ReceiverState>,
         enabled_individual: Guarded<bool>,
     ) {
         ctx.set_enabled_individual_state(*enabled_individual);
@@ -125,8 +117,8 @@ impl ReceiverComponent {
 
     async fn handle_enabled_general(
         ctx: Rc<Receiver>,
-        global_ctx: Rc<RoomCtx>,
-        state: Rc<ReceiverState>,
+        _: Rc<RoomCtx>,
+        _: Rc<ReceiverState>,
         enabled_general: Guarded<bool>,
     ) {
         ctx.set_enabled_general_state(*enabled_general);

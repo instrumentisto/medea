@@ -1,7 +1,6 @@
 use super::ProgressableField;
 use crate::{
-    subscribers_store::progressable, DroppedError, Guarded,
-    MutObservableFieldGuard,
+    subscribers_store::progressable, Guarded, MutObservableFieldGuard,
 };
 use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 use std::cell::{Ref, RefCell};

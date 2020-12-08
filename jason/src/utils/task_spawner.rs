@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use futures::{future, future::AbortHandle, Future, Stream, StreamExt as _};
 use wasm_bindgen_futures::spawn_local;
@@ -18,54 +18,11 @@ impl TaskHandlesStorage {
 
     /// Aborts all spawned [`Observable`] listeners tasks registered in this
     /// [`TaskHandlesStorage`].
-    pub(self) fn dispose(&self) {
+    pub(super) fn dispose(&self) {
         let handles: Vec<_> = std::mem::take(&mut self.0.borrow_mut());
         for handle in handles {
             handle.abort();
         }
-    }
-}
-
-/// Wrapper around disposable components which will call
-/// [`TaskDisposer::dispose_tasks`] on [`Drop`].
-#[derive(Debug)]
-pub struct RootComponent<T: TaskDisposer>(Rc<T>);
-
-impl<T> RootComponent<T>
-where
-    T: TaskDisposer,
-{
-    pub fn new(component: T) -> Self {
-        Self(Rc::new(component))
-    }
-
-    /// Returns [`Rc`] to the underlying component.
-    ///
-    /// Returned component can be used in the [`Observable`] listeners spawned
-    /// by [`ObservableSpawner::spawn_task`] and it wouldn't dispose component
-    /// on [`Drop`].
-    pub fn reference(&self) -> Rc<T> {
-        Rc::clone(&self.0)
-    }
-}
-
-impl<T> Drop for RootComponent<T>
-where
-    T: TaskDisposer,
-{
-    fn drop(&mut self) {
-        self.0.dispose_tasks();
-    }
-}
-
-impl<T> Deref for RootComponent<T>
-where
-    T: TaskDisposer,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 

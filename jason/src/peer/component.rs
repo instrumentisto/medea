@@ -1,12 +1,12 @@
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{stream, StreamExt};
+use futures::{future::LocalBoxFuture, stream};
 use medea_client_api_proto::{
-    Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
+    Command, IceCandidate, IceServer, NegotiationRole, TrackId,
 };
 use medea_reactive::{
-    collections::ProgressableHashMap, Guarded, ObservableCell,
-    ObservableHashMap, ObservableVec, ProgressableCell, ProgressableField,
+    collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
+    ProgressableCell,
 };
 
 use crate::{
@@ -19,23 +19,13 @@ use crate::{
 };
 
 use super::PeerConnection;
-use futures::future::LocalBoxFuture;
-
-#[derive(Clone, Copy, Debug)]
-enum NegotiationState {
-    HaveRemote,
-    HaveLocal,
-    Stable,
-}
 
 pub struct PeerState {
-    peer_id: PeerId,
     senders: RefCell<ProgressableHashMap<TrackId, Rc<SenderState>>>,
     receivers: RefCell<ProgressableHashMap<TrackId, Rc<ReceiverState>>>,
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
-    sdp_offer: ObservableCell<Option<String>>,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
@@ -45,7 +35,6 @@ impl PeerState {
     pub fn new(
         senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
         receivers: ProgressableHashMap<TrackId, Rc<ReceiverState>>,
-        peer_id: PeerId,
         ice_servers: Vec<IceServer>,
         force_relay: bool,
         negotiation_role: Option<NegotiationRole>,
@@ -53,10 +42,8 @@ impl PeerState {
         Self {
             senders: RefCell::new(senders),
             receivers: RefCell::new(receivers),
-            peer_id,
             ice_servers,
             force_relay,
-            sdp_offer: ObservableCell::new(None),
             remote_sdp_offer: ProgressableCell::new(None),
             negotiation_role: ObservableCell::new(negotiation_role),
             restart_ice: ObservableCell::new(false),
@@ -167,12 +154,16 @@ impl PeerComponent {
             self.state().ice_candidates.borrow().on_push(),
             Self::handle_ice_candidate_push,
         );
+        self.spawn_task(
+            self.state().restart_ice.subscribe(),
+            Self::handle_ice_restart,
+        );
     }
 
     async fn handle_ice_candidate_push(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<RoomCtx>,
-        state: Rc<PeerState>,
+        _: Rc<RoomCtx>,
+        _: Rc<PeerState>,
         candidate: IceCandidate,
     ) {
         ctx.add_ice_candidate(
@@ -186,7 +177,7 @@ impl PeerComponent {
 
     async fn handle_remote_sdp_offer(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<RoomCtx>,
+        _: Rc<RoomCtx>,
         state: Rc<PeerState>,
         remote_sdp_answer: Guarded<Option<String>>,
     ) {
@@ -211,7 +202,7 @@ impl PeerComponent {
 
     async fn handle_ice_restart(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<RoomCtx>,
+        _: Rc<RoomCtx>,
         state: Rc<PeerState>,
         val: bool,
     ) {
@@ -236,7 +227,6 @@ impl PeerComponent {
             state.remote_sdp_offer.when_all_processed().await;
         }
 
-        log::debug!("Sender inserted");
         let ((track_id, new_sender), _guard) = val.into_parts();
         // TODO: Unwrap here
         let sndr = SenderBuilder {
@@ -265,10 +255,9 @@ impl PeerComponent {
     async fn handle_receiver_insert(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
-        state: Rc<PeerState>,
+        _: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) {
-        log::debug!("Receiver inserted");
         let ((track_id, new_receiver), _guard) = val.into_parts();
         let recv = Receiver::new(
             &ctx.media_connections,
@@ -293,17 +282,16 @@ impl PeerComponent {
         state: Rc<PeerState>,
         new_negotiation_role: Option<NegotiationRole>,
     ) {
-        state.restart_ice.when_eq(false).await;
-        // state.when_all_updated().await;
+        state.restart_ice.when_eq(false).await.unwrap();
         if let Some(role) = new_negotiation_role {
             match role {
                 NegotiationRole::Offerer => {
-                    log::debug!("I'm offerer");
                     futures::future::join(
                         state.senders.borrow().when_all_processed(),
                         state.receivers.borrow().when_all_processed(),
                     )
                     .await;
+                    state.when_all_updated().await;
                     let mut criteria = LocalStreamUpdateCriteria::empty();
                     let senders: Vec<_> = state
                         .senders
@@ -332,14 +320,15 @@ impl PeerComponent {
                     ctx.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
-                    log::debug!("I'm answerer");
                     state.receivers.borrow().when_all_processed().await;
+                    // state.when_all_receivers_updated().await;
                     ctx.media_connections.sync_receivers();
                     // set offer, which will create transceivers and discover
                     // remote tracks in receivers
                     state.set_remote_sdp_offer(remote_sdp_offer);
                     state.remote_sdp_offer.when_all_processed().await;
                     state.senders.borrow().when_all_processed().await;
+                    // state.when_all_senders_updated().await;
                     let mut criteria = LocalStreamUpdateCriteria::empty();
                     let senders: Vec<_> = state
                         .senders

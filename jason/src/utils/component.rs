@@ -1,9 +1,12 @@
-use std::rc::{Rc, Weak};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
+
+use futures::{future, Future, Stream, StreamExt};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::task_spawner::{HasTaskHandlesStorage, TaskHandlesStorage};
-use futures::{future, Future, Stream, StreamExt};
-use std::cell::RefCell;
-use wasm_bindgen_futures::spawn_local;
 
 pub struct Component<S, C, G> {
     state: Rc<S>,
@@ -84,5 +87,11 @@ impl<S, C, G> Component<S, C, G> {
 impl<S, C, G> HasTaskHandlesStorage for Component<S, C, G> {
     fn task_handles_storage(&self) -> &TaskHandlesStorage {
         &self.task_handles
+    }
+}
+
+impl<S, C, G> Drop for Component<S, C, G> {
+    fn drop(&mut self) {
+        self.task_handles.dispose();
     }
 }

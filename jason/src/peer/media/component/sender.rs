@@ -1,15 +1,12 @@
-use crate::utils::{Component, ObservableSpawner};
+use std::{cell::Cell, rc::Rc};
+
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
-use medea_reactive::{Guarded, ObservableCell, ProgressableCell};
+use medea_reactive::{Guarded, ProgressableCell};
 
-use crate::{api::RoomCtx, peer::Sender, MediaKind};
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream, StreamExt};
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-};
+use crate::{api::RoomCtx, peer::Sender, utils::Component, MediaKind};
 
 pub type SenderComponent = Component<SenderState, Rc<Sender>, RoomCtx>;
 
@@ -128,8 +125,8 @@ impl SenderComponent {
 
     async fn handle_muted(
         ctx: Rc<Sender>,
-        global_ctx: Rc<RoomCtx>,
-        state: Rc<SenderState>,
+        _: Rc<RoomCtx>,
+        _: Rc<SenderState>,
         muted: Guarded<bool>,
     ) {
         ctx.set_muted(*muted);
@@ -137,7 +134,7 @@ impl SenderComponent {
 
     async fn handle_enabled_individual(
         ctx: Rc<Sender>,
-        global_ctx: Rc<RoomCtx>,
+        _: Rc<RoomCtx>,
         state: Rc<SenderState>,
         enabled_individual: Guarded<bool>,
     ) {
@@ -151,8 +148,8 @@ impl SenderComponent {
 
     async fn handle_enabled_general(
         ctx: Rc<Sender>,
-        global_ctx: Rc<RoomCtx>,
-        state: Rc<SenderState>,
+        _: Rc<RoomCtx>,
+        _: Rc<SenderState>,
         enabled_general: Guarded<bool>,
     ) {
         ctx.set_enabled_general(*enabled_general);

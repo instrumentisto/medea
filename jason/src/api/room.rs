@@ -17,7 +17,7 @@ use medea_client_api_proto::{
     MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
     TrackId, TrackUpdate,
 };
-use medea_reactive::ObservableHashMap;
+use medea_reactive::{collections::ProgressableHashMap, ObservableHashMap};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -45,8 +45,6 @@ use crate::{
     },
     JsMediaSourceKind,
 };
-use medea_client_api_proto::stats::TrackStats;
-use medea_reactive::collections::ProgressableHashMap;
 
 pub struct RoomCtx {
     pub rpc: Rc<dyn RpcSession>,
@@ -77,7 +75,7 @@ impl RoomComponent {
     async fn handle_insert_peer(
         ctx: RefCell<Weak<InnerRoom>>,
         global_ctx: Rc<RoomCtx>,
-        state: Rc<RoomState>,
+        _: Rc<RoomState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
     ) {
         log::debug!("Peer inserted");
@@ -1130,7 +1128,6 @@ impl EventHandler for InnerRoom {
         let peer_state = PeerState::new(
             senders,
             receivers,
-            peer_id,
             ice_servers,
             is_force_relayed,
             Some(negotiation_role),

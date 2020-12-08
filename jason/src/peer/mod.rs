@@ -23,7 +23,7 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    self as proto, stats::StatId, Direction, IceConnectionState, IceServer,
+    self as proto, stats::StatId, IceConnectionState, IceServer,
     MediaSourceKind, MemberId, PeerConnectionState, PeerId as Id, PeerId,
     TrackId,
 };
