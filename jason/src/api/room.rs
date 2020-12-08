@@ -51,13 +51,13 @@ pub struct RoomCtx {
 }
 
 pub struct RoomState {
-    peers: RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>,
+    peers: ObservableHashMap<PeerId, Rc<PeerState>>,
 }
 
 impl RoomState {
     pub fn new() -> Self {
         Self {
-            peers: RefCell::new(ObservableHashMap::new()),
+            peers: ObservableHashMap::new(),
         }
     }
 }
@@ -67,7 +67,7 @@ type RoomComponent = Component<RoomState, RefCell<Weak<InnerRoom>>, RoomCtx>;
 impl RoomComponent {
     pub fn spawn(&self) {
         self.spawn_task(
-            self.state().peers.borrow().on_insert(),
+            self.state().peers.on_insert(),
             Self::handle_insert_peer,
         );
     }
@@ -1097,8 +1097,8 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let mut senders = ProgressableHashMap::new();
-        let mut receivers = ProgressableHashMap::new();
+        let senders = ProgressableHashMap::new();
+        let receivers = ProgressableHashMap::new();
         for track in &tracks {
             match &track.direction {
                 Direction::Send { receivers, mid } => {
@@ -1132,10 +1132,7 @@ impl EventHandler for InnerRoom {
             is_force_relayed,
             Some(negotiation_role),
         );
-        self.state
-            .peers
-            .borrow_mut()
-            .insert(peer_id, Rc::new(peer_state));
+        self.state.peers.insert(peer_id, Rc::new(peer_state));
 
         for track in &tracks {
             match &track.direction {
@@ -1159,7 +1156,7 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         sdp_answer: String,
     ) -> Self::Output {
-        let peer = self.state.peers.borrow().get(&peer_id).unwrap().clone();
+        let peer = self.state.peers.get(&peer_id, Clone::clone).unwrap();
         peer.set_remote_sdp_offer(sdp_answer);
 
         Ok(())
@@ -1171,7 +1168,7 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         candidate: IceCandidate,
     ) -> Self::Output {
-        let peer = self.state.peers.borrow().get(&peer_id).unwrap().clone();
+        let peer = self.state.peers.get(&peer_id, Clone::clone).unwrap();
         peer.add_ice_candidate(candidate);
 
         Ok(())
@@ -1200,8 +1197,7 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer_state =
-            self.state.peers.borrow().get(&peer_id).unwrap().clone();
+        let peer_state = self.state.peers.get(&peer_id, |s| s.clone()).unwrap();
 
         for update in updates {
             match update {

@@ -21,8 +21,8 @@ use crate::{
 use super::PeerConnection;
 
 pub struct PeerState {
-    senders: RefCell<ProgressableHashMap<TrackId, Rc<SenderState>>>,
-    receivers: RefCell<ProgressableHashMap<TrackId, Rc<ReceiverState>>>,
+    senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
+    receivers: ProgressableHashMap<TrackId, Rc<ReceiverState>>,
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
@@ -40,8 +40,8 @@ impl PeerState {
         negotiation_role: Option<NegotiationRole>,
     ) -> Self {
         Self {
-            senders: RefCell::new(senders),
-            receivers: RefCell::new(receivers),
+            senders,
+            receivers,
             ice_servers,
             force_relay,
             remote_sdp_offer: ProgressableCell::new(None),
@@ -60,7 +60,7 @@ impl PeerState {
     }
 
     pub fn insert_sender(&self, track_id: TrackId, sender: Rc<SenderState>) {
-        self.senders.borrow_mut().insert(track_id, sender);
+        self.senders.insert(track_id, sender);
     }
 
     pub fn insert_receiver(
@@ -68,15 +68,15 @@ impl PeerState {
         track_id: TrackId,
         receiver: Rc<ReceiverState>,
     ) {
-        self.receivers.borrow_mut().insert(track_id, receiver);
+        self.receivers.insert(track_id, receiver);
     }
 
     pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<SenderState>> {
-        self.senders.borrow().get(&track_id).cloned()
+        self.senders.get(&track_id, |s| s.clone())
     }
 
     pub fn get_receiver(&self, track_id: TrackId) -> Option<Rc<ReceiverState>> {
-        self.receivers.borrow().get(&track_id).cloned()
+        self.receivers.get(&track_id, |s| s.clone())
     }
 
     pub fn set_negotiation_role(&self, negotiation_role: NegotiationRole) {
@@ -96,18 +96,16 @@ impl PeerState {
     }
 
     fn when_all_senders_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join_all(
-            self.senders.borrow().values().map(|s| s.when_updated()),
-        );
+        let when_futs: Vec<_> = self.senders.map_values(|s| s.when_updated());
+        let fut = futures::future::join_all(when_futs);
         Box::pin(async move {
             fut.await;
         })
     }
 
     fn when_all_receivers_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join_all(
-            self.receivers.borrow().values().map(|s| s.when_updated()),
-        );
+        let when_futs: Vec<_> = self.receivers.map_values(|s| s.when_updated());
+        let fut = futures::future::join_all(when_futs);
         Box::pin(async move {
             fut.await;
         })
@@ -130,15 +128,15 @@ impl PeerComponent {
     pub fn spawn(&self) {
         self.spawn_task(
             stream::select(
-                self.state().senders.borrow().replay_on_insert(),
-                self.state().senders.borrow().on_insert(),
+                self.state().senders.replay_on_insert(),
+                self.state().senders.on_insert(),
             ),
             Self::handle_sender_insert,
         );
         self.spawn_task(
             stream::select(
-                self.state().receivers.borrow().replay_on_insert(),
-                self.state().receivers.borrow().on_insert(),
+                self.state().receivers.replay_on_insert(),
+                self.state().receivers.on_insert(),
             ),
             Self::handle_receiver_insert,
         );
@@ -218,7 +216,7 @@ impl PeerComponent {
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) {
-        let fut = state.receivers.borrow().when_all_processed();
+        let fut = state.receivers.when_all_processed();
         fut.await;
         if matches!(
             state.negotiation_role.get(),
@@ -287,19 +285,20 @@ impl PeerComponent {
             match role {
                 NegotiationRole::Offerer => {
                     futures::future::join(
-                        state.senders.borrow().when_all_processed(),
-                        state.receivers.borrow().when_all_processed(),
+                        state.senders.when_all_processed(),
+                        state.receivers.when_all_processed(),
                     )
                     .await;
                     state.when_all_updated().await;
                     let mut criteria = LocalStreamUpdateCriteria::empty();
-                    let senders: Vec<_> = state
-                        .senders
-                        .borrow()
-                        .values()
-                        .filter(|s| s.is_local_stream_update_needed())
-                        .cloned()
-                        .collect();
+                    let senders: Vec<_> =
+                        state.senders.filter_map_values(|s| {
+                            if s.is_local_stream_update_needed() {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        });
                     for s in &senders {
                         criteria.add(s.media_kind(), s.media_source());
                     }
@@ -320,23 +319,24 @@ impl PeerComponent {
                     ctx.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
-                    state.receivers.borrow().when_all_processed().await;
+                    state.receivers.when_all_processed().await;
                     // state.when_all_receivers_updated().await;
                     ctx.media_connections.sync_receivers();
                     // set offer, which will create transceivers and discover
                     // remote tracks in receivers
                     state.set_remote_sdp_offer(remote_sdp_offer);
                     state.remote_sdp_offer.when_all_processed().await;
-                    state.senders.borrow().when_all_processed().await;
+                    state.senders.when_all_processed().await;
                     // state.when_all_senders_updated().await;
                     let mut criteria = LocalStreamUpdateCriteria::empty();
-                    let senders: Vec<_> = state
-                        .senders
-                        .borrow()
-                        .values()
-                        .filter(|s| s.is_local_stream_update_needed())
-                        .cloned()
-                        .collect();
+                    let senders: Vec<_> =
+                        state.senders.filter_map_values(|s| {
+                            if s.is_local_stream_update_needed() {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        });
                     for s in &senders {
                         criteria.add(s.media_kind(), s.media_source());
                     }

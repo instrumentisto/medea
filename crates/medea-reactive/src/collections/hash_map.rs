@@ -3,6 +3,7 @@
 //! [1]: std::collections::HashMap
 
 use std::{
+    cell::RefCell,
     collections::hash_map::{Iter, Values},
     hash::Hash,
     marker::PhantomData,
@@ -14,6 +15,7 @@ use futures::{
 };
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
+use std::iter::FromIterator;
 
 /// Reactive hash map based on [`HashMap`][1] with additional functionality of
 /// tracking progress made by its subscribers. Its [`HashMap::on_insert`] and
@@ -98,7 +100,7 @@ pub type ObservableHashMap<K, V> =
 #[derive(Debug, Clone)]
 pub struct HashMap<K, V, S: SubscribersStore<(K, V), O>, O> {
     /// Data stored by this [`HashMap`].
-    store: std::collections::HashMap<K, V>,
+    store: RefCell<std::collections::HashMap<K, V>>,
 
     /// Subscribers of the [`HashMap::on_insert`] method.
     on_insert_subs: S,
@@ -161,18 +163,50 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
         Self::default()
     }
 
-    /// An iterator visiting all key-value pairs in arbitrary order. The
-    /// iterator element type is `(&'a K, &'a V)`.
-    #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
-        self.into_iter()
+    // /// An iterator visiting all key-value pairs in arbitrary order. The
+    // /// iterator element type is `(&'a K, &'a V)`.
+    // #[inline]
+    // pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
+    //     self.into_iter()
+    // }
+    //
+    // /// An iterator visiting all values in arbitrary order. The iterator
+    // element /// type is `&'a V`.
+    // #[inline]
+    // pub fn values(&self) -> Values<'_, K, V> {
+    //     self.store.borrow().values()
+    // }
+
+    pub fn map<F, C, A>(&self, f: F) -> C
+    where
+        F: Fn((&K, &V)) -> A,
+        C: FromIterator<A>,
+    {
+        self.store.borrow().iter().map(f).collect()
     }
 
-    /// An iterator visiting all values in arbitrary order. The iterator element
-    /// type is `&'a V`.
-    #[inline]
-    pub fn values(&self) -> Values<'_, K, V> {
-        self.store.values()
+    pub fn map_values<F, C, A>(&self, f: F) -> C
+    where
+        F: Fn(&V) -> A,
+        C: FromIterator<A>,
+    {
+        self.store.borrow().values().map(f).collect()
+    }
+
+    pub fn filter_map_values<F, C, A>(&self, f: F) -> C
+    where
+        F: FnMut(&V) -> Option<A>,
+        C: FromIterator<A>,
+    {
+        self.store.borrow().values().filter_map(f).collect()
+    }
+
+    pub fn filter_map<F, C, A>(&self, f: F) -> C
+    where
+        F: FnMut((&K, &V)) -> Option<A>,
+        C: FromIterator<A>,
+    {
+        self.store.borrow().iter().filter_map(f).collect()
     }
 
     /// Returns the [`Stream`] to which the inserted key-value pairs will be
@@ -216,6 +250,7 @@ where
     pub fn replay_on_insert(&self) -> LocalBoxStream<'static, O> {
         Box::pin(futures::stream::iter(
             self.store
+                .borrow()
                 .iter()
                 .map(|(k, v)| self.on_insert_subs.wrap((k.clone(), v.clone())))
                 .collect::<Vec<_>>(),
@@ -230,8 +265,11 @@ where
 {
     /// Returns a reference to the value corresponding to the key.
     #[inline]
-    pub fn get(&self, key: &K) -> Option<&V> {
-        self.store.get(key)
+    pub fn get<F, C>(&self, key: &K, f: F) -> Option<C>
+    where
+        F: FnOnce(&V) -> C,
+    {
+        self.store.borrow().get(key).map(f)
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
@@ -244,8 +282,11 @@ where
     ///
     /// [`Observable`]: crate::Observable
     #[inline]
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.store.get_mut(key)
+    pub fn get_mut<F, C>(&mut self, key: &K, f: F) -> Option<C>
+    where
+        F: FnOnce(&mut V) -> C,
+    {
+        self.store.borrow_mut().get_mut(key).map(f)
     }
 }
 
@@ -260,8 +301,9 @@ where
     /// This emits [`HashMap::on_insert`] event and may emit
     /// [`HashMap::on_remove`] event if insert replaces value contained in
     /// [`HashMap`].
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let removed_value = self.store.insert(key.clone(), value.clone());
+    pub fn insert(&self, key: K, value: V) -> Option<V> {
+        let removed_value =
+            self.store.borrow_mut().insert(key.clone(), value.clone());
         if let Some(removed_value) = &removed_value {
             self.on_remove_subs
                 .send_update((key.clone(), removed_value.clone()));
@@ -278,7 +320,7 @@ where
     /// This emits [`HashMap::on_remove`] event if value with provided key is
     /// removed from this [`HashMap`].
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        let removed_item = self.store.remove(key);
+        let removed_item = self.store.borrow_mut().remove(key);
         if let Some(item) = &removed_item {
             self.on_remove_subs.send_update((key.clone(), item.clone()));
         }
@@ -291,7 +333,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Default for HashMap<K, V, S, O> {
     #[inline]
     fn default() -> Self {
         Self {
-            store: std::collections::HashMap::new(),
+            store: RefCell::new(std::collections::HashMap::new()),
             on_insert_subs: S::default(),
             on_remove_subs: S::default(),
             _output: PhantomData::default(),
@@ -305,7 +347,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O>
     #[inline]
     fn from(from: std::collections::HashMap<K, V>) -> Self {
         Self {
-            store: from,
+            store: RefCell::new(from),
             on_remove_subs: S::default(),
             on_insert_subs: S::default(),
             _output: PhantomData::default(),
@@ -313,23 +355,23 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O>
     }
 }
 
-impl<'a, K, V, S: SubscribersStore<(K, V), O>, O> IntoIterator
-    for &'a HashMap<K, V, S, O>
-{
-    type IntoIter = Iter<'a, K, V>;
-    type Item = (&'a K, &'a V);
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.store.iter()
-    }
-}
+// impl<'a, K, V, S: SubscribersStore<(K, V), O>, O> IntoIterator
+//     for &'a HashMap<K, V, S, O>
+// {
+//     type IntoIter = Iter<'a, K, V>;
+//     type Item = (&'a K, &'a V);
+//
+//     #[inline]
+//     fn into_iter(self) -> Self::IntoIter {
+//         self.store.borrow().iter()
+//     }
+// }
 
 impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
     /// Sends all key-values of a dropped [`HashMap`] to the
     /// [`HashMap::on_remove`] subs.
     fn drop(&mut self) {
-        let mut store = std::mem::take(&mut self.store);
+        let mut store = std::mem::take(&mut *self.store.borrow_mut());
         store.drain().for_each(|(key, value)| {
             self.on_remove_subs.send_update((key, value));
         });
