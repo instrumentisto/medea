@@ -23,7 +23,7 @@
 
 pub mod collections;
 pub mod field;
-mod subscribers_store;
+pub mod subscribers_store;
 
 #[doc(inline)]
 pub use crate::{

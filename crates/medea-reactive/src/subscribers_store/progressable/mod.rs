@@ -1,6 +1,6 @@
-//! Implementation of the progressable [`SubscribersStore`].
+//! Progressable [`SubscribersStore`].
 
-mod guarded;
+pub mod guarded;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -8,28 +8,28 @@ use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 
 use crate::{subscribers_store::SubscribersStore, ObservableCell};
 
-#[allow(unreachable_pub)] // false positive
 pub use self::guarded::{Guard, Guarded};
 
 /// [`SubscribersStore`] for progressable collections/field.
 ///
-/// Will provided [`Value`] with updated data to the
-/// [`SubscribersStore::new_subscription`] [`Stream`].
+/// Will provided [`Value`] with an updated data to the
+/// [`SubscribersStore::new_subscription()`] [`Stream`].
 ///
-/// You can wait for updates processing with a [`SubStore::when_all_processed`]
-/// method.
+/// You can wait for updates processing with a
+/// [`SubStore::when_all_processed()`] method.
 ///
-/// [`Stream`]: futures::stream::Stream
+/// [`Stream`]: futures::Stream
 #[derive(Debug)]
 pub struct SubStore<T> {
     /// All subscribers of this store.
     store: RefCell<Vec<mpsc::UnboundedSender<Guarded<T>>>>,
 
-    /// Manager which will recognise when all sent updates are processed.
+    /// Manager recognizing when all sent updates are processed.
     counter: Rc<ObservableCell<u32>>,
 }
 
 impl<T> Default for SubStore<T> {
+    #[inline]
     fn default() -> Self {
         Self {
             store: RefCell::new(Vec::new()),
@@ -39,8 +39,7 @@ impl<T> Default for SubStore<T> {
 }
 
 impl<T> SubStore<T> {
-    /// Returns [`Future`] which will be resolved when all subscribers processes
-    /// updates.
+    /// Returns [`Future`] resolving when all subscribers processes update.
     ///
     /// [`Future`]: std::future::Future
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
@@ -68,6 +67,6 @@ where
     }
 
     fn wrap(&self, value: T) -> Guarded<T> {
-        Guarded::new(value, Rc::clone(&self.counter))
+        Guarded::wrap(value, Rc::clone(&self.counter))
     }
 }

@@ -1,4 +1,4 @@
-//! Implementation of the default [`SubscribersStore`] for collections.
+//! Default [`SubscribersStore`] for collections.
 
 use std::cell::RefCell;
 
@@ -11,6 +11,7 @@ use super::SubscribersStore;
 pub struct SubStore<T>(RefCell<Vec<mpsc::UnboundedSender<T>>>);
 
 impl<T> Default for SubStore<T> {
+    #[inline]
     fn default() -> Self {
         Self(RefCell::new(Vec::new()))
     }

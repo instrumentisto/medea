@@ -1,21 +1,24 @@
-//! Implementation of the wrapper around data which will decrement underlying
-//! counter on [`Drop`].
+//! Wrapper around a data decrementing its underlying counter on [`Drop`].
 
 use std::{ops::Deref, rc::Rc};
 
 use crate::ObservableCell;
 
-/// Wrapper around data which will decrement underlying counter on [`Drop`].
+/// Wrapper around a data `T` decrementing its underlying counter on [`Drop`].
 #[derive(Debug)]
 pub struct Guarded<T> {
+    /// Guarded value of data `T`.
     value: T,
+
+    /// Guard itself guarding the value.
     guard: Guard,
 }
 
 impl<T> Guarded<T> {
-    /// Returns new [`Guarded`] with a provided value. Creates [`Guard`] based
-    /// on provided `counter`.
-    pub(super) fn new(
+    /// Wraps the `value` into a new [`Guarded`] basing on the `counter`.
+    #[inline]
+    #[must_use]
+    pub(super) fn wrap(
         value: T,
         counter: Rc<ObservableCell<u32>>,
     ) -> Guarded<T> {
@@ -25,12 +28,17 @@ impl<T> Guarded<T> {
         }
     }
 
-    /// Destructs [`Guarded`] into inner value and its [`Guard`].
+    /// Unwraps this [`Guarded`] into its inner value and its [`Guard`].
+    #[inline]
+    #[must_use]
     pub fn into_parts(self) -> (T, Guard) {
         (self.value, self.guard)
     }
 
-    /// Destructs [`Guarded`] into inner value dropping  its [`Guard`] in place.
+    /// Unwraps this [`Guarded`] into its inner value dropping its [`Guard`]
+    /// in-place.
+    #[inline]
+    #[must_use]
     pub fn into_inner(self) -> T {
         self.value
     }
@@ -50,12 +58,15 @@ impl<T> Deref for Guarded<T> {
     }
 }
 
-/// Guard backed by counter that increments on [`Guard`] and decrements in its
-/// [`Drop`] implementation.
+/// Guard backed by a counter incrementing on its creation and decrementing on
+/// [`Drop`]ping.
 #[derive(Debug)]
 pub struct Guard(Rc<ObservableCell<u32>>);
 
 impl Guard {
+    /// Creates new [`Guard`] on the given `counter`.
+    #[inline]
+    #[must_use]
     fn new(counter: Rc<ObservableCell<u32>>) -> Self {
         counter.mutate(|mut c| {
             *c = c.checked_add(1).unwrap();
@@ -65,6 +76,8 @@ impl Guard {
 }
 
 impl Drop for Guard {
+    /// Decrements the counter backing this [`Guard`].
+    #[inline]
     fn drop(&mut self) {
         self.0.mutate(|mut c| {
             *c = c.checked_sub(1).unwrap();
