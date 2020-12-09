@@ -780,43 +780,28 @@ impl ConstraintsUpdateException {
     }
 
     /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `RollbackedException` or `RollbackFailedException`.
+    /// `RecoveredException` or `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn rollback_reason(&self) -> JsValue {
+    pub fn recover_reason(&self) -> JsValue {
         use JsConstraintsUpdateError as E;
         match &self.0 {
-            E::Rollbacked { rollback_reason }
-            | E::RollbackFailed {
-                rollback_reason, ..
-            } => rollback_reason.clone(),
+            E::RecoverFailed { recover_reason, .. }
+            | E::Recovered { recover_reason, .. } => recover_reason.clone(),
             _ => JsValue::UNDEFINED,
         }
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `RollbackFailedException`.
+    /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
+    /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn rollback_fail_reason(&self) -> JsValue {
+    pub fn recover_fail_reasons(&self) -> JsValue {
         match &self.0 {
-            JsConstraintsUpdateError::RollbackFailed {
-                rollback_fail_reason,
+            JsConstraintsUpdateError::RecoverFailed {
+                recover_fail_reasons,
                 ..
-            } => rollback_fail_reason.clone(),
-            _ => JsValue::UNDEFINED,
-        }
-    }
-
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `DisabledException`.
-    ///
-    /// Returns `undefined` otherwise.
-    pub fn disable_reason(&self) -> JsValue {
-        match &self.0 {
-            JsConstraintsUpdateError::Disabled { disable_reason } => {
-                disable_reason.clone()
-            }
+            } => recover_fail_reasons.clone(),
             _ => JsValue::UNDEFINED,
         }
     }
@@ -839,33 +824,25 @@ impl ConstraintsUpdateException {
 /// JS side.
 #[derive(Debug, Display)]
 pub enum JsConstraintsUpdateError {
-    /// Indicates that new [`MediaStreamSettings`] set failed and current
-    /// [`MediaStreamSettings`] was successfully rollbacked.
-    #[display(fmt = "RollbackedException")]
-    Rollbacked {
-        /// [`JasonError`] due to which rollback happened.
-        rollback_reason: JsValue,
+    /// Indicates that new [`MediaStreamSettings`] set failed and state was
+    /// recovered accordingly to the provided recover policy
+    /// (`rollback_on_fail`/`stop_first` arguments).
+    #[display(fmt = "RecoveredException")]
+    Recovered {
+        /// [`JasonError`] due to which recovery happened.
+        recover_reason: JsValue,
     },
 
-    /// Indicates that new [`MediaStreamSettings`] setting failed and
-    /// [`MediaStreamSettings`] rollback was failed.
-    #[display(fmt = "RollbackFailedException")]
-    RollbackFailed {
-        /// [`JasonError`] due to which rollback happened.
-        rollback_reason: JsValue,
+    /// Indicates that new [`MediaStreamSettings`] set failed and state
+    /// recovering also failed.
+    #[display(fmt = "RecoverFailedException")]
+    RecoverFailed {
+        /// [`JasonError`] due to which recovery happened.
+        recover_reason: JsValue,
 
-        /// [`JasonError`] due to which rollback failed.
-        rollback_fail_reason: JsValue,
-    },
-
-    /// Indicates that [`MediaStreamSettings`] set failed and affected
-    /// [`Sender`]s without [`local::Track`]s was disabled.
-    ///
-    /// [`Sender`]: crate::peer::Sender
-    #[display(fmt = "DisabledException")]
-    Disabled {
-        /// [`JasonError`] due to which disable happened.
-        disable_reason: JsValue,
+        /// [`js_sys::Array`] with a [`JasonError`]s due to which recovery
+        /// failed.
+        recover_fail_reasons: JsValue,
     },
 
     /// Indicates that some error occurred.
@@ -877,80 +854,63 @@ pub enum JsConstraintsUpdateError {
 /// [`MediaStreamSettings`] by [`InnerRoom::set_local_media_settings`] call.
 #[derive(Debug)]
 enum ConstraintsUpdateError {
-    /// Indicates that new [`MediaStreamSettings`] setting failed and current
-    /// [`MediaStreamSettings`] was successfully rollbacked.
-    Rollbacked {
-        /// [`RoomError`] due to which rollback happened.
-        rollback_reason: Traced<RoomError>,
+    /// Indicates that new [`MediaStreamSettings`] set failed and state was
+    /// recovered accordingly to the provided recover policy
+    /// (`rollback_on_fail`/`stop_first` arguments).
+    Recovered {
+        /// [`RoomError`] due to which recovery happened.
+        recover_reason: Traced<RoomError>,
     },
 
-    /// Indicates that new [`MediaStreamSettings`] setting failed and
-    /// [`MediaStreamSettings`] rollback was failed.
-    RollbackFailed {
-        /// [`RoomError`] due to which rollback happened.
-        rollback_reason: Traced<RoomError>,
-        /// [`RoomError`] due to which rollback failed.
-        rollback_fail_reason: Traced<RoomError>,
-    },
+    /// Indicates that new [`MediaStreamSettings`] set failed and state
+    /// recovering also failed.
+    RecoverFailed {
+        /// [`RoomError`] due to which recovery happened.
+        recover_reason: Traced<RoomError>,
 
-    /// Indicates that [`MediaStreamSettings`] set failed affected [`Sender`]s
-    /// without [`local::Track`]s was disabled.
-    ///
-    /// [`Sender`]: crate::peer::Sender
-    Disabled {
-        /// [`RoomError`] due to which disable happened.
-        disable_reason: Traced<RoomError>,
+        /// [`RoomError`]s due to which recovery failed.
+        recover_fail_reasons: Vec<Traced<RoomError>>,
     },
 
     /// Indicates that some error occurred.
-    Errored { reason: Traced<RoomError> },
+    Errored { error: Traced<RoomError> },
 }
 
 impl ConstraintsUpdateError {
-    /// Returns new [`ConstraintsUpdateError::Rollbacked`].
-    pub fn rollbacked(rollback_reason: Traced<RoomError>) -> Self {
-        Self::Rollbacked { rollback_reason }
+    /// Returns new [`ConstraintsUpdateError::Recovered`].
+    pub fn recovered(recover_reason: Traced<RoomError>) -> Self {
+        Self::Recovered { recover_reason }
     }
 
-    /// Tries to convert this [`ConstraintsUpdateError`] from
-    /// [`ConstraintsUpdateError::Disabled`] to the
-    /// [`ConstraintsUpdateError::Disabled`].
-    ///
-    /// If conversion failed then old [`ConstraintsUpdateError`] will be
-    /// returned.
-    pub fn into_rollback_failed(
-        self,
-        rollback_reason: Traced<RoomError>,
-    ) -> Self {
+    /// Converts this [`ConstraintsUpdateError`] to the
+    /// [`ConstraintsUpdateError::RecoverFailed`].
+    pub fn recovery_failed(self, reason: Traced<RoomError>) -> Self {
         match self {
-            Self::Disabled { disable_reason } => Self::RollbackFailed {
-                rollback_reason,
-                rollback_fail_reason: disable_reason,
+            Self::Recovered { recover_reason } => Self::RecoverFailed {
+                recover_reason: reason,
+                recover_fail_reasons: vec![recover_reason],
             },
-            _ => self,
-        }
-    }
+            Self::RecoverFailed {
+                recover_reason,
+                mut recover_fail_reasons,
+            } => {
+                recover_fail_reasons.push(recover_reason);
 
-    /// Returns [`ConstraintsUpdateError::RollbackFailed`] with a provided
-    /// parameters.
-    pub fn rollback_failed(
-        rollback_reason: Traced<RoomError>,
-        rollback_fail_reason: Traced<RoomError>,
-    ) -> Self {
-        Self::RollbackFailed {
-            rollback_fail_reason,
-            rollback_reason,
+                Self::RecoverFailed {
+                    recover_reason: reason,
+                    recover_fail_reasons,
+                }
+            }
+            Self::Errored { error } => Self::RecoverFailed {
+                recover_reason: error,
+                recover_fail_reasons: vec![reason],
+            },
         }
-    }
-
-    /// Returns [`ConstraintsUpdateError::Disabled`] with a provided parameter.
-    pub fn disabled(disable_reason: Traced<RoomError>) -> Self {
-        Self::Disabled { disable_reason }
     }
 
     /// Returns [`ConstraintsUpdateError::Errored`] with a provided parameter.
     pub fn errored(reason: Traced<RoomError>) -> Self {
-        Self::Errored { reason }
+        Self::Errored { error: reason }
     }
 }
 
@@ -958,21 +918,24 @@ impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
     fn from(from: ConstraintsUpdateError) -> Self {
         use ConstraintsUpdateError as E;
         match from {
-            E::Rollbacked { rollback_reason } => Self::Rollbacked {
-                rollback_reason: JasonError::from(rollback_reason).into(),
+            E::Recovered { recover_reason } => Self::Recovered {
+                recover_reason: JasonError::from(recover_reason).into(),
             },
-            E::RollbackFailed {
-                rollback_reason,
-                rollback_fail_reason,
-            } => Self::RollbackFailed {
-                rollback_reason: JasonError::from(rollback_reason).into(),
-                rollback_fail_reason: JasonError::from(rollback_fail_reason)
-                    .into(),
+            E::RecoverFailed {
+                recover_reason,
+                recover_fail_reasons,
+            } => Self::RecoverFailed {
+                recover_reason: JasonError::from(recover_reason).into(),
+                recover_fail_reasons: {
+                    let arr = js_sys::Array::new();
+                    for e in recover_fail_reasons {
+                        arr.push(&JasonError::from(e).into());
+                    }
+
+                    arr.into()
+                },
             },
-            E::Disabled { disable_reason } => Self::Disabled {
-                disable_reason: JasonError::from(disable_reason).into(),
-            },
-            E::Errored { reason } => Self::Errored {
+            E::Errored { error: reason } => Self::Errored {
                 reason: JasonError::from(reason).into(),
             },
         }
@@ -1175,12 +1138,10 @@ impl InnerRoom {
     async fn disable_senders_without_tracks(
         &self,
         peer: &Rc<PeerConnection>,
-        reason: Traced<PeerError>,
         kinds: LocalStreamUpdateCriteria,
         mut states_update: HashMap<PeerId, HashMap<TrackId, MediaState>>,
-    ) -> Result<(), ConstraintsUpdateError> {
+    ) -> Result<(), Traced<RoomError>> {
         use media_exchange_state::Stable::Disabled;
-        use ConstraintsUpdateError as E;
 
         self.send_constraints
             .set_media_exchange_state_by_kinds(Disabled, kinds);
@@ -1193,12 +1154,7 @@ impl InnerRoom {
         );
         self.update_media_states(states_update)
             .await
-            .map_err(|err| {
-                E::rollback_failed(
-                    tracerr::new!(tracerr::map_from(reason.clone())),
-                    err,
-                )
-            })?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(())
     }
@@ -1276,28 +1232,33 @@ impl InnerRoom {
                         )
                         .await
                         .map_err(|err| {
-                            err.into_rollback_failed(
-                                tracerr::map_from_and_wrap!()(e.clone()),
-                            )
+                            err.recovery_failed(tracerr::map_from_and_wrap!()(
+                                e.clone(),
+                            ))
                         })?;
 
-                        E::rollbacked(tracerr::map_from_and_wrap!()(e.clone()))
-                    } else {
+                        E::recovered(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else if stop_first {
                         self.disable_senders_without_tracks(
                             &peer,
-                            e.clone(),
                             kinds,
                             states_update,
                         )
-                        .await?;
+                        .await
+                        .map_err(|err| {
+                            E::RecoverFailed {
+                                recover_reason: tracerr::map_from_and_new!(
+                                    e.clone()
+                                ),
+                                recover_fail_reasons: vec![
+                                    tracerr::map_from_and_new!(err),
+                                ],
+                            }
+                        })?;
 
-                        if stop_first {
-                            E::disabled(tracerr::map_from_and_wrap!()(
-                                e.clone(),
-                            ))
-                        } else {
-                            E::errored(tracerr::map_from_and_wrap!()(e.clone()))
-                        }
+                        E::recovered(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else {
+                        E::errored(tracerr::map_from_and_wrap!()(e.clone()))
                     };
 
                     return Err(err);

@@ -765,12 +765,13 @@ window.onload = async function() {
           await room.set_local_media_settings(constraints, true, true);
         } catch (e) {
           let name = e.name();
-          if (name === 'RollbackedException') {
-            alert('MediaStreamSettings set failed and current MediaStreamSettings was successfully rollbacked.');
-          } else if (name === 'RollbackFailedException') {
-            alert('MediaStreamSettings set failed and MediaStreamSettings rollback failed.');
-          } else if (name === 'DisabledException') {
-            alert('MediaStreamSettings set failed and affected Senders disabled.');
+          if (name === 'RecoveredException') {
+            alert('MediaStreamSettings set failed and current MediaStreamSettings was successfully recovered.');
+          } else if (name === 'RecoverFailedException') {
+            alert('MediaStreamSettings set failed and MediaStreamSettings recovery failed.');
+            for (const err of e.recover_fail_reasons()) {
+              console.error('Name: "' + err.name() + '";\nMessage: "' + err.message() + '";');
+            }
           } else if (name === 'ErroredException') {
             alert('Fatal error occured while MediaStreamSettings update.');
           }

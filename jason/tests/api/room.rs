@@ -10,9 +10,9 @@ use futures::{
     stream::{self, BoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    AudioSettings, Command, Direction, Event, IceConnectionState,
-    MediaSourceKind, MediaType, MemberId, NegotiationRole, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatchEvent, TrackUpdate, VideoSettings,
+    Command, Direction, Event, IceConnectionState, MediaSourceKind, MediaType,
+    MemberId, NegotiationRole, PeerId, PeerMetrics, Track, TrackId,
+    TrackPatchEvent, TrackUpdate, VideoSettings,
 };
 use medea_jason::{
     api::Room,
@@ -1759,7 +1759,7 @@ mod set_local_media_settings {
                         mid: None,
                     },
                     media_type: MediaType::Video(VideoSettings {
-                        required: true,
+                        required: false,
                         source_kind: MediaSourceKind::Device,
                     }),
                 }],
@@ -2116,39 +2116,39 @@ mod set_local_media_settings {
     /// types on fail.
     #[wasm_bindgen_test]
     async fn disables_on_fail_if_no_rollback() {
-        // let (room, peer1, peer2) = connect_peers_in_single_room().await;
-        //
-        // let mock_navigator = MockNavigator::new();
-        // mock_navigator.error_get_user_media("disables_on_fail".into());
-        // let err = get_constraints_update_exception(
-        //     JsFuture::from(room.new_handle().set_local_media_settings(
-        //         &media_settings_with_device_id(),
-        //         true,
-        //         false,
-        //     ))
-        //     .await
-        //     .unwrap_err(),
-        // );
-        // mock_navigator.stop();
-        //
-        // assert_eq!(&err.name(), "DisabledException");
-        // let err = get_jason_error(err.disable_reason());
-        //
-        // assert_eq!(err.name(), "CouldNotGetLocalMedia");
-        // assert_eq!(
-        //     err.message(),
-        //     "Failed to get local tracks: MediaDevices.getUserMedia() failed:
-        // \     Unknown JS error: disables_on_fail"
-        // );
-        //
-        // assert!(!peer1.is_send_video_enabled(None));
+        let (room, peer1, _peer2) = connect_peers_in_single_room().await;
+
+        let mock_navigator = MockNavigator::new();
+        mock_navigator.error_get_user_media("disables_on_fail".into());
+        let err = get_constraints_update_exception(
+            JsFuture::from(room.new_handle().set_local_media_settings(
+                &media_settings_with_device_id(),
+                true,
+                false,
+            ))
+            .await
+            .unwrap_err(),
+        );
+        mock_navigator.stop();
+
+        assert_eq!(&err.name(), "RecoveredException");
+        let err = get_jason_error(err.recover_reason());
+
+        assert_eq!(err.name(), "CouldNotGetLocalMedia");
+        assert_eq!(
+            err.message(),
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: disables_on_fail"
+        );
+
+        assert!(!peer1.is_send_video_enabled(None));
     }
 
     /// Checks that [`RoomHandle::set_local_media_settings`] will rollback
     /// [`MediaStreamSettings`] to the previous one on fail.
     #[wasm_bindgen_test]
     async fn tries_to_rollback_on_fail() {
-        let (room, peer1, peer2) = connect_peers_in_single_room().await;
+        let (room, peer1, _peer2) = connect_peers_in_single_room().await;
 
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings(true, true),
@@ -2170,9 +2170,9 @@ mod set_local_media_settings {
         );
         mock_navigator.stop();
 
-        assert_eq!(err.name(), "RollbackedException");
-        let rollback_reason = get_jason_error(err.rollback_reason());
-        assert_eq!(rollback_reason.name(), "CouldNotGetLocalMedia");
+        assert_eq!(err.name(), "RecoveredException");
+        let recover_reason = get_jason_error(err.recover_reason());
+        assert_eq!(recover_reason.name(), "CouldNotGetLocalMedia");
 
         assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
 
@@ -2184,54 +2184,56 @@ mod set_local_media_settings {
     /// types on rollback fail.
     #[wasm_bindgen_test]
     async fn disables_on_rollback_fail() {
-        // let (room, peer1, peer2) = connect_peers_in_single_room().await;
-        //
-        // JsFuture::from(room.new_handle().set_local_media_settings(
-        //     &media_stream_settings(true, true),
-        //     false,
-        //     false,
-        // ))
-        // .await
-        // .unwrap();
-        //
-        // let mock_navigator = MockNavigator::new();
-        // mock_navigator.error_get_user_media("disables_on_rollback_fail".
-        // into()); let err = get_constraints_update_exception(
-        //     JsFuture::from(room.new_handle().set_local_media_settings(
-        //         &media_settings_with_device_id(),
-        //         true,
-        //         true,
-        //     ))
-        //     .await
-        //     .unwrap_err(),
-        // );
-        // mock_navigator.stop();
-        //
-        // assert_eq!(err.name(), "RollbackFailedException");
-        // let rollback_reason = get_jason_error(err.rollback_reason());
-        // assert_eq!(rollback_reason.name(), "CouldNotGetLocalMedia");
-        // assert_eq!(
-        //     rollback_reason.message(),
-        //     "Failed to get local tracks: MediaDevices.getUserMedia() failed:
-        // \     Unknown JS error: disables_on_rollback_fail"
-        // );
-        // let rollback_fail_reason =
-        // get_jason_error(err.rollback_fail_reason());
-        // assert_eq!(rollback_fail_reason.name(), "CouldNotGetLocalMedia");
-        // assert_eq!(
-        //     rollback_reason.message(),
-        //     "Failed to get local tracks: MediaDevices.getUserMedia() failed:
-        // \     Unknown JS error: disables_on_rollback_fail"
-        // );
-        //
-        // assert!(!peer1.is_send_video_enabled(None));
+        let (room, peer1, _peer2) = connect_peers_in_single_room().await;
+
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+            false,
+        ))
+        .await
+        .unwrap();
+
+        let mock_navigator = MockNavigator::new();
+        mock_navigator.error_get_user_media("disables_on_rollback_fail".into());
+        let err = get_constraints_update_exception(
+            JsFuture::from(room.new_handle().set_local_media_settings(
+                &media_settings_with_device_id(),
+                true,
+                true,
+            ))
+            .await
+            .unwrap_err(),
+        );
+        mock_navigator.stop();
+
+        assert_eq!(err.name(), "RecoverFailedException");
+        let recover_reason = get_jason_error(err.recover_reason());
+        assert_eq!(recover_reason.name(), "CouldNotGetLocalMedia");
+        assert_eq!(
+            recover_reason.message(),
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: disables_on_rollback_fail"
+        );
+        let recover_fail_reasons =
+            js_sys::Array::from(&err.recover_fail_reasons());
+        assert_eq!(recover_fail_reasons.length(), 1);
+        let recover_fail_reason = get_jason_error(recover_fail_reasons.pop());
+        assert_eq!(
+            recover_fail_reason.message(),
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: disables_on_rollback_fail"
+        );
+        assert_eq!(recover_fail_reason.name(), "CouldNotGetLocalMedia");
+
+        assert!(!peer1.is_send_video_enabled(None));
     }
 
     /// Checks that [`RoomHandle::set_local_media_settings`] with `stop_first`
     /// set to `false` will not disable media types on rollback fail.
     #[wasm_bindgen_test]
     async fn doesnt_disables_if_not_stop_first() {
-        let (room, peer1, peer2) = connect_peers_in_single_room().await;
+        let (room, peer1, _peer2) = connect_peers_in_single_room().await;
 
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings(true, true),
@@ -2256,8 +2258,8 @@ mod set_local_media_settings {
         );
         mock_navigator.stop();
 
-        assert_eq!(err.name(), "RollbackedException");
-        let err = get_jason_error(err.rollback_reason());
+        assert_eq!(err.name(), "RecoveredException");
+        let err = get_jason_error(err.recover_reason());
         assert_eq!(err.name(), "CouldNotGetLocalMedia");
 
         assert!(peer1.is_send_video_enabled(None));
