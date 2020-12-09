@@ -16,21 +16,6 @@ use super::{PeerConnection, PeerError, PeerEvent};
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
-    /// Creates new [`PeerConnection`] with provided ID and injecting provided
-    /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
-    ///
-    /// # Errors
-    ///
-    /// Errors if creating [`PeerConnection`] fails.
-    fn create_peer(
-        &self,
-        id: PeerId,
-        ice_servers: Vec<IceServer>,
-        events_sender: mpsc::UnboundedSender<PeerEvent>,
-        is_force_relayed: bool,
-        local_stream_constraints: LocalTracksConstraints,
-    ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
-
     fn insert_peer(&self, peer_id: PeerId, component: PeerComponent);
 
     fn media_manager(&self) -> Rc<MediaManager>;
@@ -107,29 +92,6 @@ impl Repository {
 }
 
 impl PeerRepository for Repository {
-    /// Creates new [`PeerConnection`] with provided ID and injecting provided
-    /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
-    fn create_peer(
-        &self,
-        id: PeerId,
-        ice_servers: Vec<IceServer>,
-        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        is_force_relayed: bool,
-        send_constraints: LocalTracksConstraints,
-    ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
-        let peer = PeerConnection::new(
-            id,
-            peer_events_sender,
-            ice_servers,
-            Rc::clone(&self.media_manager),
-            is_force_relayed,
-            send_constraints,
-        )
-        .map_err(tracerr::map_from_and_wrap!())?;
-        // self.peers.borrow_mut().insert(id, Rc::clone(&peer));
-        Ok(peer)
-    }
-
     fn insert_peer(&self, peer_id: PeerId, component: PeerComponent) {
         self.peers.borrow_mut().insert(peer_id, component);
     }

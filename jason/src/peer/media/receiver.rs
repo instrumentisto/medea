@@ -78,14 +78,14 @@ impl Receiver {
             // Try to find send transceiver that can be used as sendrecv.
             let mut senders = connections.senders.values();
             let sender = senders.find(|sndr| {
-                sndr.ctx().caps().media_kind() == caps.media_kind()
-                    && sndr.ctx().caps().media_source_kind()
+                sndr.caps().media_kind() == caps.media_kind()
+                    && sndr.caps().media_source_kind()
                         == caps.media_source_kind()
             });
             Some(sender.map_or_else(
                 || connections.add_transceiver(kind, transceiver_direction),
                 |sender| {
-                    let trnsvr = sender.ctx().transceiver();
+                    let trnsvr = sender.transceiver();
                     trnsvr.add_direction(transceiver_direction);
 
                     trnsvr

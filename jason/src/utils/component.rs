@@ -7,6 +7,7 @@ use futures::{future, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::{task_spawner::TaskHandlesStorage, JasonError};
+use bitflags::_core::ops::Deref;
 
 pub struct Component<S, C, G> {
     state: Rc<S>,
@@ -90,5 +91,13 @@ impl<S, C, G> Component<S, C, G> {
 impl<S, C, G> Drop for Component<S, C, G> {
     fn drop(&mut self) {
         self.task_handles.dispose();
+    }
+}
+
+impl<S, C, G> Deref for Component<S, C, G> {
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        &self.ctx
     }
 }

@@ -323,11 +323,11 @@ impl InnerMediaConnections {
     ) -> impl Iterator<Item = &SenderComponent> {
         self.senders
             .values()
-            .filter(move |sender| sender.ctx().kind() == kind)
+            .filter(move |sender| sender.kind() == kind)
             .filter(move |sender| match source_kind {
                 None => true,
                 Some(source_kind) => {
-                    sender.ctx().caps().media_source_kind() == source_kind
+                    sender.caps().media_source_kind() == source_kind
                 }
             })
     }
@@ -338,9 +338,7 @@ impl InnerMediaConnections {
         &self,
         kind: MediaKind,
     ) -> impl Iterator<Item = &ReceiverComponent> {
-        self.receivers
-            .values()
-            .filter(move |s| s.ctx().kind() == kind)
+        self.receivers.values().filter(move |s| s.kind() == kind)
     }
 
     /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],
@@ -475,7 +473,6 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 sender
-                    .ctx()
                     .mid()
                     .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
@@ -485,7 +482,6 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 receiver
-                    .ctx()
                     .mid()
                     .ok_or(MediaConnectionsError::ReceiversWithoutMid)
                     .map_err(tracerr::wrap!())?,
@@ -501,10 +497,10 @@ impl MediaConnections {
 
         let mut out = HashMap::new();
         for (track_id, sender) in &inner.senders {
-            out.insert(*track_id, sender.ctx().is_publishing());
+            out.insert(*track_id, sender.is_publishing());
         }
         for (track_id, receiver) in &inner.receivers {
-            out.insert(*track_id, receiver.ctx().is_receiving());
+            out.insert(*track_id, receiver.is_receiving());
         }
         out
     }
@@ -559,8 +555,8 @@ impl MediaConnections {
                 stream_request
                     .get_or_insert_with(TracksRequest::default)
                     .add_track_request(
-                        sender.ctx().track_id(),
-                        sender.ctx().caps().clone(),
+                        sender.track_id(),
+                        sender.caps().clone(),
                     );
             }
         }
@@ -600,10 +596,10 @@ impl MediaConnections {
         let mut sender_and_track = Vec::with_capacity(inner.senders.len());
         let mut media_exchange_state_updates = HashMap::new();
         for sender in inner.senders.values() {
-            if let Some(track) = tracks.get(&sender.ctx().track_id()).cloned() {
-                if sender.ctx().caps().satisfies(track.sys_track()) {
+            if let Some(track) = tracks.get(&sender.track_id()).cloned() {
+                if sender.caps().satisfies(track.sys_track()) {
                     media_exchange_state_updates.insert(
-                        sender.ctx().track_id(),
+                        sender.track_id(),
                         media_exchange_state::Stable::Enabled,
                     );
                     sender_and_track.push((sender, track));
@@ -612,13 +608,13 @@ impl MediaConnections {
                         MediaConnectionsError::InvalidMediaTrack
                     ));
                 }
-            } else if sender.ctx().caps().required() {
+            } else if sender.caps().required() {
                 return Err(tracerr::new!(
                     MediaConnectionsError::InvalidMediaTracks
                 ));
             } else {
                 media_exchange_state_updates.insert(
-                    sender.ctx().track_id(),
+                    sender.track_id(),
                     media_exchange_state::Stable::Disabled,
                 );
             }
@@ -627,7 +623,7 @@ impl MediaConnections {
         future::try_join_all(sender_and_track.into_iter().map(
             |(sender, track)| async move {
                 sender.ctx().insert_track(track).await?;
-                sender.ctx().maybe_enable();
+                sender.maybe_enable();
                 Ok::<(), Traced<MediaConnectionsError>>(())
             },
         ))
@@ -655,9 +651,9 @@ impl MediaConnections {
         let mid = transceiver.mid().unwrap();
 
         for receiver in inner.receivers.values() {
-            if let Some(recv_mid) = &receiver.ctx().mid() {
+            if let Some(recv_mid) = &receiver.mid() {
                 if recv_mid == &mid {
-                    receiver.ctx().set_remote_track(transceiver, track);
+                    receiver.set_remote_track(transceiver, track);
                     return Ok(());
                 }
             }
@@ -677,11 +673,11 @@ impl MediaConnections {
         for receiver in inner
             .receivers
             .values()
-            .filter(|rcvr| rcvr.ctx().transceiver().is_none())
+            .filter(|rcvr| rcvr.transceiver().is_none())
         {
-            if let Some(mid) = receiver.ctx().mid() {
+            if let Some(mid) = receiver.mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
-                    receiver.ctx().replace_transceiver(trnscvr.into())
+                    receiver.replace_transceiver(trnscvr.into())
                 }
             }
         }
@@ -728,7 +724,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.ctx().disabled())
+            .find(|s| s.disabled())
             .is_none()
     }
 
@@ -739,7 +735,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.ctx().disabled())
+            .find(|s| s.disabled())
             .is_none()
     }
 

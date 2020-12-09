@@ -27,7 +27,7 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaStreamSettings,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
         RecvConstraints,
     },
     peer::{
