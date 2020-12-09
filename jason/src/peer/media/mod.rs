@@ -932,4 +932,14 @@ impl MediaConnections {
             .find(|s| s.muted())
             .is_none()
     }
+
+    /// Returns all underlying [`Sender`]'s.
+    pub fn get_senders(&self) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .map(|sndr| Rc::clone(&sndr))
+            .collect()
+    }
 }
