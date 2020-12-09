@@ -16,21 +16,6 @@ pub struct Component<S, C, G> {
     task_handles: TaskHandlesStorage,
 }
 
-impl<S, C, G> Component<S, RefCell<Weak<C>>, G> {
-    pub fn without_context(state: Rc<S>, global_ctx: Rc<G>) -> Self {
-        Self {
-            state,
-            ctx: RefCell::new(Weak::new()),
-            global_ctx,
-            task_handles: TaskHandlesStorage::new(),
-        }
-    }
-
-    pub fn replace_context(&self, new_ctx: Weak<C>) {
-        self.ctx.replace(new_ctx);
-    }
-}
-
 impl<S, C: 'static, G> Component<S, Rc<C>, G> {
     pub fn new_component(state: Rc<S>, ctx: Rc<C>, global_ctx: Rc<G>) -> Self {
         Self {
