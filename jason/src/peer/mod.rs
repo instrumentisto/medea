@@ -23,9 +23,8 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    self as proto, stats::StatId, IceConnectionState, IceServer,
-    MediaSourceKind, MemberId, PeerConnectionState, PeerId as Id, PeerId,
-    TrackId,
+    stats::StatId, IceConnectionState, IceServer, MediaSourceKind, MemberId,
+    PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -35,7 +34,6 @@ use crate::{
     media::{
         track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
-        RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
@@ -218,10 +216,6 @@ pub struct PeerConnection {
 
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalTracksConstraints,
-
-    /// Constraints to the [`remote::Track`]s received by this
-    /// [`PeerConnection`]. Used to disable or enable media receiving.
-    recv_constraints: Rc<RecvConstraints>,
 }
 
 impl PeerConnection {
@@ -246,7 +240,6 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
         send_constraints: LocalTracksConstraints,
-        recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
@@ -267,7 +260,6 @@ impl PeerConnection {
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
-            recv_constraints,
         };
 
         // Bind to `icecandidate` event.

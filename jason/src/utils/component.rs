@@ -6,7 +6,7 @@ use std::{
 use futures::{future, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::task_spawner::{HasTaskHandlesStorage, TaskHandlesStorage};
+use crate::utils::{task_spawner::TaskHandlesStorage, JasonError};
 
 pub struct Component<S, C, G> {
     state: Rc<S>,
@@ -40,7 +40,6 @@ impl<S, C: 'static, G> Component<S, Rc<C>, G> {
         }
     }
 
-    // TODO: temporary
     pub fn ctx(&self) -> Rc<C> {
         self.ctx.clone()
     }
@@ -51,24 +50,28 @@ impl<S: 'static, C: 'static + Clone, G: 'static> Component<S, C, G> {
     ///
     /// You can stop all listeners tasks spawned by this function by calling
     /// [`TaskDisposer::dispose_tasks`]
-    pub fn spawn_observer<R, V, F, O>(&self, mut rx: R, handle: F)
+    pub fn spawn_observer<R, V, F, O, E>(&self, mut rx: R, handle: F)
     where
         F: Fn(C, Rc<G>, Rc<S>, V) -> O + 'static,
         R: Stream<Item = V> + Unpin + 'static,
-        O: Future<Output = ()> + 'static,
+        O: Future<Output = Result<(), E>> + 'static,
+        E: Into<JasonError>,
     {
         let ctx = self.ctx.clone();
         let global_ctx = Rc::clone(&self.global_ctx);
         let state = Rc::clone(&self.state);
         let (fut, handle) = future::abortable(async move {
             while let Some(value) = rx.next().await {
-                (handle)(
+                if let Err(e) = (handle)(
                     ctx.clone(),
                     Rc::clone(&global_ctx),
                     Rc::clone(&state),
                     value,
                 )
-                .await;
+                .await
+                {
+                    Into::<JasonError>::into(e).print();
+                }
             }
         });
         spawn_local(async move {

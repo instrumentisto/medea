@@ -2,7 +2,7 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
+use medea_client_api_proto::{MediaSourceKind, TrackId};
 
 use crate::{
     media::{
@@ -15,8 +15,7 @@ use crate::{
 use super::{
     media_exchange_state, mute_state,
     transitable_state::{
-        MediaExchangeState, MediaExchangeStateController, MediaState,
-        MuteStateController,
+        MediaExchangeStateController, MediaState, MuteStateController,
     },
     MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
     TransceiverSide,

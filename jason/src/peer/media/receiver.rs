@@ -7,12 +7,12 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MediaSourceKind, MemberId, TrackPatchEvent};
+use medea_client_api_proto::{MediaSourceKind, MemberId};
 use proto::TrackId;
 use web_sys as sys;
 
 use crate::{
-    media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
+    media::{track::remote, MediaKind, TrackConstraints},
     peer::{
         transceiver::Transceiver, MediaConnections, MediaStateControllable,
         PeerEvent, TransceiverDirection,
@@ -63,15 +63,12 @@ impl Receiver {
         caps: TrackConstraints,
         sender_id: MemberId,
         mid: Option<String>,
-        recv_constraints: &RecvConstraints,
+        enabled_general: bool,
+        enabled_individual: bool,
     ) -> Self {
         let connections = media_connections.0.borrow();
         let kind = MediaKind::from(&caps);
-        let enabled = match kind {
-            MediaKind::Audio => recv_constraints.is_audio_enabled(),
-            MediaKind::Video => recv_constraints.is_video_enabled(),
-        };
-        let transceiver_direction = if enabled {
+        let transceiver_direction = if enabled_individual {
             TransceiverDirection::RECV
         } else {
             TransceiverDirection::INACTIVE
@@ -106,11 +103,11 @@ impl Receiver {
             mid: RefCell::new(mid),
             track: RefCell::new(None),
             general_media_exchange_state: Cell::new(
-                media_exchange_state::Stable::from(enabled),
+                media_exchange_state::Stable::from(enabled_general),
             ),
             is_track_notified: Cell::new(false),
             media_exchange_state_controller: TransitableStateController::new(
-                media_exchange_state::Stable::from(enabled),
+                media_exchange_state::Stable::from(enabled_individual),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }

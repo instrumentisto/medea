@@ -31,9 +31,9 @@ use crate::{
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
-        MediaConnectionsError, MediaState, PeerComponent, PeerConnection,
-        PeerError, PeerEvent, PeerEventHandler, PeerRepository, PeerState,
-        ReceiverState, RtcStats, SenderState, TrackDirection,
+        MediaConnectionsError, MediaState, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, PeerState, ReceiverState,
+        RtcStats, SenderState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -85,7 +85,7 @@ impl RoomComponent {
         global_ctx: Rc<RoomCtx>,
         _: Rc<RoomState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
-    ) {
+    ) -> Result<(), Traced<RoomError>> {
         let room = ctx.borrow().upgrade().unwrap();
         let peer = PeerConnection::new(
             peer_id,
@@ -94,15 +94,16 @@ impl RoomComponent {
             room.peers.media_manager(),
             new_peer.force_relay(),
             room.send_constraints.clone(),
-            room.recv_constraints.clone(),
         )
-        .unwrap();
+        .map_err(tracerr::map_from_and_wrap!())?;
 
         let component =
             Component::new_component(new_peer, peer, global_ctx.clone());
         component.spawn();
 
         room.peers.insert_peer(peer_id, component);
+
+        Ok(())
     }
 
     async fn observe_remove_peer(
@@ -110,8 +111,10 @@ impl RoomComponent {
         global_ctx: Rc<RoomCtx>,
         _: Rc<RoomState>,
         (peer_id, _): (PeerId, Rc<PeerState>),
-    ) {
+    ) -> Result<(), Traced<RoomError>> {
         global_ctx.connections.close_connection(peer_id);
+
+        Ok(())
     }
 }
 
@@ -1120,13 +1123,20 @@ impl EventHandler for InnerRoom {
                 Direction::Send { receivers, mid } => {
                     senders.insert(
                         track.id,
-                        Rc::new(SenderState::new(
-                            track.id,
-                            mid.clone(),
-                            track.media_type.clone(),
-                            receivers.clone(),
-                            &self.send_constraints,
-                        )),
+                        Rc::new(
+                            SenderState::new(
+                                track.id,
+                                mid.clone(),
+                                track.media_type.clone(),
+                                receivers.clone(),
+                                &self.send_constraints,
+                            )
+                            .map_err(|e| {
+                                self.on_failed_local_media
+                                    .call(JasonError::from(e.clone()));
+                                tracerr::map_from_and_new!(e)
+                            })?,
+                        ),
                     );
                 }
                 Direction::Recv { sender, mid } => {
@@ -1137,6 +1147,7 @@ impl EventHandler for InnerRoom {
                             mid.clone(),
                             track.media_type.clone(),
                             sender.clone(),
+                            &self.recv_constraints,
                         )),
                     );
                 }
@@ -1161,7 +1172,11 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         sdp_answer: String,
     ) -> Self::Output {
-        let peer = self.state.peers.get(&peer_id, Clone::clone).unwrap();
+        let peer = self
+            .state
+            .peers
+            .get(&peer_id, Clone::clone)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.set_remote_sdp_offer(sdp_answer);
 
         Ok(())
@@ -1173,7 +1188,11 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         candidate: IceCandidate,
     ) -> Self::Output {
-        let peer = self.state.peers.get(&peer_id, Clone::clone).unwrap();
+        let peer = self
+            .state
+            .peers
+            .get(&peer_id, Clone::clone)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.add_ice_candidate(candidate);
 
         Ok(())
@@ -1201,7 +1220,11 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer_state = self.state.peers.get(&peer_id, |s| s.clone()).unwrap();
+        let peer_state = self
+            .state
+            .peers
+            .get(&peer_id, Clone::clone)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
 
         for update in updates {
             match update {
@@ -1213,7 +1236,12 @@ impl EventHandler for InnerRoom {
                             track.media_type,
                             receivers,
                             &self.send_constraints,
-                        );
+                        )
+                        .map_err(|e| {
+                            self.on_failed_local_media
+                                .call(JasonError::from(e.clone()));
+                            tracerr::map_from_and_new!(e)
+                        })?;
                         peer_state
                             .insert_sender(track.id, Rc::new(sender_state));
                     }
@@ -1223,6 +1251,7 @@ impl EventHandler for InnerRoom {
                             mid,
                             track.media_type,
                             sender,
+                            &self.recv_constraints,
                         );
                         peer_state
                             .insert_receiver(track.id, Rc::new(receiver_state));

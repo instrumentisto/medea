@@ -3,8 +3,14 @@ use std::rc::Rc;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
 use medea_reactive::{Guarded, ProgressableCell};
+use tracerr::Traced;
 
-use crate::{api::RoomCtx, peer::Receiver, utils::Component};
+use crate::{
+    api::RoomCtx,
+    media::RecvConstraints,
+    peer::{MediaConnectionsError, Receiver},
+    utils::Component,
+};
 
 pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>, RoomCtx>;
 
@@ -24,14 +30,19 @@ impl ReceiverState {
         mid: Option<String>,
         media_type: MediaType,
         sender: MemberId,
+        recv_constraints: &RecvConstraints,
     ) -> Self {
+        let enabled = match &media_type {
+            MediaType::Audio(_) => recv_constraints.is_audio_enabled(),
+            MediaType::Video(_) => recv_constraints.is_video_enabled(),
+        };
         Self {
             id,
             mid,
             media_type,
             sender,
-            enabled_general: ProgressableCell::new(true),
-            enabled_individual: ProgressableCell::new(true),
+            enabled_general: ProgressableCell::new(enabled),
+            enabled_individual: ProgressableCell::new(enabled),
             muted: ProgressableCell::new(false),
         }
     }
@@ -94,7 +105,10 @@ impl ReceiverComponent {
             self.state().enabled_general.subscribe(),
             Self::observe_enabled_general,
         );
-        self.spawn_observer(self.state().muted.subscribe(), Self::observe_muted);
+        self.spawn_observer(
+            self.state().muted.subscribe(),
+            Self::observe_muted,
+        );
     }
 
     async fn observe_muted(
@@ -102,8 +116,10 @@ impl ReceiverComponent {
         _: Rc<RoomCtx>,
         _: Rc<ReceiverState>,
         muted: Guarded<bool>,
-    ) {
+    ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_muted(*muted);
+
+        Ok(())
     }
 
     async fn observe_enabled_individual(
@@ -111,8 +127,10 @@ impl ReceiverComponent {
         _: Rc<RoomCtx>,
         _: Rc<ReceiverState>,
         enabled_individual: Guarded<bool>,
-    ) {
+    ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_enabled_individual_state(*enabled_individual);
+
+        Ok(())
     }
 
     async fn observe_enabled_general(
@@ -120,7 +138,9 @@ impl ReceiverComponent {
         _: Rc<RoomCtx>,
         _: Rc<ReceiverState>,
         enabled_general: Guarded<bool>,
-    ) {
+    ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_enabled_general_state(*enabled_general);
+
+        Ok(())
     }
 }

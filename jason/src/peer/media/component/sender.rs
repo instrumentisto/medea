@@ -5,14 +5,12 @@ use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_reactive::{Guarded, ProgressableCell};
+use tracerr::Traced;
 
 use crate::{
     api::RoomCtx,
     media::LocalTracksConstraints,
-    peer::{
-        media::transitable_state::{media_exchange_state, mute_state},
-        PeerEvent, Sender,
-    },
+    peer::{MediaConnectionsError, Sender},
     utils::Component,
     MediaKind,
 };
@@ -37,46 +35,17 @@ impl SenderState {
         media_type: MediaType,
         receivers: Vec<MemberId>,
         send_constraints: &LocalTracksConstraints,
-    ) -> Self {
-        let enabled = if send_constraints.enabled(&media_type) {
-            true
-        } else if media_type.required() {
-            unreachable!()
-            // let e = tracerr::new!(
-            //
-            // MediaConnectionsError::CannotDisableRequiredSender
-            //             );
-            // let _ =
-            //     self.0.borrow().peer_events_sender.unbounded_send(
-            //         PeerEvent::FailedLocalMedia {
-            //             error: JasonError::from(e.clone()),
-            //         },
-            //     );
-            //
-            // return Err(e);
-        } else {
-            false
-        };
-        let muted = if !send_constraints.muted(&media_type) {
-            false
-        } else if media_type.required() {
-            unreachable!()
-            // let e = tracerr::new!(
-            //
-            // MediaConnectionsError::CannotDisableRequiredSender
-            //             );
-            // let _ =
-            //     self.0.borrow().peer_events_sender.unbounded_send(
-            //         PeerEvent::FailedLocalMedia {
-            //             error: JasonError::from(e.clone()),
-            //         },
-            //     );
-            // return Err(e);
-        } else {
-            true
-        };
+    ) -> Result<Self, Traced<MediaConnectionsError>> {
+        let required = media_type.required();
+        let enabled = send_constraints.enabled(&media_type);
+        let muted = send_constraints.muted(&media_type);
+        if (!enabled && required) || (muted && required) {
+            return Err(tracerr::new!(
+                MediaConnectionsError::CannotDisableRequiredSender
+            ));
+        }
 
-        Self {
+        Ok(Self {
             id,
             mid,
             media_type,
@@ -85,7 +54,7 @@ impl SenderState {
             enabled_individual: ProgressableCell::new(enabled),
             muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
-        }
+        })
     }
 
     pub fn id(&self) -> TrackId {
@@ -172,7 +141,10 @@ impl SenderComponent {
             self.state().enabled_general.subscribe(),
             Self::observe_enabled_general,
         );
-        self.spawn_observer(self.state().muted.subscribe(), Self::observe_muted);
+        self.spawn_observer(
+            self.state().muted.subscribe(),
+            Self::observe_muted,
+        );
     }
 
     async fn observe_muted(
@@ -180,8 +152,10 @@ impl SenderComponent {
         _: Rc<RoomCtx>,
         _: Rc<SenderState>,
         muted: Guarded<bool>,
-    ) {
+    ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_muted(*muted);
+
+        Ok(())
     }
 
     async fn observe_enabled_individual(
@@ -189,13 +163,15 @@ impl SenderComponent {
         _: Rc<RoomCtx>,
         state: Rc<SenderState>,
         enabled_individual: Guarded<bool>,
-    ) {
+    ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_enabled_individual(*enabled_individual);
         if !*enabled_individual {
             ctx.remove_track().await;
         } else {
             state.need_local_stream_update.set(true);
         }
+
+        Ok(())
     }
 
     async fn observe_enabled_general(
@@ -203,7 +179,9 @@ impl SenderComponent {
         _: Rc<RoomCtx>,
         _: Rc<SenderState>,
         enabled_general: Guarded<bool>,
-    ) {
+    ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_enabled_general(*enabled_general);
+
+        Ok(())
     }
 }
