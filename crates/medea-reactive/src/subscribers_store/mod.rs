@@ -19,5 +19,6 @@ pub trait SubscribersStore<T, O>: Default {
     fn subscribe(&self) -> LocalBoxStream<'static, O>;
 
     /// Wraps the provided `value` to the output type.
+    #[must_use]
     fn wrap(&self, value: T) -> O;
 }

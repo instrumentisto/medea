@@ -12,8 +12,8 @@ pub use self::guarded::{Guard, Guarded};
 
 /// [`SubscribersStore`] for progressable collections/field.
 ///
-/// Will provided [`Value`] with an updated data to the
-/// [`SubscribersStore::new_subscription()`] [`Stream`].
+/// Will provided [`Guarded`] with an updated data to the
+/// [`SubscribersStore::subscribe()`] [`Stream`].
 ///
 /// You can wait for updates processing with a
 /// [`SubStore::when_all_processed()`] method.
@@ -66,6 +66,7 @@ where
         Box::pin(rx)
     }
 
+    #[inline]
     fn wrap(&self, value: T) -> Guarded<T> {
         Guarded::wrap(value, Rc::clone(&self.counter))
     }

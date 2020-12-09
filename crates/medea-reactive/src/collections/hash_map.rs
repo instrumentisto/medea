@@ -3,7 +3,6 @@
 //! [1]: std::collections::HashMap
 
 use std::{
-    cell::RefCell,
     collections::hash_map::{Iter, Values},
     hash::Hash,
     marker::PhantomData,
@@ -15,13 +14,13 @@ use futures::{
 };
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
-use std::iter::FromIterator;
+use std::{cell::RefCell, iter::FromIterator};
 
 /// Reactive hash map based on [`HashMap`][1] with additional functionality of
-/// tracking progress made by its subscribers. Its [`HashMap::on_insert`] and
-/// [`HashMap::on_remove`] subscriptions return values wrapped in
+/// tracking progress made by its subscribers. Its [`HashMap::on_insert()`] and
+/// [`HashMap::on_remove()`] subscriptions return values wrapped in
 /// [`progressable::Guarded`], and implementation tracks all
-/// [`progressable::Guard`]'s.
+/// [`progressable::Guard`]s.
 ///
 /// [1]: std::collections::HashMap
 pub type ProgressableHashMap<K, V> = HashMap<
@@ -30,6 +29,7 @@ pub type ProgressableHashMap<K, V> = HashMap<
     progressable::SubStore<(K, V)>,
     progressable::Guarded<(K, V)>,
 >;
+
 /// Reactive hash map based on [`HashMap`].
 pub type ObservableHashMap<K, V> =
     HashMap<K, V, common::SubStore<(K, V)>, (K, V)>;
@@ -102,13 +102,13 @@ pub struct HashMap<K, V, S: SubscribersStore<(K, V), O>, O> {
     /// Data stored by this [`HashMap`].
     store: RefCell<std::collections::HashMap<K, V>>,
 
-    /// Subscribers of the [`HashMap::on_insert`] method.
+    /// Subscribers of the [`HashMap::on_insert()`] method.
     on_insert_subs: S,
 
-    /// Subscribers of the [`HashMap::on_remove`] method.
+    /// Subscribers of the [`HashMap::on_remove()`] method.
     on_remove_subs: S,
 
-    /// Phantom type of [`HashMap::on_insert`] and [`HashMap::on_remove`]
+    /// Phantom type of [`HashMap::on_insert()`] and [`HashMap::on_remove()`]
     /// output.
     _output: PhantomData<O>,
 }
@@ -118,8 +118,8 @@ where
     K: Hash + Eq + Clone + 'static,
     V: Clone + 'static,
 {
-    /// Returns [`Future`] which will be resolved when all insertion updates
-    /// will be processed by [`HashMap::on_insert`] subscribers.
+    /// Returns [`Future`] resolving when all insertion updates will be
+    /// processed by [`HashMap::on_insert()`] subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -128,8 +128,8 @@ where
         self.on_insert_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when all remove updates will
-    /// be processed by [`HashMap::on_remove`] subscribers.
+    /// Returns [`Future`] resolving when all remove updates will be processed
+    /// by [`HashMap::on_remove()`] subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -138,8 +138,8 @@ where
         self.on_remove_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when all insert and remove
-    /// updates will be processed by subscribers.
+    /// Returns [`Future`] resolving when all insert and remove updates will be
+    /// processed by subscribers.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -156,9 +156,9 @@ where
 }
 
 impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
-    /// Returns new empty [`HashMap`].
-    #[must_use]
+    /// Creates new empty [`HashMap`].
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -214,18 +214,20 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> HashMap<K, V, S, O> {
     ///
     /// [`Stream`]: futures::Stream
     #[inline]
+    #[must_use]
     pub fn on_insert(&self) -> LocalBoxStream<'static, O> {
         self.on_insert_subs.subscribe()
     }
 
-    /// Returns the [`Stream`] to which the removed key-value pairs will be
-    /// sent.
+    /// Returns [`Stream`] yielding removed key-value pairs from this
+    /// [`HashMap`].
     ///
-    /// Note that to this [`Stream`] will be sent all items of the
-    /// [`HashMap`] on container drop and if value is replaced with insert.
+    /// Note, that this [`Stream`] will yield all key-value pairs of this
+    /// [`HashMap`] on [`Drop`].
     ///
     /// [`Stream`]: futures::Stream
     #[inline]
+    #[must_use]
     pub fn on_remove(&self) -> LocalBoxStream<'static, O> {
         self.on_remove_subs.subscribe()
     }
@@ -238,12 +240,12 @@ where
     S: SubscribersStore<(K, V), O>,
     O: 'static,
 {
-    /// Returns [`Stream`] that contains values from this [`HashMap`].
+    /// Returns [`Stream`] containing values from this [`HashMap`].
     ///
     /// Returned [`Stream`] contains only current values. It won't update on new
     /// inserts, but you can merge returned [`Stream`] with a
-    /// [`HashMap::on_insert`] [`Stream`] if you want to process current values
-    /// and values that will be inserted.
+    /// [`HashMap::on_insert()`] [`Stream`] if you want to process current
+    /// values and values that will be inserted.
     ///
     /// [`Stream`]: futures::Stream
     #[inline]
@@ -263,7 +265,7 @@ where
     K: Hash + Eq,
     S: SubscribersStore<(K, V), O>,
 {
-    /// Returns a reference to the value corresponding to the key.
+    /// Returns a reference to the value corresponding to the `key`.
     #[inline]
     pub fn get<F, C>(&self, key: &K, f: F) -> Option<C>
     where
@@ -272,17 +274,17 @@ where
         self.store.borrow().get(key).map(f)
     }
 
-    /// Returns a mutable reference to the value corresponding to the key.
+    /// Returns a mutable reference to the value corresponding to the `key`.
     ///
-    /// Note that mutating of the returned value wouldn't work same as
-    /// [`Observable`]s and doesn't spawns [`HashMap::on_insert`] or
-    /// [`HashMap::on_remove`] events. If you need subscriptions on
-    /// value changes then just wrap value to the [`Observable`] and subscribe
-    /// to it.
+    /// Note, that mutating of the returned value wouldn't work same as
+    /// [`Observable`]s and doesn't spawns [`HashMap::on_insert()`] or
+    /// [`HashMap::on_remove()`] events. If you need subscriptions on value
+    /// changes then just wrap the value into an [`Observable`] and subscribe to
+    /// it.
     ///
     /// [`Observable`]: crate::Observable
     #[inline]
-    pub fn get_mut<F, C>(&mut self, key: &K, f: F) -> Option<C>
+    pub fn get_mut<F, C>(&self, key: &K, f: F) -> Option<C>
     where
         F: FnOnce(&mut V) -> C,
     {
@@ -296,11 +298,11 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    /// Inserts a key-value pair into the [`HashMap`].
+    /// Inserts a key-value pair to this [`HashMap`].
     ///
-    /// This emits [`HashMap::on_insert`] event and may emit
-    /// [`HashMap::on_remove`] event if insert replaces value contained in
-    /// [`HashMap`].
+    /// Emits [`HashMap::on_insert()`] event and may emit
+    /// [`HashMap::on_remove()`] event if insert replaces a value contained in
+    /// this [`HashMap`].
     pub fn insert(&self, key: K, value: V) -> Option<V> {
         let removed_value =
             self.store.borrow_mut().insert(key.clone(), value.clone());
@@ -314,12 +316,12 @@ where
         removed_value
     }
 
-    /// Removes a key from the [`HashMap`], returning the value at the key if
-    /// the key was previously in the [`HashMap`].
+    /// Removes the `key` from this [`HashMap`], returning the value behind it,
+    /// if any.
     ///
-    /// This emits [`HashMap::on_remove`] event if value with provided key is
+    /// Emits [`HashMap::on_remove()`] event if value with provided key is
     /// removed from this [`HashMap`].
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub fn remove(&self, key: &K) -> Option<V> {
         let removed_item = self.store.borrow_mut().remove(key);
         if let Some(item) = &removed_item {
             self.on_remove_subs.send_update((key.clone(), item.clone()));
