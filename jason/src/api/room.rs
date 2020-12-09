@@ -17,6 +17,7 @@ use medea_client_api_proto::{
     MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
     TrackId, TrackUpdate,
 };
+use medea_macro::{watch, watchers};
 use medea_reactive::{collections::ProgressableHashMap, ObservableHashMap};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -68,19 +69,10 @@ impl RoomState {
 
 type RoomComponent = Component<RoomState, RefCell<Weak<InnerRoom>>, RoomCtx>;
 
+#[watchers]
 impl RoomComponent {
-    pub fn spawn(&self) {
-        self.spawn_observer(
-            self.state().peers.on_insert(),
-            Self::observe_insert_peer,
-        );
-        self.spawn_observer(
-            self.state().peers.on_remove(),
-            Self::observe_remove_peer,
-        );
-    }
-
-    async fn observe_insert_peer(
+    #[watch(self.state().peers.on_insert())]
+    async fn insert_peer_watcher(
         ctx: RefCell<Weak<InnerRoom>>,
         global_ctx: Rc<RoomCtx>,
         _: Rc<RoomState>,
@@ -106,7 +98,8 @@ impl RoomComponent {
         Ok(())
     }
 
-    async fn observe_remove_peer(
+    #[watch(self.state().peers.on_remove())]
+    async fn remove_peer_watcher(
         _: RefCell<Weak<InnerRoom>>,
         global_ctx: Rc<RoomCtx>,
         _: Rc<RoomState>,

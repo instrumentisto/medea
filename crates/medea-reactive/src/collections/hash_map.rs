@@ -11,6 +11,7 @@ use std::{
 use futures::{
     future::{self, FutureExt as _, LocalBoxFuture},
     stream::LocalBoxStream,
+    StreamExt,
 };
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};
@@ -257,6 +258,10 @@ where
                 .map(|(k, v)| self.on_insert_subs.wrap((k.clone(), v.clone())))
                 .collect::<Vec<_>>(),
         ))
+    }
+
+    pub fn on_insert_with_replay(&self) -> LocalBoxStream<'static, O> {
+        Box::pin(self.replay_on_insert().chain(self.on_insert()))
     }
 }
 

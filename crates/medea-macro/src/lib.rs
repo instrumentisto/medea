@@ -9,6 +9,7 @@
 mod dispatchable;
 mod enum_delegate;
 mod js_caused;
+mod watchers;
 
 use proc_macro::TokenStream;
 use synstructure::decl_derive;
@@ -283,6 +284,17 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
     let enum_item = syn::parse_macro_input!(input as dispatchable::Item);
     let args = syn::parse_macro_input!(args as dispatchable::Args);
     dispatchable::expand(enum_item, &args)
+}
+
+#[proc_macro_attribute]
+pub fn watchers(args: TokenStream, input: TokenStream) -> TokenStream {
+    let item = syn::parse_macro_input!(input as syn::ItemImpl);
+    watchers::expand(item)
+}
+
+#[proc_macro_attribute]
+pub fn watch(args: TokenStream, input: TokenStream) -> TokenStream {
+    input
 }
 
 decl_derive!([JsCaused, attributes(js)] =>

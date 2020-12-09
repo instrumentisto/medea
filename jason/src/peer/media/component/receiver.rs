@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
+use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell};
 use tracerr::Traced;
 
@@ -95,22 +96,9 @@ impl ReceiverState {
     }
 }
 
+#[watchers]
 impl ReceiverComponent {
-    pub fn spawn(&self) {
-        self.spawn_observer(
-            self.state().enabled_individual.subscribe(),
-            Self::observe_enabled_individual,
-        );
-        self.spawn_observer(
-            self.state().enabled_general.subscribe(),
-            Self::observe_enabled_general,
-        );
-        self.spawn_observer(
-            self.state().muted.subscribe(),
-            Self::observe_muted,
-        );
-    }
-
+    #[watch(self.state().muted.subscribe())]
     async fn observe_muted(
         ctx: Rc<Receiver>,
         _: Rc<RoomCtx>,
@@ -122,6 +110,7 @@ impl ReceiverComponent {
         Ok(())
     }
 
+    #[watch(self.state().enabled_individual.subscribe())]
     async fn observe_enabled_individual(
         ctx: Rc<Receiver>,
         _: Rc<RoomCtx>,
@@ -133,6 +122,7 @@ impl ReceiverComponent {
         Ok(())
     }
 
+    #[watch(self.state().enabled_general.subscribe())]
     async fn observe_enabled_general(
         ctx: Rc<Receiver>,
         _: Rc<RoomCtx>,

@@ -4,6 +4,7 @@ use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
+use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell};
 use tracerr::Traced;
 
@@ -131,23 +132,10 @@ impl SenderState {
     }
 }
 
+#[watchers]
 impl SenderComponent {
-    pub fn spawn(&self) {
-        self.spawn_observer(
-            self.state().enabled_individual.subscribe(),
-            Self::observe_enabled_individual,
-        );
-        self.spawn_observer(
-            self.state().enabled_general.subscribe(),
-            Self::observe_enabled_general,
-        );
-        self.spawn_observer(
-            self.state().muted.subscribe(),
-            Self::observe_muted,
-        );
-    }
-
-    async fn observe_muted(
+    #[watch(self.state().muted.subscribe())]
+    async fn muted_watcher(
         ctx: Rc<Sender>,
         _: Rc<RoomCtx>,
         _: Rc<SenderState>,
@@ -158,7 +146,8 @@ impl SenderComponent {
         Ok(())
     }
 
-    async fn observe_enabled_individual(
+    #[watch(self.state().enabled_individual.subscribe())]
+    async fn enabled_individual_watcher(
         ctx: Rc<Sender>,
         _: Rc<RoomCtx>,
         state: Rc<SenderState>,
@@ -174,7 +163,8 @@ impl SenderComponent {
         Ok(())
     }
 
-    async fn observe_enabled_general(
+    #[watch(self.state().enabled_general.subscribe())]
+    async fn enabled_general_watcher(
         ctx: Rc<Sender>,
         _: Rc<RoomCtx>,
         _: Rc<SenderState>,

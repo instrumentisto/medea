@@ -1,9 +1,10 @@
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{future::LocalBoxFuture, stream};
+use futures::{future::LocalBoxFuture, stream, Stream};
 use medea_client_api_proto::{
     Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
 };
+use medea_macro::{watch, watchers};
 use medea_reactive::{
     collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
     ProgressableCell,
@@ -154,41 +155,10 @@ impl PeerState {
 
 pub type PeerComponent = Component<PeerState, Rc<PeerConnection>, RoomCtx>;
 
+#[watchers]
 impl PeerComponent {
-    pub fn spawn(&self) {
-        self.spawn_observer(
-            stream::select(
-                self.state().senders.replay_on_insert(),
-                self.state().senders.on_insert(),
-            ),
-            Self::observe_sender_insert,
-        );
-        self.spawn_observer(
-            stream::select(
-                self.state().receivers.replay_on_insert(),
-                self.state().receivers.on_insert(),
-            ),
-            Self::observe_receiver_insert,
-        );
-        self.spawn_observer(
-            self.state().negotiation_role.subscribe(),
-            Self::observe_negotiation_role,
-        );
-        self.spawn_observer(
-            self.state().remote_sdp_offer.subscribe(),
-            Self::observe_remote_sdp_offer,
-        );
-        self.spawn_observer(
-            self.state().ice_candidates.borrow().on_push(),
-            Self::observe_ice_candidate_push,
-        );
-        self.spawn_observer(
-            self.state().restart_ice.subscribe(),
-            Self::observe_ice_restart,
-        );
-    }
-
-    async fn observe_ice_candidate_push(
+    #[watch(self.state().ice_candidates.borrow().on_push())]
+    async fn ice_candidate_push_watcher(
         ctx: Rc<PeerConnection>,
         _: Rc<RoomCtx>,
         _: Rc<PeerState>,
@@ -205,7 +175,8 @@ impl PeerComponent {
         Ok(())
     }
 
-    async fn observe_remote_sdp_offer(
+    #[watch(self.state().remote_sdp_offer.subscribe())]
+    async fn remote_sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
         _: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -234,7 +205,8 @@ impl PeerComponent {
         Ok(())
     }
 
-    async fn observe_ice_restart(
+    #[watch(self.state().restart_ice.subscribe())]
+    async fn ice_restart_watcher(
         ctx: Rc<PeerConnection>,
         _: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -248,7 +220,8 @@ impl PeerComponent {
         Ok(())
     }
 
-    async fn observe_sender_insert(
+    #[watch(self.state().senders.on_insert_with_replay())]
+    async fn sender_insert_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -288,7 +261,8 @@ impl PeerComponent {
         Ok(())
     }
 
-    async fn observe_receiver_insert(
+    #[watch(self.state().receivers.on_insert_with_replay())]
+    async fn receiver_insert_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<PeerState>,
@@ -318,7 +292,8 @@ impl PeerComponent {
         Ok(())
     }
 
-    async fn observe_negotiation_role(
+    #[watch(self.state().negotiation_role.subscribe())]
+    async fn negotiation_role_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<RoomCtx>,
         state: Rc<PeerState>,
