@@ -30,6 +30,10 @@ pub struct SenderState {
 }
 
 impl SenderState {
+    /// # Errors
+    ///
+    /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
+    /// [`Sender`] can't be disabled.
     pub fn new(
         id: TrackId,
         mid: Option<String>,
@@ -40,7 +44,7 @@ impl SenderState {
         let required = media_type.required();
         let enabled = send_constraints.enabled(&media_type);
         let muted = send_constraints.muted(&media_type);
-        if (!enabled && required) || (muted && required) {
+        if (muted || !enabled) && required {
             return Err(tracerr::new!(
                 MediaConnectionsError::CannotDisableRequiredSender
             ));
@@ -86,7 +90,7 @@ impl SenderState {
         self.enabled_general.get()
     }
 
-    pub fn update(&self, track_patch: TrackPatchEvent) {
+    pub fn update(&self, track_patch: &TrackPatchEvent) {
         if track_patch.id != self.id {
             return;
         }
@@ -157,10 +161,10 @@ impl SenderComponent {
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
         ctx.set_enabled_individual(*enabled_individual);
-        if !*enabled_individual {
-            ctx.remove_track().await;
-        } else {
+        if *enabled_individual {
             state.need_local_stream_update.set(true);
+        } else {
+            ctx.remove_track().await;
         }
 
         Ok(())

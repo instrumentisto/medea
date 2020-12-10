@@ -2,11 +2,7 @@
 //!
 //! [1]: std::collections::HashMap
 
-use std::{
-    collections::hash_map::{Iter, Values},
-    hash::Hash,
-    marker::PhantomData,
-};
+use std::{hash::Hash, marker::PhantomData};
 
 use futures::{
     future::{self, FutureExt as _, LocalBoxFuture},

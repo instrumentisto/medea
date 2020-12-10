@@ -72,7 +72,7 @@ impl ReceiverState {
         self.enabled_general.get()
     }
 
-    pub fn update(&self, track_patch: TrackPatchEvent) {
+    pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.id != track_patch.id {
             return;
         }

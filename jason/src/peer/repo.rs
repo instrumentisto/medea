@@ -1,20 +1,18 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::{IceServer, PeerId};
+use medea_client_api_proto::PeerId;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
+    api::RoomCtx,
     media::{LocalTracksConstraints, MediaManager},
-    peer::component::PeerComponent,
-    utils::{delay_for, TaskHandle},
+    peer::{component::PeerComponent, PeerState},
+    utils::{delay_for, Component, TaskHandle},
 };
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::{
-    api::RoomCtx, media::RecvConstraints, peer::PeerState, utils::Component,
-};
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -93,7 +91,7 @@ impl Repository {
                 let peers = peers
                     .borrow()
                     .values()
-                    .map(|p| p.ctx())
+                    .map(Component::ctx)
                     .collect::<Vec<_>>();
                 future::join_all(
                     peers.iter().map(|p| p.scrape_and_send_peer_stats()),
@@ -130,8 +128,7 @@ impl PeerRepository for Repository {
         )
         .map_err(tracerr::map_from_and_wrap!())?;
 
-        let component =
-            Component::new_component(state, peer, global_ctx.clone());
+        let component = Component::new_component(state, peer, global_ctx);
         component.spawn();
 
         self.peers.borrow_mut().insert(peer_id, component);
@@ -150,7 +147,7 @@ impl PeerRepository for Repository {
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
-        self.peers.borrow().get(&id).map(|p| p.ctx())
+        self.peers.borrow().get(&id).map(Component::ctx)
     }
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
@@ -162,6 +159,6 @@ impl PeerRepository for Repository {
     /// Returns all [`PeerConnection`]s stored in a repository.
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
-        self.peers.borrow().values().map(|p| p.ctx()).collect()
+        self.peers.borrow().values().map(Component::ctx).collect()
     }
 }

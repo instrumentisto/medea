@@ -5,11 +5,12 @@ use wasm_bindgen_futures::spawn_local;
 
 /// Storage of the [`AbortHandle`]s used for aborting [`Observable`] listeners
 /// tasks.
+#[derive(Default)]
 pub struct TaskHandlesStorage(RefCell<Vec<AbortHandle>>);
 
 impl TaskHandlesStorage {
     pub fn new() -> Self {
-        Self(RefCell::default())
+        Self::default()
     }
 
     pub fn register_handle(&self, handle: AbortHandle) {

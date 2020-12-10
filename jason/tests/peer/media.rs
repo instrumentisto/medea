@@ -255,7 +255,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.state().update(TrackPatchEvent {
+        sender.state().update(&TrackPatchEvent {
             id: TrackId(track_id.0 + 100),
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -269,7 +269,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn disable() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.state().update(TrackPatchEvent {
+        sender.state().update(&TrackPatchEvent {
             id: track_id,
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -283,7 +283,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn enabled_enabled() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.state().update(TrackPatchEvent {
+        sender.state().update(&TrackPatchEvent {
             id: track_id,
             enabled_individual: Some(true),
             enabled_general: Some(true),
@@ -297,7 +297,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn disable_disabled() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.state().update(TrackPatchEvent {
+        sender.state().update(&TrackPatchEvent {
             id: track_id,
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -306,7 +306,7 @@ mod sender_patch {
         sender.state().when_updated().await;
         assert!(sender.general_disabled());
 
-        sender.state().update(TrackPatchEvent {
+        sender.state().update(&TrackPatchEvent {
             id: track_id,
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -320,7 +320,7 @@ mod sender_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (sender, track_id, _media_connections) = get_sender().await;
-        sender.state().update(TrackPatchEvent {
+        sender.state().update(&TrackPatchEvent {
             id: track_id,
             enabled_individual: None,
             enabled_general: None,
@@ -367,7 +367,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn wrong_track_id() {
         let (receiver, _tx) = get_receiver();
-        receiver.state().update(TrackPatchEvent {
+        receiver.state().update(&TrackPatchEvent {
             id: TrackId(TRACK_ID.0 + 100),
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -381,7 +381,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn disable() {
         let (receiver, _tx) = get_receiver();
-        receiver.state().update(TrackPatchEvent {
+        receiver.state().update(&TrackPatchEvent {
             id: TRACK_ID,
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -395,7 +395,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn enabled_enabled() {
         let (receiver, _tx) = get_receiver();
-        receiver.state().update(TrackPatchEvent {
+        receiver.state().update(&TrackPatchEvent {
             id: TRACK_ID,
             enabled_individual: Some(true),
             enabled_general: Some(true),
@@ -409,7 +409,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn disable_disabled() {
         let (receiver, _tx) = get_receiver();
-        receiver.state().update(TrackPatchEvent {
+        receiver.state().update(&TrackPatchEvent {
             id: TRACK_ID,
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -418,7 +418,7 @@ mod receiver_patch {
         receiver.state().when_updated().await;
         assert!(receiver.is_general_disabled());
 
-        receiver.state().update(TrackPatchEvent {
+        receiver.state().update(&TrackPatchEvent {
             id: TRACK_ID,
             enabled_individual: Some(false),
             enabled_general: Some(false),
@@ -432,7 +432,7 @@ mod receiver_patch {
     #[wasm_bindgen_test]
     async fn empty_patch() {
         let (receiver, _tx) = get_receiver();
-        receiver.state().update(TrackPatchEvent {
+        receiver.state().update(&TrackPatchEvent {
             id: TRACK_ID,
             enabled_individual: None,
             enabled_general: None,

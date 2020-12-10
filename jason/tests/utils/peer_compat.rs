@@ -1,6 +1,8 @@
 use std::{ops::Deref, rc::Rc};
 
-use futures::{channel::mpsc, stream, stream::LocalBoxStream, StreamExt as _};
+use futures::{
+    channel::mpsc, future, stream, stream::LocalBoxStream, StreamExt as _,
+};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     Command, Direction, IceServer, NegotiationRole, PeerId,
@@ -92,9 +94,10 @@ impl PeerConnectionCompatibility {
             .state()
             .set_negotiation_role(NegotiationRole::Offerer);
 
-        while !matches!(self.command_rx.borrow_mut().next().await.unwrap(), Command::MakeSdpOffer { .. })
-        {
-        }
+        while !matches!(
+            self.command_rx.borrow_mut().next().await.unwrap(),
+            Command::MakeSdpOffer { .. }
+        ) {}
 
         Ok(self.component.state().sdp_offer().unwrap())
     }
@@ -145,9 +148,10 @@ impl PeerConnectionCompatibility {
             .state()
             .set_negotiation_role(NegotiationRole::Answerer(offer));
 
-        while !matches!(self.command_rx.borrow_mut().next().await.unwrap(), Command::MakeSdpAnswer { .. })
-        {
-        }
+        while !matches!(
+            self.command_rx.borrow_mut().next().await.unwrap(),
+            Command::MakeSdpAnswer { .. }
+        ) {}
 
         Ok(self.component.state().sdp_offer().unwrap())
     }
@@ -155,11 +159,11 @@ impl PeerConnectionCompatibility {
     pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
         for track in tracks {
             if let Some(sender) = self.component.state().get_sender(track.id) {
-                sender.update(track);
+                sender.update(&track);
             } else if let Some(receiver) =
                 self.component.state().get_receiver(track.id)
             {
-                receiver.update(track);
+                receiver.update(&track);
             } else {
                 panic!()
             }

@@ -1,7 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
+use std::rc::Rc;
 
 use futures::{future, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;

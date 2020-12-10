@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{future::LocalBoxFuture, stream, Stream};
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
 };
@@ -22,7 +22,6 @@ use crate::{
 };
 
 use super::PeerConnection;
-use std::cell::Cell;
 
 pub struct PeerState {
     id: PeerId,
@@ -81,11 +80,11 @@ impl PeerState {
     }
 
     pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<SenderState>> {
-        self.senders.get(&track_id, |s| s.clone())
+        self.senders.get(&track_id, Clone::clone)
     }
 
     pub fn get_receiver(&self, track_id: TrackId) -> Option<Rc<ReceiverState>> {
-        self.receivers.get(&track_id, |s| s.clone())
+        self.receivers.get(&track_id, Clone::clone)
     }
 
     pub fn set_negotiation_role(&self, negotiation_role: NegotiationRole) {
@@ -299,11 +298,8 @@ impl PeerComponent {
             new_receiver.enabled_general(),
             new_receiver.enabled_individual(),
         );
-        let component = Component::new_component(
-            new_receiver,
-            Rc::new(recv),
-            global_ctx.clone(),
-        );
+        let component =
+            Component::new_component(new_receiver, Rc::new(recv), global_ctx);
         component.spawn();
         ctx.media_connections.insert_receiver(component);
 

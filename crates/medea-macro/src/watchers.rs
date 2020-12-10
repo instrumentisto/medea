@@ -1,8 +1,6 @@
-use crate::dispatchable::Args;
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{Attribute, ExprMethodCall, ImplItem, ItemImpl, Meta};
+use syn::{ExprMethodCall, ImplItem, ItemImpl};
 
 mod kw {
     syn::custom_keyword!(watch);
@@ -18,9 +16,7 @@ pub fn expand(impl_item: ItemImpl) -> TokenStream {
                 let attr = method
                     .attrs
                     .into_iter()
-                    .find(|attr| {
-                        attr.path.get_ident().unwrap().to_string() == "watch"
-                    })
+                    .find(|attr| *attr.path.get_ident().unwrap() == "watch")
                     .unwrap();
                 let out: ExprMethodCall = attr.parse_args().unwrap();
 

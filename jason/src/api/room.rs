@@ -3,7 +3,6 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    ops::Deref as _,
     rc::{Rc, Weak},
 };
 
@@ -23,18 +22,20 @@ use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
+#[cfg(feature = "mockable")]
+use crate::peer::PeerConnection;
 use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
+        LocalTracksConstraints, MediaKind, MediaStreamSettings,
         RecvConstraints,
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
-        MediaConnectionsError, MediaState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, PeerState, ReceiverState,
-        RtcStats, SenderState, TrackDirection,
+        MediaConnectionsError, MediaState, PeerError, PeerEvent,
+        PeerEventHandler, PeerRepository, PeerState, ReceiverState, RtcStats,
+        SenderState, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -784,9 +785,6 @@ struct InnerRoom {
 
     peers: PeerRepositoryComponent,
 
-    /// Channel for send events produced [`PeerConnection`] to [`Room`].
-    peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
     /// [`Connection`]: crate::api::Connection
@@ -831,7 +829,7 @@ impl InnerRoom {
             Rc::new(PeerRepositoryState::new()),
             Rc::new(PeerRepositoryCtx {
                 repo: peers,
-                peer_event_sender: peer_event_sender.clone(),
+                peer_event_sender,
                 send_constraints: send_constraints.clone(),
             }),
             Rc::new(RoomCtx {
@@ -840,12 +838,11 @@ impl InnerRoom {
             }),
         );
         peers.spawn();
-        let this = Rc::new(Self {
+        Rc::new(Self {
             peers,
             rpc,
             send_constraints,
             recv_constraints: Rc::new(RecvConstraints::default()),
-            peer_event_sender,
             connections,
             on_connection_loss: Callback1::default(),
             on_failed_local_media: Rc::new(Callback1::default()),
@@ -855,9 +852,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
-        });
-
-        this
+        })
     }
 
     /// Toggles [`InnerRoom::recv_constraints`] or
@@ -1257,11 +1252,11 @@ impl EventHandler for InnerRoom {
                 TrackUpdate::Updated(track_patch) => {
                     if let Some(sender) = peer_state.get_sender(track_patch.id)
                     {
-                        sender.update(track_patch);
+                        sender.update(&track_patch);
                     } else if let Some(receiver) =
                         peer_state.get_receiver(track_patch.id)
                     {
-                        receiver.update(track_patch);
+                        receiver.update(&track_patch);
                     }
                 }
                 TrackUpdate::IceRestart => {

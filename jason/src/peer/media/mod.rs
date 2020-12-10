@@ -12,11 +12,19 @@ use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
+#[cfg(feature = "mockable")]
+use medea_client_api_proto::{MediaType, MemberId};
 use medea_reactive::DroppedError;
 use proto::{MediaSourceKind, TrackId};
 use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
+#[cfg(feature = "mockable")]
+use crate::{
+    api::{Connections, RoomCtx},
+    media::{LocalTracksConstraints, RecvConstraints},
+    utils::Component,
+};
 use crate::{
     media::{track::local, MediaKind},
     peer::{
@@ -41,12 +49,6 @@ pub use self::{
         TransitableStateController,
     },
 };
-use crate::{
-    api::{Connections, RoomCtx},
-    media::{LocalTracksConstraints, RecvConstraints},
-    utils::Component,
-};
-use medea_client_api_proto::{MediaType, MemberId, TrackPatchEvent};
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: MediaStateControllable {
@@ -893,7 +895,6 @@ impl MediaConnections {
         send_constraints: &LocalTracksConstraints,
         recv_constraints: &RecvConstraints,
     ) -> Result<()> {
-        use crate::rpc::MockRpcSession;
         use medea_client_api_proto::Direction;
         for track in tracks {
             match track.direction {
@@ -927,12 +928,12 @@ impl MediaConnections {
         let mut wait_for_change = Vec::new();
         for track in tracks {
             if let Some(sender) = self.0.borrow().senders.get(&track.id) {
-                sender.state().update(track);
+                sender.state().update(&track);
                 wait_for_change.push(sender.state().when_updated());
             } else if let Some(receiver) =
                 self.0.borrow().receivers.get(&track.id)
             {
-                receiver.state().update(track);
+                receiver.state().update(&track);
                 wait_for_change.push(receiver.state().when_updated());
             } else {
                 panic!()
