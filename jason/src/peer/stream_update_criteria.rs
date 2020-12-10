@@ -1,4 +1,4 @@
-//! [`MediaKind`] + [`MediaSourceKind`] kinds for local stream updates.
+//! [`MediaKind`] + [`MediaSourceKind`] criteria for local stream updates.
 
 use std::ops::BitOrAssign;
 
@@ -15,8 +15,8 @@ bitflags::bitflags! {
     }
 }
 
-/// Kinds allowing to specify a set of [`MediaKind`] + [`MediaSourceKind`]
-/// pairs.
+/// Criteria, used for local stream updates, allowing to specify a set of
+/// [`MediaKind`] + [`MediaSourceKind`] pairs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LocalStreamUpdateCriteria(Inner);
 

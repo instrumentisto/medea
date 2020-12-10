@@ -53,8 +53,9 @@ All user visible changes to this project will be documented in this file. This p
             - `Jason.init_room()` ([#46]);
             - `Room.join()` ([#46]);
             - `Jason.close_room()` ([#147]).
-        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145], [#160]);
-        - `rollback_on_fail` argument in `Room.set_local_media_settings()` ([#160]);
+        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145], [#160]):
+            - `Room.set_local_media_settings()` can be configured to stop used tracks before trying to acquire new tracks ([#160]);
+            - `Room.set_local_media_settings()` can be configured to rollback to previous settings if fail to set new settings ([#160]).
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
         - `RemoteMediaTrack.on_enabled` and `RemoteMediaTrack.on_disabled` callbacks being called when `RemoteMediaTrack` is enabled or disabled ([#123], [#143], [#156]);

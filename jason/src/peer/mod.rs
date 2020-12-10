@@ -578,7 +578,7 @@ impl PeerConnection {
         tracks: Vec<proto::Track>,
         maybe_update_local_media: bool,
     ) -> Result<String> {
-        let stream_update_kinds = if maybe_update_local_media {
+        let stream_update_criteria = if maybe_update_local_media {
             Some(LocalStreamUpdateCriteria::from_tracks(&tracks))
         } else {
             None
@@ -592,8 +592,8 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if let Some(kinds) = stream_update_kinds {
-            let _ = self.update_local_stream(kinds).await;
+        if let Some(criteria) = stream_update_criteria {
+            let _ = self.update_local_stream(criteria).await;
         }
 
         let offer = self
@@ -671,9 +671,9 @@ impl PeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
-        kinds: LocalStreamUpdateCriteria,
+        criteria: LocalStreamUpdateCriteria,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        self.inner_update_local_stream(kinds).await.map_err(|e| {
+        self.inner_update_local_stream(criteria).await.map_err(|e| {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
                     error: JasonError::from(e.clone()),
@@ -687,9 +687,10 @@ impl PeerConnection {
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
-        kinds: LocalStreamUpdateCriteria,
+        criteria: LocalStreamUpdateCriteria,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        if let Some(request) = self.media_connections.get_tracks_request(kinds)
+        if let Some(request) =
+            self.media_connections.get_tracks_request(criteria)
         {
             let mut required_caps = SimpleTracksRequest::try_from(request)
                 .map_err(tracerr::from_and_wrap!())?;
@@ -866,7 +867,7 @@ impl PeerConnection {
             .await
             .map_err(tracerr::wrap!())?;
 
-        let stream_update_kinds = if maybe_update_local_media {
+        let stream_update_criteria = if maybe_update_local_media {
             Some(LocalStreamUpdateCriteria::from_tracks(&send))
         } else {
             None
@@ -877,8 +878,8 @@ impl PeerConnection {
             .create_tracks(send, &self.send_constraints, &self.recv_constraints)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        if let Some(kinds) = stream_update_kinds {
-            let _ = self.update_local_stream(kinds).await;
+        if let Some(criteria) = stream_update_criteria {
+            let _ = self.update_local_stream(criteria).await;
         }
 
         let answer = self

@@ -77,8 +77,6 @@ impl Transceiver {
     }
 
     /// Returns `true` if this [`Transceiver`] has [`local::Track`].
-    #[inline]
-    #[must_use]
     pub fn has_send_track(&self) -> bool {
         self.send_track.borrow().is_some()
     }

@@ -362,14 +362,18 @@ impl RoomHandle {
     /// update will change media tracks in all sending peers, so that might
     /// cause new [getUserMedia()][1] request.
     ///
-    /// Media obtaining/injection errors are fired to `on_failed_local_media`
-    /// callback.
-    ///
-    /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
-    /// rolled back on [getUserMedia()][1] request fail.
+    /// Media obtaining/injection errors are additionally fired to
+    /// `on_failed_local_media` callback.
     ///
     /// If `stop_first` set to `true` then affected [`local::Track`]s will be
-    /// dropped before [`MediaStreamSettings`] set.
+    /// dropped before new [`MediaStreamSettings`] is applied. This is usually
+    /// required when changing video source device due to hardware limitations,
+    /// e.g. having an active track sourced from device `A` may hinder
+    /// [getUserMedia()][1] requests to device `B`.
+    ///
+    /// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+    /// request to automatically rollback to previous settings if new settings
+    /// cannot be applied.
     ///
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
@@ -1172,11 +1176,15 @@ impl InnerRoom {
     /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
     ///
-    /// If `rollback_on_fail` set to `true` then [`MediaStreamSettings`] will be
-    /// rollbacked on `getUserMedia` request fail.
+    /// If `stop_first` set to `true` then affected [`local::Track`]s will be
+    /// dropped before new [`MediaStreamSettings`] is applied. This is usually
+    /// required when changing video source device due to hardware limitations,
+    /// e.g. having an active track sourced from device `A` may hinder
+    /// [getUserMedia()][1] requests to device `B`.
     ///
-    /// If `stop_first` set to `true` then [`Sender`]s [`local::Track`]s will be
-    /// dropped before [`MediaStreamSettings`] update.
+    /// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+    /// request to automatically rollback to previous settings if new settings
+    /// cannot be applied.
     ///
     /// If recovering from fail state isn't possible and `stop_first` set to
     /// `true` then affected media types will be disabled.
@@ -1187,22 +1195,22 @@ impl InnerRoom {
     #[async_recursion(?Send)]
     async fn set_local_media_settings(
         &self,
-        settings: MediaStreamSettings,
+        new_settings: MediaStreamSettings,
         stop_first: bool,
         rollback_on_fail: bool,
     ) -> Result<(), ConstraintsUpdateError> {
         use ConstraintsUpdateError as E;
 
-        let old_media_settings = self.send_constraints.inner();
-        self.send_constraints.constrain(settings);
-        let kinds = self
+        let current_settings = self.send_constraints.inner();
+        self.send_constraints.constrain(new_settings);
+        let criteria_kinds_diff = self
             .send_constraints
-            .calculate_kinds_diff(&old_media_settings);
+            .calculate_kinds_diff(&current_settings);
         let peers = self.peers.get_all();
 
         if stop_first {
             for peer in &peers {
-                peer.drop_send_tracks(kinds).await;
+                peer.drop_send_tracks(criteria_kinds_diff).await;
             }
         }
 
@@ -1226,7 +1234,7 @@ impl InnerRoom {
 
                     let err = if rollback_on_fail {
                         self.set_local_media_settings(
-                            old_media_settings,
+                            current_settings,
                             stop_first,
                             false,
                         )
@@ -1241,7 +1249,7 @@ impl InnerRoom {
                     } else if stop_first {
                         self.disable_senders_without_tracks(
                             &peer,
-                            kinds,
+                            criteria_kinds_diff,
                             states_update,
                         )
                         .await
