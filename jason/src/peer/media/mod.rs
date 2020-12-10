@@ -41,6 +41,12 @@ pub use self::{
         TransitableStateController,
     },
 };
+use crate::{
+    api::{Connections, RoomCtx},
+    media::{LocalTracksConstraints, RecvConstraints},
+    utils::Component,
+};
+use medea_client_api_proto::{MediaType, MemberId, TrackPatchEvent};
 
 /// Transceiver's sending ([`Sender`]) or receiving ([`Receiver`]) side.
 pub trait TransceiverSide: MediaStateControllable {
@@ -724,7 +730,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Video)
-            .find(|s| s.disabled())
+            .find(|s| !s.state().enabled_individual())
             .is_none()
     }
 
@@ -735,7 +741,7 @@ impl MediaConnections {
         self.0
             .borrow()
             .iter_receivers_with_kind(MediaKind::Audio)
-            .find(|s| s.disabled())
+            .find(|s| !s.state().enabled_individual())
             .is_none()
     }
 
@@ -743,6 +749,12 @@ impl MediaConnections {
     #[must_use]
     pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
         self.0.borrow().receivers.get(&id).map(|r| r.ctx())
+    }
+
+    #[cfg(feature = "mockable")]
+    #[must_use]
+    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
+        self.0.borrow().senders.get(&id).map(|r| r.ctx())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
@@ -793,5 +805,139 @@ impl MediaConnections {
             .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
             .find(|s| s.muted())
             .is_none()
+    }
+
+    pub fn create_sender(
+        &self,
+        id: TrackId,
+        media_type: MediaType,
+        mid: Option<String>,
+        receivers: Vec<MemberId>,
+        send_constraints: &LocalTracksConstraints,
+    ) -> Result<SenderComponent> {
+        use crate::rpc::MockRpcSession;
+        let sender_state = SenderState::new(
+            id,
+            mid.clone(),
+            media_type.clone(),
+            receivers,
+            send_constraints,
+        )?;
+        let sender = SenderBuilder {
+            required: media_type.required(),
+            media_connections: &self,
+            track_id: id,
+            send_constraints: send_constraints.clone(),
+            mid,
+            media_exchange_state: media_exchange_state::Stable::Enabled,
+            mute_state: mute_state::Stable::Muted,
+            caps: media_type.into(),
+        }
+        .build()?;
+        let component = Component::new_component(
+            Rc::new(sender_state),
+            sender,
+            Rc::new(RoomCtx {
+                rpc: Rc::new(MockRpcSession::new()),
+                connections: Rc::new(Connections::default()),
+            }),
+        );
+        component.spawn();
+
+        Ok(component)
+    }
+
+    pub fn create_receiver(
+        &self,
+        id: TrackId,
+        media_type: MediaType,
+        mid: Option<String>,
+        sender: MemberId,
+        recv_constraints: &RecvConstraints,
+    ) -> ReceiverComponent {
+        use crate::rpc::MockRpcSession;
+        let receiver_state = ReceiverState::new(
+            id,
+            mid.clone(),
+            media_type.clone(),
+            sender.clone(),
+            recv_constraints,
+        );
+        let track_id = id;
+        let receiver = Receiver::new(
+            &self,
+            track_id,
+            media_type.into(),
+            sender,
+            mid,
+            true,
+            true,
+        );
+
+        let component = Component::new_component(
+            Rc::new(receiver_state),
+            Rc::new(receiver),
+            Rc::new(RoomCtx {
+                rpc: Rc::new(MockRpcSession::new()),
+                connections: Rc::new(Connections::default()),
+            }),
+        );
+        component.spawn();
+
+        component
+    }
+
+    pub fn create_tracks(
+        &self,
+        tracks: Vec<proto::Track>,
+        send_constraints: &LocalTracksConstraints,
+        recv_constraints: &RecvConstraints,
+    ) -> Result<()> {
+        use crate::rpc::MockRpcSession;
+        use medea_client_api_proto::Direction;
+        for track in tracks {
+            match track.direction {
+                Direction::Send { mid, receivers } => {
+                    let component = self.create_sender(
+                        track.id,
+                        track.media_type,
+                        mid,
+                        receivers,
+                        send_constraints,
+                    )?;
+                    self.0.borrow_mut().senders.insert(track.id, component);
+                }
+                Direction::Recv { mid, sender } => {
+                    let component = self.create_receiver(
+                        track.id,
+                        track.media_type,
+                        mid,
+                        sender,
+                        recv_constraints,
+                    );
+                    self.0.borrow_mut().receivers.insert(track.id, component);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
+        let mut wait_for_change = Vec::new();
+        for track in tracks {
+            if let Some(sender) = self.0.borrow().senders.get(&track.id) {
+                sender.state().update(track);
+                wait_for_change.push(sender.state().when_updated());
+            } else if let Some(receiver) =
+                self.0.borrow().receivers.get(&track.id)
+            {
+                receiver.state().update(track);
+                wait_for_change.push(receiver.state().when_updated());
+            } else {
+                panic!()
+            }
+        }
+        future::join_all(wait_for_change).await;
     }
 }

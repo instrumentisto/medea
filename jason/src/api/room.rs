@@ -741,7 +741,7 @@ impl Room {
         &self,
         peer_id: PeerId,
     ) -> Option<Rc<PeerConnection>> {
-        self.0.peers.get(peer_id)
+        self.0.peers.repo.get(peer_id)
     }
 
     /// Indicates whether this [`Room`] reference is the same as the given
@@ -942,7 +942,10 @@ impl InnerRoom {
             desired_states
                 .into_iter()
                 .filter_map(|(peer_id, desired_states)| {
-                    self.peers.repo.get(peer_id).map(|peer| (peer, desired_states))
+                    self.peers
+                        .repo
+                        .get(peer_id)
+                        .map(|peer| (peer, desired_states))
                 })
                 .map(|(peer, desired_states)| {
                     let peer_id = peer.id();

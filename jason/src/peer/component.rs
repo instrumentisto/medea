@@ -22,6 +22,7 @@ use crate::{
 };
 
 use super::PeerConnection;
+use std::cell::Cell;
 
 pub struct PeerState {
     id: PeerId,
@@ -30,6 +31,7 @@ pub struct PeerState {
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
+    sdp_offer: RefCell<Option<String>>,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
@@ -51,6 +53,7 @@ impl PeerState {
             ice_servers,
             force_relay,
             remote_sdp_offer: ProgressableCell::new(None),
+            sdp_offer: RefCell::new(None),
             negotiation_role: ObservableCell::new(negotiation_role),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
@@ -101,6 +104,10 @@ impl PeerState {
         self.ice_candidates.borrow_mut().push(ice_candidate);
     }
 
+    pub fn sdp_offer(&self) -> Option<String> {
+        self.sdp_offer.borrow().clone()
+    }
+
     fn when_all_senders_updated(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self.senders.map_values(|s| s.when_updated());
         let fut = futures::future::join_all(when_futs);
@@ -117,7 +124,7 @@ impl PeerState {
         })
     }
 
-    fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
         let fut = futures::future::join(
             self.when_all_receivers_updated(),
             self.when_all_senders_updated(),
@@ -150,6 +157,17 @@ impl PeerState {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl PeerState {
+    pub async fn when_remote_sdp_answer_processed(&self) {
+        self.remote_sdp_offer.when_all_processed().await;
+    }
+
+    pub fn reset_negotiation_role(&self) {
+        self.negotiation_role.set(None);
     }
 }
 
@@ -321,6 +339,7 @@ impl PeerComponent {
                         .create_and_set_offer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                    *state.sdp_offer.borrow_mut() = Some(sdp_offer.clone());
                     let mids = ctx
                         .get_mids()
                         .map_err(tracerr::map_from_and_wrap!())?;
@@ -353,6 +372,7 @@ impl PeerComponent {
                         .create_and_set_answer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                    *state.sdp_offer.borrow_mut() = Some(sdp_answer.clone());
                     global_ctx.rpc.send_command(Command::MakeSdpAnswer {
                         peer_id: ctx.id(),
                         sdp_answer,

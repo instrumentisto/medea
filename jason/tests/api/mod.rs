@@ -1,5 +1,5 @@
 mod connection;
-mod room;
+// mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -65,7 +65,7 @@ async fn only_one_strong_rpc_rc_exists() {
 
     assert_eq!(Rc::strong_count(&ws), 3);
     jason.dispose();
-    assert_eq!(Rc::strong_count(&ws), 1);
+    assert_eq!(Rc::strong_count(&ws), 2);
 }
 
 /// Checks that [`RpcClient`] was dropped on [`JasonHandle::dispose`] call.

@@ -87,6 +87,9 @@ impl SenderState {
     }
 
     pub fn update(&self, track_patch: TrackPatchEvent) {
+        if track_patch.id != self.id {
+            return;
+        }
         if let Some(enabled_general) = track_patch.enabled_general {
             self.enabled_general.set(enabled_general);
         }
