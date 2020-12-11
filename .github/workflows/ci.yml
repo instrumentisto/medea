@@ -1,10 +1,6 @@
 name: CI
 
-#on: push
-on:
-  push:
-    branches:
-      - main
+on: push
 
 env:
   RUST_BACKTRACE: 1
@@ -15,11 +11,11 @@ jobs:
   # Linting and formatting #
   ##########################
 
-  lint:
-    name: Lint Rust code with Clippy
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+  clippy:
+    name: Clippy
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -31,11 +27,10 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - run: make lint
 
-  fmt:
-    name: Verify Rust code style with rustfmt
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+  rustfmt:
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -53,115 +48,91 @@ jobs:
   # Testing #
   ###########
 
-  test-unit-medea-macro:
-    name: Run medea-macro unit tests
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+  test-unit:
+    name: Unit tests
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    strategy:
+      matrix:
+        crate:
+          - medea-macro
+          - medea-reactive
+          - medea-coturn-telnet-client
+          - medea-client-api-proto
+          - medea
+          - medea-jason
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        if: ${{ startsWith(github.ref, format('refs/tags/{0}-', matrix.crate))
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - uses: actions-rs/toolchain@v1
+        if: ${{ matrix.crate != 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         with:
           profile: minimal
           toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-      - run: make test.unit crate=medea-macro
-
-  test-unit-medea-reactive:
-    name: Run medea-reactive unit tests
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-      - run: make test.unit crate=medea-reactive
-
-  test-unit-medea-coturn-telnet-client:
-    name: Run medea-coturn-telnet-client unit tests
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-      - run: make test.unit crate=medea-coturn-telnet-client
-
-  test-unit-medea-client-api-proto:
-    name: Run medea-client-api-proto unit tests
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-      - run: make test.unit crate=medea-client-api-proto
-
-  test-unit-medea:
-    name: Run medea unit tests
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v1
-      - run: make test.unit crate=medea
-
-  test-unit-medea-jason:
-    name: Run medea-jason unit tests in Chrome and Firefox
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         with:
           profile: minimal
           toolchain: stable
           target: wasm32-unknown-unknown
+
       - uses: Swatinem/rust-cache@v1
+        if: ${{ startsWith(github.ref, format('refs/tags/{0}-', matrix.crate))
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - name: Get wasm-bindgen-cli version from Cargo.lock
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         run: echo "WASM_CLI_VERSION=$(cargo pkgid wasm-bindgen
                                       | grep -o '#.*'
                                       | grep -o '[0-9\.]*')"
              >> $GITHUB_ENV
       - uses: actions-rs/install@v0.1
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         with:
           crate: wasm-bindgen-cli
           version: ${{ env.WASM_CLI_VERSION }}
           use-tool-cache: true
-      - name: Test in Chrome
-        run: make test.unit crate=medea-jason browser=chrome
-      - name: Test in Firefox
-        run: make test.unit crate=medea-jason browser=firefox
+
+      - name: Chrome
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
+        run: make test.unit crate=${{ matrix.crate }} browser=chrome
+      - name: Firefox
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
+        run: make test.unit crate=${{ matrix.crate }} browser=firefox
+
+      - run: make test.unit crate=${{ matrix.crate }}
+        if: ${{ matrix.crate != 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
 
   test-e2e:
     name: Run medea E2E tests
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -175,15 +146,14 @@ jobs:
 
 
 
-  ###########################
-  # Documentation integrity #
-  ###########################
+  #################
+  # Documentation #
+  #################
 
   rustdoc:
-    name: Check Rust docs of all crates
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -192,14 +162,45 @@ jobs:
           profile: minimal
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
+
       # Run all task sequentially to not flood the jobs list.
       - run: make docs.rust crate=medea-macro open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-macro-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - run: make docs.rust crate=medea-reactive open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-reactive-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - run: make docs.rust crate=medea-coturn-telnet-client open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-coturn-telnet-client-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - run: make docs.rust crate=medea-client-api-proto open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-client-api-proto-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - run: make docs.rust crate=medea-control-api-proto open=no
-      - run: make docs.rust crate=medea open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-control-api-proto-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
       - run: make docs.rust crate=medea-jason open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea open=no
+        if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+                || startsWith(github.ref, 'refs/tags/medea-0')
+                || startsWith(github.ref, 'refs/tags/medea-1')
+                || startsWith(github.ref, 'refs/tags/medea-2')
+                || startsWith(github.ref, 'refs/tags/medea-3')
+                || startsWith(github.ref, 'refs/tags/medea-4')
+                || startsWith(github.ref, 'refs/tags/medea-5')
+                || startsWith(github.ref, 'refs/tags/medea-6')
+                || startsWith(github.ref, 'refs/tags/medea-7')
+                || startsWith(github.ref, 'refs/tags/medea-8')
+                || startsWith(github.ref, 'refs/tags/medea-9') }}
+                # just until GitHub Actions support regexes in expressions =)
 
 
 
@@ -210,9 +211,9 @@ jobs:
 
   build-jason:
     name: Build medea-jason
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -226,9 +227,9 @@ jobs:
 
   build-medea:
     name: Build medea
-    if: |
-      github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')
+    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -238,3 +239,46 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
       - run: make cargo.build crate=medea dockerized=no debug=yes
+
+  release-cargo:
+    name: Release on crates.io
+    needs: ['clippy', 'rustfmt', 'rustdoc', 'test-e2e', 'test-unit']
+    if: ${{ startsWith(github.ref, 'refs/tags/medea-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Parse crate name and version
+        id: crate
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs/tags/(medea-[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+-?.*)$'
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Release ${{ steps.crate.outputs.group2 }} version
+              of ${{ steps.crate.outputs.group1 }} crate
+        run: make release.crates crate=${{ steps.crate.outputs.group1 }}
+                                 publish=yes
+
+  release-npm:
+    name: Release on NPM
+    needs: ['release-cargo']
+    if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Parse package name and version
+        id: package
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs/tags/(medea-[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+-?.*)$'
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '15'
+      - name: Release ${{ steps.package.outputs.group2 }} version
+              of ${{ steps.package.outputs.group1 }} package
+        run: make release.npm crate=${{ steps.package.outputs.group1 }}
+                              publish=yes

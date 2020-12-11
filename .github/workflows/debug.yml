@@ -1,6 +1,10 @@
 name: Debug
 
-on: push
+#on: push
+on:
+  push:
+    branches:
+      - main
 
 env:
   RUST_BACKTRACE: 1
