@@ -821,6 +821,7 @@ impl MediaConnections {
         send_constraints: &LocalTracksConstraints,
     ) -> Result<SenderComponent> {
         use crate::rpc::MockRpcSession;
+
         let sender_state = SenderState::new(
             id,
             mid.clone(),
@@ -862,6 +863,7 @@ impl MediaConnections {
         recv_constraints: &RecvConstraints,
     ) -> ReceiverComponent {
         use crate::rpc::MockRpcSession;
+
         let receiver_state = ReceiverState::new(
             id,
             mid.clone(),

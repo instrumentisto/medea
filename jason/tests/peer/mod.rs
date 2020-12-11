@@ -27,7 +27,7 @@ use wasm_bindgen_test::*;
 use crate::{
     delay_for, get_media_stream_settings, get_test_recv_tracks,
     get_test_unrequired_tracks, local_constraints, timeout,
-    utils::PeerConnectionCompatibility as PeerConnection,
+    utils::PeerConnectionCompat as PeerConnection,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);

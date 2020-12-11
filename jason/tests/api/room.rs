@@ -29,7 +29,7 @@ use wasm_bindgen_test::*;
 use crate::{
     delay_for, get_jason_error, get_test_recv_tracks, get_test_required_tracks,
     get_test_tracks, get_test_unrequired_tracks, media_stream_settings,
-    timeout, utils::PeerConnectionCompatibility, wait_and_check_test_result,
+    timeout, utils::PeerConnectionCompat, wait_and_check_test_result,
     yield_now, MockNavigator, TEST_ROOM_URL,
 };
 
@@ -1196,7 +1196,7 @@ mod patches_generation {
                 MediaKind::Audio,
                 None,
             );
-            let peer = PeerConnectionCompatibility::new(
+            let peer = PeerConnectionCompat::new(
                 peer_id,
                 tx,
                 Vec::new(),
@@ -1667,7 +1667,7 @@ async fn disable_by_server() {
 }
 
 /// Checks that server can enable track without client's request.
-// #[wasm_bindgen_test]
+#[wasm_bindgen_test]
 async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
@@ -1699,7 +1699,9 @@ async fn enable_by_server() {
     event_tx
         .unbounded_send(Event::TracksApplied {
             peer_id: peer.id(),
-            negotiation_role: Some(NegotiationRole::Offerer),
+            negotiation_role: Some(NegotiationRole::Answerer(
+                "SDP".to_string(),
+            )),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(true),

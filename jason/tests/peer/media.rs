@@ -334,10 +334,12 @@ mod sender_patch {
 
 mod receiver_patch {
     use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
-    use medea_jason::{media::RecvConstraints, peer::PeerEvent};
+    use medea_jason::{
+        media::RecvConstraints,
+        peer::{PeerEvent, ReceiverComponent},
+    };
 
     use super::*;
-    use medea_jason::peer::ReceiverComponent;
 
     const TRACK_ID: TrackId = TrackId(0);
     const MID: &str = "mid";

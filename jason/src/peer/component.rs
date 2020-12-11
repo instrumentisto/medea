@@ -1,3 +1,5 @@
+//! Implementation of the [`PeerComponent`].
+
 use std::{cell::RefCell, rc::Rc};
 
 use futures::future::LocalBoxFuture;

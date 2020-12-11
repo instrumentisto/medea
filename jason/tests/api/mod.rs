@@ -65,7 +65,9 @@ async fn only_one_strong_rpc_rc_exists() {
 
     assert_eq!(Rc::strong_count(&ws), 3);
     jason.dispose();
-    assert_eq!(Rc::strong_count(&ws), 2);
+    // Watcher's Futures doesn't aborts instantly.
+    yield_now().await;
+    assert_eq!(Rc::strong_count(&ws), 1);
 }
 
 /// Checks that [`RpcClient`] was dropped on [`JasonHandle::dispose`] call.
@@ -239,9 +241,7 @@ async fn room_dispose_works() {
         cmd_rx.next().await.unwrap(),
         ClientMsg::Command {
             room_id: _,
-            command: Command::LeaveRoom {
-                member_id: _
-            }
+            command: Command::LeaveRoom { member_id: _ }
         }
     ));
 
@@ -250,9 +250,7 @@ async fn room_dispose_works() {
         cmd_rx.next().await.unwrap(),
         ClientMsg::Command {
             room_id: _,
-            command: Command::LeaveRoom {
-                member_id: _
-            }
+            command: Command::LeaveRoom { member_id: _ }
         }
     ));
 

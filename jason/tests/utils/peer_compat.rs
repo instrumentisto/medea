@@ -18,14 +18,25 @@ use medea_jason::{
 use medea_reactive::ProgressableHashMap;
 use tracerr::Traced;
 
-pub struct PeerConnectionCompatibility {
+/// Wrapper around [`PeerComponent`] which emulates methods removed after
+/// migration to the reactive history.
+pub struct PeerConnectionCompat {
+    /// Actual [`PeerComponent`].
     component: PeerComponent,
+
+    /// [`Stream`] which will receive all [`Command`]s sent from
+    /// [`PeerComponent`].
     command_rx: RefCell<LocalBoxStream<'static, Command>>,
+
+    /// [`LocalTracksConstraints`] provided to the [`PeerComponent`].
     send_constraints: LocalTracksConstraints,
+
+    /// [`RecvConstraints`] provided to the [`PeerComponent`].
     recv_constraints: RecvConstraints,
 }
 
-impl PeerConnectionCompatibility {
+impl PeerConnectionCompat {
+    /// Returns new [`PeerConnectionCompat`] with a provided data.
     pub fn new(
         id: PeerId,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -81,6 +92,8 @@ impl PeerConnectionCompatibility {
         })
     }
 
+    /// Creates provided [`proto::Track`]s, starts renegotiation and returns SDP
+    /// offer.
     pub async fn get_offer(
         &self,
         tracks: Vec<proto::Track>,
@@ -98,6 +111,7 @@ impl PeerConnectionCompatibility {
         Ok(self.component.state().sdp_offer().unwrap())
     }
 
+    /// Creates provided [`proto::Track`]s.
     fn insert_tracks(
         &self,
         tracks: Vec<proto::Track>,
@@ -134,6 +148,8 @@ impl PeerConnectionCompatibility {
         Ok(())
     }
 
+    /// Inserts provided [`proto::Track`]s and processes provided remote SDP
+    /// offer.
     pub async fn process_offer(
         &self,
         offer: String,
@@ -152,6 +168,12 @@ impl PeerConnectionCompatibility {
         Ok(self.component.state().sdp_offer().unwrap())
     }
 
+    /// Applies provided [`TrackPatchEvent`] to the
+    /// [`SenderComponent`]s/[`ReceiverComponent`]s.
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`SenderComponent`] or [`ReceiverComponent`] not found.
     pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
         for track in tracks {
             if let Some(sender) = self.component.state().get_sender(track.id) {
@@ -169,7 +191,7 @@ impl PeerConnectionCompatibility {
     }
 }
 
-impl Deref for PeerConnectionCompatibility {
+impl Deref for PeerConnectionCompat {
     type Target = PeerComponent;
 
     fn deref(&self) -> &Self::Target {

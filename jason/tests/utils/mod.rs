@@ -3,4 +3,4 @@
 mod peer_compat;
 mod resettable_delay;
 
-pub use peer_compat::PeerConnectionCompatibility;
+pub use peer_compat::PeerConnectionCompat;
