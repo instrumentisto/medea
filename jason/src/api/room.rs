@@ -49,7 +49,9 @@ use crate::{
     JsMediaSourceKind,
 };
 
-pub struct Ctx {
+/// Global context which will be provided to the all [`Component`]s of this app.
+pub struct GlobalCtx {
+    /// Client to talk with media server via Client API RPC.
     pub rpc: Rc<dyn RpcSession>,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
@@ -58,29 +60,42 @@ pub struct Ctx {
     pub connections: Rc<Connections>,
 }
 
+/// State of the [`PeerRepositoryComponent`].
 struct PeerRepositoryState(ObservableHashMap<PeerId, Rc<PeerState>>);
 
 impl PeerRepositoryState {
+    /// Returns new empty [`PeerRepositoryState`].
     pub fn new() -> Self {
         Self(ObservableHashMap::new())
     }
 }
 
+/// Context of the [`PeerRepositoryComponent`].
 struct PeerRepositoryCtx {
+    /// [`PeerComponent`] repository.
     repo: Box<dyn PeerRepository>,
+
+    /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+
+    /// Constraints to local [`local::Track`]s that are being published by
+    /// [`PeerConnection`]s in this [`Room`].
     send_constraints: LocalTracksConstraints,
 }
 
+/// Component responsible for the new [`PeerComponent`] creating and removing.
 type PeerRepositoryComponent =
-    Component<PeerRepositoryState, PeerRepositoryCtx, Ctx>;
+    Component<PeerRepositoryState, PeerRepositoryCtx, GlobalCtx>;
 
 #[watchers]
 impl PeerRepositoryComponent {
+    /// Watches for new [`PeerState`] insertions.
+    ///
+    /// Creates new [`PeerComponent`] based on the inserted [`PeerState`].
     #[watch(self.state().0.on_insert())]
     async fn insert_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         _: Rc<PeerRepositoryState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
@@ -97,10 +112,14 @@ impl PeerRepositoryComponent {
         Ok(())
     }
 
+    /// Watches for [`PeerState`] remove.
+    ///
+    /// Removes [`PeerComponent`] and closes [`Connection`] by
+    /// [`Connections::close_connection`] call.
     #[watch(self.state().0.on_remove())]
     async fn remove_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         _: Rc<PeerRepositoryState>,
         (peer_id, _): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
@@ -783,6 +802,7 @@ struct InnerRoom {
     /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
+    /// [`PeerComponent`] repository.
     peers: PeerRepositoryComponent,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
@@ -833,7 +853,7 @@ impl InnerRoom {
                 peer_event_sender,
                 send_constraints: send_constraints.clone(),
             }),
-            Rc::new(Ctx {
+            Rc::new(GlobalCtx {
                 rpc: rpc.clone(),
                 connections: Rc::clone(&connections),
             }),

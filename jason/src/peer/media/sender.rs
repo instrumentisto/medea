@@ -170,24 +170,25 @@ impl Sender {
         )
     }
 
-    pub fn set_enabled_individual(&self, enabled: bool) {
-        self.media_exchange_state.update(enabled.into());
-    }
-
+    /// Updates general [`media_exchange_state`] of this [`Sender`] by the
+    /// provided [`bool`].
     pub fn set_enabled_general(&self, enabled: bool) {
         self.update_general_media_exchange_state(enabled.into());
     }
 
+    /// Updates individual [`media_exchange_state`] of this [`Sender`] by the
+    /// provided [`bool`].
+    pub fn set_enabled_individual(&self, enabled: bool) {
+        self.media_exchange_state.update(enabled.into());
+    }
+
+    /// Updates [`mute_state`] of this [`Sender`] with a provided [`bool`].
+    ///
+    /// Calls [`Transceiver::set_send_track_enabled`] with a inverted provided
+    /// `bool`.
     pub fn set_muted(&self, muted: bool) {
         self.mute_state.update(muted.into());
-        match mute_state::Stable::from(muted) {
-            mute_state::Stable::Unmuted => {
-                self.transceiver.set_send_track_enabled(true);
-            }
-            mute_state::Stable::Muted => {
-                self.transceiver.set_send_track_enabled(false);
-            }
-        }
+        self.transceiver.set_send_track_enabled(!muted);
     }
 
     /// Changes underlying transceiver direction to

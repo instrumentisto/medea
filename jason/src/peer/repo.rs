@@ -6,7 +6,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::Ctx,
+    api::GlobalCtx,
     media::{LocalTracksConstraints, MediaManager},
     peer::{component::PeerComponent, PeerState},
     utils::{delay_for, Component, TaskHandle},
@@ -27,7 +27,7 @@ pub trait PeerRepository {
         &self,
         peer_id: PeerId,
         state: Rc<PeerState>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         local_stream_constraints: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>>;
@@ -104,13 +104,13 @@ impl Repository {
 }
 
 impl PeerRepository for Repository {
-    /// Creates new [`PeerConnection`] with provided ID and injecting provided
+    /// Creates new [`PeerComponent`] with provided ID and injecting provided
     /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
     fn create_peer(
         &self,
         peer_id: PeerId,
         state: Rc<PeerState>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         send_constraints: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>> {

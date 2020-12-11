@@ -12,7 +12,7 @@ use medea_reactive::{
 use tracerr::Traced;
 
 use crate::{
-    api::Ctx,
+    api::GlobalCtx,
     peer::{
         media::{ReceiverState, SenderBuilder, SenderState},
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, PeerError,
@@ -23,6 +23,7 @@ use crate::{
 
 use super::PeerConnection;
 
+/// State of the [`PeerComponent`].
 pub struct PeerState {
     id: PeerId,
     senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
@@ -37,6 +38,7 @@ pub struct PeerState {
 }
 
 impl PeerState {
+    /// Returns [`PeerState`] with a provided data.
     pub fn new(
         id: PeerId,
         senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
@@ -59,18 +61,22 @@ impl PeerState {
         }
     }
 
+    /// Returns all [`IceServer`]s of this [`PeerState`].
     pub fn ice_servers(&self) -> &Vec<IceServer> {
         &self.ice_servers
     }
 
+    /// Returns `true` if `PeerConnection` should be relayed forcibly.
     pub fn force_relay(&self) -> bool {
         self.force_relay
     }
 
+    /// Inserts new [`SenderState`] into this [`PeerState`].
     pub fn insert_sender(&self, track_id: TrackId, sender: Rc<SenderState>) {
         self.senders.insert(track_id, sender);
     }
 
+    /// Inserts new [`ReceiverState`] into this [`PeerState`].
     pub fn insert_receiver(
         &self,
         track_id: TrackId,
@@ -79,34 +85,43 @@ impl PeerState {
         self.receivers.insert(track_id, receiver);
     }
 
+    /// Returns [`Rc`] to the [`SenderState`] with a provided [`TrackId`].
     pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<SenderState>> {
         self.senders.get(&track_id, Clone::clone)
     }
 
+    /// Returns [`Rc`] to the [`ReceiverState`] with a provided [`TrackId`].
     pub fn get_receiver(&self, track_id: TrackId) -> Option<Rc<ReceiverState>> {
         self.receivers.get(&track_id, Clone::clone)
     }
 
+    /// Sets [`NegotiationRole`] of this [`PeerState`] to the provided one.
     pub fn set_negotiation_role(&self, negotiation_role: NegotiationRole) {
         self.negotiation_role.set(Some(negotiation_role));
     }
 
+    /// Sets [`PeerState::restart_ice`] to `true`.
     pub fn restart_ice(&self) {
         self.restart_ice.set(true);
     }
 
+    /// Sets remote SDP offer to the provided value.
     pub fn set_remote_sdp_offer(&self, new_remote_sdp_offer: String) {
         self.remote_sdp_offer.set(Some(new_remote_sdp_offer));
     }
 
+    /// Adds [`IceCandidate`] for the [`PeerState`].
     pub fn add_ice_candidate(&self, ice_candidate: IceCandidate) {
         self.ice_candidates.borrow_mut().push(ice_candidate);
     }
 
+    /// Returns current SDP offer of this [`PeerState`].
     pub fn sdp_offer(&self) -> Option<String> {
         self.sdp_offer.borrow().clone()
     }
 
+    /// Returns [`Future`] which will be resolved when all [`SenderState`]s
+    /// updates will be applied.
     fn when_all_senders_updated(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self.senders.map_values(|s| s.when_updated());
         let fut = futures::future::join_all(when_futs);
@@ -115,6 +130,8 @@ impl PeerState {
         })
     }
 
+    /// Returns [`Future`] which will be resolved when all [`ReceiverState`]s
+    /// updates will be applied.
     fn when_all_receivers_updated(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self.receivers.map_values(|s| s.when_updated());
         let fut = futures::future::join_all(when_futs);
@@ -123,6 +140,8 @@ impl PeerState {
         })
     }
 
+    /// Returns [`Future`] which will be resolved when all
+    /// [`SenderState`]s/[`ReceiverState`]s updates will be applied.
     pub fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
         let fut = futures::future::join(
             self.when_all_receivers_updated(),
@@ -133,6 +152,10 @@ impl PeerState {
         })
     }
 
+    /// Updates local `MediaStream` based on
+    /// [`SenderState::is_local_stream_update_needed`].
+    ///
+    /// Resets [`SenderState`] local stream update when it updated.
     async fn update_local_stream(
         &self,
         ctx: &Rc<PeerConnection>,
@@ -161,23 +184,30 @@ impl PeerState {
 
 #[cfg(feature = "mockable")]
 impl PeerState {
+    /// Waits for [`PeerState::remote_sdp_offer`] change apply.
     pub async fn when_remote_sdp_answer_processed(&self) {
         self.remote_sdp_offer.when_all_processed().await;
     }
 
+    /// Resets [`NegotiationRole`] of this [`PeerState`] to [`None`].
     pub fn reset_negotiation_role(&self) {
         self.negotiation_role.set(None);
     }
 }
 
-pub type PeerComponent = Component<PeerState, PeerConnection, Ctx>;
+/// Component reponsible for the [`PeerConnection`] updating.
+pub type PeerComponent = Component<PeerState, PeerConnection, GlobalCtx>;
 
 #[watchers]
 impl PeerComponent {
+    /// Watcher for the [`PeerState::ice_candidates`] push update.
+    ///
+    /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
+    /// [`IceCandidate`].
     #[watch(self.state().ice_candidates.borrow().on_push())]
     async fn ice_candidate_push_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<Ctx>,
+        _: Rc<GlobalCtx>,
         _: Rc<PeerState>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
@@ -192,10 +222,17 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`PeerState::remote_sdp_offer`] update.
+    ///
+    /// Calls [`PeerConnection::set_remote_answer`] with a new value if current
+    /// [`NegotiationRole`] is [`NegotiationRole::Offerer`].
+    ///
+    /// Calls [`PeerConnection::set_remote_offer`] with a new value if current
+    /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
     #[watch(self.state().remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<Ctx>,
+        _: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         remote_sdp_answer: Guarded<Option<String>>,
     ) -> Result<(), Traced<PeerError>> {
@@ -222,10 +259,15 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`PeerState::restart_ice`] update.
+    ///
+    /// Calls [`PeerConnection::restart_ice`] if new value is `true`.
+    ///
+    /// Resets [`PeerState::restart_ice`] to `false` if new value is `true`.
     #[watch(self.state().restart_ice.subscribe())]
     async fn ice_restart_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<Ctx>,
+        _: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: bool,
     ) -> Result<(), Traced<PeerError>> {
@@ -237,10 +279,19 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`PeerState::senders`] insert update.
+    ///
+    /// Waits for [`ReceiverComponent`]s creation end.
+    ///
+    /// Waits for remote SDP offer apply if current [`NegotiationRole`] is
+    /// [`NegotiationRole::Answerer`].
+    ///
+    /// Creates new [`SenderComponent`], creates new [`Connection`] with all
+    /// [`SenderState::receivers`] by [`Connections::create_connection`] call,
     #[watch(self.state().senders.on_insert_with_replay())]
     async fn sender_insert_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) -> Result<(), Traced<PeerError>> {
@@ -281,22 +332,26 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`PeerState::receivers`] insert update.
+    ///
+    /// Creates new [`ReceiverComponent`], creates new [`Connection`] with a
+    /// [`ReceiverState::sender_id`] by [`Connections::create_connection`] call,
     #[watch(self.state().receivers.on_insert_with_replay())]
     async fn receiver_insert_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) -> Result<(), Traced<PeerError>> {
         let ((track_id, new_receiver), _guard) = val.into_parts();
         global_ctx
             .connections
-            .create_connection(state.id, new_receiver.sender());
+            .create_connection(state.id, new_receiver.sender_id());
         let recv = Receiver::new(
             &ctx.media_connections,
             track_id,
             new_receiver.media_type().clone().into(),
-            new_receiver.sender().clone(),
+            new_receiver.sender_id().clone(),
             new_receiver.mid().clone(),
             new_receiver.enabled_general(),
             new_receiver.enabled_individual(),
@@ -312,10 +367,18 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`PeerState::sdp_offer`] update.
+    ///
+    /// Sends [`Command::MakeSdpOffer`] if new SDP offer is `Some` and current
+    /// [`NegotiationRole`] is [`NegotiationRole::Offerer`].
+    ///
+    /// Sends [`Command::MakeSdpAnswer`] and resets [`NegotiationRole`] to
+    /// `None` if new SDP offer is `Some` and current [`NegotiationRole`] is
+    /// [`NegotiationRole::Answerer`].
     #[watch(self.state().sdp_offer.subscribe())]
     async fn sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<Ctx>,
+        global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         sdp_offer: Option<String>,
     ) -> Result<(), Traced<PeerError>> {
@@ -349,10 +412,15 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`PeerState::negotiation_role`] updates.
+    ///
+    /// Waits for [`SenderComponent`]s/[`ReceiverComponent`]s creation/update,
+    /// updates local `MediaStream` (if needed) and renegotiates
+    /// [`PeerConnection`].
     #[watch(self.state().negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<Ctx>,
+        _: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         new_negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<PeerError>> {

@@ -1,9 +1,12 @@
-use super::Progressable;
+use std::cell::{Ref, RefCell};
+
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
+
 use crate::{
     subscribers_store::progressable, Guarded, MutObservableFieldGuard,
 };
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
-use std::cell::{Ref, RefCell};
+
+use super::Progressable;
 
 #[derive(Debug)]
 pub struct ProgressableCell<D>(RefCell<Progressable<D>>);

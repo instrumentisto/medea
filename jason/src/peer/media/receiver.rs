@@ -173,14 +173,21 @@ impl Receiver {
         }
     }
 
+    /// Updates general [`media_exchange_state`] of this [`Receiver`] by the
+    /// provided [`bool`].
     pub fn set_enabled_general_state(&self, enabled: bool) {
         self.update_general_media_exchange_state(enabled.into());
     }
 
+    /// Updates individual [`media_exchange_state`] of this [`Receiver`] by the
+    /// provided [`bool`].
     pub fn set_enabled_individual_state(&self, enabled: bool) {
         self.media_exchange_state_controller.update(enabled.into());
     }
 
+    /// Calls [`remote::Track::set_muted`] with a provided [`bool`].
+    ///
+    /// Does nothing if [`Receiver`] doesn't have [`remote::Track`] atm.
     pub fn set_muted(&self, muted: bool) {
         if let Some(track) = self.track.borrow().as_ref() {
             track.set_enabled(!muted);

@@ -286,12 +286,74 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
     dispatchable::expand(enum_item, &args)
 }
 
+/// Generates `Component`'s watchers spawn method based on provided `impl`
+/// block.
+///
+/// It's not recommended to don't use `Component::spawn` function directly. Use
+/// [`medea_jason::spawn_component`] for component creating and spawning.
+///
+/// # Usage
+///
+/// ```ignore
+/// use std::rc::Rc;
+///
+/// use medea_jason::utils::Component;
+/// use medea_macro::{watchers, watch};
+///
+/// struct GlobalCtx;
+///
+/// struct FooState {
+///     muted: ObservableCell<bool>,
+/// }
+///
+/// struct FooCtx;
+///
+/// type FooComponent = Component<FooState, FooCtx, GlobalCtx>;
+///
+/// #[watchers]
+/// impl FooComponent {
+///     #[watch(self.state().muted.subscribe())]
+///     async fn muted_change_watcher(
+///         ctx: Rc<FooCtx>,
+///         global_ctx: Rc<GlobalCtx>,
+///         state: Rc<FooState>,
+///         new_muted_val: bool
+///     ) -> Result<(), ()> {
+///         Ok(())
+///     }
+/// }
+/// ```
+///
+/// # `FooComponent` implementation after macro expansion
+///
+/// ```ignore
+/// impl FooComponent {
+///     fn spawn(&self) {
+///         self.spawn_watcher(
+///             self.state().muted.subscribe(),
+///             Self::muted_change_watcher,
+///         );
+///     }
+///
+///     async fn muted_change_watcher(
+///         ctx: Rc<FooCtx>,
+///         global_ctx: Rc<GlobalCtx>,
+///         state: Rc<FooState>,
+///         new_muted_val: bool
+///     ) -> Result<(), ()> {
+///         Ok(())
+///     }
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
     watchers::expand(syn::parse_macro_input!(input))
         .unwrap_or_else(|e| e.to_compile_error().into())
 }
 
+/// Works only with a [`medea_macro::watchers`] macro.
+///
+/// See [`medea_maccro::watchers`] macro docs for the usage info.
 #[proc_macro_attribute]
 pub fn watch(_: TokenStream, input: TokenStream) -> TokenStream {
     input

@@ -8,7 +8,7 @@ use medea_client_api_proto::{
     Command, Direction, IceServer, NegotiationRole, PeerId,
 };
 use medea_jason::{
-    api::{Connections, Ctx},
+    api::{Connections, GlobalCtx},
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
         MediaConnectionsError, PeerComponent, PeerConnection, PeerError,
@@ -69,7 +69,7 @@ impl PeerConnectionCompatibility {
             PeerComponent,
             Rc::new(state),
             peer,
-            Rc::new(Ctx {
+            Rc::new(GlobalCtx {
                 connections: Rc::new(Connections::default()),
                 rpc: Rc::new(rpc),
             }),

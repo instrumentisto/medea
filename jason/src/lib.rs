@@ -6,7 +6,7 @@
 //       https://github.com/rust-lang/rust-clippy/issues/4779
 #![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
 #![deny(broken_intra_doc_links)]
-// #![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
+#![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
 #![cfg_attr(feature = "mockable", allow(missing_docs))]
 
 #[macro_use]

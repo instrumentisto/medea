@@ -21,7 +21,7 @@ use web_sys::RtcTrackEvent;
 
 #[cfg(feature = "mockable")]
 use crate::{
-    api::{Connections, Ctx},
+    api::{Connections, GlobalCtx},
     media::{LocalTracksConstraints, RecvConstraints},
 };
 use crate::{
@@ -313,16 +313,16 @@ struct InnerMediaConnections {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// [`TrackId`] to its [`Sender`].
+    /// [`TrackId`] to its [`SenderComponent`].
     senders: HashMap<TrackId, SenderComponent>,
 
-    /// [`TrackId`] to its [`Receiver`].
+    /// [`TrackId`] to its [`ReceiverComponent`].
     receivers: HashMap<TrackId, ReceiverComponent>,
 }
 
 impl InnerMediaConnections {
-    /// Returns [`Iterator`] over [`Sender`]s with provided [`MediaKind`]
-    /// and [`MediaSourceKind`].
+    /// Returns [`Iterator`] over [`SenderComponent`]s with provided
+    /// [`MediaKind`] and [`MediaSourceKind`].
     fn iter_senders_with_kind_and_source_kind(
         &self,
         kind: MediaKind,
@@ -339,7 +339,7 @@ impl InnerMediaConnections {
             })
     }
 
-    /// Returns [`Iterator`] over [`Receiver`]s with provided
+    /// Returns [`Iterator`] over [`ReceiverComponent`]s with provided
     /// [`MediaKind`].
     fn iter_receivers_with_kind(
         &self,
@@ -533,6 +533,7 @@ impl MediaConnections {
             })
     }
 
+    /// Inserts new [`SenderComponent`] into [`MediaConnections`].
     pub fn insert_sender(&self, sender: SenderComponent) {
         self.0
             .borrow_mut()
@@ -540,6 +541,7 @@ impl MediaConnections {
             .insert(sender.state().id(), sender);
     }
 
+    /// Inserts new [`ReceiverComponent`] into [`MediaConnections`].
     pub fn insert_receiver(&self, receiver: ReceiverComponent) {
         self.0
             .borrow_mut()
@@ -752,6 +754,7 @@ impl MediaConnections {
         self.0.borrow().receivers.get(&id).map(|r| r.ctx())
     }
 
+    /// Returns [`Sender`] with a provided [`TrackId`].
     #[cfg(feature = "mockable")]
     #[must_use]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
@@ -808,6 +811,7 @@ impl MediaConnections {
             .is_none()
     }
 
+    /// Creates new [`SenderComponent`] with a provided data.
     pub fn create_sender(
         &self,
         id: TrackId,
@@ -839,7 +843,7 @@ impl MediaConnections {
             SenderComponent,
             Rc::new(sender_state),
             sender,
-            Rc::new(Ctx {
+            Rc::new(GlobalCtx {
                 rpc: Rc::new(MockRpcSession::new()),
                 connections: Rc::new(Connections::default()),
             }),
@@ -848,6 +852,7 @@ impl MediaConnections {
         Ok(component)
     }
 
+    /// Creates new [`ReceiverComponent`] with a provided data.
     pub fn create_receiver(
         &self,
         id: TrackId,
@@ -879,7 +884,7 @@ impl MediaConnections {
             ReceiverComponent,
             Rc::new(receiver_state),
             Rc::new(receiver),
-            Rc::new(Ctx {
+            Rc::new(GlobalCtx {
                 rpc: Rc::new(MockRpcSession::new()),
                 connections: Rc::new(Connections::default()),
             }),
@@ -888,6 +893,8 @@ impl MediaConnections {
         component
     }
 
+    /// Creates new [`SenderComponent`]s/[`ReceiverComponent`]s from the
+    /// provided [`proto::Track`]s.
     pub fn create_tracks(
         &self,
         tracks: Vec<proto::Track>,
@@ -923,6 +930,8 @@ impl MediaConnections {
         Ok(())
     }
 
+    /// Patches [`SenderComponent`]s/[`ReceiverComponent`]s by provided
+    /// [`TrackPatchEvent`]s.
     pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
         let mut wait_for_change = Vec::new();
         for track in tracks {

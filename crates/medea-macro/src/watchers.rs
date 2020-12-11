@@ -1,3 +1,5 @@
+//! `#[watchers]` and `#[watch(...)]` macros implementation.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -5,6 +7,17 @@ use syn::{
     ExprMethodCall, ImplItem, ItemImpl,
 };
 
+/// Generates the actual code for `#[watchers]` macro.
+///
+/// # Algorithm
+///
+/// 1. Collects all methods with a `#[watch(...)]` macro.
+///
+/// 2. Generates `spawn_watcher` code for the found methods.
+///
+/// 3. Generates `spawn` method with all generated `spawn_watcher` method calls.
+///
+/// 4. Appends generated `spawn` method to the input [`ItemImpl`].
 pub fn expand(input: ItemImpl) -> Result<TokenStream> {
     let watchers: Vec<_> = input
         .items
@@ -43,6 +56,8 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
 
     let mut output = input;
     output.items.push(syn::parse_quote! {
+        /// Spawns all watchers of this [`Component`].
+        #[automatically_derived]
         pub fn spawn(&self) {
             #(#watchers)*
         }
