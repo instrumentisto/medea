@@ -61,12 +61,12 @@ pub struct GlobalCtx {
 }
 
 /// State of the [`PeerRepositoryComponent`].
-struct PeerRepositoryState(ObservableHashMap<PeerId, Rc<PeerState>>);
+struct PeerRepositoryState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
 
 impl PeerRepositoryState {
     /// Returns new empty [`PeerRepositoryState`].
     pub fn new() -> Self {
-        Self(ObservableHashMap::new())
+        Self(RefCell::new(ObservableHashMap::new()))
     }
 }
 
@@ -92,7 +92,7 @@ impl PeerRepositoryComponent {
     /// Watches for new [`PeerState`] insertions.
     ///
     /// Creates new [`PeerComponent`] based on the inserted [`PeerState`].
-    #[watch(self.state().0.on_insert())]
+    #[watch(self.state().0.borrow().on_insert())]
     async fn insert_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
         global_ctx: Rc<GlobalCtx>,
@@ -116,7 +116,7 @@ impl PeerRepositoryComponent {
     ///
     /// Removes [`PeerComponent`] and closes [`Connection`] by
     /// [`Connections::close_connection`] call.
-    #[watch(self.state().0.on_remove())]
+    #[watch(self.state().0.borrow().on_remove())]
     async fn remove_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
         global_ctx: Rc<GlobalCtx>,
@@ -1125,8 +1125,8 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let senders = ProgressableHashMap::new();
-        let receivers = ProgressableHashMap::new();
+        let mut senders = ProgressableHashMap::new();
+        let mut receivers = ProgressableHashMap::new();
         for track in &tracks {
             match &track.direction {
                 Direction::Send { receivers, mid } => {
@@ -1170,7 +1170,11 @@ impl EventHandler for InnerRoom {
             is_force_relayed,
             Some(negotiation_role),
         );
-        self.peers.state().0.insert(peer_id, Rc::new(peer_state));
+        self.peers
+            .state()
+            .0
+            .borrow_mut()
+            .insert(peer_id, Rc::new(peer_state));
 
         Ok(())
     }
@@ -1185,7 +1189,9 @@ impl EventHandler for InnerRoom {
             .peers
             .state()
             .0
-            .get(&peer_id, Clone::clone)
+            .borrow()
+            .get(&peer_id)
+            .cloned()
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.set_remote_sdp_offer(sdp_answer);
 
@@ -1202,7 +1208,9 @@ impl EventHandler for InnerRoom {
             .peers
             .state()
             .0
-            .get(&peer_id, Clone::clone)
+            .borrow()
+            .get(&peer_id)
+            .cloned()
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.add_ice_candidate(candidate);
 
@@ -1212,7 +1220,7 @@ impl EventHandler for InnerRoom {
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         peer_ids.iter().for_each(|id| {
-            self.peers.state().0.remove(id);
+            self.peers.state().0.borrow_mut().remove(id);
         });
         Ok(())
     }
@@ -1231,12 +1239,14 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer_state = self
-            .peers
-            .state()
-            .0
-            .get(&peer_id, Clone::clone)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        let peer_state =
+            self.peers
+                .state()
+                .0
+                .borrow()
+                .get(&peer_id)
+                .cloned()
+                .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
 
         for update in updates {
             match update {

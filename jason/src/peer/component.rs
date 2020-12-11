@@ -26,8 +26,8 @@ use super::PeerConnection;
 /// State of the [`PeerComponent`].
 pub struct PeerState {
     id: PeerId,
-    senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
-    receivers: ProgressableHashMap<TrackId, Rc<ReceiverState>>,
+    senders: RefCell<ProgressableHashMap<TrackId, Rc<SenderState>>>,
+    receivers: RefCell<ProgressableHashMap<TrackId, Rc<ReceiverState>>>,
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
@@ -49,8 +49,8 @@ impl PeerState {
     ) -> Self {
         Self {
             id,
-            senders,
-            receivers,
+            senders: RefCell::new(senders),
+            receivers: RefCell::new(receivers),
             ice_servers,
             force_relay,
             remote_sdp_offer: ProgressableCell::new(None),
@@ -73,7 +73,7 @@ impl PeerState {
 
     /// Inserts new [`SenderState`] into this [`PeerState`].
     pub fn insert_sender(&self, track_id: TrackId, sender: Rc<SenderState>) {
-        self.senders.insert(track_id, sender);
+        self.senders.borrow_mut().insert(track_id, sender);
     }
 
     /// Inserts new [`ReceiverState`] into this [`PeerState`].
@@ -82,17 +82,17 @@ impl PeerState {
         track_id: TrackId,
         receiver: Rc<ReceiverState>,
     ) {
-        self.receivers.insert(track_id, receiver);
+        self.receivers.borrow_mut().insert(track_id, receiver);
     }
 
     /// Returns [`Rc`] to the [`SenderState`] with a provided [`TrackId`].
     pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<SenderState>> {
-        self.senders.get(&track_id, Clone::clone)
+        self.senders.borrow().get(&track_id).cloned()
     }
 
     /// Returns [`Rc`] to the [`ReceiverState`] with a provided [`TrackId`].
     pub fn get_receiver(&self, track_id: TrackId) -> Option<Rc<ReceiverState>> {
-        self.receivers.get(&track_id, Clone::clone)
+        self.receivers.borrow().get(&track_id).cloned()
     }
 
     /// Sets [`NegotiationRole`] of this [`PeerState`] to the provided one.
@@ -123,7 +123,12 @@ impl PeerState {
     /// Returns [`Future`] which will be resolved when all [`SenderState`]s
     /// updates will be applied.
     fn when_all_senders_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let when_futs: Vec<_> = self.senders.map_values(|s| s.when_updated());
+        let when_futs: Vec<_> = self
+            .senders
+            .borrow()
+            .values()
+            .map(|s| s.when_updated())
+            .collect();
         let fut = futures::future::join_all(when_futs);
         Box::pin(async move {
             fut.await;
@@ -133,7 +138,12 @@ impl PeerState {
     /// Returns [`Future`] which will be resolved when all [`ReceiverState`]s
     /// updates will be applied.
     fn when_all_receivers_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let when_futs: Vec<_> = self.receivers.map_values(|s| s.when_updated());
+        let when_futs: Vec<_> = self
+            .receivers
+            .borrow()
+            .values()
+            .map(|s| s.when_updated())
+            .collect();
         let fut = futures::future::join_all(when_futs);
         Box::pin(async move {
             fut.await;
@@ -161,13 +171,13 @@ impl PeerState {
         ctx: &Rc<PeerConnection>,
     ) -> Result<(), Traced<PeerError>> {
         let mut criteria = LocalStreamUpdateCriteria::empty();
-        let senders: Vec<_> = self.senders.filter_map_values(|s| {
-            if s.is_local_stream_update_needed() {
-                Some(s.clone())
-            } else {
-                None
-            }
-        });
+        let senders: Vec<_> = self
+            .senders
+            .borrow()
+            .values()
+            .filter(|s| s.is_local_stream_update_needed())
+            .cloned()
+            .collect();
         for s in &senders {
             criteria.add(s.media_kind(), s.media_source());
         }
@@ -288,14 +298,14 @@ impl PeerComponent {
     ///
     /// Creates new [`SenderComponent`], creates new [`Connection`] with all
     /// [`SenderState::receivers`] by [`Connections::create_connection`] call,
-    #[watch(self.state().senders.on_insert_with_replay())]
+    #[watch(self.state().senders.borrow().on_insert_with_replay())]
     async fn sender_insert_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) -> Result<(), Traced<PeerError>> {
-        state.receivers.when_all_processed().await;
+        state.receivers.borrow().when_all_processed().await;
         if matches!(
             state.negotiation_role.get(),
             Some(NegotiationRole::Answerer(_))
@@ -336,7 +346,7 @@ impl PeerComponent {
     ///
     /// Creates new [`ReceiverComponent`], creates new [`Connection`] with a
     /// [`ReceiverState::sender_id`] by [`Connections::create_connection`] call,
-    #[watch(self.state().receivers.on_insert_with_replay())]
+    #[watch(self.state().receivers.borrow().on_insert_with_replay())]
     async fn receiver_insert_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<GlobalCtx>,
@@ -429,8 +439,8 @@ impl PeerComponent {
             match role {
                 NegotiationRole::Offerer => {
                     futures::future::join(
-                        state.senders.when_all_processed(),
-                        state.receivers.when_all_processed(),
+                        state.senders.borrow().when_all_processed(),
+                        state.receivers.borrow().when_all_processed(),
                     )
                     .await;
                     state.when_all_updated().await;
@@ -450,14 +460,14 @@ impl PeerComponent {
                     ctx.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
-                    state.receivers.when_all_processed().await;
+                    state.receivers.borrow().when_all_processed().await;
                     ctx.media_connections.sync_receivers();
 
                     state.set_remote_sdp_offer(remote_sdp_offer);
 
                     state.when_all_receivers_updated().await;
                     state.remote_sdp_offer.when_all_processed().await;
-                    state.senders.when_all_processed().await;
+                    state.senders.borrow().when_all_processed().await;
                     state.when_all_senders_updated().await;
 
                     state
