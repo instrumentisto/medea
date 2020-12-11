@@ -19,6 +19,7 @@ use syn::{
 ///
 /// 4. Appends generated `spawn` method to the input [`ItemImpl`].
 pub fn expand(input: ItemImpl) -> Result<TokenStream> {
+    #[allow(clippy::filter_map)]
     let watchers: Vec<_> = input
         .items
         .iter()
@@ -34,10 +35,7 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
                 .attrs
                 .iter()
                 .find(|attr| {
-                    attr.path
-                        .get_ident()
-                        .map(|p| *p == "watch")
-                        .unwrap_or(false)
+                    attr.path.get_ident().map_or(false, |p| *p == "watch")
                 })
                 .ok_or_else(|| {
                     Error::new(
