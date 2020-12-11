@@ -15,7 +15,7 @@ jobs:
     name: Lint Rust code with Clippy
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -31,7 +31,7 @@ jobs:
     name: Verify Rust code style with rustfmt
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -53,7 +53,7 @@ jobs:
     name: Run medea-macro unit tests
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -68,7 +68,7 @@ jobs:
     name: Run medea-reactive unit tests
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -83,7 +83,7 @@ jobs:
     name: Run medea-coturn-telnet-client unit tests
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -98,7 +98,7 @@ jobs:
     name: Run medea-client-api-proto unit tests
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -113,7 +113,7 @@ jobs:
     name: Run medea unit tests
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -128,7 +128,7 @@ jobs:
     name: Run medea-jason unit tests in Chrome and Firefox
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -157,7 +157,7 @@ jobs:
     name: Run medea E2E tests
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -179,7 +179,7 @@ jobs:
     name: Check Rust docs of all crates
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -208,7 +208,7 @@ jobs:
     name: Build medea-jason (stable)
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -224,7 +224,7 @@ jobs:
     name: Build medea (stable)
     if: |
       github.ref == 'refs/heads/master'
-      || contains(github.event.head_commit.message, '[run ci]')
+      || !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
