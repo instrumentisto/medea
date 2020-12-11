@@ -4,10 +4,10 @@
 mod errors;
 
 mod callback;
+#[macro_use]
 mod component;
 mod event_listener;
 mod resettable_delay;
-mod task_spawner;
 
 use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
@@ -29,7 +29,6 @@ pub use self::{
     },
     event_listener::{EventListener, EventListenerBindError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
-    task_spawner::ObservableSpawner,
 };
 
 /// Returns [`Window`] object.

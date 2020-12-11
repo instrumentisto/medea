@@ -1,5 +1,5 @@
 mod connection;
-// mod room;
+mod room;
 
 use std::{cell::RefCell, rc::Rc};
 

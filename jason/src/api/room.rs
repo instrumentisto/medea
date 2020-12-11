@@ -3,6 +3,7 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    ops::Deref,
     rc::{Rc, Weak},
 };
 
@@ -47,9 +48,8 @@ use crate::{
     },
     JsMediaSourceKind,
 };
-use bitflags::_core::ops::Deref;
 
-pub struct RoomCtx {
+pub struct Ctx {
     pub rpc: Rc<dyn RpcSession>,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
@@ -73,14 +73,14 @@ struct PeerRepositoryCtx {
 }
 
 type PeerRepositoryComponent =
-    Component<PeerRepositoryState, Rc<PeerRepositoryCtx>, RoomCtx>;
+    Component<PeerRepositoryState, PeerRepositoryCtx, Ctx>;
 
 #[watchers]
 impl PeerRepositoryComponent {
     #[watch(self.state().0.on_insert())]
     async fn insert_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
-        global_ctx: Rc<RoomCtx>,
+        global_ctx: Rc<Ctx>,
         _: Rc<PeerRepositoryState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
@@ -100,7 +100,7 @@ impl PeerRepositoryComponent {
     #[watch(self.state().0.on_remove())]
     async fn remove_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
-        global_ctx: Rc<RoomCtx>,
+        global_ctx: Rc<Ctx>,
         _: Rc<PeerRepositoryState>,
         (peer_id, _): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
@@ -825,19 +825,19 @@ impl InnerRoom {
     ) -> Rc<Self> {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
-        let peers = PeerRepositoryComponent::new_component(
+        let peers = spawn_component!(
+            PeerRepositoryComponent,
             Rc::new(PeerRepositoryState::new()),
             Rc::new(PeerRepositoryCtx {
                 repo: peers,
                 peer_event_sender,
                 send_constraints: send_constraints.clone(),
             }),
-            Rc::new(RoomCtx {
+            Rc::new(Ctx {
                 rpc: rpc.clone(),
                 connections: Rc::clone(&connections),
             }),
         );
-        peers.spawn();
         Rc::new(Self {
             peers,
             rpc,

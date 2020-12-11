@@ -21,9 +21,8 @@ use web_sys::RtcTrackEvent;
 
 #[cfg(feature = "mockable")]
 use crate::{
-    api::{Connections, RoomCtx},
+    api::{Connections, Ctx},
     media::{LocalTracksConstraints, RecvConstraints},
-    utils::Component,
 };
 use crate::{
     media::{track::local, MediaKind},
@@ -836,15 +835,15 @@ impl MediaConnections {
             caps: media_type.into(),
         }
         .build()?;
-        let component = Component::new_component(
+        let component = spawn_component!(
+            SenderComponent,
             Rc::new(sender_state),
             sender,
-            Rc::new(RoomCtx {
+            Rc::new(Ctx {
                 rpc: Rc::new(MockRpcSession::new()),
                 connections: Rc::new(Connections::default()),
             }),
         );
-        component.spawn();
 
         Ok(component)
     }
@@ -876,15 +875,15 @@ impl MediaConnections {
             true,
         );
 
-        let component = Component::new_component(
+        let component = spawn_component!(
+            ReceiverComponent,
             Rc::new(receiver_state),
             Rc::new(receiver),
-            Rc::new(RoomCtx {
+            Rc::new(Ctx {
                 rpc: Rc::new(MockRpcSession::new()),
                 connections: Rc::new(Connections::default()),
             }),
         );
-        component.spawn();
 
         component
     }

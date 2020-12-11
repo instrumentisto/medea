@@ -288,8 +288,8 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
-    let item = syn::parse_macro_input!(input as syn::ItemImpl);
-    watchers::expand(item)
+    watchers::expand(syn::parse_macro_input!(input))
+        .unwrap_or_else(|e| e.to_compile_error().into())
 }
 
 #[proc_macro_attribute]

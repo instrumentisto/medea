@@ -1,25 +1,55 @@
-use std::rc::Rc;
+use std::{ops::Deref, rc::Rc};
 
 use futures::{future, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::{task_spawner::TaskHandlesStorage, JasonError};
-use bitflags::_core::ops::Deref;
+use crate::utils::JasonError;
+use futures::future::AbortHandle;
+use std::cell::RefCell;
+
+#[macro_export]
+macro_rules! spawn_component {
+    ($component:ty, $state:expr, $ctx:expr, $global_ctx:expr $(,)*) => {{
+        let component = <$component>::new($state, $ctx, $global_ctx);
+        component.spawn();
+        component
+    }};
+}
+
+/// Storage of the [`AbortHandle`]s used for aborting [`Observable`] listeners
+/// tasks.
+#[derive(Default)]
+struct WatchersStorage(RefCell<Vec<AbortHandle>>);
+
+impl WatchersStorage {
+    fn register_handle(&self, handle: AbortHandle) {
+        self.0.borrow_mut().push(handle);
+    }
+
+    /// Aborts all spawned [`Observable`] listeners tasks registered in this
+    /// [`TaskHandlesStorage`].
+    fn dispose(&self) {
+        let handles: Vec<_> = std::mem::take(&mut self.0.borrow_mut());
+        for handle in handles {
+            handle.abort();
+        }
+    }
+}
 
 pub struct Component<S, C, G> {
     state: Rc<S>,
-    ctx: C,
+    ctx: Rc<C>,
     global_ctx: Rc<G>,
-    task_handles: TaskHandlesStorage,
+    watchers_store: WatchersStorage,
 }
 
-impl<S, C: 'static, G> Component<S, Rc<C>, G> {
-    pub fn new_component(state: Rc<S>, ctx: Rc<C>, global_ctx: Rc<G>) -> Self {
+impl<S, C: 'static, G> Component<S, C, G> {
+    pub fn new(state: Rc<S>, ctx: Rc<C>, global_ctx: Rc<G>) -> Self {
         Self {
             state,
             ctx,
             global_ctx,
-            task_handles: TaskHandlesStorage::new(),
+            watchers_store: WatchersStorage::default(),
         }
     }
 
@@ -28,14 +58,14 @@ impl<S, C: 'static, G> Component<S, Rc<C>, G> {
     }
 }
 
-impl<S: 'static, C: 'static + Clone, G: 'static> Component<S, C, G> {
+impl<S: 'static, C: 'static, G: 'static> Component<S, C, G> {
     /// Spawns listener for the [`Observable`].
     ///
     /// You can stop all listeners tasks spawned by this function by calling
     /// [`TaskDisposer::dispose_tasks`]
-    pub fn spawn_observer<R, V, F, O, E>(&self, mut rx: R, handle: F)
+    pub fn spawn_watcher<R, V, F, O, E>(&self, mut rx: R, handle: F)
     where
-        F: Fn(C, Rc<G>, Rc<S>, V) -> O + 'static,
+        F: Fn(Rc<C>, Rc<G>, Rc<S>, V) -> O + 'static,
         R: Stream<Item = V> + Unpin + 'static,
         O: Future<Output = Result<(), E>> + 'static,
         E: Into<JasonError>,
@@ -60,7 +90,7 @@ impl<S: 'static, C: 'static + Clone, G: 'static> Component<S, C, G> {
         spawn_local(async move {
             let _ = fut.await;
         });
-        self.task_handles.register_handle(handle);
+        self.watchers_store.register_handle(handle);
     }
 }
 
@@ -72,7 +102,7 @@ impl<S, C, G> Component<S, C, G> {
 
 impl<S, C, G> Drop for Component<S, C, G> {
     fn drop(&mut self) {
-        self.task_handles.dispose();
+        self.watchers_store.dispose();
     }
 }
 

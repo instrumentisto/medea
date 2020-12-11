@@ -1,40 +1,52 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{ExprMethodCall, ImplItem, ItemImpl};
+use syn::{
+    parse::{Error, Result},
+    ExprMethodCall, ImplItem, ItemImpl,
+};
 
-mod kw {
-    syn::custom_keyword!(watch);
-}
-
-pub fn expand(impl_item: ItemImpl) -> TokenStream {
-    let mut out = impl_item.clone();
-
-    let mut watchers = Vec::new();
-    for item in impl_item.items {
-        match item {
-            ImplItem::Method(method) => {
-                let attr = method
-                    .attrs
-                    .into_iter()
-                    .find(|attr| *attr.path.get_ident().unwrap() == "watch")
-                    .unwrap();
-                let out: ExprMethodCall = attr.parse_args().unwrap();
-
-                watchers.push((method.sig.ident, out));
+pub fn expand(input: ItemImpl) -> Result<TokenStream> {
+    let watchers: Vec<_> = input
+        .items
+        .iter()
+        .filter_map(|i| {
+            if let ImplItem::Method(m) = i {
+                Some(m)
+            } else {
+                None
             }
-            _ => continue,
-        }
-    }
+        })
+        .map(|method| {
+            let stream_expr: ExprMethodCall = method
+                .attrs
+                .iter()
+                .find(|attr| {
+                    attr.path
+                        .get_ident()
+                        .map(|p| *p == "watch")
+                        .unwrap_or(false)
+                })
+                .ok_or_else(|| {
+                    Error::new(
+                        method.sig.ident.span(),
+                        "Method doesn't have '#[watch(...)]' macro",
+                    )
+                })?
+                .parse_args()?;
+            let watcher_ident = &method.sig.ident;
 
-    let (ident, method): (Vec<_>, Vec<_>) = watchers.into_iter().unzip();
-    let output = syn::parse_quote! {
+            Ok(quote! {
+                self.spawn_watcher(#stream_expr, Self::#watcher_ident);
+            })
+        })
+        .collect::<Result<_>>()?;
+
+    let mut output = input;
+    output.items.push(syn::parse_quote! {
         pub fn spawn(&self) {
-            #(self.spawn_observer(#method, Self::#ident);)*
+            #(#watchers)*
         }
-    };
+    });
 
-    out.items.push(output);
-
-    let out = quote! { #out };
-    out.into()
+    Ok((quote! { #output }).into())
 }

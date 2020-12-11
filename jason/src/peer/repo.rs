@@ -6,7 +6,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::RoomCtx,
+    api::Ctx,
     media::{LocalTracksConstraints, MediaManager},
     peer::{component::PeerComponent, PeerState},
     utils::{delay_for, Component, TaskHandle},
@@ -27,14 +27,10 @@ pub trait PeerRepository {
         &self,
         peer_id: PeerId,
         state: Rc<PeerState>,
-        global_ctx: Rc<RoomCtx>,
+        global_ctx: Rc<Ctx>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         local_stream_constraints: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>>;
-
-    fn insert_peer(&self, peer_id: PeerId, component: PeerComponent);
-
-    fn media_manager(&self) -> Rc<MediaManager>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
@@ -114,7 +110,7 @@ impl PeerRepository for Repository {
         &self,
         peer_id: PeerId,
         state: Rc<PeerState>,
-        global_ctx: Rc<RoomCtx>,
+        global_ctx: Rc<Ctx>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         send_constraints: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>> {
@@ -128,20 +124,11 @@ impl PeerRepository for Repository {
         )
         .map_err(tracerr::map_from_and_wrap!())?;
 
-        let component = Component::new_component(state, peer, global_ctx);
-        component.spawn();
-
+        let component =
+            spawn_component!(PeerComponent, state, peer, global_ctx);
         self.peers.borrow_mut().insert(peer_id, component);
 
         Ok(())
-    }
-
-    fn insert_peer(&self, peer_id: PeerId, component: PeerComponent) {
-        self.peers.borrow_mut().insert(peer_id, component);
-    }
-
-    fn media_manager(&self) -> Rc<MediaManager> {
-        self.media_manager.clone()
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.

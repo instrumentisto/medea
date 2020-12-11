@@ -9,14 +9,14 @@ use medea_reactive::{Guarded, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
-    api::RoomCtx,
+    api::Ctx,
     media::LocalTracksConstraints,
     peer::{MediaConnectionsError, Sender},
     utils::Component,
     MediaKind,
 };
 
-pub type SenderComponent = Component<SenderState, Rc<Sender>, RoomCtx>;
+pub type SenderComponent = Component<SenderState, Sender, Ctx>;
 
 pub struct SenderState {
     id: TrackId,
@@ -144,7 +144,7 @@ impl SenderComponent {
     #[watch(self.state().muted.subscribe())]
     async fn muted_watcher(
         ctx: Rc<Sender>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         _: Rc<SenderState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -156,7 +156,7 @@ impl SenderComponent {
     #[watch(self.state().enabled_individual.subscribe())]
     async fn enabled_individual_watcher(
         ctx: Rc<Sender>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         state: Rc<SenderState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -173,7 +173,7 @@ impl SenderComponent {
     #[watch(self.state().enabled_general.subscribe())]
     async fn enabled_general_watcher(
         ctx: Rc<Sender>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         _: Rc<SenderState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {

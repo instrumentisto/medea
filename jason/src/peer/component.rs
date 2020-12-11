@@ -12,11 +12,11 @@ use medea_reactive::{
 use tracerr::Traced;
 
 use crate::{
-    api::RoomCtx,
+    api::Ctx,
     peer::{
         media::{ReceiverState, SenderBuilder, SenderState},
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, PeerError,
-        Receiver,
+        Receiver, ReceiverComponent, SenderComponent,
     },
     utils::Component,
 };
@@ -30,7 +30,7 @@ pub struct PeerState {
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
-    sdp_offer: RefCell<Option<String>>,
+    sdp_offer: ObservableCell<Option<String>>,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
@@ -52,7 +52,7 @@ impl PeerState {
             ice_servers,
             force_relay,
             remote_sdp_offer: ProgressableCell::new(None),
-            sdp_offer: RefCell::new(None),
+            sdp_offer: ObservableCell::new(None),
             negotiation_role: ObservableCell::new(negotiation_role),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
@@ -170,14 +170,14 @@ impl PeerState {
     }
 }
 
-pub type PeerComponent = Component<PeerState, Rc<PeerConnection>, RoomCtx>;
+pub type PeerComponent = Component<PeerState, PeerConnection, Ctx>;
 
 #[watchers]
 impl PeerComponent {
     #[watch(self.state().ice_candidates.borrow().on_push())]
     async fn ice_candidate_push_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         _: Rc<PeerState>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
@@ -195,7 +195,7 @@ impl PeerComponent {
     #[watch(self.state().remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         state: Rc<PeerState>,
         remote_sdp_answer: Guarded<Option<String>>,
     ) -> Result<(), Traced<PeerError>> {
@@ -225,7 +225,7 @@ impl PeerComponent {
     #[watch(self.state().restart_ice.subscribe())]
     async fn ice_restart_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         state: Rc<PeerState>,
         val: bool,
     ) -> Result<(), Traced<PeerError>> {
@@ -240,7 +240,7 @@ impl PeerComponent {
     #[watch(self.state().senders.on_insert_with_replay())]
     async fn sender_insert_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<RoomCtx>,
+        global_ctx: Rc<Ctx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) -> Result<(), Traced<PeerError>> {
@@ -270,9 +270,12 @@ impl PeerComponent {
         }
         .build()
         .map_err(tracerr::map_from_and_wrap!())?;
-        let component =
-            Component::new_component(new_sender, sndr, global_ctx.clone());
-        component.spawn();
+        let component = spawn_component!(
+            SenderComponent,
+            new_sender,
+            sndr,
+            global_ctx.clone(),
+        );
         ctx.media_connections.insert_sender(component);
 
         Ok(())
@@ -281,7 +284,7 @@ impl PeerComponent {
     #[watch(self.state().receivers.on_insert_with_replay())]
     async fn receiver_insert_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<RoomCtx>,
+        global_ctx: Rc<Ctx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) -> Result<(), Traced<PeerError>> {
@@ -298,10 +301,50 @@ impl PeerComponent {
             new_receiver.enabled_general(),
             new_receiver.enabled_individual(),
         );
-        let component =
-            Component::new_component(new_receiver, Rc::new(recv), global_ctx);
-        component.spawn();
+        let component = spawn_component!(
+            ReceiverComponent,
+            new_receiver,
+            Rc::new(recv),
+            global_ctx,
+        );
         ctx.media_connections.insert_receiver(component);
+
+        Ok(())
+    }
+
+    #[watch(self.state().sdp_offer.subscribe())]
+    async fn sdp_offer_watcher(
+        ctx: Rc<PeerConnection>,
+        global_ctx: Rc<Ctx>,
+        state: Rc<PeerState>,
+        sdp_offer: Option<String>,
+    ) -> Result<(), Traced<PeerError>> {
+        if let (Some(sdp_offer), Some(role)) =
+            (sdp_offer, state.negotiation_role.get())
+        {
+            match role {
+                NegotiationRole::Offerer => {
+                    let mids = ctx
+                        .get_mids()
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    global_ctx.rpc.send_command(Command::MakeSdpOffer {
+                        peer_id: ctx.id(),
+                        sdp_offer,
+                        transceivers_statuses: ctx.get_transceivers_statuses(),
+                        mids,
+                    });
+                }
+                NegotiationRole::Answerer(_) => {
+                    global_ctx.rpc.send_command(Command::MakeSdpAnswer {
+                        peer_id: ctx.id(),
+                        sdp_answer: sdp_offer,
+                        transceivers_statuses: ctx.get_transceivers_statuses(),
+                    });
+
+                    state.negotiation_role.set(None);
+                }
+            }
+        }
 
         Ok(())
     }
@@ -309,7 +352,7 @@ impl PeerComponent {
     #[watch(self.state().negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         state: Rc<PeerState>,
         new_negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<PeerError>> {
@@ -335,16 +378,7 @@ impl PeerComponent {
                         .create_and_set_offer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    *state.sdp_offer.borrow_mut() = Some(sdp_offer.clone());
-                    let mids = ctx
-                        .get_mids()
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    global_ctx.rpc.send_command(Command::MakeSdpOffer {
-                        peer_id: ctx.id(),
-                        sdp_offer,
-                        transceivers_statuses: ctx.get_transceivers_statuses(),
-                        mids,
-                    });
+                    state.sdp_offer.set(Some(sdp_offer));
                     ctx.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
@@ -368,13 +402,7 @@ impl PeerComponent {
                         .create_and_set_answer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    *state.sdp_offer.borrow_mut() = Some(sdp_answer.clone());
-                    global_ctx.rpc.send_command(Command::MakeSdpAnswer {
-                        peer_id: ctx.id(),
-                        sdp_answer,
-                        transceivers_statuses: ctx.get_transceivers_statuses(),
-                    });
-                    state.negotiation_role.set(None);
+                    state.sdp_offer.set(Some(sdp_answer));
                 }
             }
         }

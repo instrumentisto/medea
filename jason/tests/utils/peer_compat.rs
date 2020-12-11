@@ -1,4 +1,4 @@
-use std::{ops::Deref, rc::Rc};
+use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use futures::{
     channel::mpsc, future, stream, stream::LocalBoxStream, StreamExt as _,
@@ -8,16 +8,16 @@ use medea_client_api_proto::{
     Command, Direction, IceServer, NegotiationRole, PeerId,
 };
 use medea_jason::{
-    api::{Connections, RoomCtx},
+    api::{Connections, Ctx},
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
         MediaConnectionsError, PeerComponent, PeerConnection, PeerError,
         PeerEvent, PeerState, ReceiverState, SenderState,
     },
     rpc::MockRpcSession,
+    spawn_component,
 };
 use medea_reactive::ProgressableHashMap;
-use std::cell::RefCell;
 use tracerr::Traced;
 
 pub struct PeerConnectionCompatibility {
@@ -65,17 +65,15 @@ impl PeerConnectionCompatibility {
             command_tx.unbounded_send(cmd);
         });
 
-        let global_ctx = RoomCtx {
-            connections: Rc::new(Connections::default()),
-            rpc: Rc::new(rpc),
-        };
-
-        let component = PeerComponent::new_component(
+        let component = spawn_component!(
+            PeerComponent,
             Rc::new(state),
             peer,
-            Rc::new(global_ctx),
+            Rc::new(Ctx {
+                connections: Rc::new(Connections::default()),
+                rpc: Rc::new(rpc),
+            }),
         );
-        component.spawn();
 
         Ok(Self {
             component,

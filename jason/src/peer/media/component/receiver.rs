@@ -7,13 +7,13 @@ use medea_reactive::{Guarded, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
-    api::RoomCtx,
+    api::Ctx,
     media::RecvConstraints,
     peer::{MediaConnectionsError, Receiver},
     utils::Component,
 };
 
-pub type ReceiverComponent = Component<ReceiverState, Rc<Receiver>, RoomCtx>;
+pub type ReceiverComponent = Component<ReceiverState, Receiver, Ctx>;
 
 pub struct ReceiverState {
     id: TrackId,
@@ -102,9 +102,9 @@ impl ReceiverState {
 #[watchers]
 impl ReceiverComponent {
     #[watch(self.state().muted.subscribe())]
-    async fn observe_muted(
+    async fn muted_watcher(
         ctx: Rc<Receiver>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         _: Rc<ReceiverState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -114,9 +114,9 @@ impl ReceiverComponent {
     }
 
     #[watch(self.state().enabled_individual.subscribe())]
-    async fn observe_enabled_individual(
+    async fn enabled_individual_watcher(
         ctx: Rc<Receiver>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         _: Rc<ReceiverState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -126,9 +126,9 @@ impl ReceiverComponent {
     }
 
     #[watch(self.state().enabled_general.subscribe())]
-    async fn observe_enabled_general(
+    async fn enabled_general_watcher(
         ctx: Rc<Receiver>,
-        _: Rc<RoomCtx>,
+        _: Rc<Ctx>,
         _: Rc<ReceiverState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
