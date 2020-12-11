@@ -1133,7 +1133,6 @@ mod patches_generation {
     use medea_jason::{
         media::RecvConstraints,
         peer::{media_exchange_state, mute_state, MediaState},
-        utils::Component,
         JsMediaSourceKind,
     };
     use wasm_bindgen_futures::spawn_local;

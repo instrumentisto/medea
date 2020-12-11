@@ -1,8 +1,6 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use futures::{
-    channel::mpsc, future, stream, stream::LocalBoxStream, StreamExt as _,
-};
+use futures::{channel::mpsc, stream, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     Command, Direction, IceServer, NegotiationRole, PeerId,
@@ -62,7 +60,7 @@ impl PeerConnectionCompatibility {
             .return_once(|| stream::pending().boxed_local());
         rpc.expect_close_with_reason().return_const(());
         rpc.expect_send_command().returning(move |cmd| {
-            command_tx.unbounded_send(cmd);
+            let _ = command_tx.unbounded_send(cmd);
         });
 
         let component = spawn_component!(

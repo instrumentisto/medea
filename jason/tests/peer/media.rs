@@ -227,10 +227,10 @@ async fn new_media_connections_with_disabled_video_tracks() {
 ///
 /// This tests checks that [`TrackPatch`] works as expected.
 mod sender_patch {
-    use medea_jason::peer::{mute_state, Sender, SenderComponent, SenderState};
+    use medea_client_api_proto::{AudioSettings, MediaType};
+    use medea_jason::peer::SenderComponent;
 
     use super::*;
-    use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
 
     async fn get_sender() -> (SenderComponent, TrackId, MediaConnections) {
         let (tx, rx) = mpsc::unbounded();
@@ -334,10 +334,7 @@ mod sender_patch {
 
 mod receiver_patch {
     use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
-    use medea_jason::{
-        media::RecvConstraints,
-        peer::{PeerEvent, Receiver},
-    };
+    use medea_jason::{media::RecvConstraints, peer::PeerEvent};
 
     use super::*;
     use medea_jason::peer::ReceiverComponent;
