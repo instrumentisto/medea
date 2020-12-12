@@ -800,6 +800,15 @@ helm:
 	helm $(helm-cluster-args) $(if $(call eq,$(cmd),),--help,$(cmd))
 
 
+# Show root directory path of project Helm chart.
+#
+# Usage:
+#	make helm.dir [chart=medea-demo]
+
+helm.dir:
+	@printf "$(helm-chart-dir)"
+
+
 # Remove Helm release of project Helm chart from Kubernetes cluster.
 #
 # Usage:
@@ -967,8 +976,8 @@ endef
         	docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
-        helm helm.down helm.lint helm.list helm.package helm.package.release \
-        	helm.up \
+        helm helm.dir helm.down helm.lint helm.list \
+        	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \

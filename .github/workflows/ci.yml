@@ -27,21 +27,6 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - run: make lint
 
-  helm-lint:
-    name: Lint Helm
-    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
-            && (github.ref == 'refs/heads/master'
-                || !contains(github.event.head_commit.message, '[skip ci]')) }}
-    strategy:
-      matrix:
-        chart:
-          - medea-demo
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: azure/setup-helm@v1
-      - run: make helm.lint chart=${{ matrix.chart }}
-
   rustfmt:
     if: ${{ github.ref == 'refs/heads/master'
             || startsWith(github.ref, 'refs/tags/medea-')
@@ -55,6 +40,21 @@ jobs:
           toolchain: nightly
           components: rustfmt
       - run: make fmt check=yes
+
+  lint-helm:
+    name: Lint Helm chart
+    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
+    strategy:
+      matrix:
+        chart:
+          - medea-demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: azure/setup-helm@v1
+      - run: make helm.lint chart=${{ matrix.chart }}
 
 
 
@@ -84,58 +84,58 @@ jobs:
                 || !startsWith(github.ref, 'refs/tags/medea-') }}
 
       - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
         if: ${{ matrix.crate != 'medea-jason'
                 && (startsWith(github.ref,
                                format('refs/tags/{0}-', matrix.crate))
                     || !startsWith(github.ref, 'refs/tags/medea-')) }}
-        with:
-          profile: minimal
-          toolchain: stable
       - uses: actions-rs/toolchain@v1
-        if: ${{ matrix.crate == 'medea-jason'
-                && (startsWith(github.ref,
-                               format('refs/tags/{0}-', matrix.crate))
-                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         with:
           profile: minimal
           toolchain: stable
           target: wasm32-unknown-unknown
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
 
       - uses: Swatinem/rust-cache@v1
         if: ${{ startsWith(github.ref, format('refs/tags/{0}-', matrix.crate))
                 || !startsWith(github.ref, 'refs/tags/medea-') }}
 
       - name: Get wasm-bindgen-cli version from Cargo.lock
-        if: ${{ matrix.crate == 'medea-jason'
-                && (startsWith(github.ref,
-                               format('refs/tags/{0}-', matrix.crate))
-                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         id: wasm-cli
         run: echo ::set-output
                   name=VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*'
                                                            | grep -o '[0-9\.]*')
-      - uses: actions-rs/install@v0.1
         if: ${{ matrix.crate == 'medea-jason'
                 && (startsWith(github.ref,
                                format('refs/tags/{0}-', matrix.crate))
                     || !startsWith(github.ref, 'refs/tags/medea-')) }}
+      - uses: actions-rs/install@v0.1
         with:
           crate: wasm-bindgen-cli
           version: ${{ steps.wasm-cli.outputs.VERSION }}
           use-tool-cache: true
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
 
       - name: Chrome
-        if: ${{ matrix.crate == 'medea-jason'
-                && (startsWith(github.ref,
-                               format('refs/tags/{0}-', matrix.crate))
-                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
         run: make test.unit crate=${{ matrix.crate }} browser=chrome
-      - name: Firefox
         if: ${{ matrix.crate == 'medea-jason'
                 && (startsWith(github.ref,
                                format('refs/tags/{0}-', matrix.crate))
                     || !startsWith(github.ref, 'refs/tags/medea-')) }}
+      - name: Firefox
         run: make test.unit crate=${{ matrix.crate }} browser=firefox
+        if: ${{ matrix.crate == 'medea-jason'
+                && (startsWith(github.ref,
+                               format('refs/tags/{0}-', matrix.crate))
+                    || !startsWith(github.ref, 'refs/tags/medea-')) }}
 
       - run: make test.unit crate=${{ matrix.crate }}
         if: ${{ matrix.crate != 'medea-jason'
@@ -272,8 +272,7 @@ jobs:
         run: >-
           test "${{ steps.release.outputs.group2 }}"
                ==
-               "$(make cargo.version crate=${{ steps.release.outputs.group1 }}
-                  | tr -d '\n ')"
+               "$(make cargo.version crate=${{ steps.release.outputs.group1 }})"
       - name: Parse CHANGELOG link
         id: changelog
         run: echo ::set-output
@@ -337,3 +336,33 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
         run: make release.npm crate=${{ steps.package.outputs.group1 }}
                               publish=yes
+
+  release-helm:
+    name: Release Helm chart
+    needs: ['lint-helm']
+    if: ${{ github.ref == 'refs/heads/master' }}
+    strategy:
+      matrix:
+        chart:
+          - medea-demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: trilom/file-changes-action@v1.2.4
+        id: changed
+      - id: chart
+        run: echo ::set-output
+                  name=MANIFEST::$(make helm.dir
+                                        chart=${{ matrix.chart }})/Chart.yaml
+      - uses: azure/setup-helm@v1
+        if: ${{ contains(steps.changed.outputs.files,
+                         steps.chart.outputs.MANIFEST) }}
+      - name: Prepare Git author for push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Actions"
+        if: ${{ contains(steps.changed.outputs.files,
+                         steps.chart.outputs.MANIFEST) }}
+      - run: make helm.package.release chart=${{ matrix.chart }} build=yes
+        if: ${{ contains(steps.changed.outputs.files,
+                         steps.chart.outputs.MANIFEST) }}
