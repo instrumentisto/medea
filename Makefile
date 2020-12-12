@@ -46,6 +46,8 @@ endif
 ifeq ($(crate),medea-coturn-telnet-client)
 crate-dir = crates/medea-coturn-telnet-client
 endif
+crate-ver := $(strip \
+	$(shell grep -m1 'version = "' $(crate-dir)/Cargo.toml | cut -d '"' -f2))
 
 
 
@@ -246,6 +248,19 @@ endif
 endif
 
 
+# Show permalink to CHANGELOG of a concrete version of project's Cargo crate.
+#
+# Usage:
+#	make cargo.changelog.link [crate=(medea|medea-jason|<crate-name>)]
+#	                          [ver=($(crate-ver)|<version>)]
+
+cargo-changelog-link-crate = $(if $(call eq,$(crate),),medea,$(crate))
+cargo-changelog-link-ver = $(if $(call eq,$(ver),),$(crate-ver),$(ver))
+
+cargo.changelog.link:
+	@printf "https://github.com/instrumentisto/medea/blob/$(cargo-changelog-link-crate)-$(cargo-changelog-link-ver)/CHANGELOG.md#$(shell sed -n '/^## \[$(cargo-changelog-link-ver)\]/{s/^## \[\(.*\)\][^0-9]*\([0-9].*\)/\1--\2/;s/[^0-9a-z-]*//g;p;}' CHANGELOG.md)"
+
+
 # Format Rust sources with rustfmt.
 #
 # Usage:
@@ -268,13 +283,22 @@ ifeq ($(crate),medea-control-api-proto)
 endif
 
 
-# Lint Rust sources with clippy.
+# Lint Rust sources with Clippy.
 #
 # Usage:
 #	make cargo.lint
 
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings
+
+
+# Show version of project's Cargo crate.
+#
+# Usage:
+#	make cargo.version [crate=(medea|medea-jason|<crate-name>)]
+
+cargo.version:
+	@printf "$(crate-ver)"
 
 
 
@@ -933,7 +957,8 @@ endef
 ##################
 
 .PHONY: build build.jason build.medea \
-        cargo cargo.build cargo.fmt cargo.gen cargo.lint \
+        cargo cargo.build cargo.changelog.link cargo.fmt cargo.gen cargo.lint \
+        	cargo.version \
         docker.auth  docker.build.control docker.build.demo docker.build.medea \
         	docker.down.control docker.down.coturn docker.down.demo \
         	docker.down.medea docker.down.webdriver  \
