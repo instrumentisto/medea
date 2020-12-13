@@ -65,6 +65,7 @@ where
     /// processed by subscribers.
     ///
     /// [`Future`]: std::future::Future
+    #[inline]
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.0.borrow().when_all_processed()
     }

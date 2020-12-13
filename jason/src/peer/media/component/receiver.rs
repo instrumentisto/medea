@@ -55,33 +55,39 @@ impl ReceiverState {
     }
 
     /// Returns [`TrackId`] of this [`ReceiverState`].
+    #[inline]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`ReceiverState`].
+    #[inline]
     pub fn mid(&self) -> &Option<String> {
         &self.mid
     }
 
     /// Returns current [`MediaType`] of this [`ReceiverState`].
+    #[inline]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
     /// Returns current [`MemberId`] of the `Member` from which this
     /// [`ReceiverState`] should receive media data.
+    #[inline]
     pub fn sender_id(&self) -> &MemberId {
         &self.sender_id
     }
 
     /// Returns current individual media exchange state of this
     /// [`ReceiverState`].
+    #[inline]
     pub fn enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
     /// Returns current general media exchange state of this [`ReceiverState`].
+    #[inline]
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
@@ -124,6 +130,7 @@ impl ReceiverComponent {
     ///
     /// Calls [`Receiver::set_muted`] with a new value.
     #[watch(self.state().muted.subscribe())]
+    #[inline]
     async fn muted_watcher(
         ctx: Rc<Receiver>,
         _: Rc<GlobalCtx>,
@@ -137,8 +144,10 @@ impl ReceiverComponent {
 
     /// Watcher for the [`ReceiverState::enabled_individual`] update.
     ///
-    /// Calls [`Receiver::set_enabled_individual_state`] with a new value.
+    /// Calls [`Receiver::set    #[inline]_enabled_individual_state`] with a new
+    /// value.
     #[watch(self.state().enabled_individual.subscribe())]
+    #[inline]
     async fn enabled_individual_watcher(
         ctx: Rc<Receiver>,
         _: Rc<GlobalCtx>,
@@ -154,6 +163,7 @@ impl ReceiverComponent {
     ///
     /// Calls [`Receiver::set_enabled_general_state`] with a new value.
     #[watch(self.state().enabled_general.subscribe())]
+    #[inline]
     async fn enabled_general_watcher(
         ctx: Rc<Receiver>,
         _: Rc<GlobalCtx>,

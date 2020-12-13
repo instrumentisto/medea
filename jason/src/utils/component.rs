@@ -31,12 +31,14 @@ struct WatchersStorage(RefCell<Vec<AbortHandle>>);
 
 impl WatchersStorage {
     /// Registers new [`AbortHandle`].
+    #[inline]
     fn register_handle(&self, handle: AbortHandle) {
         self.0.borrow_mut().push(handle);
     }
 
     /// Aborts all spawned watchers tasks registered in this
     /// [`WatchersStorage`].
+    #[inline]
     fn dispose(&self) {
         let handles: Vec<_> = std::mem::take(&mut self.0.borrow_mut());
         for handle in handles {
@@ -62,6 +64,7 @@ pub struct Component<S, C, G> {
 
 impl<S, C, G> Component<S, C, G> {
     /// Returns new [`Component`] with a provided data.
+    #[inline]
     pub fn new(state: Rc<S>, ctx: Rc<C>, global_ctx: Rc<G>) -> Self {
         Self {
             state,
@@ -72,11 +75,13 @@ impl<S, C, G> Component<S, C, G> {
     }
 
     /// Returns [`Rc`] to the context of this [`Component`].
+    #[inline]
     pub fn ctx(&self) -> Rc<C> {
         self.ctx.clone()
     }
 
     /// Returns reference to the state of this [`Component`]
+    #[inline]
     pub fn state(&self) -> &S {
         &self.state
     }

@@ -65,6 +65,7 @@ struct PeerRepositoryState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
 
 impl PeerRepositoryState {
     /// Returns new empty [`PeerRepositoryState`].
+    #[inline]
     pub fn new() -> Self {
         Self(RefCell::new(ObservableHashMap::new()))
     }
@@ -102,6 +103,7 @@ impl PeerRepositoryComponent {
     /// [`PeerState`]: crate::peer::PeerState
     /// [`PeerComponent`]: crate::peer::PeerComponent
     #[watch(self.state().0.borrow().on_insert())]
+    #[inline]
     async fn insert_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
         global_ctx: Rc<GlobalCtx>,
@@ -126,6 +128,7 @@ impl PeerRepositoryComponent {
     /// Removes [`PeerComponent`] and closes [`Connection`] by
     /// [`Connections::close_connection`] call.
     #[watch(self.state().0.borrow().on_remove())]
+    #[inline]
     async fn remove_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
         global_ctx: Rc<GlobalCtx>,

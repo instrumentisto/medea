@@ -536,6 +536,7 @@ impl MediaConnections {
     }
 
     /// Inserts new [`SenderComponent`] into [`MediaConnections`].
+    #[inline]
     pub fn insert_sender(&self, sender: SenderComponent) {
         self.0
             .borrow_mut()
@@ -544,6 +545,7 @@ impl MediaConnections {
     }
 
     /// Inserts new [`ReceiverComponent`] into [`MediaConnections`].
+    #[inline]
     pub fn insert_receiver(&self, receiver: ReceiverComponent) {
         self.0
             .borrow_mut()

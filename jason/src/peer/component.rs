@@ -41,6 +41,7 @@ pub struct PeerState {
 
 impl PeerState {
     /// Returns [`PeerState`] with a provided data.
+    #[inline]
     pub fn new(
         id: PeerId,
         senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
@@ -64,21 +65,25 @@ impl PeerState {
     }
 
     /// Returns all [`IceServer`]s of this [`PeerState`].
+    #[inline]
     pub fn ice_servers(&self) -> &Vec<IceServer> {
         &self.ice_servers
     }
 
     /// Returns `true` if `PeerConnection` should be relayed forcibly.
+    #[inline]
     pub fn force_relay(&self) -> bool {
         self.force_relay
     }
 
     /// Inserts new [`SenderState`] into this [`PeerState`].
+    #[inline]
     pub fn insert_sender(&self, track_id: TrackId, sender: Rc<SenderState>) {
         self.senders.borrow_mut().insert(track_id, sender);
     }
 
     /// Inserts new [`ReceiverState`] into this [`PeerState`].
+    #[inline]
     pub fn insert_receiver(
         &self,
         track_id: TrackId,
@@ -88,36 +93,43 @@ impl PeerState {
     }
 
     /// Returns [`Rc`] to the [`SenderState`] with a provided [`TrackId`].
+    #[inline]
     pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<SenderState>> {
         self.senders.borrow().get(&track_id).cloned()
     }
 
     /// Returns [`Rc`] to the [`ReceiverState`] with a provided [`TrackId`].
+    #[inline]
     pub fn get_receiver(&self, track_id: TrackId) -> Option<Rc<ReceiverState>> {
         self.receivers.borrow().get(&track_id).cloned()
     }
 
     /// Sets [`NegotiationRole`] of this [`PeerState`] to the provided one.
+    #[inline]
     pub fn set_negotiation_role(&self, negotiation_role: NegotiationRole) {
         self.negotiation_role.set(Some(negotiation_role));
     }
 
     /// Sets [`PeerState::restart_ice`] to `true`.
+    #[inline]
     pub fn restart_ice(&self) {
         self.restart_ice.set(true);
     }
 
     /// Sets remote SDP offer to the provided value.
+    #[inline]
     pub fn set_remote_sdp_offer(&self, new_remote_sdp_offer: String) {
         self.remote_sdp_offer.set(Some(new_remote_sdp_offer));
     }
 
     /// Adds [`IceCandidate`] for the [`PeerState`].
+    #[inline]
     pub fn add_ice_candidate(&self, ice_candidate: IceCandidate) {
         self.ice_candidates.borrow_mut().push(ice_candidate);
     }
 
     /// Returns current SDP offer of this [`PeerState`].
+    #[inline]
     pub fn sdp_offer(&self) -> Option<String> {
         self.sdp_offer.borrow().clone()
     }
@@ -160,6 +172,7 @@ impl PeerState {
     /// [`SenderState`]s/[`ReceiverState`]s updates will be applied.
     ///
     /// [`Future`]: std::future::Future
+    #[inline]
     pub fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
         let fut = futures::future::join(
             self.when_all_receivers_updated(),
@@ -203,11 +216,13 @@ impl PeerState {
 #[cfg(feature = "mockable")]
 impl PeerState {
     /// Waits for [`PeerState::remote_sdp_offer`] change apply.
+    #[inline]
     pub async fn when_remote_sdp_answer_processed(&self) {
         self.remote_sdp_offer.when_all_processed().await;
     }
 
     /// Resets [`NegotiationRole`] of this [`PeerState`] to [`None`].
+    #[inline]
     pub fn reset_negotiation_role(&self) {
         self.negotiation_role.set(None);
     }
@@ -223,6 +238,7 @@ impl PeerComponent {
     /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
     /// [`IceCandidate`].
     #[watch(self.state().ice_candidates.borrow().on_push())]
+    #[inline]
     async fn ice_candidate_push_watcher(
         ctx: Rc<PeerConnection>,
         _: Rc<GlobalCtx>,
@@ -256,21 +272,20 @@ impl PeerComponent {
     ) -> Result<(), Traced<PeerError>> {
         let (remote_sdp_answer, _guard) = remote_sdp_answer.into_parts();
         if let Some(remote_sdp_answer) = remote_sdp_answer {
-            if matches!(
-                state.negotiation_role.get(),
-                Some(NegotiationRole::Offerer)
-            ) {
-                ctx.set_remote_answer(remote_sdp_answer)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                state.negotiation_role.set(None);
-            } else if matches!(
-                state.negotiation_role.get(),
-                Some(NegotiationRole::Answerer(_))
-            ) {
-                ctx.set_remote_offer(remote_sdp_answer)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
+            if let Some(role) = state.negotiation_role.get() {
+                match role {
+                    NegotiationRole::Offerer => {
+                        ctx.set_remote_answer(remote_sdp_answer)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        state.negotiation_role.set(None);
+                    }
+                    NegotiationRole::Answerer(_) => {
+                        ctx.set_remote_offer(remote_sdp_answer)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                    }
+                }
             }
         }
 
@@ -283,6 +298,7 @@ impl PeerComponent {
     ///
     /// Resets [`PeerState::restart_ice`] to `false` if new value is `true`.
     #[watch(self.state().restart_ice.subscribe())]
+    #[inline]
     async fn ice_restart_watcher(
         ctx: Rc<PeerConnection>,
         _: Rc<GlobalCtx>,

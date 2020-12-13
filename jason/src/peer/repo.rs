@@ -110,6 +110,7 @@ impl PeerRepository for Repository {
     /// # Errors
     ///
     /// Errors if creating [`PeerState`] fails.
+    #[inline]
     fn create_peer(
         &self,
         peer_id: PeerId,

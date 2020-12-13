@@ -69,37 +69,44 @@ impl SenderState {
     }
 
     /// Returns [`TrackId`] of this [`SenderState`].
+    #[inline]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`SenderState`].
+    #[inline]
     pub fn mid(&self) -> &Option<String> {
         &self.mid
     }
 
     /// Returns current [`MediaType`] of this [`SenderState`].
+    #[inline]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
     /// Returns current [`MemberId`]s of the `Member`s to which this
     /// [`SenderState`] should send media data.
+    #[inline]
     pub fn receivers(&self) -> &Vec<MemberId> {
         &self.receivers
     }
 
     /// Returns current individual media exchange state of this [`SenderState`].
+    #[inline]
     pub fn is_enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
     /// Returns current general media exchange state of this [`SenderState`].
+    #[inline]
     pub fn is_enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
 
     /// Returns current mute state of this [`SenderState`].
+    #[inline]
     pub fn is_muted(&self) -> bool {
         self.muted.get()
     }
@@ -137,16 +144,19 @@ impl SenderState {
 
     /// Returns `true` if local `MediaStream` update needed for this
     /// [`SenderState`].
+    #[inline]
     pub fn is_local_stream_update_needed(&self) -> bool {
         self.need_local_stream_update.get()
     }
 
     /// Sets [`SenderState::need_local_stream_update`] to `false`.
+    #[inline]
     pub fn local_stream_updated(&self) {
         self.need_local_stream_update.set(false);
     }
 
     /// Returns [`MediaKind`] of this [`SenderState`].
+    #[inline]
     pub fn media_kind(&self) -> MediaKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaKind::Audio,
@@ -155,6 +165,7 @@ impl SenderState {
     }
 
     /// Returns [`MediaSourceKind`] of this [`SenderState`].
+    #[inline]
     pub fn media_source(&self) -> MediaSourceKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaSourceKind::Device,
@@ -173,6 +184,7 @@ impl SenderComponent {
     /// [`SenderState::need_local_stream_update`] flag to `true`, otherwise
     /// calls [`Sender::remove_track`].
     #[watch(self.state().enabled_individual.subscribe())]
+    #[inline]
     async fn enabled_individual_watcher(
         ctx: Rc<Sender>,
         _: Rc<GlobalCtx>,
@@ -193,6 +205,7 @@ impl SenderComponent {
     ///
     /// Calls [`Sender::set_enabled_general_state`] with a new value.
     #[watch(self.state().enabled_general.subscribe())]
+    #[inline]
     async fn enabled_general_watcher(
         ctx: Rc<Sender>,
         _: Rc<GlobalCtx>,
@@ -208,6 +221,7 @@ impl SenderComponent {
     ///
     /// Calls [`Sender::set_muted`] with a new value.
     #[watch(self.state().muted.subscribe())]
+    #[inline]
     async fn muted_watcher(
         ctx: Rc<Sender>,
         _: Rc<GlobalCtx>,
