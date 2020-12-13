@@ -73,13 +73,19 @@ impl PeerRepositoryState {
 /// Context of the [`PeerRepositoryComponent`].
 struct PeerRepositoryCtx {
     /// [`PeerComponent`] repository.
+    ///
+    /// [`PeerComponent`]: crate::peer::PeerComponent
     repo: Box<dyn PeerRepository>,
 
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection;
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection;
     send_constraints: LocalTracksConstraints,
 }
 
@@ -92,6 +98,9 @@ impl PeerRepositoryComponent {
     /// Watches for new [`PeerState`] insertions.
     ///
     /// Creates new [`PeerComponent`] based on the inserted [`PeerState`].
+    ///
+    /// [`PeerState`]: crate::peer::PeerState
+    /// [`PeerComponent`]: crate::peer::PeerComponent
     #[watch(self.state().0.borrow().on_insert())]
     async fn insert_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
@@ -207,10 +216,13 @@ pub enum RoomError {
     /// [`MediaManager`].
     ///
     /// [`MediaManager`]: crate::media::MediaManager
+    /// [`PeerConnection`]: crate::peer::PeerConnection;
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection;
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
     NoSuchPeer(PeerId),
 
@@ -320,6 +332,8 @@ impl RoomHandle {
 
     /// Enables or disables specified media and source types publish or receival
     /// in all [`PeerConnection`]s.
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection;
     async fn set_track_media_state(
         &self,
         new_state: MediaState,
@@ -796,10 +810,14 @@ struct InnerRoom {
 
     /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     send_constraints: LocalTracksConstraints,
 
     /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
     /// in this [`Room`]. Used to disable or enable media receiving.
+    ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     recv_constraints: Rc<RecvConstraints>,
 
     /// [`PeerComponent`] repository.
@@ -817,6 +835,7 @@ struct InnerRoom {
     /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     ///
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`MediaManager`]: crate::media::MediaManager
     on_failed_local_media: Rc<Callback1<JasonError>>,
 

@@ -124,6 +124,8 @@ impl PeerState {
 
     /// Returns [`Future`] which will be resolved when all [`SenderState`]s
     /// updates will be applied.
+    ///
+    /// [`Future`]: std::future::Future
     fn when_all_senders_updated(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self
             .senders
@@ -139,6 +141,8 @@ impl PeerState {
 
     /// Returns [`Future`] which will be resolved when all [`ReceiverState`]s
     /// updates will be applied.
+    ///
+    /// [`Future`]: std::future::Future
     fn when_all_receivers_updated(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self
             .receivers
@@ -154,6 +158,8 @@ impl PeerState {
 
     /// Returns [`Future`] which will be resolved when all
     /// [`SenderState`]s/[`ReceiverState`]s updates will be applied.
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
         let fut = futures::future::join(
             self.when_all_receivers_updated(),

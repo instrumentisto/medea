@@ -299,8 +299,7 @@ impl MediaStateControllable for Sender {
         Rc::clone(&self.mute_state)
     }
 
-    /// Sets current [`MediaExchangeState`] to
-    /// [`media_exchange_state::Transition`].
+    /// Sets current [`MediaState`] to the transition.
     ///
     /// # Errors
     ///

@@ -51,8 +51,7 @@ impl Receiver {
     /// when [`remote::Track`] arrives.
     ///
     /// Created [`Transceiver`] direction is set to
-    /// [`TransceiverDirection::INACTIVE`] if media receiving is disabled in
-    /// provided [`RecvConstraints`].
+    /// [`TransceiverDirection::INACTIVE`] if `enabled_individual` is `false`.
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`remote::Track`] data
@@ -185,7 +184,7 @@ impl Receiver {
         self.media_exchange_state_controller.update(enabled.into());
     }
 
-    /// Calls [`remote::Track::set_muted`] with a provided [`bool`].
+    /// Calls [`remote::Track::set_enabled`] with a provided [`bool`].
     ///
     /// Does nothing if [`Receiver`] doesn't have [`remote::Track`] atm.
     pub fn set_muted(&self, muted: bool) {

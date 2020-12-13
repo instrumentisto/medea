@@ -463,9 +463,8 @@ impl PeerConnection {
 
     /// Marks [`PeerConnection`] to trigger ICE restart.
     ///
-    /// After this function returns, the offer returned by the next call to
-    /// [`PeerConnection::get_offer`] is automatically configured to trigger ICE
-    /// restart.
+    /// After this function returns, the generated offer is automatically
+    /// configured to trigger ICE restart.
     pub fn restart_ice(&self) {
         self.peer.restart_ice();
     }
@@ -518,9 +517,10 @@ impl PeerConnection {
     /// [`Sender`]s are chosen based on provided [`LocalStreamUpdateCriteria`].
     ///
     /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
-    /// date (you set those with [`PeerConnection::create_tracks`]). If
-    /// there are no senders configured in this [`PeerConnection`], then
-    /// this method is no-op.
+    /// date (you set those with [`PeerState::senders`]) and
+    /// [`PeerState::senders`] are synchronized with a real object state. If
+    /// there are no senders configured in this [`PeerConnection`], then this
+    /// method is no-op.
     ///
     /// Secondly, make sure that configured [`LocalTracksConstraints`] are up to
     /// date.

@@ -67,6 +67,8 @@ pub trait TransceiverSide: MediaStateControllable {
 
     /// Returns `true` if this [`TransceiverSide`] currently can be
     /// disabled/enabled without [`LocalTracksConstraints`] updating.
+    ///
+    /// [`LocalTracksConstraints`]: super::LocalTracksConstraints
     fn is_transitable(&self) -> bool;
 }
 

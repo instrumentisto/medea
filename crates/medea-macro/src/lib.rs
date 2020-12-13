@@ -289,8 +289,8 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// Generates `Component`'s watchers spawn method based on provided `impl`
 /// block.
 ///
-/// It's not recommended to don't use `Component::spawn` function directly. Use
-/// [`medea_jason::spawn_component`] for component creating and spawning.
+/// It's not recommended to use `Component::spawn` function directly. Use
+/// `medea_jason::spawn_component` for component creating and spawning.
 ///
 /// # Usage
 ///
@@ -351,9 +351,9 @@ pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
         .unwrap_or_else(|e| e.to_compile_error().into())
 }
 
-/// Works only with a [`medea_macro::watchers`] macro.
+/// Works only with a [`macro@watchers`] macro.
 ///
-/// See [`medea_maccro::watchers`] macro docs for the usage info.
+/// See [`macro@watchers`] macro docs for the usage info.
 #[proc_macro_attribute]
 pub fn watch(_: TokenStream, input: TokenStream) -> TokenStream {
     input

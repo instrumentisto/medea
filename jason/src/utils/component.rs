@@ -88,8 +88,8 @@ impl<S: 'static, C: 'static, G: 'static> Component<S, C, G> {
     /// If watcher returns error then this error will be converted to the
     /// [`JasonError`] and printed with a [`JasonError::print`].
     ///
-    /// You can stop all listeners tasks spawned by this function by calling
-    /// [`WatchersStorage::dispose`] or just drop [`Component`].
+    /// You can stop all listeners tasks spawned by this function by
+    /// [`Component`] drop.
     pub fn spawn_watcher<R, V, F, O, E>(&self, mut rx: R, handle: F)
     where
         F: Fn(Rc<C>, Rc<G>, Rc<S>, V) -> O + 'static,

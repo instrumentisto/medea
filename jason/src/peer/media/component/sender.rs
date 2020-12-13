@@ -122,6 +122,8 @@ impl SenderState {
 
     /// Returns [`Future`] which will be resolved when [`SenderState`] update
     /// will be applied on [`Sender`].
+    ///
+    /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
         let fut = futures::future::join_all(vec![
             self.enabled_general.when_all_processed(),

@@ -20,6 +20,8 @@ use super::Progressable;
 ///
 /// Subscription to changes works the same way as [`Progressable`], but working
 /// with underlying data of [`ProgressableCell`] is different.
+///
+/// [`Cell`]: std::cell::Cell
 #[derive(Debug)]
 pub struct ProgressableCell<D>(RefCell<Progressable<D>>);
 
@@ -27,7 +29,7 @@ impl<D> ProgressableCell<D>
 where
     D: 'static,
 {
-    /// Returns new [`ObservableCell`] with subscribable mutations.
+    /// Returns new [`ProgressableCell`] with subscribable mutations.
     #[inline]
     pub fn new(data: D) -> Self {
         Self(RefCell::new(Progressable::new(data)))

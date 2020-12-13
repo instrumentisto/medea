@@ -17,12 +17,12 @@ use super::{PeerConnection, PeerError, PeerEvent};
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
-    /// Creates new [`PeerConnection`] with provided ID and injecting provided
-    /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
+    /// Creates new [`PeerComponent`] with a provided [`PeerState`] and
+    /// [`GlobalCtx`].
     ///
     /// # Errors
     ///
-    /// Errors if creating [`PeerConnection`] fails.
+    /// Errors if creating [`PeerState`] fails.
     fn create_peer(
         &self,
         peer_id: PeerId,
@@ -104,8 +104,12 @@ impl Repository {
 }
 
 impl PeerRepository for Repository {
-    /// Creates new [`PeerComponent`] with provided ID and injecting provided
-    /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
+    /// Creates new [`PeerComponent`] with a provided [`PeerState`] and
+    /// [`GlobalCtx`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if creating [`PeerState`] fails.
     fn create_peer(
         &self,
         peer_id: PeerId,
