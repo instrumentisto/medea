@@ -1,5 +1,4 @@
-//! Service responsible for processing [`Peer`]'s metrics received
-//! from Coturn.
+//! Service responsible for processing [`Peer`]'s metrics received from Coturn.
 //!
 //! [`Peer`]: crate::media::peer::Peer
 

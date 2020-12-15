@@ -57,10 +57,49 @@ pub trait PeerConnectionStateEventsHandler: Send + Debug {
 impl_debug_by_struct_name!(MockPeerConnectionStateEventsHandler);
 
 /// Builds [`PeerTrafficWatcher`].
+#[cfg(test)]
 pub fn build_peers_traffic_watcher(
     conf: &conf::Media,
 ) -> Arc<dyn PeerTrafficWatcher> {
     Arc::new(PeersTrafficWatcherImpl::new(conf).start())
+}
+
+/// Builds [`PeerTrafficWatcher`].
+#[cfg(not(test))]
+pub fn build_peers_traffic_watcher(
+    _: &conf::Media,
+) -> Arc<dyn PeerTrafficWatcher> {
+    #[derive(Debug)]
+    struct DummyPeerTrafficWatcher;
+
+    #[async_trait(?Send)]
+    impl PeerTrafficWatcher for DummyPeerTrafficWatcher {
+        async fn register_room(
+            &self,
+            _: RoomId,
+            _: Box<dyn PeerConnectionStateEventsHandler>,
+        ) -> Result<(), MailboxError> {
+            Ok(())
+        }
+
+        fn unregister_room(&self, _: RoomId) {}
+
+        async fn register_peer(
+            &self,
+            _: RoomId,
+            _: PeerId,
+            _: bool,
+        ) -> Result<(), MailboxError> {
+            Ok(())
+        }
+
+        fn unregister_peers(&self, _: RoomId, _: Vec<PeerId>) {}
+
+        fn traffic_flows(&self, _: RoomId, _: PeerId, _: FlowMetricSource) {}
+
+        fn traffic_stopped(&self, _: RoomId, _: PeerId, _: Instant) {}
+    }
+    Arc::new(DummyPeerTrafficWatcher)
 }
 
 /// Consumes `Peer` traffic metrics for further processing.
