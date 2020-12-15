@@ -30,7 +30,8 @@ RUN cd /src/ \
 # https://hub.docker.com/_/nginx
 FROM nginx:stable-alpine AS runtime
 
-LABEL org.opencontainers.image.source="https://github.com/instrumentisto/medea"
+LABEL org.opencontainers.image.source="\
+    https://github.com/instrumentisto/medea/tree/master/jason/demo"
 
 COPY jason/demo/chart/medea-demo/conf/nginx.vh.conf \
      /etc/nginx/conf.d/default.conf
