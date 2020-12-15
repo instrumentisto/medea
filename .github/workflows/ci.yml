@@ -460,7 +460,8 @@ jobs:
             tags: edge
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
             readme_file: README.md
-            if: ${{ github.ref == 'refs/heads/master' }}
+            if: true
+            #if: ${{ github.ref == 'refs/heads/master' }}
           - image: medea-control-api-mock
             tags: edge
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
@@ -526,7 +527,7 @@ jobs:
           result-encoding: string
           script: |
             let versions = '${{ steps.parsed.outputs.group1 }}';
-            if ('${{ steps.parsed.outputs.group4 }}' !== '') {
+            if ('${{ steps.parsed.outputs.group4 }}' === '') {
               versions += ',${{ steps.parsed.outputs.group2 }}';
               if ('${{ steps.parsed.outputs.group3 }}' !== '0') {
                 versions += ',${{ steps.parsed.outputs.group3 }}';
@@ -534,15 +535,20 @@ jobs:
             }
             return versions;
         if: ${{ matrix.if && contains(matrix.tags, '@versions') }}
-      - run: echo "${{ toJson(steps.versions.outputs) }}"
-        if: ${{ matrix.if && contains(matrix.tags, '@versions') }}
-
-      - run: make docker.tag
-                  image=${{ matrix.image }} of=build-${{ github.run_number }}
-                  tags=${{ matrix.tags }} repos=${{ matrix.repos }}
+      - name: Prepare final image tags
+        id: tags
+        uses: bluwy/substitute-string-action@v1
+        with:
+          _input-text: ${{ matrix.tags }}
+          "@versions": ${{ steps.versions.outputs.result }}
         if: ${{ matrix.if }}
-      #- run: make docker.push image=${{ matrix.image }}
-      #            tags=${{ matrix.tags }} repos=${{ matrix.repos }}
+
+      - run: make docker.tag tags=${{ steps.tags.outputs.result }}
+                  image=${{ matrix.image }} of=build-${{ github.run_number }}
+                  repos=${{ matrix.repos }}
+        if: ${{ matrix.if }}
+      #- run: make docker.push tags=${{ steps.tags.outputs.result }}
+      #            image=${{ matrix.image }} repos=${{ matrix.repos }}
       #  if: ${{ matrix.if }}
 
       #- name: Prepare real image name
