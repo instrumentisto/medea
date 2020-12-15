@@ -264,8 +264,9 @@ jobs:
           - image: medea
             cache: ${{ github.ref != 'refs/heads/master'
                        && !startsWith(github.ref, 'refs/tags/medea-') }}
-            export: ${{ github.ref == 'refs/heads/master'
-                        || startsWith(github.ref, 'refs/tags/medea-') }}
+            #export: ${{ github.ref == 'refs/heads/master'
+            #            || startsWith(github.ref, 'refs/tags/medea-') }}
+            export: true
             if: true
           - image: medea-control-api-mock
             cache: ${{ github.ref != 'refs/heads/master' }}
@@ -391,7 +392,7 @@ jobs:
         uses: actions-ecosystem/action-regex-match@v2
         with:
           text: ${{ github.ref }}
-          regex: '^refs/tags/(medea-[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+-?.*)$'
+          regex: '^refs/tags/(medea[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+(-.+)?)$'
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '15'
@@ -440,20 +441,21 @@ jobs:
     strategy:
       matrix:
         include:
-          #- image: medea
-          #  tags: latest,@versions
-          #  repos: instrumentisto,ghcr.io/instrumentisto
-          #  if: ${{ startsWith(github.ref, 'refs/tags/medea-0')
-          #          || startsWith(github.ref, 'refs/tags/medea-1')
-          #          || startsWith(github.ref, 'refs/tags/medea-2')
-          #          || startsWith(github.ref, 'refs/tags/medea-3')
-          #          || startsWith(github.ref, 'refs/tags/medea-4')
-          #          || startsWith(github.ref, 'refs/tags/medea-5')
-          #          || startsWith(github.ref, 'refs/tags/medea-6')
-          #          || startsWith(github.ref, 'refs/tags/medea-7')
-          #          || startsWith(github.ref, 'refs/tags/medea-8')
-          #          || startsWith(github.ref, 'refs/tags/medea-9') }}
-          #          # just until GitHub Actions support regexes in expressions
+          - image: medea
+            tags: latest,@versions
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            if: true
+            #if: ${{ startsWith(github.ref, 'refs/tags/medea-0')
+            #        || startsWith(github.ref, 'refs/tags/medea-1')
+            #        || startsWith(github.ref, 'refs/tags/medea-2')
+            #        || startsWith(github.ref, 'refs/tags/medea-3')
+            #        || startsWith(github.ref, 'refs/tags/medea-4')
+            #        || startsWith(github.ref, 'refs/tags/medea-5')
+            #        || startsWith(github.ref, 'refs/tags/medea-6')
+            #        || startsWith(github.ref, 'refs/tags/medea-7')
+            #        || startsWith(github.ref, 'refs/tags/medea-8')
+            #        || startsWith(github.ref, 'refs/tags/medea-9') }}
+                    # just until GitHub Actions support regexes in expressions
           - image: medea
             tags: edge
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
@@ -463,18 +465,17 @@ jobs:
             tags: edge
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
             readme_file: mock/control-api/README.md
-            if: true
-            #if: ${{ github.ref == 'refs/heads/master' }}
+            if: ${{ github.ref == 'refs/heads/master' }}
           - image: medea-demo
             tags: latest
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
             readme_file: jason/demo/README.md
-            #if: ${{ github.ref == 'refs/heads/master' }}
+            if: ${{ github.ref == 'refs/heads/master' }}
           - image: medea-demo-edge
             tags: edge
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
             readme_file: jason/demo/README.md
-            #if: ${{ github.ref == 'refs/heads/master' }}
+            if: ${{ github.ref == 'refs/heads/master' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -510,40 +511,66 @@ jobs:
           password: ${{ secrets.DOCKERHUB_BOT_PASS }}
         if: ${{ matrix.if }}
 
+      - name: Parse semver versions
+        id: parsed
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          #text: ${{ github.ref }}
+          text: 'refs/tags/medea-0.1.4'
+          regex: '^refs/tags/medea[a-z-]*-((([0-9]+)\.[0-9]+)\.[0-9]+(-.+)?)$'
+        if: ${{ matrix.if && contains(matrix.tags, '@versions') }}
+      - name: Form Docker version tags
+        id: versions
+        uses: actions/github-script@v3
+        with:
+          result-encoding: string
+          script: |
+            let versions = '${{ steps.parsed.outputs.group1 }}';
+            if ('${{ steps.parsed.outputs.group4 }}' !== '') {
+              versions += ',${{ steps.parsed.outputs.group2 }}';
+              if ('${{ steps.parsed.outputs.group3 }}' !== '0') {
+                versions += ',${{ steps.parsed.outputs.group3 }}';
+              }
+            }
+            return versions;
+        if: ${{ matrix.if && contains(matrix.tags, '@versions') }}
+      - run: echo "${{ toJson(steps.versions.outputs) }}"
+        if: ${{ matrix.if && contains(matrix.tags, '@versions') }}
+
       - run: make docker.tag
                   image=${{ matrix.image }} of=build-${{ github.run_number }}
                   tags=${{ matrix.tags }} repos=${{ matrix.repos }}
         if: ${{ matrix.if }}
-      - run: make docker.push image=${{ matrix.image }}
-                  tags=${{ matrix.tags }} repos=${{ matrix.repos }}
-        if: ${{ matrix.if }}
+      #- run: make docker.push image=${{ matrix.image }}
+      #            tags=${{ matrix.tags }} repos=${{ matrix.repos }}
+      #  if: ${{ matrix.if }}
 
-      - name: Parse real image name
-        id: image
-        uses: bluwy/substitute-string-action@v1
-        with:
-          _input-text: ${{ matrix.image }}
-          -edge: ''
-        if: ${{ matrix.if }}
+      #- name: Prepare real image name
+      #  id: image
+      #  uses: bluwy/substitute-string-action@v1
+      #  with:
+      #    _input-text: ${{ matrix.image }}
+      #    -edge: ''
+      #  if: ${{ matrix.if }}
       # On GitHub Container Registry README is automatically updated on pushes.
-      - name: Update README on Quay.io
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_APIKEY: ${{ secrets.QUAYIO_API_TOKEN }}
-        with:
-          provider: quay
-          destination_container_repo: >-
-            quay.io/instrumentisto/${{ steps.image.outputs.result }}
-          readme_file: ${{ matrix.readme_file }}
-        if: ${{ matrix.if && contains(matrix.repos, 'quay.io') }}
-      - name: Update README on Docker Hub
-        uses: christian-korneck/update-container-description-action@v1
-        env:
-          DOCKER_USER: instrumentistobot
-          DOCKER_PASS: ${{ secrets.DOCKERHUB_BOT_PASS }}
-        with:
-          provider: dockerhub
-          destination_container_repo: >-
-            instrumentisto/${{ steps.image.outputs.result }}
-          readme_file: ${{ matrix.readme_file }}
-        if: ${{ matrix.if }}
+      #- name: Update README on Quay.io
+      #  uses: christian-korneck/update-container-description-action@v1
+      #  env:
+      #    DOCKER_APIKEY: ${{ secrets.QUAYIO_API_TOKEN }}
+      #  with:
+      #    provider: quay
+      #    destination_container_repo: >-
+      #      quay.io/instrumentisto/${{ steps.image.outputs.result }}
+      #    readme_file: ${{ matrix.readme_file }}
+      #  if: ${{ matrix.if && contains(matrix.repos, 'quay.io') }}
+      #- name: Update README on Docker Hub
+      #  uses: christian-korneck/update-container-description-action@v1
+      #  env:
+      #    DOCKER_USER: instrumentistobot
+      #    DOCKER_PASS: ${{ secrets.DOCKERHUB_BOT_PASS }}
+      #  with:
+      #    provider: dockerhub
+      #    destination_container_repo: >-
+      #      instrumentisto/${{ steps.image.outputs.result }}
+      #    readme_file: ${{ matrix.readme_file }}
+      #  if: ${{ matrix.if }}
