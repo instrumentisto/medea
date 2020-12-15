@@ -17,4 +17,5 @@
 !jason/demo/index.html
 
 # Makefile may be used in Dockerfiles.
+!.env
 !Makefile

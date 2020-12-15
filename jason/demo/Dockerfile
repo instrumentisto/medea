@@ -25,6 +25,9 @@ RUN cd /npm/ \
 # https://hub.docker.com/_/nginx
 FROM nginx:stable-alpine AS runtime
 
+LABEL org.opencontainers.image.source="\
+    https://github.com/instrumentisto/medea/tree/master/jason/demo"
+
 COPY chart/medea-demo/conf/nginx.vh.conf /etc/nginx/conf.d/default.conf
 
 COPY index.html /app/
