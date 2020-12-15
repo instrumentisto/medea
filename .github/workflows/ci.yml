@@ -366,3 +366,104 @@ jobs:
       - run: make helm.package.release chart=${{ matrix.chart }} build=yes
         if: ${{ contains(steps.changed.outputs.files,
                          steps.chart.outputs.MANIFEST) }}
+
+  build-docker:
+    name: Docker image
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    strategy:
+      matrix:
+        image:
+          #- medea
+          #- medea-control-api-mock
+          - medea-demo
+          - medea-demo-edge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: docker/setup-buildx-action@v1
+      - run: make docker.build debug=no no-cache=yes
+                  image=${{ matrix.image }}
+                  tag=build-${{ env.GITHUB_RUN_NUMBER }}
+        # TODO: consider tags
+        if: ${{ github.ref == 'refs/heads/master' }}
+      - run: make docker.build debug=yes no-cache=no
+                  image=${{ matrix.image }}
+                  tag=build-${{ env.GITHUB_RUN_NUMBER }}
+        if: ${{ github.ref != 'refs/heads/master' }}
+      - run: make docker.tar to-file=/tmp/image.tar
+                  image=${{ matrix.image }}
+                  tags=build-${{ env.GITHUB_RUN_NUMBER }}
+        #if: ${{ github.ref == 'refs/heads/master' }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: docker-build-${{ matrix.image }}-${{ env.GITHUB_RUN_NUMBER }}
+          path: /tmp/image.tar
+          retention-days: 1
+        #if: ${{ github.ref == 'refs/heads/master' }}
+
+  release-docker:
+    name: Release Docker image
+    needs: ['build-docker']
+    #if: ${{ github.ref == 'refs/heads/master' }}
+    strategy:
+      matrix:
+        includes:
+          #- image: medea
+          #  tags: latest,@version
+          #  repos: instrumentisto/,ghcr.io/instrumentisto/
+          #  if: ${{ startsWith(github.ref, 'refs/tags/medea-0')
+          #          || startsWith(github.ref, 'refs/tags/medea-1')
+          #          || startsWith(github.ref, 'refs/tags/medea-2')
+          #          || startsWith(github.ref, 'refs/tags/medea-3')
+          #          || startsWith(github.ref, 'refs/tags/medea-4')
+          #          || startsWith(github.ref, 'refs/tags/medea-5')
+          #          || startsWith(github.ref, 'refs/tags/medea-6')
+          #          || startsWith(github.ref, 'refs/tags/medea-7')
+          #          || startsWith(github.ref, 'refs/tags/medea-8')
+          #          || startsWith(github.ref, 'refs/tags/medea-9') }}
+          #          # just until GitHub Actions support regexes in expressions
+          #- image: medea
+          #  tags: edge
+          #  repos: instrumentisto,ghcr.io/instrumentisto
+          #  if: ${{ github.ref == 'refs/heads/master' }}
+          #- image: medea-control-api-mock
+          #  tags: edge
+          #  repos: instrumentisto
+          #  if: ${{ github.ref == 'refs/heads/master' }}
+          - image: medea-demo
+            tags: latest
+            repos: instrumentisto/,ghcr.io/instrumentisto/
+            when: ${{ github.ref == 'refs/heads/migrate-to-github-actions' }}
+            #if: ${{ github.ref == 'refs/heads/master' }}
+          - image: medea-demo-edge
+            tags: edge
+            repos: instrumentisto,ghcr.io/instrumentisto
+            when: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ toJson(env) }}"
+      - run: echo "${{ toJson(matrix) }}"
+      - run: echo ${{ matrix.when == 'true' }}
+      - run: echo ${{ matrix.when == true }}
+      - run: echo ${{ contains(matrix.when, 'true') }}
+      - uses: actions/checkout@v2
+        if: ${{ matrix.when == 'true' }}
+      - uses: docker/setup-buildx-action@v1
+        if: ${{ matrix.when == 'true' }}
+      - uses: actions/download-artifact@v2
+        with:
+          name: docker-build-${{ matrix.image }}-${{ env.GITHUB_RUN_NUMBER }}
+          path: /tmp/image.tar
+        if: ${{ matrix.when == 'true' }}
+      - run: make docker.untar from-file=/tmp/image.tar
+        if: ${{ matrix.when == 'true' }}
+      - run: make docker.tag
+                  image=${{ matrix.image }} of=${{ env.GITHUB_RUN_NUMBER }}
+                  tags=${{ matrix.tags }} repos=${{ matrix.tags }}
+        if: ${{ matrix.when == 'true' }}
+      #- run: make docker.push
+      #            image=${{ matrix.image }}
+      #            tags=${{ matrix.tags }} repos=${{ matrix.tags }}
+      #  if: ${{ matrix.if }}
