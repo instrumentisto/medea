@@ -470,7 +470,7 @@ impl PeerComponent {
                         sdp_answer: offer,
                         transceivers_statuses: ctx.get_transceivers_statuses(),
                     });
-
+                    state.sdp_offer.when_approved().await;
                     state.negotiation_role.set(None);
                 }
                 (Sdp::Rollback, _) => {
