@@ -5,6 +5,7 @@
 mod component;
 mod conn;
 mod ice_server;
+mod local_sdp;
 mod media;
 mod repo;
 mod stats;

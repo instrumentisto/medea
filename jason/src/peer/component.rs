@@ -16,7 +16,7 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     peer::{
-        component::local_sdp::{LocalSdp, Sdp},
+        local_sdp::{LocalSdp, Sdp},
         media::{ReceiverState, SenderBuilder, SenderState},
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, PeerError,
         Receiver, ReceiverComponent, SenderComponent,
@@ -25,91 +25,6 @@ use crate::{
 };
 
 use super::PeerConnection;
-
-mod local_sdp {
-    use std::cell::RefCell;
-
-    use futures::{channel::mpsc, stream::LocalBoxStream};
-
-    #[derive(Clone, Debug)]
-    pub enum Sdp {
-        Rollback,
-        Offer(String),
-    }
-
-    pub struct LocalSdp(RefCell<Inner>);
-
-    impl LocalSdp {
-        pub fn new() -> Self {
-            Self(RefCell::new(Inner::new()))
-        }
-
-        pub fn on_new_local_sdp(&self) -> LocalBoxStream<'static, Sdp> {
-            self.0.borrow_mut().on_new_local_sdp()
-        }
-
-        pub fn rollback(&self) {
-            self.0.borrow_mut().rollback()
-        }
-
-        pub fn update_offer(&self, offer: String) {
-            self.0.borrow_mut().new_offer(offer)
-        }
-
-        pub fn approve(&self) {
-            self.0.borrow_mut().approve()
-        }
-    }
-
-    struct Inner {
-        current_offer: Option<String>,
-        old_offer: Option<String>,
-        approved: bool,
-        new_local_sdp: Vec<mpsc::UnboundedSender<Sdp>>,
-    }
-
-    impl Inner {
-        fn new() -> Self {
-            Self {
-                current_offer: None,
-                old_offer: None,
-                approved: true,
-                new_local_sdp: Vec::new(),
-            }
-        }
-
-        fn send_sdp(&mut self, sdp: Sdp) {
-            self.new_local_sdp
-                .retain(|s| s.unbounded_send(sdp.clone()).is_ok());
-        }
-
-        fn on_new_local_sdp(&mut self) -> LocalBoxStream<'static, Sdp> {
-            let (tx, rx) = mpsc::unbounded();
-            self.new_local_sdp.push(tx);
-
-            Box::pin(rx)
-        }
-
-        fn rollback(&mut self) {
-            self.current_offer = self.old_offer.take();
-            self.approved = true;
-
-            self.send_sdp(Sdp::Rollback);
-        }
-
-        fn new_offer(&mut self, offer: String) {
-            let old_offer = self.current_offer.replace(offer.clone());
-            self.old_offer = old_offer;
-            self.approved = false;
-
-            self.send_sdp(Sdp::Offer(offer));
-        }
-
-        fn approve(&mut self) {
-            self.approved = true;
-        }
-    }
-}
 
 /// State of the [`PeerComponent`].
 pub struct PeerState {
