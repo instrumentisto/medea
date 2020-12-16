@@ -1128,6 +1128,8 @@ impl InnerRoom {
 impl EventHandler for InnerRoom {
     type Output = Result<(), Traced<RoomError>>;
 
+    /// Calls [`PeerState::sdp_offer_applied`] for the [`PeerState`] with a
+    /// provided [`PeerId`].
     async fn on_sdp_offer_applied(&self, peer_id: PeerId) -> Self::Output {
         let peer = self
             .peers

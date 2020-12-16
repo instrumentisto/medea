@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{channel::mpsc, future::Either, stream::LocalBoxStream};
+use futures::{channel::mpsc, future, future::Either, stream::LocalBoxStream};
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
 
@@ -127,7 +127,7 @@ impl LocalSdp {
     }
 
     /// Updates current SDP offer to the provided one.
-    pub fn update_offer(&self, offer: String) {
+    pub fn update_offer(&self, new_offer: String) {
         let (timeout, timeout_handle) = resettable_delay_for(APPROVE_TIMEOUT);
         self.0.borrow_mut().approved.set(false);
         self.0.borrow_mut().timeout_handle.replace(timeout_handle);
@@ -135,8 +135,7 @@ impl LocalSdp {
             let this = self.clone();
             let approved = self.0.borrow().approved.when_eq(true);
             async move {
-                match futures::future::select(approved, Box::pin(timeout)).await
-                {
+                match future::select(approved, Box::pin(timeout)).await {
                     Either::Left(_) => (),
                     Either::Right(_) => {
                         this.rollback();
@@ -144,11 +143,11 @@ impl LocalSdp {
                 }
             }
         });
-        let old_offer =
-            self.0.borrow_mut().current_offer.replace(offer.clone());
-        self.0.borrow_mut().prev_offer = old_offer;
+        let prev_offer =
+            self.0.borrow_mut().current_offer.replace(new_offer.clone());
+        self.0.borrow_mut().prev_offer = prev_offer;
 
-        self.0.borrow_mut().send_sdp(&Sdp::Offer(offer));
+        self.0.borrow_mut().send_sdp(&Sdp::Offer(new_offer));
     }
 
     /// Approves current [`LocalSdp`] offer.
