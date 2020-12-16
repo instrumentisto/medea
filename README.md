@@ -3,7 +3,7 @@ Medea
 
 <img align="right" src="https://raw.githubusercontent.com/instrumentisto/medea/master/logo.jpg">
 
-[![Travis.org](https://img.shields.io/travis/instrumentisto/medea/master)](https://travis-ci.org/instrumentisto/medea/branches)
+[![CI](https://github.com/instrumentisto/medea/workflows/CI/badge.svg?branch=master)](https://github.com/instrumentisto/medea/actions?query=workflow%3ACI+branch%3Amaster)
 [![Crates.io](https://img.shields.io/crates/v/medea)](https://crates.io/crates/medea)
 ![Crates.io license](https://img.shields.io/crates/l/medea)
 

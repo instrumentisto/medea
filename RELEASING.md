@@ -1,14 +1,14 @@
 HOWTO: Releasing
 ================
 
-All releases of this repository are normally made by [Travis CI] when release [Git tag][2] is pushed. Manual releasing should be avoided asap.
+All releases of this repository are normally made by [GitHub Actions] when release [Git tag][2] is pushed. Manual releasing should be avoided asap.
 
 
 
 
 ## BEFORE release
 
-1. __Ensure crate's dependencies do not contain `path` option in `Cargo.toml`.__  
+1. __Ensure crate's dependencies do NOT contain `path` option in `Cargo.toml`.__  
 While referring local dependency via `path` is neat and helpful for development, it cannot be used for publishing a release version to [crates.io].
 
 2. __Set the correct crate version in its `Cargo.toml`.__  
@@ -27,21 +27,21 @@ All its user-facing changes should be described explicitly and clear. It should 
 
 1. Commit all the changes for the prepared release with a commit message:
     ```
-    Create <version> release of '<crate-name>' crate
+    Prepare <version> release of '<crate-name>' crate
     ```
 
-2. Apply the release Git tag. Its format must be `<crate-name>-<version>`. For example:
+2. Apply Git version tag of the release. Its format must be `<crate-name>-<version>`. For example:
     - `medea-macro-3.2.1` to release `3.2.1` version of `medea-macro` crate;
     - `medea-2.4.8-beta.1` to release `2.4.8-beta.1` version of `medea` crate.
 
-3. Push the release Git tag to GitHub.
+3. Push the version tag to GitHub.
 
 
 
 
 ## After release
 
-After release there is no need to switch crate's version back to `x.y.z-dev` and refer its local dependencies with `path` option immediately. Just do it when your development process would really require such change.
+After release there is no need to switch crate's version back to `x.y.z-dev` and refer its local dependencies with `path` option immediately. Just do it when your development process would really require a such change.
 
 
 
@@ -59,18 +59,18 @@ If somehow the incorrect code has been released, the following steps should be d
 
 ## Manual releasing
 
-To perform a full releasing process manually, carefully examine `deploy` section of `.travis.yml` spec and repeat the necessary actions. Beware that releasing process may involve publishing not only to [crates.io], but also to [GitHub Releases][1], [NPM] and [GitHub Pages] (Helm chats, etc).
+To perform a full releasing process manually, carefully examine `Releasing` section of `.github/workflows/ci.yml` spec and repeat the necessary actions. Beware that releasing process may involve publishing not only to [crates.io], but also to [GitHub Releases][1], [NPM] and [GitHub Pages] (Helm chats, etc).
 
 
 
 
 
 [crates.io]: https://crates.io
+[GitHub Actions]: https://github.com/features/actions
 [GitHub Pages]: https://pages.github.com
 [Helm]: https://helm.sh
 [NPM]: https://www.npmjs.com
 [Semantic Versioning 2.0.0]: https://semver.org
-[Travis CI]: https://travis-ci.org
 
 [1]: https://help.github.com/en/articles/creating-releases
 [2]: https://git-scm.com/book/en/v2/Git-Basics-Tagging

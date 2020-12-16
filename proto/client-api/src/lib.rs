@@ -354,7 +354,9 @@ impl From<IceConnectionState> for PeerConnectionState {
 }
 
 /// Reason of disconnecting Web Client from Media Server.
-#[derive(Copy, Clone, Debug, Deserialize, Display, Serialize, Eq, PartialEq)]
+#[derive(
+    Copy, Clone, Debug, Deserialize, Display, Serialize, Eq, PartialEq,
+)]
 pub enum CloseReason {
     /// Client session was finished on a server side.
     Finished,

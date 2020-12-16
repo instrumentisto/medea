@@ -99,10 +99,13 @@ async fn concurrent_connect_requests() {
                 });
                 let join_room_sent = Rc::clone(&join_room_sent);
                 transport.expect_send().returning_st(move |msg| {
-                    if matches!(msg, ClientMsg::Command {
-                        command: Command::JoinRoom { .. },
-                        ..
-                    }) {
+                    if matches!(
+                        msg,
+                        ClientMsg::Command {
+                            command: Command::JoinRoom { .. },
+                            ..
+                        }
+                    ) {
                         let already_sent =
                             join_room_sent.fetch_or(true, Ordering::Relaxed);
                         assert!(
