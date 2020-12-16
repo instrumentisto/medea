@@ -153,6 +153,18 @@ async fn ice_restart() {
 
     {
         let event = responder_rx.next().await.unwrap();
+        if let Event::SdpOfferApplied { peer_id } = event {
+            assert_eq!(peer_id, responder_peer_id);
+        } else {
+            unreachable!(
+                "Received {:?} instead of Event::SdpOfferApplied",
+                event
+            )
+        }
+    }
+
+    {
+        let event = responder_rx.next().await.unwrap();
         match event {
             Event::TracksApplied {
                 peer_id,
@@ -224,6 +236,18 @@ async fn ice_restart() {
         }))
         .await
         .unwrap();
+
+    {
+        let event = responder_rx.next().await.unwrap();
+        if let Event::SdpOfferApplied { peer_id } = event {
+            assert_eq!(peer_id, responder_peer_id);
+        } else {
+            unreachable!(
+                "Received {:?} instead of Event::SdpOfferApplied",
+                event
+            )
+        }
+    }
 
     // second peer receives answer
     {
