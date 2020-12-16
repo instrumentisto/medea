@@ -16,6 +16,7 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     peer::{
+        component::local_sdp::{LocalSdp, Sdp},
         media::{ReceiverState, SenderBuilder, SenderState},
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, PeerError,
         Receiver, ReceiverComponent, SenderComponent,
@@ -25,6 +26,91 @@ use crate::{
 
 use super::PeerConnection;
 
+mod local_sdp {
+    use std::cell::RefCell;
+
+    use futures::{channel::mpsc, stream::LocalBoxStream};
+
+    #[derive(Clone, Debug)]
+    pub enum Sdp {
+        Rollback,
+        Offer(String),
+    }
+
+    pub struct LocalSdp(RefCell<Inner>);
+
+    impl LocalSdp {
+        pub fn new() -> Self {
+            Self(RefCell::new(Inner::new()))
+        }
+
+        pub fn on_new_local_sdp(&self) -> LocalBoxStream<'static, Sdp> {
+            self.0.borrow_mut().on_new_local_sdp()
+        }
+
+        pub fn rollback(&self) {
+            self.0.borrow_mut().rollback()
+        }
+
+        pub fn update_offer(&self, offer: String) {
+            self.0.borrow_mut().new_offer(offer)
+        }
+
+        pub fn approve(&self) {
+            self.0.borrow_mut().approve()
+        }
+    }
+
+    struct Inner {
+        current_offer: Option<String>,
+        old_offer: Option<String>,
+        approved: bool,
+        new_local_sdp: Vec<mpsc::UnboundedSender<Sdp>>,
+    }
+
+    impl Inner {
+        fn new() -> Self {
+            Self {
+                current_offer: None,
+                old_offer: None,
+                approved: true,
+                new_local_sdp: Vec::new(),
+            }
+        }
+
+        fn send_sdp(&mut self, sdp: Sdp) {
+            self.new_local_sdp
+                .retain(|s| s.unbounded_send(sdp.clone()).is_ok());
+        }
+
+        fn on_new_local_sdp(&mut self) -> LocalBoxStream<'static, Sdp> {
+            let (tx, rx) = mpsc::unbounded();
+            self.new_local_sdp.push(tx);
+
+            Box::pin(rx)
+        }
+
+        fn rollback(&mut self) {
+            self.current_offer = self.old_offer.take();
+            self.approved = true;
+
+            self.send_sdp(Sdp::Rollback);
+        }
+
+        fn new_offer(&mut self, offer: String) {
+            let old_offer = self.current_offer.replace(offer.clone());
+            self.old_offer = old_offer;
+            self.approved = false;
+
+            self.send_sdp(Sdp::Offer(offer));
+        }
+
+        fn approve(&mut self) {
+            self.approved = true;
+        }
+    }
+}
+
 /// State of the [`PeerComponent`].
 pub struct PeerState {
     id: PeerId,
@@ -33,7 +119,7 @@ pub struct PeerState {
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
-    sdp_offer: ObservableCell<Option<String>>,
+    sdp_offer: LocalSdp,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
@@ -57,7 +143,7 @@ impl PeerState {
             ice_servers,
             force_relay,
             remote_sdp_offer: ProgressableCell::new(None),
-            sdp_offer: ObservableCell::new(None),
+            sdp_offer: LocalSdp::new(),
             negotiation_role: ObservableCell::new(negotiation_role),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
@@ -128,10 +214,9 @@ impl PeerState {
         self.ice_candidates.borrow_mut().push(ice_candidate);
     }
 
-    /// Returns current SDP offer of this [`PeerState`].
     #[inline]
-    pub fn sdp_offer(&self) -> Option<String> {
-        self.sdp_offer.borrow().clone()
+    pub fn sdp_offer_applied(&self) {
+        self.sdp_offer.approve();
     }
 
     /// Returns [`Future`] which will be resolved when all [`SenderState`]s
@@ -409,36 +494,40 @@ impl PeerComponent {
     /// Sends [`Command::MakeSdpAnswer`] and resets [`NegotiationRole`] to
     /// `None` if new SDP offer is `Some` and current [`NegotiationRole`] is
     /// [`NegotiationRole::Answerer`].
-    #[watch(self.state().sdp_offer.subscribe())]
+    #[watch(self.state().sdp_offer.on_new_local_sdp())]
     async fn sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
-        sdp_offer: Option<String>,
+        sdp_offer: Sdp,
     ) -> Result<(), Traced<PeerError>> {
-        if let (Some(sdp_offer), Some(role)) =
-            (sdp_offer, state.negotiation_role.get())
-        {
-            match role {
-                NegotiationRole::Offerer => {
+        if let Some(role) = state.negotiation_role.get() {
+            match (sdp_offer, role) {
+                (Sdp::Offer(offer), NegotiationRole::Offerer) => {
                     let mids = ctx
                         .get_mids()
                         .map_err(tracerr::map_from_and_wrap!())?;
                     global_ctx.rpc.send_command(Command::MakeSdpOffer {
                         peer_id: ctx.id(),
-                        sdp_offer,
+                        sdp_offer: offer,
                         transceivers_statuses: ctx.get_transceivers_statuses(),
                         mids,
                     });
                 }
-                NegotiationRole::Answerer(_) => {
+                (Sdp::Offer(offer), NegotiationRole::Answerer(_)) => {
                     global_ctx.rpc.send_command(Command::MakeSdpAnswer {
                         peer_id: ctx.id(),
-                        sdp_answer: sdp_offer,
+                        sdp_answer: offer,
                         transceivers_statuses: ctx.get_transceivers_statuses(),
                     });
 
                     state.negotiation_role.set(None);
+                }
+                (Sdp::Rollback, _) => {
+                    ctx.peer
+                        .rollback_offer()
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
                 }
             }
         }
@@ -480,7 +569,7 @@ impl PeerComponent {
                         .create_and_set_offer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    state.sdp_offer.set(Some(sdp_offer));
+                    state.sdp_offer.update_offer(sdp_offer);
                     ctx.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
@@ -504,7 +593,7 @@ impl PeerComponent {
                         .create_and_set_answer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    state.sdp_offer.set(Some(sdp_answer));
+                    state.sdp_offer.update_offer(sdp_answer);
                 }
             }
         }

@@ -1132,6 +1132,20 @@ impl InnerRoom {
 impl EventHandler for InnerRoom {
     type Output = Result<(), Traced<RoomError>>;
 
+    async fn on_sdp_offer_applied(&self, peer_id: PeerId) -> Self::Output {
+        let peer = self
+            .peers
+            .state()
+            .0
+            .borrow()
+            .get(&peer_id)
+            .cloned()
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        peer.sdp_offer_applied();
+
+        Ok(())
+    }
+
     /// Creates [`PeerConnection`] with a provided ID and all the
     /// [`Connection`]s basing on provided [`Track`]s.
     ///

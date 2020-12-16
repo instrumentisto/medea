@@ -523,6 +523,20 @@ impl RtcPeerConnection {
         Ok(answer)
     }
 
+    pub async fn rollback_offer(&self) -> Result<()> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
+
+        JsFuture::from(peer.set_local_description(
+            &RtcSessionDescriptionInit::new(RtcSdpType::Rollback),
+        ))
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+        .map_err(tracerr::wrap!())?;
+
+        Ok(())
+    }
+
     /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
     /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
     /// description.

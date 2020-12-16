@@ -49,6 +49,7 @@ impl CommandHandler for Room {
         from_peer.set_mids(mids)?;
         from_peer.update_senders_statuses(senders_statuses);
 
+        let from_member_id = from_peer.member_id();
         let from_peer = from_peer.set_local_offer(sdp_offer.clone());
         let to_peer = to_peer.set_remote_offer(sdp_offer.clone());
 
@@ -78,7 +79,15 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        self.members.send_event_to_member(to_member_id, event)
+        self.members.send_event_to_member(to_member_id, event)?;
+        self.members.send_event_to_member(
+            from_member_id,
+            Event::SdpOfferApplied {
+                peer_id: from_peer_id,
+            },
+        )?;
+
+        Ok(())
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -100,6 +109,7 @@ impl CommandHandler for Room {
 
         from_peer.update_senders_statuses(senders_statuses);
 
+        let from_member_id = from_peer.member_id();
         let from_peer = from_peer.set_local_answer(sdp_answer.clone());
         let to_peer = to_peer.set_remote_answer(sdp_answer.clone());
 
@@ -114,7 +124,15 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        self.members.send_event_to_member(to_member_id, event)
+        self.members.send_event_to_member(to_member_id, event)?;
+        self.members.send_event_to_member(
+            from_member_id,
+            Event::SdpOfferApplied {
+                peer_id: from_peer_id,
+            },
+        )?;
+
+        Ok(())
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
