@@ -10,6 +10,7 @@
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
 FROM rust:${rust_ver} AS dist
+ARG debug=no
 
 RUN cargo install wasm-pack \
  && rustup target add wasm32-unknown-unknown
@@ -17,7 +18,7 @@ RUN cargo install wasm-pack \
 COPY / /src/
 
 RUN cd /src/ \
- && make cargo.build crate=medea-jason debug=no dockerized=no
+ && make cargo.build crate=medea-jason debug=${debug} dockerized=no
 
 
 
@@ -28,6 +29,9 @@ RUN cd /src/ \
 
 # https://hub.docker.com/_/nginx
 FROM nginx:stable-alpine AS runtime
+
+LABEL org.opencontainers.image.source="\
+    https://github.com/instrumentisto/medea/tree/master/jason/demo"
 
 COPY jason/demo/chart/medea-demo/conf/nginx.vh.conf \
      /etc/nginx/conf.d/default.conf

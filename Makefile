@@ -15,10 +15,11 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Project parameters #
 ######################
 
-MEDEA_IMAGE_NAME := $(strip \
-	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
-DEMO_IMAGE_NAME := instrumentisto/medea-demo
-CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
+IMAGE_REPO := instrumentisto
+IMAGE_NAME := $(strip \
+	$(if $(call eq,$(image),),medea,\
+	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
+	$(image))))
 
 RUST_VER := 1.48
 CHROME_VERSION := 87.0
@@ -46,6 +47,8 @@ endif
 ifeq ($(crate),medea-coturn-telnet-client)
 crate-dir = crates/medea-coturn-telnet-client
 endif
+crate-ver := $(strip \
+	$(shell grep -m1 'version = "' $(crate-dir)/Cargo.toml | cut -d '"' -f2))
 
 
 
@@ -59,7 +62,7 @@ endif
 # Usage:
 #	make build
 
-build: build.medea docker.build.medea build.jason
+build: build.medea build.jason
 
 
 build.medea:
@@ -246,6 +249,19 @@ endif
 endif
 
 
+# Show permalink to CHANGELOG of a concrete version of project's Cargo crate.
+#
+# Usage:
+#	make cargo.changelog.link [crate=(medea|medea-jason|<crate-name>)]
+#	                          [ver=($(crate-ver)|<version>)]
+
+cargo-changelog-link-crate = $(if $(call eq,$(crate),),medea,$(crate))
+cargo-changelog-link-ver = $(if $(call eq,$(ver),),$(crate-ver),$(ver))
+
+cargo.changelog.link:
+	@printf "https://github.com/instrumentisto/medea/blob/$(cargo-changelog-link-crate)-$(cargo-changelog-link-ver)/CHANGELOG.md#$(shell sed -n '/^## \[$(cargo-changelog-link-ver)\]/{s/^## \[\(.*\)\][^0-9]*\([0-9].*\)/\1--\2/;s/[^0-9a-z-]*//g;p;}' CHANGELOG.md)"
+
+
 # Format Rust sources with rustfmt.
 #
 # Usage:
@@ -268,13 +284,22 @@ ifeq ($(crate),medea-control-api-proto)
 endif
 
 
-# Lint Rust sources with clippy.
+# Lint Rust sources with Clippy.
 #
 # Usage:
 #	make cargo.lint
 
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings
+
+
+# Show version of project's Cargo crate.
+#
+# Usage:
+#	make cargo.version [crate=(medea|medea-jason|<crate-name>)]
+
+cargo.version:
+	@printf "$(crate-ver)"
 
 
 
@@ -392,8 +417,7 @@ endif
 # Usage:
 #	make test.e2e [( [up=no]
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
-#	                         | dockerized=yes [TAG=(dev|<docker-tag>)]
-#	                                          [registry=<registry-host>]
+#	                         | dockerized=yes [tag=(dev|<docker-tag>)]
 #	                                          [log=(no|yes)]
 #                                             [log-to-file=(no|yes)] )]
 #	                        [wait=(5|<seconds>)] )]
@@ -409,7 +433,7 @@ ifeq ($(up),yes)
 	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
-	                     TAG=$(TAG) registry=$(registry) \
+	                     tag=$(tag) \
 	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
@@ -485,81 +509,38 @@ endif
 docker-env = $(strip $(if $(call eq,$(minikube),yes),\
 	$(subst export,,$(shell minikube docker-env | cut -d '\#' -f1)),))
 
-# Authenticate to Container Registry where project Docker images are stored.
+# Build project Docker image with a given tag.
 #
 # Usage:
-#	make docker.auth [registry=<registry-host>]
-#	                 [user=<username>] [pass-stdin=(no|yes)]
+#	make docker.build [debug=(yes|no)] [no-cache=(no|yes)]
+#		[image=(medea|medea-control-api-mock|medea-demo|medea-demo-edge)]
+#		[tag=(dev|<tag>)]
+#		[minikube=(no|yes)]
 
-docker.auth:
-	docker login $(registry) \
-		$(if $(call eq,$(user),),,--username=$(user)) \
-		$(if $(call eq,$(pass-stdin),yes),--password-stdin,)
-
-
-# Build Docker image for Control API mock server.
-#
-# Usage:
-#	make docker.build.control [TAG=(dev|<tag>)] [debug=(yes|no)]
-#	                          [minikube=(no|yes)]
-
-docker.build.control:
-	$(docker-env) \
-	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
-		--build-arg rust_ver=$(RUST_VER) \
-		--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
-		--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
-		-t $(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
-		-f mock/control-api/Dockerfile .
-
-
-# Build Docker image for demo application.
-#
-# Usage:
-#	make docker.build.demo [TAG=(dev|<tag>)]
-#	                       [minikube=(no|yes)]
-
-docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
-
-docker.build.demo:
-ifeq ($(TAG),edge)
-	$(docker-env) \
-	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
-		--build-arg rust_ver=$(RUST_VER) \
-		-t $(docker-build-demo-image-name):$(TAG) \
-		-f jason/Dockerfile .
-else
-	@make yarn proj=demo
-	$(docker-env) \
-	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
-		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
-		jason/demo
+docker-build-tag = $(if $(call eq,$(tag),),dev,$(tag))
+docker-build-dir = .
+ifeq ($(image),medea-demo)
+docker-build-dir = jason/demo
+endif
+docker-build-file = $(docker-build-dir)/Dockerfile
+ifeq ($(image),medea-control-api-mock)
+docker-build-file = mock/control-api/Dockerfile
+endif
+ifeq ($(image),medea-demo-edge)
+docker-build-file = jason/Dockerfile
 endif
 
-
-# Build medea project Docker image.
-#
-# Usage:
-#	make docker.build.medea [TAG=(dev|<tag>)] [registry=<registry-host>]
-#	                        [debug=(yes|no)]
-#	                        [no-cache=(no|yes)]
-#	                        [minikube=(no|yes)]
-
-docker-build-medea-image-name = $(strip \
-	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
-
-docker.build.medea:
+docker.build:
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
-		$(if $(call eq,$(IMAGE),),\
-			--build-arg rust_ver=$(RUST_VER) \
-			--build-arg rustc_mode=$(if \
-				$(call eq,$(debug),no),release,debug) \
-			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,),) \
-		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+		--build-arg rust_ver=$(RUST_VER) \
+		--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
+		--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
+		--build-arg debug=$(if $(call eq,$(debug),no),no,yes) \
+		-t $(IMAGE_REPO)/$(IMAGE_NAME):$(docker-build-tag) \
+		-f $(docker-build-file) $(docker-build-dir)/
 
 
 # Stop dockerized Control API mock server and remove all related containers.
@@ -617,61 +598,121 @@ docker.down.webdriver:
 # Pull project Docker images from Container Registry.
 #
 # Usage:
-#	make docker.pull [IMAGE=(medea|demo)] [registry=<registry-host>]
-#	                 [TAGS=(@all|<t1>[,<t2>...])]
-#	                 [minikube=(no|yes)]
+#	make docker.pull
+#		[image=(medea|medea-control-api-mock|medea-demo)]
+#		[repos=($(IMAGE_REPO)|<prefix-1>[,<prefix-2>...])]
+#		[tags=(@all|<t1>[,<t2>...])]
+#		[minikube=(no|yes)]
 
-docker-pull-image-name = $(strip \
-	$(if $(call eq,$(registry),),,$(registry)/)$(strip \
-	$(if $(call eq,$(IMAGE),demo),$(DEMO_IMAGE_NAME),$(MEDEA_IMAGE_NAME))))
-docker-pull-tags = $(if $(call eq,$(TAGS),),@all,$(TAGS))
+docker-pull-repos = $(if $(call eq,$(repos),),$(IMAGE_REPO),$(repos))
+docker-pull-tags = $(if $(call eq,$(tags),),@all,$(tags))
 
 docker.pull:
 ifeq ($(docker-pull-tags),@all)
-	$(docker-env) \
-	docker pull $(docker-pull-image-name) --all-tags
+	$(foreach repo,$(subst $(comma), ,$(docker-pull-repos)),\
+		$(call docker.pull.do,$(repo)/$(IMAGE_NAME) --all-tags))
 else
 	$(foreach tag,$(subst $(comma), ,$(docker-pull-tags)),\
-		$(call docker.pull.do,$(tag)))
+		$(foreach repo,$(subst $(comma), ,$(docker-pull-repos)),\
+			$(call docker.pull.do,$(repo)/$(IMAGE_NAME):$(tag))))
 endif
 define docker.pull.do
-	$(eval tag := $(strip $(1)))
+	$(eval image-full := $(strip $(1)))
 	$(docker-env) \
-	docker pull $(docker-pull-image-name):$(tag)
+	docker pull $(image-full)
 endef
 
 
 # Push project Docker images to Container Registry.
 #
 # Usage:
-#	make docker.push [IMAGE=(medea|demo)] [registry=<registry-host>]
-#	                 [TAGS=(dev|<t1>[,<t2>...])]
-#	                 [minikube=(no|yes)]
+#	make docker.push
+#		[image=(medea|medea-control-api-mock|medea-demo)]
+#		[repos=($(IMAGE_REPO)|<prefix-1>[,<prefix-2>...])]
+#		[tags=(dev|<t1>[,<t2>...])]
+#		[minikube=(no|yes)]
 
-docker-push-image-name = $(strip \
-	$(if $(call eq,$(registry),),,$(registry)/)$(strip \
-	$(if $(call eq,$(IMAGE),demo),$(DEMO_IMAGE_NAME),$(MEDEA_IMAGE_NAME))))
-docker-push-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
+docker-push-repos = $(if $(call eq,$(repos),),$(IMAGE_REPO),$(repos))
+docker-push-tags = $(if $(call eq,$(tags),),dev,$(tags))
 
 docker.push:
 	$(foreach tag,$(subst $(comma), ,$(docker-push-tags)),\
-		$(call docker.push.do,$(tag)))
+		$(foreach repo,$(subst $(comma), ,$(docker-push-repos)),\
+			$(call docker.push.do,$(repo)/$(IMAGE_NAME):$(tag))))
 define docker.push.do
-	$(eval tag := $(strip $(1)))
+	$(eval image-full := $(strip $(1)))
 	$(docker-env) \
-	docker push $(docker-push-image-name):$(tag)
+	docker push $(image-full)
 endef
+
+
+# Tag project Docker image with given tags.
+#
+# Usage:
+#	make docker.tag [of=(dev|<tag>)]
+#		[image=(medea|medea-control-api-mock|medea-demo)]
+#		[repos=($(IMAGE_REPO)|<with-prefix-1>[,<with-prefix-2>...])]
+#		[tags=(dev|<with-t1>[,<with-t2>...])]
+#		[minikube=(no|yes)]
+
+docker-tag-of := $(if $(call eq,$(of),),dev,$(of))
+docker-tag-with := $(if $(call eq,$(tags),),dev,$(tags))
+docker-tag-repos = $(if $(call eq,$(repos),),$(IMAGE_REPO),$(repos))
+
+docker.tag:
+	$(foreach tag,$(subst $(comma), ,$(docker-tag-with)),\
+		$(foreach repo,$(subst $(comma), ,$(docker-tag-repos)),\
+			$(call docker.tag.do,$(repo),$(tag))))
+define docker.tag.do
+	$(eval repo := $(strip $(1)))
+	$(eval tag := $(strip $(2)))
+	$(docker-env) \
+	docker tag $(IMAGE_REPO)/$(IMAGE_NAME):$(if $(call eq,$(of),),dev,$(of)) \
+	           $(repo)/$(IMAGE_NAME):$(tag)
+endef
+
+
+# Save project Docker images to a tarball file.
+#
+# Usage:
+#	make docker.tar [to-file=(.cache/image.tar|<file-path>)]
+#		[image=(medea|medea-control-api-mock|medea-demo)]
+#		[tags=(dev|<t1>[,<t2>...])]
+#		[minikube=(no|yes)]
+
+docker-tar-file = $(if $(call eq,$(to-file),),.cache/image.tar,$(to-file))
+docker-tar-tags = $(if $(call eq,$(tags),),dev,$(tags))
+
+docker.tar:
+	@mkdir -p $(dir $(docker-tar-file))
+	$(docker-env) \
+	docker save -o $(docker-tar-file) \
+		$(foreach tag,$(subst $(comma), ,$(docker-tar-tags)),\
+			$(IMAGE_REPO)/$(IMAGE_NAME):$(tag))
+
+
+# Load project Docker images from a tarball file.
+#
+# Usage:
+#	make docker.untar [from-file=(.cache/image.tar|<file-path>)]
+#		[minikube=(no|yes)]
+
+docker-untar-file = $(if $(call eq,$(from-file),),.cache/image.tar,$(from-file))
+
+docker.untar:
+	$(docker-env) \
+	docker load -i $(docker-untar-file)
 
 
 # Run dockerized Medea Control API mock server.
 #
 # Usage:
-#   make docker.up.control [TAG=(dev|<docker-tag>)]
+#   make docker.up.control [tag=(dev|<docker-tag>)]
 
 docker.up.control:
 	docker run --rm -d --network=host \
 		--name medea-control-api-mock \
-		$(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG))
+		$(IMAGE_REPO)/medea-control-api-mock:$(if $(call eq,$(tag),),dev,$(tag))
 
 
 # Run Coturn STUN/TURN server in Docker Compose environment.
@@ -698,19 +739,17 @@ docker.up.demo: docker.down.demo
 # Usage:
 #	make docker.up.medea [( [dockerized=no] [debug=(yes|no)]
 #	                                        [background=(no|yes)]
-#	                      | dockerized=yes [TAG=(dev|<docker-tag>)]
-#	                                       [registry=<registry-host>]]
+#	                      | dockerized=yes [tag=(dev|<docker-tag>)]
 #	                                       [( [background=no]
 #	                                        | background=yes [log=(no|yes)] )])]
 #	                     [log-to-file=(no|yes)]
 
-docker-up-medea-image-name = $(strip \
-	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
-docker-up-medea-tag = $(if $(call eq,$(TAG),),dev,$(TAG))
+docker-up-medea-image = $(IMAGE_REPO)/medea
+docker-up-medea-tag = $(if $(call eq,$(tag),),dev,$(tag))
 
 docker.up.medea: docker.down.medea
 ifeq ($(dockerized),yes)
-	COMPOSE_IMAGE_NAME=$(docker-up-medea-image-name) \
+	COMPOSE_IMAGE_NAME=$(docker-up-medea-image) \
 	COMPOSE_IMAGE_VER=$(docker-up-medea-tag) \
 	docker-compose -f docker-compose.medea.yml up \
 		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
@@ -774,6 +813,15 @@ helm-release-namespace = $(strip \
 
 helm:
 	helm $(helm-cluster-args) $(if $(call eq,$(cmd),),--help,$(cmd))
+
+
+# Show root directory path of project Helm chart.
+#
+# Usage:
+#	make helm.dir [chart=medea-demo]
+
+helm.dir:
+	@printf "$(helm-chart-dir)"
 
 
 # Remove Helm release of project Helm chart from Kubernetes cluster.
@@ -870,9 +918,12 @@ endif
 ifeq ($(helm-cluster),minikube)
 ifeq ($(helm-chart),medea-demo)
 ifeq ($(rebuild),yes)
-	@make docker.build.demo minikube=yes TAG=dev
-	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
-	@make docker.build.control minikube=yes TAG=dev
+	@make docker.build image=medea-demo-edge tag=dev \
+	                   minikube=yes no-cache=$(no-cache)
+	@make docker.build image=medea tag=dev \
+	                   minikube=yes no-cache=$(no-cache)
+	@make docker.build image=medea-control-api-mock tag=dev \
+	                   minikube=yes no-cache=$(no-cache)
 endif
 endif
 endif
@@ -933,17 +984,18 @@ endef
 ##################
 
 .PHONY: build build.jason build.medea \
-        cargo cargo.build cargo.fmt cargo.gen cargo.lint \
-        docker.auth  docker.build.control docker.build.demo docker.build.medea \
+        cargo cargo.build cargo.changelog.link cargo.fmt cargo.gen cargo.lint \
+        	cargo.version \
+        docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
         	docker.down.medea docker.down.webdriver  \
-        	docker.pull docker.push \
+        	docker.pull docker.push docker.tag docker.tar docker.untar \
         	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
         	docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
-        helm helm.down helm.lint helm.list helm.package helm.package.release \
-        	helm.up \
+        helm helm.dir helm.down helm.lint helm.list \
+        	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
