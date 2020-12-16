@@ -4,7 +4,8 @@ use std::{cell::Cell, rc::Rc};
 
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
-    MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
+    state as proto_state, MediaSourceKind, MediaType, MemberId, TrackId,
+    TrackPatchEvent,
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell};
@@ -32,6 +33,20 @@ pub struct SenderState {
     enabled_general: ProgressableCell<bool>,
     muted: ProgressableCell<bool>,
     need_local_stream_update: Cell<bool>,
+}
+
+impl From<&SenderState> for proto_state::SenderState {
+    fn from(state: &SenderState) -> Self {
+        Self {
+            id: state.id,
+            mid: state.mid.clone(),
+            media_type: state.media_type.clone(),
+            receivers: state.receivers.clone(),
+            enabled_individual: state.enabled_individual.get(),
+            enabled_general: state.enabled_general.get(),
+            muted: state.muted.get(),
+        }
+    }
 }
 
 impl SenderState {

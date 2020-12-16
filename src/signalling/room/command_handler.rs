@@ -3,11 +3,11 @@
 
 use std::collections::HashMap;
 
+use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     CommandHandler, Credential, Event, IceCandidate, MemberId, NegotiationRole,
     PeerId, PeerMetrics, TrackId, TrackPatchCommand,
 };
-use medea_client_api_proto as proto;
 
 use crate::{
     log::prelude::*,

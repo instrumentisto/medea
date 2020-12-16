@@ -1,10 +1,11 @@
 //! Implementation of the [`PeerComponent`].
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
-    Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
+    state as proto_state, Command, IceCandidate, IceServer, NegotiationRole,
+    PeerId, TrackId,
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{
@@ -38,6 +39,44 @@ pub struct PeerState {
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
+}
+
+impl From<&PeerState> for proto_state::PeerState {
+    fn from(from: &PeerState) -> Self {
+        let mut senders = HashMap::new();
+        let mut receivers = HashMap::new();
+
+        for sender in from.senders.borrow().values() {
+            senders.insert(
+                sender.id(),
+                proto_state::SenderState::from(sender.as_ref()),
+            );
+        }
+        for receiver in from.receivers.borrow().values() {
+            receivers.insert(
+                receiver.id(),
+                proto_state::ReceiverState::from(receiver.as_ref()),
+            );
+        }
+
+        Self {
+            id: from.id,
+            senders,
+            receivers,
+            ice_servers: from.ice_servers.clone(),
+            force_relay: from.force_relay,
+            negotiation_role: from.negotiation_role.get(),
+            sdp_offer: from.sdp_offer.current(),
+            remote_sdp_offer: from.remote_sdp_offer.get(),
+            restart_ice: from.restart_ice.get(),
+            ice_candidates: from
+                .ice_candidates
+                .borrow()
+                .iter()
+                .cloned()
+                .collect(),
+        }
+    }
 }
 
 impl PeerState {

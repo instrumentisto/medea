@@ -12,10 +12,10 @@ use derive_more::Display;
 use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
-    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
-    TrackId, TrackUpdate,
+    state as proto_state, Command, ConnectionQualityScore, Direction,
+    Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
+    IceServer, MediaSourceKind, MemberId, NegotiationRole, PeerConnectionState,
+    PeerId, PeerMetrics, Track, TrackId, TrackUpdate,
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{collections::ProgressableHashMap, ObservableHashMap};
@@ -68,6 +68,17 @@ impl PeerRepositoryState {
     #[inline]
     pub fn new() -> Self {
         Self(RefCell::new(ObservableHashMap::new()))
+    }
+}
+
+impl From<&PeerRepositoryState> for proto_state::State {
+    fn from(from: &PeerRepositoryState) -> Self {
+        let mut peers = HashMap::new();
+        for (peer_id, peer) in from.0.borrow().iter() {
+            peers.insert(*peer_id, proto_state::PeerState::from(peer.as_ref()));
+        }
+
+        Self { peers }
     }
 }
 
@@ -1362,6 +1373,13 @@ impl EventHandler for InnerRoom {
         _: medea_client_api_proto::CloseReason,
     ) -> Self::Output {
         unreachable!("Room can't receive Event::RoomLeft")
+    }
+
+    async fn on_state_synchronized(
+        &self,
+        _: medea_client_api_proto::state::State,
+    ) -> Self::Output {
+        todo!()
     }
 }
 

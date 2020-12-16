@@ -59,10 +59,8 @@ impl Room {
             PeerBelongsToAnotherMember, PeerNotFound,
         };
         match &command.command {
-            C::SynchronizeMe { state: _ } => {
-                return Ok(())
-            }
-            _ => ()
+            C::SynchronizeMe { state: _ } => return Ok(()),
+            _ => (),
         }
 
         let peer_id = match command.command {
@@ -71,7 +69,9 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
-            C::LeaveRoom { .. } | C::JoinRoom { .. } | C::SynchronizeMe { .. } => unreachable!(
+            C::LeaveRoom { .. }
+            | C::JoinRoom { .. }
+            | C::SynchronizeMe { .. } => unreachable!(
                 "Room can't receive this Command: {:?}",
                 command.command
             ),

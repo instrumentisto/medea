@@ -25,8 +25,8 @@
 
 #![deny(broken_intra_doc_links)]
 
-pub mod stats;
 pub mod state;
+pub mod stats;
 
 use std::collections::HashMap;
 
@@ -239,7 +239,7 @@ pub enum Command {
 
     SynchronizeMe {
         state: State,
-    }
+    },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -428,10 +428,15 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
 
     /// Media Server notifies Web Client that his SDP offer was applied.
-    SdpOfferApplied { peer_id: PeerId },
+    SdpOfferApplied {
+        peer_id: PeerId,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -442,7 +447,9 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<PeerId> },
+    PeersRemoved {
+        peer_ids: Vec<PeerId>,
+    },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// `Peer`.
@@ -471,7 +478,7 @@ pub enum Event {
 
     StateSynchronized {
         state: State,
-    }
+    },
 }
 
 /// `Peer`'s negotiation role.
