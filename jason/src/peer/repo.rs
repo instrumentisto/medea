@@ -40,6 +40,12 @@ pub trait PeerRepository {
 
     /// Returns all [`PeerConnection`]s stored in repository.
     fn get_all(&self) -> Vec<Rc<PeerConnection>>;
+
+    /// Stops all timeouts in the all [`PeerComponent`]s.
+    fn stop_timeouts(&self);
+
+    /// Resumes all timeouts in the all [`PeerComponent`]s.
+    fn resume_timeouts(&self);
 }
 
 /// [`PeerConnection`] factory and repository.
@@ -152,5 +158,23 @@ impl PeerRepository for Repository {
     #[inline]
     fn get_all(&self) -> Vec<Rc<PeerConnection>> {
         self.peers.borrow().values().map(Component::ctx).collect()
+    }
+
+    /// Stops all timeouts in the all [`PeerComponent`]s.
+    #[inline]
+    fn stop_timeouts(&self) {
+        for peer in self.peers.borrow().values() {
+            peer.stop_state_transitions_timers();
+            peer.state().stop_timeouts();
+        }
+    }
+
+    /// Resumes all timeouts in the all [`PeerComponent`]s.
+    #[inline]
+    fn resume_timeouts(&self) {
+        for peer in self.peers.borrow().values() {
+            peer.reset_state_transitions_timers();
+            peer.state().resume_timeouts();
+        }
     }
 }

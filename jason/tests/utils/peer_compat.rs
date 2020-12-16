@@ -108,7 +108,7 @@ impl PeerConnectionCompat {
             Command::MakeSdpOffer { .. }
         ) {}
 
-        Ok(self.component.state().sdp_offer().unwrap())
+        Ok(self.component.state().current_sdp_offer().unwrap())
     }
 
     /// Creates provided [`proto::Track`]s.
@@ -165,7 +165,7 @@ impl PeerConnectionCompat {
             Command::MakeSdpAnswer { .. }
         ) {}
 
-        Ok(self.component.state().sdp_offer().unwrap())
+        Ok(self.component.state().current_sdp_offer().unwrap())
     }
 
     /// Applies provided [`TrackPatchEvent`] to the

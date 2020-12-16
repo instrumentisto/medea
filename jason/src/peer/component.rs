@@ -129,9 +129,32 @@ impl PeerState {
         self.ice_candidates.borrow_mut().push(ice_candidate);
     }
 
+    /// Returns current SDP offer of this [`PeerState`].
+    #[inline]
+    pub fn current_sdp_offer(&self) -> Option<String> {
+        self.sdp_offer.current()
+    }
+
+    /// Marks current [`LocalSdp`] as approved by server.
     #[inline]
     pub fn sdp_offer_applied(&self) {
         self.sdp_offer.approve();
+    }
+
+    /// Stops all timeouts of the [`PeerState`].
+    ///
+    /// Stops [`LocalSdp`] rollback timeout.
+    #[inline]
+    pub fn stop_timeouts(&self) {
+        self.sdp_offer.stop_timeout();
+    }
+
+    /// Resumes all timeouts of the [`PeerState`].
+    ///
+    /// Resumes [`LocalSdp`] rollback timeout.
+    #[inline]
+    pub fn resume_timeouts(&self) {
+        self.sdp_offer.resume_timeout();
     }
 
     /// Returns [`Future`] which will be resolved when all [`SenderState`]s
@@ -401,14 +424,18 @@ impl PeerComponent {
         Ok(())
     }
 
-    /// Watcher for the [`PeerState::sdp_offer`] update.
+    /// Watcher for the [`PeerState::sdp_offer`] updates.
     ///
-    /// Sends [`Command::MakeSdpOffer`] if new SDP offer is `Some` and current
+    /// Sets [`PeerConnection`]'s SDP offer to the provided one and sends
+    /// [`Command::MakeSdpOffer`] if [`Sdp`] is [`Sdp::Offer`] and
     /// [`NegotiationRole`] is [`NegotiationRole::Offerer`].
     ///
-    /// Sends [`Command::MakeSdpAnswer`] and resets [`NegotiationRole`] to
-    /// `None` if new SDP offer is `Some` and current [`NegotiationRole`] is
-    /// [`NegotiationRole::Answerer`].
+    /// Sets [`PeerConnection`]'s SDP answer to the provided one and sends
+    /// [`Command::MakeSdpAnswer`] if [`Sdp`] is [`Sdp::Offer`] and
+    /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
+    ///
+    /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
+    /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
     #[watch(self.state().sdp_offer.on_new_local_sdp())]
     async fn sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
@@ -419,6 +446,10 @@ impl PeerComponent {
         if let Some(role) = state.negotiation_role.get() {
             match (sdp_offer, role) {
                 (Sdp::Offer(offer), NegotiationRole::Offerer) => {
+                    ctx.peer
+                        .set_offer(&offer)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
                     let mids = ctx
                         .get_mids()
                         .map_err(tracerr::map_from_and_wrap!())?;
@@ -430,6 +461,10 @@ impl PeerComponent {
                     });
                 }
                 (Sdp::Offer(offer), NegotiationRole::Answerer(_)) => {
+                    ctx.peer
+                        .set_answer(&offer)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
                     global_ctx.rpc.send_command(Command::MakeSdpAnswer {
                         peer_id: ctx.id(),
                         sdp_answer: offer,
@@ -440,7 +475,7 @@ impl PeerComponent {
                 }
                 (Sdp::Rollback, _) => {
                     ctx.peer
-                        .rollback_offer()
+                        .rollback()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                 }
@@ -481,7 +516,7 @@ impl PeerComponent {
                     ctx.media_connections.sync_receivers();
                     let sdp_offer = ctx
                         .peer
-                        .create_and_set_offer()
+                        .create_offer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     state.sdp_offer.update_offer(sdp_offer);
@@ -505,7 +540,7 @@ impl PeerComponent {
 
                     let sdp_answer = ctx
                         .peer
-                        .create_and_set_answer()
+                        .create_answer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     state.sdp_offer.update_offer(sdp_answer);

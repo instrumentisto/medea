@@ -148,7 +148,7 @@ pub struct RtcPeerConnection {
     peer: Rc<SysRtcPeerConnection>,
 
     /// Flag which indicates that ICE restart will be performed on next
-    /// [`RtcPeerConnection::create_and_set_offer`] call.
+    /// [`RtcPeerConnection::create_offer`] call.
     ice_restart: Cell<bool>,
 
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
@@ -479,15 +479,70 @@ impl RtcPeerConnection {
     /// Marks [`RtcPeerConnection`] to trigger ICE restart.
     ///
     /// After this function returns, the offer returned by the next call to
-    /// [`RtcPeerConnection::create_and_set_offer`] is automatically configured
+    /// [`RtcPeerConnection::create_offer`] is automatically configured
     /// to trigger ICE restart.
     pub fn restart_ice(&self) {
         self.ice_restart.set(true);
     }
 
+    /// Sets local description to the provided one with a provided
+    /// [`RtcSdpType`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    async fn set_local_description(
+        &self,
+        sdp_type: RtcSdpType,
+        offer: &str,
+    ) -> Result<()> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
+
+        let mut desc = RtcSessionDescriptionInit::new(sdp_type);
+        desc.sdp(offer);
+
+        JsFuture::from(peer.set_local_description(&desc))
+            .await
+            .map_err(Into::into)
+            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+            .map_err(tracerr::wrap!())?;
+
+        Ok(())
+    }
+
+    /// Sets provided [SDP offer][`SdpType::Offer`] as local description.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    pub async fn set_offer(&self, offer: &str) -> Result<()> {
+        self.set_local_description(RtcSdpType::Offer, offer)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
+    /// Sets provided [SDP answer][`SdpType::Answer`] as local description.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    pub async fn set_answer(&self, answer: &str) -> Result<()> {
+        self.set_local_description(RtcSdpType::Answer, answer)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
-    /// description.
+    /// [RTCPeerConnection][`SysRtcPeerConnection`].
     ///
     /// Should be called whenever remote description has been changed.
     ///
@@ -496,14 +551,8 @@ impl RtcPeerConnection {
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
     /// [RtcPeerConnection.createAnswer()][1] fails.
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_and_set_answer(&self) -> Result<String> {
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
-
+    pub async fn create_answer(&self) -> Result<String> {
         let answer = JsFuture::from(self.peer.create_answer())
             .await
             .map_err(Into::into)
@@ -511,19 +560,19 @@ impl RtcPeerConnection {
             .map_err(tracerr::wrap!())?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
-        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-        desc.sdp(&answer);
-
-        JsFuture::from(peer.set_local_description(&desc))
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
-            .map_err(tracerr::wrap!())?;
-
         Ok(answer)
     }
 
-    pub async fn rollback_offer(&self) -> Result<()> {
+    /// Rollbacks underlying [RTCPeerConnection][`SysRtcPeerConnection`] to the
+    /// previous stable state.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    pub async fn rollback(&self) -> Result<()> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
         JsFuture::from(peer.set_local_description(
@@ -538,8 +587,7 @@ impl RtcPeerConnection {
     }
 
     /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
-    /// description.
+    /// [RTCPeerConnection][`SysRtcPeerConnection`].
     ///
     /// Should be called after local tracks changes, which require
     /// (re)negotiation.
@@ -549,12 +597,8 @@ impl RtcPeerConnection {
     /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
     /// [RtcPeerConnection.createOffer()][1] fails.
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_and_set_offer(&self) -> Result<String> {
+    pub async fn create_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
         let mut offer_options = RtcOfferOptions::new();
@@ -569,15 +613,6 @@ impl RtcPeerConnection {
         .map_err(RTCPeerConnectionError::CreateOfferFailed)
         .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
-
-        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-        desc.sdp(&offer);
-
-        JsFuture::from(peer.set_local_description(&desc))
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
-            .map_err(tracerr::wrap!())?;
 
         Ok(offer)
     }

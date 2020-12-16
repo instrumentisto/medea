@@ -1111,9 +1111,7 @@ impl InnerRoom {
     /// Stops state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_lost(&self) {
-        for peer in self.peers.repo.get_all() {
-            peer.stop_state_transitions_timers();
-        }
+        self.peers.repo.stop_timeouts();
         self.on_connection_loss
             .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
@@ -1121,9 +1119,7 @@ impl InnerRoom {
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
-        for peer in self.peers.repo.get_all() {
-            peer.reset_state_transitions_timers();
-        }
+        self.peers.repo.resume_timeouts();
     }
 }
 
