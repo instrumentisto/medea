@@ -92,11 +92,11 @@ RUN cp /app/target/${rustc_mode}/medea-control-api-mock \
 # https://hub.docker.com/_/scratch
 FROM scratch AS runtime
 
-LABEL org.opencontainers.image.source="\
-    https://github.com/instrumentisto/medea/tree/master/mock/control-api"
-
 COPY --from=dist /out/ /
 
 USER nobody:nobody
+
+LABEL org.opencontainers.image.source="\
+    https://github.com/instrumentisto/medea/tree/master/mock/control-api"
 
 ENTRYPOINT ["/medea-control-api-mock"]
