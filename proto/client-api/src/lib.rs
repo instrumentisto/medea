@@ -26,6 +26,7 @@
 #![deny(broken_intra_doc_links)]
 
 pub mod stats;
+pub mod state;
 
 use std::collections::HashMap;
 
@@ -34,6 +35,7 @@ use medea_macro::dispatchable;
 use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
+use crate::state::State;
 
 /// ID of `Room`.
 #[derive(
@@ -234,6 +236,10 @@ pub enum Command {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatchCommand>,
     },
+
+    SynchronizeMe {
+        state: State,
+    }
 }
 
 /// Web Client's Peer Connection metrics.
@@ -462,6 +468,10 @@ pub enum Event {
         /// Estimated connection quality.
         quality_score: ConnectionQualityScore,
     },
+
+    StateSynchronized {
+        state: State,
+    }
 }
 
 /// `Peer`'s negotiation role.

@@ -58,6 +58,12 @@ impl Room {
         use CommandValidationError::{
             PeerBelongsToAnotherMember, PeerNotFound,
         };
+        match &command.command {
+            C::SynchronizeMe { state: _ } => {
+                return Ok(())
+            }
+            _ => ()
+        }
 
         let peer_id = match command.command {
             C::MakeSdpOffer { peer_id, .. }
@@ -65,7 +71,7 @@ impl Room {
             | C::SetIceCandidate { peer_id, .. }
             | C::AddPeerConnectionMetrics { peer_id, .. }
             | C::UpdateTracks { peer_id, .. } => peer_id,
-            C::LeaveRoom { .. } | C::JoinRoom { .. } => unreachable!(
+            C::LeaveRoom { .. } | C::JoinRoom { .. } | C::SynchronizeMe { .. } => unreachable!(
                 "Room can't receive this Command: {:?}",
                 command.command
             ),

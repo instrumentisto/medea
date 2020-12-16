@@ -7,6 +7,7 @@ use medea_client_api_proto::{
     CommandHandler, Credential, Event, IceCandidate, MemberId, NegotiationRole,
     PeerId, PeerMetrics, TrackId, TrackPatchCommand,
 };
+use medea_client_api_proto as proto;
 
 use crate::{
     log::prelude::*,
@@ -220,5 +221,12 @@ impl CommandHandler for Room {
         })?;
 
         Ok(())
+    }
+
+    fn on_synchronize_me(
+        &mut self,
+        state: proto::state::State,
+    ) -> Self::Output {
+        todo!()
     }
 }
