@@ -49,7 +49,7 @@ impl Room {
         self.peers.add_peer(peer);
         self.peers.add_peer(partner_peer);
 
-        self.members.send_event_to_member(member_id, peer_created)
+        self.send_event(member_id, peer_created)
     }
 }
 
@@ -112,7 +112,7 @@ impl PeersMetricsEventHandler for Room {
         partner_member_id: MemberId,
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
-        self.members.send_event_to_member(
+        self.send_event(
             member_id,
             Event::ConnectionQualityUpdated {
                 partner_member_id,
@@ -219,7 +219,7 @@ impl Handler<ForceUpdate> for Room {
         let member_id = self
             .peers
             .map_peer_by_id(msg.0, PeerStateMachine::member_id)?;
-        self.members.send_event_to_member(
+        self.send_event(
             member_id,
             Event::TracksApplied {
                 peer_id: msg.0,

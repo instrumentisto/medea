@@ -80,8 +80,8 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        self.members.send_event_to_member(to_member_id, event)?;
-        self.members.send_event_to_member(
+        self.send_event(to_member_id, event)?;
+        self.send_event(
             from_member_id,
             Event::SdpOfferApplied {
                 peer_id: from_peer_id,
@@ -125,8 +125,8 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        self.members.send_event_to_member(to_member_id, event)?;
-        self.members.send_event_to_member(
+        self.send_event(to_member_id, event)?;
+        self.send_event(
             from_member_id,
             Event::SdpOfferApplied {
                 peer_id: from_peer_id,
@@ -162,7 +162,7 @@ impl CommandHandler for Room {
             candidate,
         };
 
-        self.members.send_event_to_member(to_member_id, event)
+        self.send_event(to_member_id, event)
     }
 
     /// Adds new [`Peer`] connection metrics.

@@ -197,13 +197,26 @@ impl Room {
         &self.id
     }
 
+    // TODO (evdokimovs): This function needed only for tests.
+    //                    Rollback it.
+    pub fn send_event(
+        &mut self,
+        member_id: MemberId,
+        _: Event,
+    ) -> Result<(), RoomError> {
+        let state = self.get_state();
+        self.members.send_event_to_member(member_id, Event::StateSynchronized {
+            state,
+        })
+    }
+
     /// Sends [`Event::PeersRemoved`] to [`Member`].
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
         removed_peers_ids: Vec<PeerId>,
     ) -> Result<(), RoomError> {
-        self.members.send_event_to_member(
+        self.send_event(
             member_id,
             Event::PeersRemoved {
                 peer_ids: removed_peers_ids,
@@ -383,7 +396,7 @@ impl Room {
         self.peers.add_peer(peer);
         self.peers.add_peer(partner_peer);
 
-        self.members.send_event_to_member(
+        self.send_event(
             member_id,
             Event::TracksApplied {
                 updates,
