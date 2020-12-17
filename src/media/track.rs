@@ -72,6 +72,16 @@ impl MediaTrack {
     pub fn set_send_media_exchange_state(&self, is_enabled: bool) {
         self.media_exchange_state.borrow_mut().set_send(is_enabled);
     }
+
+    #[inline]
+    pub fn set_send_muted(&self, is_muted: bool) {
+        self.media_exchange_state.borrow_mut().set_send_muted(is_muted);
+    }
+
+    #[inline]
+    pub fn set_recv_muted(&self, is_muted: bool) {
+        self.media_exchange_state.borrow_mut().set_recv_muted(is_muted);
+    }
 }
 
 /// Media exchange state of the [`MediaTrack`].
@@ -88,6 +98,10 @@ struct MediaExchangeState {
     ///
     /// If `true` then receiver is enabled.
     recv_enabled: bool,
+
+    send_muted: bool,
+
+    recv_muted: bool,
 }
 
 impl Default for MediaExchangeState {
@@ -96,6 +110,8 @@ impl Default for MediaExchangeState {
         Self {
             send_enabled: true,
             recv_enabled: true,
+            send_muted: false,
+            recv_muted: false,
         }
     }
 }
@@ -114,6 +130,22 @@ impl MediaExchangeState {
     #[must_use]
     pub fn is_enabled(self) -> bool {
         self.send_enabled && self.recv_enabled
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn is_muted(self) -> bool {
+        self.send_muted && self.recv_muted
+    }
+
+    #[inline]
+    pub fn set_recv_muted(&mut self, is_muted: bool) {
+        self.recv_muted = is_muted;
+    }
+
+    #[inline]
+    pub fn set_send_muted(&mut self, is_muted: bool) {
+        self.send_muted = is_muted;
     }
 
     /// Sets media exchange state for the `Recv` side of [`MediaTrack`].

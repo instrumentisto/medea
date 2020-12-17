@@ -451,14 +451,29 @@ impl<T> TrackChangeHandler for Peer<T> {
 
     /// Applies provided [`TrackPatchEvent`] to [`Peer`]s [`Track`].
     fn on_track_patch(&mut self, mut patch: TrackPatchEvent) -> Self::Output {
+        // TODO: check for bugs
+        let (track, is_tx) = if let Some(tx) = self.senders().get(&patch.id) {
+            (tx, true)
+        } else if let Some(rx) = self.receivers().get(&patch.id) {
+            (rx, false)
+        } else {
+            return TrackChange::TrackPatch(patch);
+        };
+
         if let Some(enabled) = patch.enabled_individual {
-            if let Some(tx) = self.senders().get(&patch.id) {
-                tx.set_send_media_exchange_state(enabled);
-                patch.enabled_general = Some(tx.is_media_exchange_enabled());
-            } else if let Some(rx) = self.receivers().get(&patch.id) {
-                rx.set_recv_media_exchange_state(enabled);
-                patch.enabled_general = Some(rx.is_media_exchange_enabled());
-            };
+            if is_tx {
+                track.set_send_media_exchange_state(enabled);
+            } else {
+                track.set_recv_media_exchange_state(enabled);
+            }
+            patch.enabled_general = Some(track.is_media_exchange_enabled());
+        }
+        if let Some(muted) = patch.muted {
+            if is_tx {
+                track.set_send_muted(muted);
+            } else {
+                track.set_recv_muted(muted);
+            }
         }
 
         TrackChange::TrackPatch(patch)
