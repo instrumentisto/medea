@@ -20,7 +20,7 @@ const APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Clone, Debug)]
 pub enum Sdp {
     /// SDP offer should be rollbacked.
-    Rollback,
+    Rollback(bool),
 
     /// New SDP offer should be set.
     Offer(String),
@@ -80,11 +80,11 @@ impl Inner {
     }
 
     /// Rollbacks [`LocalSdp`] to the previous one.
-    fn rollback(&mut self) {
+    fn rollback(&mut self, is_restart: bool) {
         self.current_offer = self.prev_offer.take();
         self.approved.set(true);
 
-        self.send_sdp(&Sdp::Rollback);
+        self.send_sdp(&Sdp::Rollback(is_restart));
     }
 
     /// Sets [`Inner::approved`] flag to the `true`.
@@ -134,12 +134,23 @@ impl LocalSdp {
     }
 
     /// Rollbacks [`LocalSdp`] to the previous one.
-    pub fn rollback(&self) {
-        self.0.borrow_mut().rollback()
+    pub fn rollback(&self, is_restart: bool) {
+        self.0.borrow_mut().rollback(is_restart)
+    }
+
+    pub fn update_offer_by_server(&self, new_offer: Option<String>) {
+        if self.0.borrow().prev_offer == new_offer {
+            self.rollback(true);
+        }
+        if self.0.borrow().current_offer == new_offer {
+            self.approve();
+        }
+
+        // TODO (evdokimovs): everything else is unreachable. But what we will do with it?
     }
 
     /// Updates current SDP offer to the provided one.
-    pub fn update_offer(&self, new_offer: String) {
+    pub fn update_offer_by_client(&self, new_offer: String) {
         let (timeout, timeout_handle) = resettable_delay_for(APPROVE_TIMEOUT);
         self.0.borrow_mut().approved.set(false);
         self.0.borrow_mut().timeout_handle.replace(timeout_handle);
@@ -150,7 +161,7 @@ impl LocalSdp {
                 match future::select(approved, Box::pin(timeout)).await {
                     Either::Left(_) => (),
                     Either::Right(_) => {
-                        this.rollback();
+                        this.rollback(false);
                     }
                 }
             }

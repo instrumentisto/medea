@@ -393,6 +393,8 @@ impl PeerComponent {
         state: Rc<PeerState>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
+        // TODO (evdokimovs): For more correctness we should wait for all updates here.
+        //                    But this kind of situation is unreachable atm.
         match negotiation_state {
             NegotiationState::Stable => {
                 state.negotiation_role.set(None);
@@ -406,7 +408,7 @@ impl PeerComponent {
                                 .create_offer()
                                 .await
                                 .map_err(tracerr::map_from_and_wrap!())?;
-                            state.sdp_offer.update_offer(sdp_offer);
+                            state.sdp_offer.update_offer_by_client(sdp_offer);
                         }
                         NegotiationRole::Answerer(_) => {
                             let sdp_answer = ctx
@@ -414,7 +416,7 @@ impl PeerComponent {
                                 .create_answer()
                                 .await
                                 .map_err(tracerr::map_from_and_wrap!())?;
-                            state.sdp_offer.update_offer(sdp_answer);
+                            state.sdp_offer.update_offer_by_client(sdp_answer);
                         }
                     }
                 }
@@ -589,11 +591,16 @@ impl PeerComponent {
                         .negotiation_state
                         .set(NegotiationState::WaitLocalSdpApprove);
                 }
-                (Sdp::Rollback, _) => {
+                (Sdp::Rollback(is_restart), _) => {
                     ctx.peer
                         .rollback()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                    if is_restart {
+                        state.negotiation_state.set(NegotiationState::WaitLocalSdp);
+                    } else {
+                        state.negotiation_state.set(NegotiationState::Stable);
+                    }
                 }
             }
         }
