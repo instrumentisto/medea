@@ -69,6 +69,18 @@ impl PeerRepositoryState {
     pub fn new() -> Self {
         Self(RefCell::new(ObservableHashMap::new()))
     }
+
+    pub fn apply(&self, state: proto_state::State) {
+        for (id, peer_state) in state.peers {
+            if let Some(peer) = self.0.borrow().get(&id) {
+                peer.apply(peer_state);
+            } else {
+                self.0
+                    .borrow_mut()
+                    .insert(id, Rc::new(PeerState::from(peer_state)));
+            }
+        }
+    }
 }
 
 impl From<&PeerRepositoryState> for proto_state::State {
@@ -1375,11 +1387,14 @@ impl EventHandler for InnerRoom {
         unreachable!("Room can't receive Event::RoomLeft")
     }
 
+    #[inline]
     async fn on_state_synchronized(
         &self,
-        _: medea_client_api_proto::state::State,
+        state: medea_client_api_proto::state::State,
     ) -> Self::Output {
-        todo!()
+        self.peers.state().apply(state);
+
+        Ok(())
     }
 }
 

@@ -49,6 +49,21 @@ impl From<&SenderState> for proto_state::SenderState {
     }
 }
 
+impl From<proto_state::SenderState> for SenderState {
+    fn from(from: proto_state::SenderState) -> Self {
+        Self {
+            id: from.id,
+            mid: from.mid,
+            media_type: from.media_type,
+            receivers: from.receivers,
+            enabled_individual: ProgressableCell::new(from.enabled_individual),
+            enabled_general: ProgressableCell::new(from.enabled_general),
+            muted: ProgressableCell::new(from.muted),
+            need_local_stream_update: Cell::new(false),
+        }
+    }
+}
+
 impl SenderState {
     /// Creates new [`SenderState`] with a provided data.
     /// # Errors
@@ -81,6 +96,12 @@ impl SenderState {
             muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
         })
+    }
+
+    pub fn apply(&self, state: proto_state::SenderState) {
+        self.muted.set(state.muted);
+        self.enabled_general.set(state.enabled_general);
+        self.enabled_individual.set(state.enabled_individual);
     }
 
     /// Returns [`TrackId`] of this [`SenderState`].

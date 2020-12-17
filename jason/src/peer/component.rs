@@ -73,11 +73,36 @@ impl From<&PeerState> for proto_state::PeerState {
             senders,
             receivers,
             force_relay: from.force_relay,
+            ice_servers: from.ice_servers.clone(),
             negotiation_role: from.negotiation_role.get(),
             sdp_offer: from.sdp_offer.current(),
             remote_sdp_offer: from.remote_sdp_offer.get(),
             restart_ice: from.restart_ice.get(),
         }
+    }
+}
+
+impl From<proto_state::PeerState> for PeerState {
+    fn from(from: proto_state::PeerState) -> Self {
+        // TODO (evdokimovs): Use ProgressableHashMap directly
+        let senders: HashMap<_, _> = from
+            .senders
+            .into_iter()
+            .map(|(id, sender)| (id, Rc::new(SenderState::from(sender))))
+            .collect();
+        let receivers: HashMap<_, _> = from
+            .receivers
+            .into_iter()
+            .map(|(id, receiver)| (id, Rc::new(ReceiverState::from(receiver))))
+            .collect();
+        Self::new(
+            from.id,
+            senders.into(),
+            receivers.into(),
+            from.ice_servers,
+            from.force_relay,
+            from.negotiation_role,
+        )
     }
 }
 
@@ -104,6 +129,31 @@ impl PeerState {
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
+        }
+    }
+
+    pub fn apply(&self, state: proto_state::PeerState) {
+        self.negotiation_role.set(state.negotiation_role);
+        self.sdp_offer.update_offer_by_server(state.sdp_offer);
+        self.remote_sdp_offer.set(state.remote_sdp_offer);
+
+        for (id, sender_state) in state.senders {
+            if let Some(sender) = self.senders.borrow().get(&id) {
+                sender.apply(sender_state);
+            } else {
+                self.senders
+                    .borrow_mut()
+                    .insert(id, Rc::new(SenderState::from(sender_state)));
+            }
+        }
+        for (id, receiver_state) in state.receivers {
+            if let Some(receiver) = self.receivers.borrow().get(&id) {
+                receiver.apply(receiver_state)
+            } else {
+                self.receivers
+                    .borrow_mut()
+                    .insert(id, Rc::new(ReceiverState::from(receiver_state)));
+            }
         }
     }
 

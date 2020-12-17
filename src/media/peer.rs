@@ -273,11 +273,14 @@ impl PeerStateMachine {
     // TODO (evdokimovs): restart_ice flag doesn't implemented
     //                    Implement it somehow.
     pub fn get_state(&self) -> medea_client_api_proto::state::PeerState {
+        // TODO (evdokimovs): Meh, ice_servers_list can be None, DO SOMETHING
+        //                    WITH IT.
         medea_client_api_proto::state::PeerState {
             id: self.id(),
             senders: self.get_senders_states(),
             receivers: self.get_receivers_states(),
             force_relay: self.is_force_relayed(),
+            ice_servers: self.ice_servers_list().unwrap(),
             negotiation_role: self.negotiation_role(),
             sdp_offer: self.sdp_offer().clone(),
             remote_sdp_offer: self.partner_sdp_offer().clone(),

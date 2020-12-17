@@ -7,7 +7,7 @@ use medea_client_api_proto::{
     state as proto_state, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ProgressableCell};
+use medea_reactive::{Guarded, ObservableCell, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
@@ -46,6 +46,20 @@ impl From<&ReceiverState> for proto_state::ReceiverState {
     }
 }
 
+impl From<proto_state::ReceiverState> for ReceiverState {
+    fn from(from: proto_state::ReceiverState) -> Self {
+        Self {
+            id: from.id,
+            mid: from.mid,
+            media_type: from.media_type,
+            sender_id: from.sender_id,
+            enabled_individual: ProgressableCell::new(from.enabled_individual),
+            enabled_general: ProgressableCell::new(from.enabled_general),
+            muted: ProgressableCell::new(from.muted),
+        }
+    }
+}
+
 impl ReceiverState {
     /// Returns [`ReceiverState`] with a provided data.
     pub fn new(
@@ -68,6 +82,12 @@ impl ReceiverState {
             enabled_individual: ProgressableCell::new(enabled),
             muted: ProgressableCell::new(false),
         }
+    }
+
+    pub fn apply(&self, state: proto_state::ReceiverState) {
+        self.muted.set(state.muted);
+        self.enabled_general.set(state.enabled_general);
+        self.enabled_individual.set(state.enabled_individual);
     }
 
     /// Returns [`TrackId`] of this [`ReceiverState`].

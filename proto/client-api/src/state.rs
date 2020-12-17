@@ -27,6 +27,8 @@ pub struct PeerState {
     // Y
     pub force_relay: bool,
 
+    pub ice_servers: Vec<IceServer>,
+
     // Y
     pub negotiation_role: Option<NegotiationRole>,
 
