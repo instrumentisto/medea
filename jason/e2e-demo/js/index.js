@@ -762,6 +762,9 @@ window.onload = async function() {
           }
         }
         try {
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
           await room.set_local_media_settings(constraints, true, true);
         } catch (e) {
           let name = e.name();
