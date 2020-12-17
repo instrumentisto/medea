@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use futures::StreamExt as _;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     state as proto_state, Command, IceCandidate, IceServer, NegotiationRole,
@@ -27,6 +28,14 @@ use crate::{
 
 use super::PeerConnection;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NegotiationState {
+    Stable,
+    WaitLocalSdp,
+    WaitLocalSdpApprove,
+    WaitRemoteSdp,
+}
+
 /// State of the [`PeerComponent`].
 pub struct PeerState {
     id: PeerId,
@@ -35,6 +44,7 @@ pub struct PeerState {
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
+    negotiation_state: ObservableCell<NegotiationState>,
     sdp_offer: LocalSdp,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
@@ -99,6 +109,7 @@ impl PeerState {
             remote_sdp_offer: ProgressableCell::new(None),
             sdp_offer: LocalSdp::new(),
             negotiation_role: ObservableCell::new(negotiation_role),
+            negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
         }
@@ -340,7 +351,7 @@ impl PeerComponent {
                         ctx.set_remote_answer(remote_sdp_answer)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
-                        state.negotiation_role.set(None);
+                        state.negotiation_state.set(NegotiationState::Stable);
                     }
                     NegotiationRole::Answerer(_) => {
                         ctx.set_remote_offer(remote_sdp_answer)
@@ -370,6 +381,68 @@ impl PeerComponent {
         if val {
             ctx.restart_ice();
             state.restart_ice.set(false);
+        }
+
+        Ok(())
+    }
+
+    #[watch(self.state().negotiation_state.subscribe().skip(1))]
+    async fn negotiation_state_watcher(
+        ctx: Rc<PeerConnection>,
+        _: Rc<GlobalCtx>,
+        state: Rc<PeerState>,
+        negotiation_state: NegotiationState,
+    ) -> Result<(), Traced<PeerError>> {
+        match negotiation_state {
+            NegotiationState::Stable => {
+                state.negotiation_role.set(None);
+            }
+            NegotiationState::WaitLocalSdp => {
+                if let Some(negotiation_role) = state.negotiation_role.get() {
+                    match negotiation_role {
+                        NegotiationRole::Offerer => {
+                            let sdp_offer = ctx
+                                .peer
+                                .create_offer()
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            state.sdp_offer.update_offer(sdp_offer);
+                        }
+                        NegotiationRole::Answerer(_) => {
+                            let sdp_answer = ctx
+                                .peer
+                                .create_answer()
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            state.sdp_offer.update_offer(sdp_answer);
+                        }
+                    }
+                }
+            }
+            _ => (),
+        }
+
+        Ok(())
+    }
+
+    #[watch(self.state().sdp_offer.on_approve().skip(1))]
+    async fn sdp_offer_approve_watcher(
+        _: Rc<PeerConnection>,
+        _: Rc<GlobalCtx>,
+        state: Rc<PeerState>,
+        _: (),
+    ) -> Result<(), Traced<PeerError>> {
+        if let Some(negotiation_role) = state.negotiation_role.get() {
+            match negotiation_role {
+                NegotiationRole::Offerer => {
+                    state
+                        .negotiation_state
+                        .set(NegotiationState::WaitRemoteSdp);
+                }
+                NegotiationRole::Answerer(_) => {
+                    state.negotiation_state.set(NegotiationState::Stable);
+                }
+            }
         }
 
         Ok(())
@@ -498,6 +571,9 @@ impl PeerComponent {
                         transceivers_statuses: ctx.get_transceivers_statuses(),
                         mids,
                     });
+                    state
+                        .negotiation_state
+                        .set(NegotiationState::WaitLocalSdpApprove);
                 }
                 (Sdp::Offer(offer), NegotiationRole::Answerer(_)) => {
                     ctx.peer
@@ -509,8 +585,9 @@ impl PeerComponent {
                         sdp_answer: offer,
                         transceivers_statuses: ctx.get_transceivers_statuses(),
                     });
-                    state.sdp_offer.when_approved().await;
-                    state.negotiation_role.set(None);
+                    state
+                        .negotiation_state
+                        .set(NegotiationState::WaitLocalSdpApprove);
                 }
                 (Sdp::Rollback, _) => {
                     ctx.peer
@@ -553,12 +630,7 @@ impl PeerComponent {
                         .map_err(tracerr::map_from_and_wrap!())?;
 
                     ctx.media_connections.sync_receivers();
-                    let sdp_offer = ctx
-                        .peer
-                        .create_offer()
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    state.sdp_offer.update_offer(sdp_offer);
+                    state.negotiation_state.set(NegotiationState::WaitLocalSdp);
                     ctx.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
@@ -577,12 +649,7 @@ impl PeerComponent {
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
 
-                    let sdp_answer = ctx
-                        .peer
-                        .create_answer()
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    state.sdp_offer.update_offer(sdp_answer);
+                    state.negotiation_state.set(NegotiationState::WaitLocalSdp);
                 }
             }
         }

@@ -7,7 +7,7 @@ use futures::{
     future,
     future::{Either, LocalBoxFuture},
     stream::LocalBoxStream,
-    FutureExt,
+    FutureExt, StreamExt,
 };
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
@@ -127,12 +127,10 @@ impl LocalSdp {
         self.0.borrow_mut().on_new_local_sdp()
     }
 
-    /// Returns [`Future`] which will be resolved when current SDP offer will be
-    /// approved by Media Server.
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_approved(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(self.0.borrow().approved.when_eq(true).map(|_| ()))
+    pub fn on_approve(&self) -> LocalBoxStream<'static, ()> {
+        Box::pin(self.0.borrow().approved.subscribe().filter_map(|approved| {
+            future::ready(if approved { Some(()) } else { None })
+        }))
     }
 
     /// Rollbacks [`LocalSdp`] to the previous one.

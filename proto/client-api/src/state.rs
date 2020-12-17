@@ -36,7 +36,8 @@ pub struct PeerState {
     // Y
     pub negotiation_role: Option<NegotiationRole>,
 
-    // Y, but we should somehow merge sdp_offer with a sdp_answer. Or just merge it on server side.
+    // Y, but we should somehow merge sdp_offer with a sdp_answer. Or just
+    // merge it on server side.
     pub sdp_offer: Option<String>,
 
     // Y

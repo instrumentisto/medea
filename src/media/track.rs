@@ -75,12 +75,16 @@ impl MediaTrack {
 
     #[inline]
     pub fn set_send_muted(&self, is_muted: bool) {
-        self.media_exchange_state.borrow_mut().set_send_muted(is_muted);
+        self.media_exchange_state
+            .borrow_mut()
+            .set_send_muted(is_muted);
     }
 
     #[inline]
     pub fn set_recv_muted(&self, is_muted: bool) {
-        self.media_exchange_state.borrow_mut().set_recv_muted(is_muted);
+        self.media_exchange_state
+            .borrow_mut()
+            .set_recv_muted(is_muted);
     }
 }
 
