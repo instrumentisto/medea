@@ -92,10 +92,10 @@ RUN cp /app/target/${rustc_mode}/medea /out/medea \
 # https://hub.docker.com/_/scratch
 FROM scratch AS runtime
 
-LABEL org.opencontainers.image.source="https://github.com/instrumentisto/medea"
-
 COPY --from=dist /out/ /
 
 USER nobody:nobody
+
+LABEL org.opencontainers.image.source="https://github.com/instrumentisto/medea"
 
 ENTRYPOINT ["/medea"]
