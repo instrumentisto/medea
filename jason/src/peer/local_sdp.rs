@@ -146,7 +146,8 @@ impl LocalSdp {
             self.approve();
         }
 
-        // TODO (evdokimovs): everything else is unreachable. But what we will do with it?
+        // TODO (evdokimovs): everything else is unreachable. But what we will
+        // do with it?
     }
 
     /// Updates current SDP offer to the provided one.

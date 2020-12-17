@@ -186,6 +186,12 @@ impl Room {
         Ok(ctx.run(this))
     }
 
+    pub fn get_state(&self) -> medea_client_api_proto::state::State {
+        medea_client_api_proto::state::State {
+            peers: self.peers.get_peers_states(),
+        }
+    }
+
     /// Returns [`RoomId`] of this [`Room`].
     pub fn id(&self) -> &RoomId {
         &self.id

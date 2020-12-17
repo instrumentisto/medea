@@ -576,6 +576,13 @@ impl PeersService {
     pub(super) fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check();
     }
+
+    #[inline]
+    pub(super) fn get_peers_states(
+        &self,
+    ) -> HashMap<PeerId, medea_client_api_proto::state::PeerState> {
+        self.peers.get_peers_states()
+    }
 }
 
 /// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
@@ -746,6 +753,16 @@ impl PeerRepository {
             });
 
         peers_to_remove
+    }
+
+    pub fn get_peers_states(
+        &self,
+    ) -> HashMap<PeerId, medea_client_api_proto::state::PeerState> {
+        self.0
+            .borrow()
+            .iter()
+            .map(|(id, p)| (*id, p.get_state()))
+            .collect()
     }
 }
 

@@ -24,12 +24,6 @@ pub struct PeerState {
     // See ReceiverState
     pub receivers: HashMap<TrackId, ReceiverState>,
 
-    // Maybe shouldn't be in State???
-    pub ice_servers: Vec<IceServer>,
-
-    // Nope and maybe should be removed from the State
-    pub ice_candidates: Vec<IceCandidate>,
-
     // Y
     pub force_relay: bool,
 

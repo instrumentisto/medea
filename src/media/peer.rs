@@ -58,8 +58,8 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, IceServer, MediaSourceKind, MediaType, MemberId,
-    PeerId as Id, PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent,
-    TrackUpdate, VideoSettings,
+    NegotiationRole, PeerId as Id, PeerId, Track, TrackId, TrackPatchCommand,
+    TrackPatchEvent, TrackUpdate, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -173,6 +173,8 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn sdp_offer(&self) -> &Option<String>)]
+#[enum_delegate(pub fn partner_sdp_offer(&self) -> &Option<String>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
@@ -195,6 +197,94 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
+    // TODO (evdokimovs): check for correctness
+    fn negotiation_role(
+        &self,
+    ) -> Option<medea_client_api_proto::NegotiationRole> {
+        use NegotiationRole as R;
+        use PeerStateMachine as S;
+
+        match self {
+            S::Stable(_) => None,
+            S::WaitLocalSdp(peer) => {
+                match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
+                {
+                    (None, Some(partner_sdp_offer)) => {
+                        Some(R::Answerer(partner_sdp_offer.clone()))
+                    }
+                    (None, None) => Some(R::Offerer),
+                    _ => None,
+                }
+            }
+            S::WaitRemoteSdp(peer) => {
+                match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
+                {
+                    (None, None) => Some(R::Offerer),
+                    _ => None,
+                }
+            }
+        }
+    }
+
+    fn get_senders_states(
+        &self,
+    ) -> HashMap<TrackId, medea_client_api_proto::state::SenderState> {
+        self.senders()
+            .iter()
+            .map(|(id, sender)| {
+                (
+                    *id,
+                    medea_client_api_proto::state::SenderState {
+                        id: sender.id,
+                        mid: sender.mid(),
+                        media_type: sender.media_type.clone(),
+                        receivers: vec![self.partner_member_id()],
+                        enabled_individual: sender.is_send_enabled(),
+                        enabled_general: sender.is_media_exchange_enabled(),
+                        muted: sender.is_send_muted(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn get_receivers_states(
+        &self,
+    ) -> HashMap<TrackId, medea_client_api_proto::state::ReceiverState> {
+        self.receivers()
+            .iter()
+            .map(|(id, receiver)| {
+                (
+                    *id,
+                    medea_client_api_proto::state::ReceiverState {
+                        id: *id,
+                        mid: receiver.mid(),
+                        media_type: receiver.media_type.clone(),
+                        sender_id: self.partner_member_id(),
+                        enabled_individual: receiver.is_recv_enabled(),
+                        enabled_general: receiver.is_media_exchange_enabled(),
+                        muted: receiver.is_recv_muted(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    // TODO (evdokimovs): restart_ice flag doesn't implemented
+    //                    Implement it somehow.
+    pub fn get_state(&self) -> medea_client_api_proto::state::PeerState {
+        medea_client_api_proto::state::PeerState {
+            id: self.id(),
+            senders: self.get_senders_states(),
+            receivers: self.get_receivers_states(),
+            force_relay: self.is_force_relayed(),
+            negotiation_role: self.negotiation_role(),
+            sdp_offer: self.sdp_offer().clone(),
+            remote_sdp_offer: self.partner_sdp_offer().clone(),
+            restart_ice: false,
+        }
+    }
+
     /// Tries to run all scheduled changes.
     ///
     /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
@@ -309,10 +399,10 @@ pub struct Context {
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     sdp_offer: Option<String>,
 
-    /// [SDP] answer of this [`Peer`].
+    /// [SDP] of the partner [`Peer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    sdp_answer: Option<String>,
+    partner_sdp_offer: Option<String>,
 
     /// All [`MediaTrack`]s with a `Recv` direction`.
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
@@ -619,6 +709,16 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
+    #[inline]
+    pub fn sdp_offer(&self) -> &Option<String> {
+        &self.context.sdp_offer
+    }
+
+    #[inline]
+    pub fn partner_sdp_offer(&self) -> &Option<String> {
+        &self.context.partner_sdp_offer
+    }
+
     /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
     /// client in the [`Event::TracksApplied`].
     ///
@@ -793,6 +893,7 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_offer(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
+        // context.sdp_offer = Some(sdp_offer);
         context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
@@ -805,7 +906,8 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
-        context.sdp_answer = Some(sdp_answer);
+        // context.sdp_answer = Some(sdp_answer);
+        context.sdp_offer = Some(sdp_answer);
         let mut this = Peer {
             context,
             state: Stable {},
@@ -860,7 +962,8 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
-        self.context.sdp_answer = Some(sdp_answer);
+        // self.context.sdp_answer = Some(sdp_answer);
+        self.context.partner_sdp_offer = Some(sdp_answer);
 
         let mut peer = Peer {
             context: self.context,
@@ -875,7 +978,8 @@ impl Peer<WaitRemoteSdp> {
     /// state.
     #[inline]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
-        self.context.sdp_offer = Some(sdp_offer);
+        self.context.partner_sdp_offer = Some(sdp_offer);
+        // self.context.sdp_offer = Some(sdp_offer);
 
         Peer {
             context: self.context,
@@ -903,7 +1007,7 @@ impl Peer<Stable> {
             partner_member,
             ice_user: None,
             sdp_offer: None,
-            sdp_answer: None,
+            partner_sdp_offer: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
@@ -929,8 +1033,10 @@ impl Peer<Stable> {
     #[inline]
     pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
-        context.sdp_answer = None;
+        // context.sdp_answer = None;
+        // context.sdp_offer = None;
         context.sdp_offer = None;
+        context.partner_sdp_offer = None;
 
         Peer {
             context,
@@ -947,8 +1053,10 @@ impl Peer<Stable> {
     #[inline]
     pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        context.sdp_answer = None;
+        // context.sdp_answer = None;
+        // context.sdp_offer = None;
         context.sdp_offer = None;
+        context.partner_sdp_offer = None;
 
         Peer {
             context,

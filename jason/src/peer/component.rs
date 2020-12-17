@@ -2,8 +2,7 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use futures::StreamExt as _;
-use futures::future::LocalBoxFuture;
+use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto::{
     state as proto_state, Command, IceCandidate, IceServer, NegotiationRole,
     PeerId, TrackId,
@@ -73,18 +72,11 @@ impl From<&PeerState> for proto_state::PeerState {
             id: from.id,
             senders,
             receivers,
-            ice_servers: from.ice_servers.clone(),
             force_relay: from.force_relay,
             negotiation_role: from.negotiation_role.get(),
             sdp_offer: from.sdp_offer.current(),
             remote_sdp_offer: from.remote_sdp_offer.get(),
             restart_ice: from.restart_ice.get(),
-            ice_candidates: from
-                .ice_candidates
-                .borrow()
-                .iter()
-                .cloned()
-                .collect(),
         }
     }
 }
@@ -393,7 +385,8 @@ impl PeerComponent {
         state: Rc<PeerState>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
-        // TODO (evdokimovs): For more correctness we should wait for all updates here.
+        // TODO (evdokimovs): For more correctness we should wait for all
+        //                    updates here.
         //                    But this kind of situation is unreachable atm.
         match negotiation_state {
             NegotiationState::Stable => {
@@ -597,7 +590,9 @@ impl PeerComponent {
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     if is_restart {
-                        state.negotiation_state.set(NegotiationState::WaitLocalSdp);
+                        state
+                            .negotiation_state
+                            .set(NegotiationState::WaitLocalSdp);
                     } else {
                         state.negotiation_state.set(NegotiationState::Stable);
                     }

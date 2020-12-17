@@ -86,6 +86,22 @@ impl MediaTrack {
             .borrow_mut()
             .set_recv_muted(is_muted);
     }
+
+    pub fn is_send_muted(&self) -> bool {
+        self.media_exchange_state.borrow().is_send_muted()
+    }
+
+    pub fn is_recv_muted(&self) -> bool {
+        self.media_exchange_state.borrow().is_recv_muted()
+    }
+
+    pub fn is_send_enabled(&self) -> bool {
+        self.media_exchange_state.borrow().is_send_enabled()
+    }
+
+    pub fn is_recv_enabled(&self) -> bool {
+        self.media_exchange_state.borrow().is_recv_enabled()
+    }
 }
 
 /// Media exchange state of the [`MediaTrack`].
@@ -162,5 +178,21 @@ impl MediaExchangeState {
     #[inline]
     pub fn set_send(&mut self, is_enabled: bool) {
         self.send_enabled = is_enabled;
+    }
+
+    pub fn is_recv_muted(&self) -> bool {
+        self.recv_muted
+    }
+
+    pub fn is_send_muted(&self) -> bool {
+        self.send_muted
+    }
+
+    pub fn is_send_enabled(&self) -> bool {
+        self.send_enabled
+    }
+
+    pub fn is_recv_enabled(&self) -> bool {
+        self.recv_enabled
     }
 }
