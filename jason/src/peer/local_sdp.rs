@@ -139,23 +139,22 @@ impl LocalSdp {
     }
 
     pub fn update_offer_by_server(&self, new_offer: Option<String>) {
-        // if new_offer.is_none() && self.0.borrow().current_offer.is_some() {
-        //     self.rollback(true);
-        // }
-        let mut should_approve = false;
-        if let Some(new_offer) = &new_offer {
-            if let Some(current_offer) = &self.0.borrow().current_offer {
-                if new_offer == current_offer {
-                    should_approve = true;
-                }
-            }
-        }
-        if should_approve {
+        let approved = new_offer
+            .as_ref()
+            .and_then(|new_offer| {
+                self.0
+                    .borrow()
+                    .current_offer
+                    .as_ref()
+                    .map(|current_offer| new_offer == current_offer)
+            })
+            .unwrap_or_default();
+        let not_approved = new_offer.is_none() && !self.0.borrow().approved.get();
+        if not_approved {
+            self.rollback(true);
+        } else if approved {
             self.approve();
         }
-
-        // TODO (evdokimovs): everything else is unreachable. But what we will
-        // do with it?
     }
 
     /// Updates current SDP offer to the provided one.

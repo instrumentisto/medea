@@ -88,21 +88,18 @@ impl From<&PeerState> for proto_state::PeerState {
 
 impl From<proto_state::PeerState> for PeerState {
     fn from(from: proto_state::PeerState) -> Self {
-        // TODO (evdokimovs): Use ProgressableHashMap directly
-        let senders: HashMap<_, _> = from
-            .senders
-            .into_iter()
-            .map(|(id, sender)| (id, Rc::new(SenderState::from(sender))))
-            .collect();
-        let receivers: HashMap<_, _> = from
-            .receivers
-            .into_iter()
-            .map(|(id, receiver)| (id, Rc::new(ReceiverState::from(receiver))))
-            .collect();
         Self::new(
             from.id,
-            senders.into(),
-            receivers.into(),
+            from.senders
+                .into_iter()
+                .map(|(id, sender)| (id, Rc::new(SenderState::from(sender))))
+                .collect(),
+            from.receivers
+                .into_iter()
+                .map(|(id, receiver)| {
+                    (id, Rc::new(ReceiverState::from(receiver)))
+                })
+                .collect(),
             from.ice_servers,
             from.force_relay,
             from.negotiation_role,
@@ -137,8 +134,6 @@ impl PeerState {
     }
 
     pub fn apply(&self, state: proto_state::PeerState) {
-        // TODO (evdokimovs): This is debug if, remove it and it should work
-        //                    Or maybe not. This code is correct, but check it.
         if state.negotiation_role.is_some() {
             self.negotiation_role.set(state.negotiation_role);
         }

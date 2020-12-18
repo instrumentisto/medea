@@ -202,7 +202,6 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
-    // TODO (evdokimovs): check for correctness
     fn negotiation_role(
         &self,
     ) -> Option<medea_client_api_proto::NegotiationRole> {
@@ -917,8 +916,9 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_offer(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        // context.sdp_offer = Some(sdp_offer);
-        context.sdp_offer = Some(sdp_offer);
+        // if !context.is_known_to_remote {
+            context.sdp_offer = Some(sdp_offer);
+        // }
         Peer {
             context,
             state: WaitRemoteSdp {},
@@ -930,8 +930,9 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
-        // context.sdp_answer = Some(sdp_answer);
-        context.sdp_offer = Some(sdp_answer);
+        // if !context.is_known_to_remote {
+            context.sdp_offer = Some(sdp_answer);
+        // }
         let mut this = Peer {
             context,
             state: Stable {},
@@ -986,8 +987,9 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
-        // self.context.sdp_answer = Some(sdp_answer);
-        self.context.partner_sdp_offer = Some(sdp_answer);
+        // if !self.context.is_known_to_remote {
+            self.context.partner_sdp_offer = Some(sdp_answer);
+        // }
 
         let mut peer = Peer {
             context: self.context,
@@ -1002,8 +1004,9 @@ impl Peer<WaitRemoteSdp> {
     /// state.
     #[inline]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
-        self.context.partner_sdp_offer = Some(sdp_offer);
-        // self.context.sdp_offer = Some(sdp_offer);
+        // if !self.context.is_known_to_remote {
+            self.context.partner_sdp_offer = Some(sdp_offer);
+        // }
 
         Peer {
             context: self.context,
@@ -1059,8 +1062,6 @@ impl Peer<Stable> {
     #[inline]
     pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
-        // context.sdp_answer = None;
-        // context.sdp_offer = None;
         context.sdp_offer = None;
         context.partner_sdp_offer = None;
 
@@ -1079,8 +1080,6 @@ impl Peer<Stable> {
     #[inline]
     pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        // context.sdp_answer = None;
-        // context.sdp_offer = None;
         context.sdp_offer = None;
         context.partner_sdp_offer = None;
 

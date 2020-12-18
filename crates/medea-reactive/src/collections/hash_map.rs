@@ -5,6 +5,7 @@
 use std::{
     collections::hash_map::{Iter, Values},
     hash::Hash,
+    iter::FromIterator,
     marker::PhantomData,
 };
 
@@ -344,6 +345,21 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
         store.drain().for_each(|(key, value)| {
             self.on_remove_subs.send_update((key, value));
         });
+    }
+}
+
+impl<K, V, S: SubscribersStore<(K, V), O>, O> FromIterator<(K, V)>
+    for HashMap<K, V, S, O>
+where
+    K: Hash + Eq,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        Self {
+            store: std::collections::HashMap::from_iter(iter),
+            on_remove_subs: S::default(),
+            on_insert_subs: S::default(),
+            _output: PhantomData::default(),
+        }
     }
 }
 
