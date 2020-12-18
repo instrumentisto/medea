@@ -8,10 +8,7 @@ use medea_client_api_proto::{
     PeerId, TrackId,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{
-    collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
-    ProgressableCell,
-};
+use medea_reactive::{collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec, ProgressableCell, ObservableHashSet};
 use tracerr::Traced;
 
 use crate::{
@@ -47,7 +44,7 @@ pub struct PeerState {
     sdp_offer: LocalSdp,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
-    ice_candidates: RefCell<ObservableVec<IceCandidate>>,
+    ice_candidates: RefCell<ObservableHashSet<IceCandidate>>,
 }
 
 impl From<&PeerState> for proto_state::PeerState {
@@ -68,10 +65,13 @@ impl From<&PeerState> for proto_state::PeerState {
             );
         }
 
+        let ice_candidates = from.ice_candidates.borrow().iter().cloned().collect();
+
         Self {
             id: from.id,
             senders,
             receivers,
+            ice_candidates,
             force_relay: from.force_relay,
             ice_servers: from.ice_servers.clone(),
             negotiation_role: from.negotiation_role.get(),
@@ -128,7 +128,7 @@ impl PeerState {
             negotiation_role: ObservableCell::new(negotiation_role),
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
-            ice_candidates: RefCell::new(ObservableVec::new()),
+            ice_candidates: RefCell::new(ObservableHashSet::new()),
         }
     }
 
@@ -140,6 +140,7 @@ impl PeerState {
         }
         self.sdp_offer.update_offer_by_server(state.sdp_offer);
         self.remote_sdp_offer.set(state.remote_sdp_offer);
+        self.ice_candidates.borrow_mut().update(state.ice_candidates);
 
         for (id, sender_state) in state.senders {
             if let Some(sender) = self.senders.borrow().get(&id) {
@@ -222,7 +223,7 @@ impl PeerState {
     /// Adds [`IceCandidate`] for the [`PeerState`].
     #[inline]
     pub fn add_ice_candidate(&self, ice_candidate: IceCandidate) {
-        self.ice_candidates.borrow_mut().push(ice_candidate);
+        self.ice_candidates.borrow_mut().insert(ice_candidate);
     }
 
     /// Returns current SDP offer of this [`PeerState`].
@@ -356,9 +357,9 @@ impl PeerComponent {
     ///
     /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
     /// [`IceCandidate`].
-    #[watch(self.state().ice_candidates.borrow().on_push())]
+    #[watch(self.state().ice_candidates.borrow().on_insert())]
     #[inline]
-    async fn ice_candidate_push_watcher(
+    async fn ice_candidate_insert_watcher(
         ctx: Rc<PeerConnection>,
         _: Rc<GlobalCtx>,
         _: Rc<PeerState>,

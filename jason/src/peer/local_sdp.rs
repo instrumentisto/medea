@@ -139,9 +139,9 @@ impl LocalSdp {
     }
 
     pub fn update_offer_by_server(&self, new_offer: Option<String>) {
-        if new_offer.is_none() && self.0.borrow().current_offer.is_some() {
-            self.rollback(true);
-        }
+        // if new_offer.is_none() && self.0.borrow().current_offer.is_some() {
+        //     self.rollback(true);
+        // }
         let mut should_approve = false;
         if let Some(new_offer) = &new_offer {
             if let Some(current_offer) = &self.0.borrow().current_offer {

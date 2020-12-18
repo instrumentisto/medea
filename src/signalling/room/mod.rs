@@ -204,29 +204,11 @@ impl Room {
         member_id: MemberId,
         e: Event,
     ) -> Result<(), RoomError> {
-        // if matches!(e, Event::SdpAnswerMade { .. } | Event::SdpOfferApplied { .. } | Event::IceCandidateDiscovered { .. }) {
-
-        if matches!(e, Event::IceCandidateDiscovered { .. }) {
-            self.members.send_event_to_member(member_id, e)?;
-            Ok(())
-        } else {
-            let state = self.get_state(&member_id);
-            self.members.send_event_to_member(member_id, Event::StateSynchronized {
-                state,
-            })?;
-            Ok(())
-        }
-
-        // if matches!(e, Event::SdpOfferApplied { .. }) {
-        //     let state = self.get_state(&member_id);
-        //     self.members.send_event_to_member(member_id, Event::StateSynchronized {
-        //         state,
-        //     })?;
-        //     Ok(())
-        // } else {
-        //     self.members.send_event_to_member(member_id, e)?;
-        //     Ok(())
-        // }
+        let state = self.get_state(&member_id);
+        self.members.send_event_to_member(member_id, Event::StateSynchronized {
+            state,
+        })?;
+        Ok(())
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].

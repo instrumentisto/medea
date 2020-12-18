@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +42,8 @@ pub struct PeerState {
 
     // Represented as TrackChange, so we should somehow bind it to this bool
     pub restart_ice: bool,
+
+    pub ice_candidates: HashSet<IceCandidate>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
