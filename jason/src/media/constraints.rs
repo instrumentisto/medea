@@ -15,7 +15,9 @@ use web_sys as sys;
 
 use crate::{
     media::MediaKind,
-    peer::{media_exchange_state, mute_state, MediaState},
+    peer::{
+        media_exchange_state, mute_state, LocalStreamUpdateCriteria, MediaState,
+    },
     utils::get_property_by_name,
 };
 
@@ -79,6 +81,16 @@ impl From<MediaStreamSettings> for LocalTracksConstraints {
 }
 
 impl LocalTracksConstraints {
+    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
+    /// [`MediaSourceKind`] which are different in the provided
+    /// [`MediaStreamSettings`].
+    pub fn calculate_kinds_diff(
+        &self,
+        settings: &MediaStreamSettings,
+    ) -> LocalStreamUpdateCriteria {
+        self.0.borrow().calculate_kinds_diff(&settings)
+    }
+
     /// Constrains the underlying [`MediaStreamSettings`] with the given `other`
     /// [`MediaStreamSettings`].
     #[inline]
@@ -105,6 +117,19 @@ impl LocalTracksConstraints {
         self.0
             .borrow_mut()
             .set_track_media_state(state, kind, source_kind);
+    }
+
+    /// Enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// provided [`media_exchange_state`].
+    #[inline]
+    pub fn set_media_exchange_state_by_kinds(
+        &self,
+        state: media_exchange_state::Stable,
+        kinds: LocalStreamUpdateCriteria,
+    ) {
+        self.0
+            .borrow_mut()
+            .set_media_exchange_state_by_kinds(state, kinds)
     }
 
     /// Indicates whether provided [`MediaType`] is enabled in the underlying
@@ -139,7 +164,7 @@ impl LocalTracksConstraints {
 /// [MediaStreamConstraints][1] for the audio media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AudioMediaTracksSettings {
     /// Constraints applicable to video tracks.
     constraints: AudioTrackConstraints,
@@ -163,7 +188,7 @@ impl Default for AudioMediaTracksSettings {
     }
 }
 
-/// Returns `true` if provided [`SysMediaStreamTrack`] basically satisfies any
+/// Returns `true` if provided [`sys::MediaStreamTrack`] basically satisfies any
 /// constraints with a provided [`MediaKind`].
 #[inline]
 fn satisfies_track(track: &sys::MediaStreamTrack, kind: MediaKind) -> bool {
@@ -174,7 +199,7 @@ fn satisfies_track(track: &sys::MediaStreamTrack, kind: MediaKind) -> bool {
 /// [MediaStreamConstraints][1] for the video media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VideoTrackConstraints<C> {
     /// Constraints applicable to video tracks.
     ///
@@ -245,8 +270,8 @@ impl<C> VideoTrackConstraints<C> {
 }
 
 impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
-    /// Returns `true` if the provided [`SysMediaStreamTrack`] satisfies device
-    /// [`VideoTrackConstraints::constraints`].
+    /// Indicates whether the provided [`sys::MediaStreamTrack`] satisfies
+    /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
     fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
@@ -258,8 +283,8 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
 }
 
 impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
-    /// Returns `true` if the provided [`SysMediaStreamTrack`] satisfies device
-    /// [`VideoTrackConstraints::constraints`].
+    /// Indicates whether the provided [`sys::MediaStreamTrack`] satisfies
+    /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
     fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
@@ -274,7 +299,7 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MediaStreamSettings {
     /// [MediaStreamConstraints][1] for the audio media type.
     ///
@@ -360,6 +385,28 @@ impl MediaStreamSettings {
         }
     }
 
+    /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
+    /// [`MediaSourceKind`] which are different in the provided
+    /// [`MediaStreamSettings`].
+    #[must_use]
+    pub fn calculate_kinds_diff(
+        &self,
+        another: &Self,
+    ) -> LocalStreamUpdateCriteria {
+        let mut kinds = LocalStreamUpdateCriteria::empty();
+        if self.device_video != another.device_video {
+            kinds.add(MediaKind::Video, MediaSourceKind::Device);
+        }
+        if self.display_video != another.display_video {
+            kinds.add(MediaKind::Video, MediaSourceKind::Display);
+        }
+        if self.audio != another.audio {
+            kinds.add(MediaKind::Audio, MediaSourceKind::Device);
+        }
+
+        kinds
+    }
+
     /// Returns only audio constraints.
     #[inline]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
@@ -421,6 +468,26 @@ impl MediaStreamSettings {
                     );
                 }
             },
+        }
+    }
+
+    /// Enables/disables provided [`LocalStreamUpdateCriteria`] based on
+    /// provided [`media_exchange_state`].
+    #[inline]
+    pub fn set_media_exchange_state_by_kinds(
+        &mut self,
+        state: media_exchange_state::Stable,
+        kinds: LocalStreamUpdateCriteria,
+    ) {
+        let enabled = state == media_exchange_state::Stable::Enabled;
+        if kinds.has(MediaKind::Audio, MediaSourceKind::Device) {
+            self.set_audio_publish(enabled);
+        }
+        if kinds.has(MediaKind::Video, MediaSourceKind::Device) {
+            self.set_video_publish(enabled, Some(MediaSourceKind::Device));
+        }
+        if kinds.has(MediaKind::Video, MediaSourceKind::Display) {
+            self.set_video_publish(enabled, Some(MediaSourceKind::Display));
         }
     }
 
@@ -787,7 +854,7 @@ impl From<ProtoTrackConstraints> for TrackConstraints {
 
 /// Constraints applicable to audio tracks.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AudioTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
@@ -889,7 +956,7 @@ trait Constraint {
 /// [MediaStreamTrack][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-#[derive(AsRef, Clone, Debug)]
+#[derive(AsRef, Clone, Debug, Eq, PartialEq)]
 #[as_ref(forward)]
 struct DeviceId(String);
 
@@ -898,7 +965,7 @@ impl Constraint for DeviceId {
 }
 
 /// Height, in pixels, of the video.
-#[derive(Debug, Clone, Copy, Into)]
+#[derive(Clone, Copy, Debug, Eq, Into, PartialEq)]
 struct Height(u32);
 
 impl Constraint for Height {
@@ -906,7 +973,7 @@ impl Constraint for Height {
 }
 
 /// Width, in pixels, of the video.
-#[derive(Debug, Clone, Copy, Into)]
+#[derive(Clone, Copy, Debug, Eq, Into, PartialEq)]
 struct Width(u32);
 
 impl Constraint for Width {
@@ -918,7 +985,7 @@ impl Constraint for Width {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FacingMode {
     /// Facing toward the user (a self-view camera).
     User,
@@ -952,7 +1019,7 @@ impl Constraint for FacingMode {
 /// `[0, 4294967295]` range.
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-constrainulong
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ConstrainU32<T> {
     /// Must be the parameter's value.
     Exact(T),
@@ -1016,7 +1083,7 @@ impl<T: Constraint + Into<u32>> From<ConstrainU32<T>>
 /// possible) constrain.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ConstrainString<T> {
     Exact(T),
     Ideal(T),
@@ -1057,7 +1124,7 @@ impl<T: AsRef<str>> From<&ConstrainString<T>>
 /// Constraints applicable to video tracks that are sourced from some media
 /// device.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DeviceVideoTrackConstraints {
     /// Importance of this [`DeviceVideoTrackConstraints`].
     ///
@@ -1200,7 +1267,7 @@ impl DeviceVideoTrackConstraints {
 
 /// Constraints applicable to video tracks sourced from screen capture.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DisplayVideoTrackConstraints {
     /// Importance of this [`DisplayVideoTrackConstraints`].
     ///

@@ -329,10 +329,10 @@ impl InnerMediaManager {
     /// # Errors
     ///
     /// - [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
-    ///   the provided [`SysMediaStream`] is in [`ended`][1] state.
+    ///   the provided [`sys::MediaStream`] is in [`ended`][1] state.
     ///
     /// - [`MediaManagerError::LocalTrackIsMuted`] if at least one track from
-    ///   the provided [`SysMediaStream`] is in [`muted`][2] state.
+    ///   the provided [`sys::MediaStream`] is in [`muted`][2] state.
     ///
     /// In case of error all tracks are stopped and are not saved in
     /// [`MediaManager`]'s tracks storage.
