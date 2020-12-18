@@ -320,6 +320,7 @@ impl PeerConnection {
     /// Returns all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
     #[inline]
+    #[must_use]
     pub fn get_senders_without_tracks(
         &self,
         kinds: LocalStreamUpdateCriteria,
@@ -1001,9 +1002,10 @@ impl PeerConnection {
         self.media_connections.is_send_audio_unmuted()
     }
 
-    /// Returns all [`local::Track`]'s from [`PeerConnection`]'s
-    /// [`Transceiver`]'s.
+    /// Returns all [`local::Track`]s from [`PeerConnection`]'s
+    /// [`Transceiver`]s.
     #[inline]
+    #[must_use]
     pub fn get_send_tracks(&self) -> Vec<Rc<local::Track>> {
         self.media_connections
             .get_senders()

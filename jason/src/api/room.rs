@@ -828,8 +828,8 @@ impl ConstraintsUpdateException {
 /// JS side.
 #[derive(Debug, Display)]
 pub enum JsConstraintsUpdateError {
-    /// Indicates that new [`MediaStreamSettings`] set failed and state was
-    /// recovered accordingly to the provided recover policy
+    /// New [`MediaStreamSettings`] set failed and state was recovered
+    /// accordingly to the provided recover policy
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
     Recovered {
@@ -837,8 +837,8 @@ pub enum JsConstraintsUpdateError {
         recover_reason: JsValue,
     },
 
-    /// Indicates that new [`MediaStreamSettings`] set failed and state
-    /// recovering also failed.
+    /// New [`MediaStreamSettings`] set failed and state recovering also
+    /// failed.
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
         /// [`JasonError`] due to which recovery happened.
@@ -849,7 +849,7 @@ pub enum JsConstraintsUpdateError {
         recover_fail_reasons: JsValue,
     },
 
-    /// Indicates that some error occurred.
+    /// Some another error occurred.
     #[display(fmt = "ErroredException")]
     Errored { reason: JsValue },
 }
@@ -858,16 +858,16 @@ pub enum JsConstraintsUpdateError {
 /// [`MediaStreamSettings`] by [`InnerRoom::set_local_media_settings`] call.
 #[derive(Debug)]
 enum ConstraintsUpdateError {
-    /// Indicates that new [`MediaStreamSettings`] set failed and state was
-    /// recovered accordingly to the provided recover policy
+    /// New [`MediaStreamSettings`] set failed and state was recovered
+    /// accordingly to the provided recover policy
     /// (`rollback_on_fail`/`stop_first` arguments).
     Recovered {
         /// [`RoomError`] due to which recovery happened.
         recover_reason: Traced<RoomError>,
     },
 
-    /// Indicates that new [`MediaStreamSettings`] set failed and state
-    /// recovering also failed.
+    /// New [`MediaStreamSettings`] set failed and state recovering also
+    /// failed.
     RecoverFailed {
         /// [`RoomError`] due to which recovery happened.
         recover_reason: Traced<RoomError>,
@@ -1276,7 +1276,7 @@ impl InnerRoom {
 
         self.update_media_states(states_update)
             .await
-            .map_err(|e| E::errored(tracerr::map_from_and_wrap!()(e)))
+            .map_err(|e| E::errored(tracerr::map_from_and_new!(e)))
     }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this

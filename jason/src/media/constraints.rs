@@ -164,7 +164,7 @@ impl LocalTracksConstraints {
 /// [MediaStreamConstraints][1] for the audio media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AudioMediaTracksSettings {
     /// Constraints applicable to video tracks.
     constraints: AudioTrackConstraints,
@@ -199,7 +199,7 @@ fn satisfies_track(track: &sys::MediaStreamTrack, kind: MediaKind) -> bool {
 /// [MediaStreamConstraints][1] for the video media type.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VideoTrackConstraints<C> {
     /// Constraints applicable to video tracks.
     ///
@@ -270,7 +270,7 @@ impl<C> VideoTrackConstraints<C> {
 }
 
 impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
-    /// Returns `true` if the provided [`sys::MediaStreamTrack`] satisfies
+    /// Indicates whether the provided [`sys::MediaStreamTrack`] satisfies
     /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
@@ -283,7 +283,7 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
 }
 
 impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
-    /// Returns `true` if the provided [`sys::MediaStreamTrack`] satisfies
+    /// Indicates whether the provided [`sys::MediaStreamTrack`] satisfies
     /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
@@ -299,7 +299,7 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MediaStreamSettings {
     /// [MediaStreamConstraints][1] for the audio media type.
     ///
@@ -388,6 +388,7 @@ impl MediaStreamSettings {
     /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
+    #[must_use]
     pub fn calculate_kinds_diff(
         &self,
         another: &Self,
@@ -853,7 +854,7 @@ impl From<ProtoTrackConstraints> for TrackConstraints {
 
 /// Constraints applicable to audio tracks.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AudioTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
@@ -955,7 +956,7 @@ trait Constraint {
 /// [MediaStreamTrack][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-#[derive(AsRef, Clone, Debug, PartialEq, Eq)]
+#[derive(AsRef, Clone, Debug, Eq, PartialEq)]
 #[as_ref(forward)]
 struct DeviceId(String);
 
@@ -964,7 +965,7 @@ impl Constraint for DeviceId {
 }
 
 /// Height, in pixels, of the video.
-#[derive(Debug, Clone, Copy, Into, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, Into, PartialEq)]
 struct Height(u32);
 
 impl Constraint for Height {
@@ -972,7 +973,7 @@ impl Constraint for Height {
 }
 
 /// Width, in pixels, of the video.
-#[derive(Debug, Clone, Copy, Into, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, Into, PartialEq)]
 struct Width(u32);
 
 impl Constraint for Width {
@@ -1018,7 +1019,7 @@ impl Constraint for FacingMode {
 /// `[0, 4294967295]` range.
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-constrainulong
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ConstrainU32<T> {
     /// Must be the parameter's value.
     Exact(T),
@@ -1082,7 +1083,7 @@ impl<T: Constraint + Into<u32>> From<ConstrainU32<T>>
 /// possible) constrain.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ConstrainString<T> {
     Exact(T),
     Ideal(T),
@@ -1123,7 +1124,7 @@ impl<T: AsRef<str>> From<&ConstrainString<T>>
 /// Constraints applicable to video tracks that are sourced from some media
 /// device.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DeviceVideoTrackConstraints {
     /// Importance of this [`DeviceVideoTrackConstraints`].
     ///
@@ -1266,7 +1267,7 @@ impl DeviceVideoTrackConstraints {
 
 /// Constraints applicable to video tracks sourced from screen capture.
 #[wasm_bindgen]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DisplayVideoTrackConstraints {
     /// Importance of this [`DisplayVideoTrackConstraints`].
     ///

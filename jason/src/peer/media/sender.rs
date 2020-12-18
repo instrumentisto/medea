@@ -100,7 +100,7 @@ impl Sender {
         &self.caps
     }
 
-    /// Returns `true` if this [`Sender`] is publishing media traffic.
+    /// Indicates whether this [`Sender`] is publishing media traffic.
     #[inline]
     #[must_use]
     pub fn is_publishing(&self) -> bool {
@@ -108,14 +108,14 @@ impl Sender {
     }
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
-    /// sending side of inner transceiver to `None`.
+    /// sending side of inner transceiver to [`None`].
     #[inline]
     pub async fn remove_track(&self) {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
     }
 
-    /// Returns `true` if this [`Sender`] has [`local::Track`].
+    /// Indicates whether this [`Sender`] has [`local::Track`].
     #[inline]
     #[must_use]
     pub fn has_track(&self) -> bool {
