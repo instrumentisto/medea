@@ -186,9 +186,9 @@ impl Room {
         Ok(ctx.run(this))
     }
 
-    pub fn get_state(&self) -> medea_client_api_proto::state::State {
+    pub fn get_state(&self, member_id: &MemberId) -> medea_client_api_proto::state::State {
         medea_client_api_proto::state::State {
-            peers: self.peers.get_peers_states(),
+            peers: self.peers.get_peers_states(member_id),
         }
     }
 
@@ -202,12 +202,31 @@ impl Room {
     pub fn send_event(
         &mut self,
         member_id: MemberId,
-        _: Event,
+        e: Event,
     ) -> Result<(), RoomError> {
-        let state = self.get_state();
-        self.members.send_event_to_member(member_id, Event::StateSynchronized {
-            state,
-        })
+        // if matches!(e, Event::SdpAnswerMade { .. } | Event::SdpOfferApplied { .. } | Event::IceCandidateDiscovered { .. }) {
+
+        if matches!(e, Event::IceCandidateDiscovered { .. }) {
+            self.members.send_event_to_member(member_id, e)?;
+            Ok(())
+        } else {
+            let state = self.get_state(&member_id);
+            self.members.send_event_to_member(member_id, Event::StateSynchronized {
+                state,
+            })?;
+            Ok(())
+        }
+
+        // if matches!(e, Event::SdpOfferApplied { .. }) {
+        //     let state = self.get_state(&member_id);
+        //     self.members.send_event_to_member(member_id, Event::StateSynchronized {
+        //         state,
+        //     })?;
+        //     Ok(())
+        // } else {
+        //     self.members.send_event_to_member(member_id, e)?;
+        //     Ok(())
+        // }
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].

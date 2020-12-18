@@ -13,6 +13,7 @@ pub struct State {
     pub peers: HashMap<PeerId, PeerState>,
 }
 
+// TODO (evdokimovs): Event::IceCandidate doesn't represented in State. FIX IT.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PeerState {
     // Y

@@ -72,7 +72,8 @@ impl PeerRepositoryState {
 
     pub fn apply(&self, state: proto_state::State) {
         for (id, peer_state) in state.peers {
-            if let Some(peer) = self.0.borrow().get(&id) {
+            let peer = self.0.borrow().get(&id).cloned();
+            if let Some(peer) = peer {
                 peer.apply(peer_state);
             } else {
                 self.0

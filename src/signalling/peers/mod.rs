@@ -580,8 +580,9 @@ impl PeersService {
     #[inline]
     pub(super) fn get_peers_states(
         &self,
+        member_id: &MemberId,
     ) -> HashMap<PeerId, medea_client_api_proto::state::PeerState> {
-        self.peers.get_peers_states()
+        self.peers.get_peers_states(member_id)
     }
 }
 
@@ -757,10 +758,14 @@ impl PeerRepository {
 
     pub fn get_peers_states(
         &self,
+        member_id: &MemberId,
     ) -> HashMap<PeerId, medea_client_api_proto::state::PeerState> {
         self.0
             .borrow()
             .iter()
+            .filter(|(_, p)| {
+                &p.member_id() == member_id
+            })
             .map(|(id, p)| (*id, p.get_state()))
             .collect()
     }

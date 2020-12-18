@@ -133,7 +133,11 @@ impl PeerState {
     }
 
     pub fn apply(&self, state: proto_state::PeerState) {
-        self.negotiation_role.set(state.negotiation_role);
+        // TODO (evdokimovs): This is debug if, remove it and it should work
+        //                    Or maybe not. This code is correct, but check it.
+        if state.negotiation_role.is_some() {
+            self.negotiation_role.set(state.negotiation_role);
+        }
         self.sdp_offer.update_offer_by_server(state.sdp_offer);
         self.remote_sdp_offer.set(state.remote_sdp_offer);
 
