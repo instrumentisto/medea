@@ -56,7 +56,11 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{AudioSettings, Direction, IceServer, MediaSourceKind, MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, Track, TrackId, TrackPatchCommand, TrackPatchEvent, TrackUpdate, VideoSettings, IceCandidate};
+use medea_client_api_proto::{
+    AudioSettings, Direction, IceCandidate, IceServer, MediaSourceKind,
+    MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, Track, TrackId,
+    TrackPatchCommand, TrackPatchEvent, TrackUpdate, VideoSettings,
+};
 use medea_macro::{dispatchable, enum_delegate};
 
 use crate::{
@@ -185,8 +189,11 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
 #[enum_delegate(fn inner_force_commit_scheduled_changes(&mut self))]
-#[enum_delegate(pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate))]
+#[enum_delegate(
+    pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate)
+)]
 #[enum_delegate(pub fn ice_candidates(&self) -> &HashSet<IceCandidate>)]
+#[enum_delegate(pub fn is_ice_restart(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -268,8 +275,6 @@ impl PeerStateMachine {
             .collect()
     }
 
-    // TODO (evdokimovs): restart_ice flag doesn't implemented
-    //                    Implement it somehow.
     pub fn get_state(&self) -> medea_client_api_proto::state::PeerState {
         // TODO (evdokimovs): Meh, ice_servers_list can be None, DO SOMETHING
         //                    WITH IT.
@@ -283,7 +288,7 @@ impl PeerStateMachine {
             sdp_offer: self.sdp_offer().clone(),
             remote_sdp_offer: self.partner_sdp_offer().clone(),
             ice_candidates: self.ice_candidates().clone(),
-            restart_ice: false,
+            restart_ice: self.is_ice_restart(),
         }
     }
 
@@ -434,6 +439,8 @@ pub struct Context {
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
 
     ice_candidates: HashSet<IceCandidate>,
+
+    ice_restart: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -603,6 +610,7 @@ impl<T> TrackChangeHandler for Peer<T> {
     /// Does nothing.
     #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
+        self.context.ice_restart = true;
         TrackChange::IceRestart
     }
 }
@@ -897,6 +905,10 @@ impl<T> Peer<T> {
     pub fn ice_candidates(&self) -> &HashSet<IceCandidate> {
         &self.context.ice_candidates
     }
+
+    pub fn is_ice_restart(&self) -> bool {
+        self.context.ice_restart
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -1029,6 +1041,7 @@ impl Peer<Stable> {
             track_changes_queue: Vec::new(),
             peer_updates_sub,
             ice_candidates: HashSet::new(),
+            ice_restart: false,
         };
 
         Self {
@@ -1143,6 +1156,7 @@ impl Peer<Stable> {
     ///
     /// Should be called when negotiation was finished.
     fn negotiation_finished(&mut self) {
+        self.context.ice_restart = false;
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
         self.commit_scheduled_changes();

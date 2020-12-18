@@ -154,10 +154,11 @@ impl CommandHandler for Room {
         let to_peer_id = self
             .peers
             .map_peer_by_id(from_peer_id, PeerStateMachine::partner_peer_id)?;
-        let to_member_id = self.peers.map_peer_by_id_mut(to_peer_id, |to_peer| {
-            to_peer.add_ice_candidate(candidate.clone());
-            to_peer.member_id()
-        })?;
+        let to_member_id =
+            self.peers.map_peer_by_id_mut(to_peer_id, |to_peer| {
+                to_peer.add_ice_candidate(candidate.clone());
+                to_peer.member_id()
+            })?;
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,

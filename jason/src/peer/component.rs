@@ -8,7 +8,10 @@ use medea_client_api_proto::{
     PeerId, TrackId,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec, ProgressableCell, ObservableHashSet};
+use medea_reactive::{
+    collections::ProgressableHashMap, Guarded, ObservableCell,
+    ObservableHashSet, ObservableVec, ProgressableCell,
+};
 use tracerr::Traced;
 
 use crate::{
@@ -65,7 +68,8 @@ impl From<&PeerState> for proto_state::PeerState {
             );
         }
 
-        let ice_candidates = from.ice_candidates.borrow().iter().cloned().collect();
+        let ice_candidates =
+            from.ice_candidates.borrow().iter().cloned().collect();
 
         Self {
             id: from.id,
@@ -138,9 +142,14 @@ impl PeerState {
         if state.negotiation_role.is_some() {
             self.negotiation_role.set(state.negotiation_role);
         }
+        if state.restart_ice {
+            self.restart_ice.set(true);
+        }
         self.sdp_offer.update_offer_by_server(state.sdp_offer);
         self.remote_sdp_offer.set(state.remote_sdp_offer);
-        self.ice_candidates.borrow_mut().update(state.ice_candidates);
+        self.ice_candidates
+            .borrow_mut()
+            .update(state.ice_candidates);
 
         for (id, sender_state) in state.senders {
             if let Some(sender) = self.senders.borrow().get(&id) {

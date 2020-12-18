@@ -763,9 +763,7 @@ impl PeerRepository {
         self.0
             .borrow()
             .iter()
-            .filter(|(_, p)| {
-                &p.member_id() == member_id
-            })
+            .filter(|(_, p)| &p.member_id() == member_id)
             .map(|(id, p)| (*id, p.get_state()))
             .collect()
     }

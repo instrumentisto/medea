@@ -186,7 +186,10 @@ impl Room {
         Ok(ctx.run(this))
     }
 
-    pub fn get_state(&self, member_id: &MemberId) -> medea_client_api_proto::state::State {
+    pub fn get_state(
+        &self,
+        member_id: &MemberId,
+    ) -> medea_client_api_proto::state::State {
         medea_client_api_proto::state::State {
             peers: self.peers.get_peers_states(member_id),
         }
@@ -205,9 +208,10 @@ impl Room {
         e: Event,
     ) -> Result<(), RoomError> {
         let state = self.get_state(&member_id);
-        self.members.send_event_to_member(member_id, Event::StateSynchronized {
-            state,
-        })?;
+        self.members.send_event_to_member(
+            member_id,
+            Event::StateSynchronized { state },
+        )?;
         Ok(())
     }
 
