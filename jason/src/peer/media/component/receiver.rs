@@ -13,7 +13,10 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     media::RecvConstraints,
-    peer::{MediaConnectionsError, Receiver},
+    peer::{
+        component::{AsProtoState, SynchronizableState, Updatable},
+        MediaConnectionsError, Receiver,
+    },
     utils::Component,
 };
 
@@ -30,6 +33,57 @@ pub struct ReceiverState {
     enabled_individual: ProgressableCell<bool>,
     enabled_general: ProgressableCell<bool>,
     muted: ProgressableCell<bool>,
+}
+
+impl AsProtoState for ReceiverState {
+    type Output = proto_state::ReceiverState;
+
+    fn as_proto(&self) -> Self::Output {
+        Self::Output {
+            id: self.id,
+            mid: self.mid.clone(),
+            media_type: self.media_type.clone(),
+            sender_id: self.sender_id.clone(),
+            enabled_individual: self.enabled_individual(),
+            enabled_general: self.enabled_general(),
+            muted: self.muted.get(),
+        }
+    }
+}
+
+impl SynchronizableState for ReceiverState {
+    type Input = proto_state::ReceiverState;
+
+    fn from_proto(input: Self::Input) -> Self {
+        Self {
+            id: input.id,
+            mid: input.mid,
+            media_type: input.media_type,
+            sender_id: input.sender_id,
+            enabled_individual: ProgressableCell::new(input.enabled_individual),
+            enabled_general: ProgressableCell::new(input.enabled_general),
+            muted: ProgressableCell::new(input.muted),
+        }
+    }
+
+    fn apply(&self, input: Self::Input) {
+        self.muted.set(input.muted);
+        self.enabled_general.set(input.enabled_general);
+        self.enabled_individual.set(input.enabled_individual);
+    }
+}
+
+impl Updatable for ReceiverState {
+    fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
+        let fut = futures::future::join_all(vec![
+            self.enabled_general.when_all_processed(),
+            self.enabled_individual.when_all_processed(),
+            self.muted.when_all_processed(),
+        ]);
+        Box::pin(async move {
+            fut.await;
+        })
+    }
 }
 
 impl From<&ReceiverState> for proto_state::ReceiverState {

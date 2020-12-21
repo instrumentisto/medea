@@ -916,9 +916,7 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_offer(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        // if !context.is_known_to_remote {
-            context.sdp_offer = Some(sdp_offer);
-        // }
+        context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
             state: WaitRemoteSdp {},
@@ -930,9 +928,7 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
-        // if !context.is_known_to_remote {
-            context.sdp_offer = Some(sdp_answer);
-        // }
+        context.sdp_offer = Some(sdp_answer);
         let mut this = Peer {
             context,
             state: Stable {},
@@ -987,9 +983,7 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
-        // if !self.context.is_known_to_remote {
-            self.context.partner_sdp_offer = Some(sdp_answer);
-        // }
+        self.context.partner_sdp_offer = Some(sdp_answer);
 
         let mut peer = Peer {
             context: self.context,
@@ -1004,9 +998,7 @@ impl Peer<WaitRemoteSdp> {
     /// state.
     #[inline]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
-        // if !self.context.is_known_to_remote {
-            self.context.partner_sdp_offer = Some(sdp_offer);
-        // }
+        self.context.partner_sdp_offer = Some(sdp_offer);
 
         Peer {
             context: self.context,

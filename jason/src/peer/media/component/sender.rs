@@ -14,7 +14,10 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     media::LocalTracksConstraints,
-    peer::{MediaConnectionsError, Sender},
+    peer::{
+        component::{AsProtoState, SynchronizableState, Updatable},
+        MediaConnectionsError, Sender,
+    },
     utils::Component,
     MediaKind,
 };
@@ -33,6 +36,58 @@ pub struct SenderState {
     enabled_general: ProgressableCell<bool>,
     muted: ProgressableCell<bool>,
     need_local_stream_update: Cell<bool>,
+}
+
+impl AsProtoState for SenderState {
+    type Output = proto_state::SenderState;
+
+    fn as_proto(&self) -> Self::Output {
+        Self::Output {
+            id: self.id,
+            mid: self.mid.clone(),
+            media_type: self.media_type.clone(),
+            receivers: self.receivers.clone(),
+            enabled_individual: self.enabled_individual.get(),
+            enabled_general: self.enabled_general.get(),
+            muted: self.muted.get(),
+        }
+    }
+}
+
+impl SynchronizableState for SenderState {
+    type Input = proto_state::SenderState;
+
+    fn from_proto(input: Self::Input) -> Self {
+        Self {
+            id: input.id,
+            mid: input.mid,
+            media_type: input.media_type,
+            receivers: input.receivers,
+            enabled_individual: ProgressableCell::new(input.enabled_individual),
+            enabled_general: ProgressableCell::new(input.enabled_general),
+            muted: ProgressableCell::new(input.muted),
+            need_local_stream_update: Cell::new(false),
+        }
+    }
+
+    fn apply(&self, input: Self::Input) {
+        self.muted.set(input.muted);
+        self.enabled_general.set(input.enabled_general);
+        self.enabled_individual.set(input.enabled_individual);
+    }
+}
+
+impl Updatable for SenderState {
+    fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
+        let fut = futures::future::join_all(vec![
+            self.enabled_general.when_all_processed(),
+            self.enabled_individual.when_all_processed(),
+            self.muted.when_all_processed(),
+        ]);
+        Box::pin(async move {
+            fut.await;
+        })
+    }
 }
 
 impl From<&SenderState> for proto_state::SenderState {
