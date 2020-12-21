@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use futures::StreamExt as _;
+use futures::{future, StreamExt as _};
 use medea_client_api_proto::{Command, IceCandidate, NegotiationRole, TrackId};
 use medea_macro::{watch, watchers};
 use medea_reactive::Guarded;
@@ -9,18 +9,15 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     peer::{
-        local_sdp::Sdp,
+        component::NegotiationState,
         media::{ReceiverState, SenderBuilder, SenderState},
-        media_exchange_state, mute_state, PeerError, Receiver,
-        ReceiverComponent, SenderComponent,
+        media_exchange_state, mute_state, PeerConnection, PeerError, PeerState,
+        Receiver, ReceiverComponent, SenderComponent,
     },
-};
-
-use super::PeerComponent;
-use crate::{
-    peer::{component::NegotiationState, PeerConnection, PeerState},
     utils::Updatable as _,
 };
+
+use super::{local_sdp::Sdp, PeerComponent};
 
 #[watchers]
 impl PeerComponent {
@@ -111,9 +108,13 @@ impl PeerComponent {
         state: Rc<PeerState>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
-        // TODO (evdokimovs): For more correctness we should wait for all
-        //                    updates here.
-        //                    But this kind of situation is unreachable atm.
+        future::join_all(vec![
+            state.when_updated(),
+            state.senders.when_all_processed(),
+            state.receivers.when_all_processed(),
+        ])
+        .await;
+
         match negotiation_state {
             NegotiationState::Stable => {
                 state.negotiation_role.set(None);

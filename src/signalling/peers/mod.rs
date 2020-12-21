@@ -18,8 +18,8 @@ use std::{
 use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
-    stats::RtcStat, Incrementable, MemberId, PeerConnectionState, PeerId,
-    RoomId, TrackId,
+    state, stats::RtcStat, Incrementable, MemberId, PeerConnectionState,
+    PeerId, RoomId, TrackId,
 };
 
 use crate::{
@@ -581,7 +581,7 @@ impl PeersService {
     pub(super) fn get_peers_states(
         &self,
         member_id: &MemberId,
-    ) -> HashMap<PeerId, medea_client_api_proto::state::PeerState> {
+    ) -> HashMap<PeerId, state::Peer> {
         self.peers.get_peers_states(member_id)
     }
 }
@@ -756,15 +756,21 @@ impl PeerRepository {
         peers_to_remove
     }
 
+    /// Returns all [`PeerState`]s for the provided [`MemberId`].
     pub fn get_peers_states(
         &self,
         member_id: &MemberId,
-    ) -> HashMap<PeerId, medea_client_api_proto::state::PeerState> {
+    ) -> HashMap<PeerId, state::Peer> {
         self.0
             .borrow()
             .iter()
-            .filter(|(_, p)| &p.member_id() == member_id)
-            .map(|(id, p)| (*id, p.get_state()))
+            .filter_map(|(id, p)| {
+                if &p.member_id() == member_id {
+                    Some((*id, p.get_state()))
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }

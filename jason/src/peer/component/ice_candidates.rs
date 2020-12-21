@@ -6,14 +6,18 @@ use medea_reactive::ObservableHashSet;
 
 use crate::utils::{AsProtoState, SynchronizableState};
 
+/// Store of the all [`IceCandidate`]s of the [`PeerComponent`].
 #[derive(Debug)]
 pub struct IceCandidates(RefCell<ObservableHashSet<IceCandidate>>);
 
 impl IceCandidates {
+    /// Adds new [`IceCandidate`].
     pub fn add(&self, candidate: IceCandidate) {
         self.0.borrow_mut().insert(candidate);
     }
 
+    /// Returns [`LocalBoxStream`] into which all added [`IceCandidate`]s will
+    /// be sent.
     pub fn on_add(&self) -> LocalBoxStream<'static, IceCandidate> {
         self.0.borrow().on_insert()
     }

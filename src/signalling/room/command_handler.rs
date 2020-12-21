@@ -225,10 +225,7 @@ impl CommandHandler for Room {
         Ok(())
     }
 
-    fn on_synchronize_me(
-        &mut self,
-        state: proto::state::State,
-    ) -> Self::Output {
+    fn on_synchronize_me(&mut self, _: proto::state::Room) -> Self::Output {
         todo!()
     }
 }

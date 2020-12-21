@@ -1,6 +1,7 @@
 //! Implementation of the [`PeerComponent`].
 
 mod ice_candidates;
+mod local_sdp;
 mod tracks_repository;
 mod watchers;
 
@@ -20,23 +21,18 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     peer::{
-        local_sdp::LocalSdp,
         media::{ReceiverState, SenderState},
-        LocalStreamUpdateCriteria, PeerError,
+        LocalStreamUpdateCriteria, PeerConnection, PeerError,
     },
-    utils::Component,
-};
-
-use crate::{
-    peer::PeerConnection,
-    utils::{AsProtoState, SynchronizableState, Updatable},
+    utils::{AsProtoState, Component, SynchronizableState, Updatable},
 };
 
 use self::{
-    ice_candidates::IceCandidates, tracks_repository::TracksRepository,
+    ice_candidates::IceCandidates, local_sdp::LocalSdp,
+    tracks_repository::TracksRepository,
 };
 
-/// Component reponsible for the [`PeerConnection`] updating.
+/// Component responsible for the [`PeerConnection`] updating.
 pub type PeerComponent = Component<PeerState, PeerConnection, GlobalCtx>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,10 +83,6 @@ impl PeerState {
             restart_ice: ObservableCell::new(false),
             ice_candidates: IceCandidates::from_proto(ice_candidates),
         }
-    }
-
-    pub fn apply(&self, state: proto_state::PeerState) {
-        SynchronizableState::apply(self, state)
     }
 
     /// Returns all [`IceServer`]s of this [`PeerState`].
@@ -225,7 +217,7 @@ impl PeerState {
 }
 
 impl AsProtoState for PeerState {
-    type Output = proto_state::PeerState;
+    type Output = proto_state::Peer;
 
     fn as_proto(&self) -> Self::Output {
         Self::Output {
@@ -244,7 +236,7 @@ impl AsProtoState for PeerState {
 }
 
 impl SynchronizableState for PeerState {
-    type Input = proto_state::PeerState;
+    type Input = proto_state::Peer;
 
     fn from_proto(from: Self::Input) -> Self {
         Self::new(
@@ -273,10 +265,9 @@ impl SynchronizableState for PeerState {
         if state.restart_ice {
             self.restart_ice.set(true);
         }
-        self.sdp_offer.update_offer_by_server(state.sdp_offer);
+        self.sdp_offer.update_offer_by_server(&state.sdp_offer);
         self.remote_sdp_offer.set(state.remote_sdp_offer);
         self.ice_candidates.apply(state.ice_candidates);
-
         self.senders.apply(state.senders);
         self.receivers.apply(state.receivers);
     }

@@ -58,9 +58,9 @@ impl Room {
         use CommandValidationError::{
             PeerBelongsToAnotherMember, PeerNotFound,
         };
-        match &command.command {
-            C::SynchronizeMe { state: _ } => return Ok(()),
-            _ => (),
+
+        if let C::SynchronizeMe { .. } = &command.command {
+            return Ok(());
         }
 
         let peer_id = match command.command {

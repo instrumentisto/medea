@@ -413,11 +413,6 @@ impl RpcSession for WebSocketRpcSession {
         let state = self.state.get();
         if let SessionState::Opened(info) = state {
             self.client.send_command(info.room_id.clone(), command);
-        } else {
-            log::error!(
-                "Tried to send Command while RPC Session is in {:?} state",
-                state
-            );
         }
     }
 

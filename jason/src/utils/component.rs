@@ -11,21 +11,35 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::JasonError;
 
+/// Abstraction over state which can be transformed to the states from the
+/// [`medea_client_api_proto::state`].
 pub trait AsProtoState {
+    /// [`medea_client_api_proto::state`] into which this state can be
+    /// transformed.
     type Output;
 
+    /// Converts this state to the [`medea_client_api_proto::state`]
+    /// representation.
     fn as_proto(&self) -> Self::Output;
 }
 
+/// Abstraction of state which can be updated or created by the
+/// [`medea_client_api_proto::state`].
 pub trait SynchronizableState {
+    /// [`medea_client_api_proto::state`] by which this state can be updated.
     type Input;
 
+    /// Creates state from the [`medea_client_api_proto::state`] representation.
     fn from_proto(input: Self::Input) -> Self;
 
+    /// Updates this state with a provided [`medea_client_api_proto::state`].
     fn apply(&self, input: Self::Input);
 }
 
+/// Abstraction over state which can be updated by client side.
 pub trait Updatable {
+    /// Returns [`Future`] which will be resolved when all client updates will
+    /// be performed on this state.
     fn when_updated(&self) -> LocalBoxFuture<'static, ()>;
 }
 

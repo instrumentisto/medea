@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ops::Deref,
     rc::{Rc, Weak},
 };
@@ -48,7 +48,6 @@ use crate::{
     },
     JsMediaSourceKind,
 };
-use std::collections::HashSet;
 
 /// Global context which will be provided to the all [`Component`]s of this app.
 pub struct GlobalCtx {
@@ -71,7 +70,7 @@ impl PeerRepositoryState {
         Self(RefCell::new(ObservableHashMap::new()))
     }
 
-    pub fn apply(&self, state: proto_state::State) {
+    pub fn apply(&self, state: proto_state::Room) {
         for (id, peer_state) in state.peers {
             let peer = self.0.borrow().get(&id).cloned();
             if let Some(peer) = peer {
@@ -85,14 +84,18 @@ impl PeerRepositoryState {
     }
 }
 
-impl From<&PeerRepositoryState> for proto_state::State {
-    fn from(from: &PeerRepositoryState) -> Self {
-        let mut peers = HashMap::new();
-        for (peer_id, peer) in from.0.borrow().iter() {
-            peers.insert(*peer_id, peer.as_proto());
-        }
+impl AsProtoState for PeerRepositoryState {
+    type Output = proto_state::Room;
 
-        Self { peers }
+    fn as_proto(&self) -> Self::Output {
+        Self::Output {
+            peers: self
+                .0
+                .borrow()
+                .iter()
+                .map(|(id, p)| (*id, p.as_proto()))
+                .collect(),
+        }
     }
 }
 
@@ -1393,7 +1396,7 @@ impl EventHandler for InnerRoom {
     #[inline]
     async fn on_state_synchronized(
         &self,
-        state: medea_client_api_proto::state::State,
+        state: proto_state::Room,
     ) -> Self::Output {
         self.peers.state().apply(state);
 

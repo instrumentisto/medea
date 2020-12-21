@@ -5,7 +5,6 @@
 mod component;
 mod conn;
 mod ice_server;
-mod local_sdp;
 mod media;
 mod repo;
 mod stats;
@@ -47,7 +46,6 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     component::{PeerComponent, PeerState},
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
-    local_sdp::{LocalSdp, Sdp},
     media::{
         media_exchange_state, mute_state, MediaConnections,
         MediaConnectionsError, MediaExchangeState,

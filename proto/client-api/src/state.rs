@@ -8,15 +8,15 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct State {
-    pub peers: HashMap<PeerId, PeerState>,
+pub struct Room {
+    pub peers: HashMap<PeerId, Peer>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct PeerState {
+pub struct Peer {
     pub id: PeerId,
-    pub senders: HashMap<TrackId, SenderState>,
-    pub receivers: HashMap<TrackId, ReceiverState>,
+    pub senders: HashMap<TrackId, Sender>,
+    pub receivers: HashMap<TrackId, Receiver>,
     pub force_relay: bool,
     pub ice_servers: Vec<IceServer>,
     pub negotiation_role: Option<NegotiationRole>,
@@ -27,7 +27,7 @@ pub struct PeerState {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct SenderState {
+pub struct Sender {
     pub id: TrackId,
     pub mid: Option<String>,
     pub media_type: MediaType,
@@ -38,7 +38,7 @@ pub struct SenderState {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub struct ReceiverState {
+pub struct Receiver {
     pub id: TrackId,
     pub mid: Option<String>,
     pub media_type: MediaType,

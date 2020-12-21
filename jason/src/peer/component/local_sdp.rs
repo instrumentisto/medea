@@ -134,7 +134,8 @@ impl LocalSdp {
         self.0.borrow_mut().rollback(is_restart)
     }
 
-    pub fn update_offer_by_server(&self, new_offer: Option<String>) {
+    /// Handles SDP offer update received from the server.
+    pub fn update_offer_by_server(&self, new_offer: &Option<String>) {
         let approved = new_offer
             .as_ref()
             .and_then(|new_offer| {

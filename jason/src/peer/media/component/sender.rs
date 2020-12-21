@@ -36,7 +36,7 @@ pub struct SenderState {
 }
 
 impl AsProtoState for SenderState {
-    type Output = proto_state::SenderState;
+    type Output = proto_state::Sender;
 
     fn as_proto(&self) -> Self::Output {
         Self::Output {
@@ -52,7 +52,7 @@ impl AsProtoState for SenderState {
 }
 
 impl SynchronizableState for SenderState {
-    type Input = proto_state::SenderState;
+    type Input = proto_state::Sender;
 
     fn from_proto(input: Self::Input) -> Self {
         Self {
@@ -87,7 +87,7 @@ impl Updatable for SenderState {
     }
 }
 
-impl From<&SenderState> for proto_state::SenderState {
+impl From<&SenderState> for proto_state::Sender {
     fn from(state: &SenderState) -> Self {
         Self {
             id: state.id,
@@ -101,8 +101,8 @@ impl From<&SenderState> for proto_state::SenderState {
     }
 }
 
-impl From<proto_state::SenderState> for SenderState {
-    fn from(from: proto_state::SenderState) -> Self {
+impl From<proto_state::Sender> for SenderState {
+    fn from(from: proto_state::Sender) -> Self {
         Self {
             id: from.id,
             mid: from.mid,
@@ -148,12 +148,6 @@ impl SenderState {
             muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
         })
-    }
-
-    pub fn apply(&self, state: proto_state::SenderState) {
-        self.muted.set(state.muted);
-        self.enabled_general.set(state.enabled_general);
-        self.enabled_individual.set(state.enabled_individual);
     }
 
     /// Returns [`TrackId`] of this [`SenderState`].

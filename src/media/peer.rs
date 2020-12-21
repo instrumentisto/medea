@@ -57,7 +57,7 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceCandidate, IceServer, MediaSourceKind,
+    state, AudioSettings, Direction, IceCandidate, IceServer, MediaSourceKind,
     MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, Track, TrackId,
     TrackPatchCommand, TrackPatchEvent, TrackUpdate, VideoSettings,
 };
@@ -230,54 +230,52 @@ impl PeerStateMachine {
         }
     }
 
-    fn get_senders_states(
-        &self,
-    ) -> HashMap<TrackId, medea_client_api_proto::state::SenderState> {
+    fn get_senders_states(&self) -> HashMap<TrackId, state::Sender> {
         self.senders()
             .iter()
             .map(|(id, sender)| {
                 (
                     *id,
-                    medea_client_api_proto::state::SenderState {
-                        id: sender.id,
+                    state::Sender {
+                        id: sender.id(),
                         mid: sender.mid(),
-                        media_type: sender.media_type.clone(),
+                        media_type: sender.media_type().clone(),
                         receivers: vec![self.partner_member_id()],
-                        enabled_individual: sender.is_send_enabled(),
-                        enabled_general: sender.is_media_exchange_enabled(),
-                        muted: sender.is_send_muted(),
+                        enabled_individual: sender
+                            .send_media_state()
+                            .is_enabled(),
+                        enabled_general: sender.is_enabled_general(),
+                        muted: sender.send_media_state().is_muted(),
                     },
                 )
             })
             .collect()
     }
 
-    fn get_receivers_states(
-        &self,
-    ) -> HashMap<TrackId, medea_client_api_proto::state::ReceiverState> {
+    fn get_receivers_states(&self) -> HashMap<TrackId, state::Receiver> {
         self.receivers()
             .iter()
             .map(|(id, receiver)| {
                 (
                     *id,
-                    medea_client_api_proto::state::ReceiverState {
+                    state::Receiver {
                         id: *id,
                         mid: receiver.mid(),
-                        media_type: receiver.media_type.clone(),
+                        media_type: receiver.media_type().clone(),
                         sender_id: self.partner_member_id(),
-                        enabled_individual: receiver.is_recv_enabled(),
-                        enabled_general: receiver.is_media_exchange_enabled(),
-                        muted: receiver.is_recv_muted(),
+                        enabled_individual: receiver
+                            .recv_media_state()
+                            .is_enabled(),
+                        enabled_general: receiver.is_enabled_general(),
+                        muted: receiver.recv_media_state().is_muted(),
                     },
                 )
             })
             .collect()
     }
 
-    pub fn get_state(&self) -> medea_client_api_proto::state::PeerState {
-        // TODO (evdokimovs): Meh, ice_servers_list can be None, DO SOMETHING
-        //                    WITH IT.
-        medea_client_api_proto::state::PeerState {
+    pub fn get_state(&self) -> state::Peer {
+        state::Peer {
             id: self.id(),
             senders: self.get_senders_states(),
             receivers: self.get_receivers_states(),
@@ -496,16 +494,16 @@ impl TrackChange {
     fn as_track_update(&self, partner_member_id: MemberId) -> TrackUpdate {
         match self {
             Self::AddSendTrack(track) => TrackUpdate::Added(Track {
-                id: track.id,
-                media_type: track.media_type.clone(),
+                id: track.id(),
+                media_type: track.media_type().clone(),
                 direction: Direction::Send {
                     receivers: vec![partner_member_id],
                     mid: track.mid(),
                 },
             }),
             Self::AddRecvTrack(track) => TrackUpdate::Added(Track {
-                id: track.id,
-                media_type: track.media_type.clone(),
+                id: track.id(),
+                media_type: track.media_type().clone(),
                 direction: Direction::Recv {
                     sender: partner_member_id,
                     mid: track.mid(),
@@ -536,7 +534,7 @@ impl<T> TrackChangeHandler for Peer<T> {
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
     #[inline]
     fn on_add_send_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
-        self.context.senders.insert(track.id, Rc::clone(&track));
+        self.context.senders.insert(track.id(), Rc::clone(&track));
 
         TrackChange::AddSendTrack(track)
     }
@@ -544,14 +542,13 @@ impl<T> TrackChangeHandler for Peer<T> {
     /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
     #[inline]
     fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
-        self.context.receivers.insert(track.id, Rc::clone(&track));
+        self.context.receivers.insert(track.id(), Rc::clone(&track));
 
         TrackChange::AddRecvTrack(track)
     }
 
     /// Applies provided [`TrackPatchEvent`] to [`Peer`]s [`Track`].
     fn on_track_patch(&mut self, mut patch: TrackPatchEvent) -> Self::Output {
-        // TODO: check for bugs
         let (track, is_tx) = if let Some(tx) = self.senders().get(&patch.id) {
             (tx, true)
         } else if let Some(rx) = self.receivers().get(&patch.id) {
@@ -562,17 +559,17 @@ impl<T> TrackChangeHandler for Peer<T> {
 
         if let Some(enabled) = patch.enabled_individual {
             if is_tx {
-                track.set_send_media_exchange_state(enabled);
+                track.send_media_state().set_enabled(enabled);
             } else {
-                track.set_recv_media_exchange_state(enabled);
+                track.recv_media_state().set_enabled(enabled);
             }
-            patch.enabled_general = Some(track.is_media_exchange_enabled());
+            patch.enabled_general = Some(track.is_enabled_general());
         }
         if let Some(muted) = patch.muted {
             if is_tx {
-                track.set_send_muted(muted);
+                track.send_media_state().set_muted(muted);
             } else {
-                track.set_recv_muted(muted);
+                track.recv_media_state().set_muted(muted);
             }
         }
 
@@ -596,9 +593,8 @@ impl<T> TrackChangeHandler for Peer<T> {
                 .or_else(|| self.receivers().get(&patch.id));
 
             if let Some(track) = track {
-                if enabled_individual == track.is_media_exchange_enabled() {
-                    patch.enabled_general =
-                        Some(track.is_media_exchange_enabled());
+                if enabled_individual == track.is_enabled_general() {
+                    patch.enabled_general = Some(track.is_enabled_general());
                 }
             }
         }
@@ -958,8 +954,9 @@ impl Peer<WaitLocalSdp> {
             .chain(self.context.receivers.iter_mut());
 
         for (id, track) in tracks {
-            let mid =
-                mids.remove(&id).ok_or(PeerError::MidsMismatch(track.id))?;
+            let mid = mids
+                .remove(&id)
+                .ok_or_else(|| PeerError::MidsMismatch(track.id()))?;
             track.set_mid(mid)
         }
 
@@ -1095,7 +1092,9 @@ impl Peer<Stable> {
         for (track_id, track) in &self.context.senders {
             mids.insert(
                 *track_id,
-                track.mid().ok_or(PeerError::MidsMismatch(track.id))?,
+                track
+                    .mid()
+                    .ok_or_else(|| PeerError::MidsMismatch(track.id()))?,
             );
         }
         Ok(mids)

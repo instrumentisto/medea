@@ -10,28 +10,37 @@ use crate::{
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
 
+/// Repository for the all [`SenderState`]s/[`ReceiverState`]s of the
+/// [`PeerComponent`].
 #[derive(Debug, From)]
 pub struct TracksRepository<S: 'static>(
     RefCell<ProgressableHashMap<TrackId, Rc<S>>>,
 );
 
 impl<S> TracksRepository<S> {
+    /// Returns new [`TracksRepository`] with a provided tracks.
     pub fn new(tracks: ProgressableHashMap<TrackId, Rc<S>>) -> Self {
         Self(RefCell::new(tracks))
     }
 
+    /// Returns [`Future`] which will be resolved when all inserts/removes will
+    /// be processed.
     pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
         self.0.borrow().when_all_processed()
     }
 
+    /// Inserts provided track.
     pub fn insert(&self, id: TrackId, track: Rc<S>) {
         self.0.borrow_mut().insert(id, track);
     }
 
+    /// Returns track with a provided [`TrackId`].
     pub fn get(&self, id: TrackId) -> Option<Rc<S>> {
         self.0.borrow().get(&id).cloned()
     }
 
+    /// Returns [`Stream`] into which all [`TracksRepository::insert`]ions will
+    /// be sent.
     pub fn on_insert(
         &self,
     ) -> LocalBoxStream<'static, Guarded<(TrackId, Rc<S>)>> {
@@ -40,6 +49,8 @@ impl<S> TracksRepository<S> {
 }
 
 impl TracksRepository<SenderState> {
+    /// Returns all [`SenderState`]s which are requires local `MediaStream`
+    /// update.
     pub fn get_outdated(&self) -> Vec<Rc<SenderState>> {
         self.0
             .borrow()

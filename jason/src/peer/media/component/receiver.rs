@@ -33,7 +33,7 @@ pub struct ReceiverState {
 }
 
 impl AsProtoState for ReceiverState {
-    type Output = proto_state::ReceiverState;
+    type Output = proto_state::Receiver;
 
     fn as_proto(&self) -> Self::Output {
         Self::Output {
@@ -49,7 +49,7 @@ impl AsProtoState for ReceiverState {
 }
 
 impl SynchronizableState for ReceiverState {
-    type Input = proto_state::ReceiverState;
+    type Input = proto_state::Receiver;
 
     fn from_proto(input: Self::Input) -> Self {
         Self {
@@ -83,7 +83,7 @@ impl Updatable for ReceiverState {
     }
 }
 
-impl From<&ReceiverState> for proto_state::ReceiverState {
+impl From<&ReceiverState> for proto_state::Receiver {
     fn from(from: &ReceiverState) -> Self {
         Self {
             id: from.id,
@@ -97,8 +97,8 @@ impl From<&ReceiverState> for proto_state::ReceiverState {
     }
 }
 
-impl From<proto_state::ReceiverState> for ReceiverState {
-    fn from(from: proto_state::ReceiverState) -> Self {
+impl From<proto_state::Receiver> for ReceiverState {
+    fn from(from: proto_state::Receiver) -> Self {
         Self {
             id: from.id,
             mid: from.mid,
@@ -133,12 +133,6 @@ impl ReceiverState {
             enabled_individual: ProgressableCell::new(enabled),
             muted: ProgressableCell::new(false),
         }
-    }
-
-    pub fn apply(&self, state: proto_state::ReceiverState) {
-        self.muted.set(state.muted);
-        self.enabled_general.set(state.enabled_general);
-        self.enabled_individual.set(state.enabled_individual);
     }
 
     /// Returns [`TrackId`] of this [`ReceiverState`].

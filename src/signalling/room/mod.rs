@@ -16,7 +16,7 @@ use derive_more::{Display, From};
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{
-    Event, MemberId, NegotiationRole, PeerId, RoomId,
+    state, Event, MemberId, NegotiationRole, PeerId, RoomId,
 };
 
 use crate::{
@@ -189,8 +189,8 @@ impl Room {
     pub fn get_state(
         &self,
         member_id: &MemberId,
-    ) -> medea_client_api_proto::state::State {
-        medea_client_api_proto::state::State {
+    ) -> medea_client_api_proto::state::Room {
+        state::Room {
             peers: self.peers.get_peers_states(member_id),
         }
     }
@@ -202,10 +202,11 @@ impl Room {
 
     // TODO (evdokimovs): This function needed only for tests.
     //                    Rollback it.
+    #[allow(clippy::missing_errors_doc)]
     pub fn send_event(
         &mut self,
         member_id: MemberId,
-        e: Event,
+        _: Event,
     ) -> Result<(), RoomError> {
         let state = self.get_state(&member_id);
         self.members.send_event_to_member(

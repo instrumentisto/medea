@@ -35,7 +35,6 @@ use medea_macro::dispatchable;
 use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
-use crate::state::State;
 
 /// ID of `Room`.
 #[derive(
@@ -238,7 +237,7 @@ pub enum Command {
     },
 
     SynchronizeMe {
-        state: State,
+        state: state::Room,
     },
 }
 
@@ -477,7 +476,7 @@ pub enum Event {
     },
 
     StateSynchronized {
-        state: State,
+        state: state::Room,
     },
 }
 
