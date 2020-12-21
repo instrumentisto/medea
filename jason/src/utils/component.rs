@@ -2,9 +2,12 @@
 
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use futures::{future, future::AbortHandle, Future, Stream, StreamExt};
+use futures::{
+    future,
+    future::{AbortHandle, LocalBoxFuture},
+    Future, Stream, StreamExt,
+};
 use wasm_bindgen_futures::spawn_local;
-use futures::future::LocalBoxFuture;
 
 use crate::utils::JasonError;
 

@@ -14,13 +14,10 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     media::LocalTracksConstraints,
-    peer::{
-        MediaConnectionsError, Sender,
-    },
-    utils::Component,
+    peer::{MediaConnectionsError, Sender},
+    utils::{AsProtoState, Component, SynchronizableState, Updatable},
     MediaKind,
 };
-use crate::utils::{AsProtoState, SynchronizableState, Updatable};
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.

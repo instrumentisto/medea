@@ -3,11 +3,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{
-    channel::mpsc,
-    future,
-    future::{Either, LocalBoxFuture},
-    stream::LocalBoxStream,
-    FutureExt, StreamExt,
+    channel::mpsc, future, future::Either, stream::LocalBoxStream, StreamExt,
 };
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;

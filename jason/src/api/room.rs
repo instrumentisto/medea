@@ -43,8 +43,8 @@ use crate::{
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
     utils::{
-        Callback1, Component, HandlerDetachedError, JasonError, JsCaused,
-        JsError,
+        AsProtoState, Callback1, Component, HandlerDetachedError, JasonError,
+        JsCaused, JsError, SynchronizableState,
     },
     JsMediaSourceKind,
 };
@@ -79,7 +79,7 @@ impl PeerRepositoryState {
             } else {
                 self.0
                     .borrow_mut()
-                    .insert(id, Rc::new(PeerState::from(peer_state)));
+                    .insert(id, Rc::new(PeerState::from_proto(peer_state)));
             }
         }
     }
@@ -89,7 +89,7 @@ impl From<&PeerRepositoryState> for proto_state::State {
     fn from(from: &PeerRepositoryState) -> Self {
         let mut peers = HashMap::new();
         for (peer_id, peer) in from.0.borrow().iter() {
-            peers.insert(*peer_id, proto_state::PeerState::from(peer.as_ref()));
+            peers.insert(*peer_id, peer.as_proto());
         }
 
         Self { peers }

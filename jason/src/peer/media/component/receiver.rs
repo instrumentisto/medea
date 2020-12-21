@@ -7,18 +7,15 @@ use medea_client_api_proto::{
     state as proto_state, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ObservableCell, ProgressableCell};
+use medea_reactive::{Guarded, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
     api::GlobalCtx,
     media::RecvConstraints,
-    peer::{
-        MediaConnectionsError, Receiver,
-    },
-    utils::Component,
+    peer::{MediaConnectionsError, Receiver},
+    utils::{AsProtoState, Component, SynchronizableState, Updatable},
 };
-use crate::utils::{AsProtoState, SynchronizableState, Updatable};
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
