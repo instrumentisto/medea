@@ -15,12 +15,12 @@ use crate::{
     api::GlobalCtx,
     media::LocalTracksConstraints,
     peer::{
-        component::{AsProtoState, SynchronizableState, Updatable},
         MediaConnectionsError, Sender,
     },
     utils::Component,
     MediaKind,
 };
+use crate::utils::{AsProtoState, SynchronizableState, Updatable};
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.

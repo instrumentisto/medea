@@ -13,6 +13,9 @@ use medea_reactive::{
     ObservableHashSet, ObservableVec, ProgressableCell,
 };
 use tracerr::Traced;
+use derive_more::From;
+use futures::stream::LocalBoxStream;
+use std::collections::HashSet;
 
 use crate::{
     api::GlobalCtx,
@@ -26,6 +29,7 @@ use crate::{
 };
 
 use super::PeerConnection;
+use crate::utils::{Updatable, AsProtoState, SynchronizableState};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NegotiationState {
@@ -33,28 +37,6 @@ enum NegotiationState {
     WaitLocalSdp,
     WaitLocalSdpApprove,
     WaitRemoteSdp,
-}
-
-use derive_more::From;
-use futures::stream::LocalBoxStream;
-use std::collections::HashSet;
-
-pub trait AsProtoState {
-    type Output;
-
-    fn as_proto(&self) -> Self::Output;
-}
-
-pub trait SynchronizableState {
-    type Input;
-
-    fn from_proto(input: Self::Input) -> Self;
-
-    fn apply(&self, input: Self::Input);
-}
-
-pub trait Updatable {
-    fn when_updated(&self) -> LocalBoxFuture<'static, ()>;
 }
 
 #[derive(Debug, From)]
@@ -413,16 +395,6 @@ impl PeerState {
     #[inline]
     pub fn resume_timeouts(&self) {
         self.sdp_offer.resume_timeout();
-    }
-
-    /// Returns [`Future`] which will be resolved when all
-    /// [`SenderState`]s/[`ReceiverState`]s updates will be applied.
-    ///
-    /// [`Future`]: std::future::Future
-    // TODO (evdokimovs): Remove it and use Updatable trait
-    #[inline]
-    pub fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
-        self.when_updated()
     }
 
     /// Updates local `MediaStream` based on
@@ -795,7 +767,7 @@ impl PeerComponent {
                         state.receivers.when_all_processed(),
                     )
                     .await;
-                    state.when_all_updated().await;
+                    state.when_updated().await;
 
                     state
                         .update_local_stream(&ctx)

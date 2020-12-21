@@ -4,8 +4,27 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 use futures::{future, future::AbortHandle, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;
+use futures::future::LocalBoxFuture;
 
 use crate::utils::JasonError;
+
+pub trait AsProtoState {
+    type Output;
+
+    fn as_proto(&self) -> Self::Output;
+}
+
+pub trait SynchronizableState {
+    type Input;
+
+    fn from_proto(input: Self::Input) -> Self;
+
+    fn apply(&self, input: Self::Input);
+}
+
+pub trait Updatable {
+    fn when_updated(&self) -> LocalBoxFuture<'static, ()>;
+}
 
 /// Creates and spawns new [`Component`].
 ///

@@ -14,11 +14,11 @@ use crate::{
     api::GlobalCtx,
     media::RecvConstraints,
     peer::{
-        component::{AsProtoState, SynchronizableState, Updatable},
         MediaConnectionsError, Receiver,
     },
     utils::Component,
 };
+use crate::utils::{AsProtoState, SynchronizableState, Updatable};
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
