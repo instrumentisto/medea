@@ -37,6 +37,7 @@ enum NegotiationState {
 
 use derive_more::From;
 use futures::stream::LocalBoxStream;
+use std::collections::HashSet;
 
 pub trait AsProtoState {
     type Output;
@@ -165,6 +166,39 @@ impl Updatable for PeerState {
     }
 }
 
+#[derive(Debug)]
+struct IceCandidates(RefCell<ObservableHashSet<IceCandidate>>);
+
+impl IceCandidates {
+    pub fn add(&self, candidate: IceCandidate) {
+        self.0.borrow_mut().insert(candidate);
+    }
+
+    pub fn on_add(&self) -> LocalBoxStream<'static, IceCandidate> {
+        self.0.borrow().on_insert()
+    }
+}
+
+impl SynchronizableState for IceCandidates {
+    type Input = HashSet<IceCandidate>;
+
+    fn from_proto(input: Self::Input) -> Self {
+        Self(RefCell::new(input.into()))
+    }
+
+    fn apply(&self, input: Self::Input) {
+        self.0.borrow_mut().update(input);
+    }
+}
+
+impl AsProtoState for IceCandidates {
+    type Output = HashSet<IceCandidate>;
+
+    fn as_proto(&self) -> Self::Output {
+        self.0.borrow().iter().cloned().collect()
+    }
+}
+
 /// State of the [`PeerComponent`].
 pub struct PeerState {
     id: PeerId,
@@ -177,19 +211,16 @@ pub struct PeerState {
     sdp_offer: LocalSdp,
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
-    ice_candidates: RefCell<ObservableHashSet<IceCandidate>>,
+    ice_candidates: IceCandidates,
 }
 
 impl From<&PeerState> for proto_state::PeerState {
     fn from(from: &PeerState) -> Self {
-        let ice_candidates =
-            from.ice_candidates.borrow().iter().cloned().collect();
-
         Self {
             id: from.id,
             senders: from.senders.as_proto(),
             receivers: from.receivers.as_proto(),
-            ice_candidates,
+            ice_candidates: from.ice_candidates.as_proto(),
             force_relay: from.force_relay,
             ice_servers: from.ice_servers.clone(),
             negotiation_role: from.negotiation_role.get(),
@@ -219,6 +250,7 @@ impl SynchronizableState for PeerState {
             from.ice_servers,
             from.force_relay,
             from.negotiation_role,
+            from.ice_candidates,
         )
     }
 
@@ -231,9 +263,7 @@ impl SynchronizableState for PeerState {
         }
         self.sdp_offer.update_offer_by_server(state.sdp_offer);
         self.remote_sdp_offer.set(state.remote_sdp_offer);
-        self.ice_candidates
-            .borrow_mut()
-            .update(state.ice_candidates);
+        self.ice_candidates.apply(state.ice_candidates);
 
         self.senders.apply(state.senders);
         self.receivers.apply(state.receivers);
@@ -257,6 +287,7 @@ impl From<proto_state::PeerState> for PeerState {
             from.ice_servers,
             from.force_relay,
             from.negotiation_role,
+            from.ice_candidates,
         )
     }
 }
@@ -271,6 +302,7 @@ impl PeerState {
         ice_servers: Vec<IceServer>,
         force_relay: bool,
         negotiation_role: Option<NegotiationRole>,
+        ice_candidates: HashSet<IceCandidate>,
     ) -> Self {
         Self {
             id,
@@ -283,7 +315,7 @@ impl PeerState {
             negotiation_role: ObservableCell::new(negotiation_role),
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
-            ice_candidates: RefCell::new(ObservableHashSet::new()),
+            ice_candidates: IceCandidates::from_proto(ice_candidates),
         }
     }
 
@@ -352,7 +384,7 @@ impl PeerState {
     /// Adds [`IceCandidate`] for the [`PeerState`].
     #[inline]
     pub fn add_ice_candidate(&self, ice_candidate: IceCandidate) {
-        self.ice_candidates.borrow_mut().insert(ice_candidate);
+        self.ice_candidates.add(ice_candidate);
     }
 
     /// Returns current SDP offer of this [`PeerState`].
@@ -441,7 +473,7 @@ impl PeerComponent {
     ///
     /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
     /// [`IceCandidate`].
-    #[watch(self.state().ice_candidates.borrow().on_insert())]
+    #[watch(self.state().ice_candidates.on_add())]
     #[inline]
     async fn ice_candidate_insert_watcher(
         ctx: Rc<PeerConnection>,

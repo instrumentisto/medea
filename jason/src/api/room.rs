@@ -48,6 +48,7 @@ use crate::{
     },
     JsMediaSourceKind,
 };
+use std::collections::HashSet;
 
 /// Global context which will be provided to the all [`Component`]s of this app.
 pub struct GlobalCtx {
@@ -1227,6 +1228,7 @@ impl EventHandler for InnerRoom {
             ice_servers,
             is_force_relayed,
             Some(negotiation_role),
+            HashSet::new(),
         );
         self.peers
             .state()
