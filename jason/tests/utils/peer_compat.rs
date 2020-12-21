@@ -1,4 +1,4 @@
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, ops::Deref, rc::Rc};
 
 use futures::{channel::mpsc, stream, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto as proto;
@@ -14,6 +14,7 @@ use medea_jason::{
     },
     rpc::MockRpcSession,
     spawn_component,
+    utils::Updatable,
 };
 use medea_reactive::ProgressableHashMap;
 use tracerr::Traced;
@@ -61,6 +62,7 @@ impl PeerConnectionCompat {
             ice_servers,
             is_force_relayed,
             None,
+            HashSet::new(),
         );
 
         let (command_tx, command_rx) = mpsc::unbounded();
@@ -187,7 +189,7 @@ impl PeerConnectionCompat {
             }
         }
 
-        self.component.state().when_all_updated().await;
+        self.component.state().when_updated().await;
     }
 }
 

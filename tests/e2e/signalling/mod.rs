@@ -430,6 +430,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                             Event::PeersRemoved { .. }
                             | Event::ConnectionQualityUpdated { .. }
                             | Event::RoomJoined { .. }
+                            | Event::StateSynchronized { .. }
                             | Event::RoomLeft { .. } => (),
                         }
                     }
