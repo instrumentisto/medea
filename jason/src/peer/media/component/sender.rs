@@ -24,6 +24,7 @@ use crate::{
 pub type SenderComponent = Component<SenderState, Sender, GlobalCtx>;
 
 /// State of the [`SenderComponent`].
+#[derive(Debug)]
 pub struct SenderState {
     id: TrackId,
     mid: Option<String>,

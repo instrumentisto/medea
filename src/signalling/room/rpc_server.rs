@@ -9,7 +9,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{Command, Credential, MemberId, PeerId};
+use medea_client_api_proto::{Command, Credential, Event, MemberId, PeerId};
 
 use crate::{
     api::{
@@ -151,6 +151,26 @@ impl Handler<CommandMessage> for Room {
     ) -> Self::Result {
         match self.validate_command(&msg) {
             Ok(_) => {
+                match &msg.command {
+                    Command::SynchronizeMe { .. } => {
+                        let state = self.get_state(&msg.member_id);
+                        return if let Err(err) = self.send_event(
+                            msg.member_id.clone(),
+                            Event::StateSynchronized { state },
+                        ) {
+                            error!(
+                                "Failed state synchronization, because {}. \
+                                 Room [id = {}] will be stopped.",
+                                err, self.id,
+                            );
+                            self.close_gracefully(ctx)
+                        } else {
+                            Box::pin(fut::ready(()))
+                        };
+                    }
+                    _ => (),
+                }
+
                 if let Err(err) = msg.command.dispatch_with(self) {
                     error!(
                         "Failed handle command, because {}. Room [id = {}] \

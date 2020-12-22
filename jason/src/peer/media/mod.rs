@@ -12,6 +12,7 @@ use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
+use medea_client_api_proto::{Command, TrackPatchCommand};
 #[cfg(feature = "mockable")]
 use medea_client_api_proto::{MediaType, MemberId};
 use medea_reactive::DroppedError;
@@ -725,6 +726,16 @@ impl MediaConnections {
         self.get_all_transceivers_sides()
             .into_iter()
             .for_each(|t| t.reset_media_state_transition_timeout());
+    }
+
+    pub fn intentions(&self) -> Vec<TrackPatchCommand> {
+        let inner = self.0.borrow();
+        inner
+            .senders
+            .values()
+            .filter_map(|s| s.intentions())
+            .chain(inner.receivers.values().filter_map(|r| r.intentions()))
+            .collect()
     }
 }
 

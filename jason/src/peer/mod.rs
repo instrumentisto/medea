@@ -23,8 +23,8 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    stats::StatId, IceConnectionState, IceServer, MediaSourceKind, MemberId,
-    PeerConnectionState, PeerId as Id, PeerId, TrackId,
+    stats::StatId, Command, IceConnectionState, IceServer, MediaSourceKind,
+    MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -736,6 +736,13 @@ impl PeerConnection {
             });
         }
         Ok(())
+    }
+
+    pub fn intentions(&self) -> Vec<Command> {
+        vec![Command::UpdateTracks {
+            peer_id: self.id,
+            tracks_patches: self.media_connections.intentions(),
+        }]
     }
 }
 

@@ -9,7 +9,7 @@ use tracerr::Traced;
 use crate::{
     api::GlobalCtx,
     peer::{
-        component::NegotiationState,
+        component::{NegotiationState, SyncState},
         media::{ReceiverState, SenderBuilder, SenderState},
         media_exchange_state, mute_state, PeerConnection, PeerError, PeerState,
         Receiver, ReceiverComponent, SenderComponent,
@@ -44,6 +44,49 @@ impl PeerComponent {
         Ok(())
     }
 
+    #[watch(self.global_ctx().rpc.on_connection_loss())]
+    async fn connection_loss_watcher(
+        _: Rc<PeerConnection>,
+        _: Rc<GlobalCtx>,
+        state: Rc<PeerState>,
+        _: (),
+    ) -> Result<(), Traced<PeerError>> {
+        state.sync_state.set(SyncState::Unsynced);
+
+        Ok(())
+    }
+
+    #[watch(self.global_ctx().rpc.on_reconnected())]
+    async fn reconnect_watcher(
+        _: Rc<PeerConnection>,
+        _: Rc<GlobalCtx>,
+        state: Rc<PeerState>,
+        _: (),
+    ) -> Result<(), Traced<PeerError>> {
+        state.sync_state.set(SyncState::Syncing);
+
+        Ok(())
+    }
+
+    #[watch(self.state().sync_state.subscribe())]
+    async fn sync_state_watcher(
+        ctx: Rc<PeerConnection>,
+        global_ctx: Rc<GlobalCtx>,
+        state: Rc<PeerState>,
+        sync_state: SyncState,
+    ) -> Result<(), Traced<PeerError>> {
+        match sync_state {
+            SyncState::Synced => {
+                for intent in ctx.intentions() {
+                    global_ctx.rpc.send_command(intent);
+                }
+            }
+            _ => (),
+        }
+
+        Ok(())
+    }
+
     /// Watcher for the [`PeerState::remote_sdp_offer`] update.
     ///
     /// Calls [`PeerConnection::set_remote_answer`] with a new value if current
@@ -67,6 +110,7 @@ impl PeerComponent {
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         state.negotiation_state.set(NegotiationState::Stable);
+                        state.negotiation_role.set(None);
                     }
                     NegotiationRole::Answerer(_) => {
                         ctx.set_remote_offer(remote_sdp_answer)
@@ -101,6 +145,7 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`NegotiationState`] change.
     #[watch(self.state().negotiation_state.subscribe().skip(1))]
     async fn negotiation_state_watcher(
         ctx: Rc<PeerConnection>,
@@ -147,6 +192,7 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the SDP offer approving.
     #[watch(self.state().sdp_offer.on_approve().skip(1))]
     async fn sdp_offer_approve_watcher(
         _: Rc<PeerConnection>,
@@ -163,6 +209,7 @@ impl PeerComponent {
                 }
                 NegotiationRole::Answerer(_) => {
                     state.negotiation_state.set(NegotiationState::Stable);
+                    state.negotiation_role.set(None);
                 }
             }
         }
@@ -277,6 +324,7 @@ impl PeerComponent {
         state: Rc<PeerState>,
         sdp_offer: Sdp,
     ) -> Result<(), Traced<PeerError>> {
+        state.sync_state.when_eq(SyncState::Synced).await;
         if let Some(role) = state.negotiation_role.get() {
             match (sdp_offer, role) {
                 (Sdp::Offer(offer), NegotiationRole::Offerer) => {
@@ -322,6 +370,7 @@ impl PeerComponent {
                             .set(NegotiationState::WaitLocalSdp);
                     } else {
                         state.negotiation_state.set(NegotiationState::Stable);
+                        state.negotiation_role.set(None);
                     }
                 }
             }

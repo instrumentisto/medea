@@ -2,14 +2,19 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use medea_client_api_proto::{MediaSourceKind, TrackId};
+use medea_client_api_proto::{
+    Command, MediaSourceKind, TrackId, TrackPatchCommand, TrackPatchEvent,
+};
 
 use crate::{
     media::{
         track::local, LocalTracksConstraints, MediaKind, TrackConstraints,
         VideoSource,
     },
-    peer::transceiver::{Transceiver, TransceiverDirection},
+    peer::{
+        transceiver::{Transceiver, TransceiverDirection},
+        MediaExchangeState, MuteState,
+    },
 };
 
 use super::{
@@ -223,6 +228,36 @@ impl Sender {
     pub async fn remove_track(&self) {
         // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
+    }
+
+    pub fn intentions(&self) -> Option<TrackPatchCommand> {
+        let media_exchange_intent =
+            if let MediaExchangeState::Transition(state) =
+                self.media_exchange_state()
+            {
+                Some(matches!(
+                    state,
+                    media_exchange_state::Transition::Enabling(_)
+                ))
+            } else {
+                None
+            };
+        let mute_intent =
+            if let MuteState::Transition(state) = self.mute_state() {
+                Some(matches!(state, mute_state::Transition::Muting(_)))
+            } else {
+                None
+            };
+
+        if media_exchange_intent.is_some() || mute_intent.is_some() {
+            Some(TrackPatchCommand {
+                id: self.track_id,
+                muted: mute_intent,
+                enabled: media_exchange_intent,
+            })
+        } else {
+            None
+        }
     }
 }
 

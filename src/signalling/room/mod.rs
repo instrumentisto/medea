@@ -206,13 +206,14 @@ impl Room {
     pub fn send_event(
         &mut self,
         member_id: MemberId,
-        _: Event,
+        event: Event,
     ) -> Result<(), RoomError> {
-        let state = self.get_state(&member_id);
-        self.members.send_event_to_member(
-            member_id,
-            Event::StateSynchronized { state },
-        )?;
+        self.members.send_event_to_member(member_id, event)?;
+        // let state = self.get_state(&member_id);
+        // self.members.send_event_to_member(
+        //     member_id,
+        //     Event::StateSynchronized { state },
+        // )?;
         Ok(())
     }
 

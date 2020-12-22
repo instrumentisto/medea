@@ -110,6 +110,11 @@ impl<S, C, G> Component<S, C, G> {
         }
     }
 
+    #[inline]
+    pub fn global_ctx(&self) -> Rc<G> {
+        self.global_ctx.clone()
+    }
+
     /// Returns [`Rc`] to the context of this [`Component`].
     #[inline]
     pub fn ctx(&self) -> Rc<C> {

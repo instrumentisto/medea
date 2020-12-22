@@ -1147,6 +1147,9 @@ impl InnerRoom {
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
+        self.rpc.send_command(Command::SynchronizeMe {
+            state: self.peers.state().as_proto(),
+        });
         self.peers.repo.resume_timeouts();
     }
 }
@@ -1358,7 +1361,7 @@ impl EventHandler for InnerRoom {
             }
         }
         if let Some(negotiation_role) = negotiation_role {
-            peer_state.set_negotiation_role(negotiation_role);
+            peer_state.set_negotiation_role(negotiation_role).await;
         }
 
         Ok(())

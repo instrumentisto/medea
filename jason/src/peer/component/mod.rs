@@ -43,7 +43,15 @@ enum NegotiationState {
     WaitRemoteSdp,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SyncState {
+    Unsynced,
+    Synced,
+    Syncing,
+}
+
 /// State of the [`PeerComponent`].
+#[derive(Debug)]
 pub struct PeerState {
     id: PeerId,
     senders: TracksRepository<SenderState>,
@@ -56,6 +64,7 @@ pub struct PeerState {
     remote_sdp_offer: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
     ice_candidates: IceCandidates,
+    sync_state: ObservableCell<SyncState>,
 }
 
 impl PeerState {
@@ -82,6 +91,7 @@ impl PeerState {
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
             ice_candidates: IceCandidates::from_proto(ice_candidates),
+            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
@@ -127,7 +137,11 @@ impl PeerState {
 
     /// Sets [`NegotiationRole`] of this [`PeerState`] to the provided one.
     #[inline]
-    pub fn set_negotiation_role(&self, negotiation_role: NegotiationRole) {
+    pub async fn set_negotiation_role(
+        &self,
+        negotiation_role: NegotiationRole,
+    ) {
+        self.negotiation_role.when_eq(None).await;
         self.negotiation_role.set(Some(negotiation_role));
     }
 
@@ -270,6 +284,8 @@ impl SynchronizableState for PeerState {
         self.ice_candidates.apply(state.ice_candidates);
         self.senders.apply(state.senders);
         self.receivers.apply(state.receivers);
+
+        self.sync_state.set(SyncState::Synced);
     }
 }
 

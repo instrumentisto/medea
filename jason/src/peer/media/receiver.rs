@@ -7,15 +7,16 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MediaSourceKind, MemberId};
+use medea_client_api_proto::{MediaSourceKind, MemberId, TrackPatchCommand};
 use proto::TrackId;
 use web_sys as sys;
 
 use crate::{
     media::{track::remote, MediaKind, TrackConstraints},
     peer::{
-        transceiver::Transceiver, MediaConnections, MediaStateControllable,
-        PeerEvent, TransceiverDirection,
+        media::transitable_state::mute_state, transceiver::Transceiver,
+        MediaConnections, MediaExchangeState, MediaStateControllable,
+        MuteState, PeerEvent, TransceiverDirection,
     },
 };
 
@@ -261,6 +262,22 @@ impl Receiver {
                 }
             }
             self.maybe_notify_track();
+        }
+    }
+
+    pub fn intentions(&self) -> Option<TrackPatchCommand> {
+        if let MediaExchangeState::Transition(state) =
+            self.media_exchange_state()
+        {
+            let enabling =
+                matches!(state, media_exchange_state::Transition::Enabling(_));
+            Some(TrackPatchCommand {
+                id: self.track_id,
+                enabled: Some(enabling),
+                muted: None,
+            })
+        } else {
+            None
         }
     }
 

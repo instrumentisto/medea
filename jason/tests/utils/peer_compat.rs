@@ -68,9 +68,9 @@ impl PeerConnectionCompat {
         let (command_tx, command_rx) = mpsc::unbounded();
         let mut rpc = MockRpcSession::new();
         rpc.expect_on_connection_loss()
-            .return_once(|| stream::pending().boxed_local());
+            .returning(|| stream::pending().boxed_local());
         rpc.expect_on_reconnected()
-            .return_once(|| stream::pending().boxed_local());
+            .returning(|| stream::pending().boxed_local());
         rpc.expect_close_with_reason().return_const(());
         rpc.expect_send_command().returning(move |cmd| {
             let _ = command_tx.unbounded_send(cmd);
@@ -103,7 +103,8 @@ impl PeerConnectionCompat {
         self.insert_tracks(tracks)?;
         self.component
             .state()
-            .set_negotiation_role(NegotiationRole::Offerer);
+            .set_negotiation_role(NegotiationRole::Offerer)
+            .await;
 
         while !matches!(
             self.command_rx.borrow_mut().next().await.unwrap(),
@@ -160,7 +161,8 @@ impl PeerConnectionCompat {
         self.insert_tracks(tracks)?;
         self.component
             .state()
-            .set_negotiation_role(NegotiationRole::Answerer(offer));
+            .set_negotiation_role(NegotiationRole::Answerer(offer))
+            .await;
 
         while !matches!(
             self.command_rx.borrow_mut().next().await.unwrap(),

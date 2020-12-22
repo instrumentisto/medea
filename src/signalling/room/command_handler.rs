@@ -226,6 +226,6 @@ impl CommandHandler for Room {
     }
 
     fn on_synchronize_me(&mut self, _: proto::state::Room) -> Self::Output {
-        todo!()
+        unreachable!()
     }
 }

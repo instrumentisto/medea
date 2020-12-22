@@ -23,6 +23,7 @@ pub enum Sdp {
 }
 
 /// Inner for the [`LocalSdp`].
+#[derive(Debug)]
 struct Inner {
     /// Current SDP offer applied on the [`PeerConnection`], but it can be not
     /// approved by server (see [`Inner::approved`]).
@@ -95,7 +96,7 @@ impl Inner {
 /// If you update [`LocalSdp`] then it will wait for server approve
 /// ([`LocalSdp::approve`]). If Media Server approve wasn't received within
 /// timeout, then SDP offer will be rollbacked to the previous one.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct LocalSdp(Rc<RefCell<Inner>>);
 
 impl LocalSdp {
