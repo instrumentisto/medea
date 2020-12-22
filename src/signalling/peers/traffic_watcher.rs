@@ -64,6 +64,9 @@ pub fn build_peers_traffic_watcher(
     Arc::new(PeersTrafficWatcherImpl::new(conf).start())
 }
 
+// TODO: Returns dummy implementation cause this component is currently
+//       disabled.
+//       Will be enabled in https://github.com/instrumentisto/medea/pull/91
 /// Builds [`PeerTrafficWatcher`].
 #[cfg(not(test))]
 pub fn build_peers_traffic_watcher(

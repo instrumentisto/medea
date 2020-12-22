@@ -123,7 +123,6 @@ pub struct RoomService {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 
-    // TODO: Enable in https://github.com/instrumentisto/medea/pull/91
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
