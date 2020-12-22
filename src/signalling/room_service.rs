@@ -125,7 +125,6 @@ pub struct RoomService {
 
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-
     /* TODO: Enable in https://github.com/instrumentisto/medea/pull/91
      * /// Service which is responsible for processing [`Peer`]'s metrics
      * received /// from Coturn.
