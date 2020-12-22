@@ -300,8 +300,7 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                     assert_eq!(self.room_id, room_id);
                     if matches!(
                         event,
-                        Event::RoomJoined { .. }
-                        | Event::RoomLeft { .. }
+                        Event::RoomJoined { .. } | Event::RoomLeft { .. }
                     ) {
                         return;
                     }

@@ -576,7 +576,7 @@ window.onload = async function() {
     try {
       const constraints = await initLocalStream();
       await fillMediaDevicesInputs(audioSelect, videoSelect, null);
-      await room.set_local_media_settings(constraints);
+      await room.set_local_media_settings(constraints, false, false);
     } catch (e) {
       console.error('Init local video failed: ' + e);
     }
@@ -747,7 +747,7 @@ window.onload = async function() {
         if (!isAudioSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, false, true);
       } catch (e) {
         console.error('Changing audio source failed: ' + e);
       }
@@ -761,10 +761,25 @@ window.onload = async function() {
             track.free();
           }
         }
-        if (isVideoSendEnabled) {
-          constraints = await initLocalStream();
+        try {
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
+          await room.set_local_media_settings(constraints, true, true);
+        } catch (e) {
+          let name = e.name();
+          if (name === 'RecoveredException') {
+            alert('MediaStreamSettings set failed and current MediaStreamSettings was successfully recovered.');
+          } else if (name === 'RecoverFailedException') {
+            alert('MediaStreamSettings set failed and MediaStreamSettings recovery failed.');
+            for (const err of e.recover_fail_reasons()) {
+              console.error('Name: "' + err.name() + '";\nMessage: "' + err.message() + '";');
+            }
+          } else if (name === 'ErroredException') {
+            alert('Fatal error occured while MediaStreamSettings update.');
+          }
+          console.error("Changing video source failed: " + name);
         }
-        await room.set_local_media_settings(constraints);
       } catch (e) {
         console.error('Changing video source failed: ' + e.message());
       }

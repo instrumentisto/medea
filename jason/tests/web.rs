@@ -87,6 +87,7 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
+    api::ConstraintsUpdateException,
     media::{track::remote, LocalTracksConstraints, MediaKind, MediaManager},
     peer::media_exchange_state,
     rpc::ApiUrl,
@@ -139,6 +140,15 @@ extern "C" {
 #[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
+}
+
+#[wasm_bindgen(
+    inline_js = "export const get_constraints_update_exception = (e) => e;"
+)]
+extern "C" {
+    fn get_constraints_update_exception(
+        err: JsValue,
+    ) -> ConstraintsUpdateException;
 }
 
 pub fn get_test_required_tracks() -> (Track, Track) {

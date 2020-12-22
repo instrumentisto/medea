@@ -5,7 +5,7 @@ labels: {}
 
 server:
   image:
-    repository: instrumentisto/medea
+    repository: ghcr.io/instrumentisto/medea
     tag: edge
     pullPolicy: IfNotPresent
 
@@ -63,7 +63,7 @@ server:
 
   control-mock:
     image:
-      repository: instrumentisto/medea-control-api-mock
+      repository: ghcr.io/instrumentisto/medea-control-api-mock
       tag: edge
       pullPolicy: IfNotPresent
 
@@ -125,7 +125,7 @@ server:
 
 web-client:
   image:
-    repository: instrumentisto/medea-demo
+    repository: ghcr.io/instrumentisto/medea-demo
     tag: latest
     pullPolicy: IfNotPresent
 

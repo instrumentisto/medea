@@ -239,9 +239,7 @@ async fn room_dispose_works() {
         cmd_rx.next().await.unwrap(),
         ClientMsg::Command {
             room_id: _,
-            command: Command::LeaveRoom {
-                member_id: _
-            }
+            command: Command::LeaveRoom { member_id: _ }
         }
     ));
 
@@ -250,9 +248,7 @@ async fn room_dispose_works() {
         cmd_rx.next().await.unwrap(),
         ClientMsg::Command {
             room_id: _,
-            command: Command::LeaveRoom {
-                member_id: _
-            }
+            command: Command::LeaveRoom { member_id: _ }
         }
     ));
 

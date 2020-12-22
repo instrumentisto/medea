@@ -818,6 +818,39 @@ impl MediaConnections {
             .into_iter()
             .for_each(|t| t.reset_media_state_transition_timeout());
     }
+
+    /// Returns all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    pub fn get_senders_without_tracks(
+        &self,
+        kinds: LocalStreamUpdateCriteria,
+    ) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .filter(|s| {
+                kinds.has(s.kind(), s.source_kind())
+                    && s.enabled()
+                    && !s.has_track()
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`].
+    pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
+        for sender in self
+            .0
+            .borrow()
+            .senders
+            .values()
+            .filter(|s| kinds.has(s.kind(), s.source_kind()))
+        {
+            sender.remove_track().await;
+        }
+    }
 }
 
 #[cfg(feature = "mockable")]
@@ -898,5 +931,15 @@ impl MediaConnections {
             .iter_senders_with_kind_and_source_kind(MediaKind::Audio, None)
             .find(|s| s.muted())
             .is_none()
+    }
+
+    /// Returns all underlying [`Sender`]'s.
+    pub fn get_senders(&self) -> Vec<Rc<Sender>> {
+        self.0
+            .borrow()
+            .senders
+            .values()
+            .map(|sndr| Rc::clone(&sndr))
+            .collect()
     }
 }
