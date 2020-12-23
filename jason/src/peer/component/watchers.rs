@@ -44,6 +44,7 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the RPC connection loss event.
     #[watch(self.global_ctx().rpc.on_connection_loss())]
     async fn connection_loss_watcher(
         _: Rc<PeerConnection>,
@@ -56,6 +57,7 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the RPC reconnection event.
     #[watch(self.global_ctx().rpc.on_reconnected())]
     async fn reconnect_watcher(
         _: Rc<PeerConnection>,
@@ -68,6 +70,10 @@ impl PeerComponent {
         Ok(())
     }
 
+    /// Watcher for the [`SyncState`] of this [`PeerComponent`].
+    ///
+    /// Will send intentions of the [`PeerComponent`] to the Media Server if
+    /// [`SyncState`] is [`SyncState::Synced`].
     #[watch(self.state().sync_state.subscribe())]
     async fn sync_state_watcher(
         ctx: Rc<PeerConnection>,
@@ -143,6 +149,10 @@ impl PeerComponent {
     }
 
     /// Watcher for the [`NegotiationState`] change.
+    ///
+    /// Resets [`NegotiationRole`] to `None` on [`NegotiationState::Stable`].
+    ///
+    /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
     #[watch(self.state().negotiation_state.subscribe().skip(1))]
     async fn negotiation_state_watcher(
         ctx: Rc<PeerConnection>,
@@ -190,6 +200,14 @@ impl PeerComponent {
     }
 
     /// Watcher for the SDP offer approving.
+    ///
+    /// If current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
+    /// [`NegotiationState`] will be transited to the
+    /// [`NegotiationState::WaitRemoteSdp`].
+    ///
+    /// If current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
+    /// [`NegotiationState`] will be transited to the
+    /// [`NegotiationState::Stable`].
     #[watch(self.state().sdp_offer.on_approve().skip(1))]
     async fn sdp_offer_approve_watcher(
         _: Rc<PeerConnection>,

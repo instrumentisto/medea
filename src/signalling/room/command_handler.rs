@@ -139,6 +139,8 @@ impl CommandHandler for Room {
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
     /// Both [`Peer`]s may have any state except [`Stable`].
     ///
+    /// Adds [`IceCandidate`] to the [`Peer`].
+    ///
     /// [`Stable`]: crate::media::peer::Stable
     fn on_set_ice_candidate(
         &mut self,

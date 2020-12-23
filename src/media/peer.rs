@@ -202,6 +202,7 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
+    /// Returns current [`NegotiationRole`] of this [`PeerStateMachine`].
     fn negotiation_role(
         &self,
     ) -> Option<medea_client_api_proto::NegotiationRole> {
@@ -230,6 +231,7 @@ impl PeerStateMachine {
         }
     }
 
+    /// Returns all [`state::Sender`] of this [`PeerStateMachine`].
     fn get_senders_states(&self) -> HashMap<TrackId, state::Sender> {
         self.senders()
             .iter()
@@ -252,6 +254,7 @@ impl PeerStateMachine {
             .collect()
     }
 
+    /// Returns all [`state::Receiver`] of this [`PeerStateMachine`].
     fn get_receivers_states(&self) -> HashMap<TrackId, state::Receiver> {
         self.receivers()
             .iter()
@@ -274,6 +277,7 @@ impl PeerStateMachine {
             .collect()
     }
 
+    /// Returns [`state::Peer`] of this [`PeerStateMachine`].
     pub fn get_state(&self) -> state::Peer {
         state::Peer {
             id: self.id(),
@@ -435,8 +439,11 @@ pub struct Context {
     /// should be started for this [`Peer`].
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
 
+    /// All [`IceCandidate`]s received for this [`Peer`].
     ice_candidates: HashSet<IceCandidate>,
 
+    /// Flag which indicates that ICE restart should be performed for this
+    /// [`Peer`].
     ice_restart: bool,
 }
 
@@ -602,7 +609,7 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::TrackPatch(patch)
     }
 
-    /// Does nothing.
+    /// Sets [`Context::ice_restart`] flag to the `true`.
     #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
         self.context.ice_restart = true;
@@ -716,11 +723,13 @@ impl<T> Peer<T> {
         self.context.partner_member.clone()
     }
 
+    /// Returns SDP offer of this [`Peer`].
     #[inline]
     pub fn sdp_offer(&self) -> &Option<String> {
         &self.context.sdp_offer
     }
 
+    /// Returns SDP offer of the partner [`Peer`].
     #[inline]
     pub fn partner_sdp_offer(&self) -> &Option<String> {
         &self.context.partner_sdp_offer
@@ -893,14 +902,17 @@ impl<T> Peer<T> {
             .extend(deduper.into_inner());
     }
 
+    /// Adds provided [`IceCandidate`] to this [`Peer`].
     pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
         self.context.ice_candidates.insert(ice_candidate);
     }
 
+    /// Returns all [`IceCandidate`]s received for this [`Peer`].
     pub fn ice_candidates(&self) -> &HashSet<IceCandidate> {
         &self.context.ice_candidates
     }
 
+    /// Returns `true` if ICE restart should be performed for this [`Peer`].
     pub fn is_ice_restart(&self) -> bool {
         self.context.ice_restart
     }
@@ -1139,6 +1151,8 @@ impl Peer<Stable> {
     }
 
     /// Sets [`Context::is_known_to_remote`] to `true`.
+    ///
+    /// Sets [`Context::ice_restart`] to `false`.
     ///
     /// Resets [`Context::pending_track_updates`] buffer.
     ///

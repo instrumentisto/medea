@@ -577,6 +577,8 @@ impl PeersService {
         self.peer_metrics_service.borrow_mut().check();
     }
 
+    /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
+    /// [`MemberId`].
     #[inline]
     pub(super) fn get_peers_states(
         &self,
@@ -756,7 +758,8 @@ impl PeerRepository {
         peers_to_remove
     }
 
-    /// Returns all [`PeerState`]s for the provided [`MemberId`].
+    /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
+    /// [`MemberId`].
     pub fn get_peers_states(
         &self,
         member_id: &MemberId,

@@ -124,6 +124,8 @@ impl LocalSdp {
         self.0.borrow_mut().on_new_local_sdp()
     }
 
+    /// Returns [`Stream`] into which `()` will be sent on every SDP offer
+    /// approve.
     pub fn on_approve(&self) -> LocalBoxStream<'static, ()> {
         Box::pin(self.0.borrow().approved.subscribe().filter_map(|approved| {
             future::ready(if approved { Some(()) } else { None })

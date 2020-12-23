@@ -70,6 +70,8 @@ impl PeerRepositoryState {
         Self(RefCell::new(ObservableHashMap::new()))
     }
 
+    /// Updates this [`PeerRepositoryState`] with a provided
+    /// [`proto_state::Room`].
     pub fn apply(&self, state: proto_state::Room) {
         for (id, peer_state) in state.peers {
             let peer = self.0.borrow().get(&id).cloned();
@@ -1164,6 +1166,9 @@ impl InnerRoom {
             .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
 
+    /// Sends [`Command::SynchronizeMe`] with a current Client state to the
+    /// Media Server.
+    ///
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
@@ -1416,6 +1421,7 @@ impl EventHandler for InnerRoom {
         unreachable!("Room can't receive Event::RoomLeft")
     }
 
+    /// Updates [`PeerRepositoryState`] with a provided [`proto_state::Room`].
     #[inline]
     async fn on_state_synchronized(
         &self,

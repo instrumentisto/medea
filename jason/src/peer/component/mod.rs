@@ -5,7 +5,7 @@ mod local_sdp;
 mod tracks_repository;
 mod watchers;
 
-use std::rc::Rc;
+use std::{collections::HashSet, rc::Rc};
 
 use futures::{future, future::LocalBoxFuture};
 use medea_client_api_proto::{
@@ -15,7 +15,6 @@ use medea_client_api_proto::{
 use medea_reactive::{
     collections::ProgressableHashMap, ObservableCell, ProgressableCell,
 };
-use std::collections::HashSet;
 use tracerr::Traced;
 
 use crate::{
@@ -35,18 +34,64 @@ use self::{
 /// Component responsible for the [`PeerConnection`] updating.
 pub type PeerComponent = Component<PeerState, PeerConnection, GlobalCtx>;
 
+/// Negotiation state of the [`PeerComponent`].
+///
+/// ```ignore
+///           +--------+
+///           |        |
+/// +-------->+ Stable +<----------+
+/// |         |        |           |
+/// |         +---+----+           |
+/// |             |                |
+/// |             v                |
+/// |      +------+-------+        |
+/// |      |              |        |
+/// |      | WaitLocalSdp +<----+  |
+/// |      |              |     |  |
+/// |      +------+-------+     |  |
+/// |             |             |  |
+/// |             v             |  |
+/// |  +----------+----------+  |  |
+/// |  |                     |  |  |
+/// +--+ WaitLocalSdpApprove +--+  |
+///    |                     |     |
+///    +----------+----------+     |
+///               |                |
+///               v                |
+///       +-------+-------+        |
+///       |               |        |
+///       | WaitRemoteSdp |        |
+///       |               |        |
+///       +-------+-------+        |
+///               |                |
+///               |                |
+///               +----------------+
+/// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NegotiationState {
+    /// Means that [`PeerComponent`] is new or negotiation completed.
     Stable,
+
+    /// [`PeerComponent`] waits for local SDP offer generating.
     WaitLocalSdp,
+
+    /// [`PeerComponent`] waits for local SDP approve by server.
     WaitLocalSdpApprove,
+
+    /// [`PeerComponent`] waits for remote SDP offer.
     WaitRemoteSdp,
 }
 
+/// Synchronization state of the [`PeerState`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SyncState {
+    /// State desynced, and should be synced on RPC reconnect.
     Desynced,
+
+    /// State syncs with a Media Server state.
     Syncing,
+
+    /// State is synced.
     Synced,
 }
 

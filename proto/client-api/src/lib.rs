@@ -236,9 +236,9 @@ pub enum Command {
         tracks_patches: Vec<TrackPatchCommand>,
     },
 
-    SynchronizeMe {
-        state: state::Room,
-    },
+    /// Web Client asks Media Server to synchronize Client State with a Server
+    /// State.
+    SynchronizeMe { state: state::Room },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -427,15 +427,10 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client that his SDP offer was applied.
-    SdpOfferApplied {
-        peer_id: PeerId,
-    },
+    SdpOfferApplied { peer_id: PeerId },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -446,9 +441,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved {
-        peer_ids: Vec<PeerId>,
-    },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// `Peer`.
@@ -475,9 +468,8 @@ pub enum Event {
         quality_score: ConnectionQualityScore,
     },
 
-    StateSynchronized {
-        state: state::Room,
-    },
+    /// Media Server synchronizes Web Client about State synchronization.
+    StateSynchronized { state: state::Room },
 }
 
 /// `Peer`'s negotiation role.
