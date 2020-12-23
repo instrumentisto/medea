@@ -372,7 +372,7 @@
         .media_manager()
         .init_local_tracks(constraints);
       await updateLocalVideo(localTracks);
-      await room.set_local_media_settings(constraints);
+      await room.set_local_media_settings(constraints, false, false);
     }
 
     async function isVideoEnabledListener(e) {
@@ -398,7 +398,7 @@
         .media_manager()
         .init_local_tracks(constraints);
       await updateLocalVideo(localTracks);
-      await room.set_local_media_settings(constraints);
+      await room.set_local_media_settings(constraints, false, false);
     }
 
     function bindJoinButtons(roomId) {
@@ -509,10 +509,7 @@
             track.free();
           }
         }
-        if (isAudioSendEnabled) {
-          constraints = await initLocalStream();
-        }
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, false, true);
       });
 
       let videoSwitch = async () => {
@@ -522,10 +519,24 @@
             track.free();
           }
         }
-        if (isVideoSendEnabled) {
-          constraints = await initLocalStream();
+        try {
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
+          await room.set_local_media_settings(constraints, true, true);
+        } catch (e) {
+          let name = e.name();
+          if (name === 'RecoveredException') {
+            alert('MediaStreamSettings set failed and current MediaStreamSettings was successfully recovered.');
+          } else if (name === 'RecoverFailedException') {
+            alert('MediaStreamSettings set failed and MediaStreamSettings recovery failed.');
+            for (const err of e.recover_fail_reasons()) {
+              console.error('Name: "' + err.name() + '";\nMessage: "' + err.message() + '";');
+            }
+          } else if (name === 'ErroredException') {
+            alert('Fatal error occured while MediaStreamSettings update.');
+          }
         }
-        await room.set_local_media_settings(constraints);
       };
       videoSelect.addEventListener('change', videoSwitch);
       screenshareSwitchEl.addEventListener('change', videoSwitch);
@@ -762,7 +773,7 @@
 
         const constraints = await initLocalStream();
         await fillMediaDevicesInputs(audioSelect, videoSelect);
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, false, false);
       } else {
         chooseRoomButton.onclick = async function () {
           let roomId = roomIdInput.value;
@@ -772,7 +783,7 @@
 
           const constraints = await initLocalStream();
           await fillMediaDevicesInputs(audioSelect, videoSelect);
-          await room.set_local_media_settings(constraints);
+          await room.set_local_media_settings(constraints, false, false);
 
           chooseRoomDiv.style.display = 'none';
           videoCallDiv.style.display = '';

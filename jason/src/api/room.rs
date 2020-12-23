@@ -7,8 +7,9 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use async_recursion::async_recursion;
 use async_trait::async_trait;
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -23,8 +24,6 @@ use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
-#[cfg(feature = "mockable")]
-use crate::peer::PeerConnection;
 use crate::{
     api::connection::Connections,
     media::{
@@ -34,9 +33,9 @@ use crate::{
     },
     peer::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria,
-        MediaConnectionsError, MediaState, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, PeerState, ReceiverState, RtcStats,
-        SenderState, TrackDirection,
+        MediaConnectionsError, MediaState, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, PeerRepository, PeerState, ReceiverState,
+        RtcStats, SenderState, TrackDirection, TransceiverSide,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -466,22 +465,41 @@ impl RoomHandle {
     /// update will change media tracks in all sending peers, so that might
     /// cause new [getUserMedia()][1] request.
     ///
-    /// Media obtaining/injection errors are fired to `on_failed_local_media`
-    /// callback.
+    /// Media obtaining/injection errors are additionally fired to
+    /// `on_failed_local_media` callback.
+    ///
+    /// If `stop_first` set to `true` then affected [`local::Track`]s will be
+    /// dropped before new [`MediaStreamSettings`] is applied. This is usually
+    /// required when changing video source device due to hardware limitations,
+    /// e.g. having an active track sourced from device `A` may hinder
+    /// [getUserMedia()][1] requests to device `B`.
+    ///
+    /// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+    /// request to automatically rollback to previous settings if new settings
+    /// cannot be applied.
+    ///
+    /// If recovering from fail state isn't possible then affected media types
+    /// will be disabled.
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
+        stop_first: bool,
+        rollback_on_fail: bool,
     ) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
         future_to_promise(async move {
             inner?
-                .set_local_media_settings(settings)
+                .set_local_media_settings(
+                    settings,
+                    stop_first,
+                    rollback_on_fail,
+                )
                 .await
-                .map_err(JasonError::from)?;
+                .map_err(ConstraintsUpdateException::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -857,6 +875,182 @@ struct InnerRoom {
     close_reason: RefCell<CloseReason>,
 }
 
+/// JS exception for the [`RoomHandle::set_local_media_settings`].
+#[wasm_bindgen]
+#[derive(Debug, From)]
+#[from(forward)]
+pub struct ConstraintsUpdateException(JsConstraintsUpdateError);
+
+#[wasm_bindgen]
+impl ConstraintsUpdateException {
+    /// Returns name of this [`ConstraintsUpdateException`].
+    pub fn name(&self) -> String {
+        self.0.to_string()
+    }
+
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `RecoveredException` or `RecoverFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
+    pub fn recover_reason(&self) -> JsValue {
+        use JsConstraintsUpdateError as E;
+        match &self.0 {
+            E::RecoverFailed { recover_reason, .. }
+            | E::Recovered { recover_reason, .. } => recover_reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
+    /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
+    pub fn recover_fail_reasons(&self) -> JsValue {
+        match &self.0 {
+            JsConstraintsUpdateError::RecoverFailed {
+                recover_fail_reasons,
+                ..
+            } => recover_fail_reasons.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `ErroredException`.
+    ///
+    /// Returns `undefined` otherwise.
+    pub fn error(&self) -> JsValue {
+        match &self.0 {
+            JsConstraintsUpdateError::Errored { reason } => reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+}
+
+/// [`ConstraintsUpdateError`] for JS side.
+///
+/// Should be wrapped to [`ConstraintsUpdateException`] before returning to the
+/// JS side.
+#[derive(Debug, Display)]
+pub enum JsConstraintsUpdateError {
+    /// New [`MediaStreamSettings`] set failed and state was recovered
+    /// accordingly to the provided recover policy
+    /// (`rollback_on_fail`/`stop_first` arguments).
+    #[display(fmt = "RecoveredException")]
+    Recovered {
+        /// [`JasonError`] due to which recovery happened.
+        recover_reason: JsValue,
+    },
+
+    /// New [`MediaStreamSettings`] set failed and state recovering also
+    /// failed.
+    #[display(fmt = "RecoverFailedException")]
+    RecoverFailed {
+        /// [`JasonError`] due to which recovery happened.
+        recover_reason: JsValue,
+
+        /// [`js_sys::Array`] with a [`JasonError`]s due to which recovery
+        /// failed.
+        recover_fail_reasons: JsValue,
+    },
+
+    /// Some another error occurred.
+    #[display(fmt = "ErroredException")]
+    Errored { reason: JsValue },
+}
+
+/// Constraints errors which are can occur while updating
+/// [`MediaStreamSettings`] by [`InnerRoom::set_local_media_settings`] call.
+#[derive(Debug)]
+enum ConstraintsUpdateError {
+    /// New [`MediaStreamSettings`] set failed and state was recovered
+    /// accordingly to the provided recover policy
+    /// (`rollback_on_fail`/`stop_first` arguments).
+    Recovered {
+        /// [`RoomError`] due to which recovery happened.
+        recover_reason: Traced<RoomError>,
+    },
+
+    /// New [`MediaStreamSettings`] set failed and state recovering also
+    /// failed.
+    RecoverFailed {
+        /// [`RoomError`] due to which recovery happened.
+        recover_reason: Traced<RoomError>,
+
+        /// [`RoomError`]s due to which recovery failed.
+        recover_fail_reasons: Vec<Traced<RoomError>>,
+    },
+
+    /// Indicates that some error occurred.
+    Errored { error: Traced<RoomError> },
+}
+
+impl ConstraintsUpdateError {
+    /// Returns new [`ConstraintsUpdateError::Recovered`].
+    pub fn recovered(recover_reason: Traced<RoomError>) -> Self {
+        Self::Recovered { recover_reason }
+    }
+
+    /// Converts this [`ConstraintsUpdateError`] to the
+    /// [`ConstraintsUpdateError::RecoverFailed`].
+    pub fn recovery_failed(self, reason: Traced<RoomError>) -> Self {
+        match self {
+            Self::Recovered { recover_reason } => Self::RecoverFailed {
+                recover_reason: reason,
+                recover_fail_reasons: vec![recover_reason],
+            },
+            Self::RecoverFailed {
+                recover_reason,
+                mut recover_fail_reasons,
+            } => {
+                recover_fail_reasons.push(recover_reason);
+
+                Self::RecoverFailed {
+                    recover_reason: reason,
+                    recover_fail_reasons,
+                }
+            }
+            Self::Errored { error } => Self::RecoverFailed {
+                recover_reason: error,
+                recover_fail_reasons: vec![reason],
+            },
+        }
+    }
+
+    /// Returns [`ConstraintsUpdateError::Errored`] with a provided parameter.
+    pub fn errored(reason: Traced<RoomError>) -> Self {
+        Self::Errored { error: reason }
+    }
+}
+
+impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
+    fn from(from: ConstraintsUpdateError) -> Self {
+        use ConstraintsUpdateError as E;
+        match from {
+            E::Recovered { recover_reason } => Self::Recovered {
+                recover_reason: JasonError::from(recover_reason).into(),
+            },
+            E::RecoverFailed {
+                recover_reason,
+                recover_fail_reasons,
+            } => Self::RecoverFailed {
+                recover_reason: JasonError::from(recover_reason).into(),
+                recover_fail_reasons: {
+                    let arr = js_sys::Array::new();
+                    for e in recover_fail_reasons {
+                        arr.push(&JasonError::from(e).into());
+                    }
+
+                    arr.into()
+                },
+            },
+            E::Errored { error: reason } => Self::Errored {
+                reason: JasonError::from(reason).into(),
+            },
+        }
+    }
+}
+
 impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
@@ -1065,6 +1259,34 @@ impl InnerRoom {
             .is_none()
     }
 
+    /// Updates [`MediaState`]s to the provided `states_update` and disables all
+    /// [`Sender`]s which are doesn't have [`local::Track`].
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    async fn disable_senders_without_tracks(
+        &self,
+        peer: &Rc<PeerConnection>,
+        kinds: LocalStreamUpdateCriteria,
+        mut states_update: HashMap<PeerId, HashMap<TrackId, MediaState>>,
+    ) -> Result<(), Traced<RoomError>> {
+        use media_exchange_state::Stable::Disabled;
+
+        self.send_constraints
+            .set_media_exchange_state_by_kinds(Disabled, kinds);
+        let senders_to_disable = peer.get_senders_without_tracks(kinds);
+
+        states_update.entry(peer.id()).or_default().extend(
+            senders_to_disable
+                .into_iter()
+                .map(|s| (s.track_id(), MediaState::from(Disabled))),
+        );
+        self.update_media_states(states_update)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(())
+    }
+
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
@@ -1078,34 +1300,107 @@ impl InnerRoom {
     /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
     /// are should be enabled or disabled.
     ///
+    /// If `stop_first` set to `true` then affected [`local::Track`]s will be
+    /// dropped before new [`MediaStreamSettings`] is applied. This is usually
+    /// required when changing video source device due to hardware limitations,
+    /// e.g. having an active track sourced from device `A` may hinder
+    /// [getUserMedia()][1] requests to device `B`.
+    ///
+    /// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+    /// request to automatically rollback to previous settings if new settings
+    /// cannot be applied.
+    ///
+    /// If recovering from fail state isn't possible and `stop_first` set to
+    /// `true` then affected media types will be disabled.
+    ///
     /// [1]: https://tinyurl.com/rnxcavf
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Sender`]: crate::peer::Sender
+    #[async_recursion(?Send)]
     async fn set_local_media_settings(
         &self,
-        settings: MediaStreamSettings,
-    ) -> Result<(), Traced<RoomError>> {
-        self.send_constraints.constrain(settings);
+        new_settings: MediaStreamSettings,
+        stop_first: bool,
+        rollback_on_fail: bool,
+    ) -> Result<(), ConstraintsUpdateError> {
+        use ConstraintsUpdateError as E;
 
-        let mut states_update = HashMap::new();
-        for peer in self.peers.repo.get_all() {
-            peer.update_local_stream(LocalStreamUpdateCriteria::all())
+        let current_settings = self.send_constraints.inner();
+        self.send_constraints.constrain(new_settings);
+        let criteria_kinds_diff = self
+            .send_constraints
+            .calculate_kinds_diff(&current_settings);
+        let peers = self.peers.repo.get_all();
+
+        if stop_first {
+            for peer in &peers {
+                peer.drop_send_tracks(criteria_kinds_diff).await;
+            }
+        }
+
+        let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
+        for peer in peers {
+            match peer
+                .update_local_stream(LocalStreamUpdateCriteria::all())
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map(|new_media_exchange_states| {
-                    states_update.insert(
-                        peer.id(),
-                        new_media_exchange_states
-                            .into_iter()
-                            .map(|(id, s)| (id, s.into()))
-                            .collect(),
+            {
+                Ok(states) => {
+                    states_update.entry(peer.id()).or_default().extend(
+                        states.into_iter().map(|(id, s)| (id, s.into())),
                     );
-                })?;
+                }
+                Err(e) => {
+                    if !matches!(e.as_ref(), PeerError::MediaManager(_)) {
+                        return Err(E::errored(tracerr::map_from_and_wrap!()(
+                            e.clone(),
+                        )));
+                    }
+
+                    let err = if rollback_on_fail {
+                        self.set_local_media_settings(
+                            current_settings,
+                            stop_first,
+                            false,
+                        )
+                        .await
+                        .map_err(|err| {
+                            err.recovery_failed(tracerr::map_from_and_wrap!()(
+                                e.clone(),
+                            ))
+                        })?;
+
+                        E::recovered(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else if stop_first {
+                        self.disable_senders_without_tracks(
+                            &peer,
+                            criteria_kinds_diff,
+                            states_update,
+                        )
+                        .await
+                        .map_err(|err| {
+                            E::RecoverFailed {
+                                recover_reason: tracerr::map_from_and_new!(
+                                    e.clone()
+                                ),
+                                recover_fail_reasons: vec![
+                                    tracerr::map_from_and_new!(err),
+                                ],
+                            }
+                        })?;
+
+                        E::recovered(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else {
+                        E::errored(tracerr::map_from_and_wrap!()(e.clone()))
+                    };
+
+                    return Err(err);
+                }
+            }
         }
 
         self.update_media_states(states_update)
             .await
-            .map_err(tracerr::map_from_and_wrap!())
+            .map_err(|e| E::errored(tracerr::map_from_and_new!(e)))
     }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this
