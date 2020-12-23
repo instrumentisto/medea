@@ -102,9 +102,33 @@ impl Sender {
         &self.caps
     }
 
-    /// Returns `true` if this [`Sender`] is publishing media traffic.
+    /// Indicates whether this [`Sender`] is publishing media traffic.
+    #[inline]
+    #[must_use]
     pub fn is_publishing(&self) -> bool {
         self.transceiver.has_direction(TransceiverDirection::SEND)
+    }
+
+    /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
+    /// sending side of inner transceiver to [`None`].
+    #[inline]
+    pub async fn remove_track(&self) {
+        // cannot fail
+        self.transceiver.set_send_track(None).await.unwrap();
+    }
+
+    /// Indicates whether this [`Sender`] has [`local::Track`].
+    #[inline]
+    #[must_use]
+    pub fn has_track(&self) -> bool {
+        self.transceiver.has_send_track()
+    }
+
+    /// Indicates whether this [`Sender`] is enabled.
+    #[inline]
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.media_exchange_state.enabled()
     }
 
     /// Updates [`Sender`]s general media exchange state based on the provided
@@ -210,6 +234,8 @@ impl Sender {
     }
 
     /// Returns [`Transceiver`] of this [`Sender`].
+    #[inline]
+    #[must_use]
     pub fn transceiver(&self) -> Transceiver {
         self.transceiver.clone()
     }
@@ -219,13 +245,6 @@ impl Sender {
     fn is_general_enabled(&self) -> bool {
         self.general_media_exchange_state.get()
             == media_exchange_state::Stable::Enabled
-    }
-
-    /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
-    /// sending side of inner transceiver to `None`.
-    pub async fn remove_track(&self) {
-        // cannot fail
-        self.transceiver.set_send_track(None).await.unwrap();
     }
 
     /// Returns all intentions of this [`Sender`] as [`TrackPatchCommand`].
@@ -286,13 +305,6 @@ impl Sender {
     #[must_use]
     pub fn muted(&self) -> bool {
         self.mute_state.muted()
-    }
-
-    /// Indicates whether this [`Sender`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.media_exchange_state.enabled()
     }
 }
 

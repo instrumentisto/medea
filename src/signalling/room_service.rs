@@ -33,7 +33,6 @@ use crate::{
         room_repo::RoomRepository,
         Room,
     },
-    turn::coturn_metrics::CoturnMetricsService,
     AppContext,
 };
 
@@ -126,12 +125,12 @@ pub struct RoomService {
 
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-
-    /// Service which is responsible for processing [`Peer`]'s metrics received
-    /// from Coturn.
-    ///
-    /// [`Peer`]: crate::media::peer::Peer
-    _coturn_metrics: Addr<CoturnMetricsService>,
+    /* TODO: Enable in https://github.com/instrumentisto/medea/pull/91
+     * /// Service which is responsible for processing [`Peer`]'s metrics
+     * received /// from Coturn.
+     * ///
+     * /// [`Peer`]: crate::media::peer::Peer
+     * _coturn_metrics: Addr<CoturnMetricsService>, */
 }
 
 impl RoomService {
@@ -148,11 +147,12 @@ impl RoomService {
         let peer_traffic_watcher =
             build_peers_traffic_watcher(&app.config.media);
         Ok(Self {
-            _coturn_metrics: CoturnMetricsService::new(
-                &app.config.turn,
-                peer_traffic_watcher.clone(),
-            )?
-            .start(),
+            // TODO: Enable in https://github.com/instrumentisto/medea/pull/91
+            // _coturn_metrics: CoturnMetricsService::new(
+            //     &app.config.turn,
+            //     peer_traffic_watcher.clone(),
+            // )?
+            // .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             peer_traffic_watcher,
