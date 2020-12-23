@@ -199,6 +199,7 @@ fn generate_member_credentials() -> Credential {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(CREDENTIALS_LEN)
+        .map(char::from)
         .collect::<String>()
         .into()
 }
