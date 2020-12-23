@@ -214,7 +214,7 @@ impl PeerState {
         self.sdp_offer.current()
     }
 
-    /// Marks current [`LocalSdp`] as approved by server.
+    /// Marks current local SDP as approved by server.
     #[inline]
     pub fn sdp_offer_applied(&self) {
         self.sdp_offer.approve();
@@ -222,7 +222,7 @@ impl PeerState {
 
     /// Stops all timeouts of the [`PeerState`].
     ///
-    /// Stops [`LocalSdp`] rollback timeout.
+    /// Stops local SDP rollback timeout.
     #[inline]
     pub fn stop_timeouts(&self) {
         self.sdp_offer.stop_timeout();
@@ -230,7 +230,7 @@ impl PeerState {
 
     /// Resumes all timeouts of the [`PeerState`].
     ///
-    /// Resumes [`LocalSdp`] rollback timeout.
+    /// Resumes local SDP rollback timeout.
     #[inline]
     pub fn resume_timeouts(&self) {
         self.sdp_offer.resume_timeout();

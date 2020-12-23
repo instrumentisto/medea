@@ -1057,7 +1057,7 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
+    /// Resets [`Context::sdp_offer`] and [`Context::partner_sdp_offer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
@@ -1075,7 +1075,7 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Resets [`Context::sdp_offer`] and [`Context::sdp_answer`].
+    /// Resets [`Context::sdp_offer`] and [`Context::partner_sdp_offer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]

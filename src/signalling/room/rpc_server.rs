@@ -152,6 +152,8 @@ impl Handler<Synchronize> for Room {
 
     /// Generates [`state::Room`] for the provided [`MemberId`] and sends
     /// [`Event::StateSynchronized`].
+    ///
+    /// [`state::Room`]: medea_client_api_proto::state::Room
     fn handle(
         &mut self,
         msg: Synchronize,

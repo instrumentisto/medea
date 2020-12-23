@@ -106,7 +106,7 @@ pub struct MediaState {
     /// Flag which indicates that [`MediaTrack`] is muted or unmuted.
     muted: Cell<bool>,
 
-    /// Flag which indicates that [`MediaTrac`] is enabled or disabled.
+    /// Flag which indicates that [`MediaTrack`] is enabled or disabled.
     enabled: Cell<bool>,
 }
 
