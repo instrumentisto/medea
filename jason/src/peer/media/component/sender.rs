@@ -26,13 +26,31 @@ pub type SenderComponent = Component<SenderState, Sender, GlobalCtx>;
 /// State of the [`SenderComponent`].
 #[derive(Debug)]
 pub struct SenderState {
+    /// ID of this [`SenderComponent`].
     id: TrackId,
+
+    /// Mid of this [`SenderComponent`].
     mid: Option<String>,
+
+    /// [`MediaType`] of this [`SenderComponent`].
     media_type: MediaType,
+
+    /// All `Member`s which are receives media from this [`SenderComponent`].
     receivers: Vec<MemberId>,
+
+    /// Flag which indicates that this [`SenderComponent`] is enabled on `Send`
+    /// direction side.
     enabled_individual: ProgressableCell<bool>,
+
+    /// Flag which indicates that this [`SenderComponent`] is enabled on `Send`
+    /// __and__ `Recv` direction sides.
     enabled_general: ProgressableCell<bool>,
+
+    /// Flag which indicates that this [`SenderComponent`] is muted.
     muted: ProgressableCell<bool>,
+
+    /// Flag which indicates that local `MediaStream` update needed for this
+    /// [`SenderComponent`].
     need_local_stream_update: Cell<bool>,
 }
 

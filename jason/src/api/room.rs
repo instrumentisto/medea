@@ -1490,7 +1490,7 @@ impl EventHandler for InnerRoom {
             .get(&peer_id)
             .cloned()
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.sdp_offer_applied();
+        peer.approve_sdp_offer();
 
         Ok(())
     }

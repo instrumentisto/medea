@@ -24,12 +24,27 @@ pub type ReceiverComponent = Component<ReceiverState, Receiver, GlobalCtx>;
 /// State of the [`ReceiverComponent`].
 #[derive(Debug)]
 pub struct ReceiverState {
+    /// ID of this [`ReceiverComponent`].
     id: TrackId,
+
+    /// Mid of this [`ReceiverComponent`].
     mid: Option<String>,
+
+    /// [`MediaType`] of this [`ReceiverComponent`].
     media_type: MediaType,
+
+    /// `Member`s which sends media to this [`ReceiverComponent`].
     sender_id: MemberId,
+
+    /// Flag which indicates that this [`ReceiverComponent`] is enabled on
+    /// `Recv` direction side.
     enabled_individual: ProgressableCell<bool>,
+
+    /// Flag which indicates that this [`ReceiverComponent`] is enabled on
+    /// `Send` __and__ `Recv` direction sides.
     enabled_general: ProgressableCell<bool>,
+
+    /// Flag which indicates that this [`ReceiverComponent`] is muted.
     muted: ProgressableCell<bool>,
 }
 

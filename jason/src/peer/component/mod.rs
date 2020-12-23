@@ -82,7 +82,7 @@ enum NegotiationState {
     WaitRemoteSdp,
 }
 
-/// Synchronization state of the [`PeerState`].
+/// Synchronization state of the [`PeerComponent`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SyncState {
     /// State desynced, and should be synced on RPC reconnect.
@@ -98,17 +98,41 @@ enum SyncState {
 /// State of the [`PeerComponent`].
 #[derive(Debug)]
 pub struct PeerState {
+    /// ID of the [`PeerComponent`].
     id: PeerId,
+
+    /// All [`SenderState`]s of this [`PeerComponent`].
     senders: TracksRepository<SenderState>,
+
+    /// All [`ReceiverState`]s of this [`PeerComponent`].
     receivers: TracksRepository<ReceiverState>,
-    ice_servers: Vec<IceServer>,
+
+    /// Flag which indicates that this [`PeerComponent`] should relay all media
+    /// through a TURN server forcibly.
     force_relay: bool,
+
+    /// List of [`IceServer`]s which this [`PeerComponent`] should use.
+    ice_servers: Vec<IceServer>,
+
+    /// Current [`NegotiationRole`] of this [`PeerComponent`].
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
+
+    /// Negotiation state of the [`PeerComponent`].
     negotiation_state: ObservableCell<NegotiationState>,
+
+    /// Current SDP offer of this [`PeerComponent`].
     sdp_offer: LocalSdp,
+
+    /// Current SDP offer of the partner [`PeerComponent`].
     remote_sdp_offer: ProgressableCell<Option<String>>,
+
+    /// Flag which indicates that ICE restart should be performed.
     restart_ice: ObservableCell<bool>,
+
+    /// All [`IceCandidate`]s of this [`PeerComponent`].
     ice_candidates: IceCandidates,
+
+    /// Synchronization state of the [`PeerComponent`].
     sync_state: ObservableCell<SyncState>,
 }
 
@@ -216,7 +240,7 @@ impl PeerState {
 
     /// Marks current local SDP as approved by server.
     #[inline]
-    pub fn sdp_offer_applied(&self) {
+    pub fn approve_sdp_offer(&self) {
         self.sdp_offer.approve();
     }
 
