@@ -64,6 +64,12 @@ pub struct PeerRepositoryState(
     RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>,
 );
 
+impl Default for PeerRepositoryState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PeerRepositoryState {
     /// Returns new empty [`PeerRepositoryState`].
     #[inline]
