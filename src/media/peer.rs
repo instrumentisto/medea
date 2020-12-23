@@ -224,7 +224,7 @@ impl PeerStateMachine {
             S::WaitRemoteSdp(peer) => {
                 match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
                 {
-                    (None, None) => Some(R::Offerer),
+                    (Some(_), None) => Some(R::Offerer),
                     _ => None,
                 }
             }
@@ -1924,6 +1924,139 @@ pub mod tests {
             peer.commit_scheduled_changes();
 
             assert_eq!(peer.context.pending_track_updates, changes);
+        }
+    }
+
+    mod state_generation {
+        use std::convert::TryInto;
+
+        use super::*;
+
+        fn peer() -> Peer<Stable> {
+            let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
+            negotiation_sub
+                .expect_negotiation_needed()
+                .returning(|_: PeerId| ());
+            negotiation_sub
+                .expect_force_update()
+                .returning(|_: PeerId, _: Vec<TrackUpdate>| ());
+
+            let mut peer = Peer::new(
+                PeerId(0),
+                MemberId::from("member-1"),
+                PeerId(0),
+                MemberId::from("member-2"),
+                false,
+                Rc::new(negotiation_sub),
+            );
+            peer.set_ice_user(IceUser::new(String::new(), String::new(), String::new()));
+
+            peer
+        }
+
+        #[test]
+        fn offerer_role() {
+            let peer = peer();
+
+            let peer = peer.start_as_offerer();
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            assert_eq!(state.negotiation_role, Some(NegotiationRole::Offerer));
+
+            let peer: Peer<WaitLocalSdp> = peer.try_into().unwrap();
+            let peer = peer.set_local_offer(String::new());
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            assert_eq!(state.negotiation_role, Some(NegotiationRole::Offerer));
+
+            let peer: Peer<WaitRemoteSdp> = peer.try_into().unwrap();
+            let peer = peer.set_remote_answer(String::new());
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+
+            assert_eq!(state.negotiation_role, None);
+        }
+
+        #[test]
+        fn answerer_role() {
+            let peer = peer();
+
+            let peer = peer.start_as_answerer();
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            assert_eq!(state.negotiation_role, None);
+
+            let peer: Peer<WaitRemoteSdp> = peer.try_into().unwrap();
+            let peer = peer.set_remote_offer(String::from("SDP"));
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            assert_eq!(state.negotiation_role, Some(NegotiationRole::Answerer(String::from("SDP"))));
+
+            let peer: Peer<WaitLocalSdp> = peer.try_into().unwrap();
+            let peer = peer.set_local_answer(String::new());
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            assert_eq!(state.negotiation_role, None);
+        }
+
+        #[test]
+        fn ice_restart() {
+            let mut peer = peer();
+
+            peer.as_changes_scheduler().restart_ice();
+            peer.commit_scheduled_changes();
+
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            assert!(state.restart_ice);
+        }
+
+        #[test]
+        fn sender_patch() {
+            let mut peer = peer();
+            peer.context.senders.insert(TrackId(0), Rc::new(MediaTrack::new(
+                TrackId(0),
+                MediaType::Audio(AudioSettings { required: true }),
+            )));
+
+            peer.as_changes_scheduler().patch_tracks(vec![TrackPatchCommand {
+                id: TrackId(0),
+                muted: Some(true),
+                enabled: Some(false),
+            }]);
+
+            peer.commit_scheduled_changes();
+
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            let track_state = state.senders.get(&TrackId(0)).unwrap();
+            assert_eq!(track_state.muted, true);
+            assert_eq!(track_state.enabled_general, false);
+            assert_eq!(track_state.enabled_individual, false);
+        }
+
+        #[test]
+        fn receiver_patch() {
+            let mut peer = peer();
+            peer.context.receivers.insert(TrackId(0), Rc::new(MediaTrack::new(
+                TrackId(0),
+                MediaType::Audio(AudioSettings { required: true }),
+            )));
+
+            peer.as_changes_scheduler().patch_tracks(vec![TrackPatchCommand {
+                id: TrackId(0),
+                muted: Some(true),
+                enabled: Some(false),
+            }]);
+
+            peer.commit_scheduled_changes();
+
+            let peer = PeerStateMachine::from(peer);
+            let state = peer.get_state();
+            let track_state = state.receivers.get(&TrackId(0)).unwrap();
+            assert_eq!(track_state.muted, true);
+            assert_eq!(track_state.enabled_general, false);
+            assert_eq!(track_state.enabled_individual, false);
         }
     }
 }
