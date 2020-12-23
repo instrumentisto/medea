@@ -14,9 +14,8 @@ use web_sys as sys;
 use crate::{
     media::{track::remote, MediaKind, TrackConstraints},
     peer::{
-        media::transitable_state::mute_state, transceiver::Transceiver,
-        MediaConnections, MediaExchangeState, MediaStateControllable,
-        MuteState, PeerEvent, TransceiverDirection,
+        transceiver::Transceiver, MediaConnections, MediaExchangeState,
+        MediaStateControllable, PeerEvent, TransceiverDirection,
     },
 };
 

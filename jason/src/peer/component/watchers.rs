@@ -51,7 +51,7 @@ impl PeerComponent {
         state: Rc<PeerState>,
         _: (),
     ) -> Result<(), Traced<PeerError>> {
-        state.sync_state.set(SyncState::Unsynced);
+        state.sync_state.set(SyncState::Desynced);
 
         Ok(())
     }
@@ -72,7 +72,7 @@ impl PeerComponent {
     async fn sync_state_watcher(
         ctx: Rc<PeerConnection>,
         global_ctx: Rc<GlobalCtx>,
-        state: Rc<PeerState>,
+        _: Rc<PeerState>,
         sync_state: SyncState,
     ) -> Result<(), Traced<PeerError>> {
         match sync_state {
@@ -324,7 +324,7 @@ impl PeerComponent {
         state: Rc<PeerState>,
         sdp_offer: Sdp,
     ) -> Result<(), Traced<PeerError>> {
-        state.sync_state.when_eq(SyncState::Synced).await;
+        state.sync_state.when_eq(SyncState::Synced).await.ok();
         if let Some(role) = state.negotiation_role.get() {
             match (sdp_offer, role) {
                 (Sdp::Offer(offer), NegotiationRole::Offerer) => {

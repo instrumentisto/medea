@@ -45,9 +45,9 @@ enum NegotiationState {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SyncState {
-    Unsynced,
-    Synced,
+    Desynced,
     Syncing,
+    Synced,
 }
 
 /// State of the [`PeerComponent`].
@@ -141,7 +141,7 @@ impl PeerState {
         &self,
         negotiation_role: NegotiationRole,
     ) {
-        self.negotiation_role.when_eq(None).await;
+        self.negotiation_role.when_eq(None).await.ok();
         self.negotiation_role.set(Some(negotiation_role));
     }
 

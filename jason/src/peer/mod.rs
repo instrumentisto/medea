@@ -738,15 +738,15 @@ impl PeerConnection {
         Ok(())
     }
 
-    pub fn intentions(&self) -> Vec<Command> {
+    pub fn intentions(&self) -> Option<Command> {
         let tracks_patches = self.media_connections.intentions();
         if tracks_patches.is_empty() {
-            vec![]
+            None
         } else {
-            vec![Command::UpdateTracks {
+            Some(Command::UpdateTracks {
                 peer_id: self.id,
                 tracks_patches,
-            }]
+            })
         }
     }
 }

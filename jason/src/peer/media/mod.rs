@@ -12,7 +12,7 @@ use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{Command, TrackPatchCommand};
+use medea_client_api_proto::TrackPatchCommand;
 #[cfg(feature = "mockable")]
 use medea_client_api_proto::{MediaType, MemberId};
 use medea_reactive::DroppedError;

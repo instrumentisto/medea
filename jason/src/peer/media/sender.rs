@@ -2,9 +2,7 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use medea_client_api_proto::{
-    Command, MediaSourceKind, TrackId, TrackPatchCommand, TrackPatchEvent,
-};
+use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchCommand};
 
 use crate::{
     media::{
