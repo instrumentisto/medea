@@ -6,8 +6,9 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{
-    self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
+use futures::{
+    future::{self, LocalBoxFuture, TryFutureExt as _},
+    FutureExt,
 };
 use medea_client_api_proto::{Command, Credential, Event, MemberId, PeerId};
 
@@ -15,7 +16,7 @@ use crate::{
     api::{
         client::rpc_connection::{
             ClosedReason, CommandMessage, RpcConnection, RpcConnectionClosed,
-            RpcConnectionEstablished, RpcConnectionSettings,
+            RpcConnectionEstablished, RpcConnectionSettings, Synchronize,
         },
         control::callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
         RpcServer, RpcServerError,
@@ -58,10 +59,6 @@ impl Room {
         use CommandValidationError::{
             PeerBelongsToAnotherMember, PeerNotFound,
         };
-
-        if let C::SynchronizeMe { .. } = &command.command {
-            return Ok(());
-        }
 
         let peer_id = match command.command {
             C::MakeSdpOffer { peer_id, .. }
@@ -137,6 +134,36 @@ impl RpcServer for Addr<Room> {
     fn send_command(&self, member_id: MemberId, msg: Command) {
         self.do_send(CommandMessage::new(member_id, msg));
     }
+
+    /// Sends [`actix::Message`] to Room actor ignoring any errors.
+    fn synchronize(&self, member_id: MemberId) -> LocalBoxFuture<'static, ()> {
+        self.send(Synchronize(member_id))
+            .map(|res| {
+                if let Err(e) = res {
+                    error!("Failed to send Synchronize cause {:?}", e,);
+                };
+            })
+            .boxed_local()
+    }
+}
+
+impl Handler<Synchronize> for Room {
+    type Result = ();
+
+    /// Generates [`state::Room`] for the provided [`MemberId`] and sends
+    /// [`Event::StateSynchronized`].
+    fn handle(
+        &mut self,
+        msg: Synchronize,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let state = self.get_state(&msg.0);
+        if let Err(e) =
+            self.send_event(msg.0.clone(), Event::StateSynchronized { state })
+        {
+            error!("Failed to synchronize Member [id = {}]: {:?}", msg.0, e);
+        }
+    }
 }
 
 impl Handler<CommandMessage> for Room {
@@ -151,23 +178,6 @@ impl Handler<CommandMessage> for Room {
     ) -> Self::Result {
         match self.validate_command(&msg) {
             Ok(_) => {
-                if let Command::SynchronizeMe { .. } = &msg.command {
-                    let state = self.get_state(&msg.member_id);
-                    return if let Err(err) = self.send_event(
-                        msg.member_id.clone(),
-                        Event::StateSynchronized { state },
-                    ) {
-                        error!(
-                            "Failed state synchronization, because {}. Room \
-                             [id = {}] will be stopped.",
-                            err, self.id,
-                        );
-                        self.close_gracefully(ctx)
-                    } else {
-                        Box::pin(fut::ready(()))
-                    };
-                }
-
                 if let Err(err) = msg.command.dispatch_with(self) {
                     error!(
                         "Failed handle command, because {}. Room [id = {}] \

@@ -18,8 +18,8 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Command, Credential, Event,
-    MemberId, RoomId, RpcSettings, ServerMsg,
+    state, ClientMsg, CloseDescription, CloseReason, Command, Credential,
+    Event, MemberId, RoomId, RpcSettings, ServerMsg,
 };
 
 use crate::{
@@ -163,6 +163,9 @@ impl WsSession {
                             ClosedReason::Closed { normal: true },
                         );
                     }
+                    Command::SynchronizeMe { state } => {
+                        self.handle_synchronize_me(ctx, &room_id, &state);
+                    }
                     _ => {
                         if let Some((member_id, room)) =
                             self.sessions.get(&room_id)
@@ -299,6 +302,22 @@ impl WsSession {
                 ctx,
                 &CloseDescription::new(CloseReason::Finished),
             )
+        }
+    }
+
+    /// Handles [`Command::SynchronizeMe`].
+    ///
+    /// Sends [`RpcServer::synchronize`] to the [`RpcServer`] and locks
+    /// [`WsSession`] event loop until this message will be processed.
+    fn handle_synchronize_me(
+        &mut self,
+        ctx: &mut ws::WebsocketContext<Self>,
+        room_id: &RoomId,
+        state: &state::Room,
+    ) {
+        debug!("{}: Received synchronization request: {:?}", self, state);
+        if let Some((member_id, room)) = self.sessions.get(&room_id) {
+            ctx.wait(room.synchronize(member_id.clone()).into_actor(self));
         }
     }
 

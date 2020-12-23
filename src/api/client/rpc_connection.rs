@@ -116,6 +116,13 @@ pub struct RpcConnectionClosed {
     pub reason: ClosedReason,
 }
 
+/// Signal of [`Member`] that his State needs synchronization.
+///
+/// [`Member`]: crate::signalling::elements::Member
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct Synchronize(pub MemberId);
+
 /// Reasons of why [`RpcConnection`] may be closed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ClosedReason {
