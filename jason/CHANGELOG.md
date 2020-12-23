@@ -83,7 +83,8 @@ All user visible changes to this project will be documented in this file. This p
         - `ConnectionHandle.on_quality_score_update` callback for quality score updates received from server ([#132]).
 - RPC messaging:
     - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
-    - `RpcClient` and `RpcTransport` reconnection ([#75]).
+    - `RpcClient` and `RpcTransport` reconnection ([#75]);
+    - State synchronization on RPC reconnection ([#167]).
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
@@ -132,6 +133,7 @@ All user visible changes to this project will be documented in this file. This p
 [#155]: /../../pull/155
 [#156]: /../../pull/156
 [#158]: /../../pull/158
+[#167]: /../../pull/167
 
 
 

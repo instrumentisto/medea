@@ -66,7 +66,14 @@ All user visible changes to this project will be documented in this file. This p
 - `source_kind` field to `VideoSettings` type ([#145]);
 - `RoomId` and `Credential` types ([#148]);
 - `JoinRoom` and `LeaveRoom` client messages ([#147]);
-- `RoomJoined` and `RoomLeft` server messages ([#147]).
+- `RoomJoined` and `RoomLeft` server messages ([#147]);
+- `StateSynchronized` server message ([#167]);
+- `SynchronizeMe` client message ([#167]);
+- States for the client and server synchronization ([#167]):
+  - `Room`;
+  - `Peer`;
+  - `Sender`;
+  - `Receiver`.
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -88,6 +95,7 @@ All user visible changes to this project will be documented in this file. This p
 [#148]: /../../pull/148
 [#155]: /../../pull/155
 [#156]: /../../pull/156
+[#167]: /../../pull/167
 
 
 
