@@ -264,6 +264,10 @@ impl Receiver {
         }
     }
 
+    /// Returns all intentions of this [`Receiver`] as [`TrackPatchCommand`].
+    ///
+    /// If this [`Receiver`] doesn't intents anything then `None` will be
+    /// returned.
     pub fn intentions(&self) -> Option<TrackPatchCommand> {
         if let MediaExchangeState::Transition(state) =
             self.media_exchange_state()

@@ -738,6 +738,11 @@ impl PeerConnection {
         Ok(())
     }
 
+    /// Returns all intentions of the [`Sender`]s and [`Receiver`]s from this
+    /// [`PeerConnection`] as [`Command`].
+    ///
+    /// If this [`PeerConnection`] doesn't intents anything then `None` will be
+    /// returned.
     pub fn intentions(&self) -> Option<Command> {
         let tracks_patches = self.media_connections.intentions();
         if tracks_patches.is_empty() {

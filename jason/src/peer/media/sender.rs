@@ -228,6 +228,10 @@ impl Sender {
         self.transceiver.set_send_track(None).await.unwrap();
     }
 
+    /// Returns all intentions of this [`Sender`] as [`TrackPatchCommand`].
+    ///
+    /// If this [`Sender`] doesn't intents anything then `None` will be
+    /// returned.
     pub fn intentions(&self) -> Option<TrackPatchCommand> {
         let media_exchange_intent =
             if let MediaExchangeState::Transition(state) =

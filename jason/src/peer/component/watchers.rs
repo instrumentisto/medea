@@ -75,13 +75,10 @@ impl PeerComponent {
         _: Rc<PeerState>,
         sync_state: SyncState,
     ) -> Result<(), Traced<PeerError>> {
-        match sync_state {
-            SyncState::Synced => {
-                for intent in ctx.intentions() {
-                    global_ctx.rpc.send_command(intent);
-                }
+        if let SyncState::Synced = sync_state {
+            if let Some(intent) = ctx.intentions() {
+                global_ctx.rpc.send_command(intent);
             }
-            _ => (),
         }
 
         Ok(())

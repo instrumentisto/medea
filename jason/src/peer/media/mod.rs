@@ -728,6 +728,8 @@ impl MediaConnections {
             .for_each(|t| t.reset_media_state_transition_timeout());
     }
 
+    /// Returns all intentions of the [`Sender`]s and [`Receiver`]s from this
+    /// [`MediaConnections`] as [`TrackPatchCommand`].
     pub fn intentions(&self) -> Vec<TrackPatchCommand> {
         let inner = self.0.borrow();
         inner
