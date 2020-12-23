@@ -1927,6 +1927,7 @@ pub mod tests {
         }
     }
 
+    /// Checks that [`state::Peer`] generation works correctly.
     mod state_generation {
         use std::convert::TryInto;
 
@@ -1949,7 +1950,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new(String::new(), String::new(), String::new()));
+            peer.set_ice_user(IceUser::new(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
 
             peer
         }
@@ -1990,7 +1995,10 @@ pub mod tests {
             let peer = peer.set_remote_offer(String::from("SDP"));
             let peer = PeerStateMachine::from(peer);
             let state = peer.get_state();
-            assert_eq!(state.negotiation_role, Some(NegotiationRole::Answerer(String::from("SDP"))));
+            assert_eq!(
+                state.negotiation_role,
+                Some(NegotiationRole::Answerer(String::from("SDP")))
+            );
 
             let peer: Peer<WaitLocalSdp> = peer.try_into().unwrap();
             let peer = peer.set_local_answer(String::new());
@@ -2014,16 +2022,20 @@ pub mod tests {
         #[test]
         fn sender_patch() {
             let mut peer = peer();
-            peer.context.senders.insert(TrackId(0), Rc::new(MediaTrack::new(
+            peer.context.senders.insert(
                 TrackId(0),
-                MediaType::Audio(AudioSettings { required: true }),
-            )));
+                Rc::new(MediaTrack::new(
+                    TrackId(0),
+                    MediaType::Audio(AudioSettings { required: true }),
+                )),
+            );
 
-            peer.as_changes_scheduler().patch_tracks(vec![TrackPatchCommand {
-                id: TrackId(0),
-                muted: Some(true),
-                enabled: Some(false),
-            }]);
+            peer.as_changes_scheduler()
+                .patch_tracks(vec![TrackPatchCommand {
+                    id: TrackId(0),
+                    muted: Some(true),
+                    enabled: Some(false),
+                }]);
 
             peer.commit_scheduled_changes();
 
@@ -2038,16 +2050,20 @@ pub mod tests {
         #[test]
         fn receiver_patch() {
             let mut peer = peer();
-            peer.context.receivers.insert(TrackId(0), Rc::new(MediaTrack::new(
+            peer.context.receivers.insert(
                 TrackId(0),
-                MediaType::Audio(AudioSettings { required: true }),
-            )));
+                Rc::new(MediaTrack::new(
+                    TrackId(0),
+                    MediaType::Audio(AudioSettings { required: true }),
+                )),
+            );
 
-            peer.as_changes_scheduler().patch_tracks(vec![TrackPatchCommand {
-                id: TrackId(0),
-                muted: Some(true),
-                enabled: Some(false),
-            }]);
+            peer.as_changes_scheduler()
+                .patch_tracks(vec![TrackPatchCommand {
+                    id: TrackId(0),
+                    muted: Some(true),
+                    enabled: Some(false),
+                }]);
 
             peer.commit_scheduled_changes();
 

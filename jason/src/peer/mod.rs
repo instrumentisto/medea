@@ -862,6 +862,13 @@ impl PeerConnection {
             .filter_map(|sndr| sndr.transceiver().send_track())
             .collect()
     }
+
+    /// Returns [`Rc`] to the [`Receiver`] with a provided [`TrackId`].
+    #[inline]
+    #[must_use]
+    pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
+        self.media_connections.get_receiver_by_id(id)
+    }
 }
 
 impl Drop for PeerConnection {

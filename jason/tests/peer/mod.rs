@@ -1072,10 +1072,11 @@ async fn new_remote_track() {
     }
 }
 
-/// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
-/// `ice-ufrag` IDs will be updated in the SDP offer.
-#[wasm_bindgen_test]
-async fn ice_restart_works() {
+mod ice_restart {
+    use medea_jason::utils::{AsProtoState, SynchronizableState};
+
+    use super::*;
+
     fn get_ice_pwds(offer: &str) -> Vec<&str> {
         offer
             .lines()
@@ -1102,22 +1103,57 @@ async fn ice_restart_works() {
             .collect()
     }
 
-    let peers = InterconnectedPeers::new().await;
-    let sdp_offer_before = peers.first_peer.get_offer(vec![]).await.unwrap();
-    let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
-    let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
-    peers.first_peer.state().reset_negotiation_role();
-    peers.first_peer.state().restart_ice();
-    let sdp_offer_after = peers.first_peer.get_offer(vec![]).await.unwrap();
-    let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
-    let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
+    /// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
+    /// `ice-ufrag` IDs will be updated in the SDP offer.
+    #[wasm_bindgen_test]
+    async fn ice_restart_works() {
+        let peers = InterconnectedPeers::new().await;
+        let sdp_offer_before =
+            peers.first_peer.get_offer(vec![]).await.unwrap();
+        let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
+        let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
+        peers.first_peer.state().reset_negotiation_role();
+        peers.first_peer.state().restart_ice();
+        let sdp_offer_after = peers.first_peer.get_offer(vec![]).await.unwrap();
+        let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
+        let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
 
-    ice_pwds_before
-        .into_iter()
-        .zip(ice_pwds_after.into_iter())
-        .for_each(|(before, after)| assert_ne!(before, after));
-    ice_ufrags_before
-        .into_iter()
-        .zip(ice_ufrags_after.into_iter())
-        .for_each(|(before, after)| assert_ne!(before, after));
+        ice_pwds_before
+            .into_iter()
+            .zip(ice_pwds_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+        ice_ufrags_before
+            .into_iter()
+            .zip(ice_ufrags_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+    }
+
+    /// Checks that ICE restart can be started by [`PeerState`] update.
+    #[wasm_bindgen_test]
+    async fn ice_restart_by_state() {
+        let peers = InterconnectedPeers::new().await;
+        let sdp_offer_before =
+            peers.first_peer.get_offer(vec![]).await.unwrap();
+        let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
+        let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
+
+        peers.first_peer.state().reset_negotiation_role();
+        peers.first_peer.state().approve_sdp_offer();
+        let mut proto_state = peers.first_peer.state().as_proto();
+        proto_state.restart_ice = true;
+        peers.first_peer.state().apply(proto_state);
+
+        let sdp_offer_after = peers.first_peer.get_offer(vec![]).await.unwrap();
+        let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
+        let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
+
+        ice_pwds_before
+            .into_iter()
+            .zip(ice_pwds_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+        ice_ufrags_before
+            .into_iter()
+            .zip(ice_ufrags_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+    }
 }

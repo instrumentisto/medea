@@ -1,6 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use futures::{
     channel::{
@@ -10,9 +13,9 @@ use futures::{
     stream::{self, BoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    Command, Direction, Event, IceConnectionState, MediaSourceKind, MediaType,
-    MemberId, NegotiationRole, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatchEvent, TrackUpdate, VideoSettings,
+    state, AudioSettings, Command, Direction, Event, IceConnectionState,
+    MediaSourceKind, MediaType, MemberId, NegotiationRole, PeerId, PeerMetrics,
+    Track, TrackId, TrackPatchEvent, TrackUpdate, VideoSettings,
 };
 use medea_jason::{
     api::Room,
@@ -21,7 +24,7 @@ use medea_jason::{
     },
     peer::{MockPeerRepository, PeerConnection, Repository},
     rpc::MockRpcSession,
-    utils::JasonError,
+    utils::{AsProtoState, JasonError},
     DeviceVideoTrackConstraints,
 };
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -2215,4 +2218,80 @@ mod set_local_media_settings {
         assert!(peer1.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert_eq!(peer1.get_send_tracks().len(), 1);
     }
+}
+
+/// Checks that [`state::Room`] update can create [`PeerConnection`] and its
+/// [`Sender`]s/[`Receiver`]s.
+#[wasm_bindgen_test]
+async fn create_peer_by_state() {
+    let mut rpc_session = MockRpcSession::new();
+    rpc_session
+        .expect_subscribe()
+        .returning(|| Box::pin(stream::pending()));
+    rpc_session
+        .expect_on_connection_loss()
+        .returning(|| Box::pin(stream::pending()));
+    rpc_session
+        .expect_on_reconnected()
+        .returning(|| Box::pin(stream::pending()));
+    rpc_session.expect_close_with_reason().returning(|_| ());
+    let (command_tx, mut command_rx) = mpsc::unbounded();
+    rpc_session.expect_send_command().returning(move |cmd| {
+        let _ = command_tx.unbounded_send(cmd);
+    });
+    let peer_repo = Box::new(medea_jason::peer::Repository::new(Rc::new(
+        medea_jason::media::MediaManager::default(),
+    )));
+    let room = Room::new(Rc::new(rpc_session), peer_repo);
+
+    let mut senders = HashMap::new();
+    senders.insert(
+        TrackId(0),
+        state::Sender {
+            id: TrackId(0),
+            muted: false,
+            enabled_individual: true,
+            enabled_general: true,
+            receivers: Vec::new(),
+            media_type: MediaType::Audio(AudioSettings { required: true }),
+            mid: None,
+        },
+    );
+    let mut receivers = HashMap::new();
+    receivers.insert(
+        TrackId(1),
+        state::Receiver {
+            id: TrackId(1),
+            muted: false,
+            enabled_individual: true,
+            enabled_general: true,
+            sender_id: "".into(),
+            media_type: MediaType::Audio(AudioSettings { required: true }),
+            mid: None,
+        },
+    );
+    let mut room_proto = room.peer_repo_state().as_proto();
+    room_proto.peers.insert(
+        PeerId(0),
+        state::Peer {
+            id: PeerId(0),
+            restart_ice: false,
+            senders,
+            receivers,
+            force_relay: false,
+            ice_servers: vec![],
+            negotiation_role: Some(NegotiationRole::Offerer),
+            sdp_offer: None,
+            remote_sdp_offer: None,
+            ice_candidates: HashSet::new(),
+        },
+    );
+    room.peer_repo_state().apply(room_proto);
+
+    let command = timeout(1000, command_rx.next()).await.unwrap().unwrap();
+    assert!(matches!(command, Command::MakeSdpOffer { .. }));
+
+    let peer = room.get_peer_by_id(PeerId(0)).unwrap();
+    assert!(peer.get_sender_by_id(TrackId(0)).is_some());
+    assert!(peer.get_receiver_by_id(TrackId(1)).is_some());
 }

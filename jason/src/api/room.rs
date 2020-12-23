@@ -60,7 +60,9 @@ pub struct GlobalCtx {
 }
 
 /// State of the [`PeerRepositoryComponent`].
-struct PeerRepositoryState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
+pub struct PeerRepositoryState(
+    RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>,
+);
 
 impl PeerRepositoryState {
     /// Returns new empty [`PeerRepositoryState`].
@@ -869,6 +871,11 @@ impl Room {
             .reset_negotiation_role();
 
         Ok(())
+    }
+
+    /// Returns reference to the [`PeerRepositoryState`] of this [`Room`].
+    pub fn peer_repo_state(&self) -> &PeerRepositoryState {
+        self.0.peers.state()
     }
 }
 
