@@ -312,6 +312,24 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
+    /// Returns all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    #[inline]
+    #[must_use]
+    pub fn get_senders_without_tracks(
+        &self,
+        kinds: LocalStreamUpdateCriteria,
+    ) -> Vec<Rc<Sender>> {
+        self.media_connections.get_senders_without_tracks(kinds)
+    }
+
+    /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
+    /// [`LocalStreamUpdateCriteria`].
+    #[inline]
+    pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
+        self.media_connections.drop_send_tracks(kinds).await
+    }
+
     /// Stops inner state transitions expiry timers.
     ///
     /// Inner state transitions initiated via external APIs that can not be
@@ -771,7 +789,6 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    #[cfg(feature = "mockable")]
     /// Indicates whether all [`Receiver`]s audio tracks are enabled.
     #[inline]
     #[must_use]
@@ -779,7 +796,6 @@ impl PeerConnection {
         self.media_connections.is_recv_audio_enabled()
     }
 
-    #[cfg(feature = "mockable")]
     /// Indicates whether all [`Receiver`]s video tracks are enabled.
     #[inline]
     #[must_use]
@@ -833,6 +849,18 @@ impl PeerConnection {
     #[must_use]
     pub fn is_send_audio_unmuted(&self) -> bool {
         self.media_connections.is_send_audio_unmuted()
+    }
+
+    /// Returns all [`local::Track`]s from [`PeerConnection`]'s
+    /// [`Transceiver`]s.
+    #[inline]
+    #[must_use]
+    pub fn get_send_tracks(&self) -> Vec<Rc<local::Track>> {
+        self.media_connections
+            .get_senders()
+            .into_iter()
+            .filter_map(|sndr| sndr.transceiver().send_track())
+            .collect()
     }
 }
 
