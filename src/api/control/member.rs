@@ -8,6 +8,7 @@ use std::{
     time::Duration,
 };
 
+use derive_more::{Display, From};
 use medea_client_api_proto::{Credential, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
@@ -26,6 +27,74 @@ use crate::api::control::{
 };
 
 const CREDENTIALS_LEN: usize = 32;
+
+#[derive(Debug, Clone, Deserialize, Display)]
+pub enum ControlCredential {
+    #[serde(rename = "hash_credentials")]
+    Hash(String),
+
+    #[serde(rename = "plain_credentials")]
+    Plain(String),
+}
+
+impl ControlCredential {
+    pub fn generate_plain() -> Self {
+        Self::Plain(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(CREDENTIALS_LEN)
+                .map(char::from)
+                .collect::<String>(),
+        )
+    }
+
+    pub fn verify(&self, client_creds: &Credential) -> bool {
+        match self {
+            Self::Hash(hash) => {
+                argon2::verify_encoded(&hash, client_creds.0.as_bytes())
+                    .unwrap()
+            }
+            Self::Plain(plain) => plain == &client_creds.0,
+        }
+    }
+}
+
+#[derive(Debug, From)]
+pub enum ControlCredentialParseError {
+    IncorrectHash(argon2::Error),
+    Empty,
+}
+
+impl TryFrom<proto::member::Credentials> for ControlCredential {
+    type Error = ControlCredentialParseError;
+
+    fn try_from(from: proto::member::Credentials) -> Result<Self, Self::Error> {
+        use proto::member::Credentials as C;
+        match from {
+            C::Hash(hash) => {
+                argon2::verify_encoded(&hash, &[])?;
+
+                Ok(Self::Hash(hash))
+            }
+            C::Plain(plain) => {
+                if plain.is_empty() {
+                    return Err(ControlCredentialParseError::Empty);
+                }
+
+                Ok(Self::Plain(plain))
+            }
+        }
+    }
+}
+
+impl From<ControlCredential> for proto::member::Credentials {
+    fn from(from: ControlCredential) -> Self {
+        match from {
+            ControlCredential::Plain(plain) => Self::Plain(plain),
+            ControlCredential::Hash(hash) => Self::Hash(hash),
+        }
+    }
+}
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
@@ -53,7 +122,7 @@ pub struct MemberSpec {
     pipeline: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
-    credentials: Credential,
+    credentials: ControlCredential,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -95,7 +164,7 @@ impl MemberSpec {
     #[inline]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
-        credentials: Credential,
+        credentials: ControlCredential,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
@@ -151,7 +220,7 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
-    pub fn credentials(&self) -> &Credential {
+    pub fn credentials(&self) -> &ControlCredential {
         &self.credentials
     }
 
@@ -230,10 +299,11 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         }
 
-        let mut credentials = Credential::from(member.credentials);
-        if credentials.0.is_empty() {
-            credentials = generate_member_credentials();
-        }
+        let credentials = if let Some(credentials) = member.credentials {
+            ControlCredential::try_from(credentials)?
+        } else {
+            ControlCredential::generate_plain()
+        };
 
         let on_leave = {
             let on_leave = member.on_leave;

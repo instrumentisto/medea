@@ -394,7 +394,7 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
 ///               p2p: Always
 ///     responder:
 ///       kind: Member
-///       credentials: test
+///       plain_credentials: test
 ///       spec:
 ///         pipeline:
 ///           play:
@@ -461,7 +461,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
 ///               src: "local://{{ room_id }}/bob/publish"
 ///     bob:
 ///       kind: Member
-///       credentials: test
+///       plain_credentials: test
 ///       spec:
 ///         pipeline:
 ///           play:

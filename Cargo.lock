@@ -1750,6 +1750,7 @@ dependencies = [
  "mockall",
  "rand 0.8.0",
  "redis",
+ "rust-argon2",
  "rust-crypto",
  "serde 1.0.118",
  "serde_json",

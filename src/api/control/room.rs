@@ -17,6 +17,7 @@ use super::{
     pipeline::Pipeline,
     RootElement, TryFromElementError,
 };
+use crate::api::control::member::ControlCredential;
 
 /// Element of [`Room`]'s [`Pipeline`].
 ///
@@ -28,7 +29,8 @@ pub enum RoomElement {
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
-        credentials: Credential,
+        #[serde(flatten)]
+        credentials: ControlCredential,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
         #[serde(default, with = "humantime_serde")]

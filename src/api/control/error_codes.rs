@@ -13,6 +13,7 @@ use crate::{
     api::control::{
         callback::url::CallbackUrlParseError,
         grpc::server::GrpcControlApiError,
+        member::ControlCredentialParseError,
         refs::{
             fid::ParseFidError, local_uri::LocalUriParseError,
             src_uri::SrcParseError,
@@ -284,6 +285,18 @@ pub enum ErrorCode {
     #[display(fmt = "Encountered negative duration")]
     NegativeDuration = 1023,
 
+    /// Member has empty credential.
+    ///
+    /// Code: __1024__.
+    #[display(fmt = "Member has empty credential")]
+    EmptyMemberCredential = 1024,
+
+    /// Member has invalid credential hash.
+    ///
+    /// Code: __1025__.
+    #[display(fmt = "Member has invalid credential hash")]
+    InvalidMemberCredentialHash = 1025,
+
     /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
@@ -308,6 +321,20 @@ impl From<ParticipantServiceErr> for ErrorResponse {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
             MemberError(_) => Self::unexpected(&err),
+        }
+    }
+}
+
+impl From<ControlCredentialParseError> for ErrorResponse {
+    fn from(err: ControlCredentialParseError) -> Self {
+        use ControlCredentialParseError as E;
+
+        // TODO (evdokimovs): Provide element ID and explanation
+        match err {
+            E::Empty => Self::without_id(ErrorCode::EmptyMemberCredential),
+            E::IncorrectHash(_) => {
+                Self::without_id(ErrorCode::InvalidMemberCredentialHash)
+            }
         }
     }
 }
@@ -345,6 +372,7 @@ impl From<TryFromProtobufError> for ErrorResponse {
                 String::from("No element was provided"),
                 Some(id),
             ),
+            E::MemberCredentialsParseErr(e) => e.into(),
             E::NegativeDuration(id, field) => Self::with_explanation(
                 ErrorCode::NegativeDuration,
                 format!(

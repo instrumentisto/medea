@@ -31,6 +31,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use crate::api::control::member::ControlCredential;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -83,7 +84,7 @@ struct MemberInner {
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
-    credentials: Credential,
+    credentials: ControlCredential,
 
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -113,7 +114,7 @@ impl Member {
     /// function.
     pub fn new(
         id: MemberId,
-        credentials: Credential,
+        credentials: ControlCredential,
         room_id: RoomId,
         idle_timeout: Duration,
         reconnect_timeout: Duration,
@@ -303,7 +304,7 @@ impl Member {
     }
 
     /// Returns credentials of this [`Member`].
-    pub fn credentials(&self) -> Credential {
+    pub fn credentials(&self) -> ControlCredential {
         self.0.borrow().credentials.clone()
     }
 
@@ -586,7 +587,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credentials: self.credentials().to_string(),
+            credentials: Some(self.credentials().into()),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())
