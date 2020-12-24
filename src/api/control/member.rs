@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use derive_more::{Display, From};
+use derive_more::From;
 use medea_client_api_proto::{Credential, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
@@ -28,7 +28,7 @@ use crate::api::control::{
 
 const CREDENTIALS_LEN: usize = 32;
 
-#[derive(Debug, Clone, Deserialize, Display)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum ControlCredential {
     #[serde(rename = "hash_credentials")]
     Hash(String),

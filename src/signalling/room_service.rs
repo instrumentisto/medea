@@ -200,8 +200,8 @@ impl RoomService {
             }
             ControlCredential::Plain(plain) => {
                 format!(
-                    "{}/{}/{}/{}",
-                    self.public_url, room_id, member_id, credentials
+                    "{}/{}/{}?token={}",
+                    self.public_url, room_id, member_id, plain
                 )
             }
         }

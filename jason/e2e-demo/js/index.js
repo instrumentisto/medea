@@ -74,7 +74,7 @@ async function createRoom(roomId, memberId) {
     }
   });
 
-  return resp.data.sids[memberId] + '/test';
+  return resp.data.sids[memberId] + '?token=test';
 }
 
 async function createMember(roomId, memberId) {
@@ -157,7 +157,7 @@ async function createMember(roomId, memberId) {
     }
   }
 
-  return resp.data.sids[memberId] + '/test';
+  return resp.data.sids[memberId] + '?token=test';
 }
 
 const colorizedJson = {
