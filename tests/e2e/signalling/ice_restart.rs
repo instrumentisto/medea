@@ -41,6 +41,7 @@ async fn ice_restart() {
         None,
         TestMember::DEFAULT_DEADLINE,
         false,
+        true,
     )
     .await;
 
@@ -57,6 +58,7 @@ async fn ice_restart() {
         None,
         TestMember::DEFAULT_DEADLINE,
         false,
+        true,
     )
     .await;
 

@@ -88,6 +88,8 @@ pub struct TestMember {
 
     /// Whether to handle negotiation in [`TestMember`].
     auto_negotiation: bool,
+
+    ignore_room_management: bool,
 }
 
 pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Credential) {
@@ -153,6 +155,7 @@ impl TestMember {
         on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
         auto_negotiation: bool,
+        ignore_room_management: bool,
     ) -> Addr<Self> {
         let (url, room_id, member_id, token) = parse_join_room_url(url);
         let (_, framed) =
@@ -173,6 +176,7 @@ impl TestMember {
                 on_message,
                 on_connection_event,
                 auto_negotiation,
+                ignore_room_management,
             };
             this.authorize(member_id, token);
 
@@ -199,6 +203,7 @@ impl TestMember {
                 on_message,
                 on_connection_event,
                 deadline,
+                true,
                 true,
             )
             .await;
@@ -304,11 +309,13 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event { room_id, event } => {
                     assert_eq!(self.room_id, room_id);
-                    if matches!(
-                        event,
-                        Event::RoomJoined { .. } | Event::RoomLeft { .. }
-                    ) {
-                        return;
+                    if self.ignore_room_management {
+                        if matches!(
+                            event,
+                            Event::RoomJoined { .. } | Event::RoomLeft { .. }
+                        ) {
+                            return;
+                        }
                     }
                     if self.auto_negotiation {
                         match &event {

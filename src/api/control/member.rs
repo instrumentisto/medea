@@ -29,6 +29,7 @@ const CREDENTIALS_LEN: usize = 32;
 
 /// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ControlCredential {
     /// [Argon2] hash of the `Member` credential.
     ///
@@ -390,5 +391,85 @@ impl TryFrom<&RoomElement> for MemberSpec {
             }),
             _ => Err(TryFromElementError::NotMember),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hash_credentials_verification_works() {
+        const HASH: &str = "$argon2i$v=19$m=16,t=2,\
+                            p=1$ZHNtcEFmVnREZkRtNk9hOA$6z1z/KA2FnBJA7fqqpdBQA";
+        let credential = ControlCredential::Hash(HASH.to_string());
+
+        for (cred, is_correct) in &[
+            ("medea", true),
+            (HASH, false),
+            ("foobar", false),
+            ("MEDEA", false),
+            ("Medea", false),
+        ] {
+            assert_eq!(
+                credential.verify(&Credential::from(*cred)),
+                *is_correct
+            );
+        }
+    }
+
+    #[test]
+    fn plain_credentials_verification_works() {
+        const CRED: &str = "medea";
+
+        let credential = ControlCredential::Plain(CRED.to_string());
+
+        for (cred, is_correct) in &[
+            (CRED, true),
+            ("foobar", false),
+            ("MEDEA", false),
+            ("Medea", false),
+        ] {
+            assert_eq!(
+                credential.verify(&Credential::from(*cred)),
+                *is_correct
+            );
+        }
+    }
+
+    #[test]
+    fn hash_credentials_validation_works() {
+        for (hash, is_valid) in &[
+            (
+                "$argon2i$v=19$m=16,t=2,p=1$ZHNtcEFmVnREZkRtNk9hOA$6z1z/\
+                 KA2FnBJA7fqqpdBQA",
+                true,
+            ),
+            (
+                "$argon2i$v=19$ZHNtcEFmVnREZkRtNk9hOA$6z1z/KA2FnBJA7fqqpdBQA",
+                false,
+            ),
+            ("$argon2i$v=19$m=16,t=2,p=1$ZHNtcEFmVnREZkRtNk9hOA", false),
+            ("", false),
+            ("medea", false),
+        ] {
+            assert_eq!(
+                ControlCredential::try_from(proto::member::Credentials::Hash(
+                    hash.to_string()
+                ))
+                .is_ok(),
+                *is_valid,
+                "Hash {}",
+                hash
+            );
+        }
+    }
+
+    #[test]
+    fn plain_credentials_generated_randomly() {
+        assert_ne!(
+            ControlCredential::generate_plain(),
+            ControlCredential::generate_plain()
+        )
     }
 }

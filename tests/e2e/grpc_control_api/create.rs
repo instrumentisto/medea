@@ -411,6 +411,7 @@ mod endpoint {
             None,
             None,
             true,
+            true,
         )
         .await;
         let _responder = TestMember::connect(
@@ -437,6 +438,7 @@ mod endpoint {
             })),
             None,
             None,
+            true,
             true,
         )
         .await;

@@ -17,14 +17,15 @@ use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
 use tokio::time::timeout;
 
 use crate::{
-    grpc_control_api::ControlClient, signalling::TestMember, test_name,
+    grpc_control_api::{plain_credentials, ControlClient},
+    signalling::TestMember,
+    test_name,
 };
 
 use super::{
     MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
     WebRtcPublishEndpointBuilder,
 };
-use crate::grpc_control_api::plain_credentials;
 
 fn done_on_both_peers_created() -> (
     impl Fn(&Event, &mut Context<TestMember>, Vec<&Event>) + Clone,
@@ -92,6 +93,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -118,6 +120,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         Some(Box::new(on_event)),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;
@@ -163,6 +166,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -191,6 +195,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         Some(Box::new(on_event)),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;
@@ -235,6 +240,7 @@ async fn signalling_starts_in_loopback_scenario() {
         Some(Box::new(on_event)),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;

@@ -74,6 +74,7 @@ async fn add_endpoints_synchronization() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -86,6 +87,7 @@ async fn add_endpoints_synchronization() {
         None,
         TestMember::DEFAULT_DEADLINE,
         false,
+        true,
     )
     .await;
 

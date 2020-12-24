@@ -4,6 +4,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 mod create;
+mod credentials;
 mod delete;
 mod rpc_settings;
 mod signaling;

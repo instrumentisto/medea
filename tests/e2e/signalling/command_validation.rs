@@ -77,6 +77,7 @@ async fn command_validation() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
