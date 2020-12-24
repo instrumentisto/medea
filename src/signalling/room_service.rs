@@ -188,6 +188,12 @@ impl RoomService {
 
     /// Returns [Control API] sid based on provided arguments and
     /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
+    ///
+    /// Returns sid with a token (`?token=<token>`) if [`ControlCredential`] is
+    /// [`ControlCredential::Plain`].
+    ///
+    /// Returns sid without token if [`ControlCredential`] is
+    /// [`ControlCredential::Hash`].
     fn get_sid(
         &self,
         room_id: &RoomId,

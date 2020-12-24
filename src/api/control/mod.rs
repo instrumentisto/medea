@@ -90,6 +90,9 @@ pub enum TryFromProtobufError {
     )]
     NegativeDuration(String, &'static str),
 
+    /// Failed to parse [Argon2] credentials hash of some `Member` element.
+    ///
+    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
     #[display(fmt = "Failed to parse Member credentials: {:?}", _0)]
     MemberCredentialsParseErr(String, argon2::Error),
 }

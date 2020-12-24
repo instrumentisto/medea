@@ -12,7 +12,7 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{MemberId, PeerId, RoomId};
+use medea_client_api_proto::{Credential, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -306,6 +306,14 @@ impl Member {
     /// Returns credentials of this [`Member`].
     pub fn credentials(&self) -> ControlCredential {
         self.0.borrow().credentials.clone()
+    }
+
+    /// Verifies that provided [`Credential`] matches with
+    /// [`Member`]'s [`ControlCredential`].
+    ///
+    /// Returns `true` if matches, `false` otherwise.
+    pub fn verify_credentials(&self, client_creds: &Credential) -> bool {
+        self.0.borrow().credentials.verify(&client_creds)
     }
 
     /// Returns all srcs of this [`Member`].

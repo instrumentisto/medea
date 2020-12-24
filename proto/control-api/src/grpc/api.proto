@@ -142,7 +142,9 @@ message Member {
   string on_leave = 3;
   // Credentials of the Member to authorize via Client API with.
   oneof credentials {
+    // Argon2 hash of credentials.
     string hash = 4;
+    // Plain text credentials.
     string plain = 5;
   }
   // Timeout of receiving heartbeat messages from the Member via Client API.

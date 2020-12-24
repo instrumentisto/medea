@@ -286,7 +286,7 @@ pub enum ErrorCode {
 
     /// Member has invalid credential hash.
     ///
-    /// Code: __1025__.
+    /// Code: __1024__.
     #[display(fmt = "Member has invalid credential hash")]
     InvalidMemberCredentialHash = 1024,
 

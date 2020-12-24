@@ -7,11 +7,16 @@ use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
 
+/// Credentials of the [`Member`].
 #[derive(Deserialize, Serialize, Debug)]
 enum Credentials {
+    /// [Argon2] hash of the [`Member`] credential.
+    ///
+    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
     #[serde(rename = "hash_credentials")]
     Hash(String),
 
+    /// Plain text [`Member`] credentials.
     #[serde(rename = "plain_credentials")]
     Plain(String),
 }

@@ -27,11 +27,16 @@ use crate::api::control::{
 
 const CREDENTIALS_LEN: usize = 32;
 
+/// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize)]
 pub enum ControlCredential {
+    /// [Argon2] hash of the `Member` credential.
+    ///
+    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
     #[serde(rename = "hash_credentials")]
     Hash(String),
 
+    /// Plain text `Member` credentials.
     #[serde(rename = "plain_credentials")]
     Plain(String),
 }
@@ -56,6 +61,10 @@ impl ControlCredential {
         )
     }
 
+    /// Verifies that provided [`Credential`] matches with
+    /// [`ControlCredential`].
+    ///
+    /// Returns `true` if matches, `false` otherwise.
     pub fn verify(&self, client_creds: &Credential) -> bool {
         match self {
             Self::Hash(hash) => {

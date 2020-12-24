@@ -180,7 +180,7 @@ impl ParticipantService {
         let member = self
             .get_member_by_id(member_id)
             .map_err(|_| RoomError::AuthorizationError)?;
-        if member.credentials().verify(credentials) {
+        if member.verify_credentials(credentials) {
             Ok(member)
         } else {
             Err(RoomError::AuthorizationError)

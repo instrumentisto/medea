@@ -196,8 +196,10 @@ pub mod member {
     /// Credentials of the Member to authorize via Client API with.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Credentials {
+        /// Argon2 hash of credentials.
         #[prost(string, tag="4")]
         Hash(std::string::String),
+        /// Plain text credentials.
         #[prost(string, tag="5")]
         Plain(std::string::String),
     }
