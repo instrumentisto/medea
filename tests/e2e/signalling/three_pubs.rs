@@ -114,19 +114,19 @@ fn three_members_p2p_video_call() {
 
         let deadline = Some(std::time::Duration::from_secs(5));
         TestMember::start(
-            format!("{}/member-1/test", base_url),
+            format!("{}/member-1?token=test", base_url),
             Some(Box::new(test_fn.clone())),
             None,
             deadline,
         );
         TestMember::start(
-            format!("{}/member-2/test", base_url),
+            format!("{}/member-2?token=test", base_url),
             Some(Box::new(test_fn.clone())),
             None,
             deadline,
         );
         TestMember::start(
-            format!("{}/member-3/test", base_url),
+            format!("{}/member-3?token=test", base_url),
             Some(Box::new(test_fn)),
             None,
             deadline,

@@ -24,6 +24,7 @@ use super::{
     MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
     WebRtcPublishEndpointBuilder,
 };
+use crate::grpc_control_api::plain_credentials;
 
 fn done_on_both_peers_created() -> (
     impl Fn(&Event, &mut Context<TestMember>, Vec<&Event>) + Clone,
@@ -63,7 +64,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -83,7 +84,10 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
     let (on_event, done) = done_on_both_peers_created();
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
+        &format!(
+            "ws://127.0.0.1:8080/ws/{}/publisher?token=test",
+            test_name!()
+        ),
         Some(Box::new(on_event.clone())),
         None,
         TestMember::DEFAULT_DEADLINE,
@@ -93,7 +97,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
 
     let create_play_member = MemberBuilder::default()
         .id("responder")
-        .credentials("qwerty")
+        .credentials(plain_credentials("qwerty"))
         .add_endpoint(
             WebRtcPlayEndpointBuilder::default()
                 .id("play")
@@ -107,7 +111,10 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
 
     control_client.create(create_play_member).await;
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", test_name!()),
+        &format!(
+            "ws://127.0.0.1:8080/ws/{}/responder?token=qwerty",
+            test_name!()
+        ),
         Some(Box::new(on_event)),
         None,
         TestMember::DEFAULT_DEADLINE,
@@ -128,7 +135,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -148,7 +155,10 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     let (on_event, done) = done_on_both_peers_created();
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
+        &format!(
+            "ws://127.0.0.1:8080/ws/{}/publisher?token=test",
+            test_name!()
+        ),
         Some(Box::new(on_event.clone())),
         None,
         TestMember::DEFAULT_DEADLINE,
@@ -158,7 +168,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 
     let create_second_member = MemberBuilder::default()
         .id("responder")
-        .credentials("qwerty")
+        .credentials(plain_credentials("qwerty"))
         .build()
         .unwrap()
         .build_request(test_name!());
@@ -174,7 +184,10 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     control_client.create(create_play).await;
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/responder/qwerty", test_name!()),
+        &format!(
+            "ws://127.0.0.1:8080/ws/{}/responder?token=qwerty",
+            test_name!()
+        ),
         Some(Box::new(on_event)),
         None,
         TestMember::DEFAULT_DEADLINE,
@@ -195,7 +208,7 @@ async fn signalling_starts_in_loopback_scenario() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -215,7 +228,10 @@ async fn signalling_starts_in_loopback_scenario() {
     let (on_event, done) = done_on_both_peers_created();
 
     TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
+        &format!(
+            "ws://127.0.0.1:8080/ws/{}/publisher?token=test",
+            test_name!()
+        ),
         Some(Box::new(on_event)),
         None,
         TestMember::DEFAULT_DEADLINE,
@@ -245,7 +261,7 @@ async fn peers_removed_on_delete_member() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -259,7 +275,7 @@ async fn peers_removed_on_delete_member() {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
@@ -306,13 +322,19 @@ async fn peers_removed_on_delete_member() {
 
     let deadline = Some(Duration::from_secs(5));
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
+        format!(
+            "ws://127.0.0.1:8080/ws/{}/publisher?token=test",
+            test_name!()
+        ),
         Some(Box::new(on_event.clone())),
         None,
         deadline,
     );
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/responder/test", test_name!()),
+        format!(
+            "ws://127.0.0.1:8080/ws/{}/responder?token=test",
+            test_name!()
+        ),
         Some(Box::new(on_event)),
         None,
         deadline,

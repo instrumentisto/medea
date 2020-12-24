@@ -465,6 +465,7 @@ mod test {
     use crate::{api::control::pipeline::Pipeline, conf::Conf};
 
     use super::*;
+    use crate::api::control::member::ControlCredential;
 
     pub fn empty_participants_service() -> ParticipantService {
         let room_spec = RoomSpec {
@@ -487,7 +488,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            ControlCredential::Plain("w/e".into()),
             None,
             None,
             None,
@@ -529,7 +530,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            ControlCredential::Plain("w/e".into()),
             None,
             None,
             Some(idle_timeout),

@@ -313,7 +313,9 @@ mod test {
     use super::*;
 
     use crate::{
-        api::control::{pipeline::Pipeline, MemberSpec, RoomSpec},
+        api::control::{
+            member::ControlCredential, pipeline::Pipeline, MemberSpec, RoomSpec,
+        },
         conf::{self, Conf},
         media::peer::tests::dummy_negotiation_sub_mock,
         signalling::{
@@ -355,7 +357,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            ControlCredential::Plain("w/e".into()),
             None,
             None,
             None,
@@ -396,7 +398,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            ControlCredential::Plain("w/e".into()),
             None,
             None,
             None,
@@ -473,7 +475,7 @@ mod test {
             let id = MemberId::from("member");
             let member = RoomElement::Member {
                 spec: Pipeline::new(HashMap::new()),
-                credentials: Credential::from("test"),
+                credentials: ControlCredential::Plain("test".into()),
                 on_leave,
                 on_join,
                 idle_timeout: None,

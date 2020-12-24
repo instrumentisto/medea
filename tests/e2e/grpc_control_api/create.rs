@@ -23,6 +23,7 @@ use super::{
 
 mod room {
     use super::*;
+    use crate::grpc_control_api::plain_credentials;
 
     #[actix_rt::test]
     #[named]
@@ -35,7 +36,10 @@ mod room {
             sids.get(&"responder".to_string()).unwrap().as_str();
         assert_eq!(
             responder_sid,
-            &format!("ws://127.0.0.1:8080/ws/{}/responder/test", test_name!())
+            &format!(
+                "ws://127.0.0.1:8080/ws/{}/responder?token=test",
+                test_name!()
+            )
         );
 
         let mut room = take_room(client.get(test_name!()).await);
@@ -45,7 +49,7 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_eq!(responder.credentials.as_str(), "test");
+        assert_eq!(responder.credentials, Some(plain_credentials("test")));
         let mut responder_pipeline = responder.pipeline;
         assert_eq!(responder_pipeline.len(), 1);
         let responder_play = responder_pipeline.remove("play").unwrap();
@@ -63,8 +67,8 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_ne!(publisher.credentials.as_str(), "test");
-        assert_ne!(publisher.credentials.as_str(), "");
+        assert_ne!(publisher.credentials, Some(plain_credentials("test")));
+        assert_ne!(publisher.credentials, Some(plain_credentials("")));
         let publisher_pipeline = publisher.pipeline;
         assert_eq!(publisher_pipeline.len(), 1);
     }
@@ -111,6 +115,7 @@ mod room {
 mod member {
 
     use super::*;
+    use crate::grpc_control_api::plain_credentials;
 
     #[actix_rt::test]
     #[named]
@@ -120,7 +125,7 @@ mod member {
 
         let add_member = MemberBuilder::default()
             .id("test-member")
-            .credentials("qwerty")
+            .credentials(plain_credentials("qwerty"))
             .add_endpoint(
                 WebRtcPlayEndpointBuilder::default()
                     .id("play")
@@ -138,7 +143,7 @@ mod member {
         assert_eq!(
             e2e_test_member_sid,
             format!(
-                "ws://127.0.0.1:8080/ws/{}/test-member/qwerty",
+                "ws://127.0.0.1:8080/ws/{}/test-member?token=qwerty",
                 test_name!()
             )
         );
@@ -146,7 +151,7 @@ mod member {
         let member = client.get(&format!("{}/test-member", test_name!())).await;
         let member = take_member(member);
         assert_eq!(member.pipeline.len(), 1);
-        assert_eq!(member.credentials.as_str(), "qwerty");
+        assert_eq!(member.credentials, Some(plain_credentials("qwerty")));
     }
 
     #[actix_rt::test]

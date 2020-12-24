@@ -5,7 +5,9 @@ use std::time::{Duration, Instant};
 use futures::channel::oneshot;
 
 use crate::{
-    grpc_control_api::{ControlClient, MemberBuilder, RoomBuilder},
+    grpc_control_api::{
+        plain_credentials, ControlClient, MemberBuilder, RoomBuilder,
+    },
     signalling::{ConnectionEvent, TestMember},
 };
 
@@ -32,7 +34,7 @@ async fn rpc_settings_from_spec_works() {
         .add_member(
             MemberBuilder::default()
                 .id("member")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .ping_interval(Some(Duration::from_secs(10)))
                 .idle_timeout(Some(Duration::from_secs(1)))
                 .reconnect_timeout(Some(Duration::from_secs(0)))
@@ -49,7 +51,7 @@ async fn rpc_settings_from_spec_works() {
 
     let mut opened = None;
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/member/test", ROOM_ID),
+        format!("ws://127.0.0.1:8080/ws/{}/member?token=test", ROOM_ID),
         None,
         Some(Box::new(move |event| match event {
             ConnectionEvent::Started => {

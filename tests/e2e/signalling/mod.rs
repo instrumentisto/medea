@@ -93,10 +93,16 @@ pub struct TestMember {
 pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Credential) {
     let mut url = Url::parse(&url).unwrap();
     url.set_fragment(None);
+    let token = url
+        .query_pairs()
+        .find(|(key, _)| key.as_ref() == "token")
+        .unwrap()
+        .1
+        .into_owned()
+        .into();
     url.set_query(None);
 
     let mut segments = url.path_segments().unwrap().rev();
-    let token = segments.next().unwrap().to_owned().into();
     let member_id = segments.next().unwrap().to_owned().into();
     let room_id = segments.next().unwrap().to_owned().into();
     url.set_path("/ws");

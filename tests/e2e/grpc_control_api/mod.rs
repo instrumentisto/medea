@@ -195,13 +195,17 @@ impl RoomBuilder {
     }
 }
 
+pub fn plain_credentials(creds: &str) -> proto::member::Credentials {
+    proto::member::Credentials::Plain(creds.to_string())
+}
+
 #[derive(Builder, Clone)]
 #[builder(setter(into))]
 pub struct Member {
     id: String,
     #[builder(default = "None")]
     #[builder(setter(strip_option))]
-    credentials: Option<String>,
+    credentials: Option<proto::member::Credentials>,
     #[builder(default = "HashMap::new()")]
     endpoints: HashMap<String, Endpoint>,
     #[builder(default = "None")]
@@ -231,7 +235,7 @@ impl Into<proto::Member> for Member {
             pipeline,
             on_leave: self.on_leave.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
-            credentials: self.credentials.unwrap_or_default(),
+            credentials: self.credentials,
             ping_interval: self.ping_interval.map(Into::into),
             idle_timeout: self.idle_timeout.map(Into::into),
             reconnect_timeout: self.reconnect_timeout.map(Into::into),
@@ -421,7 +425,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
@@ -495,7 +499,7 @@ pub fn pub_pub_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("bob")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")

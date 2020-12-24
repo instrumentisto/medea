@@ -771,6 +771,7 @@ mod tests {
     };
 
     use super::{metrics::MockRtcStatsHandler, *};
+    use crate::api::control::member::ControlCredential;
 
     impl PeersService {
         fn with_metrics_service(
@@ -907,7 +908,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".into(),
+            ControlCredential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -915,7 +916,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".into(),
+            ControlCredential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1012,7 +1013,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".into(),
+            ControlCredential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1020,7 +1021,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".into(),
+            ControlCredential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),

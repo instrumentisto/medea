@@ -8,8 +8,8 @@ use tokio::time::delay_for;
 
 use crate::{
     grpc_control_api::{
-        ControlClient, MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
-        WebRtcPublishEndpointBuilder,
+        plain_credentials, ControlClient, MemberBuilder, RoomBuilder,
+        WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
     },
     signalling::{handle_peer_created, TestMember},
     test_name,
@@ -35,7 +35,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("second")
-                .credentials("test")
+                .credentials(plain_credentials("test"))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
