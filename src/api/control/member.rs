@@ -8,7 +8,6 @@ use std::{
     time::Duration,
 };
 
-use derive_more::From;
 use medea_client_api_proto::{Credential, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
@@ -28,7 +27,7 @@ use crate::api::control::{
 
 const CREDENTIALS_LEN: usize = 32;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub enum ControlCredential {
     #[serde(rename = "hash_credentials")]
     Hash(String),
@@ -38,6 +37,15 @@ pub enum ControlCredential {
 }
 
 impl ControlCredential {
+    /// Generates alphanumeric [`ControlCredentials::Plain`] for [`Member`] with
+    /// [`CREDENTIALS_LEN`] length.
+    ///
+    /// This credentials will be generated if in dynamic [Control API] spec not
+    /// provided credentials for [`Member`]. This logic you can find in
+    /// [`TryFrom`] [`proto::Member`] implemented for [`MemberSpec`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pub fn generate_plain() -> Self {
         Self::Plain(
             rand::thread_rng()
@@ -52,21 +60,15 @@ impl ControlCredential {
         match self {
             Self::Hash(hash) => {
                 argon2::verify_encoded(&hash, client_creds.0.as_bytes())
-                    .unwrap()
+                    .unwrap_or(false)
             }
             Self::Plain(plain) => plain == &client_creds.0,
         }
     }
 }
 
-#[derive(Debug, From)]
-pub enum ControlCredentialParseError {
-    IncorrectHash(argon2::Error),
-    Empty,
-}
-
 impl TryFrom<proto::member::Credentials> for ControlCredential {
-    type Error = ControlCredentialParseError;
+    type Error = argon2::Error;
 
     fn try_from(from: proto::member::Credentials) -> Result<Self, Self::Error> {
         use proto::member::Credentials as C;
@@ -76,13 +78,7 @@ impl TryFrom<proto::member::Credentials> for ControlCredential {
 
                 Ok(Self::Hash(hash))
             }
-            C::Plain(plain) => {
-                if plain.is_empty() {
-                    return Err(ControlCredentialParseError::Empty);
-                }
-
-                Ok(Self::Plain(plain))
-            }
+            C::Plain(plain) => Ok(Self::Plain(plain)),
         }
     }
 }
@@ -255,24 +251,6 @@ impl MemberSpec {
     }
 }
 
-/// Generates alphanumeric credentials for [`Member`] with
-/// [`CREDENTIALS_LEN`] length.
-///
-/// This credentials will be generated if in dynamic [Control API] spec not
-/// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
-/// [`proto::Member`] implemented for [`MemberSpec`].
-///
-/// [`Member`]: crate::signalling::elements::Member
-/// [Control API]: https://tinyurl.com/yxsqplq7
-fn generate_member_credentials() -> Credential {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(CREDENTIALS_LEN)
-        .map(char::from)
-        .collect::<String>()
-        .into()
-}
-
 impl TryFrom<proto::Member> for MemberSpec {
     type Error = TryFromProtobufError;
 
@@ -300,7 +278,16 @@ impl TryFrom<proto::Member> for MemberSpec {
         }
 
         let credentials = if let Some(credentials) = member.credentials {
-            ControlCredential::try_from(credentials)?
+            match ControlCredential::try_from(credentials) {
+                Ok(creds) => creds,
+                Err(e) => {
+                    return Err(
+                        TryFromProtobufError::MemberCredentialsParseErr(
+                            member.id, e,
+                        ),
+                    )
+                }
+            }
         } else {
             ControlCredential::generate_plain()
         };

@@ -39,9 +39,6 @@ pub use self::{
     member::MemberSpec,
     room::{RoomElement, RoomSpec},
 };
-use crate::api::control::member::{
-    ControlCredential, ControlCredentialParseError,
-};
 
 /// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]
@@ -94,7 +91,7 @@ pub enum TryFromProtobufError {
     NegativeDuration(String, &'static str),
 
     #[display(fmt = "Failed to parse Member credentials: {:?}", _0)]
-    MemberCredentialsParseErr(ControlCredentialParseError),
+    MemberCredentialsParseErr(String, argon2::Error),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
@@ -106,12 +103,6 @@ impl From<SrcParseError> for TryFromProtobufError {
 impl From<CallbackUrlParseError> for TryFromProtobufError {
     fn from(from: CallbackUrlParseError) -> Self {
         Self::CallbackUrlParseErr(from)
-    }
-}
-
-impl From<ControlCredentialParseError> for TryFromProtobufError {
-    fn from(from: ControlCredentialParseError) -> Self {
-        Self::MemberCredentialsParseErr(from)
     }
 }
 

@@ -12,13 +12,14 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{Credential, MemberId, PeerId, RoomId};
+use medea_client_api_proto::{MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+        member::ControlCredential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
         WebRtcPublishId,
@@ -31,7 +32,6 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
-use crate::api::control::member::ControlCredential;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]

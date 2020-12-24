@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{Credential, MemberId, RoomId};
+use medea_client_api_proto::{MemberId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
