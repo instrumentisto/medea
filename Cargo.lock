@@ -2584,7 +2584,7 @@ dependencies = [
 [[package]]
 name = "rust-argon2"
 version = "0.8.3"
-source = "git+https://github.com/evdokimovs/rust-argon2?branch=make-decoded-pub#1d88c98158eedda8b6254051b52e7801375a0e35"
+source = "git+https://github.com/evdokimovs/rust-argon2?branch=make-decoded-pub#a6e8a3f6775487839de1ce037f3b8e6cbe6fe2f6"
 dependencies = [
  "base64 0.13.0",
  "blake2b_simd",

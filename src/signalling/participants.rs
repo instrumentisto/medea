@@ -462,10 +462,12 @@ impl ParticipantService {
 mod test {
     use std::time::Duration;
 
-    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+    use crate::{
+        api::control::{member::ControlCredential, pipeline::Pipeline},
+        conf::Conf,
+    };
 
     use super::*;
-    use crate::api::control::member::ControlCredential;
 
     pub fn empty_participants_service() -> ParticipantService {
         let room_spec = RoomSpec {

@@ -5,7 +5,6 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
-    str::FromStr as _,
     time::Duration,
 };
 
@@ -52,7 +51,7 @@ where
 {
     let s: String = Deserialize::deserialize(deserializer)?;
 
-    Digest::from_str(&s).map_err(|e| {
+    s.parse().map_err(|e| {
         serde::de::Error::custom(format!("Argon2 parse failed: {:?}", e))
     })
 }
@@ -98,7 +97,7 @@ impl TryFrom<proto::member::Credentials> for ControlCredential {
     fn try_from(from: proto::member::Credentials) -> Result<Self, Self::Error> {
         use proto::member::Credentials as C;
         match from {
-            C::Hash(hash) => Ok(Self::Hash(Digest::from_str(&hash)?)),
+            C::Hash(hash) => Ok(Self::Hash(hash.parse()?)),
             C::Plain(plain) => Ok(Self::Plain(plain)),
         }
     }
@@ -415,8 +414,7 @@ mod tests {
     fn hash_credentials_verification_works() {
         const HASH: &str = "$argon2i$v=19$m=16,t=2,\
                             p=1$ZHNtcEFmVnREZkRtNk9hOA$6z1z/KA2FnBJA7fqqpdBQA";
-        let credential =
-            ControlCredential::Hash(Digest::from_str(HASH).unwrap());
+        let credential = ControlCredential::Hash(HASH.parse().unwrap());
 
         for (cred, is_correct) in &[
             ("medea", true),

@@ -22,8 +22,9 @@ use super::{
 };
 
 mod room {
-    use super::*;
     use crate::grpc_control_api::plain_credentials;
+
+    use super::*;
 
     #[actix_rt::test]
     #[named]
@@ -113,9 +114,9 @@ mod room {
 }
 
 mod member {
+    use crate::grpc_control_api::plain_credentials;
 
     use super::*;
-    use crate::grpc_control_api::plain_credentials;
 
     #[actix_rt::test]
     #[named]

@@ -762,6 +762,7 @@ mod tests {
             endpoints::webrtc_publish_endpoint::{
                 AudioSettings, P2pMode, VideoSettings,
             },
+            member::ControlCredential,
             refs::SrcUri,
         },
         signalling::{
@@ -771,7 +772,6 @@ mod tests {
     };
 
     use super::{metrics::MockRtcStatsHandler, *};
-    use crate::api::control::member::ControlCredential;
 
     impl PeersService {
         fn with_metrics_service(

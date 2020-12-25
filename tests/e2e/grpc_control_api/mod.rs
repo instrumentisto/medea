@@ -196,6 +196,7 @@ impl RoomBuilder {
     }
 }
 
+/// Returns [`proto::member::Credentials::Plain`] with a provided credential.
 pub fn plain_credentials(creds: &str) -> proto::member::Credentials {
     proto::member::Credentials::Plain(creds.to_string())
 }

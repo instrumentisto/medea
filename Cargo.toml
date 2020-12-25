@@ -47,6 +47,8 @@ medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
 rand = "0.8"
+# TODO: get it from crates.io when sru-systems/rust-argon2#43
+#       will be merged to the mainline.
 rust-argon2 = { git = "https://github.com/evdokimovs/rust-argon2", branch = "make-decoded-pub" }
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
