@@ -159,7 +159,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - uses: satackey/action-docker-layer-caching@v0.0.11
+      - uses: evdokimovs/action-docker-layer-caching@v0.0.11
         with:
           key: test-e2e-{hash}
           restore-keys: test-e2e-
@@ -301,7 +301,7 @@ jobs:
                   image=${{ matrix.image }} tag=build-${{ github.run_number }}
         if: ${{ matrix.if && !matrix.cache }}
 
-      - uses: satackey/action-docker-layer-caching@v0.0.11
+      - uses: evdokimovs/action-docker-layer-caching@v0.0.11
         with:
           key: docker-${{ matrix.image }}-build-{hash}
           restore-keys: docker-${{ matrix.image }}-build-
