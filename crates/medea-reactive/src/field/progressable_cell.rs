@@ -8,14 +8,14 @@
 
 use std::cell::{Ref, RefCell};
 
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::stream::LocalBoxStream;
 
 use crate::{
-    subscribers_store::progressable, Guarded, MutObservableFieldGuard,
+    subscribers_store::{progressable, progressable::RecheckableCounterFuture},
+    Guarded, MutObservableFieldGuard,
 };
 
 use super::Progressable;
-use crate::subscribers_store::progressable::RecheckableCounterFuture;
 
 /// Progressable analogue of [`Cell`].
 ///

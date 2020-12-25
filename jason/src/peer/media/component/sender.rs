@@ -2,7 +2,6 @@
 
 use std::{cell::Cell, rc::Rc};
 
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
@@ -17,10 +16,7 @@ use crate::{
     utils::Component,
     MediaKind,
 };
-use medea_reactive::subscribers_store::progressable::{
-    JoinRecheckableCounterFuture, RecheckableFutureExt,
-};
-use std::pin::Pin;
+use medea_reactive::RecheckableFutureExt;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.

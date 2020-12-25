@@ -2,10 +2,9 @@
 
 use std::rc::Rc;
 
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ProgressableCell};
+use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 use tracerr::Traced;
 
 use crate::{
@@ -14,7 +13,6 @@ use crate::{
     peer::{MediaConnectionsError, Receiver},
     utils::Component,
 };
-use medea_reactive::subscribers_store::progressable::RecheckableFutureExt;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.

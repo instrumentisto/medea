@@ -2,14 +2,13 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{
     collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
-    ProgressableCell,
+    ProgressableCell, RecheckableFutureExt,
 };
 use tracerr::Traced;
 
@@ -25,8 +24,6 @@ use crate::{
 };
 
 use super::PeerConnection;
-use medea_reactive::subscribers_store::progressable::RecheckableFutureExt;
-use std::pin::Pin;
 
 /// State of the [`PeerComponent`].
 pub struct PeerState {

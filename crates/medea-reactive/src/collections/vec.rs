@@ -2,9 +2,7 @@
 
 use std::{marker::PhantomData, slice::Iter};
 
-use futures::{
-    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt as _,
-};
+use futures::stream::LocalBoxStream;
 
 use crate::subscribers_store::{
     common, progressable,
