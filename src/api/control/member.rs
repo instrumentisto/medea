@@ -52,8 +52,9 @@ where
 {
     let s: String = Deserialize::deserialize(deserializer)?;
 
-    Digest::from_str(&s)
-        .map_err(|_| serde::de::Error::custom("Argon2 parse failed."))
+    Digest::from_str(&s).map_err(|e| {
+        serde::de::Error::custom(format!("Argon2 parse failed: {:?}", e))
+    })
 }
 
 impl ControlCredential {
