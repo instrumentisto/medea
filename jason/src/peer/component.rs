@@ -136,8 +136,8 @@ impl PeerState {
 
     /// Marks current [`LocalSdp`] as approved by server.
     #[inline]
-    pub fn sdp_offer_applied(&self) {
-        self.sdp_offer.approve();
+    pub fn sdp_offer_applied(&self, sdp_offer: String) {
+        self.sdp_offer.approve(sdp_offer);
     }
 
     /// Stops all timeouts of the [`PeerState`].

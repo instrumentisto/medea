@@ -1426,7 +1426,11 @@ impl EventHandler for InnerRoom {
 
     /// Calls [`PeerState::sdp_offer_applied`] for the [`PeerState`] with a
     /// provided [`PeerId`].
-    async fn on_sdp_offer_applied(&self, peer_id: PeerId) -> Self::Output {
+    async fn on_local_description_applied(
+        &self,
+        peer_id: PeerId,
+        sdp_offer: String,
+    ) -> Self::Output {
         let peer = self
             .peers
             .state()
@@ -1435,7 +1439,7 @@ impl EventHandler for InnerRoom {
             .get(&peer_id)
             .cloned()
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.sdp_offer_applied();
+        peer.sdp_offer_applied(sdp_offer);
 
         Ok(())
     }

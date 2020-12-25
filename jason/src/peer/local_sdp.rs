@@ -166,8 +166,11 @@ impl LocalSdp {
     }
 
     /// Approves current [`LocalSdp`] offer.
-    pub fn approve(&self) {
-        self.0.borrow_mut().approve()
+    pub fn approve(&self, sdp_offer: String) {
+        let mut inner = self.0.borrow_mut();
+        if inner.current_offer == Some(sdp_offer) {
+            inner.approve()
+        }
     }
 
     /// Returns current SDP offer.
