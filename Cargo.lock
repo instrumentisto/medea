@@ -1750,7 +1750,7 @@ dependencies = [
  "mockall",
  "rand 0.8.0",
  "redis",
- "rust-argon2",
+ "rust-argon2 0.8.3 (git+https://github.com/evdokimovs/rust-argon2?branch=make-decoded-pub)",
  "rust-crypto",
  "serde 1.0.118",
  "serde_json",
@@ -2529,7 +2529,7 @@ checksum = "de0737333e7a9502c789a36d7c7fa6092a49895d4faa31ca5df163857ded2e9d"
 dependencies = [
  "getrandom 0.1.15",
  "redox_syscall",
- "rust-argon2",
+ "rust-argon2 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2574,6 +2574,17 @@ name = "rust-argon2"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4b18820d944b33caa75a71378964ac46f58517c92b6ae5f762636247c09e78fb"
+dependencies = [
+ "base64 0.13.0",
+ "blake2b_simd",
+ "constant_time_eq",
+ "crossbeam-utils 0.8.1",
+]
+
+[[package]]
+name = "rust-argon2"
+version = "0.8.3"
+source = "git+https://github.com/evdokimovs/rust-argon2?branch=make-decoded-pub#1d88c98158eedda8b6254051b52e7801375a0e35"
 dependencies = [
  "base64 0.13.0",
  "blake2b_simd",

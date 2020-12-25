@@ -5,13 +5,15 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    str::FromStr as _,
     time::Duration,
 };
 
+use argon2::Digest;
 use medea_client_api_proto::{Credential, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::api::control::{
     callback::url::CallbackUrl,
@@ -34,12 +36,24 @@ pub enum ControlCredential {
     /// [Argon2] hash of the `Member` credential.
     ///
     /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
+    #[serde(deserialize_with = "deserialize_digest")]
     #[serde(rename = "hash_credentials")]
-    Hash(String),
+    Hash(Digest),
 
     /// Plain text `Member` credentials.
     #[serde(rename = "plain_credentials")]
     Plain(String),
+}
+
+/// Tries to deserialize [`Digest`] from the [`String`].
+fn deserialize_digest<'de, D>(deserializer: D) -> Result<Digest, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = Deserialize::deserialize(deserializer)?;
+
+    Digest::from_str(&s)
+        .map_err(|_| serde::de::Error::custom("Argon2 parse failed."))
 }
 
 impl ControlCredential {
@@ -69,7 +83,7 @@ impl ControlCredential {
     pub fn verify(&self, client_creds: &Credential) -> bool {
         match self {
             Self::Hash(hash) => {
-                argon2::verify_encoded(&hash, client_creds.0.as_bytes())
+                argon2::verify_digest(hash, client_creds.0.as_bytes())
                     .unwrap_or(false)
             }
             Self::Plain(plain) => plain == &client_creds.0,
@@ -83,11 +97,7 @@ impl TryFrom<proto::member::Credentials> for ControlCredential {
     fn try_from(from: proto::member::Credentials) -> Result<Self, Self::Error> {
         use proto::member::Credentials as C;
         match from {
-            C::Hash(hash) => {
-                argon2::verify_encoded(&hash, &[])?;
-
-                Ok(Self::Hash(hash))
-            }
+            C::Hash(hash) => Ok(Self::Hash(Digest::from_str(&hash)?)),
             C::Plain(plain) => Ok(Self::Plain(plain)),
         }
     }
@@ -97,7 +107,7 @@ impl From<ControlCredential> for proto::member::Credentials {
     fn from(from: ControlCredential) -> Self {
         match from {
             ControlCredential::Plain(plain) => Self::Plain(plain),
-            ControlCredential::Hash(hash) => Self::Hash(hash),
+            ControlCredential::Hash(hash) => Self::Hash(hash.to_string()),
         }
     }
 }
@@ -396,13 +406,16 @@ impl TryFrom<&RoomElement> for MemberSpec {
 
 #[cfg(test)]
 mod tests {
+    use argon2::Digest;
+
     use super::*;
 
     #[test]
     fn hash_credentials_verification_works() {
         const HASH: &str = "$argon2i$v=19$m=16,t=2,\
                             p=1$ZHNtcEFmVnREZkRtNk9hOA$6z1z/KA2FnBJA7fqqpdBQA";
-        let credential = ControlCredential::Hash(HASH.to_string());
+        let credential =
+            ControlCredential::Hash(Digest::from_str(HASH).unwrap());
 
         for (cred, is_correct) in &[
             ("medea", true),
