@@ -14,6 +14,7 @@ use crate::{
     peer::{MediaConnectionsError, Receiver},
     utils::Component,
 };
+use medea_reactive::subscribers_store::progressable::RecheckableFutureExt;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -112,15 +113,12 @@ impl ReceiverState {
     /// will be applied on [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join_all(vec![
+    pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
+        medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),
             self.enabled_individual.when_all_processed(),
             self.muted.when_all_processed(),
-        ]);
-        Box::pin(async move {
-            fut.await;
-        })
+        ])
     }
 }
 

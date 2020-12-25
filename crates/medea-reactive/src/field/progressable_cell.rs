@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::Progressable;
+use crate::subscribers_store::progressable::RecheckableCounterFuture;
 
 /// Progressable analogue of [`Cell`].
 ///
@@ -66,7 +67,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> RecheckableCounterFuture {
         self.0.borrow().when_all_processed()
     }
 }

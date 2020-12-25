@@ -17,6 +17,10 @@ use crate::{
     utils::Component,
     MediaKind,
 };
+use medea_reactive::subscribers_store::progressable::{
+    JoinRecheckableCounterFuture, RecheckableFutureExt,
+};
+use std::pin::Pin;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
@@ -131,15 +135,12 @@ impl SenderState {
     /// will be applied on [`Sender`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join_all(vec![
+    pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
+        medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),
             self.enabled_individual.when_all_processed(),
             self.muted.when_all_processed(),
-        ]);
-        Box::pin(async move {
-            fut.await;
-        })
+        ])
     }
 
     /// Returns `true` if local `MediaStream` update needed for this

@@ -25,6 +25,8 @@ use crate::{
 };
 
 use super::PeerConnection;
+use medea_reactive::subscribers_store::progressable::RecheckableFutureExt;
+use std::pin::Pin;
 
 /// State of the [`PeerComponent`].
 pub struct PeerState {
@@ -161,34 +163,32 @@ impl PeerState {
     /// updates will be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_senders_updated(&self) -> LocalBoxFuture<'static, ()> {
+    fn when_all_senders_updated(
+        &self,
+    ) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         let when_futs: Vec<_> = self
             .senders
             .borrow()
             .values()
             .map(|s| s.when_updated())
             .collect();
-        let fut = futures::future::join_all(when_futs);
-        Box::pin(async move {
-            fut.await;
-        })
+        Box::new(medea_reactive::join_all(when_futs))
     }
 
     /// Returns [`Future`] which will be resolved when all [`ReceiverState`]s
     /// updates will be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_receivers_updated(&self) -> LocalBoxFuture<'static, ()> {
+    fn when_all_receivers_updated(
+        &self,
+    ) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         let when_futs: Vec<_> = self
             .receivers
             .borrow()
             .values()
             .map(|s| s.when_updated())
             .collect();
-        let fut = futures::future::join_all(when_futs);
-        Box::pin(async move {
-            fut.await;
-        })
+        Box::new(medea_reactive::join_all(when_futs))
     }
 
     /// Returns [`Future`] which will be resolved when all
@@ -196,14 +196,11 @@ impl PeerState {
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join(
+    pub fn when_all_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
+        medea_reactive::join_all(vec![
             self.when_all_receivers_updated(),
             self.when_all_senders_updated(),
-        );
-        Box::pin(async move {
-            fut.await;
-        })
+        ])
     }
 
     /// Updates local `MediaStream` based on

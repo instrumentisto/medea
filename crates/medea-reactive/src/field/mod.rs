@@ -21,6 +21,7 @@ use crate::subscribers_store::{progressable, SubscribersStore};
 
 #[doc(inline)]
 pub use self::{cell::ObservableCell, progressable_cell::ProgressableCell};
+use crate::subscribers_store::progressable::RecheckableCounterFuture;
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
@@ -132,7 +133,7 @@ where
     /// subscribers.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> RecheckableCounterFuture {
         self.subs.when_all_processed()
     }
 }
