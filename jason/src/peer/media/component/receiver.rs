@@ -8,7 +8,6 @@ use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 use tracerr::Traced;
 
 use crate::{
-    api::GlobalCtx,
     media::RecvConstraints,
     peer::{MediaConnectionsError, Receiver},
     utils::Component,
@@ -16,7 +15,7 @@ use crate::{
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
-pub type ReceiverComponent = Component<ReceiverState, Receiver, GlobalCtx>;
+pub type ReceiverComponent = Component<ReceiverState, Receiver>;
 
 /// State of the [`ReceiverComponent`].
 pub struct ReceiverState {
@@ -129,7 +128,6 @@ impl ReceiverComponent {
     #[inline]
     async fn muted_watcher(
         ctx: Rc<Receiver>,
-        _: Rc<GlobalCtx>,
         _: Rc<ReceiverState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -146,7 +144,6 @@ impl ReceiverComponent {
     #[inline]
     async fn enabled_individual_watcher(
         ctx: Rc<Receiver>,
-        _: Rc<GlobalCtx>,
         _: Rc<ReceiverState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -162,7 +159,6 @@ impl ReceiverComponent {
     #[inline]
     async fn enabled_general_watcher(
         ctx: Rc<Receiver>,
-        _: Rc<GlobalCtx>,
         _: Rc<ReceiverState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {

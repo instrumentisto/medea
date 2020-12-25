@@ -878,15 +878,8 @@ impl MediaConnections {
             caps: media_type.into(),
         }
         .build()?;
-        let component = spawn_component!(
-            SenderComponent,
-            Rc::new(sender_state),
-            sender,
-            Rc::new(GlobalCtx {
-                rpc: Rc::new(MockRpcSession::new()),
-                connections: Rc::new(Connections::default()),
-            }),
-        );
+        let component =
+            spawn_component!(SenderComponent, Rc::new(sender_state), sender,);
 
         Ok(component)
     }
@@ -924,10 +917,6 @@ impl MediaConnections {
             ReceiverComponent,
             Rc::new(receiver_state),
             Rc::new(receiver),
-            Rc::new(GlobalCtx {
-                rpc: Rc::new(MockRpcSession::new()),
-                connections: Rc::new(Connections::default()),
-            }),
         );
 
         component

@@ -62,6 +62,7 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
+use crate::api::Connections;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -181,6 +182,34 @@ pub enum PeerEvent {
         /// Reasons of local media updating fail.
         error: JasonError,
     },
+
+    NewSdpAnswer {
+        peer_id: PeerId,
+
+        /// SDP Answer of the `Peer`.
+        sdp_answer: String,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
+    },
+
+    NewSdpOffer {
+        peer_id: PeerId,
+
+        /// SDP Offer of the `Peer`.
+        sdp_offer: String,
+
+        /// Associations between [`Track`] and transceiver's
+        /// [media description][1].
+        ///
+        /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
+        ///
+        /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
+        mids: HashMap<TrackId, String>,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -218,6 +247,8 @@ pub struct PeerConnection {
 
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalTracksConstraints,
+
+    connections: Rc<Connections>,
 }
 
 impl PeerConnection {
@@ -242,6 +273,7 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
         send_constraints: LocalTracksConstraints,
+        connections: Rc<Connections>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
@@ -262,6 +294,7 @@ impl PeerConnection {
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
+            connections,
         };
 
         // Bind to `icecandidate` event.

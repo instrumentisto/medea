@@ -13,7 +13,6 @@ use medea_reactive::{
 use tracerr::Traced;
 
 use crate::{
-    api::GlobalCtx,
     peer::{
         local_sdp::{LocalSdp, Sdp},
         media::{ReceiverState, SenderBuilder, SenderState},
@@ -23,7 +22,7 @@ use crate::{
     utils::Component,
 };
 
-use super::PeerConnection;
+use super::{PeerConnection, PeerEvent};
 
 /// State of the [`PeerComponent`].
 pub struct PeerState {
@@ -246,7 +245,7 @@ impl PeerState {
 }
 
 /// Component reponsible for the [`PeerConnection`] updating.
-pub type PeerComponent = Component<PeerState, PeerConnection, GlobalCtx>;
+pub type PeerComponent = Component<PeerState, PeerConnection>;
 
 #[watchers]
 impl PeerComponent {
@@ -258,7 +257,6 @@ impl PeerComponent {
     #[inline]
     async fn ice_candidate_push_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<GlobalCtx>,
         _: Rc<PeerState>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
@@ -283,7 +281,6 @@ impl PeerComponent {
     #[watch(self.state().remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         remote_sdp_answer: Guarded<Option<String>>,
     ) -> Result<(), Traced<PeerError>> {
@@ -318,7 +315,6 @@ impl PeerComponent {
     #[inline]
     async fn ice_restart_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: bool,
     ) -> Result<(), Traced<PeerError>> {
@@ -342,7 +338,6 @@ impl PeerComponent {
     #[watch(self.state().senders.borrow().on_insert_with_replay())]
     async fn sender_insert_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) -> Result<(), Traced<PeerError>> {
@@ -356,7 +351,7 @@ impl PeerComponent {
 
         let ((track_id, new_sender), _guard) = val.into_parts();
         for receiver in new_sender.receivers() {
-            global_ctx.connections.create_connection(state.id, receiver);
+            ctx.connections.create_connection(state.id, receiver);
         }
         let sndr = SenderBuilder {
             media_connections: &ctx.media_connections,
@@ -372,12 +367,7 @@ impl PeerComponent {
         }
         .build()
         .map_err(tracerr::map_from_and_wrap!())?;
-        let component = spawn_component!(
-            SenderComponent,
-            new_sender,
-            sndr,
-            global_ctx.clone(),
-        );
+        let component = spawn_component!(SenderComponent, new_sender, sndr,);
         ctx.media_connections.insert_sender(component);
 
         Ok(())
@@ -390,13 +380,11 @@ impl PeerComponent {
     #[watch(self.state().receivers.borrow().on_insert_with_replay())]
     async fn receiver_insert_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) -> Result<(), Traced<PeerError>> {
         let ((track_id, new_receiver), _guard) = val.into_parts();
-        global_ctx
-            .connections
+        ctx.connections
             .create_connection(state.id, new_receiver.sender_id());
         let recv = Receiver::new(
             &ctx.media_connections,
@@ -407,12 +395,8 @@ impl PeerComponent {
             new_receiver.enabled_general(),
             new_receiver.enabled_individual(),
         );
-        let component = spawn_component!(
-            ReceiverComponent,
-            new_receiver,
-            Rc::new(recv),
-            global_ctx,
-        );
+        let component =
+            spawn_component!(ReceiverComponent, new_receiver, Rc::new(recv),);
         ctx.media_connections.insert_receiver(component);
 
         Ok(())
@@ -433,7 +417,6 @@ impl PeerComponent {
     #[watch(self.state().sdp_offer.on_new_local_sdp())]
     async fn sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
-        global_ctx: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         sdp_offer: Sdp,
     ) -> Result<(), Traced<PeerError>> {
@@ -447,23 +430,29 @@ impl PeerComponent {
                     let mids = ctx
                         .get_mids()
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    global_ctx.rpc.send_command(Command::MakeSdpOffer {
-                        peer_id: ctx.id(),
-                        sdp_offer: offer,
-                        transceivers_statuses: ctx.get_transceivers_statuses(),
-                        mids,
-                    });
+                    ctx.peer_events_sender
+                        .unbounded_send(PeerEvent::NewSdpOffer {
+                            peer_id: ctx.id(),
+                            sdp_offer: offer,
+                            transceivers_statuses: ctx
+                                .get_transceivers_statuses(),
+                            mids,
+                        })
+                        .ok();
                 }
                 (Sdp::Offer(offer), NegotiationRole::Answerer(_)) => {
                     ctx.peer
                         .set_answer(&offer)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    global_ctx.rpc.send_command(Command::MakeSdpAnswer {
-                        peer_id: ctx.id(),
-                        sdp_answer: offer,
-                        transceivers_statuses: ctx.get_transceivers_statuses(),
-                    });
+                    ctx.peer_events_sender
+                        .unbounded_send(PeerEvent::NewSdpAnswer {
+                            peer_id: ctx.id(),
+                            sdp_answer: offer,
+                            transceivers_statuses: ctx
+                                .get_transceivers_statuses(),
+                        })
+                        .ok();
                     state.sdp_offer.when_approved().await;
                     state.negotiation_role.set(None);
                 }
@@ -487,7 +476,6 @@ impl PeerComponent {
     #[watch(self.state().negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
         ctx: Rc<PeerConnection>,
-        _: Rc<GlobalCtx>,
         state: Rc<PeerState>,
         new_negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<PeerError>> {

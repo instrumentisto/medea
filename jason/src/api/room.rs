@@ -48,18 +48,6 @@ use crate::{
     JsMediaSourceKind,
 };
 
-// TODO: Dont really need it.
-/// Global context which will be provided to the all [`Component`]s of this app.
-pub struct GlobalCtx {
-    /// Client to talk with media server via Client API RPC.
-    pub rpc: Rc<dyn RpcSession>,
-
-    /// Collection of [`Connection`]s with a remote `Member`s.
-    ///
-    /// [`Connection`]: crate::api::Connection
-    pub connections: Rc<Connections>,
-}
-
 /// State of the [`PeerRepositoryComponent`].
 struct PeerRepositoryState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
 
@@ -88,11 +76,16 @@ struct PeerRepositoryCtx {
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection;
     send_constraints: LocalTracksConstraints,
+
+    /// Collection of [`Connection`]s with a remote `Member`s.
+    ///
+    /// [`Connection`]: crate::api::Connection
+    connections: Rc<Connections>,
 }
 
 /// Component responsible for the new [`PeerComponent`] creating and removing.
 type PeerRepositoryComponent =
-    Component<PeerRepositoryState, PeerRepositoryCtx, GlobalCtx>;
+    Component<PeerRepositoryState, PeerRepositoryCtx>;
 
 #[watchers]
 impl PeerRepositoryComponent {
@@ -106,7 +99,6 @@ impl PeerRepositoryComponent {
     #[inline]
     async fn insert_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
-        global_ctx: Rc<GlobalCtx>,
         _: Rc<PeerRepositoryState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
@@ -114,9 +106,9 @@ impl PeerRepositoryComponent {
             .create_peer(
                 peer_id,
                 new_peer,
-                global_ctx,
                 ctx.peer_event_sender.clone(),
                 ctx.send_constraints.clone(),
+                ctx.connections.clone(),
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -131,12 +123,11 @@ impl PeerRepositoryComponent {
     #[inline]
     async fn remove_peer_watcher(
         ctx: Rc<PeerRepositoryCtx>,
-        global_ctx: Rc<GlobalCtx>,
         _: Rc<PeerRepositoryState>,
         (peer_id, _): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
         ctx.repo.remove(peer_id);
-        global_ctx.connections.close_connection(peer_id);
+        ctx.connections.close_connection(peer_id);
 
         Ok(())
     }
@@ -1069,9 +1060,6 @@ impl InnerRoom {
                 repo: peers,
                 peer_event_sender,
                 send_constraints: send_constraints.clone(),
-            }),
-            Rc::new(GlobalCtx {
-                rpc: rpc.clone(),
                 connections: Rc::clone(&connections),
             }),
         );
@@ -1770,6 +1758,38 @@ impl PeerEventHandler for InnerRoom {
     /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
         self.on_failed_local_media.call(error);
+        Ok(())
+    }
+
+    async fn on_new_sdp_offer(
+        &self,
+        peer_id: PeerId,
+        sdp_offer: String,
+        mids: HashMap<TrackId, String>,
+        transceivers_statuses: HashMap<TrackId, bool>,
+    ) -> Self::Output {
+        self.rpc.send_command(Command::MakeSdpOffer {
+            peer_id,
+            sdp_offer,
+            mids,
+            transceivers_statuses,
+        });
+
+        Ok(())
+    }
+
+    async fn on_new_sdp_answer(
+        &self,
+        peer_id: PeerId,
+        sdp_answer: String,
+        transceivers_statuses: HashMap<TrackId, bool>,
+    ) -> Self::Output {
+        self.rpc.send_command(Command::MakeSdpAnswer {
+            peer_id,
+            sdp_answer,
+            transceivers_statuses,
+        });
+
         Ok(())
     }
 }

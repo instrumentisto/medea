@@ -10,7 +10,6 @@ use medea_reactive::{Guarded, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
-    api::GlobalCtx,
     media::LocalTracksConstraints,
     peer::{MediaConnectionsError, Sender},
     utils::Component,
@@ -20,7 +19,7 @@ use medea_reactive::RecheckableFutureExt;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
-pub type SenderComponent = Component<SenderState, Sender, GlobalCtx>;
+pub type SenderComponent = Component<SenderState, Sender>;
 
 /// State of the [`SenderComponent`].
 pub struct SenderState {
@@ -184,7 +183,6 @@ impl SenderComponent {
     #[inline]
     async fn enabled_individual_watcher(
         ctx: Rc<Sender>,
-        _: Rc<GlobalCtx>,
         state: Rc<SenderState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -205,7 +203,6 @@ impl SenderComponent {
     #[inline]
     async fn enabled_general_watcher(
         ctx: Rc<Sender>,
-        _: Rc<GlobalCtx>,
         _: Rc<SenderState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
@@ -221,7 +218,6 @@ impl SenderComponent {
     #[inline]
     async fn muted_watcher(
         ctx: Rc<Sender>,
-        _: Rc<GlobalCtx>,
         _: Rc<SenderState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
