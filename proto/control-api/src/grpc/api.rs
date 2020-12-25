@@ -49,6 +49,12 @@ pub struct CreateResponse {
     /// Hashmap with IDs (key) and URIs (value) of Elements, which should be used
     /// by clients to connect to a media server via Client API.
     ///
+    /// If Member credentials was provided in a Argon2 hash form, then password
+    /// won't be provided in the returned URI (value). Control API server or
+    /// Web Client should add '?token=<token>' to the returned URI.
+    ///
+    /// In other cases nothing need to be added to the URI.
+    ///
     /// Returned only if CreateResponse is successful.
     #[prost(map="string, string", tag="1")]
     pub sid: ::std::collections::HashMap<std::string::String, std::string::String>,

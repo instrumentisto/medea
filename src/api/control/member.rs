@@ -58,8 +58,8 @@ where
 }
 
 impl ControlCredential {
-    /// Generates alphanumeric [`ControlCredentials::Plain`] for [`Member`] with
-    /// [`CREDENTIALS_LEN`] length.
+    /// Generates alphanumeric [`ControlCredential::Plain`] for [`Member`] with
+    /// fixed length.
     ///
     /// This credentials will be generated if in dynamic [Control API] spec not
     /// provided credentials for [`Member`]. This logic you can find in

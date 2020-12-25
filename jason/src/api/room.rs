@@ -337,8 +337,11 @@ impl RoomHandle {
             .map(|inner| inner.on_connection_loss.set_func(f))
     }
 
-    /// Performs entering to a [`Room`] with the preconfigured authorization
+    /// Performs entering to a [`Room`] with the provided authorization
     /// `token` for connection with media server.
+    ///
+    /// Authorization token is always in format:
+    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ PASSWORD }}`.
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
