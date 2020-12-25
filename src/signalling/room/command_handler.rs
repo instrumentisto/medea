@@ -85,9 +85,7 @@ impl CommandHandler for Room {
             Event::SdpOfferApplied {
                 peer_id: from_peer_id,
             },
-        )?;
-
-        Ok(())
+        )
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -125,14 +123,13 @@ impl CommandHandler for Room {
         self.peers.sync_peer_spec(from_peer_id)?;
 
         self.members.send_event_to_member(to_member_id, event)?;
+        // TODO: LocalDescriptionApplied, contains SDP, compare in Jason
         self.members.send_event_to_member(
             from_member_id,
             Event::SdpOfferApplied {
                 peer_id: from_peer_id,
             },
-        )?;
-
-        Ok(())
+        )
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.

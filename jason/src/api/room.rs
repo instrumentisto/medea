@@ -48,6 +48,7 @@ use crate::{
     JsMediaSourceKind,
 };
 
+// TODO: Dont really need it.
 /// Global context which will be provided to the all [`Component`]s of this app.
 pub struct GlobalCtx {
     /// Client to talk with media server via Client API RPC.

@@ -10,8 +10,7 @@ use std::{
 
 use futures::{
     future::{self, FutureExt as _, LocalBoxFuture},
-    stream::LocalBoxStream,
-    StreamExt,
+    stream::{LocalBoxStream, StreamExt as _},
 };
 
 use crate::subscribers_store::{common, progressable, SubscribersStore};

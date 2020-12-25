@@ -25,28 +25,6 @@ macro_rules! spawn_component {
     }};
 }
 
-/// Storage of the [`AbortHandle`]s used for aborting watchers tasks.
-#[derive(Default)]
-struct WatchersStorage(RefCell<Vec<AbortHandle>>);
-
-impl WatchersStorage {
-    /// Registers new [`AbortHandle`].
-    #[inline]
-    fn register_handle(&self, handle: AbortHandle) {
-        self.0.borrow_mut().push(handle);
-    }
-
-    /// Aborts all spawned watchers tasks registered in this
-    /// [`WatchersStorage`].
-    #[inline]
-    fn dispose(&self) {
-        let handles: Vec<_> = std::mem::take(&mut self.0.borrow_mut());
-        for handle in handles {
-            handle.abort();
-        }
-    }
-}
-
 /// Base for all components of this app.
 ///
 /// Can spawn new watchers with a [`Component::spawn_watcher`].
@@ -59,7 +37,7 @@ pub struct Component<S, C, G> {
     state: Rc<S>,
     ctx: Rc<C>,
     global_ctx: Rc<G>,
-    watchers_store: WatchersStorage,
+    watchers_store: RefCell<Vec<AbortHandle>>,
 }
 
 impl<S, C, G> Component<S, C, G> {
@@ -70,7 +48,7 @@ impl<S, C, G> Component<S, C, G> {
             state,
             ctx,
             global_ctx,
-            watchers_store: WatchersStorage::default(),
+            watchers_store: RefCell::new(Vec::new()),
         }
     }
 
@@ -102,13 +80,13 @@ impl<S: 'static, C: 'static, G: 'static> Component<S, C, G> {
         O: Future<Output = Result<(), E>> + 'static,
         E: Into<JasonError>,
     {
-        let ctx = self.ctx.clone();
+        let ctx = Rc::clone(&self.ctx);
         let global_ctx = Rc::clone(&self.global_ctx);
         let state = Rc::clone(&self.state);
         let (fut, handle) = future::abortable(async move {
             while let Some(value) = rx.next().await {
                 if let Err(e) = (handle)(
-                    ctx.clone(),
+                    Rc::clone(&ctx),
                     Rc::clone(&global_ctx),
                     Rc::clone(&state),
                     value,
@@ -122,13 +100,16 @@ impl<S: 'static, C: 'static, G: 'static> Component<S, C, G> {
         spawn_local(async move {
             let _ = fut.await;
         });
-        self.watchers_store.register_handle(handle);
+        self.watchers_store.borrow_mut().push(handle);
     }
 }
 
 impl<S, C, G> Drop for Component<S, C, G> {
     fn drop(&mut self) {
-        self.watchers_store.dispose();
+        let handles = self.watchers_store.replace(Vec::default());
+        for handle in handles {
+            handle.abort();
+        }
     }
 }
 

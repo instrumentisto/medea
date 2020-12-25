@@ -45,6 +45,7 @@ struct Inner {
     /// [`Inner::prev_offer`].
     approved: ObservableCell<bool>,
 
+    // TODO: current_offer: ReactiveCell<Option<String>>?
     /// [`mpsc::UnboundedSender`]s for the [`Sdp`] updates.
     local_sdp_update_txs: Vec<mpsc::UnboundedSender<Sdp>>,
 
