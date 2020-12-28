@@ -46,7 +46,7 @@ pub struct RecheckableCounterFuture {
 
     /// Current [`Future`] which will be polled on
     /// [`RecheckableCounterFuture::poll`].
-    pending_fut: LocalBoxFuture<'static, ()>,
+    pending_fut: Option<LocalBoxFuture<'static, ()>>,
 }
 
 impl RecheckableFutureExt for RecheckableCounterFuture {
@@ -59,7 +59,7 @@ impl RecheckableFutureExt for RecheckableCounterFuture {
     /// [`RecheckableCounterFuture::counter`]'s [`ObservableCell::when_eq`]
     /// [`Future`].
     fn restart(&mut self) {
-        self.pending_fut = Box::pin(self.counter.when_eq(0).map(|_| ()));
+        self.pending_fut = Some(Box::pin(self.counter.when_eq(0).map(|_| ())));
     }
 }
 
@@ -74,7 +74,7 @@ impl fmt::Debug for RecheckableCounterFuture {
 impl RecheckableCounterFuture {
     pub(super) fn new(counter: Rc<ObservableCell<u32>>) -> Self {
         Self {
-            pending_fut: Box::pin(counter.when_eq(0).map(|_| ())),
+            pending_fut: None,
             counter,
         }
     }
@@ -87,7 +87,12 @@ impl Future for RecheckableCounterFuture {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Self::Output> {
-        self.pending_fut.as_mut().poll(cx)
+        if let Some(fut) = self.pending_fut.as_mut() {
+            fut.as_mut().poll(cx)
+        } else {
+            self.restart();
+            self.poll(cx)
+        }
     }
 }
 
@@ -197,4 +202,157 @@ pub fn join_all<F: RecheckableFutureExt>(
     futs: Vec<F>,
 ) -> JoinRecheckableCounterFuture<F> {
     JoinRecheckableCounterFuture::new(futs)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use futures::{executor, poll};
+
+    use super::*;
+
+    macro_rules! impl_future {
+        ($name:ty => $output:expr) => {
+            impl Future for $name {
+                type Output = ();
+
+                fn poll(
+                    self: Pin<&mut Self>,
+                    _: &mut Context<'_>,
+                ) -> Poll<Self::Output> {
+                    $output
+                }
+            }
+        };
+    }
+
+    #[test]
+    fn doesnt_resolves_if_not_done() {
+        executor::block_on(async {
+            struct Fut;
+            impl_future!(Fut => Poll::Ready(()));
+
+            impl RecheckableFutureExt for Fut {
+                fn is_done(&self) -> bool {
+                    false
+                }
+
+                fn restart(&mut self) {}
+            }
+
+            assert_eq!(poll!(join_all(vec![Fut])), Poll::Pending);
+        })
+    }
+
+    #[test]
+    fn resolved_if_done() {
+        executor::block_on(async {
+            struct Fut;
+            impl_future!(Fut => Poll::Ready(()));
+
+            impl RecheckableFutureExt for Fut {
+                fn is_done(&self) -> bool {
+                    true
+                }
+
+                fn restart(&mut self) {}
+            }
+
+            assert_eq!(poll!(join_all(vec![Fut])), Poll::Ready(()));
+        })
+    }
+
+    #[test]
+    fn doesnt_resolved_if_one_fut_is_not_done() {
+        executor::block_on(async {
+            struct Fut(bool);
+            impl_future!(Fut => Poll::Ready(()));
+
+            impl RecheckableFutureExt for Fut {
+                fn is_done(&self) -> bool {
+                    self.0
+                }
+
+                fn restart(&mut self) {}
+            }
+
+            assert_eq!(
+                poll!(join_all(vec![Fut(false), Fut(true)])),
+                Poll::Pending
+            );
+        })
+    }
+
+    #[test]
+    fn resolves_if_all_done() {
+        executor::block_on(async {
+            struct Fut;
+            impl_future!(Fut => Poll::Ready(()));
+
+            impl RecheckableFutureExt for Fut {
+                fn is_done(&self) -> bool {
+                    true
+                }
+
+                fn restart(&mut self) {}
+            }
+
+            assert_eq!(poll!(join_all(vec![Fut, Fut, Fut])), Poll::Ready(()));
+        })
+    }
+
+    #[test]
+    fn doesnt_restart_futs_until_all_resolved() {
+        executor::block_on(async {
+            struct Fut;
+            impl_future!(Fut => Poll::Pending);
+
+            impl RecheckableFutureExt for Fut {
+                fn is_done(&self) -> bool {
+                    unreachable!(
+                        "This function shouldn't be called during this test"
+                    )
+                }
+
+                fn restart(&mut self) {
+                    unreachable!(
+                        "This function shouldn't be called during this test"
+                    )
+                }
+            }
+
+            assert_eq!(poll!(join_all(vec![Fut])), Poll::Pending)
+        })
+    }
+
+    #[test]
+    fn restart_fut_on_undone() {
+        executor::block_on(async {
+            struct Fut(Rc<Cell<bool>>);
+            impl_future!(Fut => Poll::Ready(()));
+
+            impl RecheckableFutureExt for Fut {
+                fn is_done(&self) -> bool {
+                    false
+                }
+
+                fn restart(&mut self) {
+                    self.0.set(true);
+                }
+            }
+
+            let is_restart_called = Rc::new(Cell::new(false));
+            let fut = join_all(vec![Fut(Rc::clone(&is_restart_called))]).shared();
+            assert_eq!(
+                poll!(fut.clone()),
+                Poll::Pending
+            );
+            assert!(is_restart_called.get());
+            assert_eq!(
+                poll!(fut),
+                Poll::Pending,
+            );
+        })
+    }
 }
