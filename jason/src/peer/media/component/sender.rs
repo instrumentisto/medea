@@ -6,7 +6,7 @@ use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ProgressableCell};
+use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 use tracerr::Traced;
 
 use crate::{
@@ -15,7 +15,6 @@ use crate::{
     utils::Component,
     MediaKind,
 };
-use medea_reactive::RecheckableFutureExt;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.

@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use medea_client_api_proto::{
-    Command, IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
+    IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{

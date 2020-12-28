@@ -1,3 +1,6 @@
+//! Implementation of the [`Future`] extension which implements [`Future`] can
+//! check resolve condition and restart themselves if needed.
+
 use std::{
     fmt,
     fmt::Formatter,
@@ -10,10 +13,20 @@ use futures::{future::LocalBoxFuture, Future, FutureExt as _};
 
 use crate::ObservableCell;
 
+/// Extension for the [`Future`] which can recheck [`Poll::Ready`] condition
+/// after resolving and restart if [`Future`] goes to the [`Poll::Pending`]
+/// condition accordingly to the [`RecheckableFutureExt::refresh`] method.
+///
+/// This kind of [`Future`]s should be joined by [`medea_reactive::join_all`]
+/// function.
+#[allow(clippy::module_name_repetitions)]
 pub trait RecheckableFutureExt: Future + Unpin {
+    /// Returns `true` if [`RecheckableFutureExt`] matches resolving condition.
     fn is_done(&self) -> bool;
 
-    fn refresh(&mut self);
+    /// Restart this [`RecheckableFutureExt`]. After this function call, this
+    /// [`Future`] can be safely polled.
+    fn restart(&mut self);
 }
 
 impl<F: ?Sized + RecheckableFutureExt> RecheckableFutureExt for Box<F> {
@@ -21,22 +34,31 @@ impl<F: ?Sized + RecheckableFutureExt> RecheckableFutureExt for Box<F> {
         <F as RecheckableFutureExt>::is_done(&*self)
     }
 
-    fn refresh(&mut self) {
-        <F as RecheckableFutureExt>::refresh(&mut *self)
+    fn restart(&mut self) {
+        <F as RecheckableFutureExt>::restart(&mut *self)
     }
 }
 
+/// [`RecheckableFutureExt`] for [`SubStore::subscribe`].
 pub struct RecheckableCounterFuture {
+    /// Reference to the [`SubStore::counter`].
     counter: Rc<ObservableCell<u32>>,
+
+    /// Current [`Future`] which will be polled on
+    /// [`RecheckableCounterFuture::poll`].
     pending_fut: LocalBoxFuture<'static, ()>,
 }
 
 impl RecheckableFutureExt for RecheckableCounterFuture {
+    /// Returns `true` if [`RecheckableCounterFuture::counter`] is `0`.
     fn is_done(&self) -> bool {
         self.counter.get() == 0
     }
 
-    fn refresh(&mut self) {
+    /// Refreshes [`RecheckableCounterFuture::pending_fut`] with a new
+    /// [`RecheckableCounterFuture::counter`]'s [`ObservableCell::when_eq`]
+    /// [`Future`].
+    fn restart(&mut self) {
         self.pending_fut = Box::pin(self.counter.when_eq(0).map(|_| ()));
     }
 }
@@ -69,49 +91,35 @@ impl Future for RecheckableCounterFuture {
     }
 }
 
+/// [`Future`] which joins [`RecheckableFutureExt`].
+///
+/// [`JoinRecheckableCounterFuture`] will check that all [`RechecableFutureExt`]
+/// are stay done after all [`RecheckableFutureExt`] was resolved.
+/// If some [`RecheckableFutureExt`] is undone then this [`Future`] will wait
+/// for resolve.
 #[derive(Debug)]
 pub struct JoinRecheckableCounterFuture<F> {
+    /// List of [`Poll::Pending`] [`RecheckableFutureExt`]s.
     pending: Vec<F>,
+
+    /// List of [`Poll::Done`] [`RecheckableFutureExt`]s.
     done: Vec<F>,
 }
 
-impl<F> JoinRecheckableCounterFuture<F> {
+impl<F: Unpin + RecheckableFutureExt> JoinRecheckableCounterFuture<F> {
+    /// Returns [`Future`] which will be resolved when all provided
+    /// [`RecheckableFutureExt`]s will be resolved and done.
     fn new(pending: Vec<F>) -> Self {
         Self {
             pending,
             done: Vec::new(),
         }
     }
-}
 
-impl<F: RecheckableFutureExt> RecheckableFutureExt
-    for JoinRecheckableCounterFuture<F>
-{
-    fn is_done(&self) -> bool {
-        !self.done.iter().any(|f| !f.is_done())
-    }
-
-    fn refresh(&mut self) {
-        let mut i = 0;
-        while i != self.done.len() {
-            if !self.done[i].is_done() {
-                let mut pending = self.done.remove(i);
-                pending.refresh();
-                self.pending.push(pending);
-            } else {
-                i += 1;
-            }
-        }
-    }
-}
-
-impl<F: RecheckableFutureExt> Future for JoinRecheckableCounterFuture<F> {
-    type Output = ();
-
-    fn poll(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
+    /// Polls all [`JoinRecheckableCounterFuture::pending`] [`Future`]s. If
+    /// [`Future`] returned [`Poll::Ready`] then moves this [`Future`] to the
+    /// [`JoinRecheckableCounterFuture::done`].
+    fn poll_pending(self: &mut Pin<&mut Self>, cx: &mut Context<'_>) {
         let mut i = 0;
         while i != self.pending.len() {
             match Pin::new(&mut self.pending[0]).as_mut().poll(cx) {
@@ -124,32 +132,67 @@ impl<F: RecheckableFutureExt> Future for JoinRecheckableCounterFuture<F> {
                 }
             }
         }
+    }
 
-        if self.pending.is_empty() {
-            let mut is_ready = true;
-            let mut i = 0;
-            while i != self.done.len() {
-                if self.done[i].is_done() {
-                    i += 1;
-                } else {
-                    let mut pending = self.done.remove(i);
-                    pending.refresh();
-                    self.pending.push(pending);
-                    is_ready = false;
-                }
-            }
-
-            if is_ready {
-                Poll::Ready(())
+    /// Rechecks all [`JoinRecheckableCounterFuture::done`] [`Future`]s and if
+    /// [`Future`] is not done, restarts it, moves it to the
+    /// [`JoinRecheckableCounterFuture::pending`].
+    ///
+    /// If at least one [`Future`] moved from
+    /// [`JoinRecheckableCounterFuture::done`] to the
+    /// [`JoinRecheckableCounterFuture::pending`] then `false` will be returned.
+    fn recheck_done_futures(&mut self) -> bool {
+        let mut is_ready = true;
+        let mut i = 0;
+        while i != self.done.len() {
+            if self.done[i].is_done() {
+                i += 1;
             } else {
-                Poll::Pending
+                let mut pending = self.done.remove(i);
+                pending.restart();
+                self.pending.push(pending);
+                is_ready = false;
             }
+        }
+
+        is_ready
+    }
+}
+
+impl<F: RecheckableFutureExt> RecheckableFutureExt
+    for JoinRecheckableCounterFuture<F>
+{
+    fn is_done(&self) -> bool {
+        !self.done.iter().any(|f| !f.is_done())
+    }
+
+    fn restart(&mut self) {
+        let _ = self.recheck_done_futures();
+    }
+}
+
+impl<F: RecheckableFutureExt> Future for JoinRecheckableCounterFuture<F> {
+    type Output = ();
+
+    fn poll(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Self::Output> {
+        self.poll_pending(cx);
+
+        if self.pending.is_empty() && self.recheck_done_futures() {
+            Poll::Ready(())
         } else {
             Poll::Pending
         }
     }
 }
 
+/// Joins provided [`Vec`] of [`RecheckableFutureExt`].
+///
+/// Returned [`Future`] will be resolved when all [`Future`]s returned
+/// [`Poll::Ready`] and all [`RecheckableFutureExt::is_done`] returns `true`.
+#[must_use]
 pub fn join_all<F: RecheckableFutureExt>(
     futs: Vec<F>,
 ) -> JoinRecheckableCounterFuture<F> {

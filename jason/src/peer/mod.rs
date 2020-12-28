@@ -183,7 +183,9 @@ pub enum PeerEvent {
         error: JasonError,
     },
 
+    /// [`PeerComponent`] generated new SDP answer.
     NewSdpAnswer {
+        /// ID of the [`PeerConnection`] for which SDP answer was generated.
         peer_id: PeerId,
 
         /// SDP Answer of the `Peer`.
@@ -193,10 +195,12 @@ pub enum PeerEvent {
         transceivers_statuses: HashMap<TrackId, bool>,
     },
 
+    /// [`PeerComponent`] generated new SDP offer.
     NewSdpOffer {
+        /// ID of the [`PeerConnection`] for which SDP offer was generated.
         peer_id: PeerId,
 
-        /// SDP Offer of the `Peer`.
+        /// SDP Offer of the [`PeerConnection`].
         sdp_offer: String,
 
         /// Associations between [`Track`] and transceiver's
@@ -207,7 +211,7 @@ pub enum PeerEvent {
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<TrackId, String>,
 
-        /// Statuses of `Peer` transceivers.
+        /// Statuses of [`PeerConnection`] transceivers.
         transceivers_statuses: HashMap<TrackId, bool>,
     },
 }
