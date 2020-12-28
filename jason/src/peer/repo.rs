@@ -10,15 +10,14 @@ use crate::{
     peer::{component::PeerComponent, PeerState},
     utils::{delay_for, Component, TaskHandle},
 };
+use crate::api::Connections;
 
 use super::{PeerConnection, PeerError, PeerEvent};
-use crate::api::Connections;
 
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
-    /// Creates new [`PeerComponent`] with a provided [`PeerState`] and
-    /// [`GlobalCtx`].
+    /// Creates new [`PeerComponent`] with a provided [`PeerState`].
     ///
     /// # Errors
     ///
@@ -110,8 +109,7 @@ impl Repository {
 }
 
 impl PeerRepository for Repository {
-    /// Creates new [`PeerComponent`] with a provided [`PeerState`] and
-    /// [`GlobalCtx`].
+    /// Creates new [`PeerComponent`] with a provided [`PeerState`].
     ///
     /// # Errors
     ///

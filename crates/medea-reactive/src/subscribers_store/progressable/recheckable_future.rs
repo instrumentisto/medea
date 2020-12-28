@@ -2,23 +2,20 @@
 //! check resolve condition and restart themselves if needed.
 
 use std::{
-    fmt,
-    fmt::Formatter,
     pin::Pin,
-    rc::Rc,
     task::{Context, Poll},
 };
 
-use futures::{future::LocalBoxFuture, Future, FutureExt as _};
-
-use crate::ObservableCell;
+use futures::Future;
 
 /// Extension for the [`Future`] which can recheck [`Poll::Ready`] condition
 /// after resolving and restart if [`Future`] goes to the [`Poll::Pending`]
-/// condition accordingly to the [`RecheckableFutureExt::refresh`] method.
+/// condition accordingly to the [`RecheckableFutureExt::restart`] method.
 ///
 /// This kind of [`Future`]s should be joined by [`medea_reactive::join_all`]
 /// function.
+///
+/// [`medea_reactive::join_all`]: crate::join_all
 #[allow(clippy::module_name_repetitions)]
 pub trait RecheckableFutureExt: Future + Unpin {
     /// Returns `true` if [`RecheckableFutureExt`] matches resolving condition.
@@ -39,67 +36,9 @@ impl<F: ?Sized + RecheckableFutureExt> RecheckableFutureExt for Box<F> {
     }
 }
 
-/// [`RecheckableFutureExt`] for [`SubStore::subscribe`].
-pub struct RecheckableCounterFuture {
-    /// Reference to the [`SubStore::counter`].
-    counter: Rc<ObservableCell<u32>>,
-
-    /// Current [`Future`] which will be polled on
-    /// [`RecheckableCounterFuture::poll`].
-    pending_fut: Option<LocalBoxFuture<'static, ()>>,
-}
-
-impl RecheckableFutureExt for RecheckableCounterFuture {
-    /// Returns `true` if [`RecheckableCounterFuture::counter`] is `0`.
-    fn is_done(&self) -> bool {
-        self.counter.get() == 0
-    }
-
-    /// Refreshes [`RecheckableCounterFuture::pending_fut`] with a new
-    /// [`RecheckableCounterFuture::counter`]'s [`ObservableCell::when_eq`]
-    /// [`Future`].
-    fn restart(&mut self) {
-        self.pending_fut = Some(Box::pin(self.counter.when_eq(0).map(|_| ())));
-    }
-}
-
-impl fmt::Debug for RecheckableCounterFuture {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("RecheckableCounterFuture")
-            .field("counter", &self.counter)
-            .finish()
-    }
-}
-
-impl RecheckableCounterFuture {
-    pub(super) fn new(counter: Rc<ObservableCell<u32>>) -> Self {
-        Self {
-            pending_fut: None,
-            counter,
-        }
-    }
-}
-
-impl Future for RecheckableCounterFuture {
-    type Output = ();
-
-    #[allow(clippy::option_if_let_else)]
-    fn poll(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Self::Output> {
-        if let Some(fut) = self.pending_fut.as_mut() {
-            fut.as_mut().poll(cx)
-        } else {
-            self.restart();
-            self.poll(cx)
-        }
-    }
-}
-
 /// [`Future`] which joins [`RecheckableFutureExt`].
 ///
-/// [`JoinRecheckableCounterFuture`] will check that all [`RechecableFutureExt`]
+/// [`JoinRecheckableCounterFuture`] will check that all [`RecheckableFutureExt`]
 /// are stay done after all [`RecheckableFutureExt`] was resolved.
 /// If some [`RecheckableFutureExt`] is undone then this [`Future`] will wait
 /// for resolve.
@@ -108,7 +47,7 @@ pub struct JoinRecheckableCounterFuture<F> {
     /// List of [`Poll::Pending`] [`RecheckableFutureExt`]s.
     pending: Vec<F>,
 
-    /// List of [`Poll::Done`] [`RecheckableFutureExt`]s.
+    /// List of [`Poll::Ready`] [`RecheckableFutureExt`]s.
     done: Vec<F>,
 }
 
@@ -207,9 +146,9 @@ pub fn join_all<F: RecheckableFutureExt>(
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
+    use std::{cell::Cell, rc::Rc};
 
-    use futures::{executor, poll};
+    use futures::{executor, poll, FutureExt};
 
     use super::*;
 

@@ -153,7 +153,7 @@ async fn ice_restart() {
 
     {
         let event = responder_rx.next().await.unwrap();
-        if let Event::LocalDescriptionApplied { peer_id } = event {
+        if let Event::LocalDescriptionApplied { peer_id, .. } = event {
             assert_eq!(peer_id, responder_peer_id);
         } else {
             unreachable!(
@@ -239,7 +239,7 @@ async fn ice_restart() {
 
     {
         let event = responder_rx.next().await.unwrap();
-        if let Event::LocalDescriptionApplied { peer_id } = event {
+        if let Event::LocalDescriptionApplied { peer_id, .. } = event {
             assert_eq!(peer_id, responder_peer_id);
         } else {
             unreachable!(

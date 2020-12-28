@@ -204,7 +204,7 @@ pub enum PeerEvent {
         /// SDP Offer of the [`PeerConnection`].
         sdp_offer: String,
 
-        /// Associations between [`Track`] and transceiver's
+        /// Associations between `Track` and transceiver's
         /// [media description][1].
         ///
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
