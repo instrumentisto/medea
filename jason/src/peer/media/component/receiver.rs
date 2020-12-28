@@ -127,11 +127,11 @@ impl ReceiverComponent {
     #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
-        ctx: Rc<Receiver>,
+        receiver: Rc<Receiver>,
         _: Rc<ReceiverState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_muted(*muted);
+        receiver.set_muted(*muted);
 
         Ok(())
     }
@@ -143,11 +143,11 @@ impl ReceiverComponent {
     #[watch(self.state().enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
-        ctx: Rc<Receiver>,
+        receiver: Rc<Receiver>,
         _: Rc<ReceiverState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_enabled_individual_state(*enabled_individual);
+        receiver.set_enabled_individual_state(*enabled_individual);
 
         Ok(())
     }
@@ -158,11 +158,11 @@ impl ReceiverComponent {
     #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
-        ctx: Rc<Receiver>,
+        receiver: Rc<Receiver>,
         _: Rc<ReceiverState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_enabled_general_state(*enabled_general);
+        receiver.set_enabled_general_state(*enabled_general);
 
         Ok(())
     }

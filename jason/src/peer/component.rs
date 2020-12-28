@@ -135,7 +135,7 @@ impl PeerState {
 
     /// Marks current [`LocalSdp`] as approved by server.
     #[inline]
-    pub fn sdp_offer_applied(&self, sdp_offer: String) {
+    pub fn sdp_offer_applied(&self, sdp_offer: &str) {
         self.sdp_offer.approve(sdp_offer);
     }
 
@@ -205,7 +205,7 @@ impl PeerState {
     /// Resets [`SenderState`] local stream update when it updated.
     async fn update_local_stream(
         &self,
-        ctx: &Rc<PeerConnection>,
+        peer: &Rc<PeerConnection>,
     ) -> Result<(), Traced<PeerError>> {
         let mut criteria = LocalStreamUpdateCriteria::empty();
         let senders: Vec<_> = self
@@ -218,7 +218,7 @@ impl PeerState {
         for s in &senders {
             criteria.add(s.media_kind(), s.media_source());
         }
-        ctx.update_local_stream(criteria)
+        peer.update_local_stream(criteria)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
         for s in senders {
@@ -256,11 +256,11 @@ impl PeerComponent {
     #[watch(self.state().ice_candidates.borrow().on_push())]
     #[inline]
     async fn ice_candidate_push_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         _: Rc<PeerState>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
-        ctx.add_ice_candidate(
+        peer.add_ice_candidate(
             candidate.candidate,
             candidate.sdp_m_line_index,
             candidate.sdp_mid,
@@ -280,7 +280,7 @@ impl PeerComponent {
     /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
     #[watch(self.state().remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<PeerState>,
         remote_sdp_answer: Guarded<Option<String>>,
     ) -> Result<(), Traced<PeerError>> {
@@ -289,13 +289,13 @@ impl PeerComponent {
             if let Some(role) = state.negotiation_role.get() {
                 match role {
                     NegotiationRole::Offerer => {
-                        ctx.set_remote_answer(remote_sdp_answer)
+                        peer.set_remote_answer(remote_sdp_answer)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                         state.negotiation_role.set(None);
                     }
                     NegotiationRole::Answerer(_) => {
-                        ctx.set_remote_offer(remote_sdp_answer)
+                        peer.set_remote_offer(remote_sdp_answer)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
                     }
@@ -314,12 +314,12 @@ impl PeerComponent {
     #[watch(self.state().restart_ice.subscribe())]
     #[inline]
     async fn ice_restart_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<PeerState>,
         val: bool,
     ) -> Result<(), Traced<PeerError>> {
         if val {
-            ctx.restart_ice();
+            peer.restart_ice();
             state.restart_ice.set(false);
         }
 
@@ -337,7 +337,7 @@ impl PeerComponent {
     /// [`SenderState::receivers`] by [`Connections::create_connection`] call,
     #[watch(self.state().senders.borrow().on_insert_with_replay())]
     async fn sender_insert_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) -> Result<(), Traced<PeerError>> {
@@ -351,10 +351,10 @@ impl PeerComponent {
 
         let ((track_id, new_sender), _guard) = val.into_parts();
         for receiver in new_sender.receivers() {
-            ctx.connections.create_connection(state.id, receiver);
+            peer.connections.create_connection(state.id, receiver);
         }
         let sndr = SenderBuilder {
-            media_connections: &ctx.media_connections,
+            media_connections: &peer.media_connections,
             track_id,
             caps: new_sender.media_type().clone().into(),
             mute_state: mute_state::Stable::from(new_sender.is_muted()),
@@ -363,12 +363,12 @@ impl PeerComponent {
                 !new_sender.is_enabled_individual(),
             ),
             required: new_sender.media_type().required(),
-            send_constraints: ctx.send_constraints.clone(),
+            send_constraints: peer.send_constraints.clone(),
         }
         .build()
         .map_err(tracerr::map_from_and_wrap!())?;
         let component = spawn_component!(SenderComponent, new_sender, sndr,);
-        ctx.media_connections.insert_sender(component);
+        peer.media_connections.insert_sender(component);
 
         Ok(())
     }
@@ -379,15 +379,15 @@ impl PeerComponent {
     /// [`ReceiverState::sender_id`] by [`Connections::create_connection`] call,
     #[watch(self.state().receivers.borrow().on_insert_with_replay())]
     async fn receiver_insert_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<PeerState>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) -> Result<(), Traced<PeerError>> {
         let ((track_id, new_receiver), _guard) = val.into_parts();
-        ctx.connections
+        peer.connections
             .create_connection(state.id, new_receiver.sender_id());
         let recv = Receiver::new(
-            &ctx.media_connections,
+            &peer.media_connections,
             track_id,
             new_receiver.media_type().clone().into(),
             new_receiver.sender_id().clone(),
@@ -397,7 +397,7 @@ impl PeerComponent {
         );
         let component =
             spawn_component!(ReceiverComponent, new_receiver, Rc::new(recv),);
-        ctx.media_connections.insert_receiver(component);
+        peer.media_connections.insert_receiver(component);
 
         Ok(())
     }
@@ -416,47 +416,47 @@ impl PeerComponent {
     /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
     #[watch(self.state().sdp_offer.subscribe())]
     async fn sdp_offer_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<PeerState>,
         sdp_offer: Option<String>,
     ) -> Result<(), Traced<PeerError>> {
         if let Some(role) = state.negotiation_role.get() {
             if let Some(offer) = sdp_offer {
                 if state.sdp_offer.is_rollback() {
-                    ctx.peer
+                    peer.peer
                         .rollback()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                 } else {
                     match role {
                         NegotiationRole::Offerer => {
-                            ctx.peer
+                            peer.peer
                                 .set_offer(&offer)
                                 .await
                                 .map_err(tracerr::map_from_and_wrap!())?;
-                            let mids = ctx
+                            let mids = peer
                                 .get_mids()
                                 .map_err(tracerr::map_from_and_wrap!())?;
-                            ctx.peer_events_sender
+                            peer.peer_events_sender
                                 .unbounded_send(PeerEvent::NewSdpOffer {
-                                    peer_id: ctx.id(),
+                                    peer_id: peer.id(),
                                     sdp_offer: offer,
-                                    transceivers_statuses: ctx
+                                    transceivers_statuses: peer
                                         .get_transceivers_statuses(),
                                     mids,
                                 })
                                 .ok();
                         }
                         NegotiationRole::Answerer(_) => {
-                            ctx.peer
+                            peer.peer
                                 .set_answer(&offer)
                                 .await
                                 .map_err(tracerr::map_from_and_wrap!())?;
-                            ctx.peer_events_sender
+                            peer.peer_events_sender
                                 .unbounded_send(PeerEvent::NewSdpAnswer {
-                                    peer_id: ctx.id(),
+                                    peer_id: peer.id(),
                                     sdp_answer: offer,
-                                    transceivers_statuses: ctx
+                                    transceivers_statuses: peer
                                         .get_transceivers_statuses(),
                                 })
                                 .ok();
@@ -478,7 +478,7 @@ impl PeerComponent {
     /// [`PeerConnection`].
     #[watch(self.state().negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<PeerState>,
         new_negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<PeerError>> {
@@ -494,22 +494,22 @@ impl PeerComponent {
                     state.when_all_updated().await;
 
                     state
-                        .update_local_stream(&ctx)
+                        .update_local_stream(&peer)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
 
-                    ctx.media_connections.sync_receivers();
-                    let sdp_offer = ctx
+                    peer.media_connections.sync_receivers();
+                    let sdp_offer = peer
                         .peer
                         .create_offer()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
                     state.sdp_offer.update_offer(sdp_offer);
-                    ctx.media_connections.sync_receivers();
+                    peer.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
                     state.receivers.borrow().when_all_processed().await;
-                    ctx.media_connections.sync_receivers();
+                    peer.media_connections.sync_receivers();
 
                     state.set_remote_sdp_offer(remote_sdp_offer);
 
@@ -519,11 +519,11 @@ impl PeerComponent {
                     state.when_all_senders_updated().await;
 
                     state
-                        .update_local_stream(&ctx)
+                        .update_local_stream(&peer)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
 
-                    let sdp_answer = ctx
+                    let sdp_answer = peer
                         .peer
                         .create_answer()
                         .await

@@ -6,11 +6,11 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
+    api::Connections,
     media::{LocalTracksConstraints, MediaManager},
     peer::{component::PeerComponent, PeerState},
     utils::{delay_for, Component, TaskHandle},
 };
-use crate::api::Connections;
 
 use super::{PeerConnection, PeerError, PeerEvent};
 

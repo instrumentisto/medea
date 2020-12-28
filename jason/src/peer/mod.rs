@@ -32,6 +32,7 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
+    api::Connections,
     media::{
         track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
@@ -62,7 +63,6 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
-use crate::api::Connections;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///

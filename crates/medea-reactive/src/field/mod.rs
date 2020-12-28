@@ -17,11 +17,12 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
-use crate::subscribers_store::{progressable, SubscribersStore};
+use crate::subscribers_store::{
+    progressable, progressable::RecheckableCounterFuture, SubscribersStore,
+};
 
 #[doc(inline)]
 pub use self::{cell::ObservableCell, progressable_cell::ProgressableCell};
-use crate::subscribers_store::progressable::RecheckableCounterFuture;
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;

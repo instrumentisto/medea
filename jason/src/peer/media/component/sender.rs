@@ -181,15 +181,15 @@ impl SenderComponent {
     #[watch(self.state().enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
-        ctx: Rc<Sender>,
+        sender: Rc<Sender>,
         state: Rc<SenderState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_enabled_individual(*enabled_individual);
+        sender.set_enabled_individual(*enabled_individual);
         if *enabled_individual {
             state.need_local_stream_update.set(true);
         } else {
-            ctx.remove_track().await;
+            sender.remove_track().await;
         }
 
         Ok(())
@@ -201,11 +201,11 @@ impl SenderComponent {
     #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
-        ctx: Rc<Sender>,
+        sender: Rc<Sender>,
         _: Rc<SenderState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_enabled_general(*enabled_general);
+        sender.set_enabled_general(*enabled_general);
 
         Ok(())
     }
@@ -216,11 +216,11 @@ impl SenderComponent {
     #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
-        ctx: Rc<Sender>,
+        sender: Rc<Sender>,
         _: Rc<SenderState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_muted(*muted);
+        sender.set_muted(*muted);
 
         Ok(())
     }

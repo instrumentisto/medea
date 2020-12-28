@@ -38,10 +38,10 @@ impl<F: ?Sized + RecheckableFutureExt> RecheckableFutureExt for Box<F> {
 
 /// [`Future`] which joins [`RecheckableFutureExt`].
 ///
-/// [`JoinRecheckableCounterFuture`] will check that all [`RecheckableFutureExt`]
-/// are stay done after all [`RecheckableFutureExt`] was resolved.
-/// If some [`RecheckableFutureExt`] is undone then this [`Future`] will wait
-/// for resolve.
+/// [`JoinRecheckableCounterFuture`] will check that all
+/// [`RecheckableFutureExt`] are stay done after all [`RecheckableFutureExt`]
+/// was resolved. If some [`RecheckableFutureExt`] is undone then this
+/// [`Future`] will wait for resolve.
 #[derive(Debug)]
 pub struct JoinRecheckableCounterFuture<F> {
     /// List of [`Poll::Pending`] [`RecheckableFutureExt`]s.

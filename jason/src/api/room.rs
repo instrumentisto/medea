@@ -48,10 +48,10 @@ use crate::{
     JsMediaSourceKind,
 };
 
-/// State of the [`PeerRepositoryComponent`].
-struct PeerRepositoryState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
+/// State of the [`PeersComponent`].
+struct PeersState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
 
-impl PeerRepositoryState {
+impl PeersState {
     /// Returns new empty [`PeerRepositoryState`].
     #[inline]
     pub fn new() -> Self {
@@ -59,8 +59,8 @@ impl PeerRepositoryState {
     }
 }
 
-/// Context of the [`PeerRepositoryComponent`].
-struct PeerRepositoryCtx {
+/// Context of the [`PeersComponent`].
+struct Peers {
     /// [`PeerComponent`] repository.
     ///
     /// [`PeerComponent`]: crate::peer::PeerComponent
@@ -84,11 +84,10 @@ struct PeerRepositoryCtx {
 }
 
 /// Component responsible for the new [`PeerComponent`] creating and removing.
-type PeerRepositoryComponent =
-    Component<PeerRepositoryState, PeerRepositoryCtx>;
+type PeersComponent = Component<PeersState, Peers>;
 
 #[watchers]
-impl PeerRepositoryComponent {
+impl PeersComponent {
     /// Watches for new [`PeerState`] insertions.
     ///
     /// Creates new [`PeerComponent`] based on the inserted [`PeerState`].
@@ -98,17 +97,18 @@ impl PeerRepositoryComponent {
     #[watch(self.state().0.borrow().on_insert())]
     #[inline]
     async fn insert_peer_watcher(
-        ctx: Rc<PeerRepositoryCtx>,
-        _: Rc<PeerRepositoryState>,
+        peers: Rc<Peers>,
+        _: Rc<PeersState>,
         (peer_id, new_peer): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
-        ctx.repo
+        peers
+            .repo
             .create_peer(
                 peer_id,
                 new_peer,
-                ctx.peer_event_sender.clone(),
-                ctx.send_constraints.clone(),
-                ctx.connections.clone(),
+                peers.peer_event_sender.clone(),
+                peers.send_constraints.clone(),
+                peers.connections.clone(),
             )
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -122,12 +122,12 @@ impl PeerRepositoryComponent {
     #[watch(self.state().0.borrow().on_remove())]
     #[inline]
     async fn remove_peer_watcher(
-        ctx: Rc<PeerRepositoryCtx>,
-        _: Rc<PeerRepositoryState>,
+        peers: Rc<Peers>,
+        _: Rc<PeersState>,
         (peer_id, _): (PeerId, Rc<PeerState>),
     ) -> Result<(), Traced<RoomError>> {
-        ctx.repo.remove(peer_id);
-        ctx.connections.close_connection(peer_id);
+        peers.repo.remove(peer_id);
+        peers.connections.close_connection(peer_id);
 
         Ok(())
     }
@@ -833,8 +833,8 @@ struct InnerRoom {
     /// [`PeerConnection`]: crate::peer::PeerConnection
     recv_constraints: Rc<RecvConstraints>,
 
-    /// [`PeerComponent`] repository.
-    peers: PeerRepositoryComponent,
+    /// Component which manages [`PeerComponent`]s.
+    peers: PeersComponent,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
@@ -1054,9 +1054,9 @@ impl InnerRoom {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
         let peers = spawn_component!(
-            PeerRepositoryComponent,
-            Rc::new(PeerRepositoryState::new()),
-            Rc::new(PeerRepositoryCtx {
+            PeersComponent,
+            Rc::new(PeersState::new()),
+            Rc::new(Peers {
                 repo: peers,
                 peer_event_sender,
                 send_constraints: send_constraints.clone(),
@@ -1427,7 +1427,7 @@ impl EventHandler for InnerRoom {
             .get(&peer_id)
             .cloned()
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.sdp_offer_applied(sdp_offer);
+        peer.sdp_offer_applied(&sdp_offer);
 
         Ok(())
     }
@@ -1761,6 +1761,8 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
+    /// Handles [`PeerEvent::NewSdpOffer`] event by sending
+    /// [`Command::MakeSdpOffer`] to the Media Server.
     async fn on_new_sdp_offer(
         &self,
         peer_id: PeerId,
@@ -1778,6 +1780,8 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
+    /// Handles [`PeerEvent::NewSdpAnswer`] event by sending
+    /// [`Command::MakeSdpAnswer`] to the Media Server.
     async fn on_new_sdp_answer(
         &self,
         peer_id: PeerId,
