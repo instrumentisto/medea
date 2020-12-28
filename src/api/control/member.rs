@@ -31,29 +31,15 @@ const CREDENTIALS_LEN: usize = 32;
 /// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
+#[serde(rename_all = "lowercase")]
 pub enum ControlCredential {
     /// [Argon2] hash of the `Member` credential.
     ///
     /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
-    #[serde(deserialize_with = "deserialize_digest")]
-    #[serde(rename = "hash_credentials")]
-    Hash(Digest),
+    Hash(String),
 
     /// Plain text `Member` credentials.
-    #[serde(rename = "plain_credentials")]
     Plain(String),
-}
-
-/// Tries to deserialize [`Digest`] from the [`String`].
-fn deserialize_digest<'de, D>(deserializer: D) -> Result<Digest, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-
-    s.parse().map_err(|e| {
-        serde::de::Error::custom(format!("Argon2 parse failed: {:?}", e))
-    })
 }
 
 impl ControlCredential {
