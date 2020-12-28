@@ -284,12 +284,6 @@ pub enum ErrorCode {
     #[display(fmt = "Encountered negative duration")]
     NegativeDuration = 1023,
 
-    /// Member has invalid credential hash.
-    ///
-    /// Code: __1024__.
-    #[display(fmt = "Member has invalid credential hash")]
-    InvalidMemberCredentialHash = 1024,
-
     /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
@@ -349,11 +343,6 @@ impl From<TryFromProtobufError> for ErrorResponse {
             E::EmptyElement(id) => Self::with_explanation(
                 ErrorCode::NoElement,
                 String::from("No element was provided"),
-                Some(id),
-            ),
-            E::MemberCredentialsParseErr(id, e) => Self::with_explanation(
-                ErrorCode::InvalidMemberCredentialHash,
-                format!("Argon2 parse error: {:?}", e),
                 Some(id),
             ),
             E::NegativeDuration(id, field) => Self::with_explanation(

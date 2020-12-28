@@ -8,11 +8,10 @@ use std::{
     time::Duration,
 };
 
-use argon2::Digest;
 use medea_client_api_proto::{Credential, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
 use crate::api::control::{
     callback::url::CallbackUrl,
@@ -69,7 +68,7 @@ impl ControlCredential {
     pub fn verify(&self, client_creds: &Credential) -> bool {
         match self {
             Self::Hash(hash) => {
-                argon2::verify_digest(hash, client_creds.0.as_bytes())
+                argon2::verify_encoded(hash, client_creds.0.as_bytes())
                     .unwrap_or(false)
             }
             Self::Plain(plain) => plain == &client_creds.0,
@@ -77,14 +76,12 @@ impl ControlCredential {
     }
 }
 
-impl TryFrom<proto::member::Credentials> for ControlCredential {
-    type Error = argon2::Error;
-
-    fn try_from(from: proto::member::Credentials) -> Result<Self, Self::Error> {
+impl From<proto::member::Credentials> for ControlCredential {
+    fn from(from: proto::member::Credentials) -> Self {
         use proto::member::Credentials as C;
         match from {
-            C::Hash(hash) => Ok(Self::Hash(hash.parse()?)),
-            C::Plain(plain) => Ok(Self::Plain(plain)),
+            C::Hash(hash) => Self::Hash(hash),
+            C::Plain(plain) => Self::Plain(plain),
         }
     }
 }
@@ -93,7 +90,7 @@ impl From<ControlCredential> for proto::member::Credentials {
     fn from(from: ControlCredential) -> Self {
         match from {
             ControlCredential::Plain(plain) => Self::Plain(plain),
-            ControlCredential::Hash(hash) => Self::Hash(hash.to_string()),
+            ControlCredential::Hash(hash) => Self::Hash(hash),
         }
     }
 }
@@ -283,20 +280,10 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         }
 
-        let credentials = if let Some(credentials) = member.credentials {
-            match ControlCredential::try_from(credentials) {
-                Ok(creds) => creds,
-                Err(e) => {
-                    return Err(
-                        TryFromProtobufError::MemberCredentialsParseErr(
-                            member.id, e,
-                        ),
-                    )
-                }
-            }
-        } else {
-            ControlCredential::generate_plain()
-        };
+        let credentials = member.credentials.map_or_else(
+            ControlCredential::generate_plain,
+            ControlCredential::from,
+        );
 
         let on_leave = {
             let on_leave = member.on_leave;
@@ -387,87 +374,5 @@ impl TryFrom<&RoomElement> for MemberSpec {
             }),
             _ => Err(TryFromElementError::NotMember),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use argon2::Digest;
-
-    use super::*;
-
-    #[test]
-    fn hash_credentials_verification_works() {
-        const HASH: &str = "$argon2i$v=19$m=16,t=2,\
-                            p=1$ZHNtcEFmVnREZkRtNk9hOA$6z1z/KA2FnBJA7fqqpdBQA";
-        let credential = ControlCredential::Hash(HASH.parse().unwrap());
-
-        for (cred, is_correct) in &[
-            ("medea", true),
-            (HASH, false),
-            ("foobar", false),
-            ("MEDEA", false),
-            ("Medea", false),
-        ] {
-            assert_eq!(
-                credential.verify(&Credential::from(*cred)),
-                *is_correct
-            );
-        }
-    }
-
-    #[test]
-    fn plain_credentials_verification_works() {
-        const CRED: &str = "medea";
-
-        let credential = ControlCredential::Plain(CRED.to_string());
-
-        for (cred, is_correct) in &[
-            (CRED, true),
-            ("foobar", false),
-            ("MEDEA", false),
-            ("Medea", false),
-        ] {
-            assert_eq!(
-                credential.verify(&Credential::from(*cred)),
-                *is_correct
-            );
-        }
-    }
-
-    #[test]
-    fn hash_credentials_validation_works() {
-        for (hash, is_valid) in &[
-            (
-                "$argon2i$v=19$m=16,t=2,p=1$ZHNtcEFmVnREZkRtNk9hOA$6z1z/\
-                 KA2FnBJA7fqqpdBQA",
-                true,
-            ),
-            (
-                "$argon2i$v=19$ZHNtcEFmVnREZkRtNk9hOA$6z1z/KA2FnBJA7fqqpdBQA",
-                false,
-            ),
-            ("$argon2i$v=19$m=16,t=2,p=1$ZHNtcEFmVnREZkRtNk9hOA", false),
-            ("", false),
-            ("medea", false),
-        ] {
-            assert_eq!(
-                ControlCredential::try_from(proto::member::Credentials::Hash(
-                    hash.to_string()
-                ))
-                .is_ok(),
-                *is_valid,
-                "Hash {}",
-                hash
-            );
-        }
-    }
-
-    #[test]
-    fn plain_credentials_generated_randomly() {
-        assert_ne!(
-            ControlCredential::generate_plain(),
-            ControlCredential::generate_plain()
-        )
     }
 }

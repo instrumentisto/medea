@@ -29,8 +29,9 @@ const MEDEA_CRED_HASH: &str =
 ///   pipeline:
 ///     member:
 ///       kind: Member
-///       plain_credentials: {{ credentials }} # Credentials::Plain
-///       hash_credentials: {{ credentials }} # Credentials::Hash
+///       credentials:
+///         plain: {{ credentials }} # Credentials::Plain
+///         hash: {{ credentials }} # Credentials::Hash
 ///       spec:
 ///         pipeline:
 ///           play:

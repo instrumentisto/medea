@@ -9,15 +9,14 @@ use super::endpoint::Endpoint;
 
 /// Credentials of the [`Member`].
 #[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
 enum Credentials {
     /// [Argon2] hash of the [`Member`] credential.
     ///
     /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
-    #[serde(rename = "hash_credentials")]
     Hash(String),
 
     /// Plain text [`Member`] credentials.
-    #[serde(rename = "plain_credentials")]
     Plain(String),
 }
 
@@ -58,7 +57,6 @@ pub struct Member {
     /// Optional `Member` credentials.
     ///
     /// If `None` then random credentials will be generated on Medea side.
-    #[serde(flatten)]
     credentials: Option<Credentials>,
 
     /// URL to which `OnJoin` Control API callback will be sent.

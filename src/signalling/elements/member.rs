@@ -643,7 +643,8 @@ mod tests {
               pipeline:
                 caller:
                   kind: Member
-                  plain_credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       publish:
@@ -652,7 +653,8 @@ mod tests {
                           p2p: Always
                 some-member:
                   kind: Member
-                  plain_credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       publish:
@@ -661,7 +663,8 @@ mod tests {
                           p2p: Always
                 responder:
                   kind: Member
-                  plain_credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       play:
