@@ -126,7 +126,6 @@ impl CommandHandler for Room {
         self.peers.sync_peer_spec(from_peer_id)?;
 
         self.members.send_event_to_member(to_member_id, event)?;
-        // TODO: LocalDescriptionApplied, contains SDP, compare in Jason
         self.members.send_event_to_member(
             from_member_id,
             Event::LocalDescriptionApplied {

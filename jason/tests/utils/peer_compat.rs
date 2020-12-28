@@ -1,10 +1,8 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use futures::{channel::mpsc, stream, stream::LocalBoxStream, StreamExt as _};
+use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{
-    Command, Direction, IceServer, NegotiationRole, PeerId,
-};
+use medea_client_api_proto::{Direction, IceServer, NegotiationRole, PeerId};
 use medea_jason::{
     api::Connections,
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
@@ -12,7 +10,6 @@ use medea_jason::{
         MediaConnectionsError, PeerComponent, PeerConnection, PeerError,
         PeerEvent, PeerState, ReceiverState, SenderState,
     },
-    rpc::MockRpcSession,
     spawn_component,
 };
 use medea_reactive::ProgressableHashMap;
@@ -60,8 +57,8 @@ impl PeerConnectionCompat {
         let (compat_peer_event_tx, compat_peer_event_rx) = mpsc::unbounded();
         spawn_local(async move {
             while let Some(event) = peer_event_rx.next().await {
-                compat_peer_event_tx.unbounded_send(event.clone());
-                peer_events_sender.unbounded_send(event);
+                let _ = compat_peer_event_tx.unbounded_send(event.clone());
+                let _ = peer_events_sender.unbounded_send(event);
             }
         });
         let state = PeerState::new(

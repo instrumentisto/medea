@@ -14,7 +14,7 @@ use tracerr::Traced;
 
 use crate::{
     peer::{
-        local_sdp::{LocalSdp, Sdp},
+        local_sdp::LocalSdp,
         media::{ReceiverState, SenderBuilder, SenderState},
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, PeerError,
         Receiver, ReceiverComponent, SenderComponent,
@@ -414,53 +414,56 @@ impl PeerComponent {
     ///
     /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
     /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
-    #[watch(self.state().sdp_offer.on_new_local_sdp())]
+    #[watch(self.state().sdp_offer.subscribe())]
     async fn sdp_offer_watcher(
         ctx: Rc<PeerConnection>,
         state: Rc<PeerState>,
-        sdp_offer: Sdp,
+        sdp_offer: Option<String>,
     ) -> Result<(), Traced<PeerError>> {
         if let Some(role) = state.negotiation_role.get() {
-            match (sdp_offer, role) {
-                (Sdp::Offer(offer), NegotiationRole::Offerer) => {
-                    ctx.peer
-                        .set_offer(&offer)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    let mids = ctx
-                        .get_mids()
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    ctx.peer_events_sender
-                        .unbounded_send(PeerEvent::NewSdpOffer {
-                            peer_id: ctx.id(),
-                            sdp_offer: offer,
-                            transceivers_statuses: ctx
-                                .get_transceivers_statuses(),
-                            mids,
-                        })
-                        .ok();
-                }
-                (Sdp::Offer(offer), NegotiationRole::Answerer(_)) => {
-                    ctx.peer
-                        .set_answer(&offer)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    ctx.peer_events_sender
-                        .unbounded_send(PeerEvent::NewSdpAnswer {
-                            peer_id: ctx.id(),
-                            sdp_answer: offer,
-                            transceivers_statuses: ctx
-                                .get_transceivers_statuses(),
-                        })
-                        .ok();
-                    state.sdp_offer.when_approved().await;
-                    state.negotiation_role.set(None);
-                }
-                (Sdp::Rollback, _) => {
+            if let Some(offer) = sdp_offer {
+                if state.sdp_offer.is_rollback() {
                     ctx.peer
                         .rollback()
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                } else {
+                    match role {
+                        NegotiationRole::Offerer => {
+                            ctx.peer
+                                .set_offer(&offer)
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            let mids = ctx
+                                .get_mids()
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            ctx.peer_events_sender
+                                .unbounded_send(PeerEvent::NewSdpOffer {
+                                    peer_id: ctx.id(),
+                                    sdp_offer: offer,
+                                    transceivers_statuses: ctx
+                                        .get_transceivers_statuses(),
+                                    mids,
+                                })
+                                .ok();
+                        }
+                        NegotiationRole::Answerer(_) => {
+                            ctx.peer
+                                .set_answer(&offer)
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            ctx.peer_events_sender
+                                .unbounded_send(PeerEvent::NewSdpAnswer {
+                                    peer_id: ctx.id(),
+                                    sdp_answer: offer,
+                                    transceivers_statuses: ctx
+                                        .get_transceivers_statuses(),
+                                })
+                                .ok();
+                            state.sdp_offer.when_approved().await;
+                            state.negotiation_role.set(None);
+                        }
+                    }
                 }
             }
         }

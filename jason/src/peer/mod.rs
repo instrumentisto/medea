@@ -47,7 +47,7 @@ pub use self::repo::MockPeerRepository;
 pub use self::{
     component::{PeerComponent, PeerState},
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
-    local_sdp::{LocalSdp, Sdp},
+    local_sdp::LocalSdp,
     media::{
         media_exchange_state, mute_state, MediaConnections,
         MediaConnectionsError, MediaExchangeState,

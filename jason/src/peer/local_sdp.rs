@@ -3,7 +3,6 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{
-    channel::mpsc,
     future,
     future::{Either, LocalBoxFuture},
     stream::LocalBoxStream,
@@ -16,21 +15,11 @@ use crate::utils::{resettable_delay_for, ResettableDelayHandle};
 
 const APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// SDP offer which should be applied.
-#[derive(Clone, Debug)]
-pub enum Sdp {
-    /// SDP offer should be rollbacked.
-    Rollback,
-
-    /// New SDP offer should be set.
-    Offer(String),
-}
-
 /// Inner for the [`LocalSdp`].
 struct Inner {
     /// Current SDP offer applied on the [`PeerConnection`], but it can be not
     /// approved by server (see [`Inner::approved`]).
-    current_offer: Option<String>,
+    cur_offer: ObservableCell<Option<String>>,
 
     /// Previous SDP offer to which this [`Inner::current_offer`] can be
     /// transited if server doesn't approved [`Inner::current_offer`].
@@ -45,10 +34,6 @@ struct Inner {
     /// [`Inner::prev_offer`].
     approved: ObservableCell<bool>,
 
-    // TODO: current_offer: ReactiveCell<Option<String>>?
-    /// [`mpsc::UnboundedSender`]s for the [`Sdp`] updates.
-    local_sdp_update_txs: Vec<mpsc::UnboundedSender<Sdp>>,
-
     /// Timeout of the [`Inner::approved`] transition.
     timeout_handle: Option<ResettableDelayHandle>,
 }
@@ -56,36 +41,19 @@ struct Inner {
 impl Default for Inner {
     fn default() -> Self {
         Self {
-            current_offer: None,
             prev_offer: None,
+            cur_offer: ObservableCell::new(None),
             approved: ObservableCell::new(true),
-            local_sdp_update_txs: Vec::new(),
             timeout_handle: None,
         }
     }
 }
 
 impl Inner {
-    /// Sends SDP offer update to the [`Inner::local_sdp_update_txs`].
-    fn send_sdp(&mut self, sdp: &Sdp) {
-        self.local_sdp_update_txs
-            .retain(|s| s.unbounded_send(sdp.clone()).is_ok());
-    }
-
-    /// Returns [`LocalBoxStream`] into which all [`Sdp`] update will be sent.
-    fn on_new_local_sdp(&mut self) -> LocalBoxStream<'static, Sdp> {
-        let (tx, rx) = mpsc::unbounded();
-        self.local_sdp_update_txs.push(tx);
-
-        Box::pin(rx)
-    }
-
     /// Rollbacks [`LocalSdp`] to the previous one.
     fn rollback(&mut self) {
-        self.current_offer = self.prev_offer.take();
         self.approved.set(true);
-
-        self.send_sdp(&Sdp::Rollback);
+        self.cur_offer.set(self.prev_offer.clone());
     }
 
     /// Sets [`Inner::approved`] flag to the `true`.
@@ -123,11 +91,6 @@ impl LocalSdp {
         }
     }
 
-    /// Returns [`LocalBoxStream`] into which all [`Sdp`] update will be sent.
-    pub fn on_new_local_sdp(&self) -> LocalBoxStream<'static, Sdp> {
-        self.0.borrow_mut().on_new_local_sdp()
-    }
-
     /// Returns [`Future`] which will be resolved when current SDP offer will be
     /// approved by Media Server.
     ///
@@ -158,23 +121,45 @@ impl LocalSdp {
                 }
             }
         });
-        let prev_offer =
-            self.0.borrow_mut().current_offer.replace(new_offer.clone());
+        let prev_offer = self
+            .0
+            .borrow_mut()
+            .cur_offer
+            .mutate(|mut o| o.replace(new_offer));
         self.0.borrow_mut().prev_offer = prev_offer;
-
-        self.0.borrow_mut().send_sdp(&Sdp::Offer(new_offer));
     }
 
     /// Approves current [`LocalSdp`] offer.
     pub fn approve(&self, sdp_offer: String) {
         let mut inner = self.0.borrow_mut();
-        if inner.current_offer == Some(sdp_offer) {
+        if inner.cur_offer.get() == Some(sdp_offer) {
             inner.approve()
         }
     }
 
     /// Returns current SDP offer.
     pub fn current(&self) -> Option<String> {
-        self.0.borrow().current_offer.clone()
+        self.0.borrow().cur_offer.get()
+    }
+
+    /// Returns [`LocalBoxStream`] into which all current SDP offer updates will
+    /// be sent.
+    pub fn subscribe(&self) -> LocalBoxStream<'static, Option<String>> {
+        self.0.borrow().cur_offer.subscribe()
+    }
+
+    /// Returns `true` if [`LocalSdp`] current SDP offer equal to the previous
+    /// SDP offer and they both is `Some`.
+    pub fn is_rollback(&self) -> bool {
+        let inner = self.0.borrow();
+        inner.cur_offer.mutate(|c| {
+            c.as_ref().map_or(false, |current| {
+                inner
+                    .prev_offer
+                    .as_ref()
+                    .map(|prev| prev == current)
+                    .unwrap_or_default()
+            })
+        })
     }
 }

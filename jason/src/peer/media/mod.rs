@@ -20,10 +20,7 @@ use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
 #[cfg(feature = "mockable")]
-use crate::{
-    api::Connections,
-    media::{LocalTracksConstraints, RecvConstraints},
-};
+use crate::media::{LocalTracksConstraints, RecvConstraints};
 use crate::{
     media::{track::local, MediaKind},
     peer::{
@@ -858,8 +855,6 @@ impl MediaConnections {
         receivers: Vec<MemberId>,
         send_constraints: &LocalTracksConstraints,
     ) -> Result<SenderComponent> {
-        use crate::rpc::MockRpcSession;
-
         let sender_state = SenderState::new(
             id,
             mid.clone(),
@@ -893,8 +888,6 @@ impl MediaConnections {
         sender: MemberId,
         recv_constraints: &RecvConstraints,
     ) -> ReceiverComponent {
-        use crate::rpc::MockRpcSession;
-
         let receiver_state = ReceiverState::new(
             id,
             mid.clone(),
