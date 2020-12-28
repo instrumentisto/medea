@@ -21,7 +21,7 @@ use web_sys::RtcTrackEvent;
 
 #[cfg(feature = "mockable")]
 use crate::{
-    api::{Connections, GlobalCtx},
+    api::Connections,
     media::{LocalTracksConstraints, RecvConstraints},
 };
 use crate::{
@@ -962,21 +962,23 @@ impl MediaConnections {
     /// Patches [`SenderComponent`]s/[`ReceiverComponent`]s by provided
     /// [`TrackPatchEvent`]s.
     pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
-        let mut wait_for_change = Vec::new();
+        let mut wait_for_change: Vec<
+            Box<dyn medea_reactive::RecheckableFutureExt<Output = ()>>,
+        > = Vec::new();
         for track in tracks {
             if let Some(sender) = self.0.borrow().senders.get(&track.id) {
                 sender.state().update(&track);
-                wait_for_change.push(sender.state().when_updated());
+                wait_for_change.push(Box::new(sender.state().when_updated()));
             } else if let Some(receiver) =
                 self.0.borrow().receivers.get(&track.id)
             {
                 receiver.state().update(&track);
-                wait_for_change.push(receiver.state().when_updated());
+                wait_for_change.push(Box::new(receiver.state().when_updated()));
             } else {
                 panic!()
             }
         }
-        future::join_all(wait_for_change).await;
+        medea_reactive::join_all(wait_for_change).await;
     }
 
     /// Returns all underlying [`Sender`]'s.

@@ -93,6 +93,7 @@ pub enum PeerError {
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
 #[dispatchable(self: &Self, async_trait(?Send))]
+#[cfg_attr(feature = "mockable", derive(Clone))]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.

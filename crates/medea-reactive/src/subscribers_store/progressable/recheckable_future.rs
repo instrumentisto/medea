@@ -83,6 +83,7 @@ impl RecheckableCounterFuture {
 impl Future for RecheckableCounterFuture {
     type Output = ();
 
+    #[allow(clippy::option_if_let_else)]
     fn poll(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -343,16 +344,11 @@ mod tests {
             }
 
             let is_restart_called = Rc::new(Cell::new(false));
-            let fut = join_all(vec![Fut(Rc::clone(&is_restart_called))]).shared();
-            assert_eq!(
-                poll!(fut.clone()),
-                Poll::Pending
-            );
+            let fut =
+                join_all(vec![Fut(Rc::clone(&is_restart_called))]).shared();
+            assert_eq!(poll!(fut.clone()), Poll::Pending);
             assert!(is_restart_called.get());
-            assert_eq!(
-                poll!(fut),
-                Poll::Pending,
-            );
+            assert_eq!(poll!(fut), Poll::Pending,);
         })
     }
 }
