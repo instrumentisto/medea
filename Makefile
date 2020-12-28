@@ -23,7 +23,7 @@ IMAGE_NAME := $(strip \
 
 RUST_VER := 1.48
 CHROME_VERSION := 87.0
-FIREFOX_VERSION := 84.0
+FIREFOX_VERSION := 84.0.1
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
