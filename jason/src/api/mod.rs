@@ -23,8 +23,8 @@ use crate::{
 pub use self::{
     connection::{Connection, ConnectionHandle, Connections},
     room::{
-        ConstraintsUpdateException, GlobalCtx, Room, RoomCloseReason,
-        RoomError, RoomHandle, WeakRoom,
+        ConstraintsUpdateException, Room, RoomCloseReason, RoomError,
+        RoomHandle, WeakRoom,
     },
 };
 

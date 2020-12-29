@@ -430,7 +430,7 @@ pub enum Event {
     SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client that his SDP offer was applied.
-    SdpOfferApplied { peer_id: PeerId },
+    LocalDescriptionApplied { peer_id: PeerId, sdp_offer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.

@@ -2,16 +2,14 @@
 
 use std::rc::Rc;
 
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     state as proto_state, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ProgressableCell};
+use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 use tracerr::Traced;
 
 use crate::{
-    api::GlobalCtx,
     media::RecvConstraints,
     peer::{MediaConnectionsError, Receiver},
     utils::{AsProtoState, Component, SynchronizableState, Updatable},
@@ -19,7 +17,7 @@ use crate::{
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
-pub type ReceiverComponent = Component<ReceiverState, Receiver, GlobalCtx>;
+pub type ReceiverComponent = Component<ReceiverState, Receiver>;
 
 /// State of the [`ReceiverComponent`].
 #[derive(Debug)]
@@ -87,15 +85,12 @@ impl SynchronizableState for ReceiverState {
 }
 
 impl Updatable for ReceiverState {
-    fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join_all(vec![
+    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
+        Box::new(medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),
             self.enabled_individual.when_all_processed(),
             self.muted.when_all_processed(),
-        ]);
-        Box::pin(async move {
-            fut.await;
-        })
+        ]))
     }
 }
 
@@ -209,15 +204,12 @@ impl ReceiverState {
     /// will be applied on [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = futures::future::join_all(vec![
+    pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
+        medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),
             self.enabled_individual.when_all_processed(),
             self.muted.when_all_processed(),
-        ]);
-        Box::pin(async move {
-            fut.await;
-        })
+        ])
     }
 }
 
@@ -229,12 +221,11 @@ impl ReceiverComponent {
     #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
-        ctx: Rc<Receiver>,
-        _: Rc<GlobalCtx>,
+        receiver: Rc<Receiver>,
         _: Rc<ReceiverState>,
         muted: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_muted(*muted);
+        receiver.set_muted(*muted);
 
         Ok(())
     }
@@ -246,12 +237,11 @@ impl ReceiverComponent {
     #[watch(self.state().enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
-        ctx: Rc<Receiver>,
-        _: Rc<GlobalCtx>,
+        receiver: Rc<Receiver>,
         _: Rc<ReceiverState>,
         enabled_individual: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_enabled_individual_state(*enabled_individual);
+        receiver.set_enabled_individual_state(*enabled_individual);
 
         Ok(())
     }
@@ -262,12 +252,11 @@ impl ReceiverComponent {
     #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
-        ctx: Rc<Receiver>,
-        _: Rc<GlobalCtx>,
+        receiver: Rc<Receiver>,
         _: Rc<ReceiverState>,
         enabled_general: Guarded<bool>,
     ) -> Result<(), Traced<MediaConnectionsError>> {
-        ctx.set_enabled_general_state(*enabled_general);
+        receiver.set_enabled_general_state(*enabled_general);
 
         Ok(())
     }

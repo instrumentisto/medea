@@ -17,7 +17,9 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
-use crate::subscribers_store::{progressable, SubscribersStore};
+use crate::subscribers_store::{
+    progressable, progressable::RecheckableCounterFuture, SubscribersStore,
+};
 
 #[doc(inline)]
 pub use self::{cell::ObservableCell, progressable_cell::ProgressableCell};
@@ -132,7 +134,7 @@ where
     /// subscribers.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> RecheckableCounterFuture {
         self.subs.when_all_processed()
     }
 }

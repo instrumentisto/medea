@@ -62,13 +62,15 @@ impl CommandHandler for Room {
         let event = if from_peer.is_known_to_remote() {
             Event::TracksApplied {
                 peer_id: to_peer.id(),
-                negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
+                negotiation_role: Some(NegotiationRole::Answerer(
+                    sdp_offer.clone(),
+                )),
                 updates: to_peer.get_updates(),
             }
         } else {
             Event::PeerCreated {
                 peer_id: to_peer.id(),
-                negotiation_role: NegotiationRole::Answerer(sdp_offer),
+                negotiation_role: NegotiationRole::Answerer(sdp_offer.clone()),
                 tracks: to_peer.new_tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
@@ -83,12 +85,11 @@ impl CommandHandler for Room {
         self.members.send_event_to_member(to_member_id, event)?;
         self.members.send_event_to_member(
             from_member_id,
-            Event::SdpOfferApplied {
+            Event::LocalDescriptionApplied {
                 peer_id: from_peer_id,
+                sdp_offer,
             },
-        )?;
-
-        Ok(())
+        )
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -117,7 +118,7 @@ impl CommandHandler for Room {
         let to_member_id = to_peer.member_id();
         let event = Event::SdpAnswerMade {
             peer_id: to_peer.id(),
-            sdp_answer,
+            sdp_answer: sdp_answer.clone(),
         };
 
         self.peers.add_peer(from_peer);
@@ -128,12 +129,11 @@ impl CommandHandler for Room {
         self.members.send_event_to_member(to_member_id, event)?;
         self.members.send_event_to_member(
             from_member_id,
-            Event::SdpOfferApplied {
+            Event::LocalDescriptionApplied {
                 peer_id: from_peer_id,
+                sdp_offer: sdp_answer,
             },
-        )?;
-
-        Ok(())
+        )
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.

@@ -2270,7 +2270,7 @@ async fn create_peer_by_state() {
             mid: None,
         },
     );
-    let mut room_proto = room.peer_repo_state().as_proto();
+    let mut room_proto = room.peers_state().as_proto();
     room_proto.peers.insert(
         PeerId(0),
         state::Peer {
@@ -2286,7 +2286,7 @@ async fn create_peer_by_state() {
             ice_candidates: HashSet::new(),
         },
     );
-    room.peer_repo_state().apply(room_proto);
+    room.peers_state().apply(room_proto);
 
     let command = timeout(1000, command_rx.next()).await.unwrap().unwrap();
     assert!(matches!(command, Command::MakeSdpOffer { .. }));

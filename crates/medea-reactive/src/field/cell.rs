@@ -177,11 +177,11 @@ where
     /// Updates an underlying data using the provided function, which will
     /// accept a mutable reference to an underlying data.
     #[inline]
-    pub fn mutate<F>(&self, f: F)
+    pub fn mutate<F, O>(&self, f: F) -> O
     where
-        F: FnOnce(MutObservableFieldGuard<'_, D, DefaultSubscribers<D>>),
+        F: FnOnce(MutObservableFieldGuard<'_, D, DefaultSubscribers<D>>) -> O,
     {
-        (f)(self.0.borrow_mut().borrow_mut());
+        (f)(self.0.borrow_mut().borrow_mut())
     }
 }
 

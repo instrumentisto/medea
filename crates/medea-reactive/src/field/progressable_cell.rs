@@ -8,10 +8,11 @@
 
 use std::cell::{Ref, RefCell};
 
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::stream::LocalBoxStream;
 
 use crate::{
-    subscribers_store::progressable, Guarded, MutObservableFieldGuard,
+    subscribers_store::{progressable, progressable::RecheckableCounterFuture},
+    Guarded, MutObservableFieldGuard,
 };
 
 use super::Progressable;
@@ -66,7 +67,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> RecheckableCounterFuture {
         self.0.borrow().when_all_processed()
     }
 }

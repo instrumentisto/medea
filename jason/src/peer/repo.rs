@@ -6,7 +6,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::GlobalCtx,
+    api::Connections,
     media::{LocalTracksConstraints, MediaManager},
     peer::{component::PeerComponent, PeerState},
     utils::{delay_for, Component, TaskHandle},
@@ -17,8 +17,7 @@ use super::{PeerConnection, PeerError, PeerEvent};
 /// [`PeerConnection`] factory and repository.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
-    /// Creates new [`PeerComponent`] with a provided [`PeerState`] and
-    /// [`GlobalCtx`].
+    /// Creates new [`PeerComponent`] with a provided [`PeerState`].
     ///
     /// # Errors
     ///
@@ -27,9 +26,9 @@ pub trait PeerRepository {
         &self,
         peer_id: PeerId,
         state: Rc<PeerState>,
-        global_ctx: Rc<GlobalCtx>,
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         local_stream_constraints: LocalTracksConstraints,
+        connections: Rc<Connections>,
     ) -> Result<(), Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -110,8 +109,7 @@ impl Repository {
 }
 
 impl PeerRepository for Repository {
-    /// Creates new [`PeerComponent`] with a provided [`PeerState`] and
-    /// [`GlobalCtx`].
+    /// Creates new [`PeerComponent`] with a provided [`PeerState`].
     ///
     /// # Errors
     ///
@@ -121,9 +119,9 @@ impl PeerRepository for Repository {
         &self,
         peer_id: PeerId,
         state: Rc<PeerState>,
-        global_ctx: Rc<GlobalCtx>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         send_constraints: LocalTracksConstraints,
+        connections: Rc<Connections>,
     ) -> Result<(), Traced<PeerError>> {
         let peer = PeerConnection::new(
             peer_id,
@@ -132,11 +130,11 @@ impl PeerRepository for Repository {
             Rc::clone(&self.media_manager),
             state.force_relay(),
             send_constraints,
+            connections,
         )
         .map_err(tracerr::map_from_and_wrap!())?;
 
-        let component =
-            spawn_component!(PeerComponent, state, peer, global_ctx);
+        let component = spawn_component!(PeerComponent, state, peer);
         self.peers.borrow_mut().insert(peer_id, component);
 
         Ok(())

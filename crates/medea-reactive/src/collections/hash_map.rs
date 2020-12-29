@@ -9,13 +9,13 @@ use std::{
     marker::PhantomData,
 };
 
-use futures::{
-    future::{self, FutureExt as _, LocalBoxFuture},
-    stream::LocalBoxStream,
-    StreamExt,
-};
+use futures::stream::{LocalBoxStream, StreamExt as _};
 
-use crate::subscribers_store::{common, progressable, SubscribersStore};
+use crate::subscribers_store::{
+    common, progressable,
+    progressable::{RecheckableCounterFuture, RecheckableFutureExt},
+    SubscribersStore,
+};
 
 /// Reactive hash map based on [`HashMap`][1] with additional functionality of
 /// tracking progress made by its subscribers. Its [`HashMap::on_insert()`] and
@@ -125,7 +125,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_insert_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_insert_processed(&self) -> RecheckableCounterFuture {
         self.on_insert_subs.when_all_processed()
     }
 
@@ -135,7 +135,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> RecheckableCounterFuture {
         self.on_remove_subs.when_all_processed()
     }
 
@@ -145,14 +145,11 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(
-            future::join(
-                self.when_remove_processed(),
-                self.when_insert_processed(),
-            )
-            .map(|(_, _)| ()),
-        )
+    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
+        crate::join_all(vec![
+            self.when_remove_processed(),
+            self.when_insert_processed(),
+        ])
     }
 }
 

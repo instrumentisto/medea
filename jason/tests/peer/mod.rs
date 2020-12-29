@@ -316,7 +316,10 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
-            PeerEvent::NewLocalTrack { .. } => {}
+            PeerEvent::NewLocalTrack { .. }
+            | PeerEvent::NewSdpAnswer { .. }
+            | PeerEvent::NewSdpOffer { .. }
+            | PeerEvent::SendIntention { .. } => {}
             _ => unreachable!(),
         }
     }
@@ -1138,7 +1141,7 @@ mod ice_restart {
         let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
 
         peers.first_peer.state().reset_negotiation_role();
-        peers.first_peer.state().approve_sdp_offer();
+        peers.first_peer.state().sdp_offer_applied("");
         let mut proto_state = peers.first_peer.state().as_proto();
         proto_state.restart_ice = true;
         peers.first_peer.state().apply(proto_state);

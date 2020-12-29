@@ -36,5 +36,8 @@ pub use crate::{
         Observable, ObservableField, OnObservableFieldModification,
         Progressable, ProgressableCell, UniversalSubscriber, Whenable,
     },
+    subscribers_store::progressable::recheckable_future::{
+        join_all, RecheckableFutureExt,
+    },
     subscribers_store::progressable::{Guard, Guarded},
 };

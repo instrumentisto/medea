@@ -1,23 +1,21 @@
 use std::{cell::RefCell, collections::HashSet, ops::Deref, rc::Rc};
 
-use futures::{channel::mpsc, stream, stream::LocalBoxStream, StreamExt as _};
+use futures::{channel::mpsc, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{
-    Command, Direction, IceServer, NegotiationRole, PeerId,
-};
+use medea_client_api_proto::{Direction, IceServer, NegotiationRole, PeerId};
 use medea_jason::{
-    api::{Connections, GlobalCtx},
+    api::Connections,
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
         MediaConnectionsError, PeerComponent, PeerConnection, PeerError,
         PeerEvent, PeerState, ReceiverState, SenderState,
     },
-    rpc::MockRpcSession,
     spawn_component,
     utils::Updatable,
 };
 use medea_reactive::ProgressableHashMap;
 use tracerr::Traced;
+use wasm_bindgen_futures::spawn_local;
 
 /// Wrapper around [`PeerComponent`] which emulates methods removed after
 /// migration to the reactive history.
@@ -27,7 +25,7 @@ pub struct PeerConnectionCompat {
 
     /// [`Stream`] which will receive all [`Command`]s sent from
     /// [`PeerComponent`].
-    command_rx: RefCell<LocalBoxStream<'static, Command>>,
+    peer_event_rx: RefCell<LocalBoxStream<'static, PeerEvent>>,
 
     /// [`LocalTracksConstraints`] provided to the [`PeerComponent`].
     send_constraints: LocalTracksConstraints,
@@ -47,14 +45,23 @@ impl PeerConnectionCompat {
         send_constraints: LocalTracksConstraints,
         recv_constraints: RecvConstraints,
     ) -> Result<Self, Traced<PeerError>> {
+        let (peer_event_tx, mut peer_event_rx) = mpsc::unbounded();
         let peer = PeerConnection::new(
             id,
-            peer_events_sender,
+            peer_event_tx,
             ice_servers.clone(),
             media_manager,
             is_force_relayed,
             send_constraints.clone(),
+            Rc::new(Connections::default()),
         )?;
+        let (compat_peer_event_tx, compat_peer_event_rx) = mpsc::unbounded();
+        spawn_local(async move {
+            while let Some(event) = peer_event_rx.next().await {
+                let _ = compat_peer_event_tx.unbounded_send(event.clone());
+                let _ = peer_events_sender.unbounded_send(event);
+            }
+        });
         let state = PeerState::new(
             id,
             ProgressableHashMap::new(),
@@ -65,30 +72,11 @@ impl PeerConnectionCompat {
             HashSet::new(),
         );
 
-        let (command_tx, command_rx) = mpsc::unbounded();
-        let mut rpc = MockRpcSession::new();
-        rpc.expect_on_connection_loss()
-            .returning(|| stream::pending().boxed_local());
-        rpc.expect_on_reconnected()
-            .returning(|| stream::pending().boxed_local());
-        rpc.expect_close_with_reason().return_const(());
-        rpc.expect_send_command().returning(move |cmd| {
-            let _ = command_tx.unbounded_send(cmd);
-        });
-
-        let component = spawn_component!(
-            PeerComponent,
-            Rc::new(state),
-            peer,
-            Rc::new(GlobalCtx {
-                connections: Rc::new(Connections::default()),
-                rpc: Rc::new(rpc),
-            }),
-        );
+        let component = spawn_component!(PeerComponent, Rc::new(state), peer,);
 
         Ok(Self {
             component,
-            command_rx: RefCell::new(Box::pin(command_rx)),
+            peer_event_rx: RefCell::new(Box::pin(compat_peer_event_rx)),
             send_constraints,
             recv_constraints,
         })
@@ -107,8 +95,8 @@ impl PeerConnectionCompat {
             .await;
 
         while !matches!(
-            self.command_rx.borrow_mut().next().await.unwrap(),
-            Command::MakeSdpOffer { .. }
+            self.peer_event_rx.borrow_mut().next().await.unwrap(),
+            PeerEvent::NewSdpOffer { .. }
         ) {}
 
         Ok(self.component.state().current_sdp_offer().unwrap())
@@ -165,8 +153,8 @@ impl PeerConnectionCompat {
             .await;
 
         while !matches!(
-            self.command_rx.borrow_mut().next().await.unwrap(),
-            Command::MakeSdpAnswer { .. }
+            self.peer_event_rx.borrow_mut().next().await.unwrap(),
+            PeerEvent::NewSdpAnswer { .. }
         ) {}
 
         Ok(self.component.state().current_sdp_offer().unwrap())

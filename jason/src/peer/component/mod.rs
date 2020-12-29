@@ -7,18 +7,17 @@ mod watchers;
 
 use std::{collections::HashSet, rc::Rc};
 
-use futures::{future, future::LocalBoxFuture};
 use medea_client_api_proto::{
     state as proto_state, IceCandidate, IceServer, NegotiationRole, PeerId,
     TrackId,
 };
 use medea_reactive::{
     collections::ProgressableHashMap, ObservableCell, ProgressableCell,
+    RecheckableFutureExt,
 };
 use tracerr::Traced;
 
 use crate::{
-    api::GlobalCtx,
     peer::{
         media::{ReceiverState, SenderState},
         LocalStreamUpdateCriteria, PeerConnection, PeerError,
@@ -32,7 +31,7 @@ use self::{
 };
 
 /// Component responsible for the [`PeerConnection`] updating.
-pub type PeerComponent = Component<PeerState, PeerConnection, GlobalCtx>;
+pub type PeerComponent = Component<PeerState, PeerConnection>;
 
 /// Negotiation state of the [`PeerComponent`].
 ///
@@ -238,10 +237,10 @@ impl PeerState {
         self.sdp_offer.current()
     }
 
-    /// Marks current local SDP as approved by server.
+    /// Marks current [`LocalSdp`] as approved by server.
     #[inline]
-    pub fn approve_sdp_offer(&self) {
-        self.sdp_offer.approve();
+    pub fn sdp_offer_applied(&self, sdp_offer: &str) {
+        self.sdp_offer.approve(sdp_offer);
     }
 
     /// Stops all timeouts of the [`PeerState`].
@@ -258,6 +257,18 @@ impl PeerState {
     #[inline]
     pub fn resume_timeouts(&self) {
         self.sdp_offer.resume_timeout();
+    }
+
+    /// Notifies [`PeerComponent`] about RPC connection loss.
+    #[inline]
+    pub fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    /// Notifies [`PeerComponent`] about RPC connection restore.
+    #[inline]
+    pub fn reconnected(&self) {
+        self.sync_state.set(SyncState::Syncing);
     }
 
     /// Updates local `MediaStream` based on
@@ -359,13 +370,10 @@ impl SynchronizableState for PeerState {
 }
 
 impl Updatable for PeerState {
-    fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
-        let fut = future::join(
+    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
+        Box::new(medea_reactive::join_all(vec![
             self.receivers.when_updated(),
             self.senders.when_updated(),
-        );
-        Box::pin(async move {
-            fut.await;
-        })
+        ]))
     }
 }

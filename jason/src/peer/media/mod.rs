@@ -21,10 +21,7 @@ use tracerr::Traced;
 use web_sys::RtcTrackEvent;
 
 #[cfg(feature = "mockable")]
-use crate::{
-    api::{Connections, GlobalCtx},
-    media::{LocalTracksConstraints, RecvConstraints},
-};
+use crate::media::{LocalTracksConstraints, RecvConstraints};
 use crate::{
     media::{track::local, MediaKind},
     peer::{
@@ -871,8 +868,6 @@ impl MediaConnections {
         receivers: Vec<MemberId>,
         send_constraints: &LocalTracksConstraints,
     ) -> Result<SenderComponent> {
-        use crate::rpc::MockRpcSession;
-
         let sender_state = SenderState::new(
             id,
             mid.clone(),
@@ -891,15 +886,8 @@ impl MediaConnections {
             caps: media_type.into(),
         }
         .build()?;
-        let component = spawn_component!(
-            SenderComponent,
-            Rc::new(sender_state),
-            sender,
-            Rc::new(GlobalCtx {
-                rpc: Rc::new(MockRpcSession::new()),
-                connections: Rc::new(Connections::default()),
-            }),
-        );
+        let component =
+            spawn_component!(SenderComponent, Rc::new(sender_state), sender,);
 
         Ok(component)
     }
@@ -913,8 +901,6 @@ impl MediaConnections {
         sender: MemberId,
         recv_constraints: &RecvConstraints,
     ) -> ReceiverComponent {
-        use crate::rpc::MockRpcSession;
-
         let receiver_state = ReceiverState::new(
             id,
             mid.clone(),
@@ -937,10 +923,6 @@ impl MediaConnections {
             ReceiverComponent,
             Rc::new(receiver_state),
             Rc::new(receiver),
-            Rc::new(GlobalCtx {
-                rpc: Rc::new(MockRpcSession::new()),
-                connections: Rc::new(Connections::default()),
-            }),
         );
 
         component
@@ -986,21 +968,23 @@ impl MediaConnections {
     /// Patches [`SenderComponent`]s/[`ReceiverComponent`]s by provided
     /// [`TrackPatchEvent`]s.
     pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
-        let mut wait_for_change = Vec::new();
+        let mut wait_for_change: Vec<
+            Box<dyn medea_reactive::RecheckableFutureExt<Output = ()>>,
+        > = Vec::new();
         for track in tracks {
             if let Some(sender) = self.0.borrow().senders.get(&track.id) {
                 sender.state().update(&track);
-                wait_for_change.push(sender.state().when_updated());
+                wait_for_change.push(Box::new(sender.state().when_updated()));
             } else if let Some(receiver) =
                 self.0.borrow().receivers.get(&track.id)
             {
                 receiver.state().update(&track);
-                wait_for_change.push(receiver.state().when_updated());
+                wait_for_change.push(Box::new(receiver.state().when_updated()));
             } else {
                 panic!()
             }
         }
-        future::join_all(wait_for_change).await;
+        medea_reactive::join_all(wait_for_change).await;
     }
 
     /// Returns all underlying [`Sender`]'s.

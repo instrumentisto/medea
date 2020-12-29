@@ -2,11 +2,13 @@
 
 use std::{marker::PhantomData, slice::Iter};
 
-use futures::{
-    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt as _,
-};
+use futures::stream::LocalBoxStream;
 
-use crate::subscribers_store::{common, progressable, SubscribersStore};
+use crate::subscribers_store::{
+    common, progressable,
+    progressable::{RecheckableCounterFuture, RecheckableFutureExt},
+    SubscribersStore,
+};
 
 /// Reactive vector based on [`Vec`] with additional functionality of tracking
 /// progress made by its subscribers. Its [`Vec::on_push()`] and
@@ -103,7 +105,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_push_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_push_processed(&self) -> RecheckableCounterFuture {
         self.on_push_subs.when_all_processed()
     }
 
@@ -113,7 +115,7 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> RecheckableCounterFuture {
         self.on_remove_subs.when_all_processed()
     }
 
@@ -123,14 +125,11 @@ where
     /// [`Future`]: std::future::Future
     #[inline]
     #[must_use]
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(
-            future::join(
-                self.when_remove_processed(),
-                self.when_push_processed(),
-            )
-            .map(|(_, _)| ()),
-        )
+    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
+        crate::join_all(vec![
+            self.when_remove_processed(),
+            self.when_push_processed(),
+        ])
     }
 }
 

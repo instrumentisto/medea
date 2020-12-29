@@ -1,9 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use derive_more::From;
-use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::stream::LocalBoxStream;
 use medea_client_api_proto::TrackId;
-use medea_reactive::{Guarded, ProgressableHashMap};
+use medea_reactive::{Guarded, ProgressableHashMap, RecheckableFutureExt};
 
 use crate::{
     peer::SenderState,
@@ -25,7 +25,7 @@ impl<S> TracksRepository<S> {
 
     /// Returns [`Future`] which will be resolved when all inserts/removes will
     /// be processed.
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
         self.0.borrow().when_all_processed()
     }
 
@@ -93,13 +93,11 @@ impl<S> Updatable for TracksRepository<S>
 where
     S: Updatable,
 {
-    fn when_updated(&self) -> LocalBoxFuture<'static, ()> {
+    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         let when_futs: Vec<_> =
             self.0.borrow().values().map(|s| s.when_updated()).collect();
-        let fut = futures::future::join_all(when_futs);
-        Box::pin(async move {
-            fut.await;
-        })
+
+        Box::new(medea_reactive::join_all(when_futs))
     }
 }
 

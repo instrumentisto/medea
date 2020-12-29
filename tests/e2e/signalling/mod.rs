@@ -422,7 +422,9 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     }
                                 }
                             }
-                            Event::SdpOfferApplied { peer_id, .. }
+                            Event::LocalDescriptionApplied {
+                                peer_id, ..
+                            }
                             | Event::SdpAnswerMade { peer_id, .. }
                             | Event::IceCandidateDiscovered {
                                 peer_id, ..

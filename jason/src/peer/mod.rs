@@ -31,6 +31,7 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
+    api::Connections,
     media::{
         track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
@@ -90,6 +91,7 @@ pub enum PeerError {
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
 #[dispatchable(self: &Self, async_trait(?Send))]
+#[cfg_attr(feature = "mockable", derive(Clone))]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
@@ -179,6 +181,44 @@ pub enum PeerEvent {
         /// Reasons of local media updating fail.
         error: JasonError,
     },
+
+    /// [`PeerComponent`] generated new SDP answer.
+    NewSdpAnswer {
+        /// ID of the [`PeerConnection`] for which SDP answer was generated.
+        peer_id: PeerId,
+
+        /// SDP Answer of the `Peer`.
+        sdp_answer: String,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
+    },
+
+    /// [`PeerComponent`] generated new SDP offer.
+    NewSdpOffer {
+        /// ID of the [`PeerConnection`] for which SDP offer was generated.
+        peer_id: PeerId,
+
+        /// SDP Offer of the [`PeerConnection`].
+        sdp_offer: String,
+
+        /// Associations between `Track` and transceiver's
+        /// [media description][1].
+        ///
+        /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
+        ///
+        /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
+        mids: HashMap<TrackId, String>,
+
+        /// Statuses of [`PeerConnection`] transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
+    },
+
+    /// [`PeerComponent`] resends his intentions.
+    SendIntention {
+        /// Actual intentions of the [`PeerComponent`].
+        intention: Command,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -216,6 +256,8 @@ pub struct PeerConnection {
 
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalTracksConstraints,
+
+    connections: Rc<Connections>,
 }
 
 impl PeerConnection {
@@ -240,6 +282,7 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         is_force_relayed: bool,
         send_constraints: LocalTracksConstraints,
+        connections: Rc<Connections>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
@@ -260,6 +303,7 @@ impl PeerConnection {
             has_remote_description: RefCell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
+            connections,
         };
 
         // Bind to `icecandidate` event.
@@ -754,6 +798,19 @@ impl PeerConnection {
             });
         }
         Ok(())
+    }
+
+    /// Sends [`PeerEvent::SendIntention`] with the intentions of the
+    /// [`Sender`]s and [`Receiver`]s from this [`PeerConnection`]
+    ///
+    /// If this [`PeerConnection`] doesn't intents anything then nothing will be
+    /// sent.
+    fn send_intentions(&self) {
+        if let Some(intention) = self.intentions() {
+            let _ = self
+                .peer_events_sender
+                .unbounded_send(PeerEvent::SendIntention { intention });
+        }
     }
 
     /// Returns all intentions of the [`Sender`]s and [`Receiver`]s from this

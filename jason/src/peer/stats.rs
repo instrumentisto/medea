@@ -48,7 +48,7 @@ impl TryFrom<JsArray> for RtcStatsReportEntry {
 /// All available [`RtcStatsType`] of [`PeerConnection`].
 ///
 /// [`PeerConnection`]: crate::peer::PeerConnection
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RtcStats(pub Vec<RtcStat>);
 
 impl TryFrom<&JsValue> for RtcStats {
