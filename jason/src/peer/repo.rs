@@ -8,7 +8,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::{Connections,RoomError},
+    api::{Connections, RoomError},
     media::{LocalTracksConstraints, MediaManager},
     peer,
     utils::{component, delay_for, TaskHandle},
@@ -218,7 +218,7 @@ impl Repository {
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
-        self.peers.borrow().get(&id).map(Component::ctx)
+        self.peers.borrow().get(&id).map(component::Component::ctx)
     }
 
     /// Removes [`PeerConnection`] stored in repository by its ID.

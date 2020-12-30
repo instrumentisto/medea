@@ -52,40 +52,39 @@ fn toggle_disable_tracks_updates(
 const AUDIO_TRACK_ID: u32 = 1;
 const VIDEO_TRACK_ID: u32 = 2;
 
-// #[wasm_bindgen_test]
-// async fn disable_enable_audio() {
-//     let (tx, _rx) = mpsc::unbounded();
-//     let manager = Rc::new(MediaManager::default());
-//     let (audio_track, video_track) = get_test_unrequired_tracks();
-//     let peer = PeerConnection::new(
-//         PeerId(1),
-//         tx,
-//         Vec::new(),
-//         manager,
-//         false,
-//         local_constraints(true, true),
-//         RecvConstraints::default(),
-//     )
-//     .unwrap();
-//
-//     peer.get_offer(vec![audio_track, video_track])
-//         .await
-//         .unwrap();
-//
-//     assert!(peer.is_send_audio_enabled());
-//     assert!(peer.is_send_video_enabled(None));
-//
-//     peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID],
-// false))         .await;
-//     assert!(!peer.is_send_audio_enabled());
-//     assert!(peer.is_send_video_enabled(None));
-//
-//     peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
-//         .await;
-//     assert!(peer.is_send_audio_enabled());
-//     assert!(peer.is_send_video_enabled(None));
-// }
-//
+#[wasm_bindgen_test]
+async fn disable_enable_audio() {
+    let (tx, _rx) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_unrequired_tracks();
+    let peer = PeerConnection::new(
+        PeerId(1),
+        tx,
+        Vec::new(),
+        manager,
+        false,
+        local_constraints(true, true),
+        RecvConstraints::default(),
+    )
+    .unwrap();
+
+    peer.get_offer(vec![audio_track, video_track])
+        .await
+        .unwrap();
+
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled(None));
+
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], false))
+        .await;
+    assert!(!peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled(None));
+
+    peer.patch_tracks(toggle_disable_tracks_updates(&[AUDIO_TRACK_ID], true))
+        .await;
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled(None));
+}
 // #[wasm_bindgen_test]
 // async fn disable_enable_video() {
 //     let (tx, _rx) = mpsc::unbounded();
@@ -669,8 +668,8 @@ const VIDEO_TRACK_ID: u32 = 2;
 //             RtcStatsType::CandidatePair(candidate_pair) => {
 //                 assert_eq!(
 //                     candidate_pair.state,
-//                     
-// NonExhaustive::Known(KnownIceCandidatePairState::Succeeded)                 
+//
+// NonExhaustive::Known(KnownIceCandidatePairState::Succeeded)
 // );             }
 //             _ => (),
 //         }

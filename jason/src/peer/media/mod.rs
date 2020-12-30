@@ -952,28 +952,6 @@ impl MediaConnections {
         Ok(())
     }
 
-    /// Patches [`SenderComponent`]s/[`ReceiverComponent`]s by provided
-    /// [`TrackPatchEvent`]s.
-    pub async fn patch_tracks(&self, tracks: Vec<proto::TrackPatchEvent>) {
-        let mut wait_for_change: Vec<
-            Box<dyn medea_reactive::RecheckableFutureExt<Output = ()>>,
-        > = Vec::new();
-        for track in tracks {
-            if let Some(sender) = self.0.borrow().senders.get(&track.id) {
-                sender.state().update(&track);
-                wait_for_change.push(Box::new(sender.state().when_updated()));
-            } else if let Some(receiver) =
-                self.0.borrow().receivers.get(&track.id)
-            {
-                receiver.state().update(&track);
-                wait_for_change.push(Box::new(receiver.state().when_updated()));
-            } else {
-                panic!()
-            }
-        }
-        medea_reactive::join_all(wait_for_change).await;
-    }
-
     /// Returns all underlying [`Sender`]'s.
     pub fn get_senders(&self) -> Vec<Rc<Sender>> {
         self.0
