@@ -5,7 +5,7 @@ mod errors;
 
 mod callback;
 #[macro_use]
-mod component;
+pub mod component;
 mod event_listener;
 mod resettable_delay;
 
@@ -23,7 +23,6 @@ pub use self::errors::console_error;
 #[doc(inline)]
 pub use self::{
     callback::{Callback0, Callback1, Callback2},
-    component::Component,
     errors::{
         HandlerDetachedError, JasonError, JsCaused, JsError, JsonParseError,
     },

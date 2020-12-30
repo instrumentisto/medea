@@ -10,12 +10,12 @@ use tracerr::Traced;
 use crate::{
     media::RecvConstraints,
     peer::{MediaConnectionsError, Receiver},
-    utils::Component,
+    utils::component,
 };
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
-pub type ReceiverComponent = Component<ReceiverState, Receiver>;
+pub type ReceiverComponent = component::Component<ReceiverState, Receiver>;
 
 /// State of the [`ReceiverComponent`].
 pub struct ReceiverState {

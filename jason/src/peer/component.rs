@@ -19,13 +19,13 @@ use crate::{
         media_exchange_state, mute_state, LocalStreamUpdateCriteria, PeerError,
         Receiver, ReceiverComponent, SenderComponent,
     },
-    utils::Component,
+    utils::component,
 };
 
 use super::{PeerConnection, PeerEvent};
 
 /// State of the [`PeerComponent`].
-pub struct PeerState {
+pub struct State {
     id: PeerId,
     senders: RefCell<ProgressableHashMap<TrackId, Rc<SenderState>>>,
     receivers: RefCell<ProgressableHashMap<TrackId, Rc<ReceiverState>>>,
@@ -38,7 +38,7 @@ pub struct PeerState {
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
 }
 
-impl PeerState {
+impl State {
     /// Returns [`PeerState`] with a provided data.
     #[inline]
     pub fn new(
@@ -230,7 +230,7 @@ impl PeerState {
 }
 
 #[cfg(feature = "mockable")]
-impl PeerState {
+impl State {
     /// Waits for [`PeerState::remote_sdp_offer`] change apply.
     #[inline]
     pub async fn when_remote_sdp_answer_processed(&self) {
@@ -245,10 +245,10 @@ impl PeerState {
 }
 
 /// Component reponsible for the [`PeerConnection`] updating.
-pub type PeerComponent = Component<PeerState, PeerConnection>;
+pub type Component = component::Component<State, PeerConnection>;
 
 #[watchers]
-impl PeerComponent {
+impl Component {
     /// Watcher for the [`PeerState::ice_candidates`] push update.
     ///
     /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
@@ -257,7 +257,7 @@ impl PeerComponent {
     #[inline]
     async fn ice_candidate_push_watcher(
         peer: Rc<PeerConnection>,
-        _: Rc<PeerState>,
+        _: Rc<State>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
         peer.add_ice_candidate(
@@ -281,7 +281,7 @@ impl PeerComponent {
     #[watch(self.state().remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
         peer: Rc<PeerConnection>,
-        state: Rc<PeerState>,
+        state: Rc<State>,
         remote_sdp_answer: Guarded<Option<String>>,
     ) -> Result<(), Traced<PeerError>> {
         let (remote_sdp_answer, _guard) = remote_sdp_answer.into_parts();
@@ -315,7 +315,7 @@ impl PeerComponent {
     #[inline]
     async fn ice_restart_watcher(
         peer: Rc<PeerConnection>,
-        state: Rc<PeerState>,
+        state: Rc<State>,
         val: bool,
     ) -> Result<(), Traced<PeerError>> {
         if val {
@@ -338,7 +338,7 @@ impl PeerComponent {
     #[watch(self.state().senders.borrow().on_insert_with_replay())]
     async fn sender_insert_watcher(
         peer: Rc<PeerConnection>,
-        state: Rc<PeerState>,
+        state: Rc<State>,
         val: Guarded<(TrackId, Rc<SenderState>)>,
     ) -> Result<(), Traced<PeerError>> {
         state.receivers.borrow().when_all_processed().await;
@@ -380,7 +380,7 @@ impl PeerComponent {
     #[watch(self.state().receivers.borrow().on_insert_with_replay())]
     async fn receiver_insert_watcher(
         peer: Rc<PeerConnection>,
-        state: Rc<PeerState>,
+        state: Rc<State>,
         val: Guarded<(TrackId, Rc<ReceiverState>)>,
     ) -> Result<(), Traced<PeerError>> {
         let ((track_id, new_receiver), _guard) = val.into_parts();
@@ -417,7 +417,7 @@ impl PeerComponent {
     #[watch(self.state().sdp_offer.subscribe())]
     async fn sdp_offer_watcher(
         peer: Rc<PeerConnection>,
-        state: Rc<PeerState>,
+        state: Rc<State>,
         sdp_offer: Option<String>,
     ) -> Result<(), Traced<PeerError>> {
         if let Some(role) = state.negotiation_role.get() {
@@ -479,7 +479,7 @@ impl PeerComponent {
     #[watch(self.state().negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
         peer: Rc<PeerConnection>,
-        state: Rc<PeerState>,
+        state: Rc<State>,
         new_negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<PeerError>> {
         let _ = state.restart_ice.when_eq(false).await;

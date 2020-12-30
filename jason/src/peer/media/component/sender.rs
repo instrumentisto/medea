@@ -12,13 +12,13 @@ use tracerr::Traced;
 use crate::{
     media::LocalTracksConstraints,
     peer::{MediaConnectionsError, Sender},
-    utils::Component,
+    utils::component,
     MediaKind,
 };
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
-pub type SenderComponent = Component<SenderState, Sender>;
+pub type SenderComponent = component::Component<SenderState, Sender>;
 
 /// State of the [`SenderComponent`].
 pub struct SenderState {

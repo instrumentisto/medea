@@ -7,7 +7,7 @@ mod conn;
 mod ice_server;
 mod local_sdp;
 mod media;
-mod repo;
+pub mod repo;
 mod stats;
 mod stream_update_criteria;
 mod tracks_request;
@@ -41,12 +41,9 @@ use crate::{
     MediaStreamSettings,
 };
 
-#[cfg(feature = "mockable")]
-#[doc(inline)]
-pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
-    component::{PeerComponent, PeerState},
+    component::{Component, State},
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     local_sdp::LocalSdp,
     media::{
@@ -57,7 +54,7 @@ pub use self::{
         ReceiverState, Sender, SenderComponent, SenderState, TrackDirection,
         TransceiverSide, TransitableState, TransitableStateController,
     },
-    repo::{PeerRepository, Repository},
+    repo::Repository,
     stats::RtcStats,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},

@@ -116,9 +116,8 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
-        let peer_repository = Box::new(peer::Repository::new(Rc::clone(
-            &self.0.borrow().media_manager,
-        )));
+        let peer_repository =
+            peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
         let on_normal_close = rpc.on_normal_close();
         let room = Room::new(rpc, peer_repository);
 
