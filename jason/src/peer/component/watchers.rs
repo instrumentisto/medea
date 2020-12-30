@@ -350,7 +350,6 @@ impl PeerComponent {
                     }
                 }
             }
-        } else {
         }
 
         Ok(())

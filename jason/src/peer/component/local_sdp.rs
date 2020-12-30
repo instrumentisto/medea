@@ -191,6 +191,8 @@ impl LocalSdp {
         })
     }
 
+    /// Returns `true` if new SDP offer needed after rollback is
+    /// completed.
     #[inline]
     pub fn is_restart_needed(&self) -> bool {
         self.0.borrow().restart_needed
