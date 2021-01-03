@@ -13,12 +13,11 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
-    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
-    TrackId, TrackUpdate,
+    Command, ConnectionQualityScore, Event as RpcEvent, EventHandler,
+    IceCandidate, IceConnectionState, IceServer, MediaSourceKind, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackUpdate,
 };
-use medea_reactive::collections::ProgressableHashMap;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -27,14 +26,13 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaStreamSettings,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
         RecvConstraints,
     },
     peer::{
         self, media_exchange_state, mute_state, LocalStreamUpdateCriteria,
         MediaConnectionsError, MediaState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, ReceiverState, RtcStats, SenderState,
-        TrackDirection, TransceiverSide,
+        PeerEvent, PeerEventHandler, RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -598,7 +596,10 @@ pub struct Room(Rc<InnerRoom>);
 impl Room {
     /// Creates new [`Room`] and associates it with the provided [`RpcSession`].
     #[allow(clippy::mut_mut)]
-    pub fn new(rpc: Rc<dyn RpcSession>, peers: peer::repo::Repository) -> Self {
+    pub fn new(
+        rpc: Rc<dyn RpcSession>,
+        media_manager: Rc<MediaManager>,
+    ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
             PeerEvent(PeerEvent),
@@ -621,7 +622,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = InnerRoom::new(rpc, peers, tx);
+        let room = InnerRoom::new(rpc, media_manager, tx);
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -741,7 +742,7 @@ struct InnerRoom {
     /// [`PeerConnection`]: crate::peer::PeerConnection
     recv_constraints: Rc<RecvConstraints>,
 
-    /// Component which manages [`PeerComponent`]s.
+    /// Component which manages [`peer::Component`]s.
     peers: peer::repo::Component,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
@@ -956,14 +957,14 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcSession>,
-        peers: peer::repo::Repository,
+        media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Rc<Self> {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
         Rc::new(Self {
             peers: peer::repo::Component::new(
-                peers,
+                media_manager,
                 peer_event_sender,
                 send_constraints.clone(),
                 Rc::clone(&connections),
@@ -1160,12 +1161,12 @@ impl InnerRoom {
 
         self.send_constraints
             .set_media_exchange_state_by_kinds(Disabled, kinds);
-        let senders_to_disable = peer.get_senders_without_tracks(kinds);
+        let senders_to_disable = peer.get_senders_ids_without_tracks(kinds);
 
         states_update.entry(peer.id()).or_default().extend(
             senders_to_disable
                 .into_iter()
-                .map(|s| (s.track_id(), MediaState::from(Disabled))),
+                .map(|id| (id, MediaState::from(Disabled))),
         );
         self.update_media_states(states_update)
             .await
@@ -1325,54 +1326,27 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let mut senders = ProgressableHashMap::new();
-        let mut receivers = ProgressableHashMap::new();
-        for track in &tracks {
-            match &track.direction {
-                Direction::Send { receivers, mid } => {
-                    senders.insert(
-                        track.id,
-                        Rc::new(
-                            SenderState::new(
-                                track.id,
-                                mid.clone(),
-                                track.media_type.clone(),
-                                receivers.clone(),
-                                &self.send_constraints,
-                            )
-                            .map_err(|e| {
-                                self.on_failed_local_media
-                                    .call(JasonError::from(e.clone()));
-                                tracerr::map_from_and_new!(e)
-                            })?,
-                        ),
-                    );
-                }
-                Direction::Recv { sender, mid } => {
-                    receivers.insert(
-                        track.id,
-                        Rc::new(ReceiverState::new(
-                            track.id,
-                            mid.clone(),
-                            track.media_type.clone(),
-                            sender.clone(),
-                            &self.recv_constraints,
-                        )),
-                    );
-                }
-            }
-        }
-        self.peers.state().insert(
+        let peer_state = peer::State::new(
             peer_id,
-            peer::State::new(
-                peer_id,
-                senders,
-                receivers,
-                ice_servers,
-                is_force_relayed,
-                Some(negotiation_role),
-            ),
+            ice_servers,
+            is_force_relayed,
+            Some(negotiation_role),
         );
+        for track in &tracks {
+            peer_state
+                .insert_track(
+                    track,
+                    &self.send_constraints,
+                    &self.recv_constraints,
+                )
+                .map_err(|e| {
+                    self.on_failed_local_media
+                        .call(JasonError::from(e.clone()));
+                    tracerr::map_from_and_new!(e)
+                })?;
+        }
+
+        self.peers.state().insert(peer_id, peer_state);
 
         Ok(())
     }
@@ -1393,19 +1367,19 @@ impl EventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Calls [`PeerState::sdp_offer_applied`] for the [`PeerState`] with a
+    /// Calls [`peer::State::sdp_offer_applied`] for the [`peer::State`] with a
     /// provided [`PeerId`].
     async fn on_local_description_applied(
         &self,
         peer_id: PeerId,
         sdp_offer: String,
     ) -> Self::Output {
-        let peer = self
+        let peer_state = self
             .peers
             .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.sdp_offer_applied(&sdp_offer);
+        peer_state.sdp_offer_applied(&sdp_offer);
 
         Ok(())
     }
@@ -1456,44 +1430,19 @@ impl EventHandler for InnerRoom {
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => match track.direction {
-                    Direction::Send { receivers, mid } => {
-                        let sender_state = SenderState::new(
-                            track.id,
-                            mid,
-                            track.media_type,
-                            receivers,
-                            &self.send_constraints,
-                        )
-                        .map_err(|e| {
-                            self.on_failed_local_media
-                                .call(JasonError::from(e.clone()));
-                            tracerr::map_from_and_new!(e)
-                        })?;
-                        peer_state
-                            .insert_sender(track.id, Rc::new(sender_state));
-                    }
-                    Direction::Recv { sender, mid } => {
-                        let receiver_state = ReceiverState::new(
-                            track.id,
-                            mid,
-                            track.media_type,
-                            sender,
-                            &self.recv_constraints,
-                        );
-                        peer_state
-                            .insert_receiver(track.id, Rc::new(receiver_state));
-                    }
-                },
+                TrackUpdate::Added(track) => peer_state
+                    .insert_track(
+                        &track,
+                        &self.send_constraints,
+                        &self.recv_constraints,
+                    )
+                    .map_err(|e| {
+                        self.on_failed_local_media
+                            .call(JasonError::from(e.clone()));
+                        tracerr::map_from_and_new!(e)
+                    })?,
                 TrackUpdate::Updated(track_patch) => {
-                    if let Some(sender) = peer_state.get_sender(track_patch.id)
-                    {
-                        sender.update(&track_patch);
-                    } else if let Some(receiver) =
-                        peer_state.get_receiver(track_patch.id)
-                    {
-                        receiver.update(&track_patch);
-                    }
+                    peer_state.patch_track(&track_patch)
                 }
                 TrackUpdate::IceRestart => {
                     peer_state.restart_ice();

@@ -16,6 +16,7 @@ use crate::utils::{resettable_delay_for, ResettableDelayHandle};
 const APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Inner for the [`LocalSdp`].
+#[derive(Debug)]
 struct Inner {
     /// Current SDP offer applied on the [`PeerConnection`], but it can be not
     /// approved by server (see [`Inner::approved`]).
@@ -68,7 +69,7 @@ impl Inner {
 /// If you update [`LocalSdp`] then it will wait for server approve
 /// ([`LocalSdp::approve`]). If Media Server approve wasn't received within
 /// timeout, then SDP offer will be rollbacked to the previous one.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct LocalSdp(Rc<RefCell<Inner>>);
 
 impl LocalSdp {

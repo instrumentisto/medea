@@ -18,7 +18,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaKind, MediaStreamSettings},
-    peer::{PeerConnection, Repository},
+    peer::PeerConnection,
     rpc::MockRpcSession,
     utils::JasonError,
     DeviceVideoTrackConstraints,
@@ -64,7 +64,7 @@ fn get_test_room(
         let _ = tx.unbounded_send(command);
     });
 
-    (Room::new(Rc::new(rpc), Repository::new(Rc::default())), rx)
+    (Room::new(Rc::new(rpc), Rc::default()), rx)
 }
 
 async fn get_test_room_and_exist_peer(
@@ -102,7 +102,7 @@ async fn get_test_room_and_exist_peer(
         _ => (),
     });
 
-    let room = Room::new(Rc::new(rpc), Repository::new(Rc::default()));
+    let room = Room::new(Rc::new(rpc), Rc::default());
     if let Some(media_stream_settings) = &media_stream_settings {
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings,
@@ -916,7 +916,7 @@ mod rpc_close_reason_on_room_drop {
         rpc.expect_close_with_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
         });
-        let room = Room::new(Rc::new(rpc), Repository::new(Rc::default()));
+        let room = Room::new(Rc::new(rpc), Rc::default());
         (room, test_rx)
     }
 
@@ -979,7 +979,6 @@ mod rpc_close_reason_on_room_drop {
 
 /// Tests for [`TrackPatch`] generation in [`Room`].
 mod patches_generation {
-
     use medea_client_api_proto::{
         AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
         TrackPatchCommand, VideoSettings,
@@ -1016,7 +1015,7 @@ mod patches_generation {
         ]
     }
 
-    /// Returns [`Room`] with mocked [`PeerRepository`] with provided count of
+    /// Returns [`Room`] with provided count of
     /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
     /// sent from this [`Room`].
     ///
@@ -1042,7 +1041,7 @@ mod patches_generation {
         rpc.expect_on_reconnected()
             .return_once(|| stream::pending().boxed_local());
 
-        let room = Room::new(Rc::new(rpc), Repository::new(Rc::default()));
+        let room = Room::new(Rc::new(rpc), Rc::default());
 
         for i in 0..peers_count {
             let mut audio_track_id = None;
@@ -1858,7 +1857,7 @@ mod set_local_media_settings {
         let room_handle = room.new_handle();
 
         let (cb, test_result) = js_callback!(|err: JasonError| {
-            cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
+            cb_assert_eq!(&err.name(), "MediaConnections");
             cb_assert_eq!(
                 err.message(),
                 "MediaExchangeState of Sender can't be transited into \
