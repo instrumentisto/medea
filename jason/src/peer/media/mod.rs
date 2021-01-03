@@ -624,19 +624,18 @@ impl MediaConnections {
         &self,
         tracks: &HashMap<TrackId, Rc<local::Track>>,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        let inner = self.0.borrow();
-
         // Build sender to track pairs to catch errors before inserting.
-        let mut sender_and_track = Vec::with_capacity(inner.senders.len());
+        let mut sender_and_track =
+            Vec::with_capacity(self.0.borrow().senders.len());
         let mut media_exchange_state_updates = HashMap::new();
-        for sender in inner.senders.values() {
+        for sender in self.0.borrow().senders.values() {
             if let Some(track) = tracks.get(&sender.track_id()).cloned() {
                 if sender.caps().satisfies(track.sys_track()) {
                     media_exchange_state_updates.insert(
                         sender.track_id(),
                         media_exchange_state::Stable::Enabled,
                     );
-                    sender_and_track.push((sender, track));
+                    sender_and_track.push((sender.ctx(), track));
                 } else {
                     return Err(tracerr::new!(
                         MediaConnectionsError::InvalidMediaTrack
@@ -656,7 +655,7 @@ impl MediaConnections {
 
         future::try_join_all(sender_and_track.into_iter().map(
             |(sender, track)| async move {
-                sender.ctx().insert_track(track).await?;
+                sender.clone().insert_track(track).await?;
                 sender.maybe_enable();
                 Ok::<(), Traced<MediaConnectionsError>>(())
             },
@@ -779,15 +778,19 @@ impl MediaConnections {
     ///
     /// [`Sender`]: self::sender::Sender
     pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
-        for sender in self
-            .0
-            .borrow()
-            .senders
-            .values()
-            .filter(|s| kinds.has(s.kind(), s.source_kind()))
-        {
-            sender.remove_track().await;
-        }
+        let remove_tracks_fut = future::join_all(
+            self.0.borrow().senders.values().filter_map(|s| {
+                if kinds.has(s.kind(), s.source_kind()) {
+                    let sender = s.ctx();
+                    Some(async move {
+                        sender.remove_track().await;
+                    })
+                } else {
+                    None
+                }
+            }),
+        );
+        remove_tracks_fut.await;
     }
 }
 

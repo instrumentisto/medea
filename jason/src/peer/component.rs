@@ -278,6 +278,26 @@ impl State {
         Ok(())
     }
 
+    /// Returns [`RecheckableFutureExt`] which will be resolved when all
+    /// [`State::senders`]'s inserts/removes will be processed.
+    #[inline]
+    #[must_use]
+    fn when_all_senders_processed(
+        &self,
+    ) -> impl RecheckableFutureExt<Output = ()> {
+        self.senders.borrow().when_all_processed()
+    }
+
+    /// Returns [`RecheckableFutureExt`] which will be resolved when all
+    /// [`State::receivers`]'s inserts/removes will be processed.
+    #[inline]
+    #[must_use]
+    fn when_all_receivers_processed(
+        &self,
+    ) -> impl RecheckableFutureExt<Output = ()> {
+        self.receivers.borrow().when_all_processed()
+    }
+
     /// Patches [`sender::State`] or [`receiver::State`] with a provided
     /// [`proto::TrackPatchEvent`].
     pub fn patch_track(&self, track_patch: &proto::TrackPatchEvent) {
@@ -453,7 +473,7 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        state.receivers.borrow().when_all_processed().await;
+        state.when_all_receivers_processed().await;
         if matches!(
             state.negotiation_role.get(),
             Some(NegotiationRole::Answerer(_))
@@ -585,8 +605,8 @@ impl Component {
             match role {
                 NegotiationRole::Offerer => {
                     futures::future::join(
-                        state.senders.borrow().when_all_processed(),
-                        state.receivers.borrow().when_all_processed(),
+                        state.when_all_senders_processed(),
+                        state.when_all_receivers_processed(),
                     )
                     .await;
                     state.when_all_updated().await;
@@ -606,14 +626,14 @@ impl Component {
                     peer.media_connections.sync_receivers();
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
-                    state.receivers.borrow().when_all_processed().await;
+                    state.when_all_receivers_processed().await;
                     peer.media_connections.sync_receivers();
 
                     state.set_remote_sdp_offer(remote_sdp_offer);
 
                     state.when_all_receivers_updated().await;
                     state.remote_sdp_offer.when_all_processed().await;
-                    state.senders.borrow().when_all_processed().await;
+                    state.when_all_senders_processed().await;
                     state.when_all_senders_updated().await;
 
                     state

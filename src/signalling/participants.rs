@@ -151,12 +151,11 @@ impl ParticipantService {
         &self,
         id: &MemberId,
     ) -> Result<Member, ParticipantServiceErr> {
-        self.members.get(id).cloned().map_or(
-            Err(ParticipantServiceErr::ParticipantNotFound(
+        self.members.get(id).cloned().ok_or_else(|| {
+            ParticipantServiceErr::ParticipantNotFound(
                 self.get_fid_to_member(id.clone()),
-            )),
-            Ok,
-        )
+            )
+        })
     }
 
     /// Returns all [`Member`] from this [`ParticipantService`].

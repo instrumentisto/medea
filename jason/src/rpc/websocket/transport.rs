@@ -276,13 +276,8 @@ impl WebSocketRpcTransport {
             );
         }
 
-        let state = socket
-            .borrow()
-            .socket_state
-            .subscribe()
-            .skip(1)
-            .next()
-            .await;
+        let state_updates_rx = socket.borrow().socket_state.subscribe();
+        let state = state_updates_rx.skip(1).next().await;
 
         if let Some(TransportState::Open) = state {
             let this = Self(socket);

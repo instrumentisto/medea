@@ -1086,7 +1086,7 @@ impl InnerRoom {
                                 None
                             }
                         })
-                        .map(|(trnscvr, desired_state, need_patch)| {
+                        .try_for_each(|(trnscvr, desired_state, need_patch)| {
                             trnscvr.media_state_transition_to(desired_state)?;
                             transitions_futs.push(
                                 trnscvr.when_media_state_stable(desired_state),
@@ -1101,7 +1101,6 @@ impl InnerRoom {
 
                             Ok(())
                         })
-                        .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {
                         self.rpc.send_command(Command::UpdateTracks {
