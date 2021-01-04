@@ -346,7 +346,8 @@ mod tests {
                         futures::poll!(updatable_cell.when_all_processed()),
                         Poll::Ready(_),
                     ),
-                    "ProgressableCell is not processed, but `join_all` resolved."
+                    "ProgressableCell is not processed, but `join_all` \
+                     resolved."
                 );
             })
             .await;
