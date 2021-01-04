@@ -146,9 +146,15 @@ pub fn join_all<F: RecheckableFutureExt>(
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::Cell, rc::Rc};
+    use std::{cell::Cell, rc::Rc, time::Duration};
 
-    use futures::{executor, poll, FutureExt};
+    use futures::{executor, poll, task::Poll, FutureExt, StreamExt};
+    use tokio::{
+        task::{spawn_local, LocalSet},
+        time::delay_for,
+    };
+
+    use crate::ProgressableCell;
 
     use super::*;
 
@@ -289,5 +295,60 @@ mod tests {
             assert!(is_restart_called.get());
             assert_eq!(poll!(fut), Poll::Pending,);
         })
+    }
+
+    /// Checks that two joined with [`join_all`]
+    /// [`ProgressableCell::when_all_processed`]'s [`RecheckableFutureExt`]s
+    /// will be resolved only if they both processed at the end.
+    #[tokio::test]
+    async fn join_all_works_correctly_with_when_processed() {
+        LocalSet::new()
+            .run_until(async {
+                /// Update which will be processed instantly.
+                const INSTANT_PROCESSED_UPDATE: u8 = 1;
+                /// Update which will be processed after 100 millis.
+                const DELAYED_PROCESSED_UPDATE: u8 = 2;
+
+                let updatable_cell = Rc::new(ProgressableCell::new(0));
+                let _ = spawn_local({
+                    let updatable_cell = Rc::clone(&updatable_cell);
+                    let mut updatable_cell_rx =
+                        updatable_cell.subscribe().skip(1).fuse();
+                    updatable_cell.set(INSTANT_PROCESSED_UPDATE);
+                    async move {
+                        assert_eq!(
+                            INSTANT_PROCESSED_UPDATE,
+                            updatable_cell_rx
+                                .select_next_some()
+                                .await
+                                .into_inner()
+                        );
+
+                        updatable_cell.set(DELAYED_PROCESSED_UPDATE);
+                        delay_for(Duration::from_millis(100)).await;
+                        assert_eq!(
+                            DELAYED_PROCESSED_UPDATE,
+                            updatable_cell_rx
+                                .select_next_some()
+                                .await
+                                .into_inner()
+                        );
+                    }
+                });
+
+                join_all(vec![
+                    updatable_cell.when_all_processed(),
+                    ProgressableCell::new(0).when_all_processed(),
+                ])
+                .await;
+                assert!(
+                    matches!(
+                        futures::poll!(updatable_cell.when_all_processed()),
+                        Poll::Ready(_),
+                    ),
+                    "ProgressableCell is not processed, but `join_all` resolved."
+                );
+            })
+            .await;
     }
 }
