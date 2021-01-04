@@ -109,7 +109,7 @@ impl From<proto::Member> for Member {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 enum Credentials {
-    /// [Argon2] hash of the [`Member`] credential.
+    /// [Argon2] hash of the [`Member`] credentials.
     ///
     /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
     Hash(String),
@@ -119,6 +119,7 @@ enum Credentials {
 }
 
 impl From<proto::member::Credentials> for Credentials {
+    #[inline]
     fn from(from: proto::member::Credentials) -> Self {
         use proto::member::Credentials as C;
         match from {
@@ -129,6 +130,7 @@ impl From<proto::member::Credentials> for Credentials {
 }
 
 impl From<Credentials> for proto::member::Credentials {
+    #[inline]
     fn from(from: Credentials) -> Self {
         use Credentials as C;
         match from {

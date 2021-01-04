@@ -341,8 +341,8 @@ impl RoomHandle {
     /// `token`.
     ///
     /// Authorization token has fixed format:
-    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`.
-    /// E.g., `wss://medea.com/MyConf1/Alice?token=777`.
+    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
+    /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:

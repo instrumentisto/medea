@@ -308,6 +308,8 @@ impl Member {
     }
 
     /// Verifies provided [`client_proto::Credential`].
+    #[inline]
+    #[must_use]
     pub fn verify_credentials(
         &self,
         credentials: &client_proto::Credential,

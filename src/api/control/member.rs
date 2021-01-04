@@ -25,8 +25,6 @@ use crate::api::control::{
     WebRtcPlayId,
 };
 
-const CREDENTIALS_LEN: usize = 32;
-
 /// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -41,14 +39,21 @@ pub enum Credential {
 }
 
 impl Credential {
+    /// Length of [`Credential`]s.
+    const LEN: usize = 32;
+
     /// Verifies provided [`client_proto::Credential`].
+    #[must_use]
     pub fn verify(&self, other: &client_proto::Credential) -> bool {
+        use subtle::ConstantTimeEq as _;
         match self {
             Self::Hash(hash) => {
                 argon2::verify_encoded(hash, other.0.as_bytes())
                     .unwrap_or(false)
             }
-            Self::Plain(plain) => plain == &other.0,
+            Self::Plain(plain) => {
+                plain.as_bytes().ct_eq(other.0.as_bytes()).into()
+            }
         }
     }
 }
@@ -58,7 +63,7 @@ impl Default for Credential {
         Self::Plain(
             rand::thread_rng()
                 .sample_iter(&Alphanumeric)
-                .take(CREDENTIALS_LEN)
+                .take(Self::LEN)
                 .map(char::from)
                 .collect::<String>(),
         )
@@ -66,6 +71,7 @@ impl Default for Credential {
 }
 
 impl From<proto::member::Credentials> for Credential {
+    #[inline]
     fn from(from: proto::member::Credentials) -> Self {
         use proto::member::Credentials as C;
         match from {
@@ -76,6 +82,7 @@ impl From<proto::member::Credentials> for Credential {
 }
 
 impl From<Credential> for proto::member::Credentials {
+    #[inline]
     fn from(from: Credential) -> Self {
         match from {
             Credential::Plain(plain) => Self::Plain(plain),

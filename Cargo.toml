@@ -32,6 +32,7 @@ actix = "0.10"
 actix-http = "2.0"
 actix-web = "3.0"
 actix-web-actors = "3.0"
+argon2 = { version = "0.8", package = "rust-argon2" }
 async-trait = "0.1"
 bytes = "0.5"
 chrono = "0.4"
@@ -47,7 +48,6 @@ medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
 rand = "0.8"
-rust-argon2 = "0.8"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -58,6 +58,7 @@ slog-json = "2.3"
 slog-scope = "4.3"
 slog-stdlog = "4.0"
 smart-default = "0.6"
+subtle = { version = "2.2", default-features = false }
 tokio = { version = "0.2", features = ["signal", "time"] }
 toml = "0.5"
 tonic = "0.3"

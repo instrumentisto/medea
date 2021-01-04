@@ -207,7 +207,7 @@ impl RoomService {
             Credential::Plain(plain) => {
                 format!(
                     "{}/{}/{}?token={}",
-                    self.public_url, room_id, member_id, plain
+                    self.public_url, room_id, member_id, plain,
                 )
             }
         }

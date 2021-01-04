@@ -177,9 +177,11 @@ pub struct Member {
     ///
     /// Plain and hashed credentials are supported. If no credentials provided,
     /// then random plain string will be generated. If no authentication is
-    /// required then empty plain string can be used. Hashed variant only
-    /// supports Argon2 hash. Member sid won't contain token if hashed credentials
-    /// are used, so token query parameter should be appended manually.
+    /// required then empty plain string can be used.
+    ///
+    /// Hashed variant only supports Argon2 hash at the moment.
+    /// Member sid won't contain token if hashed credentials are used, so token
+    /// query parameter should be appended manually.
     #[prost(oneof="member::Credentials", tags="4, 5")]
     pub credentials: ::std::option::Option<member::Credentials>,
 }
@@ -203,9 +205,11 @@ pub mod member {
     ///
     /// Plain and hashed credentials are supported. If no credentials provided,
     /// then random plain string will be generated. If no authentication is
-    /// required then empty plain string can be used. Hashed variant only
-    /// supports Argon2 hash. Member sid won't contain token if hashed credentials
-    /// are used, so token query parameter should be appended manually.
+    /// required then empty plain string can be used.
+    ///
+    /// Hashed variant only supports Argon2 hash at the moment.
+    /// Member sid won't contain token if hashed credentials are used, so token
+    /// query parameter should be appended manually.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Credentials {
         /// Argon2 hash of credentials.
