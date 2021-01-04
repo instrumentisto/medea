@@ -61,6 +61,7 @@ async fn callback_test(name: &str, port: u16) -> CallbackTestItem {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
     (client, callback_server)

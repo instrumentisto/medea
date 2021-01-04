@@ -12,18 +12,19 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{Credential, MemberId, PeerId, RoomId};
+use medea_client_api_proto::{self as client_proto, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+        member::Credential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
         WebRtcPublishId,
     },
-    conf::Rpc as RpcConf,
+    conf,
     log::prelude::*,
 };
 
@@ -306,6 +307,16 @@ impl Member {
         self.0.borrow().credentials.clone()
     }
 
+    /// Verifies provided [`client_proto::Credential`].
+    #[inline]
+    #[must_use]
+    pub fn verify_credentials(
+        &self,
+        credentials: &client_proto::Credential,
+    ) -> bool {
+        self.0.borrow().credentials.verify(&credentials)
+    }
+
     /// Returns all srcs of this [`Member`].
     pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
@@ -516,7 +527,7 @@ impl WeakMember {
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
-    rpc_conf: RpcConf,
+    rpc_conf: conf::Rpc,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -585,7 +596,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credentials: self.credentials().to_string(),
+            credentials: Some(self.credentials().into()),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())
@@ -633,7 +644,8 @@ mod tests {
               pipeline:
                 caller:
                   kind: Member
-                  credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       publish:
@@ -642,7 +654,8 @@ mod tests {
                           p2p: Always
                 some-member:
                   kind: Member
-                  credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       publish:
@@ -651,7 +664,8 @@ mod tests {
                           p2p: Always
                 responder:
                   kind: Member
-                  credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       play:
@@ -673,7 +687,7 @@ mod tests {
         let room_element: RootElement =
             serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        parse_members(&room_spec, RpcConf::default()).unwrap()
+        parse_members(&room_spec, conf::Rpc::default()).unwrap()
     }
 
     #[test]

@@ -121,6 +121,7 @@ async fn track_disables_and_enables() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
     let (subscriber_tx, mut subscriber_rx) = mpsc::unbounded();
@@ -131,6 +132,7 @@ async fn track_disables_and_enables() {
         })),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;
@@ -200,6 +202,7 @@ async fn track_disables_and_enables_are_instant() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -211,6 +214,7 @@ async fn track_disables_and_enables_are_instant() {
         })),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;
@@ -311,6 +315,7 @@ async fn track_disables_and_enables_are_instant2() {
         None,
         TestMember::DEFAULT_DEADLINE,
         false,
+        true,
     )
     .await;
 
@@ -323,6 +328,7 @@ async fn track_disables_and_enables_are_instant2() {
         None,
         TestMember::DEFAULT_DEADLINE,
         false,
+        true,
     )
     .await;
 
@@ -469,6 +475,7 @@ async fn force_update_works() {
         })),
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -519,6 +526,7 @@ async fn force_update_works() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -562,6 +570,7 @@ async fn ordering_on_force_update_is_correct() {
         None,
         None,
         false,
+        true,
     )
     .await;
     let (bob_events_tx, mut bob_events_rx) = mpsc::unbounded();
@@ -573,6 +582,7 @@ async fn ordering_on_force_update_is_correct() {
         None,
         None,
         false,
+        true,
     )
     .await;
 
@@ -882,6 +892,7 @@ async fn individual_and_general_mute_states_works() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
     let _publisher = TestMember::connect(
@@ -994,6 +1005,7 @@ async fn individual_and_general_mute_states_works() {
         })),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;

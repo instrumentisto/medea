@@ -5,7 +5,8 @@ spec:
     # Here we're defining a member who initiates video call.
     caller:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       idle_timeout: 1m
@@ -28,7 +29,8 @@ spec:
               src: "local://pub-pub-video-call/responder/publish"
     responder:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       idle_timeout: 1m

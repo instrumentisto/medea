@@ -160,8 +160,10 @@ async fn could_not_open_transport() {
     let mut on_connection_loss = session.on_connection_loss().fuse();
 
     let connect_fut = Rc::clone(&session).connect(
-        ConnectionInfo::from_str("ws://localhost:55555/some/fake/endpoint")
-            .unwrap(),
+        ConnectionInfo::from_str(
+            "ws://localhost:55555/some/fake?token=endpoint",
+        )
+        .unwrap(),
     );
 
     // connect resolve with err

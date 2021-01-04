@@ -5,7 +5,8 @@ spec:
     # Here we're defining a member who initiates video call.
     caller:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           # Media element which is able to receive media data from client
@@ -27,7 +28,8 @@ spec:
               src: "local://three-members-conference/responder-2/publish"
     responder-1:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:
@@ -44,7 +46,8 @@ spec:
               src: "local://three-members-conference/responder-2/publish"
     responder-2:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:

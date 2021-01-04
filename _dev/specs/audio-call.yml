@@ -4,7 +4,8 @@ spec:
   pipeline:
     member-1:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       idle_timeout: 1m
@@ -24,7 +25,8 @@ spec:
               src: "local://audio-call/member-2/publish"
     member-2:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       idle_timeout: 1m

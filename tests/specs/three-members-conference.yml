@@ -4,7 +4,8 @@ spec:
   pipeline:
     member-1:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:
@@ -21,7 +22,8 @@ spec:
               src: "local://three-members-conference/member-3/publish"
     member-2:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:
@@ -38,7 +40,8 @@ spec:
               src: "local://three-members-conference/member-3/publish"
     member-3:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:
