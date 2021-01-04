@@ -2,8 +2,8 @@
 
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
-    ops::Deref,
+    collections::HashMap,
+    ops::Deref as _,
     rc::{Rc, Weak},
 };
 
@@ -13,13 +13,11 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    state as proto_state, Command, ConnectionQualityScore, Direction,
-    Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, MediaSourceKind, MemberId, NegotiationRole, PeerConnectionState,
-    PeerId, PeerMetrics, Track, TrackId, TrackUpdate,
+    state as proto_state, Command, ConnectionQualityScore, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
+    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
+    TrackId, TrackUpdate,
 };
-use medea_macro::{watch, watchers};
-use medea_reactive::{collections::ProgressableHashMap, ObservableHashMap};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -28,170 +26,24 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaStreamSettings,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
         RecvConstraints,
     },
     peer::{
-        media_exchange_state, mute_state, LocalStreamUpdateCriteria,
+        self, media_exchange_state, mute_state, LocalStreamUpdateCriteria,
         MediaConnectionsError, MediaState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, PeerState, ReceiverState,
-        RtcStats, SenderState, TrackDirection, TransceiverSide,
+        PeerEvent, PeerEventHandler, RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
     utils::{
-        AsProtoState, Callback1, Component, HandlerDetachedError, JasonError,
-        JsCaused, JsError, SynchronizableState,
+        AsProtoState, Callback1, HandlerDetachedError, JasonError, JsCaused,
+        JsError,
     },
     JsMediaSourceKind,
 };
-
-/// State of the [`PeersComponent`].
-pub struct PeersState(RefCell<ObservableHashMap<PeerId, Rc<PeerState>>>);
-
-impl Default for PeersState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PeersState {
-    /// Returns new empty [`PeerRepositoryState`].
-    #[inline]
-    pub fn new() -> Self {
-        Self(RefCell::new(ObservableHashMap::new()))
-    }
-
-    /// Updates this [`PeerRepositoryState`] with a provided
-    /// [`proto_state::Room`].
-    pub fn apply(&self, state: proto_state::Room) {
-        for (id, peer_state) in state.peers {
-            let peer = self.0.borrow().get(&id).cloned();
-            if let Some(peer) = peer {
-                peer.apply(peer_state);
-            } else {
-                self.0
-                    .borrow_mut()
-                    .insert(id, Rc::new(PeerState::from_proto(peer_state)));
-            }
-        }
-    }
-}
-
-impl AsProtoState for PeersState {
-    type Output = proto_state::Room;
-
-    fn as_proto(&self) -> Self::Output {
-        Self::Output {
-            peers: self
-                .0
-                .borrow()
-                .iter()
-                .map(|(id, p)| (*id, p.as_proto()))
-                .collect(),
-        }
-    }
-}
-
-/// Context of the [`PeersComponent`].
-struct Peers {
-    /// [`PeerComponent`] repository.
-    ///
-    /// [`PeerComponent`]: crate::peer::PeerComponent
-    repo: Box<dyn PeerRepository>,
-
-    /// Channel for send events produced [`PeerConnection`] to [`Room`].
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection;
-    peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-
-    /// Constraints to local [`local::Track`]s that are being published by
-    /// [`PeerConnection`]s in this [`Room`].
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection;
-    send_constraints: LocalTracksConstraints,
-
-    /// Collection of [`Connection`]s with a remote `Member`s.
-    ///
-    /// [`Connection`]: crate::api::Connection
-    connections: Rc<Connections>,
-}
-
-/// Component responsible for the new [`PeerComponent`] creating and removing.
-type PeersComponent = Component<PeersState, Peers>;
-
-impl PeersComponent {
-    /// Calls [`PeerState::connection_lost`] on all [`PeerState`] of this
-    /// [`PeersComponent`].
-    ///
-    /// Stops all timeouts in [`PeerRepository`]
-    pub fn connection_lost(&self) {
-        for peer in self.state().0.borrow().values() {
-            peer.connection_lost();
-        }
-        self.repo.stop_timeouts();
-    }
-
-    /// Calls [`PeerState::reconnected`] on all [`PeerState`] of this
-    /// [`PeersComponent`].
-    ///
-    /// Resumes all timeouts in [`PeerRepository`]
-    pub fn connection_recovered(&self) {
-        for peer in self.state().0.borrow().values() {
-            peer.reconnected();
-        }
-        self.repo.resume_timeouts();
-    }
-}
-
-#[watchers]
-impl PeersComponent {
-    /// Watches for new [`PeerState`] insertions.
-    ///
-    /// Creates new [`PeerComponent`] based on the inserted [`PeerState`].
-    ///
-    /// [`PeerState`]: crate::peer::PeerState
-    /// [`PeerComponent`]: crate::peer::PeerComponent
-    #[watch(self.state().0.borrow().on_insert())]
-    #[inline]
-    async fn insert_peer_watcher(
-        peers: Rc<Peers>,
-        _: Rc<PeersState>,
-        (peer_id, new_peer): (PeerId, Rc<PeerState>),
-    ) -> Result<(), Traced<RoomError>> {
-        peers
-            .repo
-            .create_peer(
-                peer_id,
-                new_peer,
-                peers.peer_event_sender.clone(),
-                peers.send_constraints.clone(),
-                peers.connections.clone(),
-            )
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(())
-    }
-
-    /// Watches for [`PeerState`] remove.
-    ///
-    /// Removes [`PeerComponent`] and closes [`Connection`] by
-    /// [`Connections::close_connection`] call.
-    #[watch(self.state().0.borrow().on_remove())]
-    #[inline]
-    async fn remove_peer_watcher(
-        peers: Rc<Peers>,
-        _: Rc<PeersState>,
-        (peer_id, _): (PeerId, Rc<PeerState>),
-    ) -> Result<(), Traced<RoomError>> {
-        peers.repo.remove(peer_id);
-        peers.connections.close_connection(peer_id);
-
-        Ok(())
-    }
-}
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -428,7 +280,7 @@ impl RoomHandle {
             TrackDirection::Send,
         ) = (new_state, direction)
         {
-            for peer in inner.peers.repo.get_all() {
+            for peer in inner.peers.get_all() {
                 peer.update_local_stream(
                     LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
                 )
@@ -749,7 +601,7 @@ impl Room {
     #[allow(clippy::mut_mut)]
     pub fn new(
         rpc: Rc<dyn RpcSession>,
-        peers: Box<dyn PeerRepository>,
+        media_manager: Rc<MediaManager>,
     ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
@@ -773,7 +625,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = InnerRoom::new(rpc, peers, tx);
+        let room = InnerRoom::new(rpc, media_manager, tx);
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -872,7 +724,7 @@ impl Room {
         &self,
         peer_id: PeerId,
     ) -> Option<Rc<PeerConnection>> {
-        self.0.peers.repo.get(peer_id)
+        self.0.peers.get(peer_id)
     }
 
     /// Resets [`NegotiationRole`] of the [`PeerConnection`] with a provided
@@ -884,9 +736,7 @@ impl Room {
         self.0
             .peers
             .state()
-            .0
-            .borrow()
-            .get(&peer_id)
+            .get(peer_id)
             .ok_or(RoomError::NoSuchPeer(peer_id))?
             .reset_negotiation_role();
 
@@ -894,7 +744,7 @@ impl Room {
     }
 
     /// Returns reference to the [`PeerRepositoryState`] of this [`Room`].
-    pub fn peers_state(&self) -> &PeersState {
+    pub fn peers_state(&self) -> &peer::repo::PeersState {
         self.0.peers.state()
     }
 }
@@ -918,8 +768,8 @@ struct InnerRoom {
     /// [`PeerConnection`]: crate::peer::PeerConnection
     recv_constraints: Rc<RecvConstraints>,
 
-    /// Component which manages [`PeerComponent`]s.
-    peers: PeersComponent,
+    /// Component which manages [`peer::Component`]s.
+    peers: peer::repo::Component,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
@@ -1133,23 +983,18 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcSession>,
-        peers: Box<dyn PeerRepository>,
+        media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Rc<Self> {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
-        let peers = spawn_component!(
-            PeersComponent,
-            Rc::new(PeersState::new()),
-            Rc::new(Peers {
-                repo: peers,
-                peer_event_sender,
-                send_constraints: send_constraints.clone(),
-                connections: Rc::clone(&connections),
-            }),
-        );
         Rc::new(Self {
-            peers,
+            peers: peer::repo::Component::new(
+                media_manager,
+                peer_event_sender,
+                send_constraints.clone(),
+                Rc::clone(&connections),
+            ),
             rpc,
             send_constraints,
             recv_constraints: Rc::new(RecvConstraints::default()),
@@ -1216,7 +1061,6 @@ impl InnerRoom {
     ) -> Result<(), Traced<RoomError>> {
         let disable_tracks: HashMap<_, _> = self
             .peers
-            .repo
             .get_all()
             .into_iter()
             .map(|peer| {
@@ -1247,10 +1091,7 @@ impl InnerRoom {
             desired_states
                 .into_iter()
                 .filter_map(|(peer_id, desired_states)| {
-                    self.peers
-                        .repo
-                        .get(peer_id)
-                        .map(|peer| (peer, desired_states))
+                    self.peers.get(peer_id).map(|peer| (peer, desired_states))
                 })
                 .map(|(peer, desired_states)| {
                     let peer_id = peer.id();
@@ -1271,7 +1112,7 @@ impl InnerRoom {
                                 None
                             }
                         })
-                        .map(|(trnscvr, desired_state, need_patch)| {
+                        .try_for_each(|(trnscvr, desired_state, need_patch)| {
                             trnscvr.media_state_transition_to(desired_state)?;
                             transitions_futs.push(
                                 trnscvr.when_media_state_stable(desired_state),
@@ -1286,7 +1127,6 @@ impl InnerRoom {
 
                             Ok(())
                         })
-                        .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {
                         self.rpc.send_command(Command::UpdateTracks {
@@ -1319,7 +1159,6 @@ impl InnerRoom {
         state: MediaState,
     ) -> bool {
         self.peers
-            .repo
             .get_all()
             .into_iter()
             .find(|p| {
@@ -1347,12 +1186,12 @@ impl InnerRoom {
 
         self.send_constraints
             .set_media_exchange_state_by_kinds(Disabled, kinds);
-        let senders_to_disable = peer.get_senders_without_tracks(kinds);
+        let senders_to_disable = peer.get_senders_ids_without_tracks(kinds);
 
         states_update.entry(peer.id()).or_default().extend(
             senders_to_disable
                 .into_iter()
-                .map(|s| (s.track_id(), MediaState::from(Disabled))),
+                .map(|id| (id, MediaState::from(Disabled))),
         );
         self.update_media_states(states_update)
             .await
@@ -1404,7 +1243,7 @@ impl InnerRoom {
         let criteria_kinds_diff = self
             .send_constraints
             .calculate_kinds_diff(&current_settings);
-        let peers = self.peers.repo.get_all();
+        let peers = self.peers.get_all();
 
         if stop_first {
             for peer in &peers {
@@ -1480,7 +1319,7 @@ impl InnerRoom {
     /// Stops state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_lost(&self) {
-        self.peers.connection_lost();
+        self.peers.stop_timeouts();
         self.on_connection_loss
             .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
@@ -1491,7 +1330,7 @@ impl InnerRoom {
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
-        self.peers.connection_recovered();
+        self.peers.resume_timeouts();
         self.rpc.send_command(Command::SynchronizeMe {
             state: self.peers.state().as_proto(),
         });
@@ -1502,26 +1341,6 @@ impl InnerRoom {
 #[async_trait(?Send)]
 impl EventHandler for InnerRoom {
     type Output = Result<(), Traced<RoomError>>;
-
-    /// Calls [`PeerState::sdp_offer_applied`] for the [`PeerState`] with a
-    /// provided [`PeerId`].
-    async fn on_local_description_applied(
-        &self,
-        peer_id: PeerId,
-        sdp_offer: String,
-    ) -> Self::Output {
-        let peer = self
-            .peers
-            .state()
-            .0
-            .borrow()
-            .get(&peer_id)
-            .cloned()
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.sdp_offer_applied(&sdp_offer);
-
-        Ok(())
-    }
 
     /// Creates [`PeerConnection`] with a provided ID and all the
     /// [`Connection`]s basing on provided [`Track`]s.
@@ -1538,57 +1357,27 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let mut senders = ProgressableHashMap::new();
-        let mut receivers = ProgressableHashMap::new();
-        for track in &tracks {
-            match &track.direction {
-                Direction::Send { receivers, mid } => {
-                    senders.insert(
-                        track.id,
-                        Rc::new(
-                            SenderState::new(
-                                track.id,
-                                mid.clone(),
-                                track.media_type.clone(),
-                                receivers.clone(),
-                                &self.send_constraints,
-                            )
-                            .map_err(|e| {
-                                self.on_failed_local_media
-                                    .call(JasonError::from(e.clone()));
-                                tracerr::map_from_and_new!(e)
-                            })?,
-                        ),
-                    );
-                }
-                Direction::Recv { sender, mid } => {
-                    receivers.insert(
-                        track.id,
-                        Rc::new(ReceiverState::new(
-                            track.id,
-                            mid.clone(),
-                            track.media_type.clone(),
-                            sender.clone(),
-                            &self.recv_constraints,
-                        )),
-                    );
-                }
-            }
-        }
-        let peer_state = PeerState::new(
+        let peer_state = peer::State::new(
             peer_id,
-            senders,
-            receivers,
             ice_servers,
             is_force_relayed,
             Some(negotiation_role),
-            HashSet::new(),
         );
-        self.peers
-            .state()
-            .0
-            .borrow_mut()
-            .insert(peer_id, Rc::new(peer_state));
+        for track in &tracks {
+            peer_state
+                .insert_track(
+                    track,
+                    &self.send_constraints,
+                    &self.recv_constraints,
+                )
+                .map_err(|e| {
+                    self.on_failed_local_media
+                        .call(JasonError::from(e.clone()));
+                    tracerr::map_from_and_new!(e)
+                })?;
+        }
+
+        self.peers.state().insert(peer_id, peer_state);
 
         Ok(())
     }
@@ -1602,12 +1391,26 @@ impl EventHandler for InnerRoom {
         let peer = self
             .peers
             .state()
-            .0
-            .borrow()
-            .get(&peer_id)
-            .cloned()
+            .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.set_remote_sdp_offer(sdp_answer);
+
+        Ok(())
+    }
+
+    /// Calls [`peer::State::sdp_offer_applied`] for the [`peer::State`] with a
+    /// provided [`PeerId`].
+    async fn on_local_description_applied(
+        &self,
+        peer_id: PeerId,
+        sdp_offer: String,
+    ) -> Self::Output {
+        let peer_state = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        peer_state.sdp_offer_applied(&sdp_offer);
 
         Ok(())
     }
@@ -1621,10 +1424,7 @@ impl EventHandler for InnerRoom {
         let peer = self
             .peers
             .state()
-            .0
-            .borrow()
-            .get(&peer_id)
-            .cloned()
+            .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
         peer.add_ice_candidate(candidate);
 
@@ -1634,7 +1434,7 @@ impl EventHandler for InnerRoom {
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         peer_ids.iter().for_each(|id| {
-            self.peers.state().0.borrow_mut().remove(id);
+            self.peers.state().remove(*id);
         });
         Ok(())
     }
@@ -1653,55 +1453,27 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer_state =
-            self.peers
-                .state()
-                .0
-                .borrow()
-                .get(&peer_id)
-                .cloned()
-                .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        let peer_state = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => match track.direction {
-                    Direction::Send { receivers, mid } => {
-                        let sender_state = SenderState::new(
-                            track.id,
-                            mid,
-                            track.media_type,
-                            receivers,
-                            &self.send_constraints,
-                        )
-                        .map_err(|e| {
-                            self.on_failed_local_media
-                                .call(JasonError::from(e.clone()));
-                            tracerr::map_from_and_new!(e)
-                        })?;
-                        peer_state
-                            .insert_sender(track.id, Rc::new(sender_state));
-                    }
-                    Direction::Recv { sender, mid } => {
-                        let receiver_state = ReceiverState::new(
-                            track.id,
-                            mid,
-                            track.media_type,
-                            sender,
-                            &self.recv_constraints,
-                        );
-                        peer_state
-                            .insert_receiver(track.id, Rc::new(receiver_state));
-                    }
-                },
+                TrackUpdate::Added(track) => peer_state
+                    .insert_track(
+                        &track,
+                        &self.send_constraints,
+                        &self.recv_constraints,
+                    )
+                    .map_err(|e| {
+                        self.on_failed_local_media
+                            .call(JasonError::from(e.clone()));
+                        tracerr::map_from_and_new!(e)
+                    })?,
                 TrackUpdate::Updated(track_patch) => {
-                    if let Some(sender) = peer_state.get_sender(track_patch.id)
-                    {
-                        sender.update(&track_patch);
-                    } else if let Some(receiver) =
-                        peer_state.get_receiver(track_patch.id)
-                    {
-                        receiver.update(&track_patch);
-                    }
+                    peer_state.patch_track(&track_patch)
                 }
                 TrackUpdate::IceRestart => {
                     peer_state.restart_ice();
@@ -1836,7 +1608,7 @@ impl PeerEventHandler for InnerRoom {
         });
 
         if let PeerConnectionState::Connected = peer_connection_state {
-            if let Some(peer) = self.peers.repo.get(peer_id) {
+            if let Some(peer) = self.peers.get(peer_id) {
                 peer.scrape_and_send_peer_stats().await;
             }
         };

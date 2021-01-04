@@ -52,7 +52,7 @@ pub trait Updatable {
 #[macro_export]
 macro_rules! spawn_component {
     ($component:ty, $state:expr, $ctx:expr $(,)*) => {{
-        let component = <$component>::new($state, $ctx);
+        let component = <$component>::inner_new($state, $ctx);
         component.spawn();
         component
     }};
@@ -75,7 +75,7 @@ pub struct Component<S, C> {
 impl<S, C> Component<S, C> {
     /// Returns new [`Component`] with a provided data.
     #[inline]
-    pub fn new(state: Rc<S>, ctx: Rc<C>) -> Self {
+    pub fn inner_new(state: Rc<S>, ctx: Rc<C>) -> Self {
         Self {
             state,
             ctx,

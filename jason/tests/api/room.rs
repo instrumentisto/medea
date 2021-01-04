@@ -10,7 +10,8 @@ use futures::{
         mpsc::{self, UnboundedReceiver},
         oneshot,
     },
-    stream::{self, BoxStream, StreamExt as _},
+    future,
+    stream::{self, BoxStream, LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
     state, AudioSettings, Command, Direction, Event, IceConnectionState,
@@ -19,10 +20,8 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     api::Room,
-    media::{
-        AudioTrackConstraints, MediaKind, MediaManager, MediaStreamSettings,
-    },
-    peer::{MockPeerRepository, PeerConnection, Repository},
+    media::{AudioTrackConstraints, MediaKind, MediaStreamSettings},
+    peer::PeerConnection,
     rpc::MockRpcSession,
     utils::{AsProtoState, JasonError},
     DeviceVideoTrackConstraints,
@@ -34,8 +33,7 @@ use crate::{
     delay_for, get_constraints_update_exception, get_jason_error,
     get_test_recv_tracks, get_test_required_tracks, get_test_tracks,
     get_test_unrequired_tracks, media_stream_settings, timeout,
-    utils::PeerConnectionCompat, wait_and_check_test_result, yield_now,
-    MockNavigator, TEST_ROOM_URL,
+    wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -69,10 +67,7 @@ fn get_test_room(
         let _ = tx.unbounded_send(command);
     });
 
-    (
-        Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default()))),
-        rx,
-    )
+    (Room::new(Rc::new(rpc), Rc::default()), rx)
 }
 
 async fn get_test_room_and_exist_peer(
@@ -110,8 +105,7 @@ async fn get_test_room_and_exist_peer(
         _ => (),
     });
 
-    let room =
-        Room::new(Rc::new(rpc), Box::new(Repository::new(Rc::default())));
+    let room = Room::new(Rc::new(rpc), Rc::default());
     if let Some(media_stream_settings) = &media_stream_settings {
         JsFuture::from(room.new_handle().set_local_media_settings(
             &media_stream_settings,
@@ -925,7 +919,7 @@ mod rpc_close_reason_on_room_drop {
         rpc.expect_close_with_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
         });
-        let room = Room::new(Rc::new(rpc), Box::new(MockPeerRepository::new()));
+        let room = Room::new(Rc::new(rpc), Rc::default());
         (room, test_rx)
     }
 
@@ -988,14 +982,11 @@ mod rpc_close_reason_on_room_drop {
 
 /// Tests for [`TrackPatch`] generation in [`Room`].
 mod patches_generation {
-
-    use futures::StreamExt;
     use medea_client_api_proto::{
         AudioSettings, Direction, MediaSourceKind, MediaType, Track, TrackId,
         TrackPatchCommand, VideoSettings,
     };
     use medea_jason::{
-        media::RecvConstraints,
         peer::{media_exchange_state, mute_state, MediaState},
         JsMediaSourceKind,
     };
@@ -1027,7 +1018,7 @@ mod patches_generation {
         ]
     }
 
-    /// Returns [`Room`] with mocked [`PeerRepository`] with provided count of
+    /// Returns [`Room`] with provided count of
     /// [`PeerConnection`]s and [`mpsc::UnboundedReceiver`] of [`Command`]s
     /// sent from this [`Room`].
     ///
@@ -1037,12 +1028,26 @@ mod patches_generation {
         peers_count: u32,
         audio_track_media_state_fn: impl Fn(u32) -> MediaState,
         tracks_content: Vec<(MediaType, Direction)>,
-    ) -> (Room, mpsc::UnboundedReceiver<Command>) {
-        let mut repo = Box::new(MockPeerRepository::new());
+    ) -> (Room, LocalBoxStream<'static, Command>) {
+        let (command_tx, command_rx) = mpsc::unbounded();
+        let (event_tx, event_rx) = mpsc::unbounded();
 
-        let mut peers = HashMap::new();
+        let mut rpc = MockRpcSession::new();
+        rpc.expect_send_command().returning(move |command| {
+            let _ = command_tx.unbounded_send(command);
+        });
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc.expect_close_with_reason().return_once(|_| ());
+        rpc.expect_on_connection_loss()
+            .return_once(|| stream::pending().boxed_local());
+        rpc.expect_on_reconnected()
+            .return_once(|| stream::pending().boxed_local());
+
+        let room = Room::new(Rc::new(rpc), Rc::default());
+
         for i in 0..peers_count {
-            let (tx, _rx) = mpsc::unbounded();
+            let mut audio_track_id = None;
             let tracks = tracks_content
                 .iter()
                 .enumerate()
@@ -1051,52 +1056,59 @@ mod patches_generation {
                     direction: direction.clone(),
                     media_type: media_type.clone(),
                 })
+                .inspect(|track| {
+                    if matches!(track.media_type, MediaType::Audio(_)) {
+                        audio_track_id = Some(track.id);
+                    }
+                })
                 .collect();
-            let peer_id = PeerId(i + 1);
+            event_tx
+                .unbounded_send(Event::PeerCreated {
+                    peer_id: PeerId(i + 1),
+                    negotiation_role: NegotiationRole::Offerer,
+                    tracks,
+                    ice_servers: Vec::new(),
+                    force_relay: false,
+                })
+                .unwrap();
 
-            let mut local_stream = MediaStreamSettings::default();
-            local_stream.set_track_media_state(
-                (audio_track_media_state_fn)(i),
-                MediaKind::Audio,
-                None,
-            );
-            let peer = PeerConnectionCompat::new(
-                peer_id,
-                tx,
-                Vec::new(),
-                Rc::new(MediaManager::default()),
-                false,
-                local_stream.into(),
-                RecvConstraints::default(),
-            )
-            .unwrap();
-
-            peer.get_offer(tracks).await.unwrap();
-
-            peers.insert(peer_id, peer);
+            if let Some(audio_track_id) = audio_track_id {
+                let state = (audio_track_media_state_fn)(i);
+                event_tx
+                    .unbounded_send(Event::TracksApplied {
+                        peer_id: PeerId(i + 1),
+                        updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                            id: audio_track_id,
+                            enabled_individual: Some(matches!(
+                                state,
+                                MediaState::MediaExchange(
+                                    media_exchange_state::Stable::Enabled
+                                )
+                            )),
+                            enabled_general: None,
+                            muted: Some(matches!(
+                                state,
+                                MediaState::Mute(mute_state::Stable::Muted)
+                            )),
+                        })],
+                        negotiation_role: None,
+                    })
+                    .unwrap();
+            };
         }
 
-        let repo_get_all: Vec<_> =
-            peers.iter().map(|(_, peer)| peer.ctx()).collect();
-        repo.expect_get_all()
-            .returning_st(move || repo_get_all.clone());
-        repo.expect_get()
-            .returning_st(move |id| peers.get(&id).map(|p| p.ctx()));
+        delay_for(100).await;
 
-        let mut rpc = MockRpcSession::new();
-        let (command_tx, command_rx) = mpsc::unbounded();
-        rpc.expect_send_command().returning(move |command| {
-            command_tx.unbounded_send(command).unwrap();
-        });
-        rpc.expect_subscribe()
-            .return_once(move || Box::pin(futures::stream::pending()));
-        rpc.expect_close_with_reason().return_once(|_| ());
-        rpc.expect_on_connection_loss()
-            .returning(|| stream::pending().boxed_local());
-        rpc.expect_on_reconnected()
-            .returning(|| stream::pending().boxed_local());
+        let filtered_rx = command_rx
+            .filter(|command| match command {
+                Command::SetIceCandidate { .. }
+                | Command::AddPeerConnectionMetrics { .. }
+                | Command::MakeSdpOffer { .. } => future::ready(false),
+                _ => future::ready(true),
+            })
+            .boxed_local();
 
-        (Room::new(Rc::new(rpc), repo), command_rx)
+        (room, filtered_rx)
     }
 
     /// Tests that [`Room`] normally generates [`TrackPatch`]s when have one
@@ -1849,7 +1861,7 @@ mod set_local_media_settings {
         let room_handle = room.new_handle();
 
         let (cb, test_result) = js_callback!(|err: JasonError| {
-            cb_assert_eq!(&err.name(), "CannotDisableRequiredSender");
+            cb_assert_eq!(&err.name(), "MediaConnections");
             cb_assert_eq!(
                 err.message(),
                 "MediaExchangeState of Sender can't be transited into \
@@ -2239,10 +2251,10 @@ async fn create_peer_by_state() {
     rpc_session.expect_send_command().returning(move |cmd| {
         let _ = command_tx.unbounded_send(cmd);
     });
-    let peer_repo = Box::new(medea_jason::peer::Repository::new(Rc::new(
-        medea_jason::media::MediaManager::default(),
-    )));
-    let room = Room::new(Rc::new(rpc_session), peer_repo);
+    let room = Room::new(
+        Rc::new(rpc_session),
+        Rc::new(medea_jason::media::MediaManager::default()),
+    );
 
     let mut senders = HashMap::new();
     senders.insert(

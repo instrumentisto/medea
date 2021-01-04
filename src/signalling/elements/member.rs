@@ -144,13 +144,12 @@ impl Member {
         room_spec: &RoomSpec,
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
-        let element = room_spec.pipeline.get(member_id).map_or(
-            Err(MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
+        let element = room_spec.pipeline.get(member_id).ok_or_else(|| {
+            MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
                 self.room_id(),
                 member_id.clone(),
-            ))),
-            Ok,
-        )?;
+            ))
+        })?;
 
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(

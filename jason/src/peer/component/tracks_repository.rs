@@ -6,11 +6,11 @@ use medea_client_api_proto::TrackId;
 use medea_reactive::{Guarded, ProgressableHashMap, RecheckableFutureExt};
 
 use crate::{
-    peer::SenderState,
+    peer::media::sender,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
 
-/// Repository for the all [`SenderState`]s/[`ReceiverState`]s of the
+/// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
 /// [`PeerComponent`].
 #[derive(Debug, From)]
 pub struct TracksRepository<S: 'static>(
@@ -19,8 +19,8 @@ pub struct TracksRepository<S: 'static>(
 
 impl<S> TracksRepository<S> {
     /// Returns new [`TracksRepository`] with a provided tracks.
-    pub fn new(tracks: ProgressableHashMap<TrackId, Rc<S>>) -> Self {
-        Self(RefCell::new(tracks))
+    pub fn new() -> Self {
+        Self(RefCell::new(ProgressableHashMap::new()))
     }
 
     /// Returns [`Future`] which will be resolved when all inserts/removes will
@@ -48,10 +48,19 @@ impl<S> TracksRepository<S> {
     }
 }
 
-impl TracksRepository<SenderState> {
-    /// Returns all [`SenderState`]s which are requires local `MediaStream`
+#[cfg(feature = "mockable")]
+impl<S> TracksRepository<S> {
+    pub fn when_insert_processed(
+        &self,
+    ) -> impl RecheckableFutureExt<Output = ()> {
+        self.0.borrow().when_insert_processed()
+    }
+}
+
+impl TracksRepository<sender::State> {
+    /// Returns all [`sender::State`]s which are requires local `MediaStream`
     /// update.
-    pub fn get_outdated(&self) -> Vec<Rc<SenderState>> {
+    pub fn get_outdated(&self) -> Vec<Rc<sender::State>> {
         self.0
             .borrow()
             .values()

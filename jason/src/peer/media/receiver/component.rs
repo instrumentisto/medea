@@ -1,4 +1,4 @@
-//! Implementation of the [`ReceiverComponent`].
+//! Implementation of [`Component`] for `MediaTrack` with a `Recv` direction.
 
 use std::rc::Rc;
 
@@ -7,22 +7,40 @@ use medea_client_api_proto::{
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
-use tracerr::Traced;
 
 use crate::{
     media::RecvConstraints,
-    peer::{MediaConnectionsError, Receiver},
-    utils::{AsProtoState, Component, SynchronizableState, Updatable},
+    peer::{media::Result, MediaConnections},
+    utils::{component, AsProtoState, SynchronizableState, Updatable},
 };
+
+use super::Receiver;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
-pub type ReceiverComponent = Component<ReceiverState, Receiver>;
+pub type Component = component::Component<State, Receiver>;
 
-/// State of the [`ReceiverComponent`].
+impl Component {
+    /// Returns new [`Component`] with a provided [`State`].
+    #[inline]
+    pub fn new(state: Rc<State>, media_connections: &MediaConnections) -> Self {
+        let recv = Receiver::new(
+            media_connections,
+            state.id,
+            state.media_type().clone().into(),
+            state.sender_id().clone(),
+            state.mid().clone(),
+            state.enabled_general(),
+            state.enabled_individual(),
+        );
+
+        spawn_component!(Component, state, Rc::new(recv))
+    }
+}
+
+/// State of the [`Component`].
 #[derive(Debug)]
-pub struct ReceiverState {
-    /// ID of this [`ReceiverComponent`].
+pub struct State {
     id: TrackId,
 
     /// Mid of this [`ReceiverComponent`].
@@ -46,7 +64,7 @@ pub struct ReceiverState {
     muted: ProgressableCell<bool>,
 }
 
-impl AsProtoState for ReceiverState {
+impl AsProtoState for State {
     type Output = proto_state::Receiver;
 
     fn as_proto(&self) -> Self::Output {
@@ -62,7 +80,7 @@ impl AsProtoState for ReceiverState {
     }
 }
 
-impl SynchronizableState for ReceiverState {
+impl SynchronizableState for State {
     type Input = proto_state::Receiver;
 
     fn from_proto(input: Self::Input) -> Self {
@@ -84,7 +102,7 @@ impl SynchronizableState for ReceiverState {
     }
 }
 
-impl Updatable for ReceiverState {
+impl Updatable for State {
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         Box::new(medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),
@@ -94,8 +112,8 @@ impl Updatable for ReceiverState {
     }
 }
 
-impl From<&ReceiverState> for proto_state::Receiver {
-    fn from(from: &ReceiverState) -> Self {
+impl From<&State> for proto_state::Receiver {
+    fn from(from: &State) -> Self {
         Self {
             id: from.id,
             mid: from.mid.clone(),
@@ -108,7 +126,7 @@ impl From<&ReceiverState> for proto_state::Receiver {
     }
 }
 
-impl From<proto_state::Receiver> for ReceiverState {
+impl From<proto_state::Receiver> for State {
     fn from(from: proto_state::Receiver) -> Self {
         Self {
             id: from.id,
@@ -122,8 +140,8 @@ impl From<proto_state::Receiver> for ReceiverState {
     }
 }
 
-impl ReceiverState {
-    /// Returns [`ReceiverState`] with a provided data.
+impl State {
+    /// Returns [`State`] with a provided data.
     pub fn new(
         id: TrackId,
         mid: Option<String>,
@@ -146,45 +164,45 @@ impl ReceiverState {
         }
     }
 
-    /// Returns [`TrackId`] of this [`ReceiverState`].
+    /// Returns [`TrackId`] of this [`State`].
     #[inline]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
-    /// Returns current `mid` of this [`ReceiverState`].
+    /// Returns current `mid` of this [`State`].
     #[inline]
     pub fn mid(&self) -> &Option<String> {
         &self.mid
     }
 
-    /// Returns current [`MediaType`] of this [`ReceiverState`].
+    /// Returns current [`MediaType`] of this [`State`].
     #[inline]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
     /// Returns current [`MemberId`] of the `Member` from which this
-    /// [`ReceiverState`] should receive media data.
+    /// [`State`] should receive media data.
     #[inline]
     pub fn sender_id(&self) -> &MemberId {
         &self.sender_id
     }
 
     /// Returns current individual media exchange state of this
-    /// [`ReceiverState`].
+    /// [`State`].
     #[inline]
     pub fn enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
-    /// Returns current general media exchange state of this [`ReceiverState`].
+    /// Returns current general media exchange state of this [`State`].
     #[inline]
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
 
-    /// Updates this [`ReceiverState`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.id != track_patch.id {
             return;
@@ -200,7 +218,7 @@ impl ReceiverState {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`ReceiverState`] update
+    /// Returns [`Future`] which will be resolved when [`State`] update
     /// will be applied on [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
@@ -214,23 +232,23 @@ impl ReceiverState {
 }
 
 #[watchers]
-impl ReceiverComponent {
-    /// Watcher for the [`ReceiverState::muted`] update.
+impl Component {
+    /// Watcher for the [`State::muted`] update.
     ///
     /// Calls [`Receiver::set_muted`] with a new value.
     #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
         receiver: Rc<Receiver>,
-        _: Rc<ReceiverState>,
+        _: Rc<State>,
         muted: Guarded<bool>,
-    ) -> Result<(), Traced<MediaConnectionsError>> {
+    ) -> Result<()> {
         receiver.set_muted(*muted);
 
         Ok(())
     }
 
-    /// Watcher for the [`ReceiverState::enabled_individual`] update.
+    /// Watcher for the [`State::enabled_individual`] update.
     ///
     /// Calls [`Receiver::set    #[inline]_enabled_individual_state`] with a new
     /// value.
@@ -238,24 +256,24 @@ impl ReceiverComponent {
     #[inline]
     async fn enabled_individual_watcher(
         receiver: Rc<Receiver>,
-        _: Rc<ReceiverState>,
+        _: Rc<State>,
         enabled_individual: Guarded<bool>,
-    ) -> Result<(), Traced<MediaConnectionsError>> {
+    ) -> Result<()> {
         receiver.set_enabled_individual_state(*enabled_individual);
 
         Ok(())
     }
 
-    /// Watcher for the [`ReceiverState::enabled_general`] update.
+    /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Calls [`Receiver::set_enabled_general_state`] with a new value.
     #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
         receiver: Rc<Receiver>,
-        _: Rc<ReceiverState>,
+        _: Rc<State>,
         enabled_general: Guarded<bool>,
-    ) -> Result<(), Traced<MediaConnectionsError>> {
+    ) -> Result<()> {
         receiver.set_enabled_general_state(*enabled_general);
 
         Ok(())

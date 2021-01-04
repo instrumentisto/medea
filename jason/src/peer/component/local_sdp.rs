@@ -69,7 +69,7 @@ impl Inner {
 /// If you update [`LocalSdp`] then it will wait for server approve
 /// ([`LocalSdp::approve`]). If Media Server approve wasn't received within
 /// timeout, then SDP offer will be rollbacked to the previous one.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct LocalSdp(Rc<RefCell<Inner>>);
 
 impl LocalSdp {
@@ -110,12 +110,13 @@ impl LocalSdp {
         let approved = new_offer
             .as_ref()
             .map(|new_offer| {
-                self.0.borrow().current_offer.mutate(|current_offer| {
-                    current_offer
-                        .as_ref()
-                        .map(|c| new_offer == c)
-                        .unwrap_or_default()
-                })
+                self.0
+                    .borrow()
+                    .current_offer
+                    .borrow()
+                    .as_ref()
+                    .map(|c| new_offer == c)
+                    .unwrap_or_default()
             })
             .unwrap_or_default();
         let not_approved =
@@ -146,20 +147,16 @@ impl LocalSdp {
                 }
             }
         });
-        let prev_offer = self
-            .0
-            .borrow_mut()
-            .current_offer
-            .mutate(|mut o| o.replace(new_offer));
+        let prev_offer = self.0.borrow().current_offer.replace(Some(new_offer));
         self.0.borrow_mut().prev_offer = prev_offer;
     }
 
     /// Approves current [`LocalSdp`] offer.
     pub fn approve(&self, sdp_offer: &str) {
         let mut inner = self.0.borrow_mut();
-        let is_approved = inner.current_offer.mutate(|current| {
-            current.as_ref().map(String::as_str) == Some(sdp_offer)
-        });
+        let is_approved =
+            inner.current_offer.borrow().as_ref().map(String::as_str)
+                == Some(sdp_offer);
         if is_approved {
             inner.approve()
         }
@@ -180,15 +177,20 @@ impl LocalSdp {
     /// SDP offer and they both is `Some`.
     pub fn is_rollback(&self) -> bool {
         let inner = self.0.borrow();
-        inner.current_offer.mutate(|c| {
-            c.as_ref().map_or(false, |current| {
-                inner
-                    .prev_offer
-                    .as_ref()
-                    .map(|prev| prev == current)
-                    .unwrap_or_default()
-            })
-        })
+        let is_rollback =
+            inner
+                .current_offer
+                .borrow()
+                .as_ref()
+                .map_or(false, |current| {
+                    inner
+                        .prev_offer
+                        .as_ref()
+                        .map(|prev| prev == current)
+                        .unwrap_or_default()
+                });
+
+        is_rollback
     }
 
     /// Returns `true` if new SDP offer needed after rollback is

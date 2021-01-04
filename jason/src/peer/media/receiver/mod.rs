@@ -1,5 +1,7 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
+mod component;
+
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -26,6 +28,8 @@ use super::{
     },
     TransceiverSide,
 };
+
+pub use self::component::{Component, State};
 
 /// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.

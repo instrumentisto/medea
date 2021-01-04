@@ -6,7 +6,7 @@ mod component;
 mod conn;
 mod ice_server;
 mod media;
-mod repo;
+pub mod repo;
 mod stats;
 mod stream_update_criteria;
 mod tracks_request;
@@ -40,22 +40,17 @@ use crate::{
     MediaStreamSettings,
 };
 
-#[cfg(feature = "mockable")]
-#[doc(inline)]
-pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
-    component::{PeerComponent, PeerState},
+    component::{Component, State},
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
-        media_exchange_state, mute_state, MediaConnections,
+        media_exchange_state, mute_state, receiver, sender, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
         MediaExchangeStateController, MediaState, MediaStateControllable,
-        MuteState, MuteStateController, Receiver, ReceiverComponent,
-        ReceiverState, Sender, SenderComponent, SenderState, TrackDirection,
-        TransceiverSide, TransitableState, TransitableStateController,
+        MuteState, MuteStateController, TrackDirection, TransceiverSide,
+        TransitableState, TransitableStateController,
     },
-    repo::{PeerRepository, Repository},
     stats::RtcStats,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
@@ -182,7 +177,7 @@ pub enum PeerEvent {
         error: JasonError,
     },
 
-    /// [`PeerComponent`] generated new SDP answer.
+    /// [`Component`] generated new SDP answer.
     NewSdpAnswer {
         /// ID of the [`PeerConnection`] for which SDP answer was generated.
         peer_id: PeerId,
@@ -194,7 +189,7 @@ pub enum PeerEvent {
         transceivers_statuses: HashMap<TrackId, bool>,
     },
 
-    /// [`PeerComponent`] generated new SDP offer.
+    /// [`Component`] generated new SDP offer.
     NewSdpOffer {
         /// ID of the [`PeerConnection`] for which SDP offer was generated.
         peer_id: PeerId,
@@ -229,9 +224,8 @@ pub struct PeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
-    /// [`Sender`]s and [`Receiver`]s of this [`RtcPeerConnection`].
-    ///
-    /// [`Receiver`]: self::media::Receiver
+    /// [`sender::Component`]s and [`receiver::Component`]s of this
+    /// [`RtcPeerConnection`].
     media_connections: Rc<MediaConnections>,
 
     /// [`MediaManager`] that will be used to acquire [`local::Track`]s.
@@ -358,17 +352,21 @@ impl PeerConnection {
 
     /// Returns all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    ///
+    /// [`Sender`]: sender::Sender
     #[inline]
     #[must_use]
-    pub fn get_senders_without_tracks(
+    pub fn get_senders_ids_without_tracks(
         &self,
         kinds: LocalStreamUpdateCriteria,
-    ) -> Vec<Rc<Sender>> {
-        self.media_connections.get_senders_without_tracks(kinds)
+    ) -> Vec<TrackId> {
+        self.media_connections.get_senders_ids_without_tracks(kinds)
     }
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
     /// [`LocalStreamUpdateCriteria`].
+    ///
+    /// [`Sender`]: sender::Sender
     #[inline]
     pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
         self.media_connections.drop_send_tracks(kinds).await
@@ -384,6 +382,8 @@ impl PeerConnection {
     /// connection to Medea is temporary lost.
     ///
     /// This currently affects only [`Sender`]s disable/enable transitions.
+    ///
+    /// [`Sender`]: sender::Sender
     pub fn stop_state_transitions_timers(&self) {
         self.media_connections.stop_state_transitions_timers()
     }
@@ -398,6 +398,8 @@ impl PeerConnection {
     /// connection to Medea is temporary lost.
     ///
     /// This currently affects only [`Sender`]s disable/enable transitions.
+    ///
+    /// [`Sender`]: sender::Sender
     pub fn reset_state_transitions_timers(&self) {
         self.media_connections.reset_state_transitions_timers();
     }
@@ -571,6 +573,8 @@ impl PeerConnection {
 
     /// Returns publishing statuses of the all [`Sender`]s from this
     /// [`MediaConnections`].
+    ///
+    /// [`Sender`]: sender::Sender
     pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         self.media_connections.get_transceivers_statuses()
     }
@@ -579,8 +583,8 @@ impl PeerConnection {
     /// [`Sender`]s are chosen based on provided [`LocalStreamUpdateCriteria`].
     ///
     /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
-    /// date (you set those with [`PeerState::senders`]) and
-    /// [`PeerState::senders`] are synchronized with a real object state. If
+    /// date (you set those with [`State::senders`]) and
+    /// [`State::senders`] are synchronized with a real object state. If
     /// there are no senders configured in this [`PeerConnection`], then this
     /// method is no-op.
     ///
@@ -623,6 +627,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [`Sender`]: sender::Sender
     pub async fn update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
@@ -750,22 +755,25 @@ impl PeerConnection {
         *self.has_remote_description.borrow_mut() = true;
         self.media_connections.sync_receivers();
 
-        let mut candidates = self.ice_candidates_buffer.borrow_mut();
-        let mut futures = Vec::with_capacity(candidates.len());
-        while let Some(candidate) = candidates.pop() {
-            let peer = Rc::clone(&self.peer);
-            futures.push(async move {
-                peer.add_ice_candidate(
-                    &candidate.candidate,
-                    candidate.sdp_m_line_index,
-                    &candidate.sdp_mid,
-                )
-                .await
-            });
-        }
-        future::try_join_all(futures)
+        let ice_candidates_buffer_flush_fut = future::try_join_all(
+            self.ice_candidates_buffer.borrow_mut().drain(..).map(
+                |candidate| {
+                    let peer = Rc::clone(&self.peer);
+                    async move {
+                        peer.add_ice_candidate(
+                            &candidate.candidate,
+                            candidate.sdp_m_line_index,
+                            &candidate.sdp_mid,
+                        )
+                        .await
+                    }
+                },
+            ),
+        );
+        ice_candidates_buffer_flush_fut
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
     }
 
@@ -870,7 +878,10 @@ impl PeerConnection {
     /// Lookups [`Sender`] by provided [`TrackId`].
     #[inline]
     #[must_use]
-    pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<Sender>> {
+    pub fn get_sender_by_id(
+        &self,
+        id: TrackId,
+    ) -> Option<Rc<media::sender::Sender>> {
         self.media_connections.get_sender_by_id(id)
     }
 
@@ -923,7 +934,10 @@ impl PeerConnection {
     /// Returns [`Rc`] to the [`Receiver`] with a provided [`TrackId`].
     #[inline]
     #[must_use]
-    pub fn get_receiver_by_id(&self, id: TrackId) -> Option<Rc<Receiver>> {
+    pub fn get_receiver_by_id(
+        &self,
+        id: TrackId,
+    ) -> Option<Rc<receiver::Receiver>> {
         self.media_connections.get_receiver_by_id(id)
     }
 }

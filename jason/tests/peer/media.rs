@@ -114,87 +114,6 @@ fn get_tracks_request2() {
     assert!(request.is_none());
 }
 
-// Tests MediaConnections::toggle_send_media function.
-// Setup:
-//     1. Create MediaConnections.
-//     2. Acquire tracks.
-// Assertions:
-//     1. Calling toggle_send_media(audio, false) disables audio track.
-//     2. Calling toggle_send_media(audio, true) enables audio track.
-//     3. Calling toggle_send_media(video, false) disables video track.
-//     4. Calling toggle_send_media(video, true) enables video track.
-#[wasm_bindgen_test]
-async fn disable_and_enable_all_tracks_in_media_manager() {
-    use media_exchange_state::Stable::{Disabled, Enabled};
-
-    let (media_connections, audio_track_id, video_track_id) =
-        get_test_media_connections(true, true).await;
-
-    let audio_track =
-        media_connections.get_sender_by_id(audio_track_id).unwrap();
-    let video_track =
-        media_connections.get_sender_by_id(video_track_id).unwrap();
-
-    assert!(!audio_track.general_disabled());
-    assert!(!video_track.general_disabled());
-
-    audio_track
-        .media_state_transition_to(Disabled.into())
-        .unwrap();
-    media_connections
-        .patch_tracks(vec![TrackPatchEvent {
-            id: audio_track_id,
-            enabled_general: Some(false),
-            enabled_individual: Some(false),
-            muted: None,
-        }])
-        .await;
-    assert!(audio_track.general_disabled());
-    assert!(!video_track.general_disabled());
-
-    video_track
-        .media_state_transition_to(Disabled.into())
-        .unwrap();
-    media_connections
-        .patch_tracks(vec![TrackPatchEvent {
-            id: video_track_id,
-            enabled_general: Some(false),
-            enabled_individual: Some(false),
-            muted: None,
-        }])
-        .await;
-    assert!(audio_track.general_disabled());
-    assert!(video_track.general_disabled());
-
-    audio_track
-        .media_state_transition_to(Enabled.into())
-        .unwrap();
-    media_connections
-        .patch_tracks(vec![TrackPatchEvent {
-            id: audio_track_id,
-            enabled_individual: Some(true),
-            enabled_general: Some(true),
-            muted: None,
-        }])
-        .await;
-    assert!(!audio_track.general_disabled());
-    assert!(video_track.general_disabled());
-
-    video_track
-        .media_state_transition_to(Enabled.into())
-        .unwrap();
-    media_connections
-        .patch_tracks(vec![TrackPatchEvent {
-            id: video_track_id,
-            enabled_individual: Some(true),
-            enabled_general: Some(true),
-            muted: None,
-        }])
-        .await;
-    assert!(!audio_track.general_disabled());
-    assert!(!video_track.general_disabled());
-}
-
 #[wasm_bindgen_test]
 async fn new_media_connections_with_disabled_audio_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
@@ -229,13 +148,13 @@ async fn new_media_connections_with_disabled_video_tracks() {
 mod sender_patch {
     use medea_client_api_proto::{AudioSettings, MediaType};
     use medea_jason::{
-        peer::{MediaExchangeState, SenderComponent},
+        peer::{sender, MediaExchangeState},
         utils::{AsProtoState, SynchronizableState},
     };
 
     use super::*;
 
-    async fn get_sender() -> (SenderComponent, TrackId, MediaConnections) {
+    async fn get_sender() -> (sender::Component, TrackId, MediaConnections) {
         let (tx, rx) = mpsc::unbounded();
         mem::forget(rx);
         let media_connections = MediaConnections::new(
@@ -360,7 +279,7 @@ mod receiver_patch {
     use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
     use medea_jason::{
         media::RecvConstraints,
-        peer::{MediaExchangeState, PeerEvent, ReceiverComponent},
+        peer::{receiver, MediaExchangeState, PeerEvent},
         utils::{AsProtoState, SynchronizableState},
     };
 
@@ -370,8 +289,8 @@ mod receiver_patch {
     const MID: &str = "mid";
     const SENDER_ID: &str = "sender";
 
-    fn get_receiver() -> (ReceiverComponent, mpsc::UnboundedReceiver<PeerEvent>)
-    {
+    fn get_receiver(
+    ) -> (receiver::Component, mpsc::UnboundedReceiver<PeerEvent>) {
         let (tx, rx) = mpsc::unbounded();
         let media_connections = MediaConnections::new(
             Rc::new(RtcPeerConnection::new(Vec::new(), false).unwrap()),

@@ -1,4 +1,4 @@
-//! Implementation of the [`SenderComponent`].
+//! Implementation of [`Component`] for `MediaTrack` with a `Send` direction.
 
 use std::{cell::Cell, rc::Rc};
 
@@ -8,23 +8,57 @@ use medea_client_api_proto::{
 };
 use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
-use tracerr::Traced;
 
 use crate::{
     media::LocalTracksConstraints,
-    peer::{MediaConnectionsError, Sender},
-    utils::{AsProtoState, Component, SynchronizableState, Updatable},
+    peer::{
+        media::{media_exchange_state, mute_state, Result},
+        MediaConnections, MediaConnectionsError,
+    },
+    utils::{component, AsProtoState, SynchronizableState, Updatable},
     MediaKind,
 };
 
+use super::{Builder, Sender};
+
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
-pub type SenderComponent = Component<SenderState, Sender>;
+pub type Component = component::Component<State, Sender>;
 
-/// State of the [`SenderComponent`].
+impl Component {
+    /// Returns new [`Component`] with a provided [`State`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MediaConnectionsError`] if [`Sender`] build fails.
+    #[inline]
+    pub fn new(
+        state: Rc<State>,
+        media_connections: &MediaConnections,
+        send_constraints: LocalTracksConstraints,
+    ) -> Result<Self> {
+        let sndr = Builder {
+            media_connections: &media_connections,
+            track_id: state.id,
+            caps: state.media_type().clone().into(),
+            mute_state: mute_state::Stable::from(state.is_muted()),
+            mid: state.mid().clone(),
+            media_exchange_state: media_exchange_state::Stable::from(
+                !state.is_enabled_individual(),
+            ),
+            required: state.media_type().required(),
+            send_constraints,
+        }
+        .build()
+        .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(spawn_component!(Component, state, sndr))
+    }
+}
+
+/// State of the [`Component`].
 #[derive(Debug)]
-pub struct SenderState {
-    /// ID of this [`SenderComponent`].
+pub struct State {
     id: TrackId,
 
     /// Mid of this [`SenderComponent`].
@@ -52,7 +86,7 @@ pub struct SenderState {
     need_local_stream_update: Cell<bool>,
 }
 
-impl AsProtoState for SenderState {
+impl AsProtoState for State {
     type Output = proto_state::Sender;
 
     fn as_proto(&self) -> Self::Output {
@@ -68,7 +102,7 @@ impl AsProtoState for SenderState {
     }
 }
 
-impl SynchronizableState for SenderState {
+impl SynchronizableState for State {
     type Input = proto_state::Sender;
 
     fn from_proto(input: Self::Input) -> Self {
@@ -91,7 +125,7 @@ impl SynchronizableState for SenderState {
     }
 }
 
-impl Updatable for SenderState {
+impl Updatable for State {
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         Box::new(medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),
@@ -101,8 +135,8 @@ impl Updatable for SenderState {
     }
 }
 
-impl From<&SenderState> for proto_state::Sender {
-    fn from(state: &SenderState) -> Self {
+impl From<&State> for proto_state::Sender {
+    fn from(state: &State) -> Self {
         Self {
             id: state.id,
             mid: state.mid.clone(),
@@ -115,7 +149,7 @@ impl From<&SenderState> for proto_state::Sender {
     }
 }
 
-impl From<proto_state::Sender> for SenderState {
+impl From<proto_state::Sender> for State {
     fn from(from: proto_state::Sender) -> Self {
         Self {
             id: from.id,
@@ -130,8 +164,8 @@ impl From<proto_state::Sender> for SenderState {
     }
 }
 
-impl SenderState {
-    /// Creates new [`SenderState`] with a provided data.
+impl State {
+    /// Creates new [`State`] with a provided data.
     /// # Errors
     ///
     /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
@@ -142,7 +176,7 @@ impl SenderState {
         media_type: MediaType,
         receivers: Vec<MemberId>,
         send_constraints: &LocalTracksConstraints,
-    ) -> Result<Self, Traced<MediaConnectionsError>> {
+    ) -> Result<Self> {
         let required = media_type.required();
         let enabled = send_constraints.enabled(&media_type);
         let muted = send_constraints.muted(&media_type);
@@ -164,50 +198,50 @@ impl SenderState {
         })
     }
 
-    /// Returns [`TrackId`] of this [`SenderState`].
+    /// Returns [`TrackId`] of this [`State`].
     #[inline]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
-    /// Returns current `mid` of this [`SenderState`].
+    /// Returns current `mid` of this [`State`].
     #[inline]
     pub fn mid(&self) -> &Option<String> {
         &self.mid
     }
 
-    /// Returns current [`MediaType`] of this [`SenderState`].
+    /// Returns current [`MediaType`] of this [`State`].
     #[inline]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
     /// Returns current [`MemberId`]s of the `Member`s to which this
-    /// [`SenderState`] should send media data.
+    /// [`State`] should send media data.
     #[inline]
     pub fn receivers(&self) -> &Vec<MemberId> {
         &self.receivers
     }
 
-    /// Returns current individual media exchange state of this [`SenderState`].
+    /// Returns current individual media exchange state of this [`State`].
     #[inline]
     pub fn is_enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
-    /// Returns current general media exchange state of this [`SenderState`].
+    /// Returns current general media exchange state of this [`State`].
     #[inline]
     pub fn is_enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
 
-    /// Returns current mute state of this [`SenderState`].
+    /// Returns current mute state of this [`State`].
     #[inline]
     pub fn is_muted(&self) -> bool {
         self.muted.get()
     }
 
-    /// Updates this [`SenderState`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if track_patch.id != self.id {
             return;
@@ -223,7 +257,7 @@ impl SenderState {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`SenderState`] update
+    /// Returns [`Future`] which will be resolved when [`State`] update
     /// will be applied on [`Sender`].
     ///
     /// [`Future`]: std::future::Future
@@ -236,19 +270,19 @@ impl SenderState {
     }
 
     /// Returns `true` if local `MediaStream` update needed for this
-    /// [`SenderState`].
+    /// [`State`].
     #[inline]
     pub fn is_local_stream_update_needed(&self) -> bool {
         self.need_local_stream_update.get()
     }
 
-    /// Sets [`SenderState::need_local_stream_update`] to `false`.
+    /// Sets [`State::need_local_stream_update`] to `false`.
     #[inline]
     pub fn local_stream_updated(&self) {
         self.need_local_stream_update.set(false);
     }
 
-    /// Returns [`MediaKind`] of this [`SenderState`].
+    /// Returns [`MediaKind`] of this [`State`].
     #[inline]
     pub fn media_kind(&self) -> MediaKind {
         match &self.media_type {
@@ -257,7 +291,7 @@ impl SenderState {
         }
     }
 
-    /// Returns [`MediaSourceKind`] of this [`SenderState`].
+    /// Returns [`MediaSourceKind`] of this [`State`].
     #[inline]
     pub fn media_source(&self) -> MediaSourceKind {
         match &self.media_type {
@@ -268,21 +302,21 @@ impl SenderState {
 }
 
 #[watchers]
-impl SenderComponent {
-    /// Watcher for the [`SenderState::enabled_individual`] update.
+impl Component {
+    /// Watcher for the [`State::enabled_individual`] update.
     ///
     /// Calls [`Sender::set_enabled_individual`] with a new value.
     ///
     /// If new value is `true` then sets
-    /// [`SenderState::need_local_stream_update`] flag to `true`, otherwise
+    /// [`State::need_local_stream_update`] flag to `true`, otherwise
     /// calls [`Sender::remove_track`].
     #[watch(self.state().enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
         sender: Rc<Sender>,
-        state: Rc<SenderState>,
+        state: Rc<State>,
         enabled_individual: Guarded<bool>,
-    ) -> Result<(), Traced<MediaConnectionsError>> {
+    ) -> Result<()> {
         sender.set_enabled_individual(*enabled_individual);
         if *enabled_individual {
             state.need_local_stream_update.set(true);
@@ -293,31 +327,31 @@ impl SenderComponent {
         Ok(())
     }
 
-    /// Watcher for the [`SenderState::enabled_general`] update.
+    /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Calls [`Sender::set_enabled_general_state`] with a new value.
     #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
         sender: Rc<Sender>,
-        _: Rc<SenderState>,
+        _: Rc<State>,
         enabled_general: Guarded<bool>,
-    ) -> Result<(), Traced<MediaConnectionsError>> {
+    ) -> Result<()> {
         sender.set_enabled_general(*enabled_general);
 
         Ok(())
     }
 
-    /// Watcher for the [`SenderState::muted`] update.
+    /// Watcher for the [`State::muted`] update.
     ///
     /// Calls [`Sender::set_muted`] with a new value.
     #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
         sender: Rc<Sender>,
-        _: Rc<SenderState>,
+        _: Rc<State>,
         muted: Guarded<bool>,
-    ) -> Result<(), Traced<MediaConnectionsError>> {
+    ) -> Result<()> {
         sender.set_muted(*muted);
 
         Ok(())

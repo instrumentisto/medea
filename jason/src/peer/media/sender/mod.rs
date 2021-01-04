@@ -1,5 +1,7 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
+mod component;
+
 use std::{cell::Cell, rc::Rc};
 
 use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchCommand};
@@ -24,8 +26,10 @@ use super::{
     TransceiverSide,
 };
 
+pub use self::component::{Component, State};
+
 /// Builder of the [`Sender`].
-pub struct SenderBuilder<'a> {
+pub(super) struct Builder<'a> {
     pub media_connections: &'a MediaConnections,
     pub track_id: TrackId,
     pub caps: TrackConstraints,
@@ -36,7 +40,7 @@ pub struct SenderBuilder<'a> {
     pub send_constraints: LocalTracksConstraints,
 }
 
-impl<'a> SenderBuilder<'a> {
+impl<'a> Builder<'a> {
     /// Builds new [`Transceiver`] if provided `mid` is [`None`], otherwise
     /// retrieves existing [`Transceiver`] via provided `mid` from a
     /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup

@@ -11,6 +11,10 @@ use crate::utils::{AsProtoState, SynchronizableState};
 pub struct IceCandidates(RefCell<ObservableHashSet<IceCandidate>>);
 
 impl IceCandidates {
+    pub fn new() -> Self {
+        Self(RefCell::new(ObservableHashSet::new()))
+    }
+
     /// Adds new [`IceCandidate`].
     pub fn add(&self, candidate: IceCandidate) {
         self.0.borrow_mut().insert(candidate);

@@ -5,24 +5,24 @@ mod local_sdp;
 mod tracks_repository;
 mod watchers;
 
-use std::{collections::HashSet, rc::Rc};
+use std::rc::Rc;
 
+use futures::channel::mpsc;
 use medea_client_api_proto::{
-    state as proto_state, IceCandidate, IceServer, NegotiationRole, PeerId,
-    TrackId,
+    self as proto, state as proto_state, IceCandidate, IceServer,
+    NegotiationRole, PeerId, TrackId,
 };
-use medea_reactive::{
-    collections::ProgressableHashMap, ObservableCell, ProgressableCell,
-    RecheckableFutureExt,
-};
+use medea_reactive::{ObservableCell, ProgressableCell, RecheckableFutureExt};
 use tracerr::Traced;
 
 use crate::{
+    api::Connections,
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer::{
-        media::{ReceiverState, SenderState},
-        LocalStreamUpdateCriteria, PeerConnection, PeerError,
+        media::{receiver, sender},
+        LocalStreamUpdateCriteria, PeerConnection, PeerError, PeerEvent,
     },
-    utils::{AsProtoState, Component, SynchronizableState, Updatable},
+    utils::{component, AsProtoState, SynchronizableState, Updatable},
 };
 
 use self::{
@@ -31,7 +31,38 @@ use self::{
 };
 
 /// Component responsible for the [`PeerConnection`] updating.
-pub type PeerComponent = Component<PeerState, PeerConnection>;
+pub type Component = component::Component<State, PeerConnection>;
+
+impl Component {
+    /// Returns new [`Component`] based on the provided [`State`].
+    ///
+    /// This function will spawn all [`Component`]'s watchers automatically.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError`] if [`PeerConnection::new`] method fails.
+    #[inline]
+    pub fn new(
+        state: Rc<State>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
+        media_manager: Rc<MediaManager>,
+        send_constraints: LocalTracksConstraints,
+        connections: Rc<Connections>,
+    ) -> Result<Self, Traced<PeerError>> {
+        let peer = PeerConnection::new(
+            state.id,
+            peer_events_sender,
+            state.ice_servers().clone(),
+            media_manager,
+            state.force_relay(),
+            send_constraints,
+            connections,
+        )
+        .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(spawn_component!(Component, state, peer))
+    }
+}
 
 /// Negotiation state of the [`PeerComponent`].
 ///
@@ -96,15 +127,15 @@ enum SyncState {
 
 /// State of the [`PeerComponent`].
 #[derive(Debug)]
-pub struct PeerState {
+pub struct State {
     /// ID of the [`PeerComponent`].
     id: PeerId,
 
-    /// All [`SenderState`]s of this [`PeerComponent`].
-    senders: TracksRepository<SenderState>,
+    /// All [`sender::State`]s of this [`PeerComponent`].
+    senders: TracksRepository<sender::State>,
 
-    /// All [`ReceiverState`]s of this [`PeerComponent`].
-    receivers: TracksRepository<ReceiverState>,
+    /// All [`receiver::State`]s of this [`PeerComponent`].
+    receivers: TracksRepository<receiver::State>,
 
     /// Flag which indicates that this [`PeerComponent`] should relay all media
     /// through a TURN server forcibly.
@@ -135,22 +166,19 @@ pub struct PeerState {
     sync_state: ObservableCell<SyncState>,
 }
 
-impl PeerState {
-    /// Returns [`PeerState`] with a provided data.
+impl State {
+    /// Returns [`State`] with a provided data.
     #[inline]
     pub fn new(
         id: PeerId,
-        senders: ProgressableHashMap<TrackId, Rc<SenderState>>,
-        receivers: ProgressableHashMap<TrackId, Rc<ReceiverState>>,
         ice_servers: Vec<IceServer>,
         force_relay: bool,
         negotiation_role: Option<NegotiationRole>,
-        ice_candidates: HashSet<IceCandidate>,
     ) -> Self {
         Self {
             id,
-            senders: TracksRepository::new(senders),
-            receivers: TracksRepository::new(receivers),
+            senders: TracksRepository::new(),
+            receivers: TracksRepository::new(),
             ice_servers,
             force_relay,
             remote_sdp_offer: ProgressableCell::new(None),
@@ -158,12 +186,12 @@ impl PeerState {
             negotiation_role: ObservableCell::new(negotiation_role),
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
-            ice_candidates: IceCandidates::from_proto(ice_candidates),
+            ice_candidates: IceCandidates::new(),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
-    /// Returns all [`IceServer`]s of this [`PeerState`].
+    /// Returns all [`IceServer`]s of this [`State`].
     #[inline]
     pub fn ice_servers(&self) -> &Vec<IceServer> {
         &self.ice_servers
@@ -175,35 +203,38 @@ impl PeerState {
         self.force_relay
     }
 
-    /// Inserts new [`SenderState`] into this [`PeerState`].
+    /// Inserts new [`sender::State`] into this [`State`].
     #[inline]
-    pub fn insert_sender(&self, track_id: TrackId, sender: Rc<SenderState>) {
+    pub fn insert_sender(&self, track_id: TrackId, sender: Rc<sender::State>) {
         self.senders.insert(track_id, sender);
     }
 
-    /// Inserts new [`ReceiverState`] into this [`PeerState`].
+    /// Inserts new [`receiver::State`] into this [`State`].
     #[inline]
     pub fn insert_receiver(
         &self,
         track_id: TrackId,
-        receiver: Rc<ReceiverState>,
+        receiver: Rc<receiver::State>,
     ) {
         self.receivers.insert(track_id, receiver);
     }
 
-    /// Returns [`Rc`] to the [`SenderState`] with a provided [`TrackId`].
+    /// Returns [`Rc`] to the [`sender::State`] with a provided [`TrackId`].
     #[inline]
-    pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<SenderState>> {
+    pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<sender::State>> {
         self.senders.get(track_id)
     }
 
-    /// Returns [`Rc`] to the [`ReceiverState`] with a provided [`TrackId`].
+    /// Returns [`Rc`] to the [`receiver::State`] with a provided [`TrackId`].
     #[inline]
-    pub fn get_receiver(&self, track_id: TrackId) -> Option<Rc<ReceiverState>> {
+    pub fn get_receiver(
+        &self,
+        track_id: TrackId,
+    ) -> Option<Rc<receiver::State>> {
         self.receivers.get(track_id)
     }
 
-    /// Sets [`NegotiationRole`] of this [`PeerState`] to the provided one.
+    /// Sets [`NegotiationRole`] of this [`State`] to the provided one.
     #[inline]
     pub async fn set_negotiation_role(
         &self,
@@ -213,7 +244,7 @@ impl PeerState {
         self.negotiation_role.set(Some(negotiation_role));
     }
 
-    /// Sets [`PeerState::restart_ice`] to `true`.
+    /// Sets [`State::restart_ice`] to `true`.
     #[inline]
     pub fn restart_ice(&self) {
         self.restart_ice.set(true);
@@ -225,13 +256,13 @@ impl PeerState {
         self.remote_sdp_offer.set(Some(new_remote_sdp_offer));
     }
 
-    /// Adds [`IceCandidate`] for the [`PeerState`].
+    /// Adds [`IceCandidate`] for the [`State`].
     #[inline]
     pub fn add_ice_candidate(&self, ice_candidate: IceCandidate) {
         self.ice_candidates.add(ice_candidate);
     }
 
-    /// Returns current SDP offer of this [`PeerState`].
+    /// Returns current SDP offer of this [`State`].
     #[inline]
     pub fn current_sdp_offer(&self) -> Option<String> {
         self.sdp_offer.current()
@@ -243,17 +274,17 @@ impl PeerState {
         self.sdp_offer.approve(sdp_offer);
     }
 
-    /// Stops all timeouts of the [`PeerState`].
+    /// Stops all timeouts of the [`State`].
     ///
-    /// Stops local SDP rollback timeout.
+    /// Stops [`LocalSdp`] rollback timeout.
     #[inline]
     pub fn stop_timeouts(&self) {
         self.sdp_offer.stop_timeout();
     }
 
-    /// Resumes all timeouts of the [`PeerState`].
+    /// Resumes all timeouts of the [`State`].
     ///
-    /// Resumes local SDP rollback timeout.
+    /// Resumes [`LocalSdp`] rollback timeout.
     #[inline]
     pub fn resume_timeouts(&self) {
         self.sdp_offer.resume_timeout();
@@ -272,9 +303,9 @@ impl PeerState {
     }
 
     /// Updates local `MediaStream` based on
-    /// [`SenderState::is_local_stream_update_needed`].
+    /// [`sender::State::is_local_stream_update_needed`].
     ///
-    /// Resets [`SenderState`] local stream update when it updated.
+    /// Resets [`sender::State`] local stream update when it updated.
     async fn update_local_stream(
         &self,
         ctx: &Rc<PeerConnection>,
@@ -293,24 +324,120 @@ impl PeerState {
 
         Ok(())
     }
+
+    /// Inserts provided [`proto::Track`] to this [`State`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::MediaConnections`] if [`sender::State`]
+    /// creation fails.
+    pub fn insert_track(
+        &self,
+        track: &proto::Track,
+        send_constraints: &LocalTracksConstraints,
+        recv_constraints: &RecvConstraints,
+    ) -> Result<(), Traced<PeerError>> {
+        match &track.direction {
+            proto::Direction::Send { receivers, mid } => {
+                self.senders.insert(
+                    track.id,
+                    Rc::new(
+                        sender::State::new(
+                            track.id,
+                            mid.clone(),
+                            track.media_type.clone(),
+                            receivers.clone(),
+                            send_constraints,
+                        )
+                        .map_err(tracerr::map_from_and_wrap!())?,
+                    ),
+                );
+            }
+            proto::Direction::Recv { sender, mid } => {
+                self.receivers.insert(
+                    track.id,
+                    Rc::new(receiver::State::new(
+                        track.id,
+                        mid.clone(),
+                        track.media_type.clone(),
+                        sender.clone(),
+                        recv_constraints,
+                    )),
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Returns [`RecheckableFutureExt`] which will be resolved when all
+    /// [`State::senders`]'s inserts/removes will be processed.
+    #[inline]
+    #[must_use]
+    fn when_all_senders_processed(
+        &self,
+    ) -> impl RecheckableFutureExt<Output = ()> {
+        self.senders.when_all_processed()
+    }
+
+    /// Returns [`RecheckableFutureExt`] which will be resolved when all
+    /// [`State::receivers`]'s inserts/removes will be processed.
+    #[inline]
+    #[must_use]
+    fn when_all_receivers_processed(
+        &self,
+    ) -> impl RecheckableFutureExt<Output = ()> {
+        self.receivers.when_all_processed()
+    }
+
+    /// Patches [`sender::State`] or [`receiver::State`] with a provided
+    /// [`proto::TrackPatchEvent`].
+    pub fn patch_track(&self, track_patch: &proto::TrackPatchEvent) {
+        if let Some(sender) = self.get_sender(track_patch.id) {
+            sender.update(track_patch);
+        } else if let Some(receiver) = self.get_receiver(track_patch.id) {
+            receiver.update(track_patch);
+        }
+    }
 }
 
 #[cfg(feature = "mockable")]
-impl PeerState {
-    /// Waits for [`PeerState::remote_sdp_offer`] change apply.
+impl State {
+    /// Waits for [`State::remote_sdp_offer`] change apply.
     #[inline]
     pub async fn when_remote_sdp_answer_processed(&self) {
         self.remote_sdp_offer.when_all_processed().await;
     }
 
-    /// Resets [`NegotiationRole`] of this [`PeerState`] to [`None`].
+    /// Resets [`NegotiationRole`] of this [`State`] to [`None`].
     #[inline]
     pub fn reset_negotiation_role(&self) {
         self.negotiation_role.set(None);
     }
+
+    /// Waits until [`State::sdp_offer`] will be resolved and returns it's new
+    /// value.
+    #[inline]
+    pub async fn when_local_sdp_offer_updated(&self) -> Option<String> {
+        use futures::StreamExt as _;
+
+        self.sdp_offer.subscribe().skip(1).next().await.unwrap()
+    }
+
+    /// Waits until all [`State::senders`] and [`State::receivers`] inserts will
+    /// be processed.
+    #[inline]
+    pub async fn when_all_tracks_created(&self) {
+        medea_reactive::join_all(vec![
+            Box::new(self.senders.when_insert_processed())
+                as Box<dyn RecheckableFutureExt<Output = ()>>,
+            Box::new(self.receivers.when_insert_processed()),
+        ])
+        .await;
+    }
 }
 
-impl AsProtoState for PeerState {
+impl AsProtoState for State {
     type Output = proto_state::Peer;
 
     fn as_proto(&self) -> Self::Output {
@@ -329,27 +456,32 @@ impl AsProtoState for PeerState {
     }
 }
 
-impl SynchronizableState for PeerState {
+impl SynchronizableState for State {
     type Input = proto_state::Peer;
 
     fn from_proto(from: Self::Input) -> Self {
-        Self::new(
+        let state = Self::new(
             from.id,
-            from.senders
-                .into_iter()
-                .map(|(id, sender)| (id, Rc::new(SenderState::from(sender))))
-                .collect(),
-            from.receivers
-                .into_iter()
-                .map(|(id, receiver)| {
-                    (id, Rc::new(ReceiverState::from(receiver)))
-                })
-                .collect(),
             from.ice_servers,
             from.force_relay,
             from.negotiation_role,
-            from.ice_candidates,
-        )
+        );
+
+        for (id, sender) in from.senders {
+            state
+                .senders
+                .insert(id, Rc::new(sender::State::from(sender)));
+        }
+        for (id, receiver) in from.receivers {
+            state
+                .receivers
+                .insert(id, Rc::new(receiver::State::from(receiver)));
+        }
+        for ice_candidate in from.ice_candidates {
+            state.ice_candidates.add(ice_candidate);
+        }
+
+        state
     }
 
     fn apply(&self, state: Self::Input) {
@@ -369,7 +501,7 @@ impl SynchronizableState for PeerState {
     }
 }
 
-impl Updatable for PeerState {
+impl Updatable for State {
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         Box::new(medea_reactive::join_all(vec![
             self.receivers.when_updated(),
