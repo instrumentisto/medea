@@ -300,22 +300,19 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// use medea_jason::utils::Component;
 /// use medea_macro::{watchers, watch};
 ///
-/// struct GlobalCtx;
-///
 /// struct FooState {
 ///     muted: ObservableCell<bool>,
 /// }
 ///
 /// struct FooCtx;
 ///
-/// type FooComponent = Component<FooState, FooCtx, GlobalCtx>;
+/// type FooComponent = Component<FooState, FooCtx>;
 ///
 /// #[watchers]
 /// impl FooComponent {
 ///     #[watch(self.state().muted.subscribe())]
 ///     async fn muted_change_watcher(
 ///         ctx: Rc<FooCtx>,
-///         global_ctx: Rc<GlobalCtx>,
 ///         state: Rc<FooState>,
 ///         new_muted_val: bool
 ///     ) -> Result<(), ()> {
@@ -337,7 +334,6 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 ///     async fn muted_change_watcher(
 ///         ctx: Rc<FooCtx>,
-///         global_ctx: Rc<GlobalCtx>,
 ///         state: Rc<FooState>,
 ///         new_muted_val: bool
 ///     ) -> Result<(), ()> {

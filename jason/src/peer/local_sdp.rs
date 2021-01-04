@@ -122,20 +122,16 @@ impl LocalSdp {
                 }
             }
         });
-        let prev_offer = self
-            .0
-            .borrow_mut()
-            .current_offer
-            .mutate(|mut o| o.replace(new_offer));
+        let prev_offer = self.0.borrow().current_offer.replace(Some(new_offer));
         self.0.borrow_mut().prev_offer = prev_offer;
     }
 
     /// Approves current [`LocalSdp`] offer.
     pub fn approve(&self, sdp_offer: &str) {
         let mut inner = self.0.borrow_mut();
-        let is_approved = inner.current_offer.mutate(|current| {
-            current.as_ref().map(String::as_str) == Some(sdp_offer)
-        });
+        let is_approved =
+            inner.current_offer.borrow().as_ref().map(String::as_str)
+                == Some(sdp_offer);
         if is_approved {
             inner.approve()
         }
@@ -156,14 +152,19 @@ impl LocalSdp {
     /// SDP offer and they both is `Some`.
     pub fn is_rollback(&self) -> bool {
         let inner = self.0.borrow();
-        inner.current_offer.mutate(|c| {
-            c.as_ref().map_or(false, |current| {
-                inner
-                    .prev_offer
-                    .as_ref()
-                    .map(|prev| prev == current)
-                    .unwrap_or_default()
-            })
-        })
+        let is_rollback =
+            inner
+                .current_offer
+                .borrow()
+                .as_ref()
+                .map_or(false, |current| {
+                    inner
+                        .prev_offer
+                        .as_ref()
+                        .map(|prev| prev == current)
+                        .unwrap_or_default()
+                });
+
+        is_rollback
     }
 }
