@@ -9,7 +9,7 @@
 
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
-FROM rust:${rust_ver} AS dist
+FROM ghcr.io/instrumentisto/rust:${rust_ver} AS dist
 ARG debug=no
 
 RUN cargo install wasm-pack \
