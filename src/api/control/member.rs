@@ -27,7 +27,7 @@ use crate::api::control::{
 
 const CREDENTIALS_LEN: usize = 32;
 
-/// Credentials of the [`Member`] element.
+/// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Credential {
