@@ -7,39 +7,6 @@ use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
 
-/// Credentials of the [`Member`].
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "lowercase")]
-enum Credentials {
-    /// [Argon2] hash of the [`Member`] credential.
-    ///
-    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
-    Hash(String),
-
-    /// Plain text [`Member`] credentials.
-    Plain(String),
-}
-
-impl From<proto::member::Credentials> for Credentials {
-    fn from(from: proto::member::Credentials) -> Self {
-        use proto::member::Credentials as C;
-        match from {
-            C::Plain(plain) => Self::Plain(plain),
-            C::Hash(hash) => Self::Hash(hash),
-        }
-    }
-}
-
-impl From<Credentials> for proto::member::Credentials {
-    fn from(from: Credentials) -> Self {
-        use Credentials as C;
-        match from {
-            C::Hash(hash) => Self::Hash(hash),
-            C::Plain(plain) => Self::Plain(plain),
-        }
-    }
-}
-
 /// Entity that represents [Control API] `Member`.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
@@ -134,6 +101,39 @@ impl From<proto::Member> for Member {
             ping_interval: proto
                 .ping_interval
                 .map(|dur| dur.try_into().unwrap()),
+        }
+    }
+}
+
+/// Credentials of the [`Member`].
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
+enum Credentials {
+    /// [Argon2] hash of the [`Member`] credential.
+    ///
+    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
+    Hash(String),
+
+    /// Plain text [`Member`] credentials.
+    Plain(String),
+}
+
+impl From<proto::member::Credentials> for Credentials {
+    fn from(from: proto::member::Credentials) -> Self {
+        use proto::member::Credentials as C;
+        match from {
+            C::Plain(plain) => Self::Plain(plain),
+            C::Hash(hash) => Self::Hash(hash),
+        }
+    }
+}
+
+impl From<Credentials> for proto::member::Credentials {
+    fn from(from: Credentials) -> Self {
+        use Credentials as C;
+        match from {
+            C::Hash(hash) => Self::Hash(hash),
+            C::Plain(plain) => Self::Plain(plain),
         }
     }
 }

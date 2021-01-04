@@ -49,12 +49,6 @@ pub struct CreateResponse {
     /// Hashmap with IDs (key) and URIs (value) of Elements, which should be used
     /// by clients to connect to a media server via Client API.
     ///
-    /// If Member credentials was provided in a Argon2 hash form, then password
-    /// won't be provided in the returned URI (value). Control API server or
-    /// Web Client should add '?token=<token>' to the returned URI.
-    ///
-    /// In other cases nothing need to be added to the URI.
-    ///
     /// Returned only if CreateResponse is successful.
     #[prost(map="string, string", tag="1")]
     pub sid: ::std::collections::HashMap<std::string::String, std::string::String>,
@@ -180,6 +174,12 @@ pub struct Member {
     #[prost(map="string, message", tag="9")]
     pub pipeline: ::std::collections::HashMap<std::string::String, member::Element>,
     /// Credentials of the Member to authorize via Client API with.
+    ///
+    /// Plain and hashed credentials are supported. If no credentials provided,
+    /// then random plain string will be generated. If no authentication is
+    /// required then empty plain string can be used. Hashed variant only
+    /// supports Argon2 hash. Member sid won't contain token if hashed credentials
+    /// are used, so token query parameter should be appended manually.
     #[prost(oneof="member::Credentials", tags="4, 5")]
     pub credentials: ::std::option::Option<member::Credentials>,
 }
@@ -200,6 +200,12 @@ pub mod member {
         }
     }
     /// Credentials of the Member to authorize via Client API with.
+    ///
+    /// Plain and hashed credentials are supported. If no credentials provided,
+    /// then random plain string will be generated. If no authentication is
+    /// required then empty plain string can be used. Hashed variant only
+    /// supports Argon2 hash. Member sid won't contain token if hashed credentials
+    /// are used, so token query parameter should be appended manually.
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Credentials {
         /// Argon2 hash of credentials.

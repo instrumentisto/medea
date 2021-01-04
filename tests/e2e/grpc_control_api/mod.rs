@@ -13,7 +13,7 @@ use std::{collections::HashMap, time::Duration};
 
 use derive_builder::*;
 use medea_control_api_proto::grpc::api::{
-    self as proto, control_api_client::ControlApiClient,
+    self as proto, control_api_client::ControlApiClient, member::Credentials,
 };
 use tonic::transport::Channel;
 
@@ -194,11 +194,6 @@ impl RoomBuilder {
 
         self
     }
-}
-
-/// Returns [`proto::member::Credentials::Plain`] with a provided credential.
-pub fn plain_credentials(creds: &str) -> proto::member::Credentials {
-    proto::member::Credentials::Plain(creds.to_string())
 }
 
 #[derive(Builder, Clone)]
@@ -428,7 +423,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
@@ -503,7 +498,7 @@ pub fn pub_pub_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("bob")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")

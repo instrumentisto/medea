@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use medea_client_api_proto::{Credential, MemberId as Id};
+use medea_client_api_proto::{self as client_proto, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
@@ -27,11 +27,10 @@ use crate::api::control::{
 
 const CREDENTIALS_LEN: usize = 32;
 
-/// Credentials of the `Member` element.
-#[derive(Clone, Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+/// Credentials of the [`Member`] element.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum ControlCredential {
+pub enum Credential {
     /// [Argon2] hash of the `Member` credential.
     ///
     /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
@@ -41,17 +40,21 @@ pub enum ControlCredential {
     Plain(String),
 }
 
-impl ControlCredential {
-    /// Generates alphanumeric [`ControlCredential::Plain`] for [`Member`] with
-    /// fixed length.
-    ///
-    /// This credentials will be generated if in dynamic [Control API] spec not
-    /// provided credentials for [`Member`]. This logic you can find in
-    /// [`TryFrom`] [`proto::Member`] implemented for [`MemberSpec`].
-    ///
-    /// [`Member`]: crate::signalling::elements::Member
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    pub fn generate_plain() -> Self {
+impl Credential {
+    /// Verifies provided [`client_proto::Credential`].
+    pub fn verify(&self, other: &client_proto::Credential) -> bool {
+        match self {
+            Self::Hash(hash) => {
+                argon2::verify_encoded(hash, other.0.as_bytes())
+                    .unwrap_or(false)
+            }
+            Self::Plain(plain) => plain == &other.0,
+        }
+    }
+}
+
+impl Default for Credential {
+    fn default() -> Self {
         Self::Plain(
             rand::thread_rng()
                 .sample_iter(&Alphanumeric)
@@ -60,23 +63,9 @@ impl ControlCredential {
                 .collect::<String>(),
         )
     }
-
-    /// Verifies that provided [`Credential`] matches with
-    /// [`ControlCredential`].
-    ///
-    /// Returns `true` if matches, `false` otherwise.
-    pub fn verify(&self, client_creds: &Credential) -> bool {
-        match self {
-            Self::Hash(hash) => {
-                argon2::verify_encoded(hash, client_creds.0.as_bytes())
-                    .unwrap_or(false)
-            }
-            Self::Plain(plain) => plain == &client_creds.0,
-        }
-    }
 }
 
-impl From<proto::member::Credentials> for ControlCredential {
+impl From<proto::member::Credentials> for Credential {
     fn from(from: proto::member::Credentials) -> Self {
         use proto::member::Credentials as C;
         match from {
@@ -86,11 +75,11 @@ impl From<proto::member::Credentials> for ControlCredential {
     }
 }
 
-impl From<ControlCredential> for proto::member::Credentials {
-    fn from(from: ControlCredential) -> Self {
+impl From<Credential> for proto::member::Credentials {
+    fn from(from: Credential) -> Self {
         match from {
-            ControlCredential::Plain(plain) => Self::Plain(plain),
-            ControlCredential::Hash(hash) => Self::Hash(hash),
+            Credential::Plain(plain) => Self::Plain(plain),
+            Credential::Hash(hash) => Self::Hash(hash),
         }
     }
 }
@@ -121,7 +110,7 @@ pub struct MemberSpec {
     pipeline: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
-    credentials: ControlCredential,
+    credentials: Credential,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -163,7 +152,7 @@ impl MemberSpec {
     #[inline]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
-        credentials: ControlCredential,
+        credentials: Credential,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
@@ -219,7 +208,7 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
-    pub fn credentials(&self) -> &ControlCredential {
+    pub fn credentials(&self) -> &Credential {
         &self.credentials
     }
 
@@ -280,10 +269,9 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         }
 
-        let credentials = member.credentials.map_or_else(
-            ControlCredential::generate_plain,
-            ControlCredential::from,
-        );
+        let credentials = member
+            .credentials
+            .map_or_else(Credential::default, Credential::from);
 
         let on_leave = {
             let on_leave = member.on_leave;

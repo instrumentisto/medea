@@ -18,7 +18,7 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
-        member::ControlCredential,
+        member::Credential,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomSpec,
         TryFromElementError,
@@ -198,13 +198,13 @@ impl RoomService {
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
-        credentials: &ControlCredential,
+        credentials: &Credential,
     ) -> String {
         match credentials {
-            ControlCredential::Hash(_) => {
+            Credential::Hash(_) => {
                 format!("{}/{}/{}", self.public_url, room_id, member_id)
             }
-            ControlCredential::Plain(plain) => {
+            Credential::Plain(plain) => {
                 format!(
                     "{}/{}/{}?token={}",
                     self.public_url, room_id, member_id, plain

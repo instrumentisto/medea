@@ -12,19 +12,19 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::{Credential, MemberId, PeerId, RoomId};
+use medea_client_api_proto::{self as client_proto, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        member::ControlCredential,
+        member::Credential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
         WebRtcPublishId,
     },
-    conf::Rpc as RpcConf,
+    conf,
     log::prelude::*,
 };
 
@@ -84,7 +84,7 @@ struct MemberInner {
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
-    credentials: ControlCredential,
+    credentials: Credential,
 
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -114,7 +114,7 @@ impl Member {
     /// function.
     pub fn new(
         id: MemberId,
-        credentials: ControlCredential,
+        credentials: Credential,
         room_id: RoomId,
         idle_timeout: Duration,
         reconnect_timeout: Duration,
@@ -145,13 +145,12 @@ impl Member {
         room_spec: &RoomSpec,
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
-        let element = room_spec.pipeline.get(member_id).map_or(
-            Err(MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
+        let element = room_spec.pipeline.get(member_id).ok_or_else(|| {
+            MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
                 self.room_id(),
                 member_id.clone(),
-            ))),
-            Ok,
-        )?;
+            ))
+        })?;
 
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
@@ -304,16 +303,16 @@ impl Member {
     }
 
     /// Returns credentials of this [`Member`].
-    pub fn credentials(&self) -> ControlCredential {
+    pub fn credentials(&self) -> Credential {
         self.0.borrow().credentials.clone()
     }
 
-    /// Verifies that provided [`Credential`] matches with
-    /// [`Member`]'s [`ControlCredential`].
-    ///
-    /// Returns `true` if matches, `false` otherwise.
-    pub fn verify_credentials(&self, client_creds: &Credential) -> bool {
-        self.0.borrow().credentials.verify(&client_creds)
+    /// Verifies provided [`client_proto::Credential`].
+    pub fn verify_credentials(
+        &self,
+        credentials: &client_proto::Credential,
+    ) -> bool {
+        self.0.borrow().credentials.verify(&credentials)
     }
 
     /// Returns all srcs of this [`Member`].
@@ -526,7 +525,7 @@ impl WeakMember {
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
-    rpc_conf: RpcConf,
+    rpc_conf: conf::Rpc,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -686,7 +685,7 @@ mod tests {
         let room_element: RootElement =
             serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        parse_members(&room_spec, RpcConf::default()).unwrap()
+        parse_members(&room_spec, conf::Rpc::default()).unwrap()
     }
 
     #[test]

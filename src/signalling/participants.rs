@@ -151,12 +151,11 @@ impl ParticipantService {
         &self,
         id: &MemberId,
     ) -> Result<Member, ParticipantServiceErr> {
-        self.members.get(id).cloned().map_or(
-            Err(ParticipantServiceErr::ParticipantNotFound(
+        self.members.get(id).cloned().ok_or_else(|| {
+            ParticipantServiceErr::ParticipantNotFound(
                 self.get_fid_to_member(id.clone()),
-            )),
-            Ok,
-        )
+            )
+        })
     }
 
     /// Returns all [`Member`] from this [`ParticipantService`].
@@ -463,7 +462,7 @@ mod test {
     use std::time::Duration;
 
     use crate::{
-        api::control::{member::ControlCredential, pipeline::Pipeline},
+        api::control::{member::Credential, pipeline::Pipeline},
         conf::Conf,
     };
 
@@ -490,7 +489,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            ControlCredential::Plain("w/e".into()),
+            Credential::Plain("w/e".into()),
             None,
             None,
             None,
@@ -532,7 +531,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            ControlCredential::Plain("w/e".into()),
+            Credential::Plain("w/e".into()),
             None,
             None,
             Some(idle_timeout),

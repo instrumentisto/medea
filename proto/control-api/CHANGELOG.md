@@ -18,7 +18,7 @@ All user visible changes to this project will be documented in this file. This p
         - `ControlApi` ([#57]);
         - `Callback` ([#63]).
     - `ControlApi` service:
-        - Methods ([#57], [#168]):
+        - Methods ([#57]):
             - `Create`;
             - `Get`;
             - `Delete`.
@@ -36,7 +36,6 @@ All user visible changes to this project will be documented in this file. This p
 [#63]: /../../pull/63
 [#79]: /../../pull/79
 [#106]: /../../pull/106
-[#168]: /../../pull/168
 
 
 

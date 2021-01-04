@@ -3,11 +3,10 @@
 use std::time::Duration;
 
 use futures::channel::oneshot;
+use medea_control_api_proto::grpc::api::member::Credentials;
 
 use crate::{
-    grpc_control_api::{
-        plain_credentials, ControlClient, MemberBuilder, RoomBuilder,
-    },
+    grpc_control_api::{ControlClient, MemberBuilder, RoomBuilder},
     signalling::{ConnectionEvent, TestMember},
 };
 
@@ -25,7 +24,7 @@ async fn rpc_settings_server_msg() {
         .add_member(
             MemberBuilder::default()
                 .id("member")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .ping_interval(Some(Duration::from_secs(
                     PING_INTERVAL_SECS.into(),
                 )))

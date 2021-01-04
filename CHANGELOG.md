@@ -30,7 +30,7 @@ All user visible changes to this project will be documented in this file. This p
         - `on_join` ([#63], [#153]);
         - `on_leave` ([#63]).
     - Configuration of `Member`'s Client API RPC settings ([#95]);
-    - Support for Argon2 hash credentials ([#168]).
+    - Hashed `Member` credentials support ([#168]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);

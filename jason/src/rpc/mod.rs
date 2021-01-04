@@ -89,9 +89,9 @@ pub enum ConnectionInfoParseError {
     #[display(fmt = "Provided URL doesn't have important segments")]
     NotEnoughSegments,
 
-    /// Provided URL doesn't have credentials.
-    #[display(fmt = "Provided URL doesn't have credentials")]
-    NoCredentials,
+    /// Provided URL doesn't contain auth token.
+    #[display(fmt = "Provided URL does not contain auth token")]
+    NoToken,
 }
 
 impl FromStr for ConnectionInfo {
@@ -102,15 +102,16 @@ impl FromStr for ConnectionInfo {
 
         let mut url =
             Url::parse(s).map_err(|err| tracerr::new!(E::UrlParse(err)))?;
-        url.set_fragment(None);
 
         let credential = url
             .query_pairs()
             .find(|(key, _)| key.as_ref() == "token")
-            .ok_or_else(|| tracerr::new!(E::NoCredentials))?
+            .ok_or_else(|| tracerr::new!(E::NoToken))?
             .1
             .to_owned()
             .into();
+
+        url.set_fragment(None);
         url.set_query(None);
 
         let mut segments = url
@@ -128,7 +129,7 @@ impl FromStr for ConnectionInfo {
             .to_owned()
             .into();
 
-        // Remove last three segments. Safe to unwrap cause we already made all
+        // Remove last two segments. Safe to unwrap cause we already made all
         // necessary checks.
         url.path_segments_mut().unwrap().pop().pop();
 

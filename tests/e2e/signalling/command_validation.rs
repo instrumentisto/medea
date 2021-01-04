@@ -4,12 +4,14 @@ use actix::Context;
 use function_name::named;
 use futures::{channel::mpsc::unbounded, StreamExt as _};
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId};
-use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
+use medea_control_api_proto::grpc::api::{
+    member::Credentials, web_rtc_publish_endpoint::P2p,
+};
 
 use crate::{
     grpc_control_api::{
-        plain_credentials, ControlClient, MemberBuilder, RoomBuilder,
-        WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
+        ControlClient, MemberBuilder, RoomBuilder, WebRtcPlayEndpointBuilder,
+        WebRtcPublishEndpointBuilder,
     },
     signalling::{SendCommand, TestMember},
     test_name,
@@ -27,7 +29,7 @@ async fn command_validation() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -41,7 +43,7 @@ async fn command_validation() {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")

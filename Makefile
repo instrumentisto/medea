@@ -21,7 +21,7 @@ IMAGE_NAME := $(strip \
 	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
 	$(image))))
 
-RUST_VER := 1.48
+RUST_VER := 1.49
 CHROME_VERSION := 87.0
 FIREFOX_VERSION := 84.0.1
 

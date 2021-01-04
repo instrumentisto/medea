@@ -5,9 +5,7 @@ use medea_client_api_proto::{CloseReason, Event};
 use medea_control_api_proto::grpc::api::member::Credentials;
 
 use crate::{
-    grpc_control_api::{plain_credentials, ControlClient},
-    signalling::TestMember,
-    test_name,
+    grpc_control_api::ControlClient, signalling::TestMember, test_name,
 };
 
 use super::{MemberBuilder, RoomBuilder};
@@ -82,22 +80,20 @@ async fn join_room(url: &str) -> Option<Event> {
     rx.next().await
 }
 
-/// Returns URL for provided `test_name` and `token`.
-fn url(test_name: &str, token: &str) -> String {
-    format!(
-        "ws://127.0.0.1:8080/ws/{}/member?token={}",
-        test_name, token,
-    )
-}
-
 /// Checks that Client will be rejected on invalid plain text credentials.
 #[actix_rt::test]
 #[named]
 async fn invalid_plain_credentials() {
-    create_test_room(test_name!(), plain_credentials("test")).await;
+    create_test_room(test_name!(), Credentials::Plain(String::from("test")))
+        .await;
 
     assert_eq!(
-        join_room(&url(test_name!(), "test2")).await.unwrap(),
+        join_room(&format!(
+            "ws://127.0.0.1:8080/ws/{}/member?token=test2",
+            test_name!(),
+        ))
+        .await
+        .unwrap(),
         Event::RoomLeft {
             close_reason: CloseReason::Rejected
         }
@@ -115,7 +111,12 @@ async fn invalid_hash_credentials() {
     .await;
 
     assert_eq!(
-        join_room(&url(test_name!(), "foobar")).await.unwrap(),
+        join_room(&format!(
+            "ws://127.0.0.1:8080/ws/{}/member?token=foobar",
+            test_name!(),
+        ))
+        .await
+        .unwrap(),
         Event::RoomLeft {
             close_reason: CloseReason::Rejected
         }
@@ -133,7 +134,12 @@ async fn valid_hash_credentials() {
     .await;
 
     assert_eq!(
-        join_room(&url(test_name!(), "medea")).await.unwrap(),
+        join_room(&format!(
+            "ws://127.0.0.1:8080/ws/{}/member?token=medea",
+            test_name!(),
+        ))
+        .await
+        .unwrap(),
         Event::RoomJoined {
             member_id: "member".into(),
         }
@@ -148,7 +154,12 @@ async fn valid_plain_credentials() {
         .await;
 
     assert_eq!(
-        join_room(&url(test_name!(), "medea")).await.unwrap(),
+        join_room(&format!(
+            "ws://127.0.0.1:8080/ws/{}/member?token=medea",
+            test_name!(),
+        ))
+        .await
+        .unwrap(),
         Event::RoomJoined {
             member_id: "member".into(),
         }

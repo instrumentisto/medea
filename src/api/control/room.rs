@@ -9,7 +9,7 @@ use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::url::CallbackUrl, member::ControlCredential, EndpointId,
+    callback::url::CallbackUrl, member::Credential, EndpointId,
     TryFromProtobufError,
 };
 
@@ -29,7 +29,7 @@ pub enum RoomElement {
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
-        credentials: ControlCredential,
+        credentials: Credential,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
         #[serde(default, with = "humantime_serde")]

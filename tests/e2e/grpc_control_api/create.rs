@@ -7,7 +7,7 @@
 
 use function_name::named;
 use medea::api::control::error_codes::ErrorCode;
-use medea_control_api_proto::grpc::api as proto;
+use medea_control_api_proto::grpc::api::{self as proto, member::Credentials};
 
 use crate::{
     enum_eq,
@@ -22,8 +22,6 @@ use super::{
 };
 
 mod room {
-    use crate::grpc_control_api::plain_credentials;
-
     use super::*;
 
     #[actix_rt::test]
@@ -50,7 +48,10 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_eq!(responder.credentials, Some(plain_credentials("test")));
+        assert_eq!(
+            responder.credentials,
+            Some(Credentials::Plain(String::from("test")))
+        );
         let mut responder_pipeline = responder.pipeline;
         assert_eq!(responder_pipeline.len(), 1);
         let responder_play = responder_pipeline.remove("play").unwrap();
@@ -68,8 +69,14 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_ne!(publisher.credentials, Some(plain_credentials("test")));
-        assert_ne!(publisher.credentials, Some(plain_credentials("")));
+        assert_ne!(
+            publisher.credentials,
+            Some(Credentials::Plain(String::from("test")))
+        );
+        assert_ne!(
+            publisher.credentials,
+            Some(Credentials::Plain(String::from("")))
+        );
         let publisher_pipeline = publisher.pipeline;
         assert_eq!(publisher_pipeline.len(), 1);
     }
@@ -114,7 +121,6 @@ mod room {
 }
 
 mod member {
-    use crate::grpc_control_api::plain_credentials;
 
     use super::*;
 
@@ -126,7 +132,7 @@ mod member {
 
         let add_member = MemberBuilder::default()
             .id("test-member")
-            .credentials(plain_credentials("qwerty"))
+            .credentials(Credentials::Plain(String::from("qwerty")))
             .add_endpoint(
                 WebRtcPlayEndpointBuilder::default()
                     .id("play")
@@ -152,7 +158,10 @@ mod member {
         let member = client.get(&format!("{}/test-member", test_name!())).await;
         let member = take_member(member);
         assert_eq!(member.pipeline.len(), 1);
-        assert_eq!(member.credentials, Some(plain_credentials("qwerty")));
+        assert_eq!(
+            member.credentials,
+            Some(Credentials::Plain(String::from("qwerty")))
+        );
     }
 
     #[actix_rt::test]

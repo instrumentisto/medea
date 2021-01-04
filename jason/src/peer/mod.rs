@@ -797,22 +797,21 @@ impl PeerConnection {
         *self.has_remote_description.borrow_mut() = true;
         self.media_connections.sync_receivers();
 
-        let mut candidates = self.ice_candidates_buffer.borrow_mut();
-        let mut futures = Vec::with_capacity(candidates.len());
-        while let Some(candidate) = candidates.pop() {
+        let mut candidates = self.ice_candidates_buffer.replace(Vec::new());
+        future::try_join_all(candidates.drain(..).map(|candidate| {
             let peer = Rc::clone(&self.peer);
-            futures.push(async move {
+            async move {
                 peer.add_ice_candidate(
                     &candidate.candidate,
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
                 .await
-            });
-        }
-        future::try_join_all(futures)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
+            }
+        }))
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
     }
 

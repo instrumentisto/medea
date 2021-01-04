@@ -65,7 +65,7 @@ async function createRoom(roomId, memberId) {
       pipeline: {
         [memberId]: {
           kind: 'Member',
-          credentials: { hash: '$argon2i$v=19$m=16,t=2,p=1$N25IdG1CWVc1MVlkSHVSWA$zVx9utA3JYT5o0VS568S3g' },
+          credentials: { plain: 'test' },
           pipeline: pipeline,
           on_join: 'grpc://127.0.0.1:9099',
           on_leave: 'grpc://127.0.0.1:9099'
@@ -74,7 +74,7 @@ async function createRoom(roomId, memberId) {
     }
   });
 
-  return resp.data.sids[memberId] + '?token=test';
+  return resp.data.sids[memberId]
 }
 
 async function createMember(roomId, memberId) {
@@ -130,7 +130,7 @@ async function createMember(roomId, memberId) {
     url: controlUrl + roomId + '/' + memberId,
     data: {
       kind: 'Member',
-      credentials: { hash: '$argon2i$v=19$m=16,t=2,p=1$N25IdG1CWVc1MVlkSHVSWA$zVx9utA3JYT5o0VS568S3g' },
+      credentials: { plain: 'test' },
       pipeline: pipeline,
       on_join: 'grpc://127.0.0.1:9099',
       on_leave: 'grpc://127.0.0.1:9099'
@@ -157,7 +157,7 @@ async function createMember(roomId, memberId) {
     }
   }
 
-  return resp.data.sids[memberId] + '?token=test';
+  return resp.data.sids[memberId];
 }
 
 const colorizedJson = {

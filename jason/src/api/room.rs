@@ -337,11 +337,12 @@ impl RoomHandle {
             .map(|inner| inner.on_connection_loss.set_func(f))
     }
 
-    /// Performs entering to a [`Room`] with the provided authorization
-    /// `token` for connection with media server.
+    /// Connects media server and enters [`Room`] with provided authorization
+    /// `token`.
     ///
-    /// Authorization token is always in format:
-    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ PASSWORD }}`.
+    /// Authorization token has fixed format:
+    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`.
+    /// E.g., `wss://medea.com/MyConf1/Alice?token=777`.
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
@@ -1077,7 +1078,7 @@ impl InnerRoom {
                                 None
                             }
                         })
-                        .map(|(trnscvr, desired_state, need_patch)| {
+                        .try_for_each(|(trnscvr, desired_state, need_patch)| {
                             trnscvr.media_state_transition_to(desired_state)?;
                             transitions_futs.push(
                                 trnscvr.when_media_state_stable(desired_state),
@@ -1092,7 +1093,6 @@ impl InnerRoom {
 
                             Ok(())
                         })
-                        .collect::<Result<(), _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {
                         self.rpc.send_command(Command::UpdateTracks {

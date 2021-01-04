@@ -13,13 +13,13 @@ use actix::{Arbiter, Context};
 use function_name::named;
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
+use medea_control_api_proto::grpc::api::{
+    member::Credentials, web_rtc_publish_endpoint::P2p,
+};
 use tokio::time::timeout;
 
 use crate::{
-    grpc_control_api::{plain_credentials, ControlClient},
-    signalling::TestMember,
-    test_name,
+    grpc_control_api::ControlClient, signalling::TestMember, test_name,
 };
 
 use super::{
@@ -65,7 +65,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -99,7 +99,7 @@ async fn signalling_starts_when_create_play_member_after_pub_member() {
 
     let create_play_member = MemberBuilder::default()
         .id("responder")
-        .credentials(plain_credentials("qwerty"))
+        .credentials(Credentials::Plain(String::from("qwerty")))
         .add_endpoint(
             WebRtcPlayEndpointBuilder::default()
                 .id("play")
@@ -138,7 +138,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -172,7 +172,7 @@ async fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 
     let create_second_member = MemberBuilder::default()
         .id("responder")
-        .credentials(plain_credentials("qwerty"))
+        .credentials(Credentials::Plain(String::from("qwerty")))
         .build()
         .unwrap()
         .build_request(test_name!());
@@ -213,7 +213,7 @@ async fn signalling_starts_in_loopback_scenario() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -267,7 +267,7 @@ async fn peers_removed_on_delete_member() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -281,7 +281,7 @@ async fn peers_removed_on_delete_member() {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials(plain_credentials("test"))
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
