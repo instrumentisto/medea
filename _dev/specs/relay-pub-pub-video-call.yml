@@ -4,7 +4,8 @@ spec:
   pipeline:
     caller:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       spec:
@@ -21,7 +22,8 @@ spec:
               force_relay: true
     responder:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       on_join: "grpc://127.0.0.1:9099"
       on_leave: "grpc://127.0.0.1:9099"
       spec:

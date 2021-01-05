@@ -4,6 +4,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 mod create;
+mod credentials;
 mod delete;
 mod rpc_settings;
 mod signaling;
@@ -12,7 +13,7 @@ use std::{collections::HashMap, time::Duration};
 
 use derive_builder::*;
 use medea_control_api_proto::grpc::api::{
-    self as proto, control_api_client::ControlApiClient,
+    self as proto, control_api_client::ControlApiClient, member::Credentials,
 };
 use tonic::transport::Channel;
 
@@ -201,7 +202,7 @@ pub struct Member {
     id: String,
     #[builder(default = "None")]
     #[builder(setter(strip_option))]
-    credentials: Option<String>,
+    credentials: Option<proto::member::Credentials>,
     #[builder(default = "HashMap::new()")]
     endpoints: HashMap<String, Endpoint>,
     #[builder(default = "None")]
@@ -231,7 +232,7 @@ impl Into<proto::Member> for Member {
             pipeline,
             on_leave: self.on_leave.unwrap_or_default(),
             on_join: self.on_join.unwrap_or_default(),
-            credentials: self.credentials.unwrap_or_default(),
+            credentials: self.credentials,
             ping_interval: self.ping_interval.map(Into::into),
             idle_timeout: self.idle_timeout.map(Into::into),
             reconnect_timeout: self.reconnect_timeout.map(Into::into),
@@ -394,7 +395,8 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
 ///               p2p: Always
 ///     responder:
 ///       kind: Member
-///       credentials: test
+///       credentials:
+///         plain: test
 ///       spec:
 ///         pipeline:
 ///           play:
@@ -421,7 +423,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials("test")
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
@@ -461,7 +463,8 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
 ///               src: "local://{{ room_id }}/bob/publish"
 ///     bob:
 ///       kind: Member
-///       credentials: test
+///       credentials:
+///         plain: test
 ///       spec:
 ///         pipeline:
 ///           play:
@@ -495,7 +498,7 @@ pub fn pub_pub_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("bob")
-                .credentials("test")
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")

@@ -7,7 +7,7 @@
 
 use function_name::named;
 use medea::api::control::error_codes::ErrorCode;
-use medea_control_api_proto::grpc::api as proto;
+use medea_control_api_proto::grpc::api::{self as proto, member::Credentials};
 
 use crate::{
     enum_eq,
@@ -35,7 +35,10 @@ mod room {
             sids.get(&"responder".to_string()).unwrap().as_str();
         assert_eq!(
             responder_sid,
-            &format!("ws://127.0.0.1:8080/ws/{}/responder/test", test_name!())
+            &format!(
+                "ws://127.0.0.1:8080/ws/{}/responder?token=test",
+                test_name!()
+            )
         );
 
         let mut room = take_room(client.get(test_name!()).await);
@@ -45,7 +48,10 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_eq!(responder.credentials.as_str(), "test");
+        assert_eq!(
+            responder.credentials,
+            Some(Credentials::Plain(String::from("test")))
+        );
         let mut responder_pipeline = responder.pipeline;
         assert_eq!(responder_pipeline.len(), 1);
         let responder_play = responder_pipeline.remove("play").unwrap();
@@ -63,8 +69,14 @@ mod room {
             proto::room::element::El::Member(member) => member,
             _ => panic!(),
         };
-        assert_ne!(publisher.credentials.as_str(), "test");
-        assert_ne!(publisher.credentials.as_str(), "");
+        assert_ne!(
+            publisher.credentials,
+            Some(Credentials::Plain(String::from("test")))
+        );
+        assert_ne!(
+            publisher.credentials,
+            Some(Credentials::Plain(String::from("")))
+        );
         let publisher_pipeline = publisher.pipeline;
         assert_eq!(publisher_pipeline.len(), 1);
     }
@@ -120,7 +132,7 @@ mod member {
 
         let add_member = MemberBuilder::default()
             .id("test-member")
-            .credentials("qwerty")
+            .credentials(Credentials::Plain(String::from("qwerty")))
             .add_endpoint(
                 WebRtcPlayEndpointBuilder::default()
                     .id("play")
@@ -138,7 +150,7 @@ mod member {
         assert_eq!(
             e2e_test_member_sid,
             format!(
-                "ws://127.0.0.1:8080/ws/{}/test-member/qwerty",
+                "ws://127.0.0.1:8080/ws/{}/test-member?token=qwerty",
                 test_name!()
             )
         );
@@ -146,7 +158,10 @@ mod member {
         let member = client.get(&format!("{}/test-member", test_name!())).await;
         let member = take_member(member);
         assert_eq!(member.pipeline.len(), 1);
-        assert_eq!(member.credentials.as_str(), "qwerty");
+        assert_eq!(
+            member.credentials,
+            Some(Credentials::Plain(String::from("qwerty")))
+        );
     }
 
     #[actix_rt::test]
@@ -406,6 +421,7 @@ mod endpoint {
             None,
             None,
             true,
+            true,
         )
         .await;
         let _responder = TestMember::connect(
@@ -432,6 +448,7 @@ mod endpoint {
             })),
             None,
             None,
+            true,
             true,
         )
         .await;

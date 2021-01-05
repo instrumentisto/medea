@@ -21,9 +21,9 @@ IMAGE_NAME := $(strip \
 	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
 	$(image))))
 
-RUST_VER := 1.48
+RUST_VER := 1.49
 CHROME_VERSION := 87.0
-FIREFOX_VERSION := 84.0
+FIREFOX_VERSION := 84.0.1
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -221,7 +221,7 @@ ifeq ($(dockerized),yes)
 	docker run --rm -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		rust:$(RUST_VER) \
+		ghcr.io/instrumentisto/rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
@@ -235,7 +235,7 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		rust:$(RUST_VER) \
+		ghcr.io/instrumentisto/rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no \
 			                 pre-install=yes

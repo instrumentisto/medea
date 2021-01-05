@@ -655,7 +655,7 @@ impl MediaConnections {
 
         future::try_join_all(sender_and_track.into_iter().map(
             |(sender, track)| async move {
-                sender.clone().insert_track(track).await?;
+                Rc::clone(&sender).insert_track(track).await?;
                 sender.maybe_enable();
                 Ok::<(), Traced<MediaConnectionsError>>(())
             },

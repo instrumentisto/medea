@@ -207,11 +207,9 @@ async fn room_dispose_works() {
             });
         }
     });
-    JsFuture::from(
-        another_room.join(
-            "ws://example.com/another_room_id/member_id/token".to_string(),
-        ),
-    )
+    JsFuture::from(another_room.join(
+        "ws://example.com/another_room_id/member_id?token=token".to_string(),
+    ))
     .await
     .unwrap();
 

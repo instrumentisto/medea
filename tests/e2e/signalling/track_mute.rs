@@ -29,6 +29,7 @@ async fn track_mute_doesnt_renegotiates() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
     let (subscriber_tx, mut subscriber_rx) = mpsc::unbounded();
@@ -39,6 +40,7 @@ async fn track_mute_doesnt_renegotiates() {
         })),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;
@@ -128,6 +130,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
     let (subscriber_tx, mut subscriber_rx) = mpsc::unbounded();
@@ -138,6 +141,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
         })),
         None,
         TestMember::DEFAULT_DEADLINE,
+        true,
         true,
     )
     .await;

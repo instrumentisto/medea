@@ -341,8 +341,12 @@ impl RoomHandle {
             .map(|inner| inner.on_connection_loss.set_func(f))
     }
 
-    /// Performs entering to a [`Room`] with the preconfigured authorization
-    /// `token` for connection with media server.
+    /// Connects media server and enters [`Room`] with provided authorization
+    /// `token`.
+    ///
+    /// Authorization token has fixed format:
+    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
+    /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:

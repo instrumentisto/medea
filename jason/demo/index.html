@@ -184,7 +184,7 @@
         url: controlUrl + roomId + '/' + memberId,
         data: {
           kind: 'Member',
-          credentials: 'test',
+          credentials: { plain: 'test' },
           pipeline: pipeline,
         },
       });
