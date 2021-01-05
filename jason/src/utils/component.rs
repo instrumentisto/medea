@@ -13,45 +13,44 @@ use crate::utils::{JasonError, TaskHandle};
 ///
 /// `$state` - [`Component`]'s state.
 ///
-/// `$ctx` - [`Component`]'s context.
+/// `$obj` - object managed by [`Component`].
 #[macro_export]
 macro_rules! spawn_component {
-    ($component:ty, $state:expr, $ctx:expr $(,)*) => {{
-        let component = <$component>::inner_new($state, $ctx);
+    ($component:ty, $state:expr, $obj:expr $(,)*) => {{
+        let component = <$component>::inner_new($state, $obj);
         component.spawn();
         component
     }};
 }
 
-/// Base for all components of this app.
+/// Component is a base that helps managing reactive components.
 ///
-/// Can spawn new watchers with a [`Component::spawn_watcher`].
-///
-/// Will stop all spawned with a [`Component::spawn_watcher`] watchers on
-/// [`Drop`].
-///
-/// Can be dereferenced to the [`Component`]'s context.
-pub struct Component<S, C> {
+/// Component consists of two parts: state and object. Object is listening to
+/// its state changes and updates accordingly, so all mutations are meant to be
+/// applied to state.
+pub struct Component<S, O> {
     state: Rc<S>,
-    ctx: Rc<C>,
-    watchers_store: RefCell<Vec<TaskHandle>>,
+    obj: Rc<O>,
+    spawned_watchers: RefCell<Vec<TaskHandle>>,
 }
 
-impl<S, C> Component<S, C> {
-    /// Returns new [`Component`] with a provided data.
+impl<S, O> Component<S, O> {
+    /// Returns new [`Component`] with a provided data. Not meant to be used
+    /// directly, use `spawn_component` macro for creating components.
     #[inline]
-    pub fn inner_new(state: Rc<S>, ctx: Rc<C>) -> Self {
+    #[doc(hidden)]
+    pub fn inner_new(state: Rc<S>, obj: Rc<O>) -> Self {
         Self {
             state,
-            ctx,
-            watchers_store: RefCell::new(Vec::new()),
+            obj,
+            spawned_watchers: RefCell::new(Vec::new()),
         }
     }
 
-    /// Returns [`Rc`] to the context of this [`Component`].
+    /// Returns [`Rc`] to the object managed by this [`Component`].
     #[inline]
-    pub fn ctx(&self) -> Rc<C> {
-        self.ctx.clone()
+    pub fn obj(&self) -> Rc<O> {
+        Rc::clone(&self.obj)
     }
 
     /// Returns reference to the state of this [`Component`]
@@ -61,7 +60,7 @@ impl<S, C> Component<S, C> {
     }
 }
 
-impl<S: 'static, C: 'static> Component<S, C> {
+impl<S: 'static, O: 'static> Component<S, O> {
     /// Spawns watchers for the provided [`Stream`].
     ///
     /// If watcher returns error then this error will be converted to the
@@ -69,19 +68,19 @@ impl<S: 'static, C: 'static> Component<S, C> {
     ///
     /// You can stop all listeners tasks spawned by this function by
     /// [`Component`] drop.
-    pub fn spawn_watcher<R, V, F, O, E>(&self, mut rx: R, handle: F)
+    pub fn spawn_watcher<R, V, F, H, E>(&self, mut rx: R, handle: F)
     where
-        F: Fn(Rc<C>, Rc<S>, V) -> O + 'static,
+        F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
         R: Stream<Item = V> + Unpin + 'static,
-        O: Future<Output = Result<(), E>> + 'static,
+        H: Future<Output = Result<(), E>> + 'static,
         E: Into<JasonError>,
     {
-        let ctx = Rc::clone(&self.ctx);
+        let obj = Rc::clone(&self.obj);
         let state = Rc::clone(&self.state);
         let (fut, handle) = future::abortable(async move {
             while let Some(value) = rx.next().await {
                 if let Err(e) =
-                    (handle)(Rc::clone(&ctx), Rc::clone(&state), value).await
+                    (handle)(Rc::clone(&obj), Rc::clone(&state), value).await
                 {
                     Into::<JasonError>::into(e).print();
                 }
@@ -89,14 +88,14 @@ impl<S: 'static, C: 'static> Component<S, C> {
         });
         spawn_local(fut.map(|_| ()));
 
-        self.watchers_store.borrow_mut().push(handle.into());
+        self.spawned_watchers.borrow_mut().push(handle.into());
     }
 }
 
-impl<S, C> Deref for Component<S, C> {
-    type Target = C;
+impl<S, O> Deref for Component<S, O> {
+    type Target = O;
 
     fn deref(&self) -> &Self::Target {
-        &self.ctx
+        &self.obj
     }
 }

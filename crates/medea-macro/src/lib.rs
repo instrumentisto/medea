@@ -300,20 +300,20 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// use medea_jason::utils::Component;
 /// use medea_macro::{watchers, watch};
 ///
-/// struct FooState {
+/// struct SenderState {
 ///     muted: ObservableCell<bool>,
 /// }
 ///
-/// struct FooCtx;
+/// struct Sender;
 ///
-/// type FooComponent = Component<FooState, FooCtx>;
+/// type SenderComponent = Component<SenderState, Sender>;
 ///
 /// #[watchers]
-/// impl FooComponent {
+/// impl SenderComponent {
 ///     #[watch(self.state().muted.subscribe())]
 ///     async fn muted_change_watcher(
-///         ctx: Rc<FooCtx>,
-///         state: Rc<FooState>,
+///         ctx: Rc<Sender>,
+///         state: Rc<SenderState>,
 ///         new_muted_val: bool
 ///     ) -> Result<(), ()> {
 ///         Ok(())
@@ -321,10 +321,10 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// # `FooComponent` implementation after macro expansion
+/// # `SenderComponent` implementation after macro expansion
 ///
 /// ```ignore
-/// impl FooComponent {
+/// impl SenderComponent {
 ///     fn spawn(&self) {
 ///         self.spawn_watcher(
 ///             self.state().muted.subscribe(),
@@ -333,8 +333,8 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     async fn muted_change_watcher(
-///         ctx: Rc<FooCtx>,
-///         state: Rc<FooState>,
+///         ctx: Rc<Sender>,
+///         state: Rc<SenderState>,
 ///         new_muted_val: bool
 ///     ) -> Result<(), ()> {
 ///         Ok(())
