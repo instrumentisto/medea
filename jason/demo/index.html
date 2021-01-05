@@ -35,6 +35,9 @@
     let isForceRelayCheckbox = document.getElementById('is_force_relay');
     let isAudioEnabledCheckbox = document.getElementById('is-audio-enabled');
     let isVideoEnabledCheckbox = document.getElementById('is-video-enabled');
+    let isNoiseSuppression = document.getElementById('noise_suppression');
+    let isAutoGainControl = document.getElementById('auto_gain_control');
+    let isEchoCancellation = document.getElementById('echo_cancellation');
     let isPublishingEnabledCheckbox = document.getElementById('is-publishing-enabled');
     let usernameInput = document.getElementById('join__username');
     let disableAudioSendBtn = document.getElementById('control__disable_audio_send');
@@ -250,6 +253,9 @@
         if (audioSource) {
           audio.device_id(audioSource.value);
         }
+        audio.echo_cancellation(isEchoCancellation.checked);
+        audio.auto_gain_control(isAutoGainControl.checked);
+        audio.noise_suppression(isNoiseSuppression.checked);
         constraints.audio(audio);
       }
 
@@ -764,6 +770,16 @@
         }
       });
 
+      let noisePropsListener = async () => {
+        let constraints = await build_constraints(audioSelect, videoSelect);
+        await room.set_local_media_settings(constraints, false, false);
+        await room.disable_audio();
+        await room.enable_audio();
+      };
+      isAutoGainControl.addEventListener('click', noisePropsListener);
+      isNoiseSuppression.addEventListener('click', noisePropsListener);
+      isEchoCancellation.addEventListener('click', noisePropsListener);
+
       let roomId = window.location.hash.replace('#', '');
 
       if (roomId) {
@@ -945,6 +961,7 @@
           </div>
         </div>
 
+
         <div class="form-check mb-3">
           <div class="custom-switch">
             <input class="form-check-input custom-control-input"
@@ -954,6 +971,39 @@
             <label class="form-check-label custom-control-label"
                    for="is_force_relay">
               Force TURN relay
+            </label>
+          </div>
+        </div>
+
+        <div class="form-check mb-3">
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="auto_gain_control"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="auto_gain_control">
+              Auto Gain Control
+            </label>
+          </div>
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="noise_suppression"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="noise_suppression">
+              Noise Suppression
+            </label>
+          </div>
+          <div class="custom-switch">
+            <input class="form-check-input custom-control-input"
+                   type="checkbox"
+                   id="echo_cancellation"
+                   checked>
+            <label class="form-check-label custom-control-label"
+                   for="echo_cancellation">
+              Echo Cancellation
             </label>
           </div>
         </div>

@@ -860,6 +860,10 @@ pub struct AudioTrackConstraints {
     /// track.
     device_id: Option<ConstrainString<DeviceId>>,
 
+    echo_cancellation: bool,
+    noise_suppression: bool,
+    auto_gain_control: bool,
+
     /// Importance of this [`AudioTrackConstraints`].
     ///
     /// If `true` then without this [`AudioTrackConstraints`] call session
@@ -880,6 +884,18 @@ impl AudioTrackConstraints {
     /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(ConstrainString::Exact(DeviceId(device_id)));
+    }
+
+    pub fn echo_cancellation(&mut self, echo_cancellation: bool) {
+        self.echo_cancellation = echo_cancellation;
+    }
+
+    pub fn noise_suppression(&mut self, noise_suppression: bool) {
+        self.noise_suppression = noise_suppression;
+    }
+
+    pub fn auto_gain_control(&mut self, auto_gain_control: bool) {
+        self.auto_gain_control = auto_gain_control;
     }
 }
 
@@ -905,6 +921,9 @@ impl AudioTrackConstraints {
         if !self.required && another.required {
             self.required = another.required;
         }
+        self.echo_cancellation = another.echo_cancellation;
+        self.noise_suppression = another.noise_suppression;
+        self.auto_gain_control = another.auto_gain_control;
     }
 
     /// Returns importance of this [`AudioTrackConstraints`].
@@ -922,6 +941,9 @@ impl From<ProtoAudioConstraints> for AudioTrackConstraints {
         Self {
             required: caps.required,
             device_id: None,
+            auto_gain_control: true,
+            echo_cancellation: true,
+            noise_suppression: true,
         }
     }
 }
@@ -929,6 +951,10 @@ impl From<ProtoAudioConstraints> for AudioTrackConstraints {
 impl From<AudioTrackConstraints> for sys::MediaTrackConstraints {
     fn from(track_constraints: AudioTrackConstraints) -> Self {
         let mut constraints = Self::new();
+
+        constraints.echo_cancellation(&track_constraints.echo_cancellation.into());
+        constraints.auto_gain_control(&track_constraints.auto_gain_control.into());
+        constraints.noise_suppression(&track_constraints.noise_suppression.into());
 
         if let Some(device_id) = track_constraints.device_id {
             constraints.device_id(&sys::ConstrainDomStringParameters::from(
