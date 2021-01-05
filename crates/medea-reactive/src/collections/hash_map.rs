@@ -8,12 +8,13 @@ use std::{
     marker::PhantomData,
 };
 
-use futures::{
-    future::{self, FutureExt as _, LocalBoxFuture},
-    stream::LocalBoxStream,
-};
+use futures::stream::{LocalBoxStream, StreamExt as _};
 
-use crate::subscribers_store::{common, progressable, SubscribersStore};
+use crate::subscribers_store::{
+    common, progressable,
+    progressable::{RecheckableCounterFuture, RecheckableFutureExt},
+    SubscribersStore,
+};
 
 /// Reactive hash map based on [`HashMap`][1] with additional functionality of
 /// tracking progress made by its subscribers. Its [`HashMap::on_insert()`] and
@@ -117,40 +118,31 @@ where
     K: Hash + Eq + Clone + 'static,
     V: Clone + 'static,
 {
-    /// Returns [`Future`] resolving when all insertion updates will be
-    /// processed by [`HashMap::on_insert()`] subscribers.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Returns [`RecheckableFutureExt`] resolving when all insertion updates
+    /// will be processed by [`HashMap::on_insert()`] subscribers.
     #[inline]
     #[must_use]
-    pub fn when_insert_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_insert_processed(&self) -> RecheckableCounterFuture {
         self.on_insert_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] resolving when all remove updates will be processed
-    /// by [`HashMap::on_remove()`] subscribers.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Returns [`RecheckableFutureExt`] resolving when all remove updates will
+    /// be processed by [`HashMap::on_remove()`] subscribers.
     #[inline]
     #[must_use]
-    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> RecheckableCounterFuture {
         self.on_remove_subs.when_all_processed()
     }
 
-    /// Returns [`Future`] resolving when all insert and remove updates will be
-    /// processed by subscribers.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Returns [`RecheckableFutureExt`] resolving when all insert and remove
+    /// updates will be processed by subscribers.
     #[inline]
     #[must_use]
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(
-            future::join(
-                self.when_remove_processed(),
-                self.when_insert_processed(),
-            )
-            .map(|(_, _)| ()),
-        )
+    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
+        crate::join_all(vec![
+            self.when_remove_processed(),
+            self.when_insert_processed(),
+        ])
     }
 }
 
@@ -222,6 +214,12 @@ where
                 .map(|(k, v)| self.on_insert_subs.wrap((k.clone(), v.clone())))
                 .collect::<Vec<_>>(),
         ))
+    }
+
+    /// Chains [`HashMap::replay_on_insert`] with a [`HashMap::on_insert`].
+    #[inline]
+    pub fn on_insert_with_replay(&self) -> LocalBoxStream<'static, O> {
+        Box::pin(self.replay_on_insert().chain(self.on_insert()))
     }
 }
 
