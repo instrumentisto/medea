@@ -473,13 +473,16 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        state.when_all_receivers_processed().await;
+        let mut wait_futs: Vec<Box<dyn RecheckableFutureExt<Output = ()>>> =
+            vec![Box::new(state.when_all_receivers_processed())];
         if matches!(
             state.negotiation_role.get(),
             Some(NegotiationRole::Answerer(_))
         ) {
-            state.remote_sdp_offer.when_all_processed().await;
+            wait_futs
+                .push(Box::new(state.remote_sdp_offer.when_all_processed()));
         }
+        medea_reactive::join_all(wait_futs).await;
 
         let ((_, new_sender), _guard) = val.into_parts();
         for receiver in new_sender.receivers() {
@@ -631,10 +634,13 @@ impl Component {
 
                     state.set_remote_sdp_offer(remote_sdp_offer);
 
-                    state.when_all_receivers_updated().await;
-                    state.remote_sdp_offer.when_all_processed().await;
-                    state.when_all_senders_processed().await;
-                    state.when_all_senders_updated().await;
+                    medea_reactive::join_all(vec![
+                        state.when_all_receivers_updated(),
+                        Box::new(state.when_all_senders_processed()),
+                        Box::new(state.remote_sdp_offer.when_all_processed()),
+                        state.when_all_senders_updated(),
+                    ])
+                    .await;
 
                     state
                         .update_local_stream(&peer)
