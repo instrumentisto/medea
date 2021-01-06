@@ -2,18 +2,17 @@
 
 use std::{cell::RefCell, ops::Deref, rc::Rc};
 
-use futures::{future, Future, FutureExt, Stream, StreamExt};
+use derive_more::Deref;
+use futures::{future, Future, FutureExt as _, Stream, StreamExt as _};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::{JasonError, TaskHandle};
 
-/// Creates and spawns new [`Component`].
+/// Creates and spawns a new [`Component`].
 ///
-/// `$component` - type alias for [`Component`] which you wanna create.
-///
-/// `$state` - [`Component`]'s state.
-///
-/// `$obj` - object managed by [`Component`].
+/// - `$component` - type alias for the [`Component`] to be created.
+/// - `$state` - [`Component`]'s state.
+/// - `$obj` - object to be managed by the created [`Component`].
 #[macro_export]
 macro_rules! spawn_component {
     ($component:ty, $state:expr, $obj:expr $(,)*) => {{
@@ -25,20 +24,23 @@ macro_rules! spawn_component {
 
 /// Component is a base that helps managing reactive components.
 ///
-/// Component consists of two parts: state and object. Object is listening to
-/// its state changes and updates accordingly, so all mutations are meant to be
-/// applied to state.
+/// It consists of two parts: state and object. Object is listening to its state
+/// changes and updates accordingly, so all mutations are meant to be applied to
+/// the state.
+#[derive(Deref)]
 pub struct Component<S, O> {
     state: Rc<S>,
+    #[deref]
     obj: Rc<O>,
     spawned_watchers: RefCell<Vec<TaskHandle>>,
 }
 
 impl<S, O> Component<S, O> {
     /// Returns new [`Component`] with a provided data. Not meant to be used
-    /// directly, use `spawn_component` macro for creating components.
-    #[inline]
+    /// directly, use [`spawn_component`] macro for creating components.
     #[doc(hidden)]
+    #[inline]
+    #[must_use]
     pub fn inner_new(state: Rc<S>, obj: Rc<O>) -> Self {
         Self {
             state,
@@ -49,12 +51,14 @@ impl<S, O> Component<S, O> {
 
     /// Returns [`Rc`] to the object managed by this [`Component`].
     #[inline]
+    #[must_use]
     pub fn obj(&self) -> Rc<O> {
         Rc::clone(&self.obj)
     }
 
-    /// Returns reference to the state of this [`Component`]
+    /// Returns reference to the state of this [`Component`].
     #[inline]
+    #[must_use]
     pub fn state(&self) -> &S {
         &self.state
     }
@@ -63,11 +67,11 @@ impl<S, O> Component<S, O> {
 impl<S: 'static, O: 'static> Component<S, O> {
     /// Spawns watchers for the provided [`Stream`].
     ///
-    /// If watcher returns error then this error will be converted to the
-    /// [`JasonError`] and printed with a [`JasonError::print`].
+    /// If watcher returns an error then this error will be converted into the
+    /// [`JasonError`] and printed with a [`JasonError::print()`].
     ///
     /// You can stop all listeners tasks spawned by this function by
-    /// [`Component`] drop.
+    /// [`Drop`]ping this [`Component`].
     pub fn spawn_watcher<R, V, F, H, E>(&self, mut rx: R, handle: F)
     where
         F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
@@ -89,13 +93,5 @@ impl<S: 'static, O: 'static> Component<S, O> {
         spawn_local(fut.map(|_| ()));
 
         self.spawned_watchers.borrow_mut().push(handle.into());
-    }
-}
-
-impl<S, O> Deref for Component<S, O> {
-    type Target = O;
-
-    fn deref(&self) -> &Self::Target {
-        &self.obj
     }
 }
