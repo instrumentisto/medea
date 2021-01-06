@@ -18,11 +18,11 @@ use syn::{
 /// 3. Generates `spawn` method with all generated `spawn_watcher` method calls.
 ///
 /// 4. Appends generated `spawn` method to the input [`ItemImpl`].
-pub fn expand(input: ItemImpl) -> Result<TokenStream> {
+pub fn expand(mut input: ItemImpl) -> Result<TokenStream> {
     #[allow(clippy::filter_map)]
     let watchers: Vec<_> = input
         .items
-        .iter()
+        .iter_mut()
         .filter_map(|i| {
             if let ImplItem::Method(m) = i {
                 Some(m)
@@ -31,11 +31,18 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
             }
         })
         .map(|method| {
+            let mut watch_attr_index = None;
             let stream_expr: ExprMethodCall = method
                 .attrs
                 .iter()
-                .find(|attr| {
-                    attr.path.get_ident().map_or(false, |p| *p == "watch")
+                .enumerate()
+                .find_map(|(i, attr)| {
+                    if attr.path.get_ident().map_or(false, |p| *p == "watch") {
+                        watch_attr_index = Some(i);
+                        Some(attr)
+                    } else {
+                        None
+                    }
                 })
                 .ok_or_else(|| {
                     Error::new(
@@ -44,6 +51,9 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
                     )
                 })?
                 .parse_args()?;
+            if let Some(index) = watch_attr_index {
+                method.attrs.remove(index);
+            }
             let watcher_ident = &method.sig.ident;
 
             Ok(quote! {
