@@ -1,6 +1,6 @@
 //! Implementation of the [`Component`].
 
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Deref;
 use futures::{future, Future, FutureExt as _, Stream, StreamExt as _};
