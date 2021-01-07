@@ -302,6 +302,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// struct SenderState {
 ///     muted: ObservableCell<bool>,
+///     enabled: ObservableCell<bool>,
 /// }
 ///
 /// struct Sender;
@@ -318,6 +319,15 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     ) -> Result<(), ()> {
 ///         Ok(())
 ///     }
+///
+///     #[watch(self.state().enabled.subscribe())]
+///     async fn enabled_change_watcher(
+///         ctx: Rc<Sender>,
+///         state: Rc<SenderState>,
+///         new_enabled_val: bool,
+///     ) -> Result<(), ()> {
+///         Ok(())
+///     }
 /// }
 /// ```
 ///
@@ -330,6 +340,10 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///             self.state().muted.subscribe(),
 ///             Self::muted_change_watcher,
 ///         );
+///         self.spawn_watcher(
+///             self.state().enabled.subscribe(),
+///             Self::enabled_change_watcher,
+///         );
 ///     }
 ///
 ///     async fn muted_change_watcher(
@@ -339,20 +353,20 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     ) -> Result<(), ()> {
 ///         Ok(())
 ///     }
+///
+///     async fn enabled_change_watcher(
+///         ctx: Rc<Sender>,
+///         state: Rc<SenderState>,
+///         new_enabled_val: bool,
+///     ) -> Result<(), ()> {
+///         Ok(())
+///     }
 /// }
 /// ```
 #[proc_macro_attribute]
 pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
     watchers::expand(syn::parse_macro_input!(input))
         .unwrap_or_else(|e| e.to_compile_error().into())
-}
-
-/// Works only with a [`macro@watchers`] macro.
-///
-/// See [`macro@watchers`] macro docs for the usage info.
-#[proc_macro_attribute]
-pub fn watch(_: TokenStream, input: TokenStream) -> TokenStream {
-    input
 }
 
 decl_derive!([JsCaused, attributes(js)] =>
