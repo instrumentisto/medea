@@ -286,11 +286,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
     dispatchable::expand(enum_item, &args)
 }
 
-/// Generates `Component`'s watchers spawn method based on provided `impl`
-/// block.
-///
-/// It's not recommended to use `Component::spawn` function directly. Use
-/// `medea_jason::spawn_component` for component creating and spawning.
+/// Generates `ComponentState` implementation on provided `impl`.
 ///
 /// # Usage
 ///
@@ -311,7 +307,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// #[watchers]
 /// impl SenderComponent {
-///     #[watch(self.state().muted.subscribe())]
+///     #[watch(self.muted.subscribe())]
 ///     async fn muted_change_watcher(
 ///         ctx: Rc<Sender>,
 ///         state: Rc<SenderState>,
@@ -320,7 +316,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///         Ok(())
 ///     }
 ///
-///     #[watch(self.state().enabled.subscribe())]
+///     #[watch(self.enabled.subscribe())]
 ///     async fn enabled_change_watcher(
 ///         ctx: Rc<Sender>,
 ///         state: Rc<SenderState>,
@@ -335,17 +331,6 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// impl SenderComponent {
-///     fn spawn(&self) {
-///         self.spawn_watcher(
-///             self.state().muted.subscribe(),
-///             Self::muted_change_watcher,
-///         );
-///         self.spawn_watcher(
-///             self.state().enabled.subscribe(),
-///             Self::enabled_change_watcher,
-///         );
-///     }
-///
 ///     async fn muted_change_watcher(
 ///         ctx: Rc<Sender>,
 ///         state: Rc<SenderState>,
@@ -362,7 +347,26 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///         Ok(())
 ///     }
 /// }
+///
+/// impl ComponentState<Sender> for SenderState {
+///     fn spawn_watchers(&self, s: &mut WatchersSpawner<SenderState, Sender>) {
+///         s.spawn(
+///             self.muted.subscribe(),
+///             SenderComponent::muted_change_watcher,
+///         );
+///         s.spawn(
+///             self.enabled.subscribe(),
+///             SenderComponent::enabled_change_watcher,
+///         );
+///     }
+/// }
 /// ```
+///
+/// __Note that `ComponentState` implementation is simplified in this example
+/// for better readability.__
+///
+/// In reality context and state types will be obtained by casting
+/// `SenderComponent` to the `ComponentTypes` trait and getting types from it.
 #[proc_macro_attribute]
 pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
     watchers::expand(syn::parse_macro_input!(input))

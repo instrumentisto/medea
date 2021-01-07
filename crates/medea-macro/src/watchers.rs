@@ -1,7 +1,7 @@
 //! `#[watchers]` and `#[watch(...)]` macros implementation.
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens as _};
+use quote::quote;
 use syn::{
     parse::{Error, Result},
     ExprMethodCall, ImplItem, ItemImpl,
@@ -13,12 +13,16 @@ use syn::{
 ///
 /// 1. Collects all methods with a `#[watch(...)]` macro.
 ///
-/// 2. Generates `spawn_watcher` code for the found methods.
+/// 2. Removes `#[watch(...)]` from the found methods.
 ///
-/// 3. Generates `spawn` method with all generated `spawn_watcher` method calls.
+/// 3. Generates `WatchersSpawner::spawn` code for the found methods.
 ///
-/// 4. Appends generated `spawn` method to the input [`ItemImpl`].
+/// 4. Generates `ComponentState` implementation with all generated
+///    `WatchersSpawner::spawn` method calls.
+///
+/// 5. Appends generated `ComponentState` implementation to the input.
 pub fn expand(mut input: ItemImpl) -> Result<TokenStream> {
+    let component_ty = input.self_ty.clone();
     #[allow(clippy::filter_map)]
     let watchers: Vec<_> = input
         .items
@@ -57,19 +61,27 @@ pub fn expand(mut input: ItemImpl) -> Result<TokenStream> {
             let watcher_ident = &method.sig.ident;
 
             Ok(quote! {
-                self.spawn_watcher(#stream_expr, Self::#watcher_ident);
+                s.spawn(#stream_expr, #component_ty::#watcher_ident);
             })
         })
         .collect::<Result<_>>()?;
 
-    let mut output = input;
-    output.items.push(syn::parse_quote! {
-        /// Spawns all watchers of this [`Component`].
-        #[automatically_derived]
-        pub fn spawn(&self) {
-            #( #watchers )*
-        }
-    });
+    let component_state = quote! { crate::utils::component::ComponentState };
+    let watchers_spawner = quote! { crate::utils::component::WatchersSpawner };
+    let state_ext =
+        quote! { <#component_ty as crate::utils::component::ComponentTypes> };
+    let output = quote! {
+        #input
 
-    Ok(output.to_token_stream().into())
+        impl #component_state<#state_ext::Obj> for #state_ext::State {
+            fn spawn_watchers(
+                &self,
+                s: &mut #watchers_spawner<Self, #state_ext::Obj>
+            ) {
+                #( #watchers )*
+            }
+        }
+    };
+
+    Ok(output.into())
 }
