@@ -1,7 +1,7 @@
 //! `#[watchers]` and `#[watch(...)]` macros implementation.
 
 use proc_macro::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens as _};
 use syn::{
     parse::{Error, Result},
     ExprMethodCall, ImplItem, ItemImpl,
@@ -31,7 +31,7 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
             }
         })
         .map(|method| {
-            let stream_expr: ExprMethodCall = method
+            let stream_expr = method
                 .attrs
                 .iter()
                 .find(|attr| {
@@ -43,7 +43,7 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
                         "Method doesn't have '#[watch(...)]' macro",
                     )
                 })?
-                .parse_args()?;
+                .parse_args::<ExprMethodCall>()?;
             let watcher_ident = &method.sig.ident;
 
             Ok(quote! {
@@ -57,9 +57,9 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
         /// Spawns all watchers of this [`Component`].
         #[automatically_derived]
         pub fn spawn(&self) {
-            #(#watchers)*
+            #( #watchers )*
         }
     });
 
-    Ok((quote! { #output }).into())
+    Ok(output.to_token_stream().into())
 }
