@@ -332,7 +332,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```ignore
 /// impl SenderComponent {
 ///     async fn muted_change_watcher(
-///         ctx: Rc<Sender>,
+///         sender: Rc<Sender>,
 ///         state: Rc<SenderState>,
 ///         new_muted_val: bool
 ///     ) -> Result<(), ()> {
@@ -340,7 +340,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     async fn enabled_change_watcher(
-///         ctx: Rc<Sender>,
+///         sender: Rc<Sender>,
 ///         state: Rc<SenderState>,
 ///         new_enabled_val: bool,
 ///     ) -> Result<(), ()> {
@@ -365,7 +365,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// __Note that `ComponentState` implementation is simplified in this example
 /// for better readability.__
 ///
-/// In reality context and state types will be obtained by casting
+/// In reality object and state types will be obtained by casting
 /// `SenderComponent` to the `ComponentTypes` trait and getting types from it.
 #[proc_macro_attribute]
 pub fn watchers(_: TokenStream, input: TokenStream) -> TokenStream {
