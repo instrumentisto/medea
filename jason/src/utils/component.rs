@@ -11,7 +11,7 @@ use crate::utils::{JasonError, TaskHandle};
 /// Abstraction for the all states of the [`Component`].
 pub trait ComponentState<C>: Sized {
     /// Spawns all watchers required for this [`ComponentState`].
-    fn spawn_watchers(&self, watchers_spawner: &mut WatchersSpawner<Self, C>);
+    fn spawn_watchers(&self, spawner: &mut WatchersSpawner<Self, C>);
 }
 
 /// Trait which provides types of the [`Component`]'s state and object for the
@@ -83,21 +83,6 @@ pub struct WatchersSpawner<S, O> {
 }
 
 impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
-    /// Creates new [`WatchersSpawner`] for the provided object and state.
-    fn new(state: Rc<S>, obj: Rc<O>) -> Self {
-        Self {
-            state,
-            obj,
-            spawned_watchers: Vec::new(),
-        }
-    }
-
-    /// Returns [`TaskHandle`]s for the watchers spawned by this
-    /// [`WatchersSpawner`].
-    fn finish(self) -> Vec<TaskHandle> {
-        self.spawned_watchers
-    }
-
     /// Spawns watchers for the provided [`Stream`].
     ///
     /// If watcher returns an error then this error will be converted into the
@@ -126,5 +111,20 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
         spawn_local(fut.map(|_| ()));
 
         self.spawned_watchers.push(handle.into());
+    }
+
+    /// Creates new [`WatchersSpawner`] for the provided object and state.
+    fn new(state: Rc<S>, obj: Rc<O>) -> Self {
+        Self {
+            state,
+            obj,
+            spawned_watchers: Vec::new(),
+        }
+    }
+
+    /// Returns [`TaskHandle`]s for the watchers spawned by this
+    /// [`WatchersSpawner`].
+    fn finish(self) -> Vec<TaskHandle> {
+        self.spawned_watchers
     }
 }

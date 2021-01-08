@@ -4,7 +4,6 @@
 mod errors;
 
 mod callback;
-#[macro_use]
 pub mod component;
 mod event_listener;
 mod resettable_delay;
