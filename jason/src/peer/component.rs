@@ -6,6 +6,7 @@ use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     IceCandidate, IceServer, NegotiationRole, PeerId as Id, TrackId,
 };
+use medea_macro::watchers;
 use medea_reactive::{
     collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
     ProgressableCell, RecheckableFutureExt,
@@ -19,10 +20,7 @@ use crate::{
         media::{receiver, sender},
         LocalStreamUpdateCriteria, PeerError,
     },
-    utils::{
-        component,
-        component::{ComponentState, WatchersSpawner},
-    },
+    utils::component,
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -350,43 +348,16 @@ impl State {
     }
 }
 
-impl ComponentState<PeerConnection> for State {
-    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, PeerConnection>) {
-        use Component as C;
-
-        s.spawn(
-            self.ice_candidates.borrow().on_push(),
-            C::ice_candidate_push_watcher,
-        );
-        s.spawn(
-            self.remote_sdp_offer.subscribe(),
-            C::remote_sdp_offer_watcher,
-        );
-        s.spawn(self.restart_ice.subscribe(), C::ice_restart_watcher);
-        s.spawn(
-            self.senders.borrow().on_insert_with_replay(),
-            C::sender_insert_watcher,
-        );
-        s.spawn(
-            self.receivers.borrow().on_insert_with_replay(),
-            C::receiver_insert_watcher,
-        );
-        s.spawn(self.sdp_offer.subscribe(), C::sdp_offer_watcher);
-        s.spawn(
-            self.negotiation_role.subscribe(),
-            C::negotiation_role_watcher,
-        );
-    }
-}
-
 /// Component responsible for the [`PeerConnection`] updating.
 pub type Component = component::Component<State, PeerConnection>;
 
+#[watchers]
 impl Component {
     /// Watcher for the [`State::ice_candidates`] push update.
     ///
     /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
     /// [`IceCandidate`].
+    #[watch(self.ice_candidates.borrow().on_push())]
     #[inline]
     async fn ice_candidate_push_watcher(
         peer: Rc<PeerConnection>,
@@ -411,6 +382,7 @@ impl Component {
     ///
     /// Calls [`PeerConnection::set_remote_offer`] with a new value if current
     /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
+    #[watch(self.remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -443,6 +415,7 @@ impl Component {
     /// Calls [`PeerConnection::restart_ice`] if new value is `true`.
     ///
     /// Resets [`State::restart_ice`] to `false` if new value is `true`.
+    #[watch(self.restart_ice.subscribe())]
     #[inline]
     async fn ice_restart_watcher(
         peer: Rc<PeerConnection>,
@@ -466,6 +439,7 @@ impl Component {
     ///
     /// Creates new [`SenderComponent`], creates new [`Connection`] with all
     /// [`sender::State::receivers`] by [`Connections::create_connection`] call,
+    #[watch(self.senders.borrow().on_insert_with_replay())]
     async fn sender_insert_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -504,6 +478,7 @@ impl Component {
     /// Creates new [`ReceiverComponent`], creates new [`Connection`] with a
     /// [`receiver::State::sender_id`] by [`Connections::create_connection`]
     /// call,
+    #[watch(self.receivers.borrow().on_insert_with_replay())]
     async fn receiver_insert_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -536,6 +511,7 @@ impl Component {
     ///
     /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
     /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
+    #[watch(self.sdp_offer.subscribe())]
     async fn sdp_offer_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -597,6 +573,7 @@ impl Component {
     /// Waits for [`SenderComponent`]s/[`ReceiverComponent`]s creation/update,
     /// updates local `MediaStream` (if needed) and renegotiates
     /// [`PeerConnection`].
+    #[watch(self.negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,

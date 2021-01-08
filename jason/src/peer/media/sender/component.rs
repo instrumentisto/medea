@@ -5,15 +5,13 @@ use std::{cell::Cell, rc::Rc};
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
+use medea_macro::watchers;
 use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 
 use crate::{
     media::LocalTracksConstraints,
     peer::{media::Result, MediaConnectionsError},
-    utils::{
-        component,
-        component::{ComponentState, WatchersSpawner},
-    },
+    utils::component,
     MediaKind,
 };
 
@@ -173,19 +171,7 @@ impl State {
     }
 }
 
-impl ComponentState<Sender> for State {
-    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, Sender>) {
-        use Component as C;
-
-        s.spawn(
-            self.enabled_individual.subscribe(),
-            C::enabled_individual_watcher,
-        );
-        s.spawn(self.enabled_general.subscribe(), C::enabled_general_watcher);
-        s.spawn(self.muted.subscribe(), C::muted_watcher);
-    }
-}
-
+#[watchers]
 impl Component {
     /// Watcher for the [`State::enabled_individual`] update.
     ///
@@ -194,6 +180,7 @@ impl Component {
     /// If new value is `true` then sets
     /// [`State::need_local_stream_update`] flag to `true`, otherwise
     /// calls [`Sender::remove_track`].
+    #[watch(self.enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
         sender: Rc<Sender>,
@@ -213,6 +200,7 @@ impl Component {
     /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Calls [`Sender::set_enabled_general_state`] with a new value.
+    #[watch(self.enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
         sender: Rc<Sender>,
@@ -227,6 +215,7 @@ impl Component {
     /// Watcher for the [`State::muted`] update.
     ///
     /// Calls [`Sender::set_muted`] with a new value.
+    #[watch(self.muted.subscribe())]
     #[inline]
     async fn muted_watcher(
         sender: Rc<Sender>,

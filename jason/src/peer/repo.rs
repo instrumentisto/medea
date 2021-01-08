@@ -5,6 +5,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::PeerId;
+use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -13,11 +14,7 @@ use crate::{
     api::{Connections, RoomError},
     media::{LocalTracksConstraints, MediaManager},
     peer,
-    utils::{
-        component,
-        component::{ComponentState, WatchersSpawner},
-        delay_for, TaskHandle,
-    },
+    utils::{component, delay_for, TaskHandle},
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -177,19 +174,12 @@ impl PeersState {
     }
 }
 
-impl ComponentState<Peers> for PeersState {
-    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, Peers>) {
-        use Component as C;
-
-        s.spawn(self.0.borrow().on_insert(), C::insert_peer_watcher);
-        s.spawn(self.0.borrow().on_remove(), C::remove_peer_watcher);
-    }
-}
-
+#[watchers]
 impl Component {
     /// Watches for new [`peer::State`] insertions.
     ///
     /// Creates new [`peer::Component`] based on the inserted [`peer::State`].
+    #[watch(self.0.borrow().on_insert())]
     #[inline]
     async fn insert_peer_watcher(
         peers: Rc<Peers>,
@@ -217,6 +207,7 @@ impl Component {
     ///
     /// Removes [`peer::Component`] and closes [`Connection`] by
     /// [`Connections::close_connection`] call.
+    #[watch(self.0.borrow().on_remove())]
     #[inline]
     async fn remove_peer_watcher(
         peers: Rc<Peers>,
