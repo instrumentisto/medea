@@ -1467,8 +1467,8 @@ async fn disable_and_enable_all_tracks() {
     );
     pc.state().when_all_tracks_created().await;
 
-    let audio_track = pc.ctx().get_sender_by_id(audio_track_id).unwrap();
-    let video_track = pc.ctx().get_sender_by_id(video_track_id).unwrap();
+    let audio_track = pc.obj().get_sender_by_id(audio_track_id).unwrap();
+    let video_track = pc.obj().get_sender_by_id(video_track_id).unwrap();
 
     assert!(!audio_track.general_disabled());
     assert!(!video_track.general_disabled());

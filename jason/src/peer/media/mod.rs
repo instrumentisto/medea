@@ -369,11 +369,11 @@ impl InnerMediaConnections {
         match direction {
             TrackDirection::Send => self
                 .iter_senders_with_kind_and_source_kind(kind, source_kind)
-                .map(|tx| tx.ctx() as Rc<dyn TransceiverSide>)
+                .map(|tx| tx.obj() as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
                 .iter_receivers_with_kind(kind)
-                .map(|rx| rx.ctx() as Rc<dyn TransceiverSide>)
+                .map(|rx| rx.obj() as Rc<dyn TransceiverSide>)
                 .collect(),
         }
     }
@@ -544,12 +544,12 @@ impl MediaConnections {
         inner
             .senders
             .get(&track_id)
-            .map(|sndr| sndr.ctx() as Rc<dyn TransceiverSide>)
+            .map(|sndr| sndr.obj() as Rc<dyn TransceiverSide>)
             .or_else(|| {
                 inner
                     .receivers
                     .get(&track_id)
-                    .map(|rcvr| rcvr.ctx() as Rc<dyn TransceiverSide>)
+                    .map(|rcvr| rcvr.obj() as Rc<dyn TransceiverSide>)
             })
     }
 
@@ -635,7 +635,7 @@ impl MediaConnections {
                         sender.track_id(),
                         media_exchange_state::Stable::Enabled,
                     );
-                    sender_and_track.push((sender.ctx(), track));
+                    sender_and_track.push((sender.obj(), track));
                 } else {
                     return Err(tracerr::new!(
                         MediaConnectionsError::InvalidMediaTrack
@@ -727,12 +727,12 @@ impl MediaConnections {
         inner
             .senders
             .values()
-            .map(|s| s.ctx() as Rc<dyn TransceiverSide>)
+            .map(|s| s.obj() as Rc<dyn TransceiverSide>)
             .chain(
                 inner
                     .receivers
                     .values()
-                    .map(|r| r.ctx() as Rc<dyn TransceiverSide>),
+                    .map(|r| r.obj() as Rc<dyn TransceiverSide>),
             )
             .collect()
     }
@@ -781,7 +781,7 @@ impl MediaConnections {
         let remove_tracks_fut = future::join_all(
             self.0.borrow().senders.values().filter_map(|s| {
                 if kinds.has(s.kind(), s.source_kind()) {
-                    let sender = s.ctx();
+                    let sender = s.obj();
                     Some(async move {
                         sender.remove_track().await;
                     })
@@ -830,7 +830,7 @@ impl MediaConnections {
         &self,
         id: TrackId,
     ) -> Option<Rc<receiver::Receiver>> {
-        self.0.borrow().receivers.get(&id).map(|r| r.ctx())
+        self.0.borrow().receivers.get(&id).map(|r| r.obj())
     }
 
     /// Returns [`Sender`] with a provided [`TrackId`].
@@ -838,7 +838,7 @@ impl MediaConnections {
     /// [`Sender`]: self::sender::Sender
     #[must_use]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<sender::Sender>> {
-        self.0.borrow().senders.get(&id).map(|r| r.ctx())
+        self.0.borrow().senders.get(&id).map(|r| r.obj())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
@@ -990,7 +990,7 @@ impl MediaConnections {
             .borrow()
             .senders
             .values()
-            .map(|sndr| sndr.ctx())
+            .map(|sndr| sndr.obj())
             .collect()
     }
 }

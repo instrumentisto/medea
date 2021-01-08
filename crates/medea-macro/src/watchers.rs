@@ -13,16 +13,20 @@ use syn::{
 ///
 /// 1. Collects all methods with a `#[watch(...)]` macro.
 ///
-/// 2. Generates `spawn_watcher` code for the found methods.
+/// 2. Removes `#[watch(...)]` from the found methods.
 ///
-/// 3. Generates `spawn` method with all generated `spawn_watcher` method calls.
+/// 3. Generates `WatchersSpawner::spawn` code for the found methods.
 ///
-/// 4. Appends generated `spawn` method to the input [`ItemImpl`].
-pub fn expand(input: ItemImpl) -> Result<TokenStream> {
+/// 4. Generates `ComponentState` implementation with all generated
+///    `WatchersSpawner::spawn` method calls.
+///
+/// 5. Appends generated `ComponentState` implementation to the input.
+pub fn expand(mut input: ItemImpl) -> Result<TokenStream> {
+    let component_ty = input.self_ty.clone();
     #[allow(clippy::filter_map)]
     let watchers: Vec<_> = input
         .items
-        .iter()
+        .iter_mut()
         .filter_map(|i| {
             if let ImplItem::Method(m) = i {
                 Some(m)
@@ -31,11 +35,18 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
             }
         })
         .map(|method| {
-            let stream_expr: ExprMethodCall = method
+            let mut watch_attr_index = None;
+            let stream_expr = method
                 .attrs
                 .iter()
-                .find(|attr| {
-                    attr.path.get_ident().map_or(false, |p| *p == "watch")
+                .enumerate()
+                .find_map(|(i, attr)| {
+                    if attr.path.get_ident().map_or(false, |p| *p == "watch") {
+                        watch_attr_index = Some(i);
+                        Some(attr)
+                    } else {
+                        None
+                    }
                 })
                 .ok_or_else(|| {
                     Error::new(
@@ -43,23 +54,34 @@ pub fn expand(input: ItemImpl) -> Result<TokenStream> {
                         "Method doesn't have '#[watch(...)]' macro",
                     )
                 })?
-                .parse_args()?;
+                .parse_args::<ExprMethodCall>()?;
+            if let Some(index) = watch_attr_index {
+                method.attrs.remove(index);
+            }
             let watcher_ident = &method.sig.ident;
 
             Ok(quote! {
-                self.spawn_watcher(#stream_expr, Self::#watcher_ident);
+                s.spawn(#stream_expr, #component_ty::#watcher_ident);
             })
         })
         .collect::<Result<_>>()?;
 
-    let mut output = input;
-    output.items.push(syn::parse_quote! {
-        /// Spawns all watchers of this [`Component`].
-        #[automatically_derived]
-        pub fn spawn(&self) {
-            #(#watchers)*
-        }
-    });
+    let component_state = quote! { crate::utils::component::ComponentState };
+    let watchers_spawner = quote! { crate::utils::component::WatchersSpawner };
+    let state_ext =
+        quote! { <#component_ty as crate::utils::component::ComponentTypes> };
+    let output = quote! {
+        #input
 
-    Ok((quote! { #output }).into())
+        impl #component_state<#state_ext::Obj> for #state_ext::State {
+            fn spawn_watchers(
+                &self,
+                s: &mut #watchers_spawner<Self, #state_ext::Obj>
+            ) {
+                #( #watchers )*
+            }
+        }
+    };
+
+    Ok(output.into())
 }

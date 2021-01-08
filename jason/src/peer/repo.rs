@@ -29,7 +29,7 @@ impl Component {
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
     pub fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
-        self.peers.borrow().get(&id).map(component::Component::ctx)
+        self.peers.borrow().get(&id).map(component::Component::obj)
     }
 
     /// Returns all [`PeerConnection`]s stored in a repository.
@@ -38,7 +38,7 @@ impl Component {
         self.peers
             .borrow()
             .values()
-            .map(component::Component::ctx)
+            .map(component::Component::obj)
             .collect()
     }
 
@@ -143,7 +143,7 @@ impl Peers {
                 let peers = peers
                     .borrow()
                     .values()
-                    .map(component::Component::ctx)
+                    .map(component::Component::obj)
                     .collect::<Vec<_>>();
                 future::join_all(
                     peers.iter().map(|p| p.scrape_and_send_peer_stats()),
