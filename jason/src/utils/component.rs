@@ -1,55 +1,35 @@
 //! Implementation of the [`Component`].
 
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::rc::Rc;
 
-use futures::{future, future::AbortHandle, Future, Stream, StreamExt};
+use derive_more::Deref;
+use futures::{future, Future, Stream, StreamExt};
 use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::JasonError;
+use crate::utils::{JasonError, TaskHandle};
 
-/// Creates and spawns new [`Component`].
-///
-/// `$state` - type alias for [`Component`] which you wanna create.
-///
-/// `$state` - [`Component`]'s state wrapped to the [`Rc`].
-///
-/// `$ctx` - [`Component`]'s context wrapped to the [`Rc`].
-///
-/// `$global_ctx` - [`Component`]'s global context wrapped to the [`Rc`].
-#[macro_export]
-macro_rules! spawn_component {
-    ($component:ty, $state:expr, $ctx:expr $(,)*) => {{
-        let component = <$component>::inner_new($state, $ctx);
-        component.spawn();
-        component
-    }};
+/// Abstraction for the all states of the [`Component`].
+pub trait ComponentState<C>: Sized {
+    /// Spawns all watchers required for this [`ComponentState`].
+    fn spawn_watchers(&self, watchers_spawner: &mut WatchersSpawner<Self, C>);
 }
 
 /// Base for all components of this app.
 ///
-/// Can spawn new watchers with a [`Component::spawn_watcher`].
+/// Spawns all watchers on [`Component::new`] function call.
 ///
-/// Will stop all spawned with a [`Component::spawn_watcher`] watchers on
-/// [`Drop`].
+/// Will stop all spawned with a [`Component::new`] watchers on [`Drop`].
 ///
 /// Can be dereferenced to the [`Component`]'s context.
+#[derive(Deref)]
 pub struct Component<S, C> {
-    state: Rc<S>,
+    #[deref]
     ctx: Rc<C>,
-    watchers_store: RefCell<Vec<AbortHandle>>,
+    state: Rc<S>,
+    _spawned_watchers: Vec<TaskHandle>,
 }
 
 impl<S, C> Component<S, C> {
-    /// Returns new [`Component`] with a provided data.
-    #[inline]
-    pub fn inner_new(state: Rc<S>, ctx: Rc<C>) -> Self {
-        Self {
-            state,
-            ctx,
-            watchers_store: RefCell::new(Vec::new()),
-        }
-    }
-
     /// Returns [`Rc`] to the context of this [`Component`].
     #[inline]
     pub fn ctx(&self) -> Rc<C> {
@@ -63,15 +43,53 @@ impl<S, C> Component<S, C> {
     }
 }
 
-impl<S: 'static, C: 'static> Component<S, C> {
-    /// Spawns watchers for the provided [`Stream`].
+impl<S: ComponentState<C> + 'static, C: 'static> Component<S, C> {
+    /// Returns new [`Component`] with a provided context and state.
     ///
+    /// Spawns all watchers of this [`Component`].
+    pub fn new(ctx: Rc<C>, state: Rc<S>) -> Self {
+        let mut watchers_spawner =
+            WatchersSpawner::new(Rc::clone(&state), Rc::clone(&ctx));
+        state.spawn_watchers(&mut watchers_spawner);
+
+        Self {
+            state,
+            ctx,
+            _spawned_watchers: watchers_spawner.finish(),
+        }
+    }
+}
+
+/// Spawner for the [`Component`]'s watchers.
+pub struct WatchersSpawner<S, C> {
+    state: Rc<S>,
+    ctx: Rc<C>,
+    spawned_watchers: Vec<TaskHandle>,
+}
+
+impl<S: 'static, C: 'static> WatchersSpawner<S, C> {
+    /// Creates new [`WatchersSpawner`] for the provided context and state.
+    fn new(state: Rc<S>, ctx: Rc<C>) -> Self {
+        Self {
+            state,
+            ctx,
+            spawned_watchers: Vec::new(),
+        }
+    }
+
+    /// Returns [`TaskHandle`] for the watchers spawned by this
+    /// [`WatchersSpawner`].
+    fn finish(self) -> Vec<TaskHandle> {
+        self.spawned_watchers
+    }
+
+    // /// Spawns watchers for the provided [`Stream`].
     /// If watcher returns error then this error will be converted to the
     /// [`JasonError`] and printed with a [`JasonError::print`].
     ///
     /// You can stop all listeners tasks spawned by this function by
     /// [`Component`] drop.
-    pub fn spawn_watcher<R, V, F, O, E>(&self, mut rx: R, handle: F)
+    pub fn spawn<R, V, F, O, E>(&mut self, mut rx: R, handle: F)
     where
         F: Fn(Rc<C>, Rc<S>, V) -> O + 'static,
         R: Stream<Item = V> + Unpin + 'static,
@@ -92,23 +110,6 @@ impl<S: 'static, C: 'static> Component<S, C> {
         spawn_local(async move {
             let _ = fut.await;
         });
-        self.watchers_store.borrow_mut().push(handle);
-    }
-}
-
-impl<S, C> Drop for Component<S, C> {
-    fn drop(&mut self) {
-        let handles = self.watchers_store.replace(Vec::default());
-        for handle in handles {
-            handle.abort();
-        }
-    }
-}
-
-impl<S, C> Deref for Component<S, C> {
-    type Target = C;
-
-    fn deref(&self) -> &Self::Target {
-        &self.ctx
+        self.spawned_watchers.push(handle.into());
     }
 }

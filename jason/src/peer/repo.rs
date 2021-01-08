@@ -5,7 +5,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::PeerId;
-use medea_macro::{watch, watchers};
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
@@ -14,7 +13,11 @@ use crate::{
     api::{Connections, RoomError},
     media::{LocalTracksConstraints, MediaManager},
     peer,
-    utils::{component, delay_for, TaskHandle},
+    utils::{
+        component,
+        component::{ComponentState, WatchersSpawner},
+        delay_for, TaskHandle,
+    },
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -23,68 +26,6 @@ use super::{PeerConnection, PeerEvent};
 pub type Component = component::Component<PeersState, Peers>;
 
 impl Component {
-    /// Returns new [`Component`].
-    ///
-    /// Spawns task which will send [`RtcStats`] updates to the Media Server.
-    ///
-    /// [`RtcStats`]: crate::peer::RtcStats
-    #[inline]
-    pub fn new(
-        media_manager: Rc<MediaManager>,
-        peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-        send_constraints: LocalTracksConstraints,
-        connections: Rc<Connections>,
-    ) -> Self {
-        let peers = Rc::default();
-        spawn_component!(
-            Self,
-            Rc::new(PeersState::default()),
-            Rc::new(Peers {
-                media_manager,
-                _stats_scrape_task: Self::spawn_peers_stats_scrape_task(
-                    Rc::clone(&peers)
-                ),
-                peers,
-                peer_event_sender,
-                send_constraints,
-                connections,
-            }),
-        )
-    }
-
-    /// Spawns task which will call [`PeerConnection::send_peer_stats`] of
-    /// all [`PeerConnection`]s every second and send updated [`RtcStats`]
-    /// to the server.
-    ///
-    /// Returns [`TaskHandle`] which will stop this task on [`Drop::drop`].
-    ///
-    /// [`RtcStats`]: crate::peer::RtcStats
-    fn spawn_peers_stats_scrape_task(
-        peers: Rc<RefCell<HashMap<PeerId, peer::Component>>>,
-    ) -> TaskHandle {
-        let (fut, abort) = future::abortable(async move {
-            loop {
-                delay_for(Duration::from_secs(1).into()).await;
-
-                let peers = peers
-                    .borrow()
-                    .values()
-                    .map(component::Component::ctx)
-                    .collect::<Vec<_>>();
-                future::join_all(
-                    peers.iter().map(|p| p.scrape_and_send_peer_stats()),
-                )
-                .await;
-            }
-        });
-
-        spawn_local(async move {
-            fut.await.ok();
-        });
-
-        abort.into()
-    }
-
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
     pub fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
@@ -160,6 +101,65 @@ pub struct Peers {
     connections: Rc<Connections>,
 }
 
+impl Peers {
+    /// Returns new empty [`Peers`].
+    ///
+    /// Spawns [`RtcStats`] scrape task.
+    ///
+    /// [`RtcStats`]: crate::peer::RtcStats
+    pub fn new(
+        media_manager: Rc<MediaManager>,
+        peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+        send_constraints: LocalTracksConstraints,
+        connections: Rc<Connections>,
+    ) -> Self {
+        let peers = Rc::default();
+        Self {
+            media_manager,
+            _stats_scrape_task: Self::spawn_peers_stats_scrape_task(Rc::clone(
+                &peers,
+            )),
+            peers,
+            peer_event_sender,
+            send_constraints,
+            connections,
+        }
+    }
+
+    /// Spawns task which will call [`PeerConnection::send_peer_stats`] of
+    /// all [`PeerConnection`]s every second and send updated [`RtcStats`]
+    /// to the server.
+    ///
+    /// Returns [`TaskHandle`] which will stop this task on [`Drop::drop`].
+    ///
+    /// [`RtcStats`]: crate::peer::RtcStats
+    fn spawn_peers_stats_scrape_task(
+        peers: Rc<RefCell<HashMap<PeerId, peer::Component>>>,
+    ) -> TaskHandle {
+        let (fut, abort) = future::abortable(async move {
+            loop {
+                delay_for(Duration::from_secs(1).into()).await;
+
+                let peers = peers
+                    .borrow()
+                    .values()
+                    .map(component::Component::ctx)
+                    .collect::<Vec<_>>();
+                future::join_all(
+                    peers.iter().map(|p| p.scrape_and_send_peer_stats()),
+                )
+                .await;
+            }
+        });
+
+        spawn_local(async move {
+            fut.await.ok();
+        });
+
+        abort.into()
+    }
+}
+
 impl PeersState {
     /// Inserts provided [`peer::State`].
     pub fn insert(&self, peer_id: PeerId, peer_state: peer::State) {
@@ -177,12 +177,19 @@ impl PeersState {
     }
 }
 
-#[watchers]
+impl ComponentState<Peers> for PeersState {
+    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, Peers>) {
+        use Component as C;
+
+        s.spawn(self.0.borrow().on_insert(), C::insert_peer_watcher);
+        s.spawn(self.0.borrow().on_remove(), C::remove_peer_watcher);
+    }
+}
+
 impl Component {
     /// Watches for new [`peer::State`] insertions.
     ///
     /// Creates new [`peer::Component`] based on the inserted [`peer::State`].
-    #[watch(self.state().0.borrow().on_insert())]
     #[inline]
     async fn insert_peer_watcher(
         peers: Rc<Peers>,
@@ -190,13 +197,16 @@ impl Component {
         (peer_id, new_peer): (PeerId, Rc<peer::State>),
     ) -> Result<(), Traced<RoomError>> {
         let peer = peer::Component::new(
+            PeerConnection::new(
+                &new_peer,
+                peers.peer_event_sender.clone(),
+                Rc::clone(&peers.media_manager),
+                peers.send_constraints.clone(),
+                Rc::clone(&peers.connections),
+            )
+            .map_err(tracerr::map_from_and_wrap!())?,
             new_peer,
-            peers.peer_event_sender.clone(),
-            Rc::clone(&peers.media_manager),
-            peers.send_constraints.clone(),
-            Rc::clone(&peers.connections),
-        )
-        .map_err(tracerr::map_from_and_wrap!())?;
+        );
 
         peers.peers.borrow_mut().insert(peer_id, peer);
 
@@ -207,7 +217,6 @@ impl Component {
     ///
     /// Removes [`peer::Component`] and closes [`Connection`] by
     /// [`Connections::close_connection`] call.
-    #[watch(self.state().0.borrow().on_remove())]
     #[inline]
     async fn remove_peer_watcher(
         peers: Rc<Peers>,

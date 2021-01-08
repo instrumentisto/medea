@@ -968,10 +968,13 @@ impl InnerRoom {
         let send_constraints = LocalTracksConstraints::default();
         Rc::new(Self {
             peers: peer::repo::Component::new(
-                media_manager,
-                peer_event_sender,
-                send_constraints.clone(),
-                Rc::clone(&connections),
+                Rc::new(peer::repo::Peers::new(
+                    media_manager,
+                    peer_event_sender,
+                    send_constraints.clone(),
+                    Rc::clone(&connections),
+                )),
+                Rc::new(peer::repo::PeersState::default()),
             ),
             rpc,
             send_constraints,

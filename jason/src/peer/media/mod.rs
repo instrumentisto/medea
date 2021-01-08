@@ -915,21 +915,13 @@ impl MediaConnections {
             receivers,
             send_constraints,
         )?;
-        let sender = sender::Builder {
-            required: media_type.required(),
-            media_connections: &self,
-            track_id: id,
-            send_constraints: send_constraints.clone(),
-            mid,
-            media_exchange_state: media_exchange_state::Stable::Enabled,
-            mute_state: mute_state::Stable::Muted,
-            caps: media_type.into(),
-        }
-        .build()?;
-        let component =
-            spawn_component!(sender::Component, Rc::new(sender_state), sender,);
+        let sender = sender::Sender::new(
+            &sender_state,
+            &self,
+            send_constraints.clone(),
+        )?;
 
-        Ok(component)
+        Ok(sender::Component::new(sender, Rc::new(sender_state)))
     }
 
     /// Creates new [`receiver::Component`] with a provided data.
@@ -941,31 +933,16 @@ impl MediaConnections {
         sender: MemberId,
         recv_constraints: &RecvConstraints,
     ) -> receiver::Component {
-        let receiver_state = receiver::State::new(
+        let state = receiver::State::new(
             id,
             mid.clone(),
             media_type.clone(),
             sender.clone(),
             recv_constraints,
         );
-        let track_id = id;
-        let receiver = receiver::Receiver::new(
-            &self,
-            track_id,
-            media_type.into(),
-            sender,
-            mid,
-            true,
-            true,
-        );
+        let receiver = receiver::Receiver::new(&state, &self);
 
-        let component = spawn_component!(
-            receiver::Component,
-            Rc::new(receiver_state),
-            Rc::new(receiver),
-        );
-
-        component
+        receiver::Component::new(Rc::new(receiver), Rc::new(state))
     }
 
     /// Creates new [`sender::Component`]s/[`receiver::Component`]s from the

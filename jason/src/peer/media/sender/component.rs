@@ -5,55 +5,23 @@ use std::{cell::Cell, rc::Rc};
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
-use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 
 use crate::{
     media::LocalTracksConstraints,
-    peer::{
-        media::{media_exchange_state, mute_state, Result},
-        MediaConnections, MediaConnectionsError,
+    peer::{media::Result, MediaConnectionsError},
+    utils::{
+        component,
+        component::{ComponentState, WatchersSpawner},
     },
-    utils::component,
     MediaKind,
 };
 
-use super::{Builder, Sender};
+use super::Sender;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
 pub type Component = component::Component<State, Sender>;
-
-impl Component {
-    /// Returns new [`Component`] with a provided [`State`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`MediaConnectionsError`] if [`Sender`] build fails.
-    #[inline]
-    pub fn new(
-        state: Rc<State>,
-        media_connections: &MediaConnections,
-        send_constraints: LocalTracksConstraints,
-    ) -> Result<Self> {
-        let sndr = Builder {
-            media_connections: &media_connections,
-            track_id: state.id,
-            caps: state.media_type().clone().into(),
-            mute_state: mute_state::Stable::from(state.is_muted()),
-            mid: state.mid().clone(),
-            media_exchange_state: media_exchange_state::Stable::from(
-                !state.is_enabled_individual(),
-            ),
-            required: state.media_type().required(),
-            send_constraints,
-        }
-        .build()
-        .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(spawn_component!(Component, state, sndr))
-    }
-}
 
 /// State of the [`Component`].
 #[derive(Debug)]
@@ -205,7 +173,19 @@ impl State {
     }
 }
 
-#[watchers]
+impl ComponentState<Sender> for State {
+    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, Sender>) {
+        use Component as C;
+
+        s.spawn(
+            self.enabled_individual.subscribe(),
+            C::enabled_individual_watcher,
+        );
+        s.spawn(self.enabled_general.subscribe(), C::enabled_general_watcher);
+        s.spawn(self.muted.subscribe(), C::muted_watcher);
+    }
+}
+
 impl Component {
     /// Watcher for the [`State::enabled_individual`] update.
     ///
@@ -214,7 +194,6 @@ impl Component {
     /// If new value is `true` then sets
     /// [`State::need_local_stream_update`] flag to `true`, otherwise
     /// calls [`Sender::remove_track`].
-    #[watch(self.state().enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
         sender: Rc<Sender>,
@@ -234,7 +213,6 @@ impl Component {
     /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Calls [`Sender::set_enabled_general_state`] with a new value.
-    #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
         sender: Rc<Sender>,
@@ -249,7 +227,6 @@ impl Component {
     /// Watcher for the [`State::muted`] update.
     ///
     /// Calls [`Sender::set_muted`] with a new value.
-    #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
         sender: Rc<Sender>,

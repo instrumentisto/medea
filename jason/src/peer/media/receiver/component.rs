@@ -3,13 +3,15 @@
 use std::rc::Rc;
 
 use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
-use medea_macro::{watch, watchers};
 use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
 
 use crate::{
     media::RecvConstraints,
-    peer::{media::Result, MediaConnections},
-    utils::component,
+    peer::media::Result,
+    utils::{
+        component,
+        component::{ComponentState, WatchersSpawner},
+    },
 };
 
 use super::Receiver;
@@ -17,24 +19,6 @@ use super::Receiver;
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
 pub type Component = component::Component<State, Receiver>;
-
-impl Component {
-    /// Returns new [`Component`] with a provided [`State`].
-    #[inline]
-    pub fn new(state: Rc<State>, media_connections: &MediaConnections) -> Self {
-        let recv = Receiver::new(
-            media_connections,
-            state.id,
-            state.media_type().clone().into(),
-            state.sender_id().clone(),
-            state.mid().clone(),
-            state.enabled_general(),
-            state.enabled_individual(),
-        );
-
-        spawn_component!(Component, state, Rc::new(recv))
-    }
-}
 
 /// State of the [`Component`].
 #[derive(Debug)]
@@ -139,12 +123,23 @@ impl State {
     }
 }
 
-#[watchers]
+impl ComponentState<Receiver> for State {
+    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, Receiver>) {
+        use Component as C;
+
+        s.spawn(self.muted.subscribe(), C::muted_watcher);
+        s.spawn(
+            self.enabled_individual.subscribe(),
+            C::enabled_individual_watcher,
+        );
+        s.spawn(self.enabled_general.subscribe(), C::enabled_general_watcher);
+    }
+}
+
 impl Component {
     /// Watcher for the [`State::muted`] update.
     ///
     /// Calls [`Receiver::set_muted`] with a new value.
-    #[watch(self.state().muted.subscribe())]
     #[inline]
     async fn muted_watcher(
         receiver: Rc<Receiver>,
@@ -160,7 +155,6 @@ impl Component {
     ///
     /// Calls [`Receiver::set    #[inline]_enabled_individual_state`] with a new
     /// value.
-    #[watch(self.state().enabled_individual.subscribe())]
     #[inline]
     async fn enabled_individual_watcher(
         receiver: Rc<Receiver>,
@@ -175,7 +169,6 @@ impl Component {
     /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Calls [`Receiver::set_enabled_general_state`] with a new value.
-    #[watch(self.state().enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_watcher(
         receiver: Rc<Receiver>,

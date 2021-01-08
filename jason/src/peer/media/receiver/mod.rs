@@ -60,24 +60,17 @@ impl Receiver {
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
-    pub fn new(
-        media_connections: &MediaConnections,
-        track_id: TrackId,
-        caps: TrackConstraints,
-        sender_id: MemberId,
-        mid: Option<String>,
-        enabled_general: bool,
-        enabled_individual: bool,
-    ) -> Self {
+    pub fn new(state: &State, media_connections: &MediaConnections) -> Self {
         let connections = media_connections.0.borrow();
+        let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
-        let transceiver_direction = if enabled_individual {
+        let transceiver_direction = if state.enabled_individual() {
             TransceiverDirection::RECV
         } else {
             TransceiverDirection::INACTIVE
         };
 
-        let transceiver = if mid.is_none() {
+        let transceiver = if state.mid().is_none() {
             // Try to find send transceiver that can be used as sendrecv.
             let mut senders = connections.senders.values();
             let sender = senders.find(|sndr| {
@@ -99,18 +92,18 @@ impl Receiver {
         };
 
         Self {
-            track_id,
+            track_id: state.id(),
             caps,
-            sender_id,
+            sender_id: state.sender_id().clone(),
             transceiver: RefCell::new(transceiver),
-            mid: RefCell::new(mid),
+            mid: RefCell::new(state.mid().clone()),
             track: RefCell::new(None),
             general_media_exchange_state: Cell::new(
-                media_exchange_state::Stable::from(enabled_general),
+                media_exchange_state::Stable::from(state.enabled_general()),
             ),
             is_track_notified: Cell::new(false),
             media_exchange_state_controller: TransitableStateController::new(
-                media_exchange_state::Stable::from(enabled_individual),
+                media_exchange_state::Stable::from(state.enabled_individual()),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }

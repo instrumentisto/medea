@@ -24,7 +24,7 @@ use std::{
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    stats::StatId, IceConnectionState, IceServer, MediaSourceKind, MemberId,
+    stats::StatId, IceConnectionState, MediaSourceKind, MemberId,
     PeerConnectionState, PeerId as Id, PeerId, TrackId,
 };
 use medea_macro::dispatchable;
@@ -265,18 +265,19 @@ impl PeerConnection {
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
     /// [`RtcPeerConnection`] can't be set.
-    pub fn new<I: IntoIterator<Item = IceServer>>(
-        id: Id,
+    pub fn new(
+        state: &State,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        ice_servers: I,
         media_manager: Rc<MediaManager>,
-        is_force_relayed: bool,
         send_constraints: LocalTracksConstraints,
         connections: Rc<Connections>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
-            RtcPeerConnection::new(ice_servers, is_force_relayed)
-                .map_err(tracerr::map_from_and_wrap!())?,
+            RtcPeerConnection::new(
+                state.ice_servers().clone(),
+                state.force_relay(),
+            )
+            .map_err(tracerr::map_from_and_wrap!())?,
         );
         let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
@@ -284,7 +285,7 @@ impl PeerConnection {
         ));
 
         let peer = Self {
-            id,
+            id: state.id(),
             peer,
             media_connections,
             media_manager,

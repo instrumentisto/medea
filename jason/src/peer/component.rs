@@ -2,12 +2,10 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::channel::mpsc;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
-    IceCandidate, IceServer, NegotiationRole, PeerId, TrackId,
+    IceCandidate, IceServer, NegotiationRole, PeerId as Id, TrackId,
 };
-use medea_macro::{watch, watchers};
 use medea_reactive::{
     collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
     ProgressableCell, RecheckableFutureExt,
@@ -15,14 +13,16 @@ use medea_reactive::{
 use tracerr::Traced;
 
 use crate::{
-    api::Connections,
-    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
+    media::{LocalTracksConstraints, RecvConstraints},
     peer::{
         local_sdp::LocalSdp,
         media::{receiver, sender},
         LocalStreamUpdateCriteria, PeerError,
     },
-    utils::component,
+    utils::{
+        component,
+        component::{ComponentState, WatchersSpawner},
+    },
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -30,7 +30,7 @@ use super::{PeerConnection, PeerEvent};
 /// State of the [`Component`].
 #[derive(Debug)]
 pub struct State {
-    id: PeerId,
+    id: Id,
     senders: RefCell<ProgressableHashMap<TrackId, Rc<sender::State>>>,
     receivers: RefCell<ProgressableHashMap<TrackId, Rc<receiver::State>>>,
     ice_servers: Vec<IceServer>,
@@ -46,7 +46,7 @@ impl State {
     /// Returns [`State`] with a provided data.
     #[inline]
     pub fn new(
-        id: PeerId,
+        id: Id,
         ice_servers: Vec<IceServer>,
         force_relay: bool,
         negotiation_role: Option<NegotiationRole>,
@@ -63,6 +63,11 @@ impl State {
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
         }
+    }
+
+    /// Returns [`Id`] of this [`State`].
+    pub fn id(&self) -> Id {
+        self.id
     }
 
     /// Returns all [`IceServer`]s of this [`State`].
@@ -345,47 +350,43 @@ impl State {
     }
 }
 
-/// Component responsible for the [`PeerConnection`] updating.
-pub type Component = component::Component<State, PeerConnection>;
+impl ComponentState<PeerConnection> for State {
+    fn spawn_watchers(&self, s: &mut WatchersSpawner<Self, PeerConnection>) {
+        use Component as C;
 
-impl Component {
-    /// Returns new [`Component`] based on the provided [`State`].
-    ///
-    /// This function will spawn all [`Component`]'s watchers automatically.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`PeerError`] if [`PeerConnection::new`] method fails.
-    #[inline]
-    pub fn new(
-        state: Rc<State>,
-        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        media_manager: Rc<MediaManager>,
-        send_constraints: LocalTracksConstraints,
-        connections: Rc<Connections>,
-    ) -> Result<Self, Traced<PeerError>> {
-        let peer = PeerConnection::new(
-            state.id,
-            peer_events_sender,
-            state.ice_servers().clone(),
-            media_manager,
-            state.force_relay(),
-            send_constraints,
-            connections,
-        )
-        .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(spawn_component!(Component, state, peer))
+        s.spawn(
+            self.ice_candidates.borrow().on_push(),
+            C::ice_candidate_push_watcher,
+        );
+        s.spawn(
+            self.remote_sdp_offer.subscribe(),
+            C::remote_sdp_offer_watcher,
+        );
+        s.spawn(self.restart_ice.subscribe(), C::ice_restart_watcher);
+        s.spawn(
+            self.senders.borrow().on_insert_with_replay(),
+            C::sender_insert_watcher,
+        );
+        s.spawn(
+            self.receivers.borrow().on_insert_with_replay(),
+            C::receiver_insert_watcher,
+        );
+        s.spawn(self.sdp_offer.subscribe(), C::sdp_offer_watcher);
+        s.spawn(
+            self.negotiation_role.subscribe(),
+            C::negotiation_role_watcher,
+        );
     }
 }
 
-#[watchers]
+/// Component responsible for the [`PeerConnection`] updating.
+pub type Component = component::Component<State, PeerConnection>;
+
 impl Component {
     /// Watcher for the [`State::ice_candidates`] push update.
     ///
     /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
     /// [`IceCandidate`].
-    #[watch(self.state().ice_candidates.borrow().on_push())]
     #[inline]
     async fn ice_candidate_push_watcher(
         peer: Rc<PeerConnection>,
@@ -410,7 +411,6 @@ impl Component {
     ///
     /// Calls [`PeerConnection::set_remote_offer`] with a new value if current
     /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
-    #[watch(self.state().remote_sdp_offer.subscribe())]
     async fn remote_sdp_offer_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -443,7 +443,6 @@ impl Component {
     /// Calls [`PeerConnection::restart_ice`] if new value is `true`.
     ///
     /// Resets [`State::restart_ice`] to `false` if new value is `true`.
-    #[watch(self.state().restart_ice.subscribe())]
     #[inline]
     async fn ice_restart_watcher(
         peer: Rc<PeerConnection>,
@@ -467,7 +466,6 @@ impl Component {
     ///
     /// Creates new [`SenderComponent`], creates new [`Connection`] with all
     /// [`sender::State::receivers`] by [`Connections::create_connection`] call,
-    #[watch(self.state().senders.borrow().on_insert_with_replay())]
     async fn sender_insert_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -488,14 +486,15 @@ impl Component {
         for receiver in new_sender.receivers() {
             peer.connections.create_connection(state.id, receiver);
         }
-        peer.media_connections.insert_sender(
-            sender::Component::new(
-                new_sender,
+        peer.media_connections.insert_sender(sender::Component::new(
+            sender::Sender::new(
+                &new_sender,
                 &peer.media_connections,
                 peer.send_constraints.clone(),
             )
             .map_err(tracerr::map_from_and_wrap!())?,
-        );
+            new_sender,
+        ));
 
         Ok(())
     }
@@ -505,7 +504,6 @@ impl Component {
     /// Creates new [`ReceiverComponent`], creates new [`Connection`] with a
     /// [`receiver::State::sender_id`] by [`Connections::create_connection`]
     /// call,
-    #[watch(self.state().receivers.borrow().on_insert_with_replay())]
     async fn receiver_insert_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -516,8 +514,11 @@ impl Component {
             .create_connection(state.id, new_receiver.sender_id());
         peer.media_connections
             .insert_receiver(receiver::Component::new(
+                Rc::new(receiver::Receiver::new(
+                    &new_receiver,
+                    &peer.media_connections,
+                )),
                 new_receiver,
-                &peer.media_connections,
             ));
 
         Ok(())
@@ -535,7 +536,6 @@ impl Component {
     ///
     /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
     /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
-    #[watch(self.state().sdp_offer.subscribe())]
     async fn sdp_offer_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -597,7 +597,6 @@ impl Component {
     /// Waits for [`SenderComponent`]s/[`ReceiverComponent`]s creation/update,
     /// updates local `MediaStream` (if needed) and renegotiates
     /// [`PeerConnection`].
-    #[watch(self.state().negotiation_role.subscribe())]
     async fn negotiation_role_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
