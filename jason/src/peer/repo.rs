@@ -19,6 +19,7 @@ use crate::{
 
 use super::{PeerConnection, PeerEvent};
 use crate::utils::{AsProtoState, SynchronizableState};
+use crate::media::RecvConstraints;
 
 /// Component responsible for the [`peer::Component`] creating and removing.
 pub type Component = component::Component<PeersState, Peers>;
@@ -35,6 +36,7 @@ impl Component {
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
         send_constraints: LocalTracksConstraints,
         connections: Rc<Connections>,
+        recv_constraints: Rc<RecvConstraints>,
     ) -> Self {
         let peers = Rc::default();
         spawn_component!(
@@ -49,6 +51,7 @@ impl Component {
                 peer_event_sender,
                 send_constraints,
                 connections,
+                recv_constraints,
             }),
         )
     }
@@ -159,6 +162,8 @@ pub struct Peers {
     ///
     /// [`Connection`]: crate::api::Connection
     connections: Rc<Connections>,
+
+    recv_constraints: Rc<RecvConstraints>,
 }
 
 impl PeersState {
@@ -226,6 +231,7 @@ impl Component {
             Rc::clone(&peers.media_manager),
             peers.send_constraints.clone(),
             Rc::clone(&peers.connections),
+            peers.recv_constraints.clone(),
         )
         .map_err(tracerr::map_from_and_wrap!())?;
 

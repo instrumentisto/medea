@@ -255,6 +255,8 @@ impl Component {
             .insert_receiver(receiver::Component::new(
                 new_receiver,
                 &peer.media_connections,
+                peer.track_events_sender.clone(),
+                &peer.recv_constraints,
             ));
 
         Ok(())

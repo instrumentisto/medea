@@ -49,6 +49,7 @@ impl Component {
         media_manager: Rc<MediaManager>,
         send_constraints: LocalTracksConstraints,
         connections: Rc<Connections>,
+        recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Self, Traced<PeerError>> {
         let peer = PeerConnection::new(
             state.id,
@@ -58,6 +59,7 @@ impl Component {
             state.force_relay(),
             send_constraints,
             connections,
+            recv_constraints,
         )
         .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -296,6 +298,7 @@ impl State {
     pub fn connection_lost(&self) {
         self.sync_state.set(SyncState::Desynced);
         self.senders.connection_lost();
+        self.receivers.connection_lost();
     }
 
     /// Notifies [`PeerComponent`] about RPC connection restore.
@@ -303,6 +306,7 @@ impl State {
     pub fn reconnected(&self) {
         self.sync_state.set(SyncState::Syncing);
         self.senders.connection_recovered();
+        self.receivers.connection_recovered();
     }
 
     /// Updates local `MediaStream` based on

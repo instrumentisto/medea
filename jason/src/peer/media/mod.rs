@@ -360,7 +360,7 @@ impl InnerMediaConnections {
         &self,
         kind: MediaKind,
     ) -> impl Iterator<Item = &receiver::Component> {
-        self.receivers.values().filter(move |s| s.kind() == kind)
+        self.receivers.values().filter(move |s| s.state().kind() == kind)
     }
 
     /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],
@@ -378,7 +378,7 @@ impl InnerMediaConnections {
                 .collect(),
             TrackDirection::Recv => self
                 .iter_receivers_with_kind(kind)
-                .map(|rx| rx.ctx() as Rc<dyn TransceiverSide>)
+                .map(|rx| rx.rc_state() as Rc<dyn TransceiverSide>)
                 .collect(),
         }
     }
@@ -557,7 +557,7 @@ impl MediaConnections {
                 inner
                     .receivers
                     .get(&track_id)
-                    .map(|rcvr| rcvr.ctx() as Rc<dyn TransceiverSide>)
+                    .map(|rcvr| rcvr.rc_state() as Rc<dyn TransceiverSide>)
             })
     }
 
@@ -740,7 +740,7 @@ impl MediaConnections {
                 inner
                     .receivers
                     .values()
-                    .map(|r| r.ctx() as Rc<dyn TransceiverSide>),
+                    .map(|r| r.rc_state() as Rc<dyn TransceiverSide>),
             )
             .collect()
     }

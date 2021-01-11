@@ -2,20 +2,20 @@
 
 use std::rc::Rc;
 
-use medea_client_api_proto::{
-    state as proto_state, MediaType, MemberId, TrackId, TrackPatchEvent,
-};
+use medea_client_api_proto::{state as proto_state, MediaType, MemberId, TrackId, TrackPatchEvent, MediaSourceKind};
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
+use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt, ObservableCell};
+use futures::channel::mpsc;
+use futures::future::LocalBoxFuture;
 
-use crate::{
-    media::RecvConstraints,
-    peer::{media::Result, MediaConnections},
-    utils::{component, AsProtoState, SynchronizableState, Updatable},
-};
+use crate::peer::{MediaExchangeStateController, TransceiverDirection, MuteStateController, TransceiverSide, TrackEvent, MediaExchangeState, MuteState};
+use crate::peer::media::{media_exchange_state, InTransition};
+use crate::{media::RecvConstraints, peer::{media::Result, MediaConnections}, utils::{component, AsProtoState, SynchronizableState, Updatable}, MediaKind};
+use crate::peer::media::MediaStateControllable;
+use crate::peer::component::SyncState;
+
 
 use super::Receiver;
-use futures::future::LocalBoxFuture;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -24,7 +24,18 @@ pub type Component = component::Component<State, Receiver>;
 impl Component {
     /// Returns new [`Component`] with a provided [`State`].
     #[inline]
-    pub fn new(state: Rc<State>, media_connections: &MediaConnections) -> Self {
+    pub fn new(state: Rc<State>, media_connections: &MediaConnections, track_events_sender: mpsc::UnboundedSender<TrackEvent>, recv_constraints: &RecvConstraints) -> Self {
+        let enabled = match &state.media_type {
+            MediaType::Audio(_) => {
+                recv_constraints.is_audio_enabled()
+            }
+            MediaType::Video(_) => {
+                recv_constraints.is_video_enabled()
+            }
+        };
+
+        state.media_exchange_state.transition_to(enabled.into());
+
         let recv = Receiver::new(
             media_connections,
             state.id,
@@ -33,6 +44,7 @@ impl Component {
             state.mid().clone(),
             state.enabled_general(),
             state.enabled_individual(),
+            track_events_sender,
         );
 
         spawn_component!(Component, state, Rc::new(recv))
@@ -63,6 +75,12 @@ pub struct State {
 
     /// Flag which indicates that this [`ReceiverComponent`] is muted.
     muted: ProgressableCell<bool>,
+
+    media_exchange_state: Rc<MediaExchangeStateController>,
+
+    general_media_exchange_state: ObservableCell<media_exchange_state::Stable>,
+
+    sync_state: ObservableCell<SyncState>,
 }
 
 impl AsProtoState for State {
@@ -93,6 +111,9 @@ impl SynchronizableState for State {
             enabled_individual: ProgressableCell::new(input.enabled_individual),
             enabled_general: ProgressableCell::new(input.enabled_general),
             muted: ProgressableCell::new(input.muted),
+            media_exchange_state: MediaExchangeStateController::new(input.enabled_individual.into()),
+            general_media_exchange_state: ObservableCell::new(input.enabled_general.into()),
+            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
@@ -100,18 +121,33 @@ impl SynchronizableState for State {
         self.muted.set(input.muted);
         self.enabled_general.set(input.enabled_general);
         self.enabled_individual.set(input.enabled_individual);
+
+        let new_media_exchange_state = media_exchange_state::Stable::from(input.enabled_individual);
+        let current_media_exchange_state = match self.media_exchange_state.state() {
+            MediaExchangeState::Transition(transition) => {
+                transition.into_inner()
+            }
+            MediaExchangeState::Stable(stable) => {
+                stable
+            }
+        };
+        if current_media_exchange_state != new_media_exchange_state {
+            self.media_exchange_state.update(new_media_exchange_state);
+        }
+
+        let new_general_media_exchange_state = media_exchange_state::Stable::from(input.enabled_general);
+        self.general_media_exchange_state.set(new_general_media_exchange_state);
+
+        self.sync_state.set(SyncState::Synced);
     }
 }
 
 impl Updatable for State {
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        // use futures::FutureExt as _;
-        // Box::pin(futures::future::join_all(vec![
-        //     self.media_exchange_state.when_stabilized(),
-        //     self.mute_state.when_stabilized(),
-        // ]).map(|_| ()))
-
-        Box::pin(futures::future::ready(()))
+        use futures::FutureExt as _;
+        Box::pin(futures::future::join_all(vec![
+            self.media_exchange_state.when_stabilized(),
+        ]).map(|_| ()))
     }
 
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
@@ -147,6 +183,9 @@ impl From<proto_state::Receiver> for State {
             enabled_individual: ProgressableCell::new(from.enabled_individual),
             enabled_general: ProgressableCell::new(from.enabled_general),
             muted: ProgressableCell::new(from.muted),
+            media_exchange_state: MediaExchangeStateController::new(from.enabled_individual.into()),
+            general_media_exchange_state: ObservableCell::new(from.enabled_general.into()),
+            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 }
@@ -172,6 +211,9 @@ impl State {
             enabled_general: ProgressableCell::new(enabled),
             enabled_individual: ProgressableCell::new(enabled),
             muted: ProgressableCell::new(false),
+            media_exchange_state: MediaExchangeStateController::new(true.into()),
+            general_media_exchange_state: ObservableCell::new(true.into()),
+            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
@@ -240,6 +282,14 @@ impl State {
             self.muted.when_all_processed(),
         ])
     }
+
+    pub fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    pub fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
+    }
 }
 
 #[watchers]
@@ -254,7 +304,7 @@ impl Component {
         _: Rc<State>,
         muted: Guarded<bool>,
     ) -> Result<()> {
-        receiver.set_muted(*muted);
+        // receiver.set_muted(*muted);
 
         Ok(())
     }
@@ -270,7 +320,7 @@ impl Component {
         _: Rc<State>,
         enabled_individual: Guarded<bool>,
     ) -> Result<()> {
-        receiver.set_enabled_individual_state(*enabled_individual);
+        // receiver.set_enabled_individual_state(*enabled_individual);
 
         Ok(())
     }
@@ -285,8 +335,132 @@ impl Component {
         _: Rc<State>,
         enabled_general: Guarded<bool>,
     ) -> Result<()> {
-        receiver.set_enabled_general_state(*enabled_general);
+        // receiver.set_enabled_general_state(*enabled_general);
 
         Ok(())
+    }
+
+    #[watch(self.state().general_media_exchange_state.subscribe())]
+    async fn general_media_exchange_state_watcher(
+        receiver: Rc<Receiver>,
+        _: Rc<State>,
+        state: media_exchange_state::Stable
+    ) -> Result<()> {
+        receiver.enabled_general.set(state == media_exchange_state::Stable::Enabled);
+        match state {
+            media_exchange_state::Stable::Disabled => {
+                if let Some(track) = receiver.track.borrow().as_ref() {
+                    track.set_enabled(false);
+                }
+                if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
+                    trnscvr.sub_direction(TransceiverDirection::RECV);
+                }
+            }
+            media_exchange_state::Stable::Enabled => {
+                if let Some(track) = receiver.track.borrow().as_ref() {
+                    track.set_enabled(true);
+                }
+                if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
+                    trnscvr.add_direction(TransceiverDirection::RECV);
+                }
+            }
+        }
+        receiver.maybe_notify_track();
+
+        Ok(())
+    }
+
+    #[watch(self.state().media_exchange_state.subscribe_stable())]
+    async fn stable_media_exchange_state_watcher(
+        receiver: Rc<Receiver>,
+        _: Rc<State>,
+        state: media_exchange_state::Stable,
+    ) -> Result<()> {
+        receiver.enabled_individual.set(state == media_exchange_state::Stable::Enabled);
+
+        Ok(())
+    }
+
+    #[watch(self.state().media_exchange_state.subscribe_transition())]
+    async fn transition_media_exchange_state_watcher(
+        receiver: Rc<Receiver>,
+        _: Rc<State>,
+        state: media_exchange_state::Transition
+    ) -> Result<()> {
+        receiver.send_media_exchange_state_intention(state);
+
+        Ok(())
+    }
+
+}
+
+impl MediaStateControllable for State {
+    fn media_exchange_state_controller(&self) -> Rc<MediaExchangeStateController> {
+        Rc::clone(&self.media_exchange_state)
+    }
+
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        // Receivers can be muted, but currently they are muted directly by
+        // server events.
+        //
+        // There is no point to provide external API for muting receivers, since
+        // muting is pipelined after demuxing and decoding, so it wont reduce
+        // incoming traffic or CPU usage. Therefore receivers muting do not
+        // require MuteStateController's state management.
+        //
+        // Removing this unreachable! would require abstracting
+        // MuteStateController to some trait and creating some dummy
+        // implementation. Not worth it atm.
+        unreachable!("Receivers muting is not implemented");
+    }
+
+    /// Stops only [`MediaExchangeStateController`]'s state transition timer.
+    #[inline]
+    fn stop_media_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .stop_transition_timeout();
+    }
+
+    /// Resets only [`MediaExchangeStateController`]'s state transition timer.
+    #[inline]
+    fn reset_media_state_transition_timeout(&self) {
+        self.media_exchange_state_controller()
+            .reset_transition_timeout();
+    }
+}
+
+impl TransceiverSide for State {
+    fn track_id(&self) -> TrackId {
+        self.id
+    }
+
+    fn kind(&self) -> MediaKind {
+            match &self.media_type {
+                MediaType::Audio(_) => MediaKind::Audio,
+                MediaType::Video(_) => MediaKind::Video,
+            }
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+            match &self.media_type {
+                MediaType::Audio(_) => MediaSourceKind::Device,
+                MediaType::Video(video) => video.source_kind,
+            }
+    }
+
+    fn mid(&self) -> Option<String> {
+        // if self.mid.borrow().is_none() && self.transceiver.borrow().is_some() {
+        //     if let Some(transceiver) =
+        //     self.transceiver.borrow().as_ref().cloned()
+        //     {
+        //         self.mid.replace(Some(transceiver.mid()?));
+        //     }
+        // }
+        // self.mid.borrow().clone()
+        self.mid.clone()
+    }
+
+    fn is_transitable(&self) -> bool {
+        true
     }
 }

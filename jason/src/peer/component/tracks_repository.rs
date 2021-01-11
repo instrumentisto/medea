@@ -4,12 +4,14 @@ use derive_more::From;
 use futures::stream::LocalBoxStream;
 use medea_client_api_proto::TrackId;
 use medea_reactive::{Guarded, ProgressableHashMap, RecheckableFutureExt};
+use futures::future::LocalBoxFuture;
 
 use crate::{
     peer::media::sender,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
-use futures::future::LocalBoxFuture;
+
+use super::receiver;
 
 /// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
 /// [`PeerComponent`].
@@ -71,6 +73,18 @@ impl TracksRepository<sender::State> {
             .collect()
     }
 
+    #[inline]
+    pub fn connection_lost(&self) {
+        self.0.borrow().values().for_each(|s| s.connection_lost());
+    }
+
+    #[inline]
+    pub fn connection_recovered(&self) {
+        self.0.borrow().values().for_each(|s| s.connection_recovered());
+    }
+}
+
+impl TracksRepository<receiver::State> {
     #[inline]
     pub fn connection_lost(&self) {
         self.0.borrow().values().for_each(|s| s.connection_lost());

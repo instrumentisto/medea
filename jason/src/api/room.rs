@@ -988,16 +988,18 @@ impl InnerRoom {
     ) -> Rc<Self> {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
+        let recv_constraints = Rc::new(RecvConstraints::default());
         Rc::new(Self {
             peers: peer::repo::Component::new(
                 media_manager,
                 peer_event_sender,
                 send_constraints.clone(),
                 Rc::clone(&connections),
+                Rc::clone(&recv_constraints),
             ),
             rpc,
             send_constraints,
-            recv_constraints: Rc::new(RecvConstraints::default()),
+            recv_constraints,
             connections,
             on_connection_loss: Callback1::default(),
             on_failed_local_media: Rc::new(Callback1::default()),

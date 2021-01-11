@@ -58,6 +58,7 @@ pub use self::{
     transceiver::{Transceiver, TransceiverDirection},
 };
 use wasm_bindgen_futures::spawn_local;
+use crate::media::RecvConstraints;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -263,6 +264,8 @@ pub struct PeerConnection {
     connections: Rc<Connections>,
 
     track_events_sender: mpsc::UnboundedSender<TrackEvent>,
+
+    recv_constraints: Rc<RecvConstraints>,
 }
 
 impl PeerConnection {
@@ -288,6 +291,7 @@ impl PeerConnection {
         is_force_relayed: bool,
         send_constraints: LocalTracksConstraints,
         connections: Rc<Connections>,
+        recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(ice_servers, is_force_relayed)
@@ -357,6 +361,7 @@ impl PeerConnection {
             send_constraints,
             connections,
             track_events_sender: track_events_tx,
+            recv_constraints,
         };
 
         // Bind to `icecandidate` event.
