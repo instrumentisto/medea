@@ -350,13 +350,13 @@ impl State {
             muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
             media_exchange_state: MediaExchangeStateController::new(
-                media_exchange_state::Stable::from(enabled),
+                media_exchange_state::Stable::from(true),
             ),
             general_media_exchange_state: ObservableCell::new(
-                media_exchange_state::Stable::from(enabled),
+                media_exchange_state::Stable::from(true),
             ),
             mute_state: MuteStateController::new(mute_state::Stable::from(
-                muted,
+                false,
             )),
             sync_state: ObservableCell::new(SyncState::Synced),
         })

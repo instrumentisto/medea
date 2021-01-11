@@ -194,6 +194,7 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn ice_candidates(&self) -> &HashSet<IceCandidate>)]
 #[enum_delegate(pub fn is_ice_restart(&self) -> bool)]
+#[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -202,34 +203,34 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
-    /// Returns current [`NegotiationRole`] of this [`PeerStateMachine`].
-    fn negotiation_role(
-        &self,
-    ) -> Option<medea_client_api_proto::NegotiationRole> {
-        use NegotiationRole as R;
-        use PeerStateMachine as S;
-
-        match self {
-            S::Stable(_) => None,
-            S::WaitLocalSdp(peer) => {
-                match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
-                {
-                    (None, Some(partner_sdp_offer)) => {
-                        Some(R::Answerer(partner_sdp_offer.clone()))
-                    }
-                    (None, None) => Some(R::Offerer),
-                    _ => None,
-                }
-            }
-            S::WaitRemoteSdp(peer) => {
-                match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
-                {
-                    (Some(_), None) => Some(R::Offerer),
-                    _ => None,
-                }
-            }
-        }
-    }
+    // /// Returns current [`NegotiationRole`] of this [`PeerStateMachine`].
+    // fn negotiation_role(
+    //     &self,
+    // ) -> Option<medea_client_api_proto::NegotiationRole> {
+    //     use NegotiationRole as R;
+    //     use PeerStateMachine as S;
+    //
+    //     match self {
+    //         S::Stable(_) => None,
+    //         S::WaitLocalSdp(peer) => {
+    //             match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
+    //             {
+    //                 (None, Some(partner_sdp_offer)) => {
+    //                     Some(R::Answerer(partner_sdp_offer.clone()))
+    //                 }
+    //                 (None, None) => Some(R::Offerer),
+    //                 _ => None,
+    //             }
+    //         }
+    //         S::WaitRemoteSdp(peer) => {
+    //             match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
+    //             {
+    //                 (Some(_), None) => Some(R::Offerer),
+    //                 _ => None,
+    //             }
+    //         }
+    //     }
+    // }
 
     /// Returns all [`state::Sender`] of this [`PeerStateMachine`].
     fn get_senders_states(&self) -> HashMap<TrackId, state::Sender> {
@@ -445,6 +446,8 @@ pub struct Context {
     /// Flag which indicates that ICE restart should be performed for this
     /// [`Peer`].
     ice_restart: bool,
+
+    negotiation_role: Option<NegotiationRole>,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -916,6 +919,10 @@ impl<T> Peer<T> {
     pub fn is_ice_restart(&self) -> bool {
         self.context.ice_restart
     }
+
+    pub fn negotiation_role(&self) -> Option<NegotiationRole> {
+        self.context.negotiation_role.clone()
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -1007,6 +1014,7 @@ impl Peer<WaitRemoteSdp> {
     /// state.
     #[inline]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
+        self.context.negotiation_role = Some(NegotiationRole::Answerer(sdp_offer.clone()));
         self.context.partner_sdp_offer = Some(sdp_offer);
 
         Peer {
@@ -1046,6 +1054,7 @@ impl Peer<Stable> {
             peer_updates_sub,
             ice_candidates: HashSet::new(),
             ice_restart: false,
+            negotiation_role: None,
         };
 
         Self {
@@ -1065,6 +1074,8 @@ impl Peer<Stable> {
         let mut context = self.context;
         context.sdp_offer = None;
         context.partner_sdp_offer = None;
+
+        context.negotiation_role = Some(NegotiationRole::Offerer);
 
         Peer {
             context,
@@ -1163,6 +1174,7 @@ impl Peer<Stable> {
         self.context.ice_restart = false;
         self.context.is_known_to_remote = true;
         self.context.pending_track_updates.clear();
+        self.context.negotiation_role = None;
         self.commit_scheduled_changes();
     }
 }

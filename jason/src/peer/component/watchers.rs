@@ -129,6 +129,7 @@ impl Component {
             state.when_updated(),
             Box::new(state.senders.when_all_processed()),
             Box::new(state.receivers.when_all_processed()),
+            Box::new(state.remote_sdp_offer.when_all_processed()),
         ])
         .await;
 
@@ -363,9 +364,9 @@ impl Component {
                     .await;
 
                     state.senders.when_stabilized().await;
-                    state.senders.when_all_processed().await;
+                    state.senders.when_updated().await;
                     state.receivers.when_stabilized().await;
-                    state.receivers.when_all_processed().await;
+                    state.receivers.when_updated().await;
 
                     state.when_updated().await;
 
@@ -380,17 +381,15 @@ impl Component {
                 }
                 NegotiationRole::Answerer(remote_sdp_offer) => {
                     state.when_all_receivers_processed().await;
-                    state.receivers.when_stabilized().await;
-                    state.receivers.when_updated().await;
                     peer.media_connections.sync_receivers();
 
                     state.set_remote_sdp_offer(remote_sdp_offer);
 
+                    state.receivers.when_stabilized().await;
                     state.receivers.when_updated().await;
                     state.remote_sdp_offer.when_all_processed().await;
                     state.when_all_senders_processed().await;
                     state.senders.when_stabilized().await;
-                    state.senders.when_updated().await;
                     state.senders.when_updated().await;
 
                     state
