@@ -52,7 +52,7 @@ impl Component {
         sync_state: SyncState,
     ) -> Result<(), Traced<PeerError>> {
         if let SyncState::Synced = sync_state {
-            peer.send_intentions();
+            // peer.send_intentions();
         }
 
         Ok(())
@@ -228,6 +228,7 @@ impl Component {
                 new_sender,
                 &peer.media_connections,
                 peer.send_constraints.clone(),
+                peer.track_events_sender.clone(),
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );

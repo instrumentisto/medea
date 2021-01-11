@@ -114,7 +114,7 @@ enum NegotiationState {
 
 /// Synchronization state of the [`PeerComponent`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SyncState {
+pub enum SyncState {
     /// State desynced, and should be synced on RPC reconnect.
     Desynced,
 
@@ -294,12 +294,14 @@ impl State {
     #[inline]
     pub fn connection_lost(&self) {
         self.sync_state.set(SyncState::Desynced);
+        self.senders.connection_lost();
     }
 
     /// Notifies [`PeerComponent`] about RPC connection restore.
     #[inline]
     pub fn reconnected(&self) {
         self.sync_state.set(SyncState::Syncing);
+        self.senders.connection_recovered();
     }
 
     /// Updates local `MediaStream` based on

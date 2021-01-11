@@ -1129,10 +1129,10 @@ impl InnerRoom {
                         })
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {
-                        self.rpc.send_command(Command::UpdateTracks {
-                            peer_id,
-                            tracks_patches,
-                        });
+                        // self.rpc.send_command(Command::UpdateTracks {
+                        //     peer_id,
+                        //     tracks_patches,
+                        // });
                     }
 
                     Ok(future::try_join_all(transitions_futs))

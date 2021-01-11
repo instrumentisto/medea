@@ -17,6 +17,7 @@ use crate::{
 };
 
 use super::TransitableState;
+use futures::stream::LocalBoxStream;
 
 /// [`TransitableStateController`] for the [`mute_state`].
 pub type MuteStateController =
@@ -29,6 +30,7 @@ pub type MediaExchangeStateController = TransitableStateController<
 >;
 
 /// Component managing all kinds of [`TransitableState`].
+#[derive(Debug)]
 pub struct TransitableStateController<S, T> {
     /// Actual [`TransitableState`].
     state: ObservableCell<TransitableState<S, T>>,
@@ -106,6 +108,32 @@ where
         });
     }
 
+    pub fn subscribe_stable(&self) -> LocalBoxStream<'static, S> {
+        self.state
+            .subscribe()
+            .filter_map(|s| async move {
+                if let TransitableState::Stable(stable) = s {
+                    Some(stable)
+                } else {
+                    None
+                }
+            })
+            .boxed_local()
+    }
+
+    pub fn subscribe_transition(&self) -> LocalBoxStream<'static, T> {
+        self.state
+            .subscribe()
+            .filter_map(|s| async move {
+                if let TransitableState::Transition(transition) = s {
+                    Some(transition)
+                } else {
+                    None
+                }
+            })
+            .boxed_local()
+    }
+
     /// Stops disable/enable timeout of this [`TransitableStateController`].
     pub(in super::super) fn stop_transition_timeout(&self) {
         if let Some(timer) = &*self.timeout_handle.borrow() {
@@ -173,6 +201,15 @@ where
             Ok(())
         }
         .boxed_local()
+    }
+
+    pub fn when_stabilized(&self) -> future::LocalBoxFuture<'static, ()> {
+        let fut =
+            self.state.when(|s| matches!(s, TransitableState::Stable(_)));
+
+        Box::pin(async move {
+            fut.await;
+        })
     }
 
     /// Updates [`TransitableStateController::state`].

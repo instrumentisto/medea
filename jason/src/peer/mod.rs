@@ -25,6 +25,7 @@ use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     stats::StatId, Command, IceConnectionState, IceServer, MediaSourceKind,
     MemberId, PeerConnectionState, PeerId as Id, PeerId, TrackId,
+    TrackPatchCommand,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -56,6 +57,7 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
+use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -84,6 +86,13 @@ pub enum PeerError {
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
+
+#[derive(Debug)]
+pub enum TrackEvent {
+    MuteUpdateIntention { id: TrackId, muted: bool },
+
+    MediaExchangeIntention { id: TrackId, enabled: bool },
+}
 
 #[dispatchable(self: &Self, async_trait(?Send))]
 #[cfg_attr(feature = "mockable", derive(Clone))]
@@ -252,6 +261,8 @@ pub struct PeerConnection {
     send_constraints: LocalTracksConstraints,
 
     connections: Rc<Connections>,
+
+    track_events_sender: mpsc::UnboundedSender<TrackEvent>,
 }
 
 impl PeerConnection {
@@ -282,10 +293,57 @@ impl PeerConnection {
             RtcPeerConnection::new(ice_servers, is_force_relayed)
                 .map_err(tracerr::map_from_and_wrap!())?,
         );
+        let (track_events_tx, mut track_events_rx) = mpsc::unbounded();
         let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
             peer_events_sender.clone(),
+            track_events_tx.clone(),
         ));
+
+        spawn_local({
+            use futures::StreamExt as _;
+            let peer_events_sender = peer_events_sender.clone();
+            let peer_id = id;
+
+            async move {
+                while let Some(e) = track_events_rx.next().await {
+                    match e {
+                        TrackEvent::MediaExchangeIntention { id, enabled } => {
+                            peer_events_sender.unbounded_send(
+                                PeerEvent::SendIntention {
+                                    intention: Command::UpdateTracks {
+                                        peer_id,
+                                        tracks_patches: vec![
+                                            TrackPatchCommand {
+                                                id,
+                                                muted: None,
+                                                enabled: Some(enabled),
+                                            },
+                                        ],
+                                    },
+                                },
+                            );
+                        }
+                        TrackEvent::MuteUpdateIntention { id, muted } => {
+                            peer_events_sender.unbounded_send(
+                                PeerEvent::SendIntention {
+                                    intention: Command::UpdateTracks {
+                                        peer_id,
+                                        tracks_patches: vec![
+                                            TrackPatchCommand {
+                                                id,
+                                                muted: Some(muted),
+                                                enabled: None,
+                                            },
+                                        ],
+                                    },
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+        });
 
         let peer = Self {
             id,
@@ -298,6 +356,7 @@ impl PeerConnection {
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
             connections,
+            track_events_sender: track_events_tx,
         };
 
         // Bind to `icecandidate` event.
@@ -806,36 +865,6 @@ impl PeerConnection {
             });
         }
         Ok(())
-    }
-
-    /// Sends [`PeerEvent::SendIntention`] with the intentions of the
-    /// [`Sender`]s and [`Receiver`]s from this [`PeerConnection`]
-    ///
-    /// If this [`PeerConnection`] doesn't intents anything then nothing will be
-    /// sent.
-    fn send_intentions(&self) {
-        if let Some(intention) = self.intentions() {
-            let _ = self
-                .peer_events_sender
-                .unbounded_send(PeerEvent::SendIntention { intention });
-        }
-    }
-
-    /// Returns all intentions of the [`Sender`]s and [`Receiver`]s from this
-    /// [`PeerConnection`] as [`Command`].
-    ///
-    /// If this [`PeerConnection`] doesn't intents anything then `None` will be
-    /// returned.
-    pub fn intentions(&self) -> Option<Command> {
-        let tracks_patches = self.media_connections.intentions();
-        if tracks_patches.is_empty() {
-            None
-        } else {
-            Some(Command::UpdateTracks {
-                peer_id: self.id,
-                tracks_patches,
-            })
-        }
     }
 }
 

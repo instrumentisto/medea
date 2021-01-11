@@ -2,12 +2,15 @@
 
 use std::{cell::Cell, rc::Rc};
 
+use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::{
     state as proto_state, MediaSourceKind, MediaType, MemberId, TrackId,
     TrackPatchEvent,
 };
 use medea_macro::{watch, watchers};
-use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
+use medea_reactive::{
+    Guarded, ObservableCell, ProgressableCell, RecheckableFutureExt,
+};
 
 use crate::{
     media::LocalTracksConstraints,
@@ -20,6 +23,14 @@ use crate::{
 };
 
 use super::{Builder, Sender};
+use crate::peer::{
+    component::SyncState,
+    conn::RTCPeerConnectionError::PeerConnectionEventBindFailed,
+    MediaExchangeState, MediaExchangeStateController, MediaState,
+    MediaStateControllable, MuteState, MuteStateController, PeerEvent,
+    TrackEvent, TransceiverDirection, TransceiverSide,
+};
+use crate::peer::media::InTransition;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
@@ -36,7 +47,18 @@ impl Component {
         state: Rc<State>,
         media_connections: &MediaConnections,
         send_constraints: LocalTracksConstraints,
+        track_events_sender: mpsc::UnboundedSender<TrackEvent>,
     ) -> Result<Self> {
+        let media_exchange_state = media_exchange_state::Stable::from(
+            send_constraints.enabled(state.media_type())
+        );
+        let mute_state = mute_state::Stable::from(
+            send_constraints.muted(state.media_type())
+        );
+
+        state.mute_state_controller().transition_to(mute_state);
+        state.media_exchange_state_controller().transition_to(media_exchange_state);
+
         let sndr = Builder {
             media_connections: &media_connections,
             track_id: state.id,
@@ -48,6 +70,7 @@ impl Component {
             ),
             required: state.media_type().required(),
             send_constraints,
+            track_events_sender,
         }
         .build()
         .map_err(tracerr::map_from_and_wrap!())?;
@@ -84,6 +107,77 @@ pub struct State {
     /// Flag which indicates that local `MediaStream` update needed for this
     /// [`SenderComponent`].
     need_local_stream_update: Cell<bool>,
+
+    media_exchange_state: Rc<MediaExchangeStateController>,
+
+    mute_state: Rc<MuteStateController>,
+
+    general_media_exchange_state: ObservableCell<media_exchange_state::Stable>,
+
+    sync_state: ObservableCell<SyncState>,
+}
+
+impl TransceiverSide for State {
+    fn track_id(&self) -> TrackId {
+        self.id
+    }
+
+    fn kind(&self) -> MediaKind {
+        self.media_kind()
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+        self.media_source()
+    }
+
+    fn mid(&self) -> Option<String> {
+        self.mid.clone()
+    }
+
+    fn is_transitable(&self) -> bool {
+        // TODO (evdokimovs): Temp code. Rewrite it using is_constraints.
+        match &self.media_type {
+            MediaType::Video(video) => match &video.source_kind {
+                MediaSourceKind::Display => false,
+                MediaSourceKind::Device => true,
+            },
+            _ => true,
+        }
+    }
+}
+
+impl MediaStateControllable for State {
+    fn media_exchange_state_controller(
+        &self,
+    ) -> Rc<MediaExchangeStateController> {
+        Rc::clone(&self.media_exchange_state)
+    }
+
+    fn mute_state_controller(&self) -> Rc<MuteStateController> {
+        Rc::clone(&self.mute_state)
+    }
+
+    fn media_state_transition_to(
+        &self,
+        desired_state: MediaState,
+    ) -> Result<()> {
+        if self.media_type.required() {
+            Err(tracerr::new!(
+                MediaConnectionsError::CannotDisableRequiredSender
+            ))
+        } else {
+            match desired_state {
+                MediaState::MediaExchange(desired_state) => {
+                    self.media_exchange_state_controller()
+                        .transition_to(desired_state);
+                }
+                MediaState::Mute(desired_state) => {
+                    self.mute_state_controller().transition_to(desired_state);
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 impl AsProtoState for State {
@@ -115,6 +209,16 @@ impl SynchronizableState for State {
             enabled_general: ProgressableCell::new(input.enabled_general),
             muted: ProgressableCell::new(input.muted),
             need_local_stream_update: Cell::new(false),
+            mute_state: MuteStateController::new(mute_state::Stable::from(
+                input.muted,
+            )),
+            media_exchange_state: MediaExchangeStateController::new(
+                media_exchange_state::Stable::from(input.enabled_individual),
+            ),
+            general_media_exchange_state: ObservableCell::new(
+                media_exchange_state::Stable::from(input.enabled_general),
+            ),
+            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
@@ -122,6 +226,37 @@ impl SynchronizableState for State {
         self.muted.set(input.muted);
         self.enabled_general.set(input.enabled_general);
         self.enabled_individual.set(input.enabled_individual);
+
+        let new_media_exchange_state = media_exchange_state::Stable::from(input.enabled_individual);
+        let current_media_exchange_state = match self.media_exchange_state.state() {
+            MediaExchangeState::Transition(transition) => {
+                transition.into_inner()
+            }
+            MediaExchangeState::Stable(stable) => {
+                stable
+            }
+        };
+        if current_media_exchange_state != new_media_exchange_state {
+            self.media_exchange_state.update(new_media_exchange_state);
+        }
+
+        let new_mute_state = mute_state::Stable::from(input.muted);
+        let current_mute_state = match self.mute_state.state() {
+            MuteState::Stable(stable) => {
+                stable
+            }
+            MuteState::Transition(transition) => {
+                transition.into_inner()
+            }
+        };
+        if current_mute_state != new_mute_state {
+            self.mute_state.update(new_mute_state);
+        }
+
+        let new_general_media_exchange_state = media_exchange_state::Stable::from(input.enabled_general);
+        self.general_media_exchange_state.set(new_general_media_exchange_state);
+
+        self.sync_state.set(SyncState::Synced);
     }
 }
 
@@ -160,6 +295,16 @@ impl From<proto_state::Sender> for State {
             enabled_general: ProgressableCell::new(from.enabled_general),
             muted: ProgressableCell::new(from.muted),
             need_local_stream_update: Cell::new(false),
+            mute_state: MuteStateController::new(mute_state::Stable::from(
+                from.muted,
+            )),
+            media_exchange_state: MediaExchangeStateController::new(
+                media_exchange_state::Stable::from(from.enabled_individual),
+            ),
+            general_media_exchange_state: ObservableCell::new(
+                media_exchange_state::Stable::from(from.enabled_general),
+            ),
+            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 }
@@ -195,7 +340,29 @@ impl State {
             enabled_individual: ProgressableCell::new(enabled),
             muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
+            media_exchange_state: MediaExchangeStateController::new(
+                media_exchange_state::Stable::from(enabled),
+            ),
+            general_media_exchange_state: ObservableCell::new(
+                media_exchange_state::Stable::from(enabled),
+            ),
+            mute_state: MuteStateController::new(mute_state::Stable::from(
+                muted,
+            )),
+            sync_state: ObservableCell::new(SyncState::Synced),
         })
+    }
+
+    pub fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    pub fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.media_exchange_state.enabled()
     }
 
     /// Returns [`TrackId`] of this [`State`].
@@ -247,13 +414,18 @@ impl State {
             return;
         }
         if let Some(enabled_general) = track_patch.enabled_general {
-            self.enabled_general.set(enabled_general);
+            self.general_media_exchange_state
+                .set(media_exchange_state::Stable::from(enabled_general));
+            // self.enabled_general.set(enabled_general);
         }
         if let Some(enabled_individual) = track_patch.enabled_individual {
-            self.enabled_individual.set(enabled_individual);
+            self.media_exchange_state
+                .update(media_exchange_state::Stable::from(enabled_individual));
+            // self.enabled_individual.set(enabled_individual);
         }
         if let Some(muted) = track_patch.muted {
-            self.muted.set(muted);
+            self.mute_state.update(mute_state::Stable::from(muted));
+            // self.muted.set(muted);
         }
     }
 
@@ -317,12 +489,12 @@ impl Component {
         state: Rc<State>,
         enabled_individual: Guarded<bool>,
     ) -> Result<()> {
-        sender.set_enabled_individual(*enabled_individual);
-        if *enabled_individual {
-            state.need_local_stream_update.set(true);
-        } else {
-            sender.remove_track().await;
-        }
+        // sender.set_enabled_individual(*enabled_individual);
+        // if *enabled_individual {
+        //     state.need_local_stream_update.set(true);
+        // } else {
+        //     sender.remove_track().await;
+        // }
 
         Ok(())
     }
@@ -337,7 +509,7 @@ impl Component {
         _: Rc<State>,
         enabled_general: Guarded<bool>,
     ) -> Result<()> {
-        sender.set_enabled_general(*enabled_general);
+        // sender.set_enabled_general(*enabled_general);
 
         Ok(())
     }
@@ -352,7 +524,115 @@ impl Component {
         _: Rc<State>,
         muted: Guarded<bool>,
     ) -> Result<()> {
-        sender.set_muted(*muted);
+        // sender.set_muted(*muted);
+
+        Ok(())
+    }
+
+    #[watch(self.state().media_exchange_state.subscribe_transition())]
+    async fn individual_media_exchange_state_transition_watcher(
+        sender: Rc<Sender>,
+        state: Rc<State>,
+        new_state: media_exchange_state::Transition,
+    ) -> Result<()> {
+        sender.send_media_exchange_state_intention(new_state);
+
+        Ok(())
+    }
+
+    #[watch(self.state().mute_state.subscribe_transition())]
+    async fn mute_state_transition_watcher(
+        sender: Rc<Sender>,
+        state: Rc<State>,
+        new_state: mute_state::Transition,
+    ) -> Result<()> {
+        sender.send_mute_state_intention(new_state);
+
+        Ok(())
+    }
+
+    #[watch(self.state().general_media_exchange_state.subscribe())]
+    async fn general_media_exchange_state_watcher(
+        sender: Rc<Sender>,
+        _: Rc<State>,
+        new_state: media_exchange_state::Stable,
+    ) -> Result<()> {
+        sender.set_enabled_general(
+            new_state == media_exchange_state::Stable::Enabled,
+        );
+        match new_state {
+            media_exchange_state::Stable::Enabled => {
+                if sender.enabled_in_cons() {
+                    sender
+                        .transceiver
+                        .add_direction(TransceiverDirection::SEND);
+                }
+            }
+            media_exchange_state::Stable::Disabled => {
+                sender.transceiver.sub_direction(TransceiverDirection::SEND);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[watch(self.state().media_exchange_state.subscribe_stable())]
+    async fn individual_media_exchange_state_stable_watcher(
+        sender: Rc<Sender>,
+        state: Rc<State>,
+        new_state: media_exchange_state::Stable,
+    ) -> Result<()> {
+        sender.set_enabled_individual(
+            new_state == media_exchange_state::Stable::Enabled,
+        );
+        match new_state {
+            media_exchange_state::Stable::Enabled => {
+                state.need_local_stream_update.set(true);
+            }
+            media_exchange_state::Stable::Disabled => {
+                sender.remove_track().await;
+            }
+        }
+
+        Ok(())
+    }
+
+    #[watch(self.state().mute_state.subscribe_stable())]
+    async fn mute_state_stable_watcher(
+        sender: Rc<Sender>,
+        _: Rc<State>,
+        new_state: mute_state::Stable,
+    ) -> Result<()> {
+        sender.set_muted(new_state == mute_state::Stable::Muted);
+        match new_state {
+            mute_state::Stable::Muted => {
+                sender.transceiver.set_send_track_enabled(false);
+            }
+            mute_state::Stable::Unmuted => {
+                sender.transceiver.set_send_track_enabled(true);
+            }
+        }
+
+        Ok(())
+    }
+
+    #[watch(self.state().sync_state.subscribe().skip(1))]
+    async fn sync_state_watcher(
+        sender: Rc<Sender>,
+        state: Rc<State>,
+        sync_state: SyncState,
+    ) -> Result<()> {
+        if let SyncState::Synced = sync_state {
+            if let MediaExchangeState::Transition(transition) =
+                state.media_exchange_state.state()
+            {
+                sender.send_media_exchange_state_intention(transition);
+            }
+            if let MuteState::Transition(transition) = state.mute_state.state()
+            {
+                sender.send_mute_state_intention(transition);
+            }
+        }
 
         Ok(())
     }

@@ -60,6 +60,7 @@ impl<S> TracksRepository<S> {
 impl TracksRepository<sender::State> {
     /// Returns all [`sender::State`]s which are requires local `MediaStream`
     /// update.
+    #[inline]
     pub fn get_outdated(&self) -> Vec<Rc<sender::State>> {
         self.0
             .borrow()
@@ -67,6 +68,16 @@ impl TracksRepository<sender::State> {
             .filter(|s| s.is_local_stream_update_needed())
             .cloned()
             .collect()
+    }
+
+    #[inline]
+    pub fn connection_lost(&self) {
+        self.0.borrow().values().for_each(|s| s.connection_lost());
+    }
+
+    #[inline]
+    pub fn connection_recovered(&self) {
+        self.0.borrow().values().for_each(|s| s.connection_recovered());
     }
 }
 

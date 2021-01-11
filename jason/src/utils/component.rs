@@ -94,6 +94,11 @@ impl<S, C> Component<S, C> {
     pub fn state(&self) -> &S {
         &self.state
     }
+
+    // TODO (evdokimovs): Remove this function.
+    pub fn rc_state(&self) -> Rc<S> {
+        Rc::clone(&self.state)
+    }
 }
 
 impl<S: 'static, C: 'static> Component<S, C> {
