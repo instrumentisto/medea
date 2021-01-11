@@ -95,17 +95,6 @@ pub struct State {
     /// All `Member`s which are receives media from this [`SenderComponent`].
     receivers: Vec<MemberId>,
 
-    /// Flag which indicates that this [`SenderComponent`] is enabled on `Send`
-    /// direction side.
-    enabled_individual: ProgressableCell<bool>,
-
-    /// Flag which indicates that this [`SenderComponent`] is enabled on `Send`
-    /// __and__ `Recv` direction sides.
-    enabled_general: ProgressableCell<bool>,
-
-    /// Flag which indicates that this [`SenderComponent`] is muted.
-    muted: ProgressableCell<bool>,
-
     /// Flag which indicates that local `MediaStream` update needed for this
     /// [`SenderComponent`].
     need_local_stream_update: Cell<bool>,
@@ -191,9 +180,10 @@ impl AsProtoState for State {
             mid: self.mid.clone(),
             media_type: self.media_type.clone(),
             receivers: self.receivers.clone(),
-            enabled_individual: self.enabled_individual.get(),
-            enabled_general: self.enabled_general.get(),
-            muted: self.muted.get(),
+            enabled_individual: self.media_exchange_state.enabled(),
+            enabled_general: self.general_media_exchange_state.get()
+                == media_exchange_state::Stable::Enabled,
+            muted: self.mute_state.muted(),
         }
     }
 }
@@ -207,9 +197,6 @@ impl SynchronizableState for State {
             mid: input.mid,
             media_type: input.media_type,
             receivers: input.receivers,
-            enabled_individual: ProgressableCell::new(input.enabled_individual),
-            enabled_general: ProgressableCell::new(input.enabled_general),
-            muted: ProgressableCell::new(input.muted),
             need_local_stream_update: Cell::new(false),
             mute_state: MuteStateController::new(mute_state::Stable::from(
                 input.muted,
@@ -225,10 +212,6 @@ impl SynchronizableState for State {
     }
 
     fn apply(&self, input: Self::Input) {
-        self.muted.set(input.muted);
-        self.enabled_general.set(input.enabled_general);
-        self.enabled_individual.set(input.enabled_individual);
-
         let new_media_exchange_state =
             media_exchange_state::Stable::from(input.enabled_individual);
         let current_media_exchange_state =
@@ -274,9 +257,8 @@ impl Updatable for State {
 
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         Box::new(medea_reactive::join_all(vec![
-            self.enabled_general.when_all_processed(),
-            self.enabled_individual.when_all_processed(),
-            self.muted.when_all_processed(),
+            Box::new(self.media_exchange_state.when_processed()) as Box<dyn RecheckableFutureExt<Output = ()>>,
+            Box::new(self.mute_state.when_processed()),
         ]))
     }
 }
@@ -288,9 +270,10 @@ impl From<&State> for proto_state::Sender {
             mid: state.mid.clone(),
             media_type: state.media_type.clone(),
             receivers: state.receivers.clone(),
-            enabled_individual: state.enabled_individual.get(),
-            enabled_general: state.enabled_general.get(),
-            muted: state.muted.get(),
+            enabled_individual: state.media_exchange_state.enabled(),
+            enabled_general: state.general_media_exchange_state.get()
+                == media_exchange_state::Stable::Enabled,
+            muted: state.mute_state.muted(),
         }
     }
 }
@@ -302,9 +285,6 @@ impl From<proto_state::Sender> for State {
             mid: from.mid,
             media_type: from.media_type,
             receivers: from.receivers,
-            enabled_individual: ProgressableCell::new(from.enabled_individual),
-            enabled_general: ProgressableCell::new(from.enabled_general),
-            muted: ProgressableCell::new(from.muted),
             need_local_stream_update: Cell::new(false),
             mute_state: MuteStateController::new(mute_state::Stable::from(
                 from.muted,
@@ -347,9 +327,6 @@ impl State {
             mid,
             media_type,
             receivers,
-            enabled_general: ProgressableCell::new(enabled),
-            enabled_individual: ProgressableCell::new(enabled),
-            muted: ProgressableCell::new(muted),
             need_local_stream_update: Cell::new(false),
             media_exchange_state: MediaExchangeStateController::new(
                 media_exchange_state::Stable::from(true),
@@ -404,19 +381,20 @@ impl State {
     /// Returns current individual media exchange state of this [`State`].
     #[inline]
     pub fn is_enabled_individual(&self) -> bool {
-        self.enabled_individual.get()
+        self.media_exchange_state.enabled()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
     pub fn is_enabled_general(&self) -> bool {
-        self.enabled_general.get()
+        self.general_media_exchange_state.get()
+            == media_exchange_state::Stable::Enabled
     }
 
     /// Returns current mute state of this [`State`].
     #[inline]
     pub fn is_muted(&self) -> bool {
-        self.muted.get()
+        self.mute_state.muted()
     }
 
     /// Updates this [`State`] with a provided [`TrackPatchEvent`].
@@ -438,18 +416,6 @@ impl State {
             self.mute_state.update(mute_state::Stable::from(muted));
             // self.muted.set(muted);
         }
-    }
-
-    /// Returns [`Future`] which will be resolved when [`State`] update
-    /// will be applied on [`Sender`].
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
-        medea_reactive::join_all(vec![
-            self.enabled_general.when_all_processed(),
-            self.enabled_individual.when_all_processed(),
-            self.muted.when_all_processed(),
-        ])
     }
 
     /// Returns `true` if local `MediaStream` update needed for this
@@ -486,60 +452,6 @@ impl State {
 
 #[watchers]
 impl Component {
-    /// Watcher for the [`State::enabled_individual`] update.
-    ///
-    /// Calls [`Sender::set_enabled_individual`] with a new value.
-    ///
-    /// If new value is `true` then sets
-    /// [`State::need_local_stream_update`] flag to `true`, otherwise
-    /// calls [`Sender::remove_track`].
-    #[watch(self.state().enabled_individual.subscribe())]
-    #[inline]
-    async fn enabled_individual_watcher(
-        sender: Rc<Sender>,
-        state: Rc<State>,
-        enabled_individual: Guarded<bool>,
-    ) -> Result<()> {
-        // sender.set_enabled_individual(*enabled_individual);
-        // if *enabled_individual {
-        //     state.need_local_stream_update.set(true);
-        // } else {
-        //     sender.remove_track().await;
-        // }
-
-        Ok(())
-    }
-
-    /// Watcher for the [`State::enabled_general`] update.
-    ///
-    /// Calls [`Sender::set_enabled_general_state`] with a new value.
-    #[watch(self.state().enabled_general.subscribe())]
-    #[inline]
-    async fn enabled_general_watcher(
-        sender: Rc<Sender>,
-        _: Rc<State>,
-        enabled_general: Guarded<bool>,
-    ) -> Result<()> {
-        // sender.set_enabled_general(*enabled_general);
-
-        Ok(())
-    }
-
-    /// Watcher for the [`State::muted`] update.
-    ///
-    /// Calls [`Sender::set_muted`] with a new value.
-    #[watch(self.state().muted.subscribe())]
-    #[inline]
-    async fn muted_watcher(
-        sender: Rc<Sender>,
-        _: Rc<State>,
-        muted: Guarded<bool>,
-    ) -> Result<()> {
-        // sender.set_muted(*muted);
-
-        Ok(())
-    }
-
     #[watch(self.state().media_exchange_state.subscribe_transition())]
     async fn individual_media_exchange_state_transition_watcher(
         sender: Rc<Sender>,

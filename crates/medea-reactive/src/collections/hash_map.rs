@@ -264,6 +264,24 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
+    // TODO: better naming
+    pub fn remove_not_present<A>(&mut self, another: &std::collections::HashMap<K, A>) {
+        self.iter()
+            .filter_map(|(id, _)| {
+                if another.contains_key(id) {
+                    None
+                } else {
+                    Some(id.clone())
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|id| {
+                self.remove(&id);
+            });
+    }
+
+
     /// Inserts a key-value pair to this [`HashMap`].
     ///
     /// Emits [`HashMap::on_insert()`] event and may emit

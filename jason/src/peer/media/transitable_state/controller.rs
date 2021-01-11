@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{future, future::Either, FutureExt, StreamExt};
-use medea_reactive::{ObservableCell, ProgressableCell};
+use medea_reactive::{ObservableCell, ProgressableCell, RecheckableFutureExt};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -205,6 +205,10 @@ where
             Ok(())
         }
         .boxed_local()
+    }
+
+    pub fn when_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
+        self.state.when_all_processed()
     }
 
     pub fn when_stabilized(&self) -> future::LocalBoxFuture<'static, ()> {

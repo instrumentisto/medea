@@ -1,9 +1,11 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashSet;
 
 use derive_more::From;
 use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 use medea_client_api_proto::TrackId;
 use medea_reactive::{Guarded, ProgressableHashMap, RecheckableFutureExt};
+
 
 use crate::{
     peer::media::sender,
@@ -117,6 +119,8 @@ where
     }
 
     fn apply(&self, input: Self::Input) {
+        self.0.borrow_mut().remove_not_present(&input);
+
         for (id, track) in input {
             if let Some(sync_track) = self.0.borrow().get(&id) {
                 sync_track.apply(track);

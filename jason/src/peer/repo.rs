@@ -2,6 +2,7 @@
 //! creating and removing.
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
+use std::collections::HashSet;
 
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{state as proto_state, PeerId};
@@ -22,6 +23,8 @@ use crate::{
     media::RecvConstraints,
     utils::{AsProtoState, SynchronizableState},
 };
+use std::hash::Hash;
+use wasm_bindgen::__rt::std::collections::hash_map::RandomState;
 
 /// Component responsible for the [`peer::Component`] creating and removing.
 pub type Component = component::Component<PeersState, Peers>;
@@ -187,6 +190,8 @@ impl PeersState {
     /// Updates this [`PeersState`] with a provided
     /// [`proto_state::Room`].
     pub fn apply(&self, state: proto_state::Room) {
+        self.0.borrow_mut().remove_not_present(&state.peers);
+
         for (id, peer_state) in state.peers {
             let peer = self.0.borrow().get(&id).cloned();
             if let Some(peer) = peer {
