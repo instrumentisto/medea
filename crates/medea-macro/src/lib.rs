@@ -327,7 +327,7 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// # `SenderComponent` implementation after macro expansion
+/// ## `SenderComponent` implementation after macro expansion
 ///
 /// ```ignore
 /// impl SenderComponent {
@@ -362,8 +362,8 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// __Note that `ComponentState` implementation is simplified in this example
-/// for better readability.__
+/// __Note__, that `ComponentState` implementation is simplified in this example
+/// for better readability.
 ///
 /// In reality object and state types will be obtained by casting
 /// `SenderComponent` to the `ComponentTypes` trait and getting types from it.
