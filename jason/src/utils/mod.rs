@@ -4,6 +4,7 @@
 mod errors;
 
 mod callback;
+pub mod component;
 mod event_listener;
 mod resettable_delay;
 
