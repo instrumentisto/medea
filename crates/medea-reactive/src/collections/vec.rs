@@ -6,7 +6,7 @@ use futures::stream::LocalBoxStream;
 
 use crate::subscribers_store::{
     common, progressable,
-    progressable::{RecheckableCounterFuture, RecheckableFutureExt},
+    progressable::{processed::AllProcessed, Processed},
     SubscribersStore,
 };
 
@@ -99,30 +99,33 @@ impl<T> ProgressableVec<T>
 where
     T: Clone + 'static,
 {
-    /// Returns [`RecheckableFutureExt`] resolving when all push updates will be
-    /// processed by [`Vec::on_push()`] subscribers.
+    /// Returns [`Future`] resolving when all push updates will be processed by
+    /// [`Vec::on_push()`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_push_processed(&self) -> RecheckableCounterFuture {
+    pub fn when_push_processed(&self) -> Processed<'static, ()> {
         self.on_push_subs.when_all_processed()
     }
 
-    /// Returns [`RecheckableFutureExt`] resolving when all remove updates will
-    /// be processed by [`Vec::on_remove()`] subscribers.
+    /// Returns [`Future`] resolving when all remove updates will be processed
+    /// by [`Vec::on_remove()`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_remove_processed(&self) -> RecheckableCounterFuture {
+    pub fn when_remove_processed(&self) -> Processed<'static, ()> {
         self.on_remove_subs.when_all_processed()
     }
 
-    /// Returns [`RecheckableFutureExt`] resolving when all push and remove
-    /// updates will be processed by subscribers.
+    /// Returns [`Future`] resolving when all push and remove updates will be
+    /// processed by subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
-        crate::join_all(vec![
-            self.when_remove_processed(),
-            self.when_push_processed(),
+    pub fn when_all_processed(&self) -> AllProcessed<'static, ()> {
+        crate::when_all_processed(vec![
+            self.when_remove_processed().into(),
+            self.when_push_processed().into(),
         ])
     }
 }

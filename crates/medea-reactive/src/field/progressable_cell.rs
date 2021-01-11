@@ -11,16 +11,11 @@ use std::cell::{Ref, RefCell};
 use futures::stream::LocalBoxStream;
 
 use crate::{
-    subscribers_store::{progressable, progressable::RecheckableCounterFuture},
-    Guarded, MutObservableFieldGuard,
+    subscribers_store::progressable::{self, Processed},
+    Guarded, MutObservableFieldGuard, Progressable,
 };
 
-use super::Progressable;
-
-/// Progressable analogue of [`Cell`].
-///
-/// Subscription to changes works the same way as [`Progressable`], but working
-/// with underlying data of [`ProgressableCell`] is different.
+/// Reactive [`Cell`] with progress tracking.
 ///
 /// [`Cell`]: std::cell::Cell
 #[derive(Debug)]
@@ -30,13 +25,13 @@ impl<D> ProgressableCell<D>
 where
     D: 'static,
 {
-    /// Returns new [`ProgressableCell`] with subscribable mutations.
+    /// Returns new [`ProgressableCell`].
     #[inline]
     pub fn new(data: D) -> Self {
         Self(RefCell::new(Progressable::new(data)))
     }
 
-    /// Returns immutable reference to an underlying data.
+    /// Returns immutable reference to underlying data.
     #[inline]
     pub fn borrow(&self) -> Ref<'_, D> {
         let reference = self.0.borrow();
@@ -62,12 +57,12 @@ where
         self.0.borrow().subscribe()
     }
 
-    /// Returns [`RecheckableFutureExt`] which will be resolved when all data
-    /// updates will be processed by subscribers.
+    /// Returns [`Future`] that will be resolved when all data updates will be
+    /// processed by all subscribers.
     ///
-    /// [`RecheckableFutureExt`]: crate::RecheckableFutureExt
+    /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_processed(&self) -> RecheckableCounterFuture {
+    pub fn when_all_processed(&self) -> Processed<'static, ()> {
         self.0.borrow().when_all_processed()
     }
 }
@@ -76,14 +71,14 @@ impl<D> ProgressableCell<D>
 where
     D: Clone + PartialEq + 'static,
 {
-    /// Sets the `new_data` value as an underlying data.
+    /// Replaces the wrapped value with a new one.
     #[inline]
     pub fn set(&self, new_data: D) {
-        *self.0.borrow_mut().borrow_mut() = new_data;
+        let _ = self.replace(new_data);
     }
 
-    /// Replaces the contained underlying data with the given `new_data` value,
-    /// and returns the old one.
+    /// Replaces the wrapped value with a new one, returning the old value,
+    /// without deinitializing either one.
     #[inline]
     pub fn replace(&self, mut new_data: D) -> D {
         std::mem::swap(&mut *self.0.borrow_mut().borrow_mut(), &mut new_data);

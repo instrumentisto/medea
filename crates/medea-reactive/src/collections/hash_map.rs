@@ -12,7 +12,7 @@ use futures::stream::{LocalBoxStream, StreamExt as _};
 
 use crate::subscribers_store::{
     common, progressable,
-    progressable::{RecheckableCounterFuture, RecheckableFutureExt},
+    progressable::{AllProcessed, Processed},
     SubscribersStore,
 };
 
@@ -118,30 +118,33 @@ where
     K: Hash + Eq + Clone + 'static,
     V: Clone + 'static,
 {
-    /// Returns [`RecheckableFutureExt`] resolving when all insertion updates
-    /// will be processed by [`HashMap::on_insert()`] subscribers.
+    /// Returns [`Future`] resolving when all insertion updates will be
+    /// processed by [`HashMap::on_insert()`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_insert_processed(&self) -> RecheckableCounterFuture {
+    pub fn when_insert_processed(&self) -> Processed<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
-    /// Returns [`RecheckableFutureExt`] resolving when all remove updates will
-    /// be processed by [`HashMap::on_remove()`] subscribers.
+    /// Returns [`Future`] resolving when all remove updates will be processed
+    /// by [`HashMap::on_remove()`] subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_remove_processed(&self) -> RecheckableCounterFuture {
+    pub fn when_remove_processed(&self) -> Processed<'static, ()> {
         self.on_remove_subs.when_all_processed()
     }
 
-    /// Returns [`RecheckableFutureExt`] resolving when all insert and remove
-    /// updates will be processed by subscribers.
+    /// Returns [`Future`] resolving when all insert and remove updates will be
+    /// processed by subscribers.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
-        crate::join_all(vec![
-            self.when_remove_processed(),
-            self.when_insert_processed(),
+    pub fn when_all_processed(&self) -> AllProcessed<'static, ()> {
+        crate::when_all_processed(vec![
+            self.when_remove_processed().into(),
+            self.when_insert_processed().into(),
         ])
     }
 }

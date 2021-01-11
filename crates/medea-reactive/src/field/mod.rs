@@ -18,7 +18,7 @@ use futures::{
 };
 
 use crate::subscribers_store::{
-    progressable, progressable::RecheckableCounterFuture, SubscribersStore,
+    progressable, progressable::Processed, SubscribersStore,
 };
 
 #[doc(inline)]
@@ -130,11 +130,11 @@ where
         Box::pin(stream::once(async move { data }).chain(self.subs.subscribe()))
     }
 
-    /// Returns [`RecheckableFutureExt`] resolving when all data updates will be
-    /// processed by subscribers.
+    /// Returns [`Future`] resolving when all data updates will be processed by
+    /// subscribers.
     ///
-    /// [`RecheckableFutureExt`]: crate::RecheckableFutureExt
-    pub fn when_all_processed(&self) -> RecheckableCounterFuture {
+    /// [`Future`]: std::future::Future
+    pub fn when_all_processed(&self) -> Processed<'static, ()> {
         self.subs.when_all_processed()
     }
 }

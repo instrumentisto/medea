@@ -24,7 +24,7 @@ All user visible changes to this project will be documented in this file. This p
     - `ProgressableHashMap`;
     - `ProgressableHashSet`.
 - `ProgressableCell` container ([#170]);
-- `RecheckableFutureExt` `Future` extension ([#170]).
+- `Processed` and `AllProcessed` futures ([#170]).
 
 [#81]: /../../pull/81
 [#103]: /../../pull/103
