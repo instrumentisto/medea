@@ -18,8 +18,10 @@ use crate::{
 };
 
 use super::{PeerConnection, PeerEvent};
-use crate::utils::{AsProtoState, SynchronizableState};
-use crate::media::RecvConstraints;
+use crate::{
+    media::RecvConstraints,
+    utils::{AsProtoState, SynchronizableState},
+};
 
 /// Component responsible for the [`peer::Component`] creating and removing.
 pub type Component = component::Component<PeersState, Peers>;

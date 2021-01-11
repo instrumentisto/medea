@@ -211,9 +211,9 @@ where
         let mut sub = self.state.subscribe();
 
         Box::pin(async move {
-            while let Some(TransitableState::Transition(_)) = sub.next().await.map(|g| g.into_inner()) {
-
-            }
+            while let Some(TransitableState::Transition(_)) =
+                sub.next().await.map(|g| g.into_inner())
+            {}
         })
     }
 

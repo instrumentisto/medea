@@ -213,8 +213,8 @@ impl PeerStateMachine {
     //     match self {
     //         S::Stable(_) => None,
     //         S::WaitLocalSdp(peer) => {
-    //             match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
-    //             {
+    //             match (&peer.context.sdp_offer,
+    // &peer.context.partner_sdp_offer)             {
     //                 (None, Some(partner_sdp_offer)) => {
     //                     Some(R::Answerer(partner_sdp_offer.clone()))
     //                 }
@@ -223,8 +223,8 @@ impl PeerStateMachine {
     //             }
     //         }
     //         S::WaitRemoteSdp(peer) => {
-    //             match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer)
-    //             {
+    //             match (&peer.context.sdp_offer,
+    // &peer.context.partner_sdp_offer)             {
     //                 (Some(_), None) => Some(R::Offerer),
     //                 _ => None,
     //             }
@@ -1014,7 +1014,8 @@ impl Peer<WaitRemoteSdp> {
     /// state.
     #[inline]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
-        self.context.negotiation_role = Some(NegotiationRole::Answerer(sdp_offer.clone()));
+        self.context.negotiation_role =
+            Some(NegotiationRole::Answerer(sdp_offer.clone()));
         self.context.partner_sdp_offer = Some(sdp_offer);
 
         Peer {

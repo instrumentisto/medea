@@ -38,7 +38,6 @@ pub trait SynchronizableState {
 pub trait Updatable {
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()>;
 
-
     /// Returns [`Future`] which will be resolved when all client updates will
     /// be performed on this state.
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>>;

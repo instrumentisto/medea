@@ -119,8 +119,9 @@ impl LocalSdp {
                     .unwrap_or_default()
             })
             .unwrap_or_default();
-        let not_approved =
-            new_offer.is_none() && !self.0.borrow().approved.get() && !self.0.borrow().prev_offer.is_none();
+        let not_approved = new_offer.is_none()
+            && !self.0.borrow().approved.get()
+            && !self.0.borrow().prev_offer.is_none();
         if not_approved {
             self.0.borrow_mut().restart_needed = true;
             self.rollback();

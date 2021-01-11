@@ -1,10 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use derive_more::From;
-use futures::stream::LocalBoxStream;
+use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 use medea_client_api_proto::TrackId;
 use medea_reactive::{Guarded, ProgressableHashMap, RecheckableFutureExt};
-use futures::future::LocalBoxFuture;
 
 use crate::{
     peer::media::sender,
@@ -80,7 +79,10 @@ impl TracksRepository<sender::State> {
 
     #[inline]
     pub fn connection_recovered(&self) {
-        self.0.borrow().values().for_each(|s| s.connection_recovered());
+        self.0
+            .borrow()
+            .values()
+            .for_each(|s| s.connection_recovered());
     }
 }
 
@@ -92,7 +94,10 @@ impl TracksRepository<receiver::State> {
 
     #[inline]
     pub fn connection_recovered(&self) {
-        self.0.borrow().values().for_each(|s| s.connection_recovered());
+        self.0
+            .borrow()
+            .values()
+            .for_each(|s| s.connection_recovered());
     }
 }
 
@@ -130,7 +135,9 @@ where
 {
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         use futures::FutureExt as _;
-        let when = futures::future::join_all(self.0.borrow().values().map(|s| s.when_stabilized()));
+        let when = futures::future::join_all(
+            self.0.borrow().values().map(|s| s.when_stabilized()),
+        );
 
         Box::pin(when.map(|_| ()))
     }

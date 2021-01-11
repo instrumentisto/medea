@@ -511,8 +511,13 @@ impl SynchronizableState for State {
 impl Updatable for State {
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         use futures::FutureExt as _;
-        Box::pin(futures::future::join_all(vec![self.senders.when_stabilized(), self.receivers.when_stabilized()]).map(|_| ()))
-
+        Box::pin(
+            futures::future::join_all(vec![
+                self.senders.when_stabilized(),
+                self.receivers.when_stabilized(),
+            ])
+            .map(|_| ()),
+        )
     }
 
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {

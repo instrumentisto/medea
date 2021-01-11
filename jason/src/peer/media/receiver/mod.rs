@@ -49,7 +49,7 @@ pub struct Receiver {
     enabled_general: Cell<bool>,
     enabled_individual: Cell<bool>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-    track_events_sender: mpsc::UnboundedSender<TrackEvent>
+    track_events_sender: mpsc::UnboundedSender<TrackEvent>,
 }
 use crate::peer::media::TrackEvent;
 
@@ -133,7 +133,7 @@ impl Receiver {
     pub fn mid(&self) -> Option<String> {
         if self.mid.borrow().is_none() && self.transceiver.borrow().is_some() {
             if let Some(transceiver) =
-            self.transceiver.borrow().as_ref().cloned()
+                self.transceiver.borrow().as_ref().cloned()
             {
                 self.mid.replace(Some(transceiver.mid()?));
             }

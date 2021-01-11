@@ -26,11 +26,10 @@ use super::{Builder, Sender};
 use crate::peer::{
     component::SyncState,
     conn::RTCPeerConnectionError::PeerConnectionEventBindFailed,
-    MediaExchangeState, MediaExchangeStateController, MediaState,
-    MediaStateControllable, MuteState, MuteStateController, PeerEvent,
-    TrackEvent, TransceiverDirection, TransceiverSide,
+    media::InTransition, MediaExchangeState, MediaExchangeStateController,
+    MediaState, MediaStateControllable, MuteState, MuteStateController,
+    PeerEvent, TrackEvent, TransceiverDirection, TransceiverSide,
 };
-use crate::peer::media::InTransition;
 use futures::future::LocalBoxFuture;
 
 /// Component responsible for the [`Sender`] enabling/disabling and
@@ -51,14 +50,16 @@ impl Component {
         track_events_sender: mpsc::UnboundedSender<TrackEvent>,
     ) -> Result<Self> {
         let media_exchange_state = media_exchange_state::Stable::from(
-            send_constraints.enabled(state.media_type())
+            send_constraints.enabled(state.media_type()),
         );
         let mute_state = mute_state::Stable::from(
-            send_constraints.muted(state.media_type())
+            send_constraints.muted(state.media_type()),
         );
 
         state.mute_state_controller().transition_to(mute_state);
-        state.media_exchange_state_controller().transition_to(media_exchange_state);
+        state
+            .media_exchange_state_controller()
+            .transition_to(media_exchange_state);
 
         let sndr = Builder {
             media_connections: &media_connections,
@@ -228,34 +229,32 @@ impl SynchronizableState for State {
         self.enabled_general.set(input.enabled_general);
         self.enabled_individual.set(input.enabled_individual);
 
-        let new_media_exchange_state = media_exchange_state::Stable::from(input.enabled_individual);
-        let current_media_exchange_state = match self.media_exchange_state.state() {
-            MediaExchangeState::Transition(transition) => {
-                transition.into_inner()
-            }
-            MediaExchangeState::Stable(stable) => {
-                stable
-            }
-        };
+        let new_media_exchange_state =
+            media_exchange_state::Stable::from(input.enabled_individual);
+        let current_media_exchange_state =
+            match self.media_exchange_state.state() {
+                MediaExchangeState::Transition(transition) => {
+                    transition.into_inner()
+                }
+                MediaExchangeState::Stable(stable) => stable,
+            };
         if current_media_exchange_state != new_media_exchange_state {
             self.media_exchange_state.update(new_media_exchange_state);
         }
 
         let new_mute_state = mute_state::Stable::from(input.muted);
         let current_mute_state = match self.mute_state.state() {
-            MuteState::Stable(stable) => {
-                stable
-            }
-            MuteState::Transition(transition) => {
-                transition.into_inner()
-            }
+            MuteState::Stable(stable) => stable,
+            MuteState::Transition(transition) => transition.into_inner(),
         };
         if current_mute_state != new_mute_state {
             self.mute_state.update(new_mute_state);
         }
 
-        let new_general_media_exchange_state = media_exchange_state::Stable::from(input.enabled_general);
-        self.general_media_exchange_state.set(new_general_media_exchange_state);
+        let new_general_media_exchange_state =
+            media_exchange_state::Stable::from(input.enabled_general);
+        self.general_media_exchange_state
+            .set(new_general_media_exchange_state);
 
         self.sync_state.set(SyncState::Synced);
     }
@@ -264,10 +263,13 @@ impl SynchronizableState for State {
 impl Updatable for State {
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         use futures::FutureExt as _;
-        Box::pin(futures::future::join_all(vec![
-            self.media_exchange_state.when_stabilized(),
-            self.mute_state.when_stabilized(),
-        ]).map(|_| ()))
+        Box::pin(
+            futures::future::join_all(vec![
+                self.media_exchange_state.when_stabilized(),
+                self.mute_state.when_stabilized(),
+            ])
+            .map(|_| ()),
+        )
     }
 
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {

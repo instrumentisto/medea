@@ -360,7 +360,9 @@ impl InnerMediaConnections {
         &self,
         kind: MediaKind,
     ) -> impl Iterator<Item = &receiver::Component> {
-        self.receivers.values().filter(move |s| s.state().kind() == kind)
+        self.receivers
+            .values()
+            .filter(move |s| s.state().kind() == kind)
     }
 
     /// Returns all [`TransceiverSide`]s by provided [`TrackDirection`],

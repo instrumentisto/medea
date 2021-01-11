@@ -57,8 +57,8 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
-use wasm_bindgen_futures::spawn_local;
 use crate::media::RecvConstraints;
+use wasm_bindgen_futures::spawn_local;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
