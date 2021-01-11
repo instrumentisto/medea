@@ -9,6 +9,7 @@ use crate::{
     peer::media::sender,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
+use futures::future::LocalBoxFuture;
 
 /// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
 /// [`PeerComponent`].
@@ -113,6 +114,13 @@ impl<S> Updatable for TracksRepository<S>
 where
     S: Updatable,
 {
+    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        use futures::FutureExt as _;
+        let when = futures::future::join_all(self.0.borrow().values().map(|s| s.when_stabilized()));
+
+        Box::pin(when.map(|_| ()))
+    }
+
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         let when_futs: Vec<_> =
             self.0.borrow().values().map(|s| s.when_updated()).collect();

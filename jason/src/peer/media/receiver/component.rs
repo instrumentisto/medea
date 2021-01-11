@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::Receiver;
+use futures::future::LocalBoxFuture;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -103,6 +104,16 @@ impl SynchronizableState for State {
 }
 
 impl Updatable for State {
+    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        // use futures::FutureExt as _;
+        // Box::pin(futures::future::join_all(vec![
+        //     self.media_exchange_state.when_stabilized(),
+        //     self.mute_state.when_stabilized(),
+        // ]).map(|_| ()))
+
+        Box::pin(futures::future::ready(()))
+    }
+
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
         Box::new(medea_reactive::join_all(vec![
             self.enabled_general.when_all_processed(),

@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{future, future::Either, FutureExt, StreamExt};
-use medea_reactive::ObservableCell;
+use medea_reactive::{ObservableCell, ProgressableCell};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -33,7 +33,7 @@ pub type MediaExchangeStateController = TransitableStateController<
 #[derive(Debug)]
 pub struct TransitableStateController<S, T> {
     /// Actual [`TransitableState`].
-    state: ObservableCell<TransitableState<S, T>>,
+    state: ProgressableCell<TransitableState<S, T>>,
 
     /// Timeout of the [`TransitableStateController::state`] transition.
     timeout_handle: RefCell<Option<ResettableDelayHandle>>,
@@ -54,7 +54,7 @@ where
     #[must_use]
     pub(in super::super) fn new(state: S) -> Rc<Self> {
         let this = Rc::new(Self {
-            state: ObservableCell::new(state.into()),
+            state: ProgressableCell::new(state.into()),
             timeout_handle: RefCell::new(None),
         });
         this.clone().spawn();
@@ -72,6 +72,7 @@ where
         let weak_this = Rc::downgrade(&self);
         spawn_local(async move {
             while let Some(state) = state_changes.next().await {
+                let (state, _guard) = state.into_parts();
                 if let Some(this) = weak_this.upgrade() {
                     if let TransitableState::Transition(_) = state {
                         let weak_this = Rc::downgrade(&this);
@@ -112,6 +113,7 @@ where
         self.state
             .subscribe()
             .filter_map(|s| async move {
+                let (s, _guard) = s.into_parts();
                 if let TransitableState::Stable(stable) = s {
                     Some(stable)
                 } else {
@@ -125,6 +127,7 @@ where
         self.state
             .subscribe()
             .filter_map(|s| async move {
+                let (s, _guard) = s.into_parts();
                 if let TransitableState::Transition(transition) = s {
                     Some(transition)
                 } else {
@@ -184,6 +187,7 @@ where
         let mut states = self.state.subscribe();
         async move {
             while let Some(state) = states.next().await {
+                let (state, _guard) = state.into_parts();
                 match state {
                     TransitableState::Transition(_) => continue,
                     TransitableState::Stable(s) => {
@@ -204,11 +208,12 @@ where
     }
 
     pub fn when_stabilized(&self) -> future::LocalBoxFuture<'static, ()> {
-        let fut =
-            self.state.when(|s| matches!(s, TransitableState::Stable(_)));
+        let mut sub = self.state.subscribe();
 
         Box::pin(async move {
-            fut.await;
+            while let Some(TransitableState::Transition(_)) = sub.next().await.map(|g| g.into_inner()) {
+
+            }
         })
     }
 

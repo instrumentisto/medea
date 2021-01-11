@@ -7,6 +7,7 @@ use medea_reactive::RecheckableFutureExt;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::JasonError;
+use futures::future::LocalBoxFuture;
 
 /// Abstraction over state which can be transformed to the states from the
 /// [`medea_client_api_proto::state`].
@@ -35,6 +36,9 @@ pub trait SynchronizableState {
 
 /// Abstraction over state which can be updated by client side.
 pub trait Updatable {
+    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()>;
+
+
     /// Returns [`Future`] which will be resolved when all client updates will
     /// be performed on this state.
     fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>>;
