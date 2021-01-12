@@ -276,7 +276,6 @@ impl State {
     ///
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
-        todo!("General media exchange state");
         medea_reactive::join_all(vec![
             self.media_exchange_state.when_processed()
         ])
@@ -421,18 +420,6 @@ impl TransceiverSide for State {
             MediaType::Audio(_) => MediaSourceKind::Device,
             MediaType::Video(video) => video.source_kind,
         }
-    }
-
-    fn mid(&self) -> Option<String> {
-        // if self.mid.borrow().is_none() && self.transceiver.borrow().is_some()
-        // {     if let Some(transceiver) =
-        //     self.transceiver.borrow().as_ref().cloned()
-        //     {
-        //         self.mid.replace(Some(transceiver.mid()?));
-        //     }
-        // }
-        // self.mid.borrow().clone()
-        self.mid.clone()
     }
 
     fn is_transitable(&self) -> bool {

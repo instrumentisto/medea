@@ -121,10 +121,6 @@ impl TransceiverSide for State {
         self.media_source()
     }
 
-    fn mid(&self) -> Option<String> {
-        self.mid.clone()
-    }
-
     fn is_transitable(&self) -> bool {
         // TODO (evdokimovs): Temp code. Rewrite it using is_constraints.
         match &self.media_type {

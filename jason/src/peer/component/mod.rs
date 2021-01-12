@@ -492,6 +492,9 @@ impl SynchronizableState for State {
     }
 
     fn apply(&self, state: Self::Input) {
+        if !matches!(state.negotiation_role, Some(NegotiationRole::Answerer(_))) {
+            self.remote_sdp_offer.set(state.remote_sdp_offer);
+        }
         if state.negotiation_role.is_some() {
             self.negotiation_role.set(state.negotiation_role);
         }
@@ -499,7 +502,7 @@ impl SynchronizableState for State {
             self.restart_ice.set(true);
         }
         self.sdp_offer.update_offer_by_server(&state.sdp_offer);
-        self.remote_sdp_offer.set(state.remote_sdp_offer);
+        // self.remote_sdp_offer.set(state.remote_sdp_offer);
         self.ice_candidates.apply(state.ice_candidates);
         self.senders.apply(state.senders);
         self.receivers.apply(state.receivers);

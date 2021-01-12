@@ -83,6 +83,9 @@ impl Component {
                         state.negotiation_role.set(None);
                     }
                     NegotiationRole::Answerer(_) => {
+                        state.receivers.when_all_processed().await;
+                        state.receivers.when_stabilized().await;
+                        state.receivers.when_updated().await;
                         peer.set_remote_offer(remote_sdp_answer)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
@@ -125,6 +128,11 @@ impl Component {
         state: Rc<State>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
+        log::debug!("[{}] NEGOTIATION STATE", state.id);
+        futures::future::join(
+            state.senders.when_stabilized(),
+            state.receivers.when_stabilized(),
+        ).await;
         medea_reactive::join_all(vec![
             state.when_updated(),
             Box::new(state.senders.when_all_processed()),
@@ -180,6 +188,7 @@ impl Component {
         state: Rc<State>,
         _: (),
     ) -> Result<(), Traced<PeerError>> {
+        log::debug!("[{}] SDP OFFER APPROVE", state.id);
         if let Some(negotiation_role) = state.negotiation_role.get() {
             match negotiation_role {
                 NegotiationRole::Offerer => {
@@ -212,6 +221,7 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
+        log::debug!("[{}] SENDER INSERT", state.id);
         state.when_all_receivers_processed().await;
         if matches!(
             state.negotiation_role.get(),
@@ -248,6 +258,7 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<receiver::State>)>,
     ) -> Result<(), Traced<PeerError>> {
+        log::debug!("[{}] RECEIVER INSERT", state.id);
         let ((_, new_receiver), _guard) = val.into_parts();
         peer.connections
             .create_connection(state.id, new_receiver.sender_id());
@@ -280,6 +291,7 @@ impl Component {
         state: Rc<State>,
         sdp_offer: Option<String>,
     ) -> Result<(), Traced<PeerError>> {
+        log::debug!("[{}] SDP OFFER", state.id);
         state.sync_state.when_eq(SyncState::Synced).await.ok();
         if let Some(role) = state.negotiation_role.get() {
             if let Some(offer) = sdp_offer {
@@ -355,6 +367,8 @@ impl Component {
         state: Rc<State>,
         new_negotiation_role: Option<NegotiationRole>,
     ) -> Result<(), Traced<PeerError>> {
+        log::debug!("[{}] NEGOTIATION ROLE", state.id);
+        // log::debug!("[{}] My role is {:?}", state.id, new_negotiation_role);
         let _ = state.restart_ice.when_eq(false).await;
         if let Some(role) = new_negotiation_role {
             match role {
@@ -385,14 +399,19 @@ impl Component {
                     state.when_all_receivers_processed().await;
                     peer.media_connections.sync_receivers();
 
+                    log::debug!("Settings remote SDP offer");
                     state.set_remote_sdp_offer(remote_sdp_offer);
-
-                    state.receivers.when_stabilized().await;
-                    state.receivers.when_updated().await;
+                    futures::future::join(
+                        state.receivers.when_stabilized(),
+                        state.receivers.when_updated(),
+                    ).await;
                     state.remote_sdp_offer.when_all_processed().await;
+
                     state.when_all_senders_processed().await;
-                    state.senders.when_stabilized().await;
-                    state.senders.when_updated().await;
+                    futures::future::join(
+                        state.senders.when_stabilized(),
+                        state.senders.when_updated(),
+                    ).await;
 
                     state
                         .update_local_stream(&peer)

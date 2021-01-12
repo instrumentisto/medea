@@ -54,11 +54,6 @@ pub trait TransceiverSide: MediaStateControllable {
     /// Returns [`MediaSourceKind`] of this [`TransceiverSide`].
     fn source_kind(&self) -> MediaSourceKind;
 
-    /// Returns [`mid`] of this [`TransceiverSide`].
-    ///
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
-    fn mid(&self) -> Option<String>;
-
     /// Returns `true` if this [`TransceiverSide`] currently can be
     /// disabled/enabled without [`LocalTracksConstraints`] updating.
     ///
@@ -704,6 +699,7 @@ impl MediaConnections {
                 }
             }
         }
+
         Err(tracerr::new!(
             MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
         ))

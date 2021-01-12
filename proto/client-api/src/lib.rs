@@ -480,8 +480,9 @@ pub enum Event {
 /// - If [`Event`] contains [`NegotiationRole::Answerer`], then `Peer` is
 ///   expected to apply provided SDP Offer and provide its SDP Answer in a
 ///   [`Command::MakeSdpAnswer`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Clone, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Debug)]
 pub enum NegotiationRole {
     /// [`Command::MakeSdpOffer`] should be sent by client.
     Offerer,
