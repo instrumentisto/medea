@@ -8,8 +8,8 @@ use medea_client_api_proto::{
 };
 use medea_macro::watchers;
 use medea_reactive::{
-    collections::ProgressableHashMap, Guarded, ObservableCell, ObservableVec,
-    ProgressableCell, RecheckableFutureExt,
+    collections::ProgressableHashMap, AllProcessed, Guarded, ObservableCell,
+    ObservableVec, ProgressableCell,
 };
 use tracerr::Traced;
 
@@ -167,32 +167,28 @@ impl State {
     /// updates will be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_senders_updated(
-        &self,
-    ) -> Box<dyn RecheckableFutureExt<Output = ()>> {
+    fn when_all_senders_updated(&self) -> AllProcessed<'static, ()> {
         let when_futs: Vec<_> = self
             .senders
             .borrow()
             .values()
-            .map(|s| s.when_updated())
+            .map(|s| s.when_updated().into())
             .collect();
-        Box::new(medea_reactive::join_all(when_futs))
+        medea_reactive::when_all_processed(when_futs)
     }
 
     /// Returns [`Future`] which will be resolved when all [`receiver::State`]s
     /// updates will be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_receivers_updated(
-        &self,
-    ) -> Box<dyn RecheckableFutureExt<Output = ()>> {
+    fn when_all_receivers_updated(&self) -> AllProcessed<'static, ()> {
         let when_futs: Vec<_> = self
             .receivers
             .borrow()
             .values()
-            .map(|s| s.when_updated())
+            .map(|s| s.when_updated().into())
             .collect();
-        Box::new(medea_reactive::join_all(when_futs))
+        medea_reactive::when_all_processed(when_futs)
     }
 
     /// Returns [`Future`] which will be resolved when all
@@ -200,10 +196,10 @@ impl State {
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
-        medea_reactive::join_all(vec![
-            self.when_all_receivers_updated(),
-            self.when_all_senders_updated(),
+    pub fn when_all_updated(&self) -> AllProcessed<'static, ()> {
+        medea_reactive::when_all_processed(vec![
+            self.when_all_receivers_updated().into(),
+            self.when_all_senders_updated().into(),
         ])
     }
 
@@ -284,20 +280,14 @@ impl State {
     /// Returns [`RecheckableFutureExt`] which will be resolved when all
     /// [`State::senders`]'s inserts/removes will be processed.
     #[inline]
-    #[must_use]
-    fn when_all_senders_processed(
-        &self,
-    ) -> impl RecheckableFutureExt<Output = ()> {
+    fn when_all_senders_processed(&self) -> AllProcessed<'static, ()> {
         self.senders.borrow().when_all_processed()
     }
 
     /// Returns [`RecheckableFutureExt`] which will be resolved when all
     /// [`State::receivers`]'s inserts/removes will be processed.
     #[inline]
-    #[must_use]
-    fn when_all_receivers_processed(
-        &self,
-    ) -> impl RecheckableFutureExt<Output = ()> {
+    fn when_all_receivers_processed(&self) -> AllProcessed<'static, ()> {
         self.receivers.borrow().when_all_processed()
     }
 
@@ -339,10 +329,9 @@ impl State {
     /// be processed.
     #[inline]
     pub async fn when_all_tracks_created(&self) {
-        medea_reactive::join_all(vec![
-            Box::new(self.senders.borrow().when_insert_processed())
-                as Box<dyn RecheckableFutureExt<Output = ()>>,
-            Box::new(self.receivers.borrow().when_insert_processed()),
+        medea_reactive::when_all_processed(vec![
+            self.senders.borrow().when_insert_processed().into(),
+            self.receivers.borrow().when_insert_processed().into(),
         ])
         .await;
     }
@@ -445,16 +434,14 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        let mut wait_futs: Vec<Box<dyn RecheckableFutureExt<Output = ()>>> =
-            vec![Box::new(state.when_all_receivers_processed())];
+        let mut wait_futs = vec![state.when_all_receivers_processed().into()];
         if matches!(
             state.negotiation_role.get(),
             Some(NegotiationRole::Answerer(_))
         ) {
-            wait_futs
-                .push(Box::new(state.remote_sdp_offer.when_all_processed()));
+            wait_futs.push(state.remote_sdp_offer.when_all_processed().into());
         }
-        medea_reactive::join_all(wait_futs).await;
+        medea_reactive::when_all_processed(wait_futs).await;
 
         let ((_, new_sender), _guard) = val.into_parts();
         for receiver in new_sender.receivers() {
@@ -610,11 +597,11 @@ impl Component {
 
                     state.set_remote_sdp_offer(remote_sdp_offer);
 
-                    medea_reactive::join_all(vec![
-                        state.when_all_receivers_updated(),
-                        Box::new(state.when_all_senders_processed()),
-                        Box::new(state.remote_sdp_offer.when_all_processed()),
-                        state.when_all_senders_updated(),
+                    medea_reactive::when_all_processed(vec![
+                        state.when_all_receivers_updated().into(),
+                        state.when_all_senders_processed().into(),
+                        state.remote_sdp_offer.when_all_processed().into(),
+                        state.when_all_senders_updated().into(),
                     ])
                     .await;
 

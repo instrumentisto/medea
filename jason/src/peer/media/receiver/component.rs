@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use medea_client_api_proto::{MediaType, MemberId, TrackId, TrackPatchEvent};
 use medea_macro::watchers;
-use medea_reactive::{Guarded, ProgressableCell, RecheckableFutureExt};
+use medea_reactive::{AllProcessed, Guarded, ProgressableCell};
 
 use crate::{media::RecvConstraints, peer::media::Result, utils::component};
 
@@ -108,11 +108,11 @@ impl State {
     /// will be applied on [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
-        medea_reactive::join_all(vec![
-            self.enabled_general.when_all_processed(),
-            self.enabled_individual.when_all_processed(),
-            self.muted.when_all_processed(),
+    pub fn when_updated(&self) -> AllProcessed<'static, ()> {
+        medea_reactive::when_all_processed(vec![
+            self.enabled_general.when_all_processed().into(),
+            self.enabled_individual.when_all_processed().into(),
+            self.muted.when_all_processed().into(),
         ])
     }
 }

@@ -119,13 +119,10 @@ pub enum RoomError {
     /// [`MediaManager`].
     ///
     /// [`MediaManager`]: crate::media::MediaManager
-    /// [`PeerConnection`]: crate::peer::PeerConnection;
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection;
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
     NoSuchPeer(PeerId),
 
@@ -235,8 +232,6 @@ impl RoomHandle {
 
     /// Enables or disables specified media and source types publish or receival
     /// in all [`PeerConnection`]s.
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection;
     async fn set_track_media_state(
         &self,
         new_state: MediaState,
@@ -386,7 +381,6 @@ impl RoomHandle {
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
         &self,
@@ -593,8 +587,6 @@ impl WeakRoom {
 /// handles media server events, etc).
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
-///
-/// [`PeerConnection`]: crate::peer::PeerConnection
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
@@ -736,14 +728,10 @@ struct InnerRoom {
 
     /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s in this [`Room`].
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     send_constraints: LocalTracksConstraints,
 
     /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
     /// in this [`Room`]. Used to disable or enable media receiving.
-    ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     recv_constraints: Rc<RecvConstraints>,
 
     /// Component which manages [`peer::Component`]s.
@@ -761,7 +749,6 @@ struct InnerRoom {
     /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`MediaManager`]: crate::media::MediaManager
     on_failed_local_media: Rc<Callback1<JasonError>>,
 
@@ -1030,7 +1017,6 @@ impl InnerRoom {
     /// Toggles [`TransceiverSide`]s [`MediaState`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
     async fn toggle_media_state(
@@ -1208,7 +1194,6 @@ impl InnerRoom {
     /// `true` then affected media types will be disabled.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Sender`]: crate::peer::Sender
     #[async_recursion(?Send)]
     async fn set_local_media_settings(
