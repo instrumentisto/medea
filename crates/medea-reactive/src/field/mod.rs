@@ -3,6 +3,7 @@
 #![allow(clippy::module_name_repetitions)]
 
 pub mod cell;
+pub mod progressable_cell;
 
 use std::{
     cell::RefCell,
@@ -16,10 +17,12 @@ use futures::{
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
-use crate::subscribers_store::{progressable, SubscribersStore};
+use crate::subscribers_store::{
+    progressable, progressable::Processed, SubscribersStore,
+};
 
 #[doc(inline)]
-pub use self::cell::ObservableCell;
+pub use self::{cell::ObservableCell, progressable_cell::ProgressableCell};
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
@@ -131,7 +134,7 @@ where
     /// subscribers.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> Processed<'static, ()> {
         self.subs.when_all_processed()
     }
 }

@@ -1,14 +1,18 @@
 //! Progressable [`SubscribersStore`].
 
 pub mod guarded;
+pub mod processed;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::{channel::mpsc, stream::LocalBoxStream};
 
 use crate::{subscribers_store::SubscribersStore, ObservableCell};
 
-pub use self::guarded::{Guard, Guarded};
+pub use self::{
+    guarded::{Guard, Guarded},
+    processed::{AllProcessed, Processed},
+};
 
 /// [`SubscribersStore`] for progressable collections/field.
 ///
@@ -42,11 +46,14 @@ impl<T> SubStore<T> {
     /// Returns [`Future`] resolving when all subscribers processes update.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_all_processed(&self) -> Processed<'static, ()> {
         let counter = Rc::clone(&self.counter);
-        Box::pin(async move {
-            let _ = counter.when_eq(0).await;
-        })
+        Processed::new(Box::new(move || {
+            let counter = Rc::clone(&counter);
+            Box::pin(async move {
+                let _ = counter.when_eq(0).await;
+            })
+        }))
     }
 }
 

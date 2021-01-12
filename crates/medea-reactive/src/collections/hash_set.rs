@@ -2,11 +2,13 @@
 
 use std::{collections::hash_set::Iter, hash::Hash, marker::PhantomData};
 
-use futures::{
-    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt,
-};
+use futures::stream::LocalBoxStream;
 
-use crate::subscribers_store::{common, progressable, SubscribersStore};
+use crate::subscribers_store::{
+    common, progressable,
+    progressable::{AllProcessed, Processed},
+    SubscribersStore,
+};
 
 /// Reactive hash set based on [`HashSet`] with an ability to recognize when all
 /// updates was processed by subscribers.
@@ -119,8 +121,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_insert_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_insert_processed(&self) -> Processed<'static, ()> {
         self.on_insert_subs.when_all_processed()
     }
 
@@ -129,8 +130,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_remove_processed(&self) -> LocalBoxFuture<'static, ()> {
+    pub fn when_remove_processed(&self) -> Processed<'static, ()> {
         self.on_remove_subs.when_all_processed()
     }
 
@@ -139,15 +139,11 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    #[must_use]
-    pub fn when_all_processed(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(
-            future::join(
-                self.when_remove_processed(),
-                self.when_insert_processed(),
-            )
-            .map(|(_, _)| ()),
-        )
+    pub fn when_all_processed(&self) -> AllProcessed<'static, ()> {
+        crate::when_all_processed(vec![
+            self.when_remove_processed().into(),
+            self.when_insert_processed().into(),
+        ])
     }
 }
 
