@@ -44,6 +44,19 @@ impl<T> Guarded<T> {
     }
 }
 
+impl<T> Guarded<Option<T>> {
+    /// Transposes an [`Guarded`] [`Option`] into a [`Option`] with a
+    /// [`Guarded`] value.
+    ///
+    /// `Guarded(Some)` will be mapped to `Some(Guarded)` and `Guarded(None)`
+    /// will be mapped to `None`.
+    pub fn transpose(self) -> Option<Guarded<T>> {
+        let (value, guard) = self.into_parts();
+
+        value.map(move |v| Guarded { value: v, guard })
+    }
+}
+
 impl<T> AsRef<T> for Guarded<T> {
     fn as_ref(&self) -> &T {
         &self.value

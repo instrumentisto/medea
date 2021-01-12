@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+use futures::{future, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     IceCandidate, IceServer, NegotiationRole, PeerId as Id, TrackId,
@@ -20,7 +21,7 @@ use crate::{
         media::{receiver, sender},
         LocalStreamUpdateCriteria, PeerError,
     },
-    utils::component,
+    utils::{component, transpose_guarded},
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -371,27 +372,25 @@ impl Component {
     ///
     /// Calls [`PeerConnection::set_remote_offer`] with a new value if current
     /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
-    #[watch(self.remote_sdp_offer.subscribe())]
+    #[watch(self.remote_sdp_offer.subscribe().filter_map(transpose_guarded))]
     async fn remote_sdp_offer_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
-        remote_sdp_answer: Guarded<Option<String>>,
+        remote_sdp_answer: Guarded<String>,
     ) -> Result<(), Traced<PeerError>> {
         let (remote_sdp_answer, _guard) = remote_sdp_answer.into_parts();
-        if let Some(remote_sdp_answer) = remote_sdp_answer {
-            if let Some(role) = state.negotiation_role.get() {
-                match role {
-                    NegotiationRole::Offerer => {
-                        peer.set_remote_answer(remote_sdp_answer)
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                        state.negotiation_role.set(None);
-                    }
-                    NegotiationRole::Answerer(_) => {
-                        peer.set_remote_offer(remote_sdp_answer)
-                            .await
-                            .map_err(tracerr::map_from_and_wrap!())?;
-                    }
+        if let Some(role) = state.negotiation_role.get() {
+            match role {
+                NegotiationRole::Offerer => {
+                    peer.set_remote_answer(remote_sdp_answer)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    state.negotiation_role.set(None);
+                }
+                NegotiationRole::Answerer(_) => {
+                    peer.set_remote_offer(remote_sdp_answer)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
                 }
             }
         }
@@ -498,55 +497,53 @@ impl Component {
     ///
     /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
     /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
-    #[watch(self.sdp_offer.subscribe())]
+    #[watch(self.sdp_offer.subscribe().filter_map(future::ready))]
     async fn sdp_offer_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
-        sdp_offer: Option<String>,
+        offer: String,
     ) -> Result<(), Traced<PeerError>> {
         if let Some(role) = state.negotiation_role.get() {
-            if let Some(offer) = sdp_offer {
-                if state.sdp_offer.is_rollback() {
-                    peer.peer
-                        .rollback()
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                } else {
-                    match role {
-                        NegotiationRole::Offerer => {
-                            peer.peer
-                                .set_offer(&offer)
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            let mids = peer
-                                .get_mids()
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            peer.peer_events_sender
-                                .unbounded_send(PeerEvent::NewSdpOffer {
-                                    peer_id: peer.id(),
-                                    sdp_offer: offer,
-                                    transceivers_statuses: peer
-                                        .get_transceivers_statuses(),
-                                    mids,
-                                })
-                                .ok();
-                        }
-                        NegotiationRole::Answerer(_) => {
-                            peer.peer
-                                .set_answer(&offer)
-                                .await
-                                .map_err(tracerr::map_from_and_wrap!())?;
-                            peer.peer_events_sender
-                                .unbounded_send(PeerEvent::NewSdpAnswer {
-                                    peer_id: peer.id(),
-                                    sdp_answer: offer,
-                                    transceivers_statuses: peer
-                                        .get_transceivers_statuses(),
-                                })
-                                .ok();
-                            state.sdp_offer.when_approved().await;
-                            state.negotiation_role.set(None);
-                        }
+            if state.sdp_offer.is_rollback() {
+                peer.peer
+                    .rollback()
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
+            } else {
+                match role {
+                    NegotiationRole::Offerer => {
+                        peer.peer
+                            .set_offer(&offer)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let mids = peer
+                            .get_mids()
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        peer.peer_events_sender
+                            .unbounded_send(PeerEvent::NewSdpOffer {
+                                peer_id: peer.id(),
+                                sdp_offer: offer,
+                                transceivers_statuses: peer
+                                    .get_transceivers_statuses(),
+                                mids,
+                            })
+                            .ok();
+                    }
+                    NegotiationRole::Answerer(_) => {
+                        peer.peer
+                            .set_answer(&offer)
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        peer.peer_events_sender
+                            .unbounded_send(PeerEvent::NewSdpAnswer {
+                                peer_id: peer.id(),
+                                sdp_answer: offer,
+                                transceivers_statuses: peer
+                                    .get_transceivers_statuses(),
+                            })
+                            .ok();
+                        state.sdp_offer.when_approved().await;
+                        state.negotiation_role.set(None);
                     }
                 }
             }
@@ -560,63 +557,61 @@ impl Component {
     /// Waits for [`SenderComponent`]s/[`ReceiverComponent`]s creation/update,
     /// updates local `MediaStream` (if needed) and renegotiates
     /// [`PeerConnection`].
-    #[watch(self.negotiation_role.subscribe())]
+    #[watch(self.negotiation_role.subscribe().filter_map(future::ready))]
     async fn negotiation_role_watcher(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
-        new_negotiation_role: Option<NegotiationRole>,
+        role: NegotiationRole,
     ) -> Result<(), Traced<PeerError>> {
         let _ = state.restart_ice.when_eq(false).await;
-        if let Some(role) = new_negotiation_role {
-            match role {
-                NegotiationRole::Offerer => {
-                    futures::future::join(
-                        state.when_all_senders_processed(),
-                        state.when_all_receivers_processed(),
-                    )
-                    .await;
-                    state.when_all_updated().await;
+        match role {
+            NegotiationRole::Offerer => {
+                futures::future::join(
+                    state.when_all_senders_processed(),
+                    state.when_all_receivers_processed(),
+                )
+                .await;
+                state.when_all_updated().await;
 
-                    state
-                        .update_local_stream(&peer)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
+                state
+                    .update_local_stream(&peer)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
 
-                    peer.media_connections.sync_receivers();
-                    let sdp_offer = peer
-                        .peer
-                        .create_offer()
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    state.sdp_offer.update_offer(sdp_offer);
-                    peer.media_connections.sync_receivers();
-                }
-                NegotiationRole::Answerer(remote_sdp_offer) => {
-                    state.when_all_receivers_processed().await;
-                    peer.media_connections.sync_receivers();
+                peer.media_connections.sync_receivers();
+                let sdp_offer = peer
+                    .peer
+                    .create_offer()
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
+                state.sdp_offer.update_offer(sdp_offer);
+                peer.media_connections.sync_receivers();
+            }
+            NegotiationRole::Answerer(remote_sdp_offer) => {
+                state.when_all_receivers_processed().await;
+                peer.media_connections.sync_receivers();
 
-                    state.set_remote_sdp_offer(remote_sdp_offer);
+                state.set_remote_sdp_offer(remote_sdp_offer);
 
-                    medea_reactive::when_all_processed(vec![
-                        state.when_all_receivers_updated().into(),
-                        state.when_all_senders_processed().into(),
-                        state.remote_sdp_offer.when_all_processed().into(),
-                        state.when_all_senders_updated().into(),
-                    ])
-                    .await;
+                medea_reactive::when_all_processed(vec![
+                    state.when_all_receivers_updated().into(),
+                    state.when_all_senders_processed().into(),
+                    state.remote_sdp_offer.when_all_processed().into(),
+                    state.when_all_senders_updated().into(),
+                ])
+                .await;
 
-                    state
-                        .update_local_stream(&peer)
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
+                state
+                    .update_local_stream(&peer)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
 
-                    let sdp_answer = peer
-                        .peer
-                        .create_answer()
-                        .await
-                        .map_err(tracerr::map_from_and_wrap!())?;
-                    state.sdp_offer.update_offer(sdp_answer);
-                }
+                let sdp_answer = peer
+                    .peer
+                    .create_answer()
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?;
+                state.sdp_offer.update_offer(sdp_answer);
             }
         }
 
