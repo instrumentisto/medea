@@ -219,7 +219,7 @@ where
         ))
     }
 
-    /// Chains [`HashMap::replay_on_insert`] with a [`HashMap::on_insert`].
+    /// Chains [`HashMap::replay_on_insert()`] with a [`HashMap::on_insert()`].
     #[inline]
     pub fn on_insert_with_replay(&self) -> LocalBoxStream<'static, O> {
         Box::pin(self.replay_on_insert().chain(self.on_insert()))

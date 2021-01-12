@@ -1,5 +1,5 @@
-//! Implementation of the [`Future`]s returned from `when_*_processed` functions
-//! on progressable containers.
+//! [`Future`] returned from `when_*_processed` methods of progressable
+//! containers.
 
 #![allow(clippy::module_name_repetitions)]
 
@@ -11,13 +11,13 @@ use std::{
 
 use futures::{
     future::{self, Future, LocalBoxFuture},
-    FutureExt as _,
+    ready, FutureExt as _,
 };
 
-/// [`Future`]'s factory used in [`Processed`] and [`AllProcessed`].
+/// Factory producing a [`Future`] in [`when_all_processed()`] function.
 pub type Factory<'a, T> = Box<dyn Fn() -> LocalBoxFuture<'a, T> + 'static>;
 
-/// Creates [`AllProcessed`] [`Future`] from provided [`Iterator`] of
+/// Creates [`AllProcessed`] [`Future`] from the provided [`Iterator`] of
 /// [`Factory`]s.
 pub fn when_all_processed<I, T>(futures: I) -> AllProcessed<'static, ()>
 where
@@ -35,15 +35,16 @@ where
 /// implementation.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Processed<'a, T> {
-    /// Factory that created underlying [`Future`].
+    /// Factory creating the underlying [`Future`].
     factory: Factory<'a, T>,
 
-    /// Underlying [`Future`] that is polled in [`Future`] implementation.
+    /// Underlying [`Future`] being polled in a [`Future`] implementation.
     fut: LocalBoxFuture<'a, T>,
 }
 
 impl<'a, T> Processed<'a, T> {
-    /// Creates new [`Processed`] from provided [`Factory`].
+    /// Creates new [`Processed`] from the provided [`Factory`].
+    #[inline]
     pub fn new(factory: Factory<'a, T>) -> Self {
         Self {
             fut: factory(),
@@ -55,6 +56,7 @@ impl<'a, T> Processed<'a, T> {
 impl<'a, T> Future for Processed<'a, T> {
     type Output = T;
 
+    #[inline]
     fn poll(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -64,41 +66,45 @@ impl<'a, T> Future for Processed<'a, T> {
 }
 
 impl<'a, T> Into<Factory<'a, T>> for Processed<'a, T> {
+    #[inline]
     fn into(self) -> Factory<'a, T> {
         self.factory
     }
 }
 
 impl<'a, T> fmt::Debug for Processed<'a, T> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Processed").finish()
     }
 }
 
-/// [`Future`] for the [`when_all_processed`] function.
+/// [`Future`] returned by [`when_all_processed()`] function.
 ///
-/// Restarts underlying [`Future`] when it is ready to recheck that all
+/// Restarts the underlying [`Future`] when it is ready to recheck that all
 /// conditions are still met.
 ///
 /// Inner [`Factory`] can be unwrapped using [`Into`] implementation.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct AllProcessed<'a, T> {
-    /// Factory that created underlying [`Future`] and is used to recreate it
-    /// to recheck [`Future`] during poll.
+    /// Factory creating the underlying [`Future`] and recreating it to recheck
+    /// the [`Future`] during polling.
     factory: Factory<'a, T>,
 
-    /// Underlying [`Future`].
+    /// Underlying [`Future`] being polled in a [`Future`] implementation.
     fut: LocalBoxFuture<'a, T>,
 }
 
 impl<'a, T> Into<Factory<'a, T>> for AllProcessed<'a, T> {
+    #[inline]
     fn into(self) -> Box<dyn Fn() -> LocalBoxFuture<'a, T>> {
         self.factory
     }
 }
 
 impl<'a, T> AllProcessed<'a, T> {
-    /// Creates new [`AllProcessed`] from provided factory.
+    /// Creates new [`AllProcessed`] from provided [`Factory`].
+    #[inline]
     fn new(factory: Factory<'a, T>) -> Self {
         Self {
             fut: factory(),
@@ -108,6 +114,7 @@ impl<'a, T> AllProcessed<'a, T> {
 }
 
 impl<'a, T> fmt::Debug for AllProcessed<'a, T> {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AllProcessed").finish()
     }
@@ -120,18 +127,15 @@ impl<'a, T> Future for AllProcessed<'a, T> {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Self::Output> {
-        match self.fut.as_mut().poll(cx) {
-            Poll::Ready(_) => {
-                let mut retry = (self.factory)();
-                match retry.as_mut().poll(cx) {
-                    Poll::Ready(r) => Poll::Ready(r),
-                    Poll::Pending => {
-                        self.fut = retry;
-                        Poll::Pending
-                    }
-                }
+        let _ = ready!(self.fut.as_mut().poll(cx));
+
+        let mut retry = (self.factory)();
+        match retry.as_mut().poll(cx) {
+            Poll::Ready(r) => Poll::Ready(r),
+            Poll::Pending => {
+                self.fut = retry;
+                Poll::Pending
             }
-            Poll::Pending => Poll::Pending,
         }
     }
 }
@@ -150,9 +154,8 @@ mod tests {
 
     use super::*;
 
-    /// Checks that two joined with [`join_all`]
-    /// [`ProgressableCell::when_all_processed`]'s will be resolved only if they
-    /// both processed at the end.
+    /// Checks whether two joined [`ProgressableCell::when_all_processed()`]s
+    /// will be resolved only if they both processed at the end.
     #[tokio::test]
     async fn when_all_processed_rechecks() {
         LocalSet::new()
