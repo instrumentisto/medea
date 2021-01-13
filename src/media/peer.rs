@@ -194,7 +194,8 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn ice_candidates(&self) -> &HashSet<IceCandidate>)]
 #[enum_delegate(pub fn is_ice_restart(&self) -> bool)]
-#[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
+// #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
+#[enum_delegate(pub fn is_known_to_remote(&self) -> bool)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -203,34 +204,28 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
-    // /// Returns current [`NegotiationRole`] of this [`PeerStateMachine`].
-    // fn negotiation_role(
-    //     &self,
-    // ) -> Option<medea_client_api_proto::NegotiationRole> {
-    //     use NegotiationRole as R;
-    //     use PeerStateMachine as S;
-    //
-    //     match self {
-    //         S::Stable(_) => None,
-    //         S::WaitLocalSdp(peer) => {
-    //             match (&peer.context.sdp_offer,
-    // &peer.context.partner_sdp_offer)             {
-    //                 (None, Some(partner_sdp_offer)) => {
-    //                     Some(R::Answerer(partner_sdp_offer.clone()))
-    //                 }
-    //                 (None, None) => Some(R::Offerer),
-    //                 _ => None,
-    //             }
-    //         }
-    //         S::WaitRemoteSdp(peer) => {
-    //             match (&peer.context.sdp_offer,
-    // &peer.context.partner_sdp_offer)             {
-    //                 (Some(_), None) => Some(R::Offerer),
-    //                 _ => None,
-    //             }
-    //         }
-    //     }
-    // }
+    /// Returns current [`NegotiationRole`] of this [`PeerStateMachine`].
+    pub fn negotiation_role(&self) -> Option<medea_client_api_proto::NegotiationRole> {
+        use NegotiationRole as R;
+        use PeerStateMachine as S;
+
+        match self {
+            S::Stable(_) => None,
+            S::WaitLocalSdp(peer) => match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer) {
+                (None, None) => Some(R::Offerer),
+                (None, Some(partner_sdp_offer)) => Some(R::Answerer(partner_sdp_offer.clone())),
+                (Some(_), None) => Some(R::Offerer),
+                _ => None,
+            },
+            S::WaitRemoteSdp(peer) => {
+                match (&peer.context.sdp_offer, &peer.context.partner_sdp_offer) {
+                    (Some(_), None) => Some(R::Offerer),
+                    (None, Some(remote)) => Some(R::Answerer(remote.clone())),
+                    _ => None,
+                }
+            }
+        }
+    }
 
     /// Returns all [`state::Sender`] of this [`PeerStateMachine`].
     fn get_senders_states(&self) -> HashMap<TrackId, state::Sender> {
