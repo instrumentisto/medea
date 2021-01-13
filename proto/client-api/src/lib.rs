@@ -424,6 +424,9 @@ pub enum Event {
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
+    /// Media Server notifies Web Client that his SDP offer was applied.
+    LocalDescriptionApplied { peer_id: PeerId, sdp_offer: String },
+
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
     IceCandidateDiscovered {

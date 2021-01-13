@@ -13,10 +13,10 @@ use derive_more::{Display, From};
 use futures::{channel::mpsc, future, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, ConnectionQualityScore, Direction, Event as RpcEvent,
-    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
-    TrackId, TrackUpdate,
+    Command, ConnectionQualityScore, Event as RpcEvent, EventHandler,
+    IceCandidate, IceConnectionState, IceServer, MediaSourceKind, MemberId,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
+    TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -26,14 +26,13 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaStreamSettings,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
         RecvConstraints,
     },
     peer::{
-        media_exchange_state, mute_state, LocalStreamUpdateCriteria,
+        self, media_exchange_state, mute_state, LocalStreamUpdateCriteria,
         MediaConnectionsError, MediaState, PeerConnection, PeerError,
-        PeerEvent, PeerEventHandler, PeerRepository, RtcStats, TrackDirection,
-        TransceiverSide,
+        PeerEvent, PeerEventHandler, RtcStats, TrackDirection,
     },
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
@@ -382,7 +381,6 @@ impl RoomHandle {
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
         &self,
@@ -589,8 +587,6 @@ impl WeakRoom {
 /// handles media server events, etc).
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
-///
-/// [`PeerConnection`]: crate::peer::PeerConnection
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
@@ -598,7 +594,7 @@ impl Room {
     #[allow(clippy::mut_mut)]
     pub fn new(
         rpc: Rc<dyn RpcSession>,
-        peers: Box<dyn PeerRepository>,
+        media_manager: Rc<MediaManager>,
     ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
@@ -622,7 +618,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = Rc::new(InnerRoom::new(rpc, peers, tx));
+        let room = Rc::new(InnerRoom::new(rpc, media_manager, tx));
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -738,16 +734,13 @@ struct InnerRoom {
     /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
-    /// [`PeerConnection`] repository.
-    peers: Box<dyn PeerRepository>,
-
-    /// Channel for send events produced [`PeerConnection`] to [`Room`].
-    peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+    /// [`peer::Component`]s repository.
+    peers: peer::repo::Component,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
     /// [`Connection`]: crate::api::Connection
-    connections: Connections,
+    connections: Rc<Connections>,
 
     /// Callback to be invoked when new local [`local::JsTrack`] will be added
     /// to this [`Room`].
@@ -955,16 +948,25 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcSession>,
-        peers: Box<dyn PeerRepository>,
+        media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
+        let connections = Rc::new(Connections::default());
+        let send_constraints = LocalTracksConstraints::default();
         Self {
+            peers: peer::repo::Component::new(
+                Rc::new(peer::repo::Repository::new(
+                    media_manager,
+                    peer_event_sender,
+                    send_constraints.clone(),
+                    Rc::clone(&connections),
+                )),
+                Rc::new(peer::repo::State::default()),
+            ),
             rpc,
-            send_constraints: LocalTracksConstraints::default(),
+            send_constraints,
             recv_constraints: Rc::new(RecvConstraints::default()),
-            peers,
-            peer_event_sender,
-            connections: Connections::default(),
+            connections,
             on_connection_loss: Callback1::default(),
             on_failed_local_media: Rc::new(Callback1::default()),
             on_local_track: Callback1::default(),
@@ -1015,7 +1017,6 @@ impl InnerRoom {
     /// Toggles [`TransceiverSide`]s [`MediaState`] by provided
     /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
     async fn toggle_media_state(
@@ -1152,12 +1153,12 @@ impl InnerRoom {
 
         self.send_constraints
             .set_media_exchange_state_by_kinds(Disabled, kinds);
-        let senders_to_disable = peer.get_senders_without_tracks(kinds);
+        let senders_to_disable = peer.get_senders_without_tracks_ids(kinds);
 
         states_update.entry(peer.id()).or_default().extend(
             senders_to_disable
                 .into_iter()
-                .map(|s| (s.track_id(), MediaState::from(Disabled))),
+                .map(|id| (id, MediaState::from(Disabled))),
         );
         self.update_media_states(states_update)
             .await
@@ -1193,7 +1194,6 @@ impl InnerRoom {
     /// `true` then affected media types will be disabled.
     ///
     /// [1]: https://tinyurl.com/rnxcavf
-    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Sender`]: crate::peer::Sender
     #[async_recursion(?Send)]
     async fn set_local_media_settings(
@@ -1285,9 +1285,7 @@ impl InnerRoom {
     /// Stops state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_lost(&self) {
-        for peer in self.peers.get_all() {
-            peer.stop_state_transitions_timers();
-        }
+        self.peers.stop_timeouts();
         self.on_connection_loss
             .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
@@ -1295,56 +1293,7 @@ impl InnerRoom {
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
-        for peer in self.peers.get_all() {
-            peer.reset_state_transitions_timers();
-        }
-    }
-
-    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`] in
-    /// provided [`PeerConnection`]. Negotiates [`PeerConnection`] if provided
-    /// `negotiation_role` is `Some`.
-    ///
-    /// [`Receiver`]: crate::peer::Receiver
-    /// [`Sender`]: crate::peer::Sender
-    async fn create_tracks_and_maybe_negotiate(
-        &self,
-        peer: Rc<PeerConnection>,
-        tracks: Vec<Track>,
-        negotiation_role: Option<NegotiationRole>,
-        maybe_update_local_media: bool,
-    ) -> Result<(), Traced<RoomError>> {
-        match negotiation_role {
-            None => {
-                peer.create_tracks(tracks)
-                    .map_err(tracerr::map_from_and_wrap!())?;
-            }
-            Some(NegotiationRole::Offerer) => {
-                let sdp_offer = peer
-                    .get_offer(tracks, maybe_update_local_media)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                let mids =
-                    peer.get_mids().map_err(tracerr::map_from_and_wrap!())?;
-                self.rpc.send_command(Command::MakeSdpOffer {
-                    peer_id: peer.id(),
-                    sdp_offer,
-                    transceivers_statuses: peer.get_transceivers_statuses(),
-                    mids,
-                });
-            }
-            Some(NegotiationRole::Answerer(offer)) => {
-                let sdp_answer = peer
-                    .process_offer(offer, tracks, maybe_update_local_media)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                self.rpc.send_command(Command::MakeSdpAnswer {
-                    peer_id: peer.id(),
-                    sdp_answer,
-                    transceivers_statuses: peer.get_transceivers_statuses(),
-                });
-            }
-        };
-        Ok(())
+        self.peers.resume_timeouts();
     }
 }
 
@@ -1368,38 +1317,29 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .create_peer(
-                peer_id,
-                ice_servers,
-                self.peer_event_sender.clone(),
-                is_force_relayed,
-                self.send_constraints.clone(),
-                Rc::clone(&self.recv_constraints),
-            )
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        for track in &tracks {
-            match &track.direction {
-                Direction::Recv { sender, .. } => {
-                    self.connections.create_connection(peer_id, sender);
-                }
-                Direction::Send { receivers, .. } => {
-                    for receiver in receivers {
-                        self.connections.create_connection(peer_id, receiver);
-                    }
-                }
-            }
-        }
-        self.create_tracks_and_maybe_negotiate(
-            peer,
-            tracks,
+        let peer_state = peer::State::new(
+            peer_id,
+            ice_servers,
+            is_force_relayed,
             Some(negotiation_role),
-            true,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())
+        );
+        for track in &tracks {
+            peer_state
+                .insert_track(
+                    track,
+                    &self.send_constraints,
+                    &self.recv_constraints,
+                )
+                .map_err(|e| {
+                    self.on_failed_local_media
+                        .call(JasonError::from(e.clone()));
+                    tracerr::map_from_and_new!(e)
+                })?;
+        }
+
+        self.peers.state().insert(peer_id, peer_state);
+
+        Ok(())
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
@@ -1410,11 +1350,28 @@ impl EventHandler for InnerRoom {
     ) -> Self::Output {
         let peer = self
             .peers
+            .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.set_remote_answer(sdp_answer)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+        peer.set_remote_sdp(sdp_answer);
+
+        Ok(())
+    }
+
+    /// Applies provided SDP to the [`peer::State`] with a provided [`PeerId`].
+    async fn on_local_description_applied(
+        &self,
+        peer_id: PeerId,
+        local_sdp: String,
+    ) -> Self::Output {
+        let peer_state = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        peer_state.apply_local_sdp(local_sdp);
+
+        Ok(())
     }
 
     /// Applies specified [`IceCandidate`] to a specified [`PeerConnection`].
@@ -1425,23 +1382,18 @@ impl EventHandler for InnerRoom {
     ) -> Self::Output {
         let peer = self
             .peers
+            .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        peer.add_ice_candidate(candidate);
 
-        peer.add_ice_candidate(
-            candidate.candidate,
-            candidate.sdp_m_line_index,
-            candidate.sdp_mid,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())
+        Ok(())
     }
 
     /// Disposes specified [`PeerConnection`]s.
     async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         peer_ids.iter().for_each(|id| {
-            self.connections.close_connection(*id);
-            self.peers.remove(*id);
+            self.peers.state().remove(*id);
         });
         Ok(())
     }
@@ -1460,41 +1412,37 @@ impl EventHandler for InnerRoom {
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer = self
+        let peer_state = self
             .peers
+            .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        let mut new_tracks = Vec::new();
-        let mut patches = Vec::new();
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => {
-                    new_tracks.push(track);
-                }
+                TrackUpdate::Added(track) => peer_state
+                    .insert_track(
+                        &track,
+                        &self.send_constraints,
+                        &self.recv_constraints,
+                    )
+                    .map_err(|e| {
+                        self.on_failed_local_media
+                            .call(JasonError::from(e.clone()));
+                        tracerr::map_from_and_new!(e)
+                    })?,
                 TrackUpdate::Updated(track_patch) => {
-                    patches.push(track_patch);
+                    peer_state.patch_track(&track_patch)
                 }
                 TrackUpdate::IceRestart => {
-                    peer.restart_ice();
+                    peer_state.restart_ice();
                 }
             }
         }
-        let kinds = peer
-            .patch_tracks(patches)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        peer.update_local_stream(kinds)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        self.create_tracks_and_maybe_negotiate(
-            peer,
-            new_tracks,
-            negotiation_role,
-            false,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())?;
+        if let Some(negotiation_role) = negotiation_role {
+            peer_state.set_negotiation_role(negotiation_role);
+        }
+
         Ok(())
     }
 
@@ -1633,6 +1581,40 @@ impl PeerEventHandler for InnerRoom {
     /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
         self.on_failed_local_media.call(error);
+        Ok(())
+    }
+
+    /// Handles [`PeerEvent::NewSdpOffer`] event by sending
+    /// [`Command::MakeSdpOffer`] to the Media Server.
+    async fn on_new_sdp_offer(
+        &self,
+        peer_id: PeerId,
+        sdp_offer: String,
+        mids: HashMap<TrackId, String>,
+        transceivers_statuses: HashMap<TrackId, bool>,
+    ) -> Self::Output {
+        self.rpc.send_command(Command::MakeSdpOffer {
+            peer_id,
+            sdp_offer,
+            mids,
+            transceivers_statuses,
+        });
+        Ok(())
+    }
+
+    /// Handles [`PeerEvent::NewSdpAnswer`] event by sending
+    /// [`Command::MakeSdpAnswer`] to the Media Server.
+    async fn on_new_sdp_answer(
+        &self,
+        peer_id: PeerId,
+        sdp_answer: String,
+        transceivers_statuses: HashMap<TrackId, bool>,
+    ) -> Self::Output {
+        self.rpc.send_command(Command::MakeSdpAnswer {
+            peer_id,
+            sdp_answer,
+            transceivers_statuses,
+        });
         Ok(())
     }
 }

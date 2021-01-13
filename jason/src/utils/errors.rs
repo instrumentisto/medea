@@ -82,7 +82,7 @@ impl From<JsError> for js_sys::Error {
 ///
 /// Contains JS side error if it the cause and trace information.
 #[wasm_bindgen]
-#[derive(Debug, Display)]
+#[derive(Clone, Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
     name: &'static str,

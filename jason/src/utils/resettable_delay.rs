@@ -22,6 +22,7 @@ pub fn resettable_delay_for(
 }
 
 /// Handler to delay which can be stopped and started over again [`Duration`].
+#[derive(Debug)]
 pub struct ResettableDelayHandle {
     /// [`oneshot::Sender`] with which timer [`Future`] can be resolved.
     ///

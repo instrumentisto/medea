@@ -75,16 +75,16 @@ fn pub_sub_video_call() {
                 }
 
                 if is_caller {
-                    if let Event::SdpAnswerMade { .. } = &events[1] {
+                    if let Event::SdpAnswerMade { .. } = &events[2] {
                     } else {
                         unreachable!();
                     }
 
-                    if let Event::IceCandidateDiscovered { .. } = &events[2] {
+                    if let Event::IceCandidateDiscovered { .. } = &events[3] {
                     } else {
                         unreachable!();
                     }
-                } else if let Event::IceCandidateDiscovered { .. } = &events[1]
+                } else if let Event::IceCandidateDiscovered { .. } = &events[2]
                 {
                 } else {
                     unreachable!();

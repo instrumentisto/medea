@@ -437,7 +437,10 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                                     }
                                 }
                             }
-                            Event::SdpAnswerMade { peer_id, .. }
+                            Event::LocalDescriptionApplied {
+                                peer_id, ..
+                            }
+                            | Event::SdpAnswerMade { peer_id, .. }
                             | Event::IceCandidateDiscovered {
                                 peer_id, ..
                             } => assert!(self.known_peers.contains(peer_id)),

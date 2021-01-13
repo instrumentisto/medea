@@ -1,8 +1,10 @@
 //! Implementation of the `MediaTrack` with a `Send` direction.
 
+mod component;
+
 use std::{cell::Cell, rc::Rc};
 
-use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchEvent};
+use medea_client_api_proto::{MediaSourceKind, TrackId};
 
 use crate::{
     media::{
@@ -15,73 +17,15 @@ use crate::{
 use super::{
     media_exchange_state, mute_state,
     transitable_state::{
-        MediaExchangeState, MediaExchangeStateController, MediaState,
-        MuteStateController,
+        MediaExchangeStateController, MediaState, MuteStateController,
     },
     MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
     TransceiverSide,
 };
 
-/// Builder of the [`Sender`].
-pub struct SenderBuilder<'a> {
-    pub media_connections: &'a MediaConnections,
-    pub track_id: TrackId,
-    pub caps: TrackConstraints,
-    pub mid: Option<String>,
-    pub media_exchange_state: media_exchange_state::Stable,
-    pub mute_state: mute_state::Stable,
-    pub required: bool,
-    pub send_constraints: LocalTracksConstraints,
-}
+pub use self::component::{Component, State};
 
-impl<'a> SenderBuilder<'a> {
-    /// Builds new [`Transceiver`] if provided `mid` is [`None`], otherwise
-    /// retrieves existing [`Transceiver`] via provided `mid` from a
-    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
-    /// fails.
-    pub fn build(self) -> Result<Rc<Sender>> {
-        let connections = self.media_connections.0.borrow();
-        let kind = MediaKind::from(&self.caps);
-        let transceiver = match self.mid {
-            // Try to find rcvr transceiver that can be used as sendrecv.
-            None => connections
-                .receivers
-                .values()
-                .find(|rcvr| {
-                    rcvr.caps().media_kind() == self.caps.media_kind()
-                        && rcvr.caps().media_source_kind()
-                            == self.caps.media_source_kind()
-                })
-                .and_then(|rcvr| rcvr.transceiver())
-                .unwrap_or_else(|| {
-                    connections
-                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
-                }),
-            Some(mid) => connections
-                .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                .map_err(tracerr::wrap!())?,
-        };
-
-        let media_exchange_state =
-            MediaExchangeStateController::new(self.media_exchange_state);
-        let this = Rc::new(Sender {
-            track_id: self.track_id,
-            caps: self.caps,
-            general_media_exchange_state: Cell::new(self.media_exchange_state),
-            mute_state: MuteStateController::new(self.mute_state),
-            transceiver,
-            media_exchange_state,
-            required: self.required,
-            send_constraints: self.send_constraints,
-        });
-
-        Ok(this)
-    }
-}
-
-/// Representation of a [`local::Track`] that is being sent to some
-/// remote peer.
+/// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
@@ -94,6 +38,68 @@ pub struct Sender {
 }
 
 impl Sender {
+    /// Creates new [`Transceiver`] if provided `mid` is [`None`], otherwise
+    /// retrieves existing [`Transceiver`] via provided `mid` from a
+    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
+    /// fails.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::TransceiverNotFound`] if [`State`]
+    /// has [`Some`] [`mid`], but this [`mid`] isn't found in the
+    /// [`MediaConnections`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    pub fn new(
+        state: &State,
+        media_connections: &MediaConnections,
+        send_constraints: LocalTracksConstraints,
+    ) -> Result<Rc<Self>> {
+        let connections = media_connections.0.borrow();
+        let caps = TrackConstraints::from(state.media_type().clone());
+        let kind = MediaKind::from(&caps);
+        let transceiver = match state.mid() {
+            // Try to find rcvr transceiver that can be used as sendrecv.
+            None => connections
+                .receivers
+                .values()
+                .find(|rcvr| {
+                    rcvr.caps().media_kind() == caps.media_kind()
+                        && rcvr.caps().media_source_kind()
+                            == caps.media_source_kind()
+                })
+                .and_then(|rcvr| rcvr.transceiver())
+                .unwrap_or_else(|| {
+                    connections
+                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                }),
+            Some(mid) => connections
+                .get_transceiver_by_mid(mid)
+                .ok_or_else(|| {
+                    MediaConnectionsError::TransceiverNotFound(mid.to_owned())
+                })
+                .map_err(tracerr::wrap!())?,
+        };
+        let media_exchange_state =
+            media_exchange_state::Stable::from(!state.is_enabled_individual());
+        let mute_state = mute_state::Stable::from(state.is_muted());
+
+        let this = Rc::new(Sender {
+            track_id: state.id(),
+            caps,
+            general_media_exchange_state: Cell::new(media_exchange_state),
+            mute_state: MuteStateController::new(mute_state),
+            transceiver,
+            media_exchange_state: MediaExchangeStateController::new(
+                media_exchange_state,
+            ),
+            required: state.media_type().required(),
+            send_constraints,
+        });
+
+        Ok(this)
+    }
+
     /// Returns [`TrackConstraints`] of this [`Sender`].
     #[inline]
     pub fn caps(&self) -> &TrackConstraints {
@@ -195,52 +201,28 @@ impl Sender {
         )
     }
 
-    /// Updates this [`Sender`]s tracks based on the provided
-    /// [`TrackPatchEvent`].
+    /// Updates general [`media_exchange_state`] of this [`Sender`] by the
+    /// provided [`bool`].
+    #[inline]
+    pub fn set_enabled_general(&self, enabled: bool) {
+        self.update_general_media_exchange_state(enabled.into());
+    }
+
+    /// Updates individual [`media_exchange_state`] of this [`Sender`] by the
+    /// provided [`bool`].
+    #[inline]
+    pub fn set_enabled_individual(&self, enabled: bool) {
+        self.media_exchange_state.update(enabled.into());
+    }
+
+    /// Updates [`mute_state`] of this [`Sender`] with a provided [`bool`].
     ///
-    /// Returns `true` if media stream update should be performed for this
-    /// [`Sender`].
-    pub async fn update(&self, track: &TrackPatchEvent) -> bool {
-        if track.id != self.track_id {
-            return false;
-        }
-
-        if let Some(muted) = track.muted {
-            self.mute_state.update(muted.into());
-            match mute_state::Stable::from(muted) {
-                mute_state::Stable::Unmuted => {
-                    self.transceiver.set_send_track_enabled(true);
-                }
-                mute_state::Stable::Muted => {
-                    self.transceiver.set_send_track_enabled(false);
-                }
-            }
-        }
-        let mut requires_media_update = false;
-        if let Some(enabled) = track.enabled_individual {
-            let mute_state_before = self.media_exchange_state.state();
-            self.media_exchange_state.update(enabled.into());
-            if let (
-                MediaExchangeState::Stable(before),
-                MediaExchangeState::Stable(after),
-            ) = (mute_state_before, self.media_exchange_state.state())
-            {
-                requires_media_update = before != after
-                    && after == media_exchange_state::Stable::Enabled;
-            }
-
-            if !enabled {
-                self.remove_track().await;
-            }
-        }
-        if let Some(enabled) = track.enabled_individual {
-            self.media_exchange_state.update(enabled.into());
-        }
-        if let Some(enabled) = track.enabled_general {
-            self.update_general_media_exchange_state(enabled.into());
-        }
-
-        requires_media_update
+    /// Calls [`Transceiver::set_send_track_enabled()`] with the provided
+    /// [`bool`] value being inverted.
+    #[inline]
+    pub fn set_muted(&self, muted: bool) {
+        self.mute_state.update(muted.into());
+        self.transceiver.set_send_track_enabled(!muted);
     }
 
     /// Changes underlying transceiver direction to
@@ -339,8 +321,7 @@ impl MediaStateControllable for Sender {
         Rc::clone(&self.mute_state)
     }
 
-    /// Sets current [`MediaExchangeState`] to
-    /// [`media_exchange_state::Transition`].
+    /// Sets current [`MediaState`] to the transition.
     ///
     /// # Errors
     ///

@@ -11,7 +11,6 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{MediaManager, MediaManagerHandle},
-    peer,
     rpc::{
         ClientDisconnect, RpcSession, RpcTransport, WebSocketRpcClient,
         WebSocketRpcSession, WebSocketRpcTransport,
@@ -116,11 +115,8 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
-        let peer_repository = Box::new(peer::Repository::new(Rc::clone(
-            &self.0.borrow().media_manager,
-        )));
         let on_normal_close = rpc.on_normal_close();
-        let room = Room::new(rpc, peer_repository);
+        let room = Room::new(rpc, Rc::clone(&self.0.borrow().media_manager));
 
         let weak_room = room.downgrade();
         let weak_inner = Rc::downgrade(&self.0);

@@ -49,6 +49,7 @@ impl CommandHandler for Room {
         from_peer.set_mids(mids)?;
         from_peer.update_senders_statuses(senders_statuses);
 
+        let from_member_id = from_peer.member_id();
         let from_peer = from_peer.set_local_offer(sdp_offer.clone());
         let to_peer = to_peer.set_remote_offer(sdp_offer.clone());
 
@@ -60,13 +61,15 @@ impl CommandHandler for Room {
         let event = if from_peer.is_known_to_remote() {
             Event::TracksApplied {
                 peer_id: to_peer.id(),
-                negotiation_role: Some(NegotiationRole::Answerer(sdp_offer)),
+                negotiation_role: Some(NegotiationRole::Answerer(
+                    sdp_offer.clone(),
+                )),
                 updates: to_peer.get_updates(),
             }
         } else {
             Event::PeerCreated {
                 peer_id: to_peer.id(),
-                negotiation_role: NegotiationRole::Answerer(sdp_offer),
+                negotiation_role: NegotiationRole::Answerer(sdp_offer.clone()),
                 tracks: to_peer.new_tracks(),
                 ice_servers,
                 force_relay: to_peer.is_force_relayed(),
@@ -78,6 +81,13 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
+        self.members.send_event_to_member(
+            from_member_id,
+            Event::LocalDescriptionApplied {
+                peer_id: from_peer_id,
+                sdp_offer,
+            },
+        )?;
         self.members.send_event_to_member(to_member_id, event)
     }
 
@@ -100,13 +110,14 @@ impl CommandHandler for Room {
 
         from_peer.update_senders_statuses(senders_statuses);
 
+        let from_member_id = from_peer.member_id();
         let from_peer = from_peer.set_local_answer(sdp_answer.clone());
         let to_peer = to_peer.set_remote_answer(sdp_answer.clone());
 
         let to_member_id = to_peer.member_id();
         let event = Event::SdpAnswerMade {
             peer_id: to_peer.id(),
-            sdp_answer,
+            sdp_answer: sdp_answer.clone(),
         };
 
         self.peers.add_peer(from_peer);
@@ -114,6 +125,13 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
+        self.members.send_event_to_member(
+            from_member_id,
+            Event::LocalDescriptionApplied {
+                peer_id: from_peer_id,
+                sdp_offer: sdp_answer,
+            },
+        )?;
         self.members.send_event_to_member(to_member_id, event)
     }
 

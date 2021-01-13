@@ -1,5 +1,7 @@
 //! Implementation of the `MediaTrack` with a `Recv` direction.
 
+mod component;
+
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -7,12 +9,12 @@ use std::{
 
 use futures::channel::mpsc;
 use medea_client_api_proto as proto;
-use medea_client_api_proto::{MediaSourceKind, MemberId, TrackPatchEvent};
+use medea_client_api_proto::{MediaSourceKind, MemberId};
 use proto::TrackId;
 use web_sys as sys;
 
 use crate::{
-    media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
+    media::{track::remote, MediaKind, TrackConstraints},
     peer::{
         transceiver::Transceiver, MediaConnections, MediaStateControllable,
         PeerEvent, TransceiverDirection,
@@ -26,6 +28,8 @@ use super::{
     },
     TransceiverSide,
 };
+
+pub use self::component::{Component, State};
 
 /// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -51,33 +55,22 @@ impl Receiver {
     /// when [`remote::Track`] arrives.
     ///
     /// Created [`Transceiver`] direction is set to
-    /// [`TransceiverDirection::INACTIVE`] if media receiving is disabled in
-    /// provided [`RecvConstraints`].
+    /// [`TransceiverDirection::INACTIVE`] if `enabled_individual` is `false`.
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
-    pub fn new(
-        media_connections: &MediaConnections,
-        track_id: TrackId,
-        caps: TrackConstraints,
-        sender_id: MemberId,
-        mid: Option<String>,
-        recv_constraints: &RecvConstraints,
-    ) -> Self {
+    pub fn new(state: &State, media_connections: &MediaConnections) -> Self {
         let connections = media_connections.0.borrow();
+        let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
-        let enabled = match kind {
-            MediaKind::Audio => recv_constraints.is_audio_enabled(),
-            MediaKind::Video => recv_constraints.is_video_enabled(),
-        };
-        let transceiver_direction = if enabled {
+        let transceiver_direction = if state.enabled_individual() {
             TransceiverDirection::RECV
         } else {
             TransceiverDirection::INACTIVE
         };
 
-        let transceiver = if mid.is_none() {
+        let transceiver = if state.mid().is_none() {
             // Try to find send transceiver that can be used as sendrecv.
             let mut senders = connections.senders.values();
             let sender = senders.find(|sndr| {
@@ -99,18 +92,18 @@ impl Receiver {
         };
 
         Self {
-            track_id,
+            track_id: state.id(),
             caps,
-            sender_id,
+            sender_id: state.sender_id().clone(),
             transceiver: RefCell::new(transceiver),
-            mid: RefCell::new(mid),
+            mid: RefCell::new(state.mid().map(str::to_owned)),
             track: RefCell::new(None),
             general_media_exchange_state: Cell::new(
-                media_exchange_state::Stable::from(enabled),
+                media_exchange_state::Stable::from(state.enabled_general()),
             ),
             is_track_notified: Cell::new(false),
             media_exchange_state_controller: TransitableStateController::new(
-                media_exchange_state::Stable::from(enabled),
+                media_exchange_state::Stable::from(state.enabled_individual()),
             ),
             peer_events_sender: connections.peer_events_sender.clone(),
         }
@@ -176,21 +169,27 @@ impl Receiver {
         }
     }
 
-    /// Updates [`Receiver`] based on the provided [`TrackPatchEvent`].
-    pub fn update(&self, track_patch: &TrackPatchEvent) {
-        if self.track_id != track_patch.id {
-            return;
-        }
-        if let Some(enabled) = track_patch.enabled_general {
-            self.update_general_media_exchange_state(enabled.into());
-        }
-        if let Some(enabled) = track_patch.enabled_individual {
-            self.media_exchange_state_controller.update(enabled.into());
-        }
-        if let Some(muted) = track_patch.muted {
-            if let Some(track) = self.track.borrow().as_ref() {
-                track.set_enabled(!muted);
-            }
+    /// Updates general [`media_exchange_state`] of this [`Receiver`] with the
+    /// provided [`bool`].
+    #[inline]
+    pub fn set_enabled_general_state(&self, enabled: bool) {
+        self.update_general_media_exchange_state(enabled.into());
+    }
+
+    /// Updates individual [`media_exchange_state`] of this [`Receiver`] with
+    /// the provided [`bool`].
+    #[inline]
+    pub fn set_enabled_individual_state(&self, enabled: bool) {
+        self.media_exchange_state_controller.update(enabled.into());
+    }
+
+    /// Calls [`remote::Track::set_enabled()`] with the provided [`bool`].
+    ///
+    /// No-op if [`Receiver`] doesn't have any [`remote::Track`] at the moment.
+    #[inline]
+    pub fn set_muted(&self, muted: bool) {
+        if let Some(track) = self.track.borrow().as_ref() {
+            track.set_enabled(!muted);
         }
     }
 
@@ -267,13 +266,6 @@ impl Receiver {
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.media_exchange_state_controller.enabled()
-    }
-
-    /// Indicates whether this [`Receiver`] is disabled.
-    #[inline]
-    #[must_use]
-    pub fn disabled(&self) -> bool {
-        self.media_exchange_state_controller.disabled()
     }
 }
 

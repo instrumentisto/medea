@@ -162,7 +162,8 @@ async fn command_validation() {
                 assert_eq!(candidate, correct_candidate);
                 break;
             }
-            Event::PeerCreated { .. } => (),
+            Event::LocalDescriptionApplied { .. }
+            | Event::PeerCreated { .. } => (),
             _ => unreachable!("{:?}", msg),
         }
     }

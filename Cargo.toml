@@ -26,6 +26,10 @@ members = [
 
 [profile.release]
 lto = "thin"
+codegen-units = 1
+
+[profile.release.package.medea-jason]
+opt-level = "s"  # Tell rustc to optimize for small code size.
 
 [dependencies]
 actix = "0.10"
