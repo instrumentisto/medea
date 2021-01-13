@@ -1599,7 +1599,6 @@ impl PeerEventHandler for InnerRoom {
             mids,
             transceivers_statuses,
         });
-
         Ok(())
     }
 
@@ -1616,7 +1615,6 @@ impl PeerEventHandler for InnerRoom {
             sdp_answer,
             transceivers_statuses,
         });
-
         Ok(())
     }
 }

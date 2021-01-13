@@ -1,4 +1,4 @@
-//! Implementation of [`Component`] for `MediaTrack` with a `Recv` direction.
+//! [`Component`] for `MediaTrack` with a `Recv` direction.
 
 use std::rc::Rc;
 
@@ -27,7 +27,8 @@ pub struct State {
 }
 
 impl State {
-    /// Returns [`State`] with a provided data.
+    /// Returns [`State`] with the provided data.
+    #[must_use]
     pub fn new(
         id: TrackId,
         mid: Option<String>,
@@ -52,18 +53,21 @@ impl State {
 
     /// Returns [`TrackId`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`State`].
     #[inline]
-    pub fn mid(&self) -> &Option<String> {
-        &self.mid
+    #[must_use]
+    pub fn mid(&self) -> Option<&str> {
+        self.mid.as_deref()
     }
 
     /// Returns current [`MediaType`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
@@ -71,24 +75,26 @@ impl State {
     /// Returns current [`MemberId`] of the `Member` from which this
     /// [`State`] should receive media data.
     #[inline]
+    #[must_use]
     pub fn sender_id(&self) -> &MemberId {
         &self.sender_id
     }
 
-    /// Returns current individual media exchange state of this
-    /// [`State`].
+    /// Returns current individual media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
 
-    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.id != track_patch.id {
             return;
@@ -104,8 +110,8 @@ impl State {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`State`] update
-    /// will be applied on [`Receiver`].
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> AllProcessed<'static, ()> {
@@ -121,46 +127,43 @@ impl State {
 impl Component {
     /// Watcher for the [`State::muted`] update.
     ///
-    /// Calls [`Receiver::set_muted`] with a new value.
-    #[watch(self.muted.subscribe())]
+    /// Calls [`Receiver::set_muted()`] with a new value.
     #[inline]
+    #[watch(self.muted.subscribe())]
     async fn muted_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         muted: Guarded<bool>,
     ) -> Result<()> {
         receiver.set_muted(*muted);
-
         Ok(())
     }
 
     /// Watcher for the [`State::enabled_individual`] update.
     ///
-    /// Calls [`Receiver::set_enabled_individual_state`] with a new value.
-    #[watch(self.enabled_individual.subscribe())]
+    /// Calls [`Receiver::set_enabled_individual_state()`] with a new value.
     #[inline]
+    #[watch(self.enabled_individual.subscribe())]
     async fn enabled_individual_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         enabled_individual: Guarded<bool>,
     ) -> Result<()> {
         receiver.set_enabled_individual_state(*enabled_individual);
-
         Ok(())
     }
 
     /// Watcher for the [`State::enabled_general`] update.
     ///
-    /// Calls [`Receiver::set_enabled_general_state`] with a new value.
-    #[watch(self.enabled_general.subscribe())]
+    /// Calls [`Receiver::set_enabled_general_state()`] with a new value.
     #[inline]
+    #[watch(self.enabled_general.subscribe())]
     async fn enabled_general_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         enabled_general: Guarded<bool>,
     ) -> Result<()> {
         receiver.set_enabled_general_state(*enabled_general);
-
         Ok(())
     }
 }

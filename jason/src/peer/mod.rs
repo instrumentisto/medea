@@ -179,7 +179,7 @@ pub enum PeerEvent {
         error: JasonError,
     },
 
-    /// [`Component`] generated new SDP answer.
+    /// [`Component`] generated a new SDP answer.
     NewSdpAnswer {
         /// ID of the [`PeerConnection`] for which SDP answer was generated.
         peer_id: PeerId,
@@ -191,7 +191,7 @@ pub enum PeerEvent {
         transceivers_statuses: HashMap<TrackId, bool>,
     },
 
-    /// [`Component`] generated new SDP offer.
+    /// [`Component`] generated a new SDP offer.
     NewSdpOffer {
         /// ID of the [`PeerConnection`] for which SDP offer was generated.
         peer_id: PeerId,
@@ -350,8 +350,8 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
-    /// Returns all [`TrackId`]s of [`Sender`]s that match provided
-    /// [`LocalStreamUpdateCriteria`] and do not have [`local::Track`].
+    /// Returns all [`TrackId`]s of [`Sender`]s that match the provided
+    /// [`LocalStreamUpdateCriteria`] and don't have [`local::Track`].
     ///
     /// [`Sender`]: sender::Sender
     #[inline]
@@ -583,10 +583,9 @@ impl PeerConnection {
     /// [`Sender`]s are chosen based on provided [`LocalStreamUpdateCriteria`].
     ///
     /// First of all make sure that [`PeerConnection`] [`Sender`]s are up to
-    /// date (you set those with [`State::senders`]) and
-    /// [`State::senders`] are synchronized with a real object state. If
-    /// there are no senders configured in this [`PeerConnection`], then this
-    /// method is no-op.
+    /// date (you set those with [`State::senders`]) and [`State::senders`] are
+    /// synchronized with a real object state. If there are no senders
+    /// configured in this [`PeerConnection`], then this method is no-op.
     ///
     /// Secondly, make sure that configured [`LocalTracksConstraints`] are up to
     /// date.
@@ -625,10 +624,9 @@ impl PeerConnection {
     /// [`MediaConnectionsError::CouldNotInsertLocalTrack`] if
     /// [`local::Track`] couldn't inserted into [`PeerConnection`]s [`Sender`]s.
     ///
+    /// [`Sender`]: sender::Sender
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-    ///
-    /// [`Sender`]: sender::Sender
     pub async fn update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,

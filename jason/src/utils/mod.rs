@@ -11,7 +11,7 @@ mod resettable_delay;
 use std::{convert::TryInto as _, future::Future, ops::Mul, time::Duration};
 
 use derive_more::{From, Sub};
-use futures::{future, future::AbortHandle};
+use futures::future::{self, AbortHandle};
 use js_sys::{Promise, Reflect};
 use medea_reactive::Guarded;
 use wasm_bindgen::prelude::*;
@@ -184,12 +184,12 @@ macro_rules! upgrade_or_break {
     };
 }
 
-/// Returns [`Future`] which will return provided value transposed with a
-/// [`Guarded::transpose`].
+/// Returns [`Future`] which will return the provided value being
+/// [`Guarded::transpose()`]d.
 ///
-/// Supposed to be used in the [`StreamExt::filter_map`].
+/// Intended for use in [`StreamExt::filter_map()`].
 ///
-/// [`StreamExt::filter_map`]: futures::StreamExt::filter_map
+/// [`StreamExt::filter_map()`]: futures::StreamExt::filter_map
 #[inline]
 pub fn transpose_guarded<T>(
     val: Guarded<Option<T>>,

@@ -1,4 +1,4 @@
-//! Implementation of [`Component`] for `MediaTrack` with a `Send` direction.
+//! [`Component`] for `MediaTrack` with a `Send` direction.
 
 use std::{cell::Cell, rc::Rc};
 
@@ -35,11 +35,12 @@ pub struct State {
 }
 
 impl State {
-    /// Creates new [`State`] with a provided data.
+    /// Creates new [`State`] with the provided data.
+    ///
     /// # Errors
     ///
     /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
-    /// [`Sender`] can't be disabled.
+    /// [`Sender`] cannot be disabled.
     pub fn new(
         id: TrackId,
         mid: Option<String>,
@@ -70,48 +71,55 @@ impl State {
 
     /// Returns [`TrackId`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`State`].
     #[inline]
-    pub fn mid(&self) -> &Option<String> {
-        &self.mid
+    #[must_use]
+    pub fn mid(&self) -> Option<&str> {
+        self.mid.as_deref()
     }
 
     /// Returns current [`MediaType`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
-    /// Returns current [`MemberId`]s of the `Member`s to which this
-    /// [`State`] should send media data.
+    /// Returns current [`MemberId`]s of the `Member`s that this [`State`]
+    /// should send media data to.
     #[inline]
+    #[must_use]
     pub fn receivers(&self) -> &Vec<MemberId> {
         &self.receivers
     }
 
     /// Returns current individual media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_enabled_individual(&self) -> bool {
         self.enabled_individual.get()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_enabled_general(&self) -> bool {
         self.enabled_general.get()
     }
 
     /// Returns current mute state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_muted(&self) -> bool {
         self.muted.get()
     }
 
-    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if track_patch.id != self.id {
             return;
@@ -127,8 +135,8 @@ impl State {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`State`] update
-    /// will be applied on [`Sender`].
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Sender`].
     ///
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> AllProcessed<'static, ()> {
@@ -139,9 +147,9 @@ impl State {
         ])
     }
 
-    /// Returns `true` if local `MediaStream` update needed for this
-    /// [`State`].
+    /// Indicates whether local `MediaStream` update needed for this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_local_stream_update_needed(&self) -> bool {
         self.need_local_stream_update.get()
     }
@@ -154,6 +162,7 @@ impl State {
 
     /// Returns [`MediaKind`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_kind(&self) -> MediaKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaKind::Audio,
@@ -163,6 +172,7 @@ impl State {
 
     /// Returns [`MediaSourceKind`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_source(&self) -> MediaSourceKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaSourceKind::Device,
@@ -175,27 +185,26 @@ impl State {
 impl Component {
     /// Watcher for the [`State::muted`] update.
     ///
-    /// Calls [`Sender::set_muted`] with a new value.
-    #[watch(self.muted.subscribe())]
+    /// Calls [`Sender::set_muted()`] with a new value.
     #[inline]
+    #[watch(self.muted.subscribe())]
     async fn muted_state_changed(
         sender: Rc<Sender>,
         _: Rc<State>,
         muted: Guarded<bool>,
     ) -> Result<()> {
         sender.set_muted(*muted);
-
         Ok(())
     }
 
     /// Watcher for the [`State::enabled_individual`] update.
     ///
-    /// Calls [`Sender::set_enabled_individual`] with a new value.
+    /// Calls [`Sender::set_enabled_individual()`] with a new value.
     ///
     /// If new value is `true` then sets [`State::need_local_stream_update`]
-    /// flag to `true`, otherwise calls [`Sender::remove_track`].
-    #[watch(self.enabled_individual.subscribe())]
+    /// flag to `true`, otherwise calls [`Sender::remove_track()`].
     #[inline]
+    #[watch(self.enabled_individual.subscribe())]
     async fn enabled_individual_changed(
         sender: Rc<Sender>,
         state: Rc<State>,
@@ -207,13 +216,12 @@ impl Component {
         } else {
             sender.remove_track().await;
         }
-
         Ok(())
     }
 
     /// Watcher for the [`State::enabled_general`] update.
     ///
-    /// Calls [`Sender::set_enabled_general_state`] with a new value.
+    /// Calls [`Sender::set_enabled_general_state()`] with a new value.
     #[watch(self.enabled_general.subscribe())]
     #[inline]
     async fn enabled_general_changed(
@@ -222,7 +230,6 @@ impl Component {
         enabled_general: Guarded<bool>,
     ) -> Result<()> {
         sender.set_enabled_general(*enabled_general);
-
         Ok(())
     }
 }

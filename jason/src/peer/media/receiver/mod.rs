@@ -96,7 +96,7 @@ impl Receiver {
             caps,
             sender_id: state.sender_id().clone(),
             transceiver: RefCell::new(transceiver),
-            mid: RefCell::new(state.mid().clone()),
+            mid: RefCell::new(state.mid().map(str::to_owned)),
             track: RefCell::new(None),
             general_media_exchange_state: Cell::new(
                 media_exchange_state::Stable::from(state.enabled_general()),
@@ -169,23 +169,23 @@ impl Receiver {
         }
     }
 
-    /// Updates general [`media_exchange_state`] of this [`Receiver`] by the
+    /// Updates general [`media_exchange_state`] of this [`Receiver`] with the
     /// provided [`bool`].
     #[inline]
     pub fn set_enabled_general_state(&self, enabled: bool) {
         self.update_general_media_exchange_state(enabled.into());
     }
 
-    /// Updates individual [`media_exchange_state`] of this [`Receiver`] by the
-    /// provided [`bool`].
+    /// Updates individual [`media_exchange_state`] of this [`Receiver`] with
+    /// the provided [`bool`].
     #[inline]
     pub fn set_enabled_individual_state(&self, enabled: bool) {
         self.media_exchange_state_controller.update(enabled.into());
     }
 
-    /// Calls [`remote::Track::set_enabled`] with a provided [`bool`].
+    /// Calls [`remote::Track::set_enabled()`] with the provided [`bool`].
     ///
-    /// Does nothing if [`Receiver`] doesn't have [`remote::Track`] atm.
+    /// No-op if [`Receiver`] doesn't have any [`remote::Track`] at the moment.
     #[inline]
     pub fn set_muted(&self, muted: bool) {
         if let Some(track) = self.track.borrow().as_ref() {
