@@ -105,11 +105,7 @@ struct OsSignal(i32);
 impl Handler<OsSignal> for GracefulShutdown {
     type Result = ResponseFuture<()>;
 
-    fn handle(
-        &mut self,
-        sig: OsSignal,
-        _: &mut Context<Self>,
-    ) -> ResponseFuture<()> {
+    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {

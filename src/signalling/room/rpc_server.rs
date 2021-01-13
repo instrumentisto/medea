@@ -134,7 +134,7 @@ impl RpcServer for Addr<Room> {
 }
 
 impl Handler<CommandMessage> for Room {
-    type Result = ActFuture<()>;
+    type Result = ActFuture;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
     /// handlers. Will emit `CloseRoom` on any error.

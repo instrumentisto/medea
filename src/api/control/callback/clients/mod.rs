@@ -13,7 +13,7 @@ use crate::{
     log::prelude::*,
 };
 
-type Result<T> = std::result::Result<T, CallbackClientError>;
+type Result<T = ()> = std::result::Result<T, CallbackClientError>;
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
 #[derive(Debug, Display, From)]
@@ -31,7 +31,7 @@ pub enum CallbackClientError {
 #[cfg_attr(test, mockall::automock)]
 pub trait CallbackClient: fmt::Debug + Send + Sync {
     /// Sends provided [`CallbackRequest`].
-    async fn send(&self, request: CallbackRequest) -> Result<()>;
+    async fn send(&self, request: CallbackRequest) -> Result;
 }
 
 #[cfg(test)]

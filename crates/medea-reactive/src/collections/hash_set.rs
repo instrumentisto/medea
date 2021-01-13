@@ -121,7 +121,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_insert_processed(&self) -> Processed<'static, ()> {
+    pub fn when_insert_processed(&self) -> Processed<'static> {
         self.on_insert_subs.when_all_processed()
     }
 
@@ -130,7 +130,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_remove_processed(&self) -> Processed<'static, ()> {
+    pub fn when_remove_processed(&self) -> Processed<'static> {
         self.on_remove_subs.when_all_processed()
     }
 
@@ -139,7 +139,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_processed(&self) -> AllProcessed<'static, ()> {
+    pub fn when_all_processed(&self) -> AllProcessed<'static> {
         crate::when_all_processed(vec![
             self.when_remove_processed().into(),
             self.when_insert_processed().into(),

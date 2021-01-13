@@ -139,7 +139,7 @@ impl State {
     /// [`Sender`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> AllProcessed<'static, ()> {
+    pub fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.enabled_general.when_all_processed().into(),
             self.enabled_individual.when_all_processed().into(),
