@@ -756,7 +756,7 @@ impl MediaConnections {
     ///
     /// [`Sender`]: self::sender::Sender
     #[allow(clippy::filter_map)]
-    pub fn get_senders_ids_without_tracks(
+    pub fn get_senders_without_tracks_ids(
         &self,
         kinds: LocalStreamUpdateCriteria,
     ) -> Vec<TrackId> {

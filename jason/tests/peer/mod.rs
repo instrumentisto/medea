@@ -88,7 +88,7 @@ async fn disable_enable_audio() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    peer.state().when_local_sdp_offer_updated().await.unwrap();
+    peer.state().when_local_sdp_updated().await.unwrap();
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
@@ -143,7 +143,7 @@ async fn disable_enable_video() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    peer.state().when_local_sdp_offer_updated().await.unwrap();
+    peer.state().when_local_sdp_updated().await.unwrap();
 
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
@@ -198,7 +198,7 @@ async fn new_with_disable_audio() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    peer.state().when_local_sdp_offer_updated().await.unwrap();
+    peer.state().when_local_sdp_updated().await.unwrap();
 
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
@@ -241,7 +241,7 @@ async fn new_with_disable_video() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    peer.state().when_local_sdp_offer_updated().await.unwrap();
+    peer.state().when_local_sdp_updated().await.unwrap();
 
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled(None));
@@ -285,7 +285,7 @@ async fn add_candidates_to_answerer_before_offer() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let pc1_offer = pc1.state().when_local_sdp_offer_updated().await.unwrap();
+    let pc1_offer = pc1.state().when_local_sdp_updated().await.unwrap();
 
     let pc2_state = peer::State::new(PeerId(2), Vec::new(), false, None);
     let pc2 = peer::Component::new(
@@ -305,7 +305,7 @@ async fn add_candidates_to_answerer_before_offer() {
 
     pc2.state()
         .set_negotiation_role(NegotiationRole::Answerer(pc1_offer));
-    pc2.state().when_local_sdp_offer_updated().await.unwrap();
+    pc2.state().when_local_sdp_updated().await.unwrap();
     assert_eq!(pc2.candidates_buffer_len(), 0);
 }
 
@@ -361,17 +361,17 @@ async fn add_candidates_to_offerer_before_answer() {
         Rc::new(pc2_state),
     );
 
-    let offer = pc1.state().when_local_sdp_offer_updated().await.unwrap();
+    let offer = pc1.state().when_local_sdp_updated().await.unwrap();
     pc2.state()
         .set_negotiation_role(NegotiationRole::Answerer(offer));
-    let answer = pc2.state().when_local_sdp_offer_updated().await.unwrap();
+    let answer = pc2.state().when_local_sdp_updated().await.unwrap();
 
     handle_ice_candidates(rx2, &pc1, 1).await;
 
     // assert that pc1 has buffered candidates
     assert!(pc1.candidates_buffer_len() > 0);
-    pc1.state().set_remote_sdp_offer(answer);
-    pc1.state().when_remote_sdp_answer_processed().await;
+    pc1.state().set_remote_sdp(answer);
+    pc1.state().when_remote_sdp_processed().await;
     // assert that pc1 has buffered candidates got fulshed
     assert_eq!(pc1.candidates_buffer_len(), 0);
 }
@@ -429,12 +429,12 @@ async fn normal_exchange_of_candidates() {
         Rc::new(pc2_state),
     );
 
-    let offer = pc1.state().when_local_sdp_offer_updated().await.unwrap();
+    let offer = pc1.state().when_local_sdp_updated().await.unwrap();
     pc2.state()
         .set_negotiation_role(NegotiationRole::Answerer(offer));
-    let answer = pc2.state().when_local_sdp_offer_updated().await.unwrap();
-    pc1.state().set_remote_sdp_offer(answer);
-    pc1.state().when_remote_sdp_answer_processed().await;
+    let answer = pc2.state().when_local_sdp_updated().await.unwrap();
+    pc1.state().set_remote_sdp(answer);
+    pc1.state().when_remote_sdp_processed().await;
 
     handle_ice_candidates(rx1, &pc2, 1).await;
     handle_ice_candidates(rx2, &pc1, 1).await;
@@ -511,7 +511,7 @@ async fn send_event_on_new_local_stream() {
         .unwrap(),
         Rc::new(peer_state),
     );
-    peer.state().when_local_sdp_offer_updated().await.unwrap();
+    peer.state().when_local_sdp_updated().await.unwrap();
 
     while let Some(event) = rx.next().await {
         match event {
@@ -564,7 +564,7 @@ async fn ice_connection_state_changed_is_emitted() {
             &RecvConstraints::default(),
         )
         .unwrap();
-    let pc1_offer = pc1.state().when_local_sdp_offer_updated().await.unwrap();
+    let pc1_offer = pc1.state().when_local_sdp_updated().await.unwrap();
 
     let pc2_state = peer::State::new(
         PeerId(2),
@@ -584,9 +584,9 @@ async fn ice_connection_state_changed_is_emitted() {
         Rc::new(pc2_state),
     );
 
-    let answer = pc2.state().when_local_sdp_offer_updated().await.unwrap();
-    pc1.state().set_remote_sdp_offer(answer);
-    pc1.state().when_remote_sdp_answer_processed().await;
+    let answer = pc2.state().when_local_sdp_updated().await.unwrap();
+    pc1.state().set_remote_sdp(answer);
+    pc1.state().when_remote_sdp_processed().await;
 
     let mut events = futures::stream::select(rx1, rx2);
 
@@ -692,8 +692,7 @@ impl InterconnectedPeers {
             Rc::new(pc1_state),
         );
 
-        let pc1_offer =
-            pc1.state().when_local_sdp_offer_updated().await.unwrap();
+        let pc1_offer = pc1.state().when_local_sdp_updated().await.unwrap();
         let pc2_send_cons = local_constraints(true, true);
         let pc2_state = peer::State::new(
             PeerId(2),
@@ -722,10 +721,9 @@ impl InterconnectedPeers {
             Rc::new(pc2_state),
         );
 
-        let pc2_offer =
-            pc2.state().when_local_sdp_offer_updated().await.unwrap();
-        pc1.state().set_remote_sdp_offer(pc2_offer);
-        pc1.state().when_remote_sdp_answer_processed().await;
+        let pc2_offer = pc2.state().when_local_sdp_updated().await.unwrap();
+        pc1.state().set_remote_sdp(pc2_offer);
+        pc1.state().when_remote_sdp_processed().await;
 
         let events =
             futures::stream::select(peer_events_stream1, peer_events_stream2);
@@ -1130,7 +1128,7 @@ async fn reset_transition_timers() {
         Rc::new(peer_state),
     );
 
-    peer.state().when_local_sdp_offer_updated().await.unwrap();
+    peer.state().when_local_sdp_updated().await.unwrap();
 
     let all_enabled = future::join_all(
         peer.get_transceivers_sides(
@@ -1228,11 +1226,8 @@ async fn new_remote_track() {
             .state()
             .set_negotiation_role(NegotiationRole::Offerer);
 
-        let sender_offer = sender_peer
-            .state()
-            .when_local_sdp_offer_updated()
-            .await
-            .unwrap();
+        let sender_offer =
+            sender_peer.state().when_local_sdp_updated().await.unwrap();
 
         let rcv_caps = RecvConstraints::default();
         rcv_caps.set_enabled(audio_rx_enabled, MediaKind::Audio);
@@ -1291,14 +1286,10 @@ async fn new_remote_track() {
             .state()
             .set_negotiation_role(NegotiationRole::Answerer(sender_offer));
 
-        let answer = rcvr_peer
-            .state()
-            .when_local_sdp_offer_updated()
-            .await
-            .unwrap();
+        let answer = rcvr_peer.state().when_local_sdp_updated().await.unwrap();
 
-        sender_peer.state().set_remote_sdp_offer(answer);
-        sender_peer.state().when_remote_sdp_answer_processed().await;
+        sender_peer.state().set_remote_sdp(answer);
+        sender_peer.state().when_remote_sdp_processed().await;
 
         let mut result = FinalTrack {
             has_audio: false,
@@ -1399,7 +1390,7 @@ async fn ice_restart_works() {
     let sdp_offer_before = peers
         .first_peer
         .state()
-        .when_local_sdp_offer_updated()
+        .when_local_sdp_updated()
         .await
         .unwrap();
     let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
@@ -1413,7 +1404,7 @@ async fn ice_restart_works() {
     let sdp_offer_after = peers
         .first_peer
         .state()
-        .when_local_sdp_offer_updated()
+        .when_local_sdp_updated()
         .await
         .unwrap();
     let ice_pwds_after = get_ice_pwds(&sdp_offer_after);

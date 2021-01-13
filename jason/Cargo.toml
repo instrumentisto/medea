@@ -16,9 +16,6 @@ exclude = ["/demo/", "/e2e-demo/"]
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[profile.release]
-opt-level = "s"  # Tell `rustc` to optimize for small code size.
-
 # TODO: Remove when fixed.
 #       Workaround for wasm-bindgen v0.2.66 regression.
 #       See: https://github.com/rustwasm/wasm-pack/issues/886,

@@ -53,7 +53,7 @@ impl<T> Guarded<Option<T>> {
     pub fn transpose(self) -> Option<Guarded<T>> {
         let (value, guard) = self.into_parts();
 
-        value.map(move |v| Guarded { value: v, guard })
+        value.map(move |value| Guarded { value, guard })
     }
 }
 

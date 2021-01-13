@@ -88,7 +88,7 @@ pub enum PeerError {
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
 #[dispatchable(self: &Self, async_trait(?Send))]
-#[cfg_attr(feature = "mockable", derive(Clone))]
+#[derive(Clone)]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
@@ -247,6 +247,9 @@ pub struct PeerConnection {
     /// Local media stream constraints used in this [`PeerConnection`].
     send_constraints: LocalTracksConstraints,
 
+    /// Collection of [`Connection`]s with a remote `Member`s.
+    ///
+    /// [`Connection`]: crate::api::Connection
     connections: Rc<Connections>,
 }
 
@@ -347,17 +350,17 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
-    /// Returns all [`Sender`]s which are matches provided
-    /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
+    /// Returns all [`TrackId`]s of [`Sender`]s that match provided
+    /// [`LocalStreamUpdateCriteria`] and do not have [`local::Track`].
     ///
     /// [`Sender`]: sender::Sender
     #[inline]
     #[must_use]
-    pub fn get_senders_ids_without_tracks(
+    pub fn get_senders_without_tracks_ids(
         &self,
         kinds: LocalStreamUpdateCriteria,
     ) -> Vec<TrackId> {
-        self.media_connections.get_senders_ids_without_tracks(kinds)
+        self.media_connections.get_senders_without_tracks_ids(kinds)
     }
 
     /// Drops [`local::Track`]s of all [`Sender`]s which are matches provided
@@ -526,7 +529,7 @@ impl PeerConnection {
     ///
     /// After this function returns, the generated offer is automatically
     /// configured to trigger ICE restart.
-    pub fn restart_ice(&self) {
+    fn restart_ice(&self) {
         self.peer.restart_ice();
     }
 
@@ -559,7 +562,7 @@ impl PeerConnection {
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://w3.org/TR/webrtc/#rtcrtptransceiver-interface
     #[inline]
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+    fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let mids = self
             .media_connections
             .get_mids()
@@ -572,7 +575,7 @@ impl PeerConnection {
     /// [`MediaConnections`].
     ///
     /// [`Sender`]: sender::Sender
-    pub fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
+    fn get_transceivers_statuses(&self) -> HashMap<TrackId, bool> {
         self.media_connections.get_transceivers_statuses()
     }
 
@@ -624,6 +627,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    ///
     /// [`Sender`]: sender::Sender
     pub async fn update_local_stream(
         &self,
@@ -708,7 +712,7 @@ impl PeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-    pub async fn set_remote_answer(&self, answer: String) -> Result<()> {
+    async fn set_remote_answer(&self, answer: String) -> Result<()> {
         self.set_remote_description(SdpType::Answer(answer))
             .await
             .map_err(tracerr::wrap!())

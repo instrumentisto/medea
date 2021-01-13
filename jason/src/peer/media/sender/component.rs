@@ -173,16 +173,30 @@ impl State {
 
 #[watchers]
 impl Component {
+    /// Watcher for the [`State::muted`] update.
+    ///
+    /// Calls [`Sender::set_muted`] with a new value.
+    #[watch(self.muted.subscribe())]
+    #[inline]
+    async fn muted_state_changed(
+        sender: Rc<Sender>,
+        _: Rc<State>,
+        muted: Guarded<bool>,
+    ) -> Result<()> {
+        sender.set_muted(*muted);
+
+        Ok(())
+    }
+
     /// Watcher for the [`State::enabled_individual`] update.
     ///
     /// Calls [`Sender::set_enabled_individual`] with a new value.
     ///
-    /// If new value is `true` then sets
-    /// [`State::need_local_stream_update`] flag to `true`, otherwise
-    /// calls [`Sender::remove_track`].
+    /// If new value is `true` then sets [`State::need_local_stream_update`]
+    /// flag to `true`, otherwise calls [`Sender::remove_track`].
     #[watch(self.enabled_individual.subscribe())]
     #[inline]
-    async fn enabled_individual_watcher(
+    async fn enabled_individual_changed(
         sender: Rc<Sender>,
         state: Rc<State>,
         enabled_individual: Guarded<bool>,
@@ -202,27 +216,12 @@ impl Component {
     /// Calls [`Sender::set_enabled_general_state`] with a new value.
     #[watch(self.enabled_general.subscribe())]
     #[inline]
-    async fn enabled_general_watcher(
+    async fn enabled_general_changed(
         sender: Rc<Sender>,
         _: Rc<State>,
         enabled_general: Guarded<bool>,
     ) -> Result<()> {
         sender.set_enabled_general(*enabled_general);
-
-        Ok(())
-    }
-
-    /// Watcher for the [`State::muted`] update.
-    ///
-    /// Calls [`Sender::set_muted`] with a new value.
-    #[watch(self.muted.subscribe())]
-    #[inline]
-    async fn muted_watcher(
-        sender: Rc<Sender>,
-        _: Rc<State>,
-        muted: Guarded<bool>,
-    ) -> Result<()> {
-        sender.set_muted(*muted);
 
         Ok(())
     }

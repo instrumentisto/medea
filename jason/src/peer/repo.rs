@@ -20,7 +20,7 @@ use crate::{
 use super::{PeerConnection, PeerEvent};
 
 /// Component responsible for the [`peer::Component`] creating and removing.
-pub type Component = component::Component<PeersState, Peers>;
+pub type Component = component::Component<State, Repository>;
 
 impl Component {
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -60,10 +60,10 @@ impl Component {
 
 /// State of the [`Component`].
 #[derive(Default)]
-pub struct PeersState(RefCell<ObservableHashMap<PeerId, Rc<peer::State>>>);
+pub struct State(RefCell<ObservableHashMap<PeerId, Rc<peer::State>>>);
 
 /// Context of the [`Component`].
-pub struct Peers {
+pub struct Repository {
     /// [`MediaManager`] for injecting into new created [`PeerConnection`]s.
     media_manager: Rc<MediaManager>,
 
@@ -98,8 +98,8 @@ pub struct Peers {
     connections: Rc<Connections>,
 }
 
-impl Peers {
-    /// Returns new empty [`Peers`].
+impl Repository {
+    /// Returns new empty [`Repository`].
     ///
     /// Spawns [`RtcStats`] scrape task.
     ///
@@ -157,7 +157,7 @@ impl Peers {
     }
 }
 
-impl PeersState {
+impl State {
     /// Inserts provided [`peer::State`].
     pub fn insert(&self, peer_id: PeerId, peer_state: peer::State) {
         self.0.borrow_mut().insert(peer_id, Rc::new(peer_state));
@@ -181,9 +181,9 @@ impl Component {
     /// Creates new [`peer::Component`] based on the inserted [`peer::State`].
     #[watch(self.0.borrow().on_insert())]
     #[inline]
-    async fn insert_peer_watcher(
-        peers: Rc<Peers>,
-        _: Rc<PeersState>,
+    async fn peer_added(
+        peers: Rc<Repository>,
+        _: Rc<State>,
         (peer_id, new_peer): (PeerId, Rc<peer::State>),
     ) -> Result<(), Traced<RoomError>> {
         let peer = peer::Component::new(
@@ -209,9 +209,9 @@ impl Component {
     /// [`Connections::close_connection`] call.
     #[watch(self.0.borrow().on_remove())]
     #[inline]
-    async fn remove_peer_watcher(
-        peers: Rc<Peers>,
-        _: Rc<PeersState>,
+    async fn peer_removed(
+        peers: Rc<Repository>,
+        _: Rc<State>,
         (peer_id, _): (PeerId, Rc<peer::State>),
     ) -> Result<(), Traced<RoomError>> {
         peers.peers.borrow_mut().remove(&peer_id);

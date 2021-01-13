@@ -618,7 +618,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = InnerRoom::new(rpc, media_manager, tx);
+        let room = Rc::new(InnerRoom::new(rpc, media_manager, tx));
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -734,7 +734,7 @@ struct InnerRoom {
     /// in this [`Room`]. Used to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
 
-    /// Component which manages [`peer::Component`]s.
+    /// [`peer::Component`]s repository.
     peers: peer::repo::Component,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
@@ -950,18 +950,18 @@ impl InnerRoom {
         rpc: Rc<dyn RpcSession>,
         media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-    ) -> Rc<Self> {
+    ) -> Self {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
-        Rc::new(Self {
+        Self {
             peers: peer::repo::Component::new(
-                Rc::new(peer::repo::Peers::new(
+                Rc::new(peer::repo::Repository::new(
                     media_manager,
                     peer_event_sender,
                     send_constraints.clone(),
                     Rc::clone(&connections),
                 )),
-                Rc::new(peer::repo::PeersState::default()),
+                Rc::new(peer::repo::State::default()),
             ),
             rpc,
             send_constraints,
@@ -975,7 +975,7 @@ impl InnerRoom {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
-        })
+        }
     }
 
     /// Toggles [`InnerRoom::recv_constraints`] or
@@ -1153,7 +1153,7 @@ impl InnerRoom {
 
         self.send_constraints
             .set_media_exchange_state_by_kinds(Disabled, kinds);
-        let senders_to_disable = peer.get_senders_ids_without_tracks(kinds);
+        let senders_to_disable = peer.get_senders_without_tracks_ids(kinds);
 
         states_update.entry(peer.id()).or_default().extend(
             senders_to_disable
@@ -1353,24 +1353,23 @@ impl EventHandler for InnerRoom {
             .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.set_remote_sdp_offer(sdp_answer);
+        peer.set_remote_sdp(sdp_answer);
 
         Ok(())
     }
 
-    /// Calls [`peer::State::sdp_offer_applied`] for the [`peer::State`] with a
-    /// provided [`PeerId`].
+    /// Applies provided SDP to the [`peer::State`] with a provided [`PeerId`].
     async fn on_local_description_applied(
         &self,
         peer_id: PeerId,
-        sdp_offer: String,
+        local_sdp: String,
     ) -> Self::Output {
         let peer_state = self
             .peers
             .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer_state.sdp_offer_applied(&sdp_offer);
+        peer_state.apply_local_sdp(local_sdp);
 
         Ok(())
     }

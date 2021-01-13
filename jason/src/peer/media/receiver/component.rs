@@ -124,7 +124,7 @@ impl Component {
     /// Calls [`Receiver::set_muted`] with a new value.
     #[watch(self.muted.subscribe())]
     #[inline]
-    async fn muted_watcher(
+    async fn muted_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         muted: Guarded<bool>,
@@ -136,11 +136,10 @@ impl Component {
 
     /// Watcher for the [`State::enabled_individual`] update.
     ///
-    /// Calls [`Receiver::set    #[inline]_enabled_individual_state`] with a new
-    /// value.
+    /// Calls [`Receiver::set_enabled_individual_state`] with a new value.
     #[watch(self.enabled_individual.subscribe())]
     #[inline]
-    async fn enabled_individual_watcher(
+    async fn enabled_individual_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         enabled_individual: Guarded<bool>,
@@ -155,7 +154,7 @@ impl Component {
     /// Calls [`Receiver::set_enabled_general_state`] with a new value.
     #[watch(self.enabled_general.subscribe())]
     #[inline]
-    async fn enabled_general_watcher(
+    async fn enabled_general_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         enabled_general: Guarded<bool>,
