@@ -46,7 +46,7 @@ impl<T> SubStore<T> {
     /// Returns [`Future`] resolving when all subscribers processes update.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_all_processed(&self) -> Processed<'static, ()> {
+    pub fn when_all_processed(&self) -> Processed<'static> {
         let counter = Rc::clone(&self.counter);
         Processed::new(Box::new(move || {
             let counter = Rc::clone(&counter);

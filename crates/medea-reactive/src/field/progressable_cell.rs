@@ -66,7 +66,7 @@ where
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_processed(&self) -> Processed<'static, ()> {
+    pub fn when_all_processed(&self) -> Processed<'static> {
         self.0.borrow().when_all_processed()
     }
 }
