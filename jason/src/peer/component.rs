@@ -169,7 +169,7 @@ impl State {
     /// be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_senders_updated(&self) -> AllProcessed<'static, ()> {
+    fn when_all_senders_updated(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .senders
             .borrow()
@@ -183,7 +183,7 @@ impl State {
     /// be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_receivers_updated(&self) -> AllProcessed<'static, ()> {
+    fn when_all_receivers_updated(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .receivers
             .borrow()
@@ -198,7 +198,7 @@ impl State {
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_updated(&self) -> AllProcessed<'static, ()> {
+    pub fn when_all_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.when_all_receivers_updated().into(),
             self.when_all_senders_updated().into(),
@@ -283,7 +283,7 @@ impl State {
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    fn when_all_senders_processed(&self) -> AllProcessed<'static, ()> {
+    fn when_all_senders_processed(&self) -> AllProcessed<'static> {
         self.senders.borrow().when_all_processed()
     }
 
@@ -292,7 +292,7 @@ impl State {
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    fn when_all_receivers_processed(&self) -> AllProcessed<'static, ()> {
+    fn when_all_receivers_processed(&self) -> AllProcessed<'static> {
         self.receivers.borrow().when_all_processed()
     }
 
