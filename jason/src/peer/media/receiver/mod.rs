@@ -93,7 +93,7 @@ impl Receiver {
             caps,
             sender_id: state.sender_id().clone(),
             transceiver: RefCell::new(transceiver),
-            mid: RefCell::new(state.mid().map(|s| s.to_string())),
+            mid: RefCell::new(state.mid().map(ToString::to_string)),
             track: RefCell::new(None),
             is_track_notified: Cell::new(false),
             peer_events_sender: connections.peer_events_sender.clone(),

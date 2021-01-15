@@ -37,6 +37,7 @@ use crate::{
     media::{
         track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
+        RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
@@ -59,7 +60,6 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
-use crate::media::RecvConstraints;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -114,9 +114,9 @@ pub enum TrackEvent {
     },
 }
 
-/// Events emitted from [`RtcPeerConnection`].
 #[dispatchable(self: &Self, async_trait(?Send))]
 #[derive(Clone)]
+/// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
     ///
@@ -407,6 +407,10 @@ impl PeerConnection {
     }
 
     /// Handler [`TrackEvent`]s emitted from [`Sender`] or [`Receiver`].
+    ///
+    /// Sends [`PeerEvent::SendIntention`] with a [`Command::UpdateTracks`] on
+    /// [`TrackEvent::MediaExchangeIntention`] and
+    /// [`TrackEvent::MuteStateIntention`].
     fn handle_track_event(
         peer_id: PeerId,
         peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
@@ -721,8 +725,6 @@ impl PeerConnection {
     /// [`Sender`]: sender::Sender
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-    ///
-    /// [`Sender`]: sender::Sender
     pub async fn update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,

@@ -341,6 +341,8 @@ pub struct Context {
     /// should be started for this [`Peer`].
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
 
+    /// Flag which indicates that [`Peer`] needs renegotiation after
+    /// negotiation finish.
     need_renegotiation: bool,
 }
 

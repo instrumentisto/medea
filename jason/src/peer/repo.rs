@@ -11,13 +11,12 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{Connections, RoomError},
-    media::{LocalTracksConstraints, MediaManager},
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer,
     utils::{component, delay_for, TaskHandle},
 };
 
 use super::{PeerConnection, PeerEvent};
-use crate::media::RecvConstraints;
 
 /// Component responsible for the [`peer::Component`] creating and removing.
 pub type Component = component::Component<State, Repository>;
@@ -87,7 +86,7 @@ pub struct Repository {
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Constraints to local [`local::Track`]s that are being published by
-    /// [`PeerConnection`]s in this [`Room`].
+    /// [`PeerConnection`]s from this [`Repository`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Room`]: crate::api::Room
@@ -99,6 +98,12 @@ pub struct Repository {
     /// [`Connection`]: crate::api::Connection
     connections: Rc<Connections>,
 
+    /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
+    /// from this [`Repository`].
+    ///
+    /// Used to disable or enable media receiving.
+    ///
+    /// [`remote::Track`]: crate::media::track::remote::Track
     recv_constraints: Rc<RecvConstraints>,
 }
 
@@ -179,6 +184,7 @@ impl State {
     }
 
     /// Removes [`peer::State`] with the provided [`PeerId`].
+    #[inline]
     pub fn remove(&self, peer_id: PeerId) {
         self.0.borrow_mut().remove(&peer_id);
     }
@@ -195,7 +201,7 @@ impl Component {
         _: Rc<State>,
         (peer_id, new_peer): (PeerId, Rc<peer::State>),
     ) -> Result<(), Traced<RoomError>> {
-                let peer = peer::Component::new(
+        let peer = peer::Component::new(
             PeerConnection::new(
                 &new_peer,
                 peers.peer_event_sender.clone(),

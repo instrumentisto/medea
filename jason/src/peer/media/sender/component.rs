@@ -215,6 +215,10 @@ impl State {
 
 #[watchers]
 impl Component {
+    /// Watcher for [`MediaExchangeState::Transition`] update.
+    ///
+    /// Sends new intention by [`Receiver::send_media_exchange_state_intention`]
+    /// call.
     #[watch(self.media_exchange_state.subscribe_transition())]
     async fn individual_media_exchange_state_transition_watcher(
         sender: Rc<Sender>,
@@ -226,6 +230,9 @@ impl Component {
         Ok(())
     }
 
+    /// Watcher for [`MuteState::Transition`] update.
+    ///
+    /// Sends new intention by [`Receiver::send_mute_state_intention`] call.
     #[watch(self.mute_state.subscribe_transition())]
     async fn mute_state_transition_watcher(
         sender: Rc<Sender>,
@@ -237,6 +244,11 @@ impl Component {
         Ok(())
     }
 
+    /// Watcher for the [`State::general_media_exchange_state`] update.
+    ///
+    /// Updates [`Sender`]'s general media exchange state. Adds or removes
+    /// [`TransceiverDirection::SEND`] from the [`Transceiver`] of the
+    /// [`Receiver`].
     #[watch(self.general_media_exchange_state.subscribe())]
     async fn general_media_exchange_state_watcher(
         sender: Rc<Sender>,
@@ -264,6 +276,15 @@ impl Component {
         Ok(())
     }
 
+    /// Watcher for [`MediaExchangeState::Stable`] update.
+    ///
+    /// Updates [`Receiver::enabled_individual`] to the new state.
+    ///
+    /// Removes `MediaTrack` from [`Transceiver`] if new state is
+    /// [`media_exchange_state::Stable::Disabled`].
+    ///
+    /// Sets [`State::need_local_stream_update`] to the `true` if state is
+    /// [`media_exchange_state::Stable::Enabled`].
     #[watch(self.media_exchange_state.subscribe_stable())]
     async fn individual_media_exchange_state_stable_watcher(
         sender: Rc<Sender>,
@@ -285,6 +306,11 @@ impl Component {
         Ok(())
     }
 
+    /// Watcher for [`MuteState::Stable`] update.
+    ///
+    /// Updates [`Sender`]'s mute state.
+    ///
+    /// Updates [`Sender`]'s [`Transceiver`] `MediaTrack.enabled` property.
     #[watch(self.mute_state.subscribe_stable())]
     async fn mute_state_stable_watcher(
         sender: Rc<Sender>,

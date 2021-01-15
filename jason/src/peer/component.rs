@@ -243,6 +243,8 @@ impl State {
         medea_reactive::when_all_processed(when_futs)
     }
 
+    /// Returns [`Future`] which will be resolved when all [`State::receivers`]
+    /// will be stabilized.
     fn when_all_receivers_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self
             .receivers
@@ -254,6 +256,8 @@ impl State {
         Box::pin(futures::future::join_all(when_futs).map(|_| ()))
     }
 
+    /// Returns [`Future`] which will be resolved when all [`State::senders`]
+    /// will be stabilized.
     fn when_all_senders_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self
             .senders

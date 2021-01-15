@@ -6,7 +6,7 @@ use futures::{
     future,
     future::{Either, LocalBoxFuture},
     stream::LocalBoxStream,
-    StreamExt,
+    StreamExt as _,
 };
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;

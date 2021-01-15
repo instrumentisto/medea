@@ -155,8 +155,13 @@ impl State {
 
 #[watchers]
 impl Component {
+    /// Watcher for the [`State::general_media_exchange_state`] update.
+    ///
+    /// Updates [`Receiver`]'s general media exchange state. Adds or removes
+    /// [`TransceiverDirection::RECV`] from the [`Transceiver`] of the
+    /// [`Receiver`].
     #[watch(self.general_media_exchange_state.subscribe())]
-    async fn general_media_exchange_state_watcher(
+    async fn general_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: Guarded<media_exchange_state::Stable>,
@@ -188,8 +193,11 @@ impl Component {
         Ok(())
     }
 
+    /// Watcher for [`MediaExchangeState::Stable`] update.
+    ///
+    /// Updates [`Receiver::enabled_individual`] to the new state.
     #[watch(self.media_exchange_state.subscribe_stable())]
-    async fn stable_media_exchange_state_watcher(
+    async fn stable_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Stable,
@@ -201,8 +209,12 @@ impl Component {
         Ok(())
     }
 
+    /// Watcher for [`MediaExchangeState::Transition`] update.
+    ///
+    /// Sends new intention by [`Receiver::send_media_exchange_state_intention`]
+    /// call.
     #[watch(self.media_exchange_state.subscribe_transition())]
-    async fn transition_media_exchange_state_watcher(
+    async fn transition_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Transition,

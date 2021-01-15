@@ -485,9 +485,6 @@ impl MediaConnections {
     /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-    ///
-    /// [`Sender`]: self::sender::Sender
-    /// [`Receiver`]: self::receiver::Receiver
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let inner = self.0.borrow();
         let mut mids =
@@ -620,7 +617,6 @@ impl MediaConnections {
     /// [`Sender`]: self::sender::Sender
     /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    /// [`Sender`]: self::sender::Sender
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, Rc<local::Track>>,
@@ -695,7 +691,6 @@ impl MediaConnections {
                 }
             }
         }
-
         Err(tracerr::new!(
             MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
         ))

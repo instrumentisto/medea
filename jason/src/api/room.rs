@@ -1063,9 +1063,7 @@ impl InnerRoom {
                     self.peers.get(peer_id).map(|peer| (peer, desired_states))
                 })
                 .map(|(peer, desired_states)| {
-                    let mut transitions_futs = Vec::new();
-                    let mut tracks_patches = Vec::new();
-                    desired_states
+                    let transitions_futs: Vec<_> = desired_states
                         .into_iter()
                         .filter_map(move |(track_id, desired_state)| {
                             peer.get_transceiver_side_by_id(track_id)
@@ -1073,35 +1071,18 @@ impl InnerRoom {
                         })
                         .filter_map(|(trnscvr, desired_state)| {
                             if trnscvr.is_subscription_needed(desired_state) {
-                                let need_patch = trnscvr
-                                    .is_track_patch_needed(desired_state);
-                                Some((trnscvr, desired_state, need_patch))
+                                Some((trnscvr, desired_state))
                             } else {
                                 None
                             }
                         })
-                        .try_for_each(|(trnscvr, desired_state, need_patch)| {
+                        .map(|(trnscvr, desired_state)| {
                             trnscvr.media_state_transition_to(desired_state)?;
-                            transitions_futs.push(
-                                trnscvr.when_media_state_stable(desired_state),
-                            );
-                            if need_patch {
-                                tracks_patches.push(
-                                    desired_state.generate_track_patch(
-                                        trnscvr.track_id(),
-                                    ),
-                                );
-                            }
 
-                            Ok(())
+                            Ok(trnscvr.when_media_state_stable(desired_state))
                         })
+                        .collect::<Result<_, _>>()
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
-                    if !tracks_patches.is_empty() {
-                        // self.rpc.send_command(Command::UpdateTracks {
-                        //     peer_id,
-                        //     tracks_patches,
-                        // });
-                    }
 
                     Ok(future::try_join_all(transitions_futs))
                 })
@@ -1611,6 +1592,8 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
+    /// Handles [`PeerEvent::SendIntention`] event by sending provided
+    /// [`Command`] to the Media Server.
     async fn on_send_intention(&self, intention: Command) -> Self::Output {
         self.rpc.send_command(intention);
         Ok(())
