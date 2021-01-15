@@ -88,7 +88,7 @@ impl Sender {
             Some(mid) => connections
                 .get_transceiver_by_mid(&mid)
                 .ok_or_else(|| {
-                    MediaConnectionsError::TransceiverNotFound(mid.clone())
+                    MediaConnectionsError::TransceiverNotFound(mid.to_string())
                 })
                 .map_err(tracerr::wrap!())?,
         };

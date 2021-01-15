@@ -1,4 +1,4 @@
-//! Implementation of [`Component`] for `MediaTrack` with a `Recv` direction.
+//! [`Component`] for `MediaTrack` with a `Recv` direction.
 
 use std::rc::Rc;
 
@@ -59,18 +59,21 @@ impl State {
 
     /// Returns [`TrackId`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`State`].
     #[inline]
-    pub fn mid(&self) -> &Option<String> {
-        &self.mid
+    #[must_use]
+    pub fn mid(&self) -> Option<&str> {
+        self.mid.as_deref()
     }
 
     /// Returns current [`MediaType`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
@@ -78,19 +81,21 @@ impl State {
     /// Returns current [`MemberId`] of the `Member` from which this
     /// [`State`] should receive media data.
     #[inline]
+    #[must_use]
     pub fn sender_id(&self) -> &MemberId {
         &self.sender_id
     }
 
-    /// Returns current individual media exchange state of this
-    /// [`State`].
+    /// Returns current individual media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn enabled_individual(&self) -> bool {
         self.media_exchange_state.enabled()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn enabled_general(&self) -> bool {
         self.general_media_exchange_state.get()
             == media_exchange_state::Stable::Enabled
@@ -110,8 +115,8 @@ impl State {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`State`] update
-    /// will be applied on [`Receiver`].
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> AllProcessed<'static, ()> {

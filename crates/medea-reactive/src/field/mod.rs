@@ -134,7 +134,7 @@ where
     /// subscribers.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_all_processed(&self) -> Processed<'static, ()> {
+    pub fn when_all_processed(&self) -> Processed<'static> {
         self.subs.when_all_processed()
     }
 }

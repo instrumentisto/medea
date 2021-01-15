@@ -1,5 +1,4 @@
-//! Implementation of the component responsible for the [`peer::Component`]
-//! creating and removing.
+//! Component responsible for the [`peer::Component`] creating and removing.
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
@@ -24,14 +23,16 @@ use crate::media::RecvConstraints;
 pub type Component = component::Component<State, Repository>;
 
 impl Component {
-    /// Returns [`PeerConnection`] stored in repository by its ID.
+    /// Returns [`PeerConnection`] stored in the repository by its ID.
     #[inline]
+    #[must_use]
     pub fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
         self.peers.borrow().get(&id).map(component::Component::obj)
     }
 
-    /// Returns all [`PeerConnection`]s stored in a repository.
+    /// Returns all [`PeerConnection`]s stored in the repository.
     #[inline]
+    #[must_use]
     pub fn get_all(&self) -> Vec<Rc<PeerConnection>> {
         self.peers
             .borrow()
@@ -79,7 +80,7 @@ pub struct Repository {
     /// medea_client_api_proto::PeerMetrics::RtcStats
     _stats_scrape_task: TaskHandle,
 
-    /// Channel for send events produced [`PeerConnection`] to [`Room`].
+    /// Channel for sending events produced by [`PeerConnection`] to [`Room`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Room`]: crate::api::Room
@@ -107,6 +108,7 @@ impl Repository {
     /// Spawns [`RtcStats`] scrape task.
     ///
     /// [`RtcStats`]: crate::peer::RtcStats
+    #[must_use]
     pub fn new(
         media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -132,7 +134,7 @@ impl Repository {
     /// all [`PeerConnection`]s every second and send updated [`RtcStats`]
     /// to the server.
     ///
-    /// Returns [`TaskHandle`] which will stop this task on [`Drop::drop`].
+    /// Returns [`TaskHandle`] which will stop this task on [`Drop::drop()`].
     ///
     /// [`RtcStats`]: crate::peer::RtcStats
     fn spawn_peers_stats_scrape_task(
@@ -163,17 +165,20 @@ impl Repository {
 }
 
 impl State {
-    /// Inserts provided [`peer::State`].
+    /// Inserts the provided [`peer::State`].
+    #[inline]
     pub fn insert(&self, peer_id: PeerId, peer_state: peer::State) {
         self.0.borrow_mut().insert(peer_id, Rc::new(peer_state));
     }
 
-    /// Lookups [`peer::State`] by provided [`PeerId`].
+    /// Lookups [`peer::State`] by the provided [`PeerId`].
+    #[inline]
+    #[must_use]
     pub fn get(&self, peer_id: PeerId) -> Option<Rc<peer::State>> {
         self.0.borrow().get(&peer_id).cloned()
     }
 
-    /// Removes [`peer::State`] with a provided [`PeerId`].
+    /// Removes [`peer::State`] with the provided [`PeerId`].
     pub fn remove(&self, peer_id: PeerId) {
         self.0.borrow_mut().remove(&peer_id);
     }
@@ -185,13 +190,12 @@ impl Component {
     ///
     /// Creates new [`peer::Component`] based on the inserted [`peer::State`].
     #[watch(self.0.borrow().on_insert())]
-    #[inline]
     async fn peer_added(
         peers: Rc<Repository>,
         _: Rc<State>,
         (peer_id, new_peer): (PeerId, Rc<peer::State>),
     ) -> Result<(), Traced<RoomError>> {
-        let peer = peer::Component::new(
+                let peer = peer::Component::new(
             PeerConnection::new(
                 &new_peer,
                 peers.peer_event_sender.clone(),
@@ -209,12 +213,12 @@ impl Component {
         Ok(())
     }
 
-    /// Watches for [`peer::State`] remove.
+    /// Watches for [`peer::State`] removal.
     ///
-    /// Removes [`peer::Component`] and closes [`Connection`] by
-    /// [`Connections::close_connection`] call.
-    #[watch(self.0.borrow().on_remove())]
+    /// Removes [`peer::Component`] and closes [`Connection`] by calling
+    /// [`Connections::close_connection()`].
     #[inline]
+    #[watch(self.0.borrow().on_remove())]
     async fn peer_removed(
         peers: Rc<Repository>,
         _: Rc<State>,
@@ -222,7 +226,6 @@ impl Component {
     ) -> Result<(), Traced<RoomError>> {
         peers.peers.borrow_mut().remove(&peer_id);
         peers.connections.close_connection(peer_id);
-
         Ok(())
     }
 }

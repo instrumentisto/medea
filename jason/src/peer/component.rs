@@ -1,4 +1,4 @@
-//! Implementation of the [`Component`].
+//! [`Component`] responsible for the [`PeerConnection`] updating.
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -93,6 +93,7 @@ pub struct State {
 impl State {
     /// Returns [`State`] with a provided data.
     #[inline]
+    #[must_use]
     pub fn new(
         id: Id,
         ice_servers: Vec<IceServer>,
@@ -115,18 +116,22 @@ impl State {
     }
 
     /// Returns [`Id`] of this [`State`].
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> Id {
         self.id
     }
 
     /// Returns all [`IceServer`]s of this [`State`].
     #[inline]
+    #[must_use]
     pub fn ice_servers(&self) -> &Vec<IceServer> {
         &self.ice_servers
     }
 
-    /// Returns `true` if `PeerConnection` should be relayed forcibly.
+    /// Indicates whether [`PeerConnection`] should be relayed forcibly.
     #[inline]
+    #[must_use]
     pub fn force_relay(&self) -> bool {
         self.force_relay
     }
@@ -147,14 +152,16 @@ impl State {
         self.receivers.borrow_mut().insert(track_id, receiver);
     }
 
-    /// Returns [`Rc`] to the [`sender::State`] with a provided [`TrackId`].
+    /// Returns [`Rc`] to the [`sender::State`] with the provided [`TrackId`].
     #[inline]
+    #[must_use]
     pub fn get_sender(&self, track_id: TrackId) -> Option<Rc<sender::State>> {
         self.senders.borrow().get(&track_id).cloned()
     }
 
-    /// Returns [`Rc`] to the [`receiver::State`] with a provided [`TrackId`].
+    /// Returns [`Rc`] to the [`receiver::State`] with the provided [`TrackId`].
     #[inline]
+    #[must_use]
     pub fn get_receiver(
         &self,
         track_id: TrackId,
@@ -208,11 +215,11 @@ impl State {
         self.local_sdp.resume_timeout();
     }
 
-    /// Returns [`Future`] which will be resolved when all [`sender::State`]s
-    /// updates will be applied.
+    /// Returns [`Future`] resolving when all [`sender::State`]'s updates will
+    /// be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_senders_updated(&self) -> AllProcessed<'static, ()> {
+    fn when_all_senders_updated(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .senders
             .borrow()
@@ -222,11 +229,11 @@ impl State {
         medea_reactive::when_all_processed(when_futs)
     }
 
-    /// Returns [`Future`] which will be resolved when all [`receiver::State`]s
-    /// updates will be applied.
+    /// Returns [`Future`] resolving when all [`receiver::State`]'s updates will
+    /// be applied.
     ///
     /// [`Future`]: std::future::Future
-    fn when_all_receivers_updated(&self) -> AllProcessed<'static, ()> {
+    fn when_all_receivers_updated(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .receivers
             .borrow()
@@ -258,12 +265,12 @@ impl State {
         Box::pin(futures::future::join_all(when_futs).map(|_| ()))
     }
 
-    /// Returns [`Future`] which will be resolved when all
-    /// [`sender::State`]s/[`receiver::State`]s updates will be applied.
+    /// Returns [`Future`] resolving when all [`sender::State`]'s and
+    /// [`receiver::State`]'s updates will be applied.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
-    pub fn when_all_updated(&self) -> AllProcessed<'static, ()> {
+    pub fn when_all_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.when_all_receivers_updated().into(),
             self.when_all_senders_updated().into(),
@@ -273,7 +280,7 @@ impl State {
     /// Updates local `MediaStream` based on
     /// [`sender::State::is_local_stream_update_needed`].
     ///
-    /// Resets [`sender::State`] local stream update when it updated.
+    /// Resets [`sender::State`] local stream update when it's updated.
     async fn update_local_stream(
         &self,
         peer: &Rc<PeerConnection>,
@@ -295,11 +302,10 @@ impl State {
         for s in senders {
             s.local_stream_updated();
         }
-
         Ok(())
     }
 
-    /// Inserts provided [`proto::Track`] to this [`State`].
+    /// Inserts the provided [`proto::Track`] to this [`State`].
     ///
     /// # Errors
     ///
@@ -342,21 +348,25 @@ impl State {
         Ok(())
     }
 
-    /// Returns [`RecheckableFutureExt`] which will be resolved when all
-    /// [`State::senders`]'s inserts/removes will be processed.
+    /// Returns [`Future`] resolving when all [`State::senders`]' inserts and
+    /// removes will be processed.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    fn when_all_senders_processed(&self) -> AllProcessed<'static, ()> {
+    fn when_all_senders_processed(&self) -> AllProcessed<'static> {
         self.senders.borrow().when_all_processed()
     }
 
-    /// Returns [`RecheckableFutureExt`] which will be resolved when all
-    /// [`State::receivers`]'s inserts/removes will be processed.
+    /// Returns [`Future`] resolving when all [`State::receivers`]' inserts and
+    /// removes will be processed.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
-    fn when_all_receivers_processed(&self) -> AllProcessed<'static, ()> {
+    fn when_all_receivers_processed(&self) -> AllProcessed<'static> {
         self.receivers.borrow().when_all_processed()
     }
 
-    /// Patches [`sender::State`] or [`receiver::State`] with a provided
+    /// Patches [`sender::State`] or [`receiver::State`] with the provided
     /// [`proto::TrackPatchEvent`].
     pub fn patch_track(&self, track_patch: &proto::TrackPatchEvent) {
         if let Some(sender) = self.get_sender(track_patch.id) {
@@ -369,7 +379,7 @@ impl State {
 
 #[cfg(feature = "mockable")]
 impl State {
-    /// Waits for [`State::remote_sdp`] change apply.
+    /// Waits for [`State::remote_sdp`] change to be applied.
     #[inline]
     pub async fn when_remote_sdp_processed(&self) {
         self.remote_sdp.when_all_processed().await;
@@ -401,7 +411,7 @@ impl State {
         });
     }
 
-    /// Waits until [`State::local_sdp`] will be resolved and returns it's new
+    /// Waits until [`State::local_sdp`] will be resolved and returns its new
     /// value.
     #[inline]
     pub async fn when_local_sdp_updated(&self) -> Option<String> {
@@ -410,8 +420,8 @@ impl State {
         self.local_sdp.subscribe().skip(1).next().await.unwrap()
     }
 
-    /// Waits until all [`State::senders`] and [`State::receivers`] inserts will
-    /// be processed.
+    /// Waits until all [`State::senders`]' and [`State::receivers`]' inserts
+    /// will be processed.
     #[inline]
     pub async fn when_all_tracks_created(&self) {
         medea_reactive::when_all_processed(vec![
@@ -429,10 +439,10 @@ pub type Component = component::Component<State, PeerConnection>;
 impl Component {
     /// Watcher for the [`State::ice_candidates`] push update.
     ///
-    /// Calls [`PeerConnection::add_ice_candidate`] with a pushed
+    /// Calls [`PeerConnection::add_ice_candidate()`] with the pushed
     /// [`IceCandidate`].
-    #[watch(self.ice_candidates.borrow().on_push())]
     #[inline]
+    #[watch(self.ice_candidates.borrow().on_push())]
     async fn ice_candidate_added(
         peer: Rc<PeerConnection>,
         _: Rc<State>,
@@ -445,17 +455,19 @@ impl Component {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
-
         Ok(())
     }
 
     /// Watcher for the [`State::remote_sdp`] update.
     ///
-    /// Calls [`PeerConnection::set_remote_answer`] with a new value if current
-    /// [`NegotiationRole`] is [`NegotiationRole::Offerer`].
+    /// Calls [`PeerConnection::set_remote_answer()`] with a new value if the
+    /// current [`NegotiationRole`] is an [`Offerer`].
     ///
-    /// Calls [`PeerConnection::set_remote_offer`] with a new value if current
-    /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
+    /// Calls [`PeerConnection::set_remote_offer()`] with a new value if the
+    /// current [`NegotiationRole`] is an [`Answerer`].
+    ///
+    /// [`Answerer`]: NegotiationRole::Answerer
+    /// [`Offerer`]: NegotiationRole::Offerer
     #[watch(self.remote_sdp.subscribe().filter_map(transpose_guarded))]
     async fn remote_sdp_changed(
         peer: Rc<PeerConnection>,
@@ -479,17 +491,16 @@ impl Component {
                 }
             }
         }
-
         Ok(())
     }
 
     /// Watcher for the [`State::restart_ice`] update.
     ///
-    /// Calls [`PeerConnection::restart_ice`] if new value is `true`.
+    /// Calls [`PeerConnection::restart_ice()`] if new value is `true`.
     ///
     /// Resets [`State::restart_ice`] to `false` if new value is `true`.
-    #[watch(self.restart_ice.subscribe())]
     #[inline]
+    #[watch(self.restart_ice.subscribe())]
     async fn ice_restart_scheduled(
         peer: Rc<PeerConnection>,
         state: Rc<State>,
@@ -499,19 +510,21 @@ impl Component {
             peer.restart_ice();
             state.restart_ice.set(false);
         }
-
         Ok(())
     }
 
     /// Watcher for the [`State::senders`] insert update.
     ///
-    /// Waits for [`ReceiverComponent`]s creation end.
+    /// Waits until [`ReceiverComponent`]s creation id finished.
     ///
-    /// Waits for remote SDP offer apply if current [`NegotiationRole`] is
-    /// [`NegotiationRole::Answerer`].
+    /// Waits for remote SDP offer apply if the current [`NegotiationRole`] is
+    /// an [`Answerer`].
     ///
     /// Creates new [`SenderComponent`], creates new [`Connection`] with all
-    /// [`sender::State::receivers`] by [`Connections::create_connection`] call,
+    /// [`sender::State::receivers`] by calling
+    /// [`Connections::create_connection()`].
+    ///
+    /// [`Answerer`]: NegotiationRole::Answerer
     #[watch(self.senders.borrow().on_insert_with_replay())]
     async fn sender_added(
         peer: Rc<PeerConnection>,
@@ -559,8 +572,8 @@ impl Component {
     /// Watcher for the [`State::receivers`] insert update.
     ///
     /// Creates new [`ReceiverComponent`], creates new [`Connection`] with a
-    /// [`receiver::State::sender_id`] by [`Connections::create_connection`]
-    /// call,
+    /// [`receiver::State::sender_id`] by calling
+    /// [`Connections::create_connection()`].
     #[watch(self.receivers.borrow().on_insert_with_replay())]
     async fn receiver_added(
         peer: Rc<PeerConnection>,
@@ -580,7 +593,6 @@ impl Component {
                 )),
                 receiver,
             ));
-
         Ok(())
     }
 
@@ -588,14 +600,17 @@ impl Component {
     ///
     /// Sets [`PeerConnection`]'s SDP offer to the provided one and sends
     /// [`Command::MakeSdpOffer`] if [`Sdp`] is [`Sdp::Offer`] and
-    /// [`NegotiationRole`] is [`NegotiationRole::Offerer`].
+    /// [`NegotiationRole`] is [`Offerer`].
     ///
     /// Sets [`PeerConnection`]'s SDP answer to the provided one and sends
     /// [`Command::MakeSdpAnswer`] if [`Sdp`] is [`Sdp::Offer`] and
-    /// [`NegotiationRole`] is [`NegotiationRole::Answerer`].
+    /// [`NegotiationRole`] is [`Answerer`].
     ///
     /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
-    /// [`Sdp::Rollback`] and [`NegotiationRole`] is `Some`.
+    /// [`Sdp::Rollback`] and [`NegotiationRole`] is [`Some`].
+    ///
+    /// [`Answerer`]: NegotiationRole::Answerer
+    /// [`Offerer`]: NegotiationRole::Offerer
     #[watch(self.local_sdp.subscribe().filter_map(future::ready))]
     async fn local_sdp_changed(
         peer: Rc<PeerConnection>,
@@ -653,7 +668,6 @@ impl Component {
                 }
             }
         }
-
         Ok(())
     }
 
@@ -741,15 +755,14 @@ impl Component {
             }
             _ => (),
         }
-
         Ok(())
     }
 
     /// Watcher for the [`State::negotiation_role`] updates.
     ///
-    /// Waits for [`SenderComponent`]s/[`ReceiverComponent`]s creation/update,
-    /// updates local `MediaStream` (if needed) and renegotiates
-    /// [`PeerConnection`].
+    /// Waits for [`SenderComponent`]s' and [`ReceiverComponent`]s'
+    /// creation/update, updates local `MediaStream` (if required) and
+    /// renegotiates [`PeerConnection`].
     #[watch(self.negotiation_role.subscribe().filter_map(future::ready))]
     async fn negotiation_role_changed(
         peer: Rc<PeerConnection>,

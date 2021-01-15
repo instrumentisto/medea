@@ -65,15 +65,6 @@ pub enum MediaManagerError {
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(JsError),
 
-    /// Occurs when local track is [`muted`][1] right after [getUserMedia()][2]
-    /// or [getDisplayMedia()][3] request.
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams#track-muted
-    /// [2]: https://tinyurl.com/rnxcavf
-    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
-    #[display(fmt = "{} track is muted", _0)]
-    LocalTrackIsMuted(MediaKind),
-
     /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
     /// or [getDisplayMedia()][3] request.
     ///
@@ -328,24 +319,20 @@ impl InnerMediaManager {
     ///
     /// # Errors
     ///
-    /// - [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
-    ///   the provided [`sys::MediaStream`] is in [`ended`][1] state.
-    ///
-    /// - [`MediaManagerError::LocalTrackIsMuted`] if at least one track from
-    ///   the provided [`sys::MediaStream`] is in [`muted`][2] state.
+    /// With [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
+    /// the provided [`sys::MediaStream`] is in [`ended`][1] state.
     ///
     /// In case of error all tracks are stopped and are not saved in
     /// [`MediaManager`]'s tracks storage.
     ///
     /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
-    /// [2]: https://w3.org/TR/mediacapture-streams#track-muted
     #[allow(clippy::needless_pass_by_value)]
     fn parse_and_save_tracks(
         &self,
         stream: sys::MediaStream,
         kind: MediaSourceKind,
     ) -> Result<Vec<Rc<local::Track>>> {
-        use MediaManagerError::{LocalTrackIsEnded, LocalTrackIsMuted};
+        use MediaManagerError::LocalTrackIsEnded;
 
         let mut storage = self.tracks.borrow_mut();
         let tracks: Vec<_> = js_sys::try_iter(&stream.get_tracks())
@@ -355,16 +342,13 @@ impl InnerMediaManager {
             .collect();
 
         // Tracks returned by getDisplayMedia()/getUserMedia() request should be
-        // `live` and `!muted`. Otherwise, we should err without caching tracks
-        // in `MediaManager`. Tracks will be stopped on ``Drop`.
+        // `live`. Otherwise, we should err without caching tracks in
+        // `MediaManager`. Tracks will be stopped on `Drop`.
         for track in &tracks {
             if track.sys_track().ready_state()
                 != sys::MediaStreamTrackState::Live
             {
                 return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
-            }
-            if track.sys_track().muted() {
-                return Err(tracerr::new!(LocalTrackIsMuted(track.kind())));
             }
         }
 

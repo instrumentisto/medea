@@ -1592,7 +1592,6 @@ impl PeerEventHandler for InnerRoom {
             mids,
             transceivers_statuses,
         });
-
         Ok(())
     }
 
@@ -1609,13 +1608,11 @@ impl PeerEventHandler for InnerRoom {
             sdp_answer,
             transceivers_statuses,
         });
-
         Ok(())
     }
 
     async fn on_send_intention(&self, intention: Command) -> Self::Output {
         self.rpc.send_command(intention);
-
         Ok(())
     }
 }

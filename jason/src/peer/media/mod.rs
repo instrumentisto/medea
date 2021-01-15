@@ -480,6 +480,8 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
+    /// [`Sender`]: self::sender::Sender
+    /// [`Receiver`]: self::receiver::Receiver
     /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [mid]:
     /// https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
@@ -615,6 +617,7 @@ impl MediaConnections {
     /// [`local::Track`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
+    /// [`Sender`]: self::sender::Sender
     /// [`RtcRtpTransceiver`]: web_sys::RtcRtpTransceiver
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     /// [`Sender`]: self::sender::Sender
@@ -754,7 +757,6 @@ impl MediaConnections {
     /// [`LocalStreamUpdateCriteria`] and doesn't have [`local::Track`].
     ///
     /// [`Sender`]: self::sender::Sender
-    #[allow(clippy::filter_map)]
     pub fn get_senders_without_tracks_ids(
         &self,
         kinds: LocalStreamUpdateCriteria,
@@ -763,12 +765,16 @@ impl MediaConnections {
             .borrow()
             .senders
             .values()
-            .filter(|s| {
-                kinds.has(s.state().kind(), s.state().source_kind())
+            .filter_map(|s| {
+                if kinds.has(s.state().kind(), s.state().source_kind())
                     && s.state().enabled()
                     && !s.has_track()
+                {
+                    Some(s.state().id())
+                } else {
+                    None
+                }
             })
-            .map(|s| s.state().id())
             .collect()
     }
 
@@ -908,7 +914,7 @@ impl MediaConnections {
             .is_none()
     }
 
-    /// Creates new [`sender::Component`] with a provided data.
+    /// Creates new [`sender::Component`] with the provided data.
     pub fn create_sender(
         &self,
         id: TrackId,
@@ -934,7 +940,8 @@ impl MediaConnections {
         Ok(sender::Component::new(sender, Rc::new(sender_state)))
     }
 
-    /// Creates new [`receiver::Component`] with a provided data.
+    /// Creates new [`receiver::Component`] with the provided data.
+    #[must_use]
     pub fn create_receiver(
         &self,
         id: TrackId,
@@ -992,7 +999,6 @@ impl MediaConnections {
                 }
             }
         }
-
         Ok(())
     }
 

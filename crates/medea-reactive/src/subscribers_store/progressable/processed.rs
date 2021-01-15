@@ -19,7 +19,7 @@ pub type Factory<'a, T> = Box<dyn Fn() -> LocalBoxFuture<'a, T> + 'static>;
 
 /// Creates [`AllProcessed`] [`Future`] from the provided [`Iterator`] of
 /// [`Factory`]s.
-pub fn when_all_processed<I, T>(futures: I) -> AllProcessed<'static, ()>
+pub fn when_all_processed<I, T>(futures: I) -> AllProcessed<'static>
 where
     I: IntoIterator<Item = Factory<'static, T>>,
     T: 'static,
@@ -34,7 +34,7 @@ where
 /// [`Future`] with inner factory. [`Factory`] can be unwrapped using [`Into`]
 /// implementation.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct Processed<'a, T> {
+pub struct Processed<'a, T = ()> {
     /// Factory creating the underlying [`Future`].
     factory: Factory<'a, T>,
 
@@ -86,7 +86,7 @@ impl<'a, T> fmt::Debug for Processed<'a, T> {
 ///
 /// Inner [`Factory`] can be unwrapped using [`Into`] implementation.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct AllProcessed<'a, T> {
+pub struct AllProcessed<'a, T = ()> {
     /// Factory creating the underlying [`Future`] and recreating it to recheck
     /// the [`Future`] during polling.
     factory: Factory<'a, T>,

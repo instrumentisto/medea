@@ -17,19 +17,22 @@ const DESCRIPTION_APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Local session description wrapper.
 ///
-/// Stores current and previous descriptions and may rollback to previous if new
-/// description will not be approved in configured timeout.
+/// Stores current and previous descriptions and may rollback to the previous
+/// one if new description won't be approved in a configured timeout.
 #[derive(Clone, Debug, Default)]
 pub struct LocalSdp(Rc<Inner>);
 
 impl LocalSdp {
     /// Returns new empty [`LocalSdp`].
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Returns [`LocalBoxStream`] into which all current SDP offer updates will
     /// be sent.
+    #[inline]
     pub fn subscribe(&self) -> LocalBoxStream<'static, Option<String>> {
         self.0.current_sdp.subscribe()
     }
@@ -56,13 +59,14 @@ impl LocalSdp {
     }
 
     /// Rollbacks [`LocalSdp`] to the previous one.
+    #[inline]
     pub fn rollback(&self) {
         self.0.current_sdp.set(self.0.prev_sdp.borrow().clone());
         self.0.approved.set(true);
     }
 
-    /// Sets provided SDP as current, marks it as unapproved and schedules task,
-    /// that waits for SDP approval.
+    /// Sets the provided SDP as the current one, marks it as unapproved and
+    /// schedules task to wait for a SDP approval.
     pub fn unapproved_set(&self, sdp: String) {
         let prev_sdp = self.0.current_sdp.replace(Some(sdp));
         self.0.prev_sdp.replace(prev_sdp);
@@ -72,7 +76,7 @@ impl LocalSdp {
             .replace(Some(self.spawn_rollback_task()));
     }
 
-    /// Approves current [`LocalSdp`] offer.
+    /// Approves the current [`LocalSdp`] offer.
     pub fn approved_set(&self, sdp: String) {
         let is_current_approved =
             self.0.current_sdp.borrow().as_ref() == Some(&sdp);
@@ -83,8 +87,9 @@ impl LocalSdp {
         self.0.approved.set(true);
     }
 
-    /// Returns `true` if current [`LocalSdp`] state is rollback, meaning that
-    /// current SDP equals previous SDP.
+    /// Indicates whether current [`LocalSdp`] state is rollback, meaning that
+    /// the current SDP equals to the previous SDP.
+    #[must_use]
     pub fn is_rollback(&self) -> bool {
         self.0
             .current_sdp
@@ -100,22 +105,25 @@ impl LocalSdp {
             })
     }
 
-    /// Stops current SDP rollback task countdown (if any).
+    /// Stops the current SDP rollback task countdown, if any.
+    #[inline]
     pub fn stop_timeout(&self) {
         if let Some(handle) = self.0.rollback_task_handle.borrow().as_ref() {
             handle.stop();
         }
     }
 
-    /// Resets current SDP rollback task countdown (if any).
+    /// Resets the current SDP rollback task countdown, if any.
+    #[inline]
     pub fn resume_timeout(&self) {
         if let Some(handle) = self.0.rollback_task_handle.borrow().as_ref() {
             handle.reset();
         }
     }
 
-    /// Spawns task that will call [`LocalSdp::rollback()`] if current SDP won't
-    /// be approved in [`DESCRIPTION_APPROVE_TIMEOUT`].
+    /// Spawns task that will call [`LocalSdp::rollback()`] if the current SDP
+    /// won't be approved in [`DESCRIPTION_APPROVE_TIMEOUT`].
+    #[must_use]
     fn spawn_rollback_task(&self) -> ResettableDelayHandle {
         let (timeout, rollback_task) =
             resettable_delay_for(DESCRIPTION_APPROVE_TIMEOUT);
@@ -145,10 +153,10 @@ struct Inner {
     /// Flag which indicates that Media Server approved this SDP
     /// [`Inner::current_sdp`].
     ///
-    /// On every SDP offer update this field should be reseted to `false` and
-    /// if this field doesn't transits into `true` within [`APPROVE_TIMEOUT`],
-    /// then [`Inner::current_sdp`] should be rollbacked to the
-    /// [`Inner::prev_sdp`].
+    /// On every SDP offer update this field should be reset to `false` and
+    /// if this field doesn't transits into `true` within
+    /// [`DESCRIPTION_APPROVE_TIMEOUT`], then [`Inner::current_sdp`] should be
+    /// rolled back to the [`Inner::prev_sdp`].
     approved: Rc<ObservableCell<bool>>,
 
     /// Timeout of the [`Inner::approved`] transition.
@@ -156,6 +164,7 @@ struct Inner {
 }
 
 impl Default for Inner {
+    #[inline]
     fn default() -> Self {
         Self {
             prev_sdp: RefCell::new(None),

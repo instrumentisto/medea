@@ -1,4 +1,4 @@
-//! Implementation of [`Component`] for `MediaTrack` with a `Send` direction.
+//! [`Component`] for `MediaTrack` with a `Send` direction.
 
 use std::{cell::Cell, rc::Rc};
 
@@ -83,37 +83,43 @@ impl State {
 
     /// Returns [`TrackId`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`State`].
     #[inline]
-    pub fn mid(&self) -> &Option<String> {
-        &self.mid
+    #[must_use]
+    pub fn mid(&self) -> Option<&str> {
+        self.mid.as_deref()
     }
 
     /// Returns current [`MediaType`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
 
-    /// Returns current [`MemberId`]s of the `Member`s to which this
-    /// [`State`] should send media data.
+    /// Returns current [`MemberId`]s of the `Member`s that this [`State`]
+    /// should send media data to.
     #[inline]
+    #[must_use]
     pub fn receivers(&self) -> &Vec<MemberId> {
         &self.receivers
     }
 
     /// Returns current individual media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_enabled_individual(&self) -> bool {
         self.media_exchange_state.enabled()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_enabled_general(&self) -> bool {
         self.general_media_exchange_state.get()
             == media_exchange_state::Stable::Enabled
@@ -121,11 +127,12 @@ impl State {
 
     /// Returns current mute state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_muted(&self) -> bool {
         self.mute_state.muted()
     }
 
-    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if track_patch.id != self.id {
             return;
@@ -187,6 +194,7 @@ impl State {
 
     /// Returns [`MediaKind`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_kind(&self) -> MediaKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaKind::Audio,
@@ -196,6 +204,7 @@ impl State {
 
     /// Returns [`MediaSourceKind`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_source(&self) -> MediaSourceKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaSourceKind::Device,
