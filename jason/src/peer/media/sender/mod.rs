@@ -4,23 +4,22 @@ mod component;
 
 use std::{cell::Cell, rc::Rc};
 
-use medea_client_api_proto::{MediaSourceKind, TrackId};
+use futures::channel::mpsc;
+use medea_client_api_proto::TrackId;
 
 use crate::{
     media::{
         track::local, LocalTracksConstraints, MediaKind, TrackConstraints,
-        VideoSource,
     },
-    peer::transceiver::{Transceiver, TransceiverDirection},
+    peer::{
+        transceiver::{Transceiver, TransceiverDirection},
+        TrackEvent,
+    },
 };
 
 use super::{
-    media_exchange_state, mute_state,
-    transitable_state::{
-        MediaExchangeStateController, MediaState, MuteStateController,
-    },
-    MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
-    TransceiverSide,
+    media_exchange_state, mute_state, MediaConnections, MediaConnectionsError,
+    MediaStateControllable, Result,
 };
 
 pub use self::component::{Component, State};
@@ -31,11 +30,11 @@ pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
-    media_exchange_state: Rc<MediaExchangeStateController>,
-    mute_state: Rc<MuteStateController>,
-    general_media_exchange_state: Cell<media_exchange_state::Stable>,
-    required: bool,
+    muted: Cell<bool>,
+    enabled_individual: Cell<bool>,
+    enabled_general: Cell<bool>,
     send_constraints: LocalTracksConstraints,
+    track_events_sender: mpsc::UnboundedSender<TrackEvent>,
 }
 
 impl Sender {
@@ -55,7 +54,19 @@ impl Sender {
         state: &State,
         media_connections: &MediaConnections,
         send_constraints: LocalTracksConstraints,
+        track_events_sender: mpsc::UnboundedSender<TrackEvent>,
     ) -> Result<Rc<Self>> {
+        if state.media_type().required()
+            && (state.is_muted()
+                || !state.is_enabled_individual()
+                || !send_constraints.enabled(state.media_type())
+                || send_constraints.muted(state.media_type()))
+        {
+            return Err(tracerr::new!(
+                MediaConnectionsError::CannotDisableRequiredSender
+            ));
+        }
+
         let connections = media_connections.0.borrow();
         let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
@@ -81,24 +92,53 @@ impl Sender {
                 })
                 .map_err(tracerr::wrap!())?,
         };
-        let media_exchange_state =
-            media_exchange_state::Stable::from(!state.is_enabled_individual());
-        let mute_state = mute_state::Stable::from(state.is_muted());
 
+        let enabled = send_constraints.enabled(state.media_type());
+        let media_exchange_state = media_exchange_state::Stable::from(enabled);
+        let mute_state = mute_state::Stable::from(
+            send_constraints.muted(state.media_type()),
+        );
         let this = Rc::new(Sender {
             track_id: state.id(),
             caps,
-            general_media_exchange_state: Cell::new(media_exchange_state),
-            mute_state: MuteStateController::new(mute_state),
             transceiver,
-            media_exchange_state: MediaExchangeStateController::new(
-                media_exchange_state,
-            ),
-            required: state.media_type().required(),
+            enabled_general: Cell::new(state.is_enabled_general()),
+            enabled_individual: Cell::new(state.is_enabled_individual()),
+            muted: Cell::new(state.is_muted()),
+            track_events_sender,
             send_constraints,
         });
 
+        if media_exchange_state == media_exchange_state::Stable::Disabled {
+            state
+                .media_exchange_state_controller()
+                .transition_to(media_exchange_state);
+        }
+        if mute_state == mute_state::Stable::Muted {
+            state.mute_state_controller().transition_to(mute_state);
+        }
+
         Ok(this)
+    }
+
+    /// Updates `enabled_general` property of this [`Sender`] to the provided
+    /// one.
+    #[inline]
+    pub fn set_enabled_general(&self, enabled_general: bool) {
+        self.enabled_general.set(enabled_general);
+    }
+
+    /// Updates `enabled_individual` property of this [`Sender`] to the provided
+    /// one.
+    #[inline]
+    pub fn set_enabled_individual(&self, enable_individual: bool) {
+        self.enabled_individual.set(enable_individual);
+    }
+
+    /// Updates `muted` property of this [`Sender`] to the provided one.
+    #[inline]
+    pub fn set_muted(&self, muted: bool) {
+        self.muted.set(muted);
     }
 
     /// Returns [`TrackConstraints`] of this [`Sender`].
@@ -129,39 +169,6 @@ impl Sender {
         self.transceiver.has_send_track()
     }
 
-    /// Indicates whether this [`Sender`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.media_exchange_state.enabled()
-    }
-
-    /// Updates [`Sender`]s general media exchange state based on the provided
-    /// [`media_exchange_state::Stable`].
-    ///
-    /// Sets [`Sender`]s underlying transceiver direction to
-    /// [`TransceiverDirection::INACTIVE`] if provided media exchange state is
-    /// [`media_exchange_state::Stable::Disabled`].
-    fn update_general_media_exchange_state(
-        &self,
-        new_state: media_exchange_state::Stable,
-    ) {
-        if self.general_media_exchange_state.get() != new_state {
-            self.general_media_exchange_state.set(new_state);
-            match new_state {
-                media_exchange_state::Stable::Enabled => {
-                    if self.enabled_in_cons() {
-                        self.transceiver
-                            .add_direction(TransceiverDirection::SEND);
-                    }
-                }
-                media_exchange_state::Stable::Disabled => {
-                    self.transceiver.sub_direction(TransceiverDirection::SEND);
-                }
-            }
-        }
-    }
-
     /// Inserts provided [`local::Track`] into provided [`Sender`]s
     /// transceiver. No-op if provided track already being used by this
     /// [`Sender`].
@@ -178,10 +185,7 @@ impl Sender {
 
         let new_track = new_track.fork();
 
-        new_track.set_enabled(
-            self.mute_state.state().cancel_transition()
-                == mute_state::Stable::Unmuted.into(),
-        );
+        new_track.set_enabled(!self.muted.get());
 
         self.transceiver
             .set_send_track(Some(Rc::new(new_track)))
@@ -202,35 +206,11 @@ impl Sender {
         )
     }
 
-    /// Updates general [`media_exchange_state`] of this [`Sender`] by the
-    /// provided [`bool`].
-    #[inline]
-    pub fn set_enabled_general(&self, enabled: bool) {
-        self.update_general_media_exchange_state(enabled.into());
-    }
-
-    /// Updates individual [`media_exchange_state`] of this [`Sender`] by the
-    /// provided [`bool`].
-    #[inline]
-    pub fn set_enabled_individual(&self, enabled: bool) {
-        self.media_exchange_state.update(enabled.into());
-    }
-
-    /// Updates [`mute_state`] of this [`Sender`] with a provided [`bool`].
-    ///
-    /// Calls [`Transceiver::set_send_track_enabled`] with a inverted provided
-    /// `bool`.
-    #[inline]
-    pub fn set_muted(&self, muted: bool) {
-        self.mute_state.update(muted.into());
-        self.transceiver.set_send_track_enabled(!muted);
-    }
-
     /// Changes underlying transceiver direction to
     /// [`TransceiverDirection::SEND`] if this [`Sender`]s general media
     /// exchange state is [`media_exchange_state::Stable::Enabled`].
     pub fn maybe_enable(&self) {
-        if self.is_general_enabled()
+        if self.enabled_general.get()
             && !self.transceiver.has_direction(TransceiverDirection::SEND)
             && self.enabled_in_cons()
         {
@@ -245,11 +225,61 @@ impl Sender {
         self.transceiver.clone()
     }
 
-    /// Checks whether general media exchange state of the [`Sender`] is in
-    /// [`media_exchange_state::Stable::Enabled`].
-    fn is_general_enabled(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == media_exchange_state::Stable::Enabled
+    /// Returns [`mid`] of this [`Sender`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    #[inline]
+    pub fn mid(&self) -> Option<String> {
+        self.transceiver.mid()
+    }
+
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// [`media_exchange_state`].
+    pub fn send_media_exchange_state_intention(
+        &self,
+        state: media_exchange_state::Transition,
+    ) {
+        match state {
+            media_exchange_state::Transition::Enabling(_) => {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MediaExchangeIntention {
+                        id: self.track_id,
+                        enabled: true,
+                    })
+                    .ok();
+            }
+            media_exchange_state::Transition::Disabling(_) => {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MediaExchangeIntention {
+                        id: self.track_id,
+                        enabled: false,
+                    })
+                    .ok();
+            }
+        }
+    }
+
+    /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided
+    /// [`mute_state`].
+    pub fn send_mute_state_intention(&self, state: mute_state::Transition) {
+        match state {
+            mute_state::Transition::Muting(_) => {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MuteUpdateIntention {
+                        id: self.track_id,
+                        muted: true,
+                    })
+                    .ok();
+            }
+            mute_state::Transition::Unmuting(_) => {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MuteUpdateIntention {
+                        id: self.track_id,
+                        muted: false,
+                    })
+                    .ok();
+            }
+        }
     }
 }
 
@@ -260,93 +290,20 @@ impl Sender {
     #[inline]
     #[must_use]
     pub fn general_disabled(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == media_exchange_state::Stable::Disabled
+        !self.enabled_general.get()
     }
 
     /// Indicates whether this [`Sender`] is disabled.
     #[inline]
     #[must_use]
     pub fn disabled(&self) -> bool {
-        self.media_exchange_state.disabled()
+        !self.enabled_individual.get()
     }
 
     /// Indicates whether this [`Sender`] is muted.
     #[inline]
     #[must_use]
     pub fn muted(&self) -> bool {
-        self.mute_state.muted()
-    }
-}
-
-impl TransceiverSide for Sender {
-    fn track_id(&self) -> TrackId {
-        self.track_id
-    }
-
-    fn kind(&self) -> MediaKind {
-        MediaKind::from(&self.caps)
-    }
-
-    fn source_kind(&self) -> MediaSourceKind {
-        self.caps.media_source_kind()
-    }
-
-    fn mid(&self) -> Option<String> {
-        self.transceiver.mid()
-    }
-
-    fn is_transitable(&self) -> bool {
-        match &self.caps {
-            TrackConstraints::Video(VideoSource::Device(_)) => {
-                self.send_constraints.inner().get_device_video().is_some()
-            }
-            TrackConstraints::Video(VideoSource::Display(_)) => {
-                self.send_constraints.inner().get_display_video().is_some()
-            }
-            TrackConstraints::Audio(_) => true,
-        }
-    }
-}
-
-impl MediaStateControllable for Sender {
-    #[inline]
-    fn media_exchange_state_controller(
-        &self,
-    ) -> Rc<MediaExchangeStateController> {
-        Rc::clone(&self.media_exchange_state)
-    }
-
-    #[inline]
-    fn mute_state_controller(&self) -> Rc<MuteStateController> {
-        Rc::clone(&self.mute_state)
-    }
-
-    /// Sets current [`MediaState`] to the transition.
-    ///
-    /// # Errors
-    ///
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`] is returned if
-    /// [`Sender`] is required for the call and can't be disabled.
-    fn media_state_transition_to(
-        &self,
-        desired_state: MediaState,
-    ) -> Result<()> {
-        if self.required {
-            Err(tracerr::new!(
-                MediaConnectionsError::CannotDisableRequiredSender
-            ))
-        } else {
-            match desired_state {
-                MediaState::MediaExchange(desired_state) => {
-                    self.media_exchange_state_controller()
-                        .transition_to(desired_state);
-                }
-                MediaState::Mute(desired_state) => {
-                    self.mute_state_controller().transition_to(desired_state);
-                }
-            }
-            Ok(())
-        }
+        self.muted.get()
     }
 }

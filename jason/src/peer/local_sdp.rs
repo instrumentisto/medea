@@ -6,6 +6,7 @@ use futures::{
     future,
     future::{Either, LocalBoxFuture},
     stream::LocalBoxStream,
+    StreamExt,
 };
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
@@ -42,6 +43,16 @@ impl LocalSdp {
         Box::pin(async move {
             let _ = approved.when_eq(true).await;
         })
+    }
+
+    /// Returns [`Stream`] into which `()` will be sent on every SDP offer
+    /// approve.
+    ///
+    /// [`Stream`]: futures::stream::Stream
+    pub fn on_approve(&self) -> LocalBoxStream<'static, ()> {
+        Box::pin(self.0.approved.subscribe().filter_map(|approved| {
+            future::ready(if approved { Some(()) } else { None })
+        }))
     }
 
     /// Rollbacks [`LocalSdp`] to the previous one.

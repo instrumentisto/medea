@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{future, StreamExt as _};
+use futures::{future, future::LocalBoxFuture, FutureExt, StreamExt as _};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     IceCandidate, IceServer, NegotiationRole, PeerId as Id, TrackId,
@@ -15,7 +15,7 @@ use medea_reactive::{
 use tracerr::Traced;
 
 use crate::{
-    media::{LocalTracksConstraints, RecvConstraints},
+    media::LocalTracksConstraints,
     peer::{
         local_sdp::LocalSdp,
         media::{receiver, sender},
@@ -26,6 +26,54 @@ use crate::{
 
 use super::{PeerConnection, PeerEvent};
 
+/// Negotiation state of the [`PeerComponent`].
+///
+/// ```ignore
+///           +--------+
+///           |        |
+/// +-------->+ Stable +<----------+
+/// |         |        |           |
+/// |         +---+----+           |
+/// |             |                |
+/// |             v                |
+/// |      +------+-------+        |
+/// |      |              |        |
+/// |      | WaitLocalSdp +<----+  |
+/// |      |              |     |  |
+/// |      +------+-------+     |  |
+/// |             |             |  |
+/// |             v             |  |
+/// |  +----------+----------+  |  |
+/// |  |                     |  |  |
+/// +--+ WaitLocalSdpApprove +--+  |
+///    |                     |     |
+///    +----------+----------+     |
+///               |                |
+///               v                |
+///       +-------+-------+        |
+///       |               |        |
+///       | WaitRemoteSdp |        |
+///       |               |        |
+///       +-------+-------+        |
+///               |                |
+///               |                |
+///               +----------------+
+/// ```
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NegotiationState {
+    /// Means that [`PeerComponent`] is new or negotiation completed.
+    Stable,
+
+    /// [`PeerComponent`] waits for local SDP offer generating.
+    WaitLocalSdp,
+
+    /// [`PeerComponent`] waits for local SDP approve by server.
+    WaitLocalSdpApprove,
+
+    /// [`PeerComponent`] waits for remote SDP offer.
+    WaitRemoteSdp,
+}
+
 /// State of the [`Component`].
 #[derive(Debug)]
 pub struct State {
@@ -35,6 +83,7 @@ pub struct State {
     ice_servers: Vec<IceServer>,
     force_relay: bool,
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
+    negotiation_state: ObservableCell<NegotiationState>,
     local_sdp: LocalSdp,
     remote_sdp: ProgressableCell<Option<String>>,
     restart_ice: ObservableCell<bool>,
@@ -59,6 +108,7 @@ impl State {
             local_sdp: LocalSdp::new(),
             remote_sdp: ProgressableCell::new(None),
             negotiation_role: ObservableCell::new(negotiation_role),
+            negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
         }
@@ -186,6 +236,28 @@ impl State {
         medea_reactive::when_all_processed(when_futs)
     }
 
+    fn when_all_receivers_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        let when_futs: Vec<_> = self
+            .receivers
+            .borrow()
+            .values()
+            .map(|s| s.when_stabilized())
+            .collect();
+
+        Box::pin(futures::future::join_all(when_futs).map(|_| ()))
+    }
+
+    fn when_all_senders_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        let when_futs: Vec<_> = self
+            .senders
+            .borrow()
+            .values()
+            .map(|s| s.when_stabilized())
+            .collect();
+
+        Box::pin(futures::future::join_all(when_futs).map(|_| ()))
+    }
+
     /// Returns [`Future`] which will be resolved when all
     /// [`sender::State`]s/[`receiver::State`]s updates will be applied.
     ///
@@ -236,8 +308,7 @@ impl State {
     pub fn insert_track(
         &self,
         track: &proto::Track,
-        send_constraints: &LocalTracksConstraints,
-        recv_constraints: &RecvConstraints,
+        send_cons: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>> {
         match &track.direction {
             proto::Direction::Send { receivers, mid } => {
@@ -249,7 +320,7 @@ impl State {
                             mid.clone(),
                             track.media_type.clone(),
                             receivers.clone(),
-                            send_constraints,
+                            send_cons,
                         )
                         .map_err(tracerr::map_from_and_wrap!())?,
                     ),
@@ -263,7 +334,6 @@ impl State {
                         mid.clone(),
                         track.media_type.clone(),
                         sender.clone(),
-                        recv_constraints,
                     )),
                 );
             }
@@ -308,7 +378,27 @@ impl State {
     /// Resets [`NegotiationRole`] of this [`State`] to [`None`].
     #[inline]
     pub fn reset_negotiation_role(&self) {
+        self.negotiation_state.set(NegotiationState::Stable);
         self.negotiation_role.set(None);
+    }
+
+    /// Returns [`Future`] which will be resolved when local SDP approve will be
+    /// needed.
+    #[inline]
+    pub fn when_local_sdp_approve_needed(
+        &self,
+    ) -> impl future::Future<Output = ()> {
+        self.negotiation_state
+            .when_eq(NegotiationState::WaitLocalSdpApprove)
+            .map(|_| ())
+    }
+
+    /// Stabilize all [`receiver::State`] from this [`State`].
+    #[inline]
+    pub fn stabilize_all(&self) {
+        self.receivers.borrow().values().for_each(|r| {
+            r.stabilize();
+        });
     }
 
     /// Waits until [`State::local_sdp`] will be resolved and returns it's new
@@ -379,6 +469,7 @@ impl Component {
                     peer.set_remote_answer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                    state.negotiation_state.set(NegotiationState::Stable);
                     state.negotiation_role.set(None);
                 }
                 NegotiationRole::Answerer(_) => {
@@ -440,15 +531,27 @@ impl Component {
         for receiver in new_sender.receivers() {
             peer.connections.create_connection(state.id, receiver);
         }
-        peer.media_connections.insert_sender(sender::Component::new(
-            sender::Sender::new(
-                &new_sender,
-                &peer.media_connections,
-                peer.send_constraints.clone(),
-            )
-            .map_err(tracerr::map_from_and_wrap!())?,
-            new_sender,
-        ));
+        let sender = match sender::Sender::new(
+            &new_sender,
+            &peer.media_connections,
+            peer.send_constraints.clone(),
+            peer.track_events_sender.clone(),
+        )
+        .map_err(tracerr::map_from_and_wrap!())
+        {
+            Ok(sender) => sender,
+            Err(e) => {
+                let _ = peer.peer_events_sender.unbounded_send(
+                    PeerEvent::FailedLocalMedia {
+                        error: e.clone().into(),
+                    },
+                );
+
+                return Err(e);
+            }
+        };
+        peer.media_connections
+            .insert_sender(sender::Component::new(sender, new_sender));
 
         Ok(())
     }
@@ -472,6 +575,8 @@ impl Component {
                 Rc::new(receiver::Receiver::new(
                     &receiver,
                     &peer.media_connections,
+                    peer.track_events_sender.clone(),
+                    &peer.recv_constraints,
                 )),
                 receiver,
             ));
@@ -503,6 +608,8 @@ impl Component {
                     .rollback()
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
+                state.negotiation_state.set(NegotiationState::Stable);
+                state.negotiation_role.set(None);
             } else {
                 match role {
                     NegotiationRole::Offerer => {
@@ -522,6 +629,9 @@ impl Component {
                                 mids,
                             })
                             .ok();
+                        state
+                            .negotiation_state
+                            .set(NegotiationState::WaitLocalSdpApprove);
                     }
                     NegotiationRole::Answerer(_) => {
                         peer.peer
@@ -536,11 +646,100 @@ impl Component {
                                     .get_transceivers_statuses(),
                             })
                             .ok();
-                        state.local_sdp.when_approved().await;
-                        state.negotiation_role.set(None);
+                        state
+                            .negotiation_state
+                            .set(NegotiationState::WaitLocalSdpApprove);
                     }
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    /// Watcher for the SDP offer approving.
+    ///
+    /// If current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
+    /// [`NegotiationState`] will be transited to the
+    /// [`NegotiationState::WaitRemoteSdp`].
+    ///
+    /// If current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
+    /// [`NegotiationState`] will be transited to the
+    /// [`NegotiationState::Stable`].
+    #[watch(self.local_sdp.on_approve().skip(1))]
+    async fn sdp_offer_approve_watcher(
+        _: Rc<PeerConnection>,
+        state: Rc<State>,
+        _: (),
+    ) -> Result<(), Traced<PeerError>> {
+        if let Some(negotiation_role) = state.negotiation_role.get() {
+            match negotiation_role {
+                NegotiationRole::Offerer => {
+                    state
+                        .negotiation_state
+                        .set(NegotiationState::WaitRemoteSdp);
+                }
+                NegotiationRole::Answerer(_) => {
+                    state.negotiation_state.set(NegotiationState::Stable);
+                    state.negotiation_role.set(None);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Watcher for the [`NegotiationState`] change.
+    ///
+    /// Resets [`NegotiationRole`] to `None` on [`NegotiationState::Stable`].
+    ///
+    /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
+    #[watch(self.negotiation_state.subscribe().skip(1))]
+    async fn negotiation_state_watcher(
+        ctx: Rc<PeerConnection>,
+        state: Rc<State>,
+        negotiation_state: NegotiationState,
+    ) -> Result<(), Traced<PeerError>> {
+        futures::future::join(
+            state.when_all_senders_stabilized(),
+            state.when_all_receivers_stabilized(),
+        )
+        .await;
+        medea_reactive::when_all_processed(vec![
+            state.when_all_updated().into(),
+            state.when_all_senders_processed().into(),
+            state.when_all_receivers_processed().into(),
+            state.remote_sdp.when_all_processed().into(),
+        ])
+        .await;
+
+        match negotiation_state {
+            NegotiationState::Stable => {
+                state.negotiation_role.set(None);
+            }
+            NegotiationState::WaitLocalSdp => {
+                if let Some(negotiation_role) = state.negotiation_role.get() {
+                    match negotiation_role {
+                        NegotiationRole::Offerer => {
+                            let sdp_offer = ctx
+                                .peer
+                                .create_offer()
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            state.local_sdp.unapproved_set(sdp_offer);
+                        }
+                        NegotiationRole::Answerer(_) => {
+                            let sdp_answer = ctx
+                                .peer
+                                .create_answer()
+                                .await
+                                .map_err(tracerr::map_from_and_wrap!())?;
+                            state.local_sdp.unapproved_set(sdp_answer);
+                        }
+                    }
+                }
+            }
+            _ => (),
         }
 
         Ok(())
@@ -565,6 +764,8 @@ impl Component {
                     state.when_all_receivers_processed(),
                 )
                 .await;
+                state.when_all_senders_stabilized().await;
+                state.when_all_receivers_stabilized().await;
                 state.when_all_updated().await;
 
                 state
@@ -573,12 +774,7 @@ impl Component {
                     .map_err(tracerr::map_from_and_wrap!())?;
 
                 peer.media_connections.sync_receivers();
-                let sdp_offer = peer
-                    .peer
-                    .create_offer()
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                state.local_sdp.unapproved_set(sdp_offer);
+                state.negotiation_state.set(NegotiationState::WaitLocalSdp);
                 peer.media_connections.sync_receivers();
             }
             NegotiationRole::Answerer(remote_sdp) => {
@@ -594,18 +790,15 @@ impl Component {
                     state.when_all_senders_updated().into(),
                 ])
                 .await;
+                state.when_all_senders_stabilized().await;
+                state.when_all_receivers_stabilized().await;
 
                 state
                     .update_local_stream(&peer)
                     .await
                     .map_err(tracerr::map_from_and_wrap!())?;
 
-                let local_sdp = peer
-                    .peer
-                    .create_answer()
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                state.local_sdp.unapproved_set(local_sdp);
+                state.negotiation_state.set(NegotiationState::WaitLocalSdp);
             }
         }
 

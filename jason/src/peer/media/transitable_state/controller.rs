@@ -2,8 +2,13 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{future, future::Either, FutureExt, StreamExt};
-use medea_reactive::ObservableCell;
+use futures::{
+    future,
+    future::{Either, LocalBoxFuture},
+    stream::LocalBoxStream,
+    FutureExt as _, StreamExt as _,
+};
+use medea_reactive::{Guarded, Processed, ProgressableCell};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -29,9 +34,10 @@ pub type MediaExchangeStateController = TransitableStateController<
 >;
 
 /// Component managing all kinds of [`TransitableState`].
+#[derive(Debug)]
 pub struct TransitableStateController<S, T> {
     /// Actual [`TransitableState`].
-    state: ObservableCell<TransitableState<S, T>>,
+    state: ProgressableCell<TransitableState<S, T>>,
 
     /// Timeout of the [`TransitableStateController::state`] transition.
     timeout_handle: RefCell<Option<ResettableDelayHandle>>,
@@ -52,7 +58,7 @@ where
     #[must_use]
     pub(in super::super) fn new(state: S) -> Rc<Self> {
         let this = Rc::new(Self {
-            state: ObservableCell::new(state.into()),
+            state: ProgressableCell::new(state.into()),
             timeout_handle: RefCell::new(None),
         });
         this.clone().spawn();
@@ -70,6 +76,7 @@ where
         let weak_this = Rc::downgrade(&self);
         spawn_local(async move {
             while let Some(state) = state_changes.next().await {
+                let (state, _guard) = state.into_parts();
                 if let Some(this) = weak_this.upgrade() {
                     if let TransitableState::Transition(_) = state {
                         let weak_this = Rc::downgrade(&this);
@@ -104,6 +111,42 @@ where
                 }
             }
         });
+    }
+
+    /// Returns [`Stream`] into which the [`TransitableState::Stable`] updates
+    /// will be emitted.
+    ///
+    /// [`Stream`]: futures::stream::Stream
+    pub fn subscribe_stable(&self) -> LocalBoxStream<'static, S> {
+        self.state
+            .subscribe()
+            .filter_map(|s| async move {
+                let (s, _guard) = s.into_parts();
+                if let TransitableState::Stable(stable) = s {
+                    Some(stable)
+                } else {
+                    None
+                }
+            })
+            .boxed_local()
+    }
+
+    /// Returns [`Stream`] into which the [`TransitableState::Transition`]
+    /// updates will be emitted.
+    ///
+    /// [`Stream`]: futures::stream::Stream
+    pub fn subscribe_transition(&self) -> LocalBoxStream<'static, T> {
+        self.state
+            .subscribe()
+            .filter_map(|s| async move {
+                let (s, _guard) = s.into_parts();
+                if let TransitableState::Transition(transition) = s {
+                    Some(transition)
+                } else {
+                    None
+                }
+            })
+            .boxed_local()
     }
 
     /// Stops disable/enable timeout of this [`TransitableStateController`].
@@ -156,6 +199,7 @@ where
         let mut states = self.state.subscribe();
         async move {
             while let Some(state) = states.next().await {
+                let (state, _guard) = state.into_parts();
                 match state {
                     TransitableState::Transition(_) => continue,
                     TransitableState::Stable(s) => {
@@ -173,6 +217,26 @@ where
             Ok(())
         }
         .boxed_local()
+    }
+
+    /// Returns [`Processed`] that will be resolved when all the underlying data
+    /// updates will be processed by all subscribers.
+    pub fn when_processed(&self) -> Processed<'static, ()> {
+        self.state.when_all_processed()
+    }
+
+    /// Returns [`Future`] which will be resolved when [`TransitableState`] will
+    /// be transited to the [`TransitableState::Stable`].
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        let mut sub = self.state.subscribe();
+
+        Box::pin(async move {
+            while let Some(TransitableState::Transition(_)) =
+                sub.next().await.map(Guarded::into_inner)
+            {}
+        })
     }
 
     /// Updates [`TransitableStateController::state`].

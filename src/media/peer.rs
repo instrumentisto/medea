@@ -340,6 +340,8 @@ pub struct Context {
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
+
+    need_renegotiation: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -713,6 +715,9 @@ impl<T> Peer<T> {
             .collect();
 
         if !updates.is_empty() {
+            if self.context.is_known_to_remote {
+                self.context.need_renegotiation = true;
+            }
             self.context
                 .peer_updates_sub
                 .force_update(self.id(), updates);
@@ -897,6 +902,7 @@ impl Peer<Stable> {
             pending_track_updates: Vec::new(),
             track_changes_queue: Vec::new(),
             peer_updates_sub,
+            need_renegotiation: false,
         };
 
         Self {
@@ -969,7 +975,9 @@ impl Peer<Stable> {
     /// regardless of negotiation state will be immediately force-pushed to
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
-        if !self.context.track_changes_queue.is_empty() {
+        if !self.context.track_changes_queue.is_empty()
+            || self.context.need_renegotiation
+        {
             let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
                 let change = task.dispatch_with(self);
@@ -982,7 +990,9 @@ impl Peer<Stable> {
 
             self.dedup_pending_track_updates();
 
-            if self.context.pending_track_updates.is_empty() {
+            if self.context.pending_track_updates.is_empty()
+                && !self.context.need_renegotiation
+            {
                 self.context.peer_updates_sub.force_update(
                     self.id(),
                     negotiationless_changes
@@ -995,6 +1005,7 @@ impl Peer<Stable> {
                     .pending_track_updates
                     .append(&mut negotiationless_changes);
                 self.context.peer_updates_sub.negotiation_needed(self.id());
+                self.context.need_renegotiation = false;
             }
         }
     }
@@ -1304,9 +1315,14 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
         peer.commit_scheduled_changes();
+
+        let peer_id = negotiation_needed_rx.recv().unwrap();
+        assert_eq!(peer_id, PeerId(0));
+
         let mut peer = peer.start_as_offerer();
 
         peer.as_changes_scheduler().patch_tracks(vec![
@@ -1327,9 +1343,10 @@ pub mod tests {
         assert_eq!(peer_id, PeerId(0));
         assert_eq!(changes.len(), 2);
         assert!(peer.context.track_changes_queue.is_empty());
+        assert!(peer.context.need_renegotiation);
 
         let peer = peer.set_local_offer(String::new());
-        peer.set_remote_answer(String::new());
+        let peer = peer.set_remote_answer(String::new());
 
         let peer_id = negotiation_needed_rx.recv().unwrap();
         assert_eq!(peer_id, PeerId(0));

@@ -35,6 +35,13 @@ impl<S, O> Component<S, O> {
     pub fn state(&self) -> &S {
         &self.state
     }
+
+    /// Returns [`Rc`] to the state of this [`Component`].
+    #[inline]
+    #[must_use]
+    pub fn state_rc(&self) -> Rc<S> {
+        Rc::clone(&self.state)
+    }
 }
 
 impl<S: ComponentState<O> + 'static, O: 'static> Component<S, O> {

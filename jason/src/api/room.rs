@@ -953,19 +953,21 @@ impl InnerRoom {
     ) -> Self {
         let connections = Rc::new(Connections::default());
         let send_constraints = LocalTracksConstraints::default();
+        let recv_constraints = Rc::new(RecvConstraints::default());
         Self {
             peers: peer::repo::Component::new(
                 Rc::new(peer::repo::Repository::new(
                     media_manager,
                     peer_event_sender,
                     send_constraints.clone(),
+                    recv_constraints.clone(),
                     Rc::clone(&connections),
                 )),
                 Rc::new(peer::repo::State::default()),
             ),
             rpc,
             send_constraints,
-            recv_constraints: Rc::new(RecvConstraints::default()),
+            recv_constraints,
             connections,
             on_connection_loss: Callback1::default(),
             on_failed_local_media: Rc::new(Callback1::default()),
@@ -1061,7 +1063,6 @@ impl InnerRoom {
                     self.peers.get(peer_id).map(|peer| (peer, desired_states))
                 })
                 .map(|(peer, desired_states)| {
-                    let peer_id = peer.id();
                     let mut transitions_futs = Vec::new();
                     let mut tracks_patches = Vec::new();
                     desired_states
@@ -1096,10 +1097,10 @@ impl InnerRoom {
                         })
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
                     if !tracks_patches.is_empty() {
-                        self.rpc.send_command(Command::UpdateTracks {
-                            peer_id,
-                            tracks_patches,
-                        });
+                        // self.rpc.send_command(Command::UpdateTracks {
+                        //     peer_id,
+                        //     tracks_patches,
+                        // });
                     }
 
                     Ok(future::try_join_all(transitions_futs))
@@ -1325,11 +1326,7 @@ impl EventHandler for InnerRoom {
         );
         for track in &tracks {
             peer_state
-                .insert_track(
-                    track,
-                    &self.send_constraints,
-                    &self.recv_constraints,
-                )
+                .insert_track(track, self.send_constraints.clone())
                 .map_err(|e| {
                     self.on_failed_local_media
                         .call(JasonError::from(e.clone()));
@@ -1421,11 +1418,7 @@ impl EventHandler for InnerRoom {
         for update in updates {
             match update {
                 TrackUpdate::Added(track) => peer_state
-                    .insert_track(
-                        &track,
-                        &self.send_constraints,
-                        &self.recv_constraints,
-                    )
+                    .insert_track(&track, self.send_constraints.clone())
                     .map_err(|e| {
                         self.on_failed_local_media
                             .call(JasonError::from(e.clone()));
@@ -1616,6 +1609,12 @@ impl PeerEventHandler for InnerRoom {
             sdp_answer,
             transceivers_statuses,
         });
+
+        Ok(())
+    }
+
+    async fn on_send_intention(&self, intention: Command) -> Self::Output {
+        self.rpc.send_command(intention);
 
         Ok(())
     }
