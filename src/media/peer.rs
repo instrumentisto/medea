@@ -717,9 +717,7 @@ impl<T> Peer<T> {
             .collect();
 
         if !updates.is_empty() {
-            if self.context.is_known_to_remote {
-                self.context.need_renegotiation = true;
-            }
+            self.context.need_renegotiation = true;
             self.context
                 .peer_updates_sub
                 .force_update(self.id(), updates);
