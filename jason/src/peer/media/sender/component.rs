@@ -148,7 +148,6 @@ impl State {
         if let Some(muted) = track_patch.muted {
             self.mute_state.update(mute_state::Stable::from(muted));
         }
-        log::debug!("{:?}", self);
     }
 
     /// Returns [`Future`] which will be resolved when [`State`] update

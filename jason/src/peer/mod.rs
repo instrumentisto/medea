@@ -416,36 +416,31 @@ impl PeerConnection {
         peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
         event: &TrackEvent,
     ) {
-        match event {
+        let patch = match event {
             TrackEvent::MediaExchangeIntention { id, enabled } => {
-                peer_events_sender
-                    .unbounded_send(PeerEvent::SendIntention {
-                        intention: Command::UpdateTracks {
-                            peer_id,
-                            tracks_patches: vec![TrackPatchCommand {
-                                id: *id,
-                                muted: None,
-                                enabled: Some(*enabled),
-                            }],
-                        },
-                    })
-                    .ok();
+                TrackPatchCommand {
+                    id: *id,
+                    muted: None,
+                    enabled: Some(*enabled),
+                }
             }
             TrackEvent::MuteUpdateIntention { id, muted } => {
-                peer_events_sender
-                    .unbounded_send(PeerEvent::SendIntention {
-                        intention: Command::UpdateTracks {
-                            peer_id,
-                            tracks_patches: vec![TrackPatchCommand {
-                                id: *id,
-                                muted: Some(*muted),
-                                enabled: None,
-                            }],
-                        },
-                    })
-                    .ok();
+                TrackPatchCommand {
+                    id: *id,
+                    muted: Some(*muted),
+                    enabled: None,
+                }
             }
-        }
+        };
+
+        peer_events_sender
+            .unbounded_send(PeerEvent::SendIntention {
+                intention: Command::UpdateTracks {
+                    peer_id,
+                    tracks_patches: vec![patch],
+                },
+            })
+            .ok();
     }
 
     /// Returns all [`TrackId`]s of [`Sender`]s that match the provided

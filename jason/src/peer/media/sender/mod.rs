@@ -56,12 +56,13 @@ impl Sender {
         send_constraints: LocalTracksConstraints,
         track_events_sender: mpsc::UnboundedSender<TrackEvent>,
     ) -> Result<Rc<Self>> {
-        if state.media_type().required()
-            && (state.is_muted()
-                || !state.is_enabled_individual()
-                || !send_constraints.enabled(state.media_type())
-                || send_constraints.muted(state.media_type()))
-        {
+        let enabled_in_cons = send_constraints.enabled(state.media_type());
+        let muted_in_cons = send_constraints.muted(state.media_type());
+        let media_disabled = state.is_muted()
+            || !state.is_enabled_individual()
+            || !enabled_in_cons
+            || muted_in_cons;
+        if state.media_type().required() && media_disabled {
             return Err(tracerr::new!(
                 MediaConnectionsError::CannotDisableRequiredSender
             ));
@@ -93,11 +94,6 @@ impl Sender {
                 .map_err(tracerr::wrap!())?,
         };
 
-        let enabled = send_constraints.enabled(state.media_type());
-        let media_exchange_state = media_exchange_state::Stable::from(enabled);
-        let mute_state = mute_state::Stable::from(
-            send_constraints.muted(state.media_type()),
-        );
         let this = Rc::new(Sender {
             track_id: state.id(),
             caps,
@@ -109,13 +105,15 @@ impl Sender {
             send_constraints,
         });
 
-        if media_exchange_state == media_exchange_state::Stable::Disabled {
-            state
-                .media_exchange_state_controller()
-                .transition_to(media_exchange_state);
+        if !enabled_in_cons {
+            state.media_exchange_state_controller().transition_to(
+                media_exchange_state::Stable::from(enabled_in_cons),
+            );
         }
-        if mute_state == mute_state::Stable::Muted {
-            state.mute_state_controller().transition_to(mute_state);
+        if muted_in_cons {
+            state
+                .mute_state_controller()
+                .transition_to(mute_state::Stable::from(muted_in_cons));
         }
 
         Ok(this)

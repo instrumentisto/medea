@@ -818,7 +818,6 @@ impl Component {
                 state.negotiation_state.set(NegotiationState::WaitLocalSdp);
             }
         }
-
         Ok(())
     }
 }
