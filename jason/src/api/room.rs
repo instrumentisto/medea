@@ -1414,7 +1414,7 @@ impl EventHandler for InnerRoom {
             }
         }
         if let Some(negotiation_role) = negotiation_role {
-            peer_state.set_negotiation_role(negotiation_role);
+            peer_state.set_negotiation_role(negotiation_role).await;
         }
 
         Ok(())

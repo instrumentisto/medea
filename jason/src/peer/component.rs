@@ -171,7 +171,11 @@ impl State {
 
     /// Sets [`NegotiationRole`] of this [`State`] to the provided one.
     #[inline]
-    pub fn set_negotiation_role(&self, negotiation_role: NegotiationRole) {
+    pub async fn set_negotiation_role(
+        &self,
+        negotiation_role: NegotiationRole,
+    ) {
+        self.negotiation_role.when(Option::is_none).await.ok();
         self.negotiation_role.set(Some(negotiation_role));
     }
 
