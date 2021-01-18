@@ -135,6 +135,11 @@ pub struct IceUser {
 
 impl IceUser {
     /// Build new non static [`IceUser`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if unable to establish connection with database, or database
+    /// request fails.
     pub async fn new_non_static(
         address: String,
         room_id: &RoomId,

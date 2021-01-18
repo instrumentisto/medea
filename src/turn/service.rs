@@ -181,10 +181,6 @@ pub mod test {
                 "password".into(),
             ))
         }
-
-        async fn delete(&self, _: &[IceUser]) -> Result<(), TurnServiceErr> {
-            Ok(())
-        }
     }
 
     pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
