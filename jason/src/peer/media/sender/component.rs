@@ -39,21 +39,22 @@ pub struct State {
     mute_state: Rc<MuteStateController>,
     general_media_exchange_state:
         ProgressableCell<media_exchange_state::Stable>,
-    cons: LocalTracksConstraints,
+    send_constraints: LocalTracksConstraints,
 }
 
 impl State {
-    /// Creates new [`State`] with a provided data.
+    /// Creates new [`State`] with the provided data.
+    ///
     /// # Errors
     ///
     /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
-    /// [`Sender`] can't be disabled.
+    /// [`Sender`] cannot be disabled.
     pub fn new(
         id: TrackId,
         mid: Option<String>,
         media_type: MediaType,
         receivers: Vec<MemberId>,
-        cons: LocalTracksConstraints,
+        send_constraints: LocalTracksConstraints,
     ) -> Result<Self> {
         Ok(Self {
             id,
@@ -70,7 +71,7 @@ impl State {
             mute_state: MuteStateController::new(mute_state::Stable::from(
                 false,
             )),
-            cons,
+            send_constraints,
         })
     }
 
@@ -150,8 +151,8 @@ impl State {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when [`State`] update
-    /// will be applied on [`Sender`].
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Sender`].
     ///
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> AllProcessed<'static, ()> {
@@ -178,9 +179,9 @@ impl State {
         )
     }
 
-    /// Returns `true` if local `MediaStream` update needed for this
-    /// [`State`].
+    /// Indicates whether local `MediaStream` update needed for this [`State`].
     #[inline]
+    #[must_use]
     pub fn is_local_stream_update_needed(&self) -> bool {
         self.need_local_stream_update.get()
     }
@@ -347,10 +348,10 @@ impl TransceiverSide for State {
         let caps = TrackConstraints::from(self.media_type.clone());
         match &caps {
             TrackConstraints::Video(VideoSource::Device(_)) => {
-                self.cons.inner().get_device_video().is_some()
+                self.send_constraints.inner().get_device_video().is_some()
             }
             TrackConstraints::Video(VideoSource::Display(_)) => {
-                self.cons.inner().get_display_video().is_some()
+                self.send_constraints.inner().get_display_video().is_some()
             }
             TrackConstraints::Audio(_) => true,
         }

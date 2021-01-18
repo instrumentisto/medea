@@ -24,8 +24,7 @@ use super::{
 
 pub use self::component::{Component, State};
 
-/// Representation of a [`local::Track`] that is being sent to some
-/// remote peer.
+/// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
@@ -46,7 +45,7 @@ impl Sender {
     /// # Errors
     ///
     /// Errors with [`MediaConnectionsError::TransceiverNotFound`] if [`State`]
-    /// has [`Some`] [`mid`], but this [`mid`] not found in the
+    /// has [`Some`] [`mid`], but this [`mid`] isn't found in the
     /// [`MediaConnections`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid

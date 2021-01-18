@@ -318,7 +318,7 @@ impl State {
     pub fn insert_track(
         &self,
         track: &proto::Track,
-        send_cons: LocalTracksConstraints,
+        send_constraints: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>> {
         match &track.direction {
             proto::Direction::Send { receivers, mid } => {
@@ -330,7 +330,7 @@ impl State {
                             mid.clone(),
                             track.media_type.clone(),
                             receivers.clone(),
-                            send_cons,
+                            send_constraints,
                         )
                         .map_err(tracerr::map_from_and_wrap!())?,
                     ),
@@ -718,17 +718,17 @@ impl Component {
         state: Rc<State>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
-        futures::future::join(
-            state.when_all_senders_stabilized(),
-            state.when_all_receivers_stabilized(),
-        )
-        .await;
         medea_reactive::when_all_processed(vec![
             state.when_all_updated().into(),
             state.when_all_senders_processed().into(),
             state.when_all_receivers_processed().into(),
             state.remote_sdp.when_all_processed().into(),
         ])
+        .await;
+        futures::future::join(
+            state.when_all_senders_stabilized(),
+            state.when_all_receivers_stabilized(),
+        )
         .await;
 
         match negotiation_state {

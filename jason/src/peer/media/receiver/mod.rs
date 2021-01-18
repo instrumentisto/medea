@@ -102,15 +102,14 @@ impl Receiver {
             track_events_sender,
         };
 
-        let enabled = match &state.media_type() {
+        let enabled_in_cons = match &state.media_type() {
             MediaType::Audio(_) => recv_constraints.is_audio_enabled(),
             MediaType::Video(_) => recv_constraints.is_video_enabled(),
         };
-
-        if !enabled {
+        if !enabled_in_cons {
             state
                 .media_exchange_state_controller()
-                .transition_to(enabled.into());
+                .transition_to(enabled_in_cons.into());
         }
 
         this
