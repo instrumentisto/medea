@@ -316,12 +316,12 @@ impl ParticipantService {
         close_rpc_connections.map(|_| ()).boxed_local()
     }
 
-    /// Deletes [`Member`] from [`ParticipantService`].
+    /// Deletes a [`Member`] by its ID from this [`ParticipantService`].
     pub fn delete_member(&mut self, member_id: &MemberId) {
         self.members.remove(member_id);
     }
 
-    /// Closes [`RpcConnection`] with [`Member`] with a provided [`MemberId`].
+    /// Closes [`RpcConnection`] with [`Member`] with the provided [`MemberId`].
     pub fn close_member_connection(
         &mut self,
         member_id: &MemberId,

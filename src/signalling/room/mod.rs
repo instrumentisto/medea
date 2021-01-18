@@ -311,8 +311,8 @@ impl Room {
 
     /// Closes [`Member`]s [`RpcConnection`] if `ws_close_reason` is provided,
     /// removes [`Member`]s [`Peer`], notifying connected [`Members`] and emits
-    /// [`OnLeaveEvent`] [`CallbackEvent`] if `on_leave_reason` is provided
-    /// and [`Member`] is configured to emit [`OnLeaveEvent`].
+    /// [`OnLeaveEvent`] [`CallbackEvent`] if `on_leave_reason` is provided and
+    /// [`Member`] is configured to emit [`OnLeaveEvent`].
     ///
     /// [`CallbackEvent`]: crate::api::control::callback::CallbackEvent
     fn disconnect_member(

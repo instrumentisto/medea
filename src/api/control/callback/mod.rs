@@ -50,7 +50,7 @@ pub enum OnLeaveReason {
     /// Connection with `Member` was lost.
     LostConnection,
 
-    /// User was forcefully disconnected by server.
+    /// `Member` was forcibly disconnected by server.
     Kicked,
 
     /// Server is shutting down.
