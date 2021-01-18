@@ -221,7 +221,7 @@ where
 
     /// Returns [`Processed`] that will be resolved when all the underlying data
     /// updates will be processed by all subscribers.
-    pub fn when_processed(&self) -> Processed<'static, ()> {
+    pub fn when_processed(&self) -> Processed<'static> {
         self.state.when_all_processed()
     }
 

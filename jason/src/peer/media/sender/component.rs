@@ -155,7 +155,7 @@ impl State {
     /// [`Sender`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> AllProcessed<'static, ()> {
+    pub fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.media_exchange_state.when_processed().into(),
             self.mute_state.when_processed().into(),

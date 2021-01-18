@@ -101,7 +101,7 @@ impl State {
             == media_exchange_state::Stable::Enabled
     }
 
-    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.id != track_patch.id {
             return;
@@ -119,7 +119,7 @@ impl State {
     /// [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> AllProcessed<'static, ()> {
+    pub fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.media_exchange_state.when_processed().into(),
             self.general_media_exchange_state
