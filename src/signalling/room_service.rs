@@ -10,7 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
-use medea_client_api_proto::{Credential, MemberId, RoomId};
+use medea_client_api_proto::{MemberId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
@@ -18,6 +18,7 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
+        member::Credential,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomSpec,
         TryFromElementError,
@@ -187,16 +188,29 @@ impl RoomService {
 
     /// Returns [Control API] sid based on provided arguments and
     /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
+    ///
+    /// Returns sid with a token (`?token=<token>`) if [`ControlCredential`] is
+    /// [`ControlCredential::Plain`].
+    ///
+    /// Returns sid without token if [`ControlCredential`] is
+    /// [`ControlCredential::Hash`].
     fn get_sid(
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
         credentials: &Credential,
     ) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.public_url, room_id, member_id, credentials
-        )
+        match credentials {
+            Credential::Hash(_) => {
+                format!("{}/{}/{}", self.public_url, room_id, member_id)
+            }
+            Credential::Plain(plain) => {
+                format!(
+                    "{}/{}/{}?token={}",
+                    self.public_url, room_id, member_id, plain,
+                )
+            }
+        }
     }
 }
 

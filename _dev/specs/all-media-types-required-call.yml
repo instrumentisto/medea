@@ -4,7 +4,8 @@ spec:
   pipeline:
     caller:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:
@@ -21,7 +22,8 @@ spec:
               src: "local://all-media-types-required-call/responder/publish"
     responder:
       kind: Member
-      credentials: test
+      credentials:
+        plain: test
       spec:
         pipeline:
           publish:

@@ -1,203 +1,190 @@
-//! Implementation of the local SDP offer state.
+//! Local session description wrapper.
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{future, future::Either, stream::LocalBoxStream, StreamExt};
+use futures::{
+    future,
+    future::{Either, LocalBoxFuture},
+    stream::LocalBoxStream,
+    StreamExt as _,
+};
 use medea_reactive::ObservableCell;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::{resettable_delay_for, ResettableDelayHandle};
 
-const APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
+const DESCRIPTION_APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Inner for the [`LocalSdp`].
-#[derive(Debug)]
-struct Inner {
-    /// Current SDP offer applied on the [`PeerConnection`], but it can be not
-    /// approved by server (see [`Inner::approved`]).
-    current_offer: ObservableCell<Option<String>>,
-
-    /// Previous SDP offer to which this [`Inner::current_offer`] can be
-    /// transited if server doesn't approved [`Inner::current_offer`].
-    prev_offer: Option<String>,
-
-    /// Flag which indicates that Media Server approved this SDP
-    /// [`Inner::current_offer`].
-    ///
-    /// On every SDP offer update this field should be reseted to `false` and
-    /// if this field doesn't transits into `true` within [`APPROVE_TIMEOUT`],
-    /// then [`Inner::current_offer`] should be rollbacked to the
-    /// [`Inner::prev_offer`].
-    approved: ObservableCell<bool>,
-
-    /// Flag which indicates that new SDP offer needed after rollback is
-    /// completed.
-    restart_needed: bool,
-
-    /// Timeout of the [`Inner::approved`] transition.
-    timeout_handle: Option<ResettableDelayHandle>,
-}
-
-impl Default for Inner {
-    fn default() -> Self {
-        Self {
-            prev_offer: None,
-            current_offer: ObservableCell::new(None),
-            approved: ObservableCell::new(true),
-            timeout_handle: None,
-            restart_needed: false,
-        }
-    }
-}
-
-impl Inner {
-    /// Rollbacks [`LocalSdp`] to the previous one.
-    fn rollback(&mut self) {
-        self.approved.set(true);
-        self.current_offer.set(self.prev_offer.clone());
-    }
-
-    /// Sets [`Inner::approved`] flag to the `true`.
-    fn approve(&mut self) {
-        self.approved.set(true);
-    }
-}
-
-/// Wrapper around SDP offer which stores previous SDP approved SDP offer and
-/// can rollback to it on timeout.
+/// Local session description wrapper.
 ///
-/// If you update [`LocalSdp`] then it will wait for server approve
-/// ([`LocalSdp::approve`]). If Media Server approve wasn't received within
-/// timeout, then SDP offer will be rollbacked to the previous one.
+/// Stores current and previous descriptions and may rollback to the previous
+/// one if new description won't be approved in a configured timeout.
 #[derive(Clone, Debug, Default)]
-pub struct LocalSdp(Rc<RefCell<Inner>>);
+pub struct LocalSdp(Rc<Inner>);
 
 impl LocalSdp {
-    /// Returns new [`LocalSdp`].
+    /// Returns new empty [`LocalSdp`].
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Stops [`LocalSdp`] rollback timeout.
-    pub fn stop_timeout(&self) {
-        if let Some(handle) = self.0.borrow().timeout_handle.as_ref() {
-            handle.stop();
-        }
+    /// Returns [`LocalBoxStream`] into which all current SDP offer updates will
+    /// be sent.
+    #[inline]
+    pub fn subscribe(&self) -> LocalBoxStream<'static, Option<String>> {
+        self.0.current_sdp.subscribe()
     }
 
-    /// Resumes [`LocalSdp`] rollback timeout.
-    pub fn resume_timeout(&self) {
-        if let Some(handle) = self.0.borrow().timeout_handle.as_ref() {
-            handle.reset();
-        }
+    /// Returns [`Future`] that will be resolved when current SDP offer will be
+    /// approved by Media Server.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn when_approved(&self) -> LocalBoxFuture<'static, ()> {
+        let approved = Rc::clone(&self.0.approved);
+        Box::pin(async move {
+            let _ = approved.when_eq(true).await;
+        })
     }
 
     /// Returns [`Stream`] into which `()` will be sent on every SDP offer
     /// approve.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     pub fn on_approve(&self) -> LocalBoxStream<'static, ()> {
-        Box::pin(self.0.borrow().approved.subscribe().filter_map(|approved| {
+        Box::pin(self.0.approved.subscribe().filter_map(|approved| {
             future::ready(if approved { Some(()) } else { None })
         }))
     }
 
     /// Rollbacks [`LocalSdp`] to the previous one.
+    #[inline]
     pub fn rollback(&self) {
-        self.0.borrow_mut().rollback()
+        self.0.current_sdp.set(self.0.prev_sdp.borrow().clone());
+        self.0.approved.set(true);
     }
 
-    /// Handles SDP offer update received from the server.
-    pub fn update_offer_by_server(&self, new_offer: &Option<String>) {
-        let approved = new_offer
+    /// Sets the provided SDP as the current one, marks it as unapproved and
+    /// schedules task to wait for a SDP approval.
+    pub fn unapproved_set(&self, sdp: String) {
+        let prev_sdp = self.0.current_sdp.replace(Some(sdp));
+        self.0.prev_sdp.replace(prev_sdp);
+        self.0.approved.set(false);
+        self.0
+            .rollback_task_handle
+            .replace(Some(self.spawn_rollback_task()));
+    }
+
+    /// Approves the current [`LocalSdp`] offer.
+    pub fn approved_set(&self, sdp: String) {
+        let is_current_approved =
+            self.0.current_sdp.borrow().as_ref() == Some(&sdp);
+
+        if !is_current_approved {
+            self.0.current_sdp.replace(Some(sdp));
+        }
+        self.0.approved.set(true);
+    }
+
+    pub fn current(&self) -> Option<String> {
+        self.0.current_sdp.get()
+    }
+
+    /// Indicates whether current [`LocalSdp`] state is rollback, meaning that
+    /// the current SDP equals to the previous SDP.
+    #[must_use]
+    pub fn is_rollback(&self) -> bool {
+        self.0
+            .current_sdp
+            .borrow()
             .as_ref()
-            .map(|new_offer| {
+            .map_or(false, |current| {
                 self.0
-                    .borrow()
-                    .current_offer
+                    .prev_sdp
                     .borrow()
                     .as_ref()
-                    .map(|c| new_offer == c)
+                    .map(|prev| prev == current)
                     .unwrap_or_default()
             })
-            .unwrap_or_default();
-        let not_approved = new_offer.is_none()
-            && !self.0.borrow().approved.get()
-            && !self.0.borrow().prev_offer.is_none();
-        if not_approved {
-            self.0.borrow_mut().restart_needed = true;
-            self.rollback();
-        } else if approved {
-            self.0.borrow().approved.set(true);
+    }
+
+    /// Stops the current SDP rollback task countdown, if any.
+    #[inline]
+    pub fn stop_timeout(&self) {
+        if let Some(handle) = self.0.rollback_task_handle.borrow().as_ref() {
+            handle.stop();
         }
     }
 
-    /// Updates current SDP offer to the provided one.
-    pub fn update_offer_by_client(&self, new_offer: String) {
-        let (timeout, timeout_handle) = resettable_delay_for(APPROVE_TIMEOUT);
-        self.0.borrow_mut().approved.set(false);
-        self.0.borrow_mut().timeout_handle.replace(timeout_handle);
-        self.0.borrow_mut().restart_needed = false;
+    /// Resets the current SDP rollback task countdown, if any.
+    #[inline]
+    pub fn resume_timeout(&self) {
+        if let Some(handle) = self.0.rollback_task_handle.borrow().as_ref() {
+            handle.reset();
+        }
+    }
+
+    /// Spawns task that will call [`LocalSdp::rollback()`] if the current SDP
+    /// won't be approved in [`DESCRIPTION_APPROVE_TIMEOUT`].
+    #[must_use]
+    fn spawn_rollback_task(&self) -> ResettableDelayHandle {
+        let (timeout, rollback_task) =
+            resettable_delay_for(DESCRIPTION_APPROVE_TIMEOUT);
         spawn_local({
             let this = self.clone();
-            let approved = self.0.borrow().approved.when_eq(true);
             async move {
-                match future::select(approved, Box::pin(timeout)).await {
-                    Either::Left(_) => (),
-                    Either::Right(_) => {
-                        this.rollback();
-                    }
-                }
+                if let Either::Right(_) =
+                    future::select(this.when_approved(), Box::pin(timeout))
+                        .await
+                {
+                    this.rollback();
+                };
             }
         });
-        let prev_offer = self.0.borrow().current_offer.replace(Some(new_offer));
-        self.0.borrow_mut().prev_offer = prev_offer;
-    }
-
-    /// Approves current [`LocalSdp`] offer.
-    pub fn approve(&self, sdp_offer: &str) {
-        let mut inner = self.0.borrow_mut();
-        let is_approved =
-            inner.current_offer.borrow().as_ref().map(String::as_str)
-                == Some(sdp_offer);
-        if is_approved {
-            inner.approve()
-        }
-    }
-
-    /// Returns current SDP offer.
-    pub fn current(&self) -> Option<String> {
-        self.0.borrow().current_offer.get()
-    }
-
-    /// Returns [`LocalBoxStream`] into which all current SDP offer updates will
-    /// be sent.
-    pub fn subscribe(&self) -> LocalBoxStream<'static, Option<String>> {
-        self.0.borrow().current_offer.subscribe()
-    }
-
-    /// Returns `true` if [`LocalSdp`] current SDP offer equal to the previous
-    /// SDP offer and they both is `Some`.
-    pub fn is_rollback(&self) -> bool {
-        let inner = self.0.borrow();
-        let is_rollback =
-            inner
-                .current_offer
-                .borrow()
-                .as_ref()
-                .map_or(false, |current| {
-                    inner
-                        .prev_offer
-                        .as_ref()
-                        .map(|prev| prev == current)
-                        .unwrap_or_default()
-                });
-
-        is_rollback
+        rollback_task
     }
 
     /// Returns `true` if new SDP offer needed after rollback is
     /// completed.
     #[inline]
     pub fn is_restart_needed(&self) -> bool {
-        self.0.borrow().restart_needed
+        self.0.restart_needed
+    }
+}
+
+#[derive(Debug)]
+struct Inner {
+    /// Currently applied session description.
+    current_sdp: ObservableCell<Option<String>>,
+
+    /// Previously applied session description.
+    prev_sdp: RefCell<Option<String>>,
+
+    /// Flag which indicates that Media Server approved this SDP
+    /// [`Inner::current_sdp`].
+    ///
+    /// On every SDP offer update this field should be reset to `false` and
+    /// if this field doesn't transits into `true` within
+    /// [`DESCRIPTION_APPROVE_TIMEOUT`], then [`Inner::current_sdp`] should be
+    /// rolled back to the [`Inner::prev_sdp`].
+    approved: Rc<ObservableCell<bool>>,
+
+    /// Timeout of the [`Inner::approved`] transition.
+    rollback_task_handle: RefCell<Option<ResettableDelayHandle>>,
+
+    restart_needed: bool,
+}
+
+impl Default for Inner {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            prev_sdp: RefCell::new(None),
+            current_sdp: ObservableCell::new(None),
+            approved: Rc::new(ObservableCell::new(true)),
+            rollback_task_handle: RefCell::new(None),
+            restart_needed: false,
+        }
     }
 }

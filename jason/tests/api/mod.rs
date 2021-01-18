@@ -65,7 +65,7 @@ async fn only_one_strong_rpc_rc_exists() {
 
     assert_eq!(Rc::strong_count(&ws), 3);
     jason.dispose();
-    // Watcher's Futures doesn't aborts instantly.
+    // Watcher's Futures doesn't abort instantly.
     yield_now().await;
     assert_eq!(Rc::strong_count(&ws), 1);
 }
@@ -207,11 +207,9 @@ async fn room_dispose_works() {
             });
         }
     });
-    JsFuture::from(
-        another_room.join(
-            "ws://example.com/another_room_id/member_id/token".to_string(),
-        ),
-    )
+    JsFuture::from(another_room.join(
+        "ws://example.com/another_room_id/member_id?token=token".to_string(),
+    ))
     .await
     .unwrap();
 

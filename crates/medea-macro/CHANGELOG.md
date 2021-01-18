@@ -20,7 +20,7 @@ All user visible changes to this project will be documented in this file. This p
 - `#[dispatchable]` macro:
     - Optional argument to specify `self` type for methods of `*Handler` trait (e.g. `#[dispatchable(self: &Self)]`) ([#112]);
     - Optional argument that enables [async-trait] integration (e.g. `#[dispatchable(async_trait(?Send))]`) ([#112]).
-- `#[watchers]` and `#[watch(...)]` macros for generating `Component::spawn` method in `medea-jason` crate ([#164]).
+- `#[watchers]` macro for generating `Component::spawn` method in `medea-jason` crate ([#169]).
 
 ### Fixed
 
@@ -32,7 +32,7 @@ All user visible changes to this project will be documented in this file. This p
 [#91]: /../../pull/91
 [#112]: /../../pull/112
 [#147]: /../../pull/147
-[#164]: /../../pull/164
+[#169]: /../../pull/169
 
 
 

@@ -30,7 +30,7 @@ use super::{
 const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
-pub type ActFuture<O> =
+pub type ActFuture<O = ()> =
     Pin<Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>>;
 
 /// Service responsible for processing [`Peer`]'s metrics received
@@ -107,7 +107,7 @@ impl CoturnMetricsService {
     }
 
     /// Connects Redis until succeeds.
-    fn connect_until_success(&mut self) -> ActFuture<()> {
+    fn connect_until_success(&mut self) -> ActFuture {
         Box::pin(self.connect_and_subscribe().then(|res, this, _| {
             if let Err(err) = res {
                 warn!(

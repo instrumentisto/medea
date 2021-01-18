@@ -9,7 +9,7 @@
 
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
-FROM rust:${rust_ver} AS dist
+FROM ghcr.io/instrumentisto/rust:${rust_ver} AS dist
 ARG rustc_mode=release
 ARG rustc_opts=--release
 

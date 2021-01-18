@@ -46,7 +46,8 @@ pub use dynamic_api::{
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-pub type ActFuture<O> = Pin<Box<dyn ActorFuture<Actor = Room, Output = O>>>;
+pub type ActFuture<O = ()> =
+    Pin<Box<dyn ActorFuture<Actor = Room, Output = O>>>;
 
 #[derive(Debug, Display, Fail, From)]
 pub enum RoomError {
@@ -313,7 +314,7 @@ impl Room {
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving
     /// into [`State::Stopped`].
-    fn close_gracefully(&mut self, ctx: &mut Context<Self>) -> ActFuture<()> {
+    fn close_gracefully(&mut self, ctx: &mut Context<Self>) -> ActFuture {
         info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
 
@@ -347,7 +348,7 @@ impl Room {
         &mut self,
         peers_id: Vec<PeerId>,
         member_id: MemberId,
-    ) -> ActFuture<()> {
+    ) -> ActFuture {
         info!(
             "Peers {:?} removed for member [id = {}].",
             peers_id, member_id
@@ -434,7 +435,7 @@ impl Actor for Room {
 }
 
 impl Handler<ShutdownGracefully> for Room {
-    type Result = ActFuture<()>;
+    type Result = ActFuture;
 
     fn handle(
         &mut self,

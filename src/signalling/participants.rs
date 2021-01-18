@@ -179,7 +179,7 @@ impl ParticipantService {
         let member = self
             .get_member_by_id(member_id)
             .map_err(|_| RoomError::AuthorizationError)?;
-        if &member.credentials() == credentials {
+        if member.verify_credentials(credentials) {
             Ok(member)
         } else {
             Err(RoomError::AuthorizationError)
@@ -461,7 +461,10 @@ impl ParticipantService {
 mod test {
     use std::time::Duration;
 
-    use crate::{api::control::pipeline::Pipeline, conf::Conf};
+    use crate::{
+        api::control::{member::Credential, pipeline::Pipeline},
+        conf::Conf,
+    };
 
     use super::*;
 
@@ -486,7 +489,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            Credential::Plain("w/e".into()),
             None,
             None,
             None,
@@ -528,7 +531,7 @@ mod test {
 
         let test_member_spec = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            Credential::Plain("w/e".into()),
             None,
             None,
             Some(idle_timeout),

@@ -4,7 +4,9 @@ use actix::Context;
 use function_name::named;
 use futures::{channel::mpsc::unbounded, StreamExt as _};
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId};
-use medea_control_api_proto::grpc::api::web_rtc_publish_endpoint::P2p;
+use medea_control_api_proto::grpc::api::{
+    member::Credentials, web_rtc_publish_endpoint::P2p,
+};
 
 use crate::{
     grpc_control_api::{
@@ -27,7 +29,7 @@ async fn command_validation() {
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .credentials("test")
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -41,7 +43,7 @@ async fn command_validation() {
         .add_member(
             MemberBuilder::default()
                 .id("responder")
-                .credentials("test")
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
                         .id("play")
@@ -63,7 +65,10 @@ async fn command_validation() {
 
     let (tx1, mut rx1) = unbounded();
     let member1 = TestMember::connect(
-        &format!("ws://127.0.0.1:8080/ws/{}/publisher/test", test_name!()),
+        &format!(
+            "ws://127.0.0.1:8080/ws/{}/publisher?token=test",
+            test_name!()
+        ),
         Some(Box::new(
             move |event: &Event,
                   _: &mut Context<TestMember>,
@@ -74,12 +79,16 @@ async fn command_validation() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
     let (tx2, mut rx2) = unbounded();
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/responder/test", test_name!()),
+        format!(
+            "ws://127.0.0.1:8080/ws/{}/responder?token=test",
+            test_name!()
+        ),
         Some(Box::new(
             move |event: &Event,
                   _: &mut Context<TestMember>,

@@ -792,6 +792,7 @@ mod tests {
             endpoints::webrtc_publish_endpoint::{
                 AudioSettings, P2pMode, VideoSettings,
             },
+            member::Credential,
             refs::SrcUri,
         },
         signalling::{
@@ -937,7 +938,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".into(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -945,7 +946,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".into(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1042,7 +1043,7 @@ mod tests {
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".into(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1050,7 +1051,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".into(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),

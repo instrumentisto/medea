@@ -4,105 +4,31 @@ mod component;
 
 use std::{cell::Cell, rc::Rc};
 
-use crate::peer::{PeerEvent, TrackEvent};
 use futures::channel::mpsc;
-use medea_client_api_proto::{MediaSourceKind, TrackId, TrackPatchCommand};
+use medea_client_api_proto::TrackId;
 
 use crate::{
     media::{
         track::local, LocalTracksConstraints, MediaKind, TrackConstraints,
-        VideoSource,
     },
     peer::{
         transceiver::{Transceiver, TransceiverDirection},
-        MediaExchangeState, MuteState,
+        TrackEvent,
     },
 };
 
 use super::{
-    media_exchange_state, mute_state,
-    transitable_state::{
-        MediaExchangeStateController, MediaState, MuteStateController,
-    },
-    MediaConnections, MediaConnectionsError, MediaStateControllable, Result,
-    TransceiverSide,
+    media_exchange_state, mute_state, MediaConnections, MediaConnectionsError,
+    MediaStateControllable, Result,
 };
 
 pub use self::component::{Component, State};
 
-/// Builder of the [`Sender`].
-pub(super) struct Builder<'a> {
-    pub media_connections: &'a MediaConnections,
-    pub track_id: TrackId,
-    pub caps: TrackConstraints,
-    pub mid: Option<String>,
-    pub media_exchange_state: media_exchange_state::Stable,
-    pub mute_state: mute_state::Stable,
-    pub required: bool,
-    pub send_constraints: LocalTracksConstraints,
-    pub track_events_sender: mpsc::UnboundedSender<TrackEvent>,
-}
-
-impl<'a> Builder<'a> {
-    /// Builds new [`Transceiver`] if provided `mid` is [`None`], otherwise
-    /// retrieves existing [`Transceiver`] via provided `mid` from a
-    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
-    /// fails.
-    pub fn build(self) -> Result<Rc<Sender>> {
-        let connections = self.media_connections.0.borrow();
-        let kind = MediaKind::from(&self.caps);
-        let transceiver = match self.mid {
-            // Try to find rcvr transceiver that can be used as sendrecv.
-            None => connections
-                .receivers
-                .values()
-                .find(|rcvr| {
-                    rcvr.caps().media_kind() == self.caps.media_kind()
-                        && rcvr.caps().media_source_kind()
-                            == self.caps.media_source_kind()
-                })
-                .and_then(|rcvr| rcvr.transceiver())
-                .unwrap_or_else(|| {
-                    connections
-                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
-                }),
-            Some(mid) => connections
-                .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
-                .map_err(tracerr::wrap!())?,
-        };
-
-        let media_exchange_state =
-            MediaExchangeStateController::new(self.media_exchange_state);
-        let this = Rc::new(Sender {
-            track_id: self.track_id,
-            caps: self.caps,
-            transceiver,
-            required: self.required,
-            send_constraints: self.send_constraints,
-            enabled_general: Cell::new(
-                self.media_exchange_state
-                    == media_exchange_state::Stable::Enabled,
-            ),
-            enabled_individual: Cell::new(
-                self.media_exchange_state
-                    == media_exchange_state::Stable::Enabled,
-            ),
-            muted: Cell::new(self.mute_state == mute_state::Stable::Muted),
-            track_events_sender: self.track_events_sender,
-        });
-
-        Ok(this)
-    }
-}
-
-/// Representation of a [`local::Track`] that is being sent to some
-/// remote peer.
+/// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
     transceiver: Transceiver,
-    required: bool,
     muted: Cell<bool>,
     enabled_individual: Cell<bool>,
     enabled_general: Cell<bool>,
@@ -111,14 +37,103 @@ pub struct Sender {
 }
 
 impl Sender {
+    /// Creates new [`Transceiver`] if provided `mid` is [`None`], otherwise
+    /// retrieves existing [`Transceiver`] via provided `mid` from a
+    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
+    /// fails.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`MediaConnectionsError::TransceiverNotFound`] if [`State`]
+    /// has [`Some`] [`mid`], but this [`mid`] isn't found in the
+    /// [`MediaConnections`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    pub fn new(
+        state: &State,
+        media_connections: &MediaConnections,
+        send_constraints: LocalTracksConstraints,
+        track_events_sender: mpsc::UnboundedSender<TrackEvent>,
+    ) -> Result<Rc<Self>> {
+        let enabled_in_cons = send_constraints.enabled(state.media_type());
+        let muted_in_cons = send_constraints.muted(state.media_type());
+        let media_disabled = state.is_muted()
+            || !state.is_enabled_individual()
+            || !enabled_in_cons
+            || muted_in_cons;
+        if state.media_type().required() && media_disabled {
+            return Err(tracerr::new!(
+                MediaConnectionsError::CannotDisableRequiredSender
+            ));
+        }
+
+        let connections = media_connections.0.borrow();
+        let caps = TrackConstraints::from(state.media_type().clone());
+        let kind = MediaKind::from(&caps);
+        let transceiver = match state.mid() {
+            // Try to find rcvr transceiver that can be used as sendrecv.
+            None => connections
+                .receivers
+                .values()
+                .find(|rcvr| {
+                    rcvr.caps().media_kind() == caps.media_kind()
+                        && rcvr.caps().media_source_kind()
+                            == caps.media_source_kind()
+                })
+                .and_then(|rcvr| rcvr.transceiver())
+                .unwrap_or_else(|| {
+                    connections
+                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                }),
+            Some(mid) => connections
+                .get_transceiver_by_mid(&mid)
+                .ok_or_else(|| {
+                    MediaConnectionsError::TransceiverNotFound(mid.to_string())
+                })
+                .map_err(tracerr::wrap!())?,
+        };
+
+        let this = Rc::new(Sender {
+            track_id: state.id(),
+            caps,
+            transceiver,
+            enabled_general: Cell::new(state.is_enabled_general()),
+            enabled_individual: Cell::new(state.is_enabled_individual()),
+            muted: Cell::new(state.is_muted()),
+            track_events_sender,
+            send_constraints,
+        });
+
+        if !enabled_in_cons {
+            state.media_exchange_state_controller().transition_to(
+                media_exchange_state::Stable::from(enabled_in_cons),
+            );
+        }
+        if muted_in_cons {
+            state
+                .mute_state_controller()
+                .transition_to(mute_state::Stable::from(muted_in_cons));
+        }
+
+        Ok(this)
+    }
+
+    /// Updates `enabled_general` property of this [`Sender`] to the provided
+    /// one.
+    #[inline]
     pub fn set_enabled_general(&self, enabled_general: bool) {
         self.enabled_general.set(enabled_general);
     }
 
+    /// Updates `enabled_individual` property of this [`Sender`] to the provided
+    /// one.
+    #[inline]
     pub fn set_enabled_individual(&self, enable_individual: bool) {
         self.enabled_individual.set(enable_individual);
     }
 
+    /// Updates `muted` property of this [`Sender`] to the provided one.
+    #[inline]
     pub fn set_muted(&self, muted: bool) {
         self.muted.set(muted);
     }
@@ -207,51 +222,59 @@ impl Sender {
         self.transceiver.clone()
     }
 
+    /// Returns [`mid`] of this [`Sender`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    #[inline]
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }
 
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// [`media_exchange_state`].
     pub fn send_media_exchange_state_intention(
         &self,
         state: media_exchange_state::Transition,
     ) {
         match state {
             media_exchange_state::Transition::Enabling(_) => {
-                self.track_events_sender.unbounded_send(
-                    TrackEvent::MediaExchangeIntention {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MediaExchangeIntention {
                         id: self.track_id,
                         enabled: true,
-                    },
-                );
+                    })
+                    .ok();
             }
             media_exchange_state::Transition::Disabling(_) => {
-                self.track_events_sender.unbounded_send(
-                    TrackEvent::MediaExchangeIntention {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MediaExchangeIntention {
                         id: self.track_id,
                         enabled: false,
-                    },
-                );
+                    })
+                    .ok();
             }
         }
     }
 
+    /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided
+    /// [`mute_state`].
     pub fn send_mute_state_intention(&self, state: mute_state::Transition) {
         match state {
             mute_state::Transition::Muting(_) => {
-                self.track_events_sender.unbounded_send(
-                    TrackEvent::MuteUpdateIntention {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MuteUpdateIntention {
                         id: self.track_id,
                         muted: true,
-                    },
-                );
+                    })
+                    .ok();
             }
             mute_state::Transition::Unmuting(_) => {
-                self.track_events_sender.unbounded_send(
-                    TrackEvent::MuteUpdateIntention {
+                self.track_events_sender
+                    .unbounded_send(TrackEvent::MuteUpdateIntention {
                         id: self.track_id,
                         muted: false,
-                    },
-                );
+                    })
+                    .ok();
             }
         }
     }
@@ -264,24 +287,20 @@ impl Sender {
     #[inline]
     #[must_use]
     pub fn general_disabled(&self) -> bool {
-        // self.general_media_exchange_state.get()
-        //     == media_exchange_state::Stable::Disabled
-        todo!()
+        !self.enabled_general.get()
     }
 
     /// Indicates whether this [`Sender`] is disabled.
     #[inline]
     #[must_use]
     pub fn disabled(&self) -> bool {
-        // self.media_exchange_state.disabled()
-        todo!()
+        !self.enabled_individual.get()
     }
 
     /// Indicates whether this [`Sender`] is muted.
     #[inline]
     #[must_use]
     pub fn muted(&self) -> bool {
-        // self.mute_state.muted()
-        todo!()
+        self.muted.get()
     }
 }

@@ -313,6 +313,7 @@ mod disable_recv_tracks {
                 assert!(video_recv); // enabled
                 assert!(!audio_recv); // disabled
             }
+            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
@@ -725,6 +726,7 @@ mod disable_send_tracks {
                 assert!(!audio); // disabled
                 assert!(video); // enabled
             }
+            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
@@ -776,6 +778,7 @@ mod disable_send_tracks {
                 assert!(audio); // enabled
                 assert!(!video); // disabled
             }
+            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
@@ -2015,7 +2018,7 @@ mod set_local_media_settings {
     #[wasm_bindgen_test]
     async fn set_local_media_stream_settings_updates_media_exchange_state() {
         let (event_tx, event_rx) = mpsc::unbounded();
-        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        let (room, commands_rx) = get_test_room(Box::pin(event_rx));
         let room_handle = room.new_handle();
         room_handle
             .on_failed_local_media(js_sys::Function::new_no_args(""))
@@ -2041,25 +2044,17 @@ mod set_local_media_settings {
         delay_for(10).await;
 
         spawn_local(async move {
-            let err = get_constraints_update_exception(
-                JsFuture::from(room_handle.set_local_media_settings(
-                    &media_stream_settings(true, true),
-                    false,
-                    false,
-                ))
-                .await
-                .unwrap_err(),
-            );
-            let err = get_jason_error(err.error());
-            assert_eq!(err.name(), "MediaConnections");
-            assert_eq!(
-                err.message(),
-                "Some MediaConnectionsError: MediaState of Sender transits \
-                 into opposite to expected MediaExchangeState"
-            );
+            JsFuture::from(room_handle.set_local_media_settings(
+                &media_stream_settings(true, true),
+                false,
+                false,
+            ))
+            .await
+            .unwrap();
         });
         yield_now().await;
 
+        let mut commands_rx = commands_rx.skip(1);
         while let Some(update_tracks_cmd) = commands_rx.next().await {
             if let Command::UpdateTracks {
                 peer_id,

@@ -2,8 +2,13 @@
 
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use futures::{future, future::Either, FutureExt, StreamExt};
-use medea_reactive::{ObservableCell, ProgressableCell, RecheckableFutureExt};
+use futures::{
+    future,
+    future::{Either, LocalBoxFuture},
+    stream::LocalBoxStream,
+    FutureExt as _, StreamExt as _,
+};
+use medea_reactive::{Guarded, Processed, ProgressableCell};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -17,7 +22,6 @@ use crate::{
 };
 
 use super::TransitableState;
-use futures::stream::LocalBoxStream;
 
 /// [`TransitableStateController`] for the [`mute_state`].
 pub type MuteStateController =
@@ -109,6 +113,10 @@ where
         });
     }
 
+    /// Returns [`Stream`] into which the [`TransitableState::Stable`] updates
+    /// will be emitted.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     pub fn subscribe_stable(&self) -> LocalBoxStream<'static, S> {
         self.state
             .subscribe()
@@ -123,6 +131,10 @@ where
             .boxed_local()
     }
 
+    /// Returns [`Stream`] into which the [`TransitableState::Transition`]
+    /// updates will be emitted.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     pub fn subscribe_transition(&self) -> LocalBoxStream<'static, T> {
         self.state
             .subscribe()
@@ -207,16 +219,22 @@ where
         .boxed_local()
     }
 
-    pub fn when_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
+    /// Returns [`Processed`] that will be resolved when all the underlying data
+    /// updates will be processed by all subscribers.
+    pub fn when_processed(&self) -> Processed<'static> {
         self.state.when_all_processed()
     }
 
-    pub fn when_stabilized(&self) -> future::LocalBoxFuture<'static, ()> {
+    /// Returns [`Future`] which will be resolved when [`TransitableState`] will
+    /// be transited to the [`TransitableState::Stable`].
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         let mut sub = self.state.subscribe();
 
         Box::pin(async move {
             while let Some(TransitableState::Transition(_)) =
-                sub.next().await.map(|g| g.into_inner())
+                sub.next().await.map(Guarded::into_inner)
             {}
         })
     }

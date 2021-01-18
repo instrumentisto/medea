@@ -3,7 +3,7 @@ use std::time::Duration;
 use function_name::named;
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{Direction, Event, TrackUpdate};
-use medea_control_api_proto::grpc::api::{self as proto};
+use medea_control_api_proto::grpc::api::{self as proto, member::Credentials};
 use tokio::time::delay_for;
 
 use crate::{
@@ -35,7 +35,7 @@ pub fn create_room_req(room_id: &str) -> proto::CreateRequest {
         .add_member(
             MemberBuilder::default()
                 .id("second")
-                .credentials("test")
+                .credentials(Credentials::Plain(String::from("test")))
                 .add_endpoint(
                     WebRtcPublishEndpointBuilder::default()
                         .id("publish")
@@ -74,6 +74,7 @@ async fn add_endpoints_synchronization() {
         None,
         TestMember::DEFAULT_DEADLINE,
         true,
+        true,
     )
     .await;
 
@@ -86,6 +87,7 @@ async fn add_endpoints_synchronization() {
         None,
         TestMember::DEFAULT_DEADLINE,
         false,
+        true,
     )
     .await;
 

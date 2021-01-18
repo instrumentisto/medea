@@ -56,14 +56,14 @@ async fn get_test_media_connections(
         .unwrap();
 
     media_connections
-        .get_sender_by_id(audio_track_id)
+        .get_sender_state_by_id(audio_track_id)
         .unwrap()
         .media_state_transition_to(
             media_exchange_state::Stable::from(enabled_audio).into(),
         )
         .unwrap();
     media_connections
-        .get_sender_by_id(video_track_id)
+        .get_sender_state_by_id(video_track_id)
         .unwrap()
         .media_state_transition_to(
             media_exchange_state::Stable::from(enabled_video).into(),
@@ -119,13 +119,15 @@ async fn new_media_connections_with_disabled_audio_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
         get_test_media_connections(false, true).await;
 
-    let audio_track =
-        media_connections.get_sender_by_id(audio_track_id).unwrap();
-    let video_track =
-        media_connections.get_sender_by_id(video_track_id).unwrap();
+    let audio_track = media_connections
+        .get_sender_state_by_id(audio_track_id)
+        .unwrap();
+    let video_track = media_connections
+        .get_sender_state_by_id(video_track_id)
+        .unwrap();
 
-    assert!(audio_track.general_disabled());
-    assert!(!video_track.general_disabled());
+    assert!(!audio_track.enabled());
+    assert!(video_track.enabled());
 }
 
 #[wasm_bindgen_test]
@@ -133,13 +135,15 @@ async fn new_media_connections_with_disabled_video_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
         get_test_media_connections(true, false).await;
 
-    let audio_track =
-        media_connections.get_sender_by_id(audio_track_id).unwrap();
-    let video_track =
-        media_connections.get_sender_by_id(video_track_id).unwrap();
+    let audio_track = media_connections
+        .get_sender_state_by_id(audio_track_id)
+        .unwrap();
+    let video_track = media_connections
+        .get_sender_state_by_id(video_track_id)
+        .unwrap();
 
-    assert!(!audio_track.general_disabled());
-    assert!(video_track.general_disabled());
+    assert!(audio_track.enabled());
+    assert!(!video_track.enabled());
 }
 
 /// Tests for [`Sender::update`] function.
@@ -318,7 +322,7 @@ mod receiver_patch {
         });
         receiver.state().when_updated().await;
 
-        assert!(!receiver.is_general_disabled());
+        assert!(receiver.enabled_general());
     }
 
     #[wasm_bindgen_test]
@@ -332,7 +336,7 @@ mod receiver_patch {
         });
         receiver.state().when_updated().await;
 
-        assert!(receiver.is_general_disabled());
+        assert!(!receiver.enabled_general());
     }
 
     #[wasm_bindgen_test]
@@ -346,7 +350,7 @@ mod receiver_patch {
         });
         receiver.state().when_updated().await;
 
-        assert!(!receiver.is_general_disabled());
+        assert!(receiver.enabled_general());
     }
 
     #[wasm_bindgen_test]
@@ -359,7 +363,7 @@ mod receiver_patch {
             muted: None,
         });
         receiver.state().when_updated().await;
-        assert!(receiver.is_general_disabled());
+        assert!(!receiver.enabled_general());
 
         receiver.state().update(&TrackPatchEvent {
             id: TRACK_ID,
@@ -369,7 +373,7 @@ mod receiver_patch {
         });
         receiver.state().when_updated().await;
 
-        assert!(receiver.is_general_disabled());
+        assert!(!receiver.enabled_general());
     }
 
     #[wasm_bindgen_test]
@@ -383,7 +387,7 @@ mod receiver_patch {
         });
         receiver.state().when_updated().await;
 
-        assert!(!receiver.is_general_disabled());
+        assert!(receiver.enabled_general());
     }
 
     /// Checks that [`Receiver`]'s media exchange state can be changed by

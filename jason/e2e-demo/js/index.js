@@ -65,7 +65,7 @@ async function createRoom(roomId, memberId) {
       pipeline: {
         [memberId]: {
           kind: 'Member',
-          credentials: 'test',
+          credentials: { plain: 'test' },
           pipeline: pipeline,
           on_join: 'grpc://127.0.0.1:9099',
           on_leave: 'grpc://127.0.0.1:9099'
@@ -130,7 +130,7 @@ async function createMember(roomId, memberId) {
     url: controlUrl + roomId + '/' + memberId,
     data: {
       kind: 'Member',
-      credentials: 'test',
+      credentials: { plain: 'test' },
       pipeline: pipeline,
       on_join: 'grpc://127.0.0.1:9099',
       on_leave: 'grpc://127.0.0.1:9099'

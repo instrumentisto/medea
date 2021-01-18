@@ -4,16 +4,16 @@
 mod errors;
 
 mod callback;
-#[macro_use]
 pub mod component;
 mod event_listener;
 mod resettable_delay;
 
-use std::{convert::TryInto as _, ops::Mul, time::Duration};
+use std::{convert::TryInto as _, future::Future, ops::Mul, time::Duration};
 
 use derive_more::{From, Sub};
-use futures::future::AbortHandle;
+use futures::future::{self, AbortHandle};
 use js_sys::{Promise, Reflect};
+use medea_reactive::Guarded;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Window;
@@ -183,4 +183,17 @@ macro_rules! upgrade_or_break {
             break;
         }
     };
+}
+
+/// Returns [`Future`] which will return the provided value being
+/// [`Guarded::transpose()`]d.
+///
+/// Intended for use in [`StreamExt::filter_map()`].
+///
+/// [`StreamExt::filter_map()`]: futures::StreamExt::filter_map
+#[inline]
+pub fn transpose_guarded<T>(
+    val: Guarded<Option<T>>,
+) -> impl Future<Output = Option<Guarded<T>>> {
+    future::ready(val.transpose())
 }

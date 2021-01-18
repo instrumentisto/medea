@@ -235,7 +235,7 @@ pub fn get_test_recv_tracks() -> (Track, Track) {
     )
 }
 
-const TEST_ROOM_URL: &str = "ws://example.com/room_id/member_id/token";
+const TEST_ROOM_URL: &str = "ws://example.com/room_id/member_id?token=token";
 
 pub fn join_room_url() -> ApiUrl {
     Url::parse("ws://example.com/ws").unwrap().into()

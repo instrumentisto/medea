@@ -13,7 +13,8 @@ use crate::{
     log::prelude::*,
 };
 
-type Result<T> = std::result::Result<T, CallbackClientError>;
+/// Shortcut for [`Result`] of methods in this module.
+type CallbackResult<T = ()> = Result<T, CallbackClientError>;
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
 #[derive(Debug, Display, From)]
@@ -31,7 +32,7 @@ pub enum CallbackClientError {
 #[cfg_attr(test, mockall::automock)]
 pub trait CallbackClient: fmt::Debug + Send + Sync {
     /// Sends provided [`CallbackRequest`].
-    async fn send(&self, request: CallbackRequest) -> Result<()>;
+    async fn send(&self, request: CallbackRequest) -> CallbackResult;
 }
 
 #[cfg(test)]
@@ -43,7 +44,7 @@ pub trait CallbackClientFactory {
     /// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
     fn build(
         url: CallbackUrl,
-    ) -> LocalBoxFuture<'static, Result<Arc<dyn CallbackClient>>>;
+    ) -> LocalBoxFuture<'static, CallbackResult<Arc<dyn CallbackClient>>>;
 }
 
 #[cfg(test)]
@@ -57,7 +58,7 @@ impl CallbackClientFactory for CallbackClientFactoryImpl {
     #[inline]
     fn build(
         url: CallbackUrl,
-    ) -> LocalBoxFuture<'static, Result<Arc<dyn CallbackClient>>> {
+    ) -> LocalBoxFuture<'static, CallbackResult<Arc<dyn CallbackClient>>> {
         info!("Creating CallbackClient for URL: {}", url);
         match url {
             CallbackUrl::Grpc(grpc_url) => async move {

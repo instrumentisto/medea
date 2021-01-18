@@ -485,8 +485,7 @@ impl RtcPeerConnection {
         self.ice_restart.set(true);
     }
 
-    /// Sets local description to the provided one with a provided
-    /// [`RtcSdpType`].
+    /// Sets local description to the provided one [`RtcSdpType`].
     ///
     /// # Errors
     ///
@@ -563,8 +562,8 @@ impl RtcPeerConnection {
         Ok(answer)
     }
 
-    /// Rollbacks underlying [RTCPeerConnection][`SysRtcPeerConnection`] to the
-    /// previous stable state.
+    /// Rollbacks the underlying [RTCPeerConnection][`SysRtcPeerConnection`] to
+    /// the previous stable state.
     ///
     /// # Errors
     ///

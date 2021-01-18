@@ -40,7 +40,7 @@ pub enum SessionError {
     NoCredentials,
 
     /// [`WebSocketRpcSession`] authorization on the server was failed.
-    #[display(fmt = "RPC Session authorization on the server was failed")]
+    #[display(fmt = "Failed to authorize RPC session")]
     AuthorizationFailed,
 
     /// [`WebSocketRpcClient`] returned [`RpcClientError`].

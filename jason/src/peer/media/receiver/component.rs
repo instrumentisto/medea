@@ -1,69 +1,35 @@
-//! Implementation of [`Component`] for `MediaTrack` with a `Recv` direction.
+//! [`Component`] for `MediaTrack` with a `Recv` direction.
 
 use std::rc::Rc;
 
+use medea_client_api_proto as proto;
+use futures::future::LocalBoxFuture;
 use futures::StreamExt as _;
-use futures::{channel::mpsc, future::LocalBoxFuture};
 use medea_client_api_proto::{
-    state as proto_state, MediaSourceKind, MediaType, MemberId, TrackId,
-    TrackPatchEvent,
+    MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
-use medea_macro::{watch, watchers};
-use medea_reactive::{
-    Guarded, ObservableCell, ProgressableCell, RecheckableFutureExt,
-};
+use medea_macro::watchers;
+use medea_reactive::{AllProcessed, Guarded, ProgressableCell, ObservableCell};
 
 use crate::{
-    media::RecvConstraints,
     peer::{
-        component::SyncState,
-        media::{
-            media_exchange_state, InTransition, MediaStateControllable, Result,
-        },
-        MediaConnections, MediaExchangeState, MediaExchangeStateController,
-        MuteState, MuteStateController, TrackEvent, TransceiverDirection,
-        TransceiverSide,
+        media::{transitable_state::media_exchange_state, Result},
+        MediaExchangeStateController, MediaStateControllable,
+        MuteStateController, TransceiverDirection, TransceiverSide,
     },
-    utils::{component, AsProtoState, SynchronizableState, Updatable},
+    utils::component,
     MediaKind,
 };
 
 use super::Receiver;
+use crate::peer::component::SyncState;
+use crate::peer::MediaExchangeState;
+use crate::utils::{Updatable, AsProtoState, SynchronizableState};
+use crate::peer::media::InTransition;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
 pub type Component = component::Component<State, Receiver>;
-
-impl Component {
-    /// Returns new [`Component`] with a provided [`State`].
-    #[inline]
-    pub fn new(
-        state: Rc<State>,
-        media_connections: &MediaConnections,
-        track_events_sender: mpsc::UnboundedSender<TrackEvent>,
-        recv_constraints: &RecvConstraints,
-    ) -> Self {
-        let enabled = match &state.media_type {
-            MediaType::Audio(_) => recv_constraints.is_audio_enabled(),
-            MediaType::Video(_) => recv_constraints.is_video_enabled(),
-        };
-
-        state.media_exchange_state.transition_to(enabled.into());
-
-        let recv = Receiver::new(
-            media_connections,
-            state.id,
-            state.media_type().clone().into(),
-            state.sender_id().clone(),
-            state.mid().clone(),
-            state.enabled_general(),
-            state.enabled_individual(),
-            track_events_sender,
-        );
-
-        spawn_component!(Component, state, Rc::new(recv))
-    }
-}
 
 /// State of the [`Component`].
 #[derive(Debug)]
@@ -80,14 +46,14 @@ pub struct State {
     sender_id: MemberId,
 
     media_exchange_state: Rc<MediaExchangeStateController>,
-
-    general_media_exchange_state: ObservableCell<media_exchange_state::Stable>,
+    general_media_exchange_state:
+    ProgressableCell<media_exchange_state::Stable>,
 
     sync_state: ObservableCell<SyncState>,
 }
 
 impl AsProtoState for State {
-    type Output = proto_state::Receiver;
+    type Output = proto::state::Receiver;
 
     fn as_proto(&self) -> Self::Output {
         Self::Output {
@@ -103,7 +69,7 @@ impl AsProtoState for State {
 }
 
 impl SynchronizableState for State {
-    type Input = proto_state::Receiver;
+    type Input = proto::state::Receiver;
 
     fn from_proto(input: Self::Input) -> Self {
         Self {
@@ -114,7 +80,7 @@ impl SynchronizableState for State {
             media_exchange_state: MediaExchangeStateController::new(
                 input.enabled_individual.into(),
             ),
-            general_media_exchange_state: ObservableCell::new(
+            general_media_exchange_state: ProgressableCell::new(
                 input.enabled_general.into(),
             ),
             sync_state: ObservableCell::new(SyncState::Synced),
@@ -155,14 +121,14 @@ impl Updatable for State {
         )
     }
 
-    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
-        Box::new(medea_reactive::join_all(vec![
-            self.media_exchange_state.when_processed()
-        ]))
+    fn when_updated(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            self.media_exchange_state.when_processed().into(),
+        ])
     }
 }
 
-impl From<&State> for proto_state::Receiver {
+impl From<&State> for proto::state::Receiver {
     fn from(from: &State) -> Self {
         Self {
             id: from.id,
@@ -176,8 +142,8 @@ impl From<&State> for proto_state::Receiver {
     }
 }
 
-impl From<proto_state::Receiver> for State {
-    fn from(from: proto_state::Receiver) -> Self {
+impl From<proto::state::Receiver> for State {
+    fn from(from: proto::state::Receiver) -> Self {
         Self {
             id: from.id,
             mid: from.mid,
@@ -186,7 +152,7 @@ impl From<proto_state::Receiver> for State {
             media_exchange_state: MediaExchangeStateController::new(
                 from.enabled_individual.into(),
             ),
-            general_media_exchange_state: ObservableCell::new(
+            general_media_exchange_state: ProgressableCell::new(
                 from.enabled_general.into(),
             ),
             sync_state: ObservableCell::new(SyncState::Synced),
@@ -201,12 +167,7 @@ impl State {
         mid: Option<String>,
         media_type: MediaType,
         sender: MemberId,
-        recv_constraints: &RecvConstraints,
     ) -> Self {
-        let enabled = match &media_type {
-            MediaType::Audio(_) => recv_constraints.is_audio_enabled(),
-            MediaType::Video(_) => recv_constraints.is_video_enabled(),
-        };
         Self {
             id,
             mid,
@@ -215,25 +176,28 @@ impl State {
             media_exchange_state: MediaExchangeStateController::new(
                 true.into(),
             ),
-            general_media_exchange_state: ObservableCell::new(true.into()),
+            general_media_exchange_state: ProgressableCell::new(true.into()),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
     /// Returns [`TrackId`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn id(&self) -> TrackId {
         self.id
     }
 
     /// Returns current `mid` of this [`State`].
     #[inline]
-    pub fn mid(&self) -> &Option<String> {
-        &self.mid
+    #[must_use]
+    pub fn mid(&self) -> Option<&str> {
+        self.mid.as_deref()
     }
 
     /// Returns current [`MediaType`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn media_type(&self) -> &MediaType {
         &self.media_type
     }
@@ -241,44 +205,38 @@ impl State {
     /// Returns current [`MemberId`] of the `Member` from which this
     /// [`State`] should receive media data.
     #[inline]
+    #[must_use]
     pub fn sender_id(&self) -> &MemberId {
         &self.sender_id
     }
 
-    /// Returns current individual media exchange state of this
-    /// [`State`].
+    /// Returns current individual media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn enabled_individual(&self) -> bool {
         self.media_exchange_state.enabled()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
+    #[must_use]
     pub fn enabled_general(&self) -> bool {
-        self.general_media_exchange_state.get() == media_exchange_state::Stable::Enabled
+        self.general_media_exchange_state.get()
+            == media_exchange_state::Stable::Enabled
     }
 
-    /// Updates this [`State`] with a provided [`TrackPatchEvent`].
+    /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.id != track_patch.id {
             return;
         }
         if let Some(enabled_general) = track_patch.enabled_general {
-            self.general_media_exchange_state.set(enabled_general.into());
+            self.general_media_exchange_state
+                .set(enabled_general.into());
         }
         if let Some(enabled_individual) = track_patch.enabled_individual {
             self.media_exchange_state.update(enabled_individual.into());
         }
-    }
-
-    /// Returns [`Future`] which will be resolved when [`State`] update
-    /// will be applied on [`Receiver`].
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> impl RecheckableFutureExt<Output = ()> {
-        medea_reactive::join_all(vec![
-            self.media_exchange_state.when_processed()
-        ])
     }
 
     pub fn connection_lost(&self) {
@@ -288,16 +246,59 @@ impl State {
     pub fn connection_recovered(&self) {
         self.sync_state.set(SyncState::Syncing);
     }
+
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Receiver`].
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn when_updated(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            self.media_exchange_state.when_processed().into(),
+            self.general_media_exchange_state
+                .when_all_processed()
+                .into(),
+        ])
+    }
+
+    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
+    /// will be stabilized.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        self.media_exchange_state.when_stabilized()
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl State {
+    /// Stabilizes [`MediaExchangeState`] of this [`State`].
+    #[inline]
+    pub fn stabilize(&self) {
+        use crate::peer::media::InTransition as _;
+
+        if let crate::peer::MediaExchangeState::Transition(transition) =
+            self.media_exchange_state.state()
+        {
+            self.media_exchange_state.update(transition.intended());
+            self.general_media_exchange_state.set(transition.intended());
+        }
+    }
 }
 
 #[watchers]
 impl Component {
-    #[watch(self.state().general_media_exchange_state.subscribe())]
-    async fn general_media_exchange_state_watcher(
+    /// Watcher for the [`State::general_media_exchange_state`] update.
+    ///
+    /// Updates [`Receiver`]'s general media exchange state. Adds or removes
+    /// [`TransceiverDirection::RECV`] from the [`Transceiver`] of the
+    /// [`Receiver`].
+    #[watch(self.general_media_exchange_state.subscribe())]
+    async fn general_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
-        state: media_exchange_state::Stable,
+        state: Guarded<media_exchange_state::Stable>,
     ) -> Result<()> {
+        let (state, _guard) = state.into_parts();
         receiver
             .enabled_general
             .set(state == media_exchange_state::Stable::Enabled);
@@ -324,8 +325,11 @@ impl Component {
         Ok(())
     }
 
-    #[watch(self.state().media_exchange_state.subscribe_stable())]
-    async fn stable_media_exchange_state_watcher(
+    /// Watcher for [`MediaExchangeState::Stable`] update.
+    ///
+    /// Updates [`Receiver::enabled_individual`] to the new state.
+    #[watch(self.media_exchange_state.subscribe_stable())]
+    async fn stable_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Stable,
@@ -337,8 +341,12 @@ impl Component {
         Ok(())
     }
 
-    #[watch(self.state().media_exchange_state.subscribe_transition())]
-    async fn transition_media_exchange_state_watcher(
+    /// Watcher for [`MediaExchangeState::Transition`] update.
+    ///
+    /// Sends new intention by [`Receiver::send_media_exchange_state_intention`]
+    /// call.
+    #[watch(self.media_exchange_state.subscribe_transition())]
+    async fn transition_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Transition,
@@ -348,7 +356,7 @@ impl Component {
         Ok(())
     }
 
-    #[watch(self.state().sync_state.subscribe().skip(1))]
+    #[watch(self.sync_state.subscribe().skip(1))]
     async fn sync_state_watcher(
         receiver: Rc<Receiver>,
         state: Rc<State>,
@@ -363,6 +371,30 @@ impl Component {
         }
 
         Ok(())
+    }
+}
+
+impl TransceiverSide for State {
+    fn track_id(&self) -> TrackId {
+        self.id
+    }
+
+    fn kind(&self) -> MediaKind {
+        match &self.media_type {
+            MediaType::Audio(_) => MediaKind::Audio,
+            MediaType::Video(_) => MediaKind::Video,
+        }
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+        match &self.media_type {
+            MediaType::Audio(_) => MediaSourceKind::Device,
+            MediaType::Video(video) => video.source_kind,
+        }
+    }
+
+    fn is_transitable(&self) -> bool {
+        true
     }
 }
 
@@ -400,29 +432,5 @@ impl MediaStateControllable for State {
     fn reset_media_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
             .reset_transition_timeout();
-    }
-}
-
-impl TransceiverSide for State {
-    fn track_id(&self) -> TrackId {
-        self.id
-    }
-
-    fn kind(&self) -> MediaKind {
-        match &self.media_type {
-            MediaType::Audio(_) => MediaKind::Audio,
-            MediaType::Video(_) => MediaKind::Video,
-        }
-    }
-
-    fn source_kind(&self) -> MediaSourceKind {
-        match &self.media_type {
-            MediaType::Audio(_) => MediaSourceKind::Device,
-            MediaType::Video(video) => video.source_kind,
-        }
-    }
-
-    fn is_transitable(&self) -> bool {
-        true
     }
 }

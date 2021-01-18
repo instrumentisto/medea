@@ -88,15 +88,25 @@ pub struct TestMember {
 
     /// Whether to handle negotiation in [`TestMember`].
     auto_negotiation: bool,
+
+    /// Whether to handle room management ([`Event::RoomJoined`] /
+    /// [`Event::RoomLeft`]) in [`TestMember`].
+    auto_room_management: bool,
 }
 
 pub fn parse_join_room_url(url: &str) -> (Url, RoomId, MemberId, Credential) {
     let mut url = Url::parse(&url).unwrap();
     url.set_fragment(None);
+    let token = url
+        .query_pairs()
+        .find(|(key, _)| key.as_ref() == "token")
+        .unwrap()
+        .1
+        .into_owned()
+        .into();
     url.set_query(None);
 
     let mut segments = url.path_segments().unwrap().rev();
-    let token = segments.next().unwrap().to_owned().into();
     let member_id = segments.next().unwrap().to_owned().into();
     let room_id = segments.next().unwrap().to_owned().into();
     url.set_path("/ws");
@@ -147,6 +157,7 @@ impl TestMember {
         on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
         auto_negotiation: bool,
+        auto_room_management: bool,
     ) -> Addr<Self> {
         let (url, room_id, member_id, token) = parse_join_room_url(url);
         let (_, framed) =
@@ -167,6 +178,7 @@ impl TestMember {
                 on_message,
                 on_connection_event,
                 auto_negotiation,
+                auto_room_management,
             };
             this.authorize(member_id, token);
 
@@ -193,6 +205,7 @@ impl TestMember {
                 on_message,
                 on_connection_event,
                 deadline,
+                true,
                 true,
             )
             .await;
@@ -298,11 +311,13 @@ impl StreamHandler<Result<Frame, WsProtocolError>> for TestMember {
                 ServerMsg::Ping(id) => self.send_pong(id),
                 ServerMsg::Event { room_id, event } => {
                     assert_eq!(self.room_id, room_id);
-                    if matches!(
-                        event,
-                        Event::RoomJoined { .. } | Event::RoomLeft { .. }
-                    ) {
-                        return;
+                    if self.auto_room_management {
+                        if matches!(
+                            event,
+                            Event::RoomJoined { .. } | Event::RoomLeft { .. }
+                        ) {
+                            return;
+                        }
                     }
                     if self.auto_negotiation {
                         match &event {

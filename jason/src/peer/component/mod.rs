@@ -12,7 +12,7 @@ use medea_client_api_proto::{
     self as proto, state as proto_state, IceCandidate, IceServer,
     NegotiationRole, PeerId, TrackId,
 };
-use medea_reactive::{ObservableCell, ProgressableCell, RecheckableFutureExt};
+use medea_reactive::{ObservableCell, ProgressableCell, AllProcessed};
 use tracerr::Traced;
 
 use crate::{
@@ -35,39 +35,6 @@ use crate::utils::delay_for;
 
 /// Component responsible for the [`PeerConnection`] updating.
 pub type Component = component::Component<State, PeerConnection>;
-
-impl Component {
-    /// Returns new [`Component`] based on the provided [`State`].
-    ///
-    /// This function will spawn all [`Component`]'s watchers automatically.
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`PeerError`] if [`PeerConnection::new`] method fails.
-    #[inline]
-    pub fn new(
-        state: Rc<State>,
-        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        media_manager: Rc<MediaManager>,
-        send_constraints: LocalTracksConstraints,
-        connections: Rc<Connections>,
-        recv_constraints: Rc<RecvConstraints>,
-    ) -> Result<Self, Traced<PeerError>> {
-        let peer = PeerConnection::new(
-            state.id,
-            peer_events_sender,
-            state.ice_servers().clone(),
-            media_manager,
-            state.force_relay(),
-            send_constraints,
-            connections,
-            recv_constraints,
-        )
-        .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(spawn_component!(Component, state, peer))
-    }
-}
 
 /// Negotiation state of the [`PeerComponent`].
 ///
@@ -155,11 +122,9 @@ pub struct State {
     /// Negotiation state of the [`PeerComponent`].
     negotiation_state: ObservableCell<NegotiationState>,
 
-    /// Current SDP offer of this [`PeerComponent`].
-    sdp_offer: LocalSdp,
+    local_sdp: LocalSdp,
 
-    /// Current SDP offer of the partner [`PeerComponent`].
-    remote_sdp_offer: ProgressableCell<Option<String>>,
+    remote_sdp: ProgressableCell<Option<String>>,
 
     /// Flag which indicates that ICE restart should be performed.
     restart_ice: ObservableCell<bool>,
@@ -186,14 +151,21 @@ impl State {
             receivers: TracksRepository::new(),
             ice_servers,
             force_relay,
-            remote_sdp_offer: ProgressableCell::new(None),
-            sdp_offer: LocalSdp::new(),
+            remote_sdp: ProgressableCell::new(None),
+            local_sdp: LocalSdp::new(),
             negotiation_role: ObservableCell::new(negotiation_role),
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: ObservableCell::new(false),
             ice_candidates: IceCandidates::new(),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
+    }
+
+    /// Returns [`Id`] of this [`State`].
+    #[inline]
+    #[must_use]
+    pub fn id(&self) -> PeerId {
+        self.id
     }
 
     /// Returns all [`IceServer`]s of this [`State`].
@@ -257,8 +229,8 @@ impl State {
 
     /// Sets remote SDP offer to the provided value.
     #[inline]
-    pub fn set_remote_sdp_offer(&self, new_remote_sdp_offer: String) {
-        self.remote_sdp_offer.set(Some(new_remote_sdp_offer));
+    pub fn set_remote_sdp(&self, sdp: String) {
+        self.remote_sdp.set(Some(sdp));
     }
 
     /// Adds [`IceCandidate`] for the [`State`].
@@ -267,16 +239,23 @@ impl State {
         self.ice_candidates.add(ice_candidate);
     }
 
+    /// Marks current [`LocalSdp`] as approved by server.
+    #[inline]
+    pub fn apply_local_sdp(&self, sdp: String) {
+        self.local_sdp.approved_set(sdp);
+    }
+
     /// Returns current SDP offer of this [`State`].
     #[inline]
     pub fn current_sdp_offer(&self) -> Option<String> {
-        self.sdp_offer.current()
+        self.local_sdp.current()
     }
 
     /// Marks current [`LocalSdp`] as approved by server.
     #[inline]
     pub fn sdp_offer_applied(&self, sdp_offer: &str) {
-        self.sdp_offer.approve(sdp_offer);
+        // TODO: take String
+        self.local_sdp.approved_set(sdp_offer.to_string());
     }
 
     /// Stops all timeouts of the [`State`].
@@ -284,7 +263,7 @@ impl State {
     /// Stops [`LocalSdp`] rollback timeout.
     #[inline]
     pub fn stop_timeouts(&self) {
-        self.sdp_offer.stop_timeout();
+        self.local_sdp.stop_timeout();
     }
 
     /// Resumes all timeouts of the [`State`].
@@ -292,7 +271,7 @@ impl State {
     /// Resumes [`LocalSdp`] rollback timeout.
     #[inline]
     pub fn resume_timeouts(&self) {
-        self.sdp_offer.resume_timeout();
+        self.local_sdp.resume_timeout();
     }
 
     /// Notifies [`PeerComponent`] about RPC connection loss.
@@ -343,8 +322,7 @@ impl State {
     pub fn insert_track(
         &self,
         track: &proto::Track,
-        send_constraints: &LocalTracksConstraints,
-        recv_constraints: &RecvConstraints,
+        send_constraints: LocalTracksConstraints,
     ) -> Result<(), Traced<PeerError>> {
         match &track.direction {
             proto::Direction::Send { receivers, mid } => {
@@ -358,7 +336,7 @@ impl State {
                             receivers.clone(),
                             send_constraints,
                         )
-                        .map_err(tracerr::map_from_and_wrap!())?,
+                            .map_err(tracerr::map_from_and_wrap!())?,
                     ),
                 );
             }
@@ -370,7 +348,6 @@ impl State {
                         mid.clone(),
                         track.media_type.clone(),
                         sender.clone(),
-                        recv_constraints,
                     )),
                 );
             }
@@ -385,7 +362,7 @@ impl State {
     #[must_use]
     fn when_all_senders_processed(
         &self,
-    ) -> impl RecheckableFutureExt<Output = ()> {
+    ) -> AllProcessed<'static> {
         self.senders.when_all_processed()
     }
 
@@ -395,8 +372,32 @@ impl State {
     #[must_use]
     fn when_all_receivers_processed(
         &self,
-    ) -> impl RecheckableFutureExt<Output = ()> {
+    ) -> AllProcessed<'static> {
         self.receivers.when_all_processed()
+    }
+
+    /// Returns [`Future`] which will be resolved when all [`State::receivers`]
+    /// will be stabilized.
+    fn when_all_receivers_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        self.senders.when_stabilized()
+    }
+
+    /// Returns [`Future`] which will be resolved when all [`State::senders`]
+    /// will be stabilized.
+    fn when_all_senders_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+        self.receivers.when_stabilized()
+    }
+
+    /// Returns [`Future`] resolving when all [`sender::State`]'s and
+    /// [`receiver::State`]'s updates will be applied.
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    pub fn when_all_updated(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            self.senders.when_updated().into(),
+            self.receivers.when_updated().into(),
+        ])
     }
 
     /// Patches [`sender::State`] or [`receiver::State`] with a provided
@@ -458,8 +459,8 @@ impl AsProtoState for State {
             force_relay: self.force_relay,
             ice_servers: self.ice_servers.clone(),
             negotiation_role: self.negotiation_role.get(),
-            sdp_offer: self.sdp_offer.current(),
-            remote_sdp_offer: self.remote_sdp_offer.get(),
+            sdp_offer: self.local_sdp.current(),
+            remote_sdp_offer: self.remote_sdp.get(),
             restart_ice: self.restart_ice.get(),
         }
     }
@@ -500,8 +501,10 @@ impl SynchronizableState for State {
         if state.restart_ice {
             self.restart_ice.set(true);
         }
-        self.sdp_offer.update_offer_by_server(&state.sdp_offer);
-        self.remote_sdp_offer.set(state.remote_sdp_offer);
+        if let Some(sdp_offer) = state.sdp_offer {
+            self.local_sdp.approved_set(sdp_offer);
+        }
+        self.remote_sdp.set(state.remote_sdp_offer);
         self.ice_candidates.apply(state.ice_candidates);
         self.senders.apply(state.senders);
         self.receivers.apply(state.receivers);
@@ -522,10 +525,10 @@ impl Updatable for State {
         )
     }
 
-    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
-        Box::new(medea_reactive::join_all(vec![
-            self.receivers.when_updated(),
-            self.senders.when_updated(),
-        ]))
+    fn when_updated(&self) -> AllProcessed<'static> {
+       medea_reactive::when_all_processed(vec![
+            self.receivers.when_updated().into(),
+            self.senders.when_updated().into(),
+        ])
     }
 }

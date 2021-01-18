@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use futures::channel::oneshot;
+use medea_control_api_proto::grpc::api::member::Credentials;
 
 use crate::{
     grpc_control_api::{ControlClient, MemberBuilder, RoomBuilder},
@@ -23,7 +24,7 @@ async fn rpc_settings_server_msg() {
         .add_member(
             MemberBuilder::default()
                 .id("member")
-                .credentials("test")
+                .credentials(Credentials::Plain(String::from("test")))
                 .ping_interval(Some(Duration::from_secs(
                     PING_INTERVAL_SECS.into(),
                 )))
@@ -43,7 +44,7 @@ async fn rpc_settings_server_msg() {
     let mut end_tx = Some(end_tx);
     let mut is_initial_settings_received = false;
     TestMember::start(
-        format!("ws://127.0.0.1:8080/ws/{}/member/test", ROOM_ID),
+        format!("ws://127.0.0.1:8080/ws/{}/member?token=test", ROOM_ID),
         None,
         Some(Box::new(move |event| {
             if let ConnectionEvent::SettingsReceived(settings) = event {

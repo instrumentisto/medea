@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use derive_more::From;
 use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 use medea_client_api_proto::TrackId;
-use medea_reactive::{Guarded, ProgressableHashMap, RecheckableFutureExt};
+use medea_reactive::{Guarded, ProgressableHashMap, AllProcessed};
 
 
 use crate::{
@@ -29,7 +29,7 @@ impl<S> TracksRepository<S> {
 
     /// Returns [`Future`] which will be resolved when all inserts/removes will
     /// be processed.
-    pub fn when_all_processed(&self) -> impl RecheckableFutureExt<Output = ()> {
+    pub fn when_all_processed(&self) -> AllProcessed<'static> {
         self.0.borrow().when_all_processed()
     }
 
@@ -146,11 +146,11 @@ where
         Box::pin(when.map(|_| ()))
     }
 
-    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>> {
+    fn when_updated(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> =
-            self.0.borrow().values().map(|s| s.when_updated()).collect();
+            self.0.borrow().values().map(|s| s.when_updated().into()).collect();
 
-        Box::new(medea_reactive::join_all(when_futs))
+       medea_reactive::when_all_processed(when_futs)
     }
 }
 

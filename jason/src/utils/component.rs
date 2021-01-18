@@ -1,13 +1,15 @@
 //! Implementation of the [`Component`].
 
-use std::{cell::RefCell, ops::Deref, rc::Rc};
+use std::rc::Rc;
 
 use futures::{future, future::AbortHandle, Future, Stream, StreamExt};
-use medea_reactive::RecheckableFutureExt;
 use wasm_bindgen_futures::spawn_local;
-
-use crate::utils::JasonError;
+use derive_more::Deref;
+use futures::{FutureExt as _};
 use futures::future::LocalBoxFuture;
+
+use crate::utils::{JasonError, TaskHandle};
+use medea_reactive::AllProcessed;
 
 /// Abstraction over state which can be transformed to the states from the
 /// [`medea_client_api_proto::state`].
@@ -40,62 +42,59 @@ pub trait Updatable {
 
     /// Returns [`Future`] which will be resolved when all client updates will
     /// be performed on this state.
-    fn when_updated(&self) -> Box<dyn RecheckableFutureExt<Output = ()>>;
+    fn when_updated(&self) -> AllProcessed<'static>;
 }
 
-/// Creates and spawns new [`Component`].
+/// Component is a base that helps managing reactive components.
 ///
-/// `$state` - type alias for [`Component`] which you wanna create.
-///
-/// `$state` - [`Component`]'s state wrapped to the [`Rc`].
-///
-/// `$ctx` - [`Component`]'s context wrapped to the [`Rc`].
-///
-/// `$global_ctx` - [`Component`]'s global context wrapped to the [`Rc`].
-#[macro_export]
-macro_rules! spawn_component {
-    ($component:ty, $state:expr, $ctx:expr $(,)*) => {{
-        let component = <$component>::inner_new($state, $ctx);
-        component.spawn();
-        component
-    }};
-}
-
-/// Base for all components of this app.
-///
-/// Can spawn new watchers with a [`Component::spawn_watcher`].
-///
-/// Will stop all spawned with a [`Component::spawn_watcher`] watchers on
-/// [`Drop`].
-///
-/// Can be dereferenced to the [`Component`]'s context.
-pub struct Component<S, C> {
+/// It consists of two parts: state and object. Object is listening to its state
+/// changes and updates accordingly, so all mutations are meant to be applied to
+/// the state.
+#[derive(Deref)]
+pub struct Component<S, O> {
+    #[deref]
+    obj: Rc<O>,
     state: Rc<S>,
-    ctx: Rc<C>,
-    watchers_store: RefCell<Vec<AbortHandle>>,
+    _spawned_watchers: Vec<TaskHandle>,
 }
 
-impl<S, C> Component<S, C> {
-    /// Returns new [`Component`] with a provided data.
+impl<S, O> Component<S, O> {
+    /// Returns [`Rc`] to the object managed by this [`Component`].
     #[inline]
-    pub fn inner_new(state: Rc<S>, ctx: Rc<C>) -> Self {
-        Self {
-            state,
-            ctx,
-            watchers_store: RefCell::new(Vec::new()),
-        }
+    #[must_use]
+    pub fn obj(&self) -> Rc<O> {
+        Rc::clone(&self.obj)
     }
 
-    /// Returns [`Rc`] to the context of this [`Component`].
+    /// Returns reference to the state of this [`Component`].
     #[inline]
-    pub fn ctx(&self) -> Rc<C> {
-        self.ctx.clone()
-    }
-
-    /// Returns reference to the state of this [`Component`]
-    #[inline]
+    #[must_use]
     pub fn state(&self) -> &S {
         &self.state
+    }
+
+    /// Returns [`Rc`] to the state of this [`Component`].
+    #[inline]
+    #[must_use]
+    pub fn state_rc(&self) -> Rc<S> {
+        Rc::clone(&self.state)
+    }
+}
+
+impl<S: ComponentState<O> + 'static, O: 'static> Component<S, O> {
+    /// Returns new [`Component`] with a provided object and state.
+    ///
+    /// Spawns all watchers of this [`Component`].
+    pub fn new(obj: Rc<O>, state: Rc<S>) -> Self {
+        let mut watchers_spawner =
+            WatchersSpawner::new(Rc::clone(&state), Rc::clone(&obj));
+        state.spawn_watchers(&mut watchers_spawner);
+
+        Self {
+            state,
+            obj,
+            _spawned_watchers: watchers_spawner.finish(),
+        }
     }
 
     // TODO (evdokimovs): Remove this function.
@@ -104,52 +103,82 @@ impl<S, C> Component<S, C> {
     }
 }
 
-impl<S: 'static, C: 'static> Component<S, C> {
+/// Spawner for the [`Component`]'s watchers.
+pub struct WatchersSpawner<S, O> {
+    state: Rc<S>,
+    obj: Rc<O>,
+    spawned_watchers: Vec<TaskHandle>,
+}
+
+impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
     /// Spawns watchers for the provided [`Stream`].
     ///
-    /// If watcher returns error then this error will be converted to the
-    /// [`JasonError`] and printed with a [`JasonError::print`].
+    /// If watcher returns an error then this error will be converted into the
+    /// [`JasonError`] and printed with a [`JasonError::print()`].
     ///
     /// You can stop all listeners tasks spawned by this function by
-    /// [`Component`] drop.
-    pub fn spawn_watcher<R, V, F, O, E>(&self, mut rx: R, handle: F)
+    /// [`Drop`]ping [`Component`].
+    pub fn spawn<R, V, F, H, E>(&mut self, mut rx: R, handle: F)
     where
-        F: Fn(Rc<C>, Rc<S>, V) -> O + 'static,
+        F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
         R: Stream<Item = V> + Unpin + 'static,
-        O: Future<Output = Result<(), E>> + 'static,
+        H: Future<Output = Result<(), E>> + 'static,
         E: Into<JasonError>,
     {
-        let ctx = Rc::clone(&self.ctx);
+        let obj = Rc::clone(&self.obj);
         let state = Rc::clone(&self.state);
         let (fut, handle) = future::abortable(async move {
             while let Some(value) = rx.next().await {
                 if let Err(e) =
-                    (handle)(Rc::clone(&ctx), Rc::clone(&state), value).await
+                    (handle)(Rc::clone(&obj), Rc::clone(&state), value).await
                 {
                     Into::<JasonError>::into(e).print();
                 }
             }
         });
-        spawn_local(async move {
-            let _ = fut.await;
-        });
-        self.watchers_store.borrow_mut().push(handle);
-    }
-}
+        spawn_local(fut.map(|_| ()));
 
-impl<S, C> Drop for Component<S, C> {
-    fn drop(&mut self) {
-        let handles = self.watchers_store.replace(Vec::default());
-        for handle in handles {
-            handle.abort();
+        self.spawned_watchers.push(handle.into());
+    }
+
+    /// Creates new [`WatchersSpawner`] for the provided object and state.
+    #[inline]
+    #[must_use]
+    fn new(state: Rc<S>, obj: Rc<O>) -> Self {
+        Self {
+            state,
+            obj,
+            spawned_watchers: Vec::new(),
         }
     }
+
+    /// Returns [`TaskHandle`]s for the watchers spawned by this
+    /// [`WatchersSpawner`].
+    #[inline]
+    #[must_use]
+    fn finish(self) -> Vec<TaskHandle> {
+        self.spawned_watchers
+    }
 }
 
-impl<S, C> Deref for Component<S, C> {
-    type Target = C;
+/// Abstraction describing state of the [`Component`].
+pub trait ComponentState<C>: Sized {
+    /// Spawns all watchers required for this [`ComponentState`].
+    fn spawn_watchers(&self, spawner: &mut WatchersSpawner<Self, C>);
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.ctx
-    }
+/// Helper trait for naming types of the [`Component`]'s state and object for
+/// the [`ComponentState`] implementation generated by
+/// [`medea_macro::watchers`].
+pub trait ComponentTypes {
+    /// Type of [`Component`]'s state.
+    type State;
+
+    /// Type of object managed by [`Component`].
+    type Obj;
+}
+
+impl<S, O> ComponentTypes for Component<S, O> {
+    type Obj = O;
+    type State = S;
 }

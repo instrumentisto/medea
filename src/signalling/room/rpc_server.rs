@@ -169,7 +169,7 @@ impl Handler<Synchronize> for Room {
 }
 
 impl Handler<CommandMessage> for Room {
-    type Result = ActFuture<()>;
+    type Result = ActFuture;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
     /// handlers. Will emit `CloseRoom` on any error.
@@ -348,7 +348,9 @@ mod test {
     use super::*;
 
     use crate::{
-        api::control::{pipeline::Pipeline, MemberSpec, RoomSpec},
+        api::control::{
+            member::Credential, pipeline::Pipeline, MemberSpec, RoomSpec,
+        },
         conf::{self, Conf},
         media::peer::tests::dummy_negotiation_sub_mock,
         signalling::{
@@ -390,7 +392,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            Credential::Plain(String::from("w/e")),
             None,
             None,
             None,
@@ -431,7 +433,7 @@ mod test {
 
         let member1 = MemberSpec::new(
             Pipeline::new(HashMap::new()),
-            "w/e".into(),
+            Credential::Plain(String::from("w/e")),
             None,
             None,
             None,
@@ -471,7 +473,8 @@ mod test {
 
         use actix::Addr;
         use medea_client_api_proto::{
-            CloseDescription, CloseReason, Credential, MemberId, RoomId,
+            self as client_proto, CloseDescription, CloseReason, MemberId,
+            RoomId,
         };
         use mockall::predicate::eq;
         use serial_test::serial;
@@ -485,6 +488,7 @@ mod test {
                     },
                     url::CallbackUrl,
                 },
+                member::Credential,
                 RoomElement,
             },
         };
@@ -508,7 +512,7 @@ mod test {
             let id = MemberId::from("member");
             let member = RoomElement::Member {
                 spec: Pipeline::new(HashMap::new()),
-                credentials: Credential::from("test"),
+                credentials: Credential::Plain(String::from("test")),
                 on_leave,
                 on_join,
                 idle_timeout: None,
@@ -559,7 +563,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
-                    Credential::from("test"),
+                    client_proto::Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -591,14 +595,14 @@ mod test {
                     .return_once(|_, _| Box::pin(future::ready(())));
                 room.connection_established(
                     MemberId::from("member"),
-                    Credential::from("test"),
+                    client_proto::Credential::from("test"),
                     Box::new(rpc_connection),
                 )
                 .await
                 .unwrap();
                 room.connection_established(
                     MemberId::from("member"),
-                    Credential::from("test"),
+                    client_proto::Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -616,7 +620,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
-                    Credential::from("test"),
+                    client_proto::Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -638,7 +642,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
-                    Credential::from("test"),
+                    client_proto::Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
@@ -657,7 +661,7 @@ mod test {
 
                 room.connection_established(
                     MemberId::from("member"),
-                    Credential::from("test"),
+                    client_proto::Credential::from("test"),
                     Box::new(MockRpcConnection::new()),
                 )
                 .await
