@@ -47,5 +47,8 @@ message OnLeave {
 
     // Medea media server is shutting down.
     SERVER_SHUTDOWN = 2;
+
+    // Internal server error;
+    KICKED = 3;
   }
 }

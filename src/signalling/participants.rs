@@ -199,7 +199,7 @@ impl ParticipantService {
     /// Errors with [`RoomError::ConnectionNotExists`] if unable to find
     /// [`RpcConnection`] with specified [`Member`].
     pub fn send_event_to_member(
-        &mut self,
+        &self,
         member_id: MemberId,
         event: Event,
     ) -> Result<(), RoomError> {
@@ -262,46 +262,27 @@ impl ParticipantService {
         self.connections.insert(member_id, conn);
     }
 
-    /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated
-    /// with specified user [`Member`] from the storage and closes the room.
-    /// If [`ClosedReason::Lost`], then creates delayed task that emits
-    /// [`ClosedReason::Closed`].
-    pub fn connection_closed(
+    /// Creates delayed task that emits [`ClosedReason::Closed`].
+    pub fn connection_lost(
         &mut self,
         member_id: MemberId,
-        reason: ClosedReason,
         ctx: &mut Context<Room>,
     ) {
-        let closed_at = Instant::now();
-        match reason {
-            ClosedReason::Closed { .. } => {
-                debug!("Connection for member [id = {}] removed.", member_id);
-                self.connections.remove(&member_id);
-                // TODO: we have no way to handle absence of RpcConnection right
-                //       now.
-            }
-            ClosedReason::Lost => {
-                if let Ok(member) = self.get_member_by_id(&member_id) {
-                    self.drop_connection_tasks.insert(
-                        member_id.clone(),
-                        ctx.run_later(
-                            member.get_reconnect_timeout(),
-                            move |_, ctx| {
-                                info!(
-                                    "Member [id = {}] connection lost at {:?}.",
-                                    member_id, closed_at,
-                                );
-                                ctx.notify(RpcConnectionClosed {
-                                    member_id,
-                                    reason: ClosedReason::Closed {
-                                        normal: false,
-                                    },
-                                })
-                            },
-                        ),
+        let lost_at = Instant::now();
+        if let Ok(member) = self.get_member_by_id(&member_id) {
+            self.drop_connection_tasks.insert(
+                member_id.clone(),
+                ctx.run_later(member.get_reconnect_timeout(), move |_, ctx| {
+                    info!(
+                        "Member [id = {}] connection lost at {:?}.",
+                        member_id, lost_at,
                     );
-                }
-            }
+                    ctx.notify(RpcConnectionClosed {
+                        member_id,
+                        reason: ClosedReason::Closed { normal: false },
+                    })
+                }),
+            );
         }
     }
 
@@ -335,24 +316,16 @@ impl ParticipantService {
         close_rpc_connections.map(|_| ()).boxed_local()
     }
 
-    /// Deletes [`Member`] from [`ParticipantService`], removes this user from
-    /// [`TurnAuthService`], closes RPC connection with him and removes drop
-    /// connection task.
-    ///
-    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
-    pub fn delete_member(
-        &mut self,
-        member_id: &MemberId,
-        ctx: &mut Context<Room>,
-    ) {
-        self.close_member_connection(member_id, ctx);
+    /// Deletes [`Member`] from [`ParticipantService`].
+    pub fn delete_member(&mut self, member_id: &MemberId) {
         self.members.remove(member_id);
     }
 
-    /// Closes [`RpcConnection`] with [`Member`] with a provided [`MemberId`]/
+    /// Closes [`RpcConnection`] with [`Member`] with a provided [`MemberId`].
     pub fn close_member_connection(
         &mut self,
         member_id: &MemberId,
+        close_reason: CloseReason,
         ctx: &mut Context<Room>,
     ) {
         if let Some(drop) = self.drop_connection_tasks.remove(member_id) {
@@ -362,7 +335,7 @@ impl ParticipantService {
         if let Some(mut conn) = self.connections.remove(member_id) {
             wrap_future::<_, Room>(conn.close(
                 self.room_id.clone(),
-                CloseDescription::new(CloseReason::Evicted),
+                CloseDescription::new(close_reason),
             ))
             .spawn(ctx);
         }

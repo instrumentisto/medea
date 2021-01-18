@@ -98,6 +98,9 @@ mod leave {
 
         /// Server is shutting down.
         ServerShutdown,
+
+        /// User was forcefully disconnected by server.
+        Kicked,
     }
 
     impl From<proto::on_leave::Reason> for OnLeaveReason {
@@ -108,6 +111,7 @@ mod leave {
                 R::ServerShutdown => Self::ServerShutdown,
                 R::LostConnection => Self::LostConnection,
                 R::Disconnected => Self::Disconnected,
+                R::Kicked => Self::Kicked,
             }
         }
     }

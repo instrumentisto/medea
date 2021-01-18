@@ -590,7 +590,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn map_peer_by_id<T>(
+    fn map_peer_by_id<T>(
         &self,
         peer_id: PeerId,
         f: impl FnOnce(&PeerStateMachine) -> T,
@@ -609,7 +609,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn map_peer_by_id_mut<T>(
+    fn map_peer_by_id_mut<T>(
         &self,
         peer_id: PeerId,
         f: impl FnOnce(&mut PeerStateMachine) -> T,
@@ -624,7 +624,7 @@ impl PeerRepository {
     /// Removes [`PeerStateMachine`] with a provided [`PeerId`].
     ///
     /// Returns removed [`PeerStateMachine`] if it existed.
-    pub fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
+    fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
         self.0.borrow_mut().remove(&peer_id)
     }
 
@@ -635,7 +635,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
+    fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
         self.remove(peer_id).ok_or(RoomError::PeerNotFound(peer_id))
     }
 
@@ -648,10 +648,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
     /// requested state.
-    pub fn take_inner_peer<S>(
-        &self,
-        peer_id: PeerId,
-    ) -> Result<Peer<S>, RoomError>
+    fn take_inner_peer<S>(&self, peer_id: PeerId) -> Result<Peer<S>, RoomError>
     where
         Peer<S>: TryFrom<PeerStateMachine>,
         <Peer<S> as TryFrom<PeerStateMachine>>::Error:
@@ -669,7 +666,7 @@ impl PeerRepository {
     /// Stores [`Peer`] in [`Room`].
     ///
     /// [`Room`]: crate::signalling::Room
-    pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
+    fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
         let peer = peer.into();
         self.0.borrow_mut().insert(peer.id(), peer);
     }
@@ -681,7 +678,7 @@ impl PeerRepository {
     /// otherwise returns `None`.
     ///
     /// [`Member`]: crate::signalling::elements::Member
-    pub fn get_peers_between_members(
+    fn get_peers_between_members(
         &self,
         member_id: &MemberId,
         partner_member_id: &MemberId,
@@ -706,7 +703,7 @@ impl PeerRepository {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
-    pub fn remove_peers_related_to_member(
+    fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,
     ) -> HashMap<MemberId, Vec<PeerId>> {

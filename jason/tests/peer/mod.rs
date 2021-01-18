@@ -1457,6 +1457,7 @@ async fn disable_and_enable_all_tracks() {
         Rc::new(pc_state),
     );
     pc.state().when_all_tracks_created().await;
+    pc.state().when_all_updated().await;
 
     let audio_track = pc.obj().get_sender_by_id(audio_track_id).unwrap();
     let video_track = pc.obj().get_sender_by_id(video_track_id).unwrap();

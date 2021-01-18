@@ -9,14 +9,14 @@ mod rpc_server;
 use std::{pin::Pin, rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
-    fut, Actor, ActorFuture, Addr, AsyncContext as _, Context, Handler,
-    MailboxError, WrapFuture as _,
+    Actor, ActorFuture, Addr, AsyncContext as _, AtomicResponse, Context,
+    Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{
-    Event, MemberId, NegotiationRole, PeerId, RoomId,
+    CloseReason, Event, MemberId, NegotiationRole, PeerId, RoomId,
 };
 
 use crate::{
@@ -67,10 +67,6 @@ pub enum RoomError {
     #[from(ignore)]
     ConnectionNotExists(MemberId),
 
-    #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
-    #[from(ignore)]
-    UnableToSendEvent(MemberId),
-
     #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
 
@@ -117,17 +113,6 @@ pub enum RoomError {
     CallbackClientError(CallbackClientError),
 }
 
-/// Possible states of [`Room`].
-#[derive(Debug)]
-enum State {
-    /// [`Room`] has been started and is operating at the moment.
-    Started,
-    /// [`Room`] is stopping at the moment.
-    Stopping,
-    /// [`Room`] is stopped and can be removed.
-    Stopped,
-}
-
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
@@ -146,9 +131,6 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: Rc<PeersService>,
-
-    /// Current state of this [`Room`].
-    state: State,
 }
 
 impl Room {
@@ -180,7 +162,6 @@ impl Room {
                     as Rc<dyn PeerUpdatesSubscriber>,
             ),
             members: ParticipantService::new(room_spec, context)?,
-            state: State::Started,
             callbacks: context.callbacks.clone(),
         };
 
@@ -194,7 +175,7 @@ impl Room {
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
     fn send_peers_removed(
-        &mut self,
+        &self,
         member_id: MemberId,
         removed_peers_ids: Vec<PeerId>,
     ) -> Result<(), RoomError> {
@@ -281,76 +262,19 @@ impl Room {
         )
     }
 
-    /// Closes [`Room`] gracefully, by dropping all the connections and moving
-    /// into [`State::Stopped`].
-    fn close_gracefully(&mut self, ctx: &mut Context<Self>) -> ActFuture {
-        info!("Closing Room [id = {}]", self.id);
-        self.state = State::Stopping;
-
-        self.members
-            .iter_members()
-            .filter_map(|(_, member)| {
-                member
-                    .get_on_leave()
-                    .map(move |on_leave| (member, on_leave))
-            })
-            .filter(|(member, _)| {
-                self.members.member_has_connection(&member.id())
-            })
-            .for_each(|(member, on_leave)| {
-                self.callbacks.do_send(
-                    on_leave,
-                    member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
-                );
-            });
-
-        Box::pin(self.members.drop_connections(ctx).into_actor(self).map(
-            |_, room: &mut Self, _| {
-                room.state = State::Stopped;
-            },
-        ))
-    }
-
     /// Signals about removing [`Member`]'s [`Peer`]s.
     fn member_peers_removed(
         &mut self,
         peers_id: Vec<PeerId>,
         member_id: MemberId,
-    ) -> ActFuture {
+    ) {
         info!(
             "Peers {:?} removed for member [id = {}].",
             peers_id, member_id
         );
         if let Ok(member) = self.members.get_member_by_id(&member_id) {
             member.peers_removed(&peers_id);
-            Box::pin(
-                fut::ready(self.send_peers_removed(member_id, peers_id)).then(
-                    |err, this: &mut Room, ctx: &mut Context<Self>| {
-                        if let Err(e) = err {
-                            match e {
-                                RoomError::ConnectionNotExists(_)
-                                | RoomError::UnableToSendEvent(_) => {
-                                    Box::pin(fut::ready(()))
-                                }
-                                _ => {
-                                    error!(
-                                        "Unexpected failed PeersEvent \
-                                         command, because {}. Room will be \
-                                         stopped.",
-                                        e
-                                    );
-                                    this.close_gracefully(ctx)
-                                }
-                            }
-                        } else {
-                            Box::pin(fut::ready(()))
-                        }
-                    },
-                ),
-            )
-        } else {
-            Box::pin(fut::ready(()))
+            let _ = self.send_peers_removed(member_id, peers_id);
         }
     }
 
@@ -361,10 +285,7 @@ impl Room {
     /// # Errors
     ///
     /// Errors if [`Peer`] lookup fails, or it is not in [`Stable`] state.
-    fn send_tracks_applied(
-        &mut self,
-        peer_id: PeerId,
-    ) -> Result<(), RoomError> {
+    fn send_tracks_applied(&self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
             self.peers.take_inner_peer(peer.partner_peer_id())?;
@@ -387,6 +308,43 @@ impl Room {
             },
         )
     }
+
+    /// Closes [`Member`]s [`RpcConnection`] if `ws_close_reason` is provided,
+    /// removes [`Member`]s [`Peer`], notifying connected [`Members`] and emits
+    /// [`OnLeaveEvent`] [`CallbackEvent`] if `on_leave_reason` is provided
+    /// and [`Member`] is configured to emit [`OnLeaveEvent`].
+    ///
+    /// [`CallbackEvent`]: crate::api::control::callback::CallbackEvent
+    fn disconnect_member(
+        &mut self,
+        member_id: &MemberId,
+        ws_close_reason: Option<CloseReason>,
+        on_leave_reason: Option<OnLeaveReason>,
+        ctx: &mut Context<Room>,
+    ) {
+        let removed_peers =
+            self.peers.remove_peers_related_to_member(&member_id);
+        for (peer_member_id, peers_ids) in removed_peers {
+            self.member_peers_removed(peers_ids, peer_member_id);
+        }
+
+        if let Some(reason) = ws_close_reason {
+            self.members
+                .close_member_connection(&member_id, reason, ctx);
+        }
+
+        if let Ok(member) = self.members.get_member_by_id(member_id) {
+            if let (Some(url), Some(reason)) =
+                (member.get_on_leave(), on_leave_reason)
+            {
+                self.callbacks.do_send(
+                    url,
+                    member.get_fid().into(),
+                    OnLeaveEvent::new(reason),
+                );
+            }
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -404,7 +362,7 @@ impl Actor for Room {
 }
 
 impl Handler<ShutdownGracefully> for Room {
-    type Result = ActFuture;
+    type Result = AtomicResponse<Self, ()>;
 
     fn handle(
         &mut self,
@@ -416,6 +374,27 @@ impl Handler<ShutdownGracefully> for Room {
              down",
             self.id
         );
-        self.close_gracefully(ctx)
+
+        self.members
+            .iter_members()
+            .filter_map(|(_, member)| {
+                member
+                    .get_on_leave()
+                    .map(move |on_leave| (member, on_leave))
+            })
+            .filter(|(member, _)| {
+                self.members.member_has_connection(&member.id())
+            })
+            .for_each(|(member, on_leave)| {
+                self.callbacks.do_send(
+                    on_leave,
+                    member.get_fid().into(),
+                    OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                );
+            });
+
+        AtomicResponse::new(Box::pin(
+            self.members.drop_connections(ctx).into_actor(self),
+        ))
     }
 }
