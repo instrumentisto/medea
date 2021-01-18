@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
 use medea_client_api_proto::{PeerId, RoomId};
-use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
@@ -21,8 +20,6 @@ use crate::{
 };
 
 use super::IceUser;
-
-static TURN_PASS_LEN: usize = 16;
 
 /// Error which can happen in [`TurnAuthService`].
 #[derive(Display, Debug, Fail, From)]
@@ -60,9 +57,6 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
         peer_id: PeerId,
         policy: UnreachablePolicy,
     ) -> Result<IceUser, TurnServiceErr>;
-
-    /// Deletes batch of [`IceUser`]s.
-    async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr>;
 }
 
 /// [`TurnAuthService`] implementation backed by Redis database.
@@ -90,18 +84,9 @@ struct Service {
 }
 
 impl Service {
-    /// Generates random alphanumeric string of specified length.
-    fn generate_pass(n: usize) -> String {
-        rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(n)
-            .map(char::from)
-            .collect()
-    }
-
     /// Returns [`IceUser`] with static credentials.
     fn static_user(&self) -> IceUser {
-        IceUser::new(
+        IceUser::new_static(
             self.turn_address.clone(),
             self.turn_username.clone(),
             self.turn_password.clone(),
@@ -121,36 +106,21 @@ impl TurnAuthService for Service {
         peer_id: PeerId,
         policy: UnreachablePolicy,
     ) -> Result<IceUser, TurnServiceErr> {
-        let ice_user = IceUser::build(
+        match IceUser::new_non_static(
             self.turn_address.clone(),
             &room_id,
             peer_id,
-            Self::generate_pass(TURN_PASS_LEN),
-        );
-
-        match self.turn_db.insert(&ice_user).await {
-            Ok(_) => Ok(ice_user),
+            self.turn_db.clone(),
+            self.coturn_cli.clone(),
+        )
+        .await
+        {
+            Ok(user) => Ok(user),
             Err(err) => match policy {
                 UnreachablePolicy::ReturnErr => Err(err.into()),
                 UnreachablePolicy::ReturnStatic => Ok(self.static_user()),
             },
         }
-    }
-
-    /// Deletes provided [`IceUser`]s from [`TurnDatabase`] and closes their
-    /// sessions on [Coturn] server.
-    ///
-    /// [Coturn]: https://github.com/coturn/coturn
-    async fn delete(&self, users: &[IceUser]) -> Result<(), TurnServiceErr> {
-        if users.is_empty() {
-            return Ok(());
-        }
-
-        // leave only non static users
-        let users = users.iter().filter(|u| !u.is_static()).collect::<Vec<_>>();
-        self.turn_db.remove(users.as_slice()).await?;
-        self.coturn_cli.delete_sessions(users.as_slice()).await?;
-        Ok(())
     }
 }
 
@@ -205,7 +175,7 @@ pub mod test {
             _: PeerId,
             _: UnreachablePolicy,
         ) -> Result<IceUser, TurnServiceErr> {
-            Ok(IceUser::new(
+            Ok(IceUser::new_static(
                 "5.5.5.5:1234".parse().unwrap(),
                 "username".into(),
                 "password".into(),

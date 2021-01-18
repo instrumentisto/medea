@@ -24,6 +24,9 @@ pub use self::{
 #[cfg(test)]
 pub use self::service::test::new_turn_auth_service_mock;
 
+/// Medea's [Coturn] realm name.
+const COTURN_REALM: &str = "medea";
+
 /// Username of Coturn user.
 #[derive(Clone, Debug, Display, Eq, Hash, PartialEq)]
 #[display(fmt = "{}_{}", room_id, peer_id)]

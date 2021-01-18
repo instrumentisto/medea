@@ -5,6 +5,7 @@ mod actix_try_join_all;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
+use rand::{distributions::Alphanumeric, Rng};
 
 pub use self::actix_try_join_all::actix_try_join_all;
 
@@ -123,4 +124,13 @@ macro_rules! actix_try {
 pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
     chrono::Duration::from_std(instant.elapsed())
         .map_or_else(|_| Utc::now(), |dur| Utc::now() - dur)
+}
+
+/// Generates random alphanumeric string of specified length.
+pub fn generate_pass(n: usize) -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(n)
+        .map(char::from)
+        .collect()
 }

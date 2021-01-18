@@ -10,9 +10,10 @@ use derive_more::{Display, From};
 use failure::Fail;
 use redis::{IntoConnectionInfo, RedisError};
 
-use crate::log::prelude::*;
-
-use super::IceUser;
+use crate::{
+    log::prelude::*,
+    turn::{ice_user::IcePassword, IceUsername, COTURN_REALM},
+};
 
 #[derive(Debug, Display, Fail, From)]
 pub enum TurnDatabaseErr {
@@ -21,6 +22,16 @@ pub enum TurnDatabaseErr {
 
     #[display(fmt = "Redis returned error: {}", _0)]
     RedisError(RedisError),
+}
+
+/// Returns [Coturn]'s [HMAC key] for the provided [`IceUsername`] and
+/// [`IcePassword`].
+///
+/// [HMAC key]: https://tinyurl.com/y33qa86c
+fn hmackey(username: &IceUsername, pass: &IcePassword) -> String {
+    let mut hasher = Md5::new();
+    hasher.input_str(&format!("{}:{}:{}", username, COTURN_REALM, pass));
+    hasher.result_str()
 }
 
 /// Abstraction over remote Redis database used to store Turn server
@@ -56,33 +67,29 @@ impl TurnDatabase {
         })
     }
 
-    /// Inserts provided [`IceUser`] into remote Redis database.
+    /// Inserts provided [`IceUsername`] and [`IcePassword`] into remote Redis
+    /// database.
     ///
     /// # Errors
     ///
     /// Errors if unable to establish connection with database, or database
     /// request fails.
-    pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
-        debug!("Store ICE user: {:?}", user);
-
-        let key = format!("turn/realm/medea/user/{}/key", user.user());
-        let value = format!("{}:medea:{}", user.user(), user.pass());
-
-        let mut hasher = Md5::new();
-        hasher.input_str(&value);
-        let result = hasher.result_str();
+    pub async fn insert(
+        &self,
+        username: &IceUsername,
+        pass: &IcePassword,
+    ) -> Result<(), TurnDatabaseErr> {
+        debug!("Store ICE user: {}", username);
 
         let mut conn = self.pool.get().await?;
         Ok(cmd("SET")
-            .arg(key)
-            .arg(result)
+            .arg(username.as_redis_key())
+            .arg(hmackey(&username, &pass))
             .query_async(&mut conn)
             .await?)
     }
 
-    /// Deletes batch of provided [`IceUser`]s.
-    ///
-    /// No-op if empty batch is provided.
+    /// Deletes provided [`IceUsername`].
     ///
     /// # Errors
     ///
@@ -90,21 +97,15 @@ impl TurnDatabase {
     /// request fails.
     pub async fn remove(
         &self,
-        users: &[&IceUser],
+        username: &IceUsername,
     ) -> Result<(), TurnDatabaseErr> {
-        debug!("Remove ICE users: {:?}", users);
-
-        if users.is_empty() {
-            return Ok(());
-        }
-
-        let keys: Vec<_> = users
-            .iter()
-            .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
-            .collect();
+        debug!("Remove ICE user: {}", username);
 
         let mut conn = self.pool.get().await?;
-        Ok(cmd("DEL").arg(keys).query_async(&mut conn).await?)
+        Ok(cmd("DEL")
+            .arg(username.as_redis_key())
+            .query_async(&mut conn)
+            .await?)
     }
 }
 

@@ -14,7 +14,7 @@ use medea_coturn_telnet_client::{
     CoturnTelnetError,
 };
 
-use super::IceUser;
+use crate::turn::IceUsername;
 
 /// Possible errors returned by [`CoturnTelnetClient`].
 #[derive(Display, Debug, Fail, From)]
@@ -51,14 +51,14 @@ impl CoturnTelnetClient {
         ))
     }
 
-    /// Forcibly closes provided [`IceUser`]s sessions on [Coturn] server.
+    /// Forcibly closes provided [`IceUsername`]'s sessions on [Coturn] server.
     ///
     /// # Errors
     ///
     /// When:
     /// - establishing connection with [Coturn] fails;
-    /// - retrieving all `users`' sessions from [Coturn] fails;
-    /// - deleting all retrieved `users`' sessions fails.
+    /// - retrieving `user`' sessions from [Coturn] fails;
+    /// - deleting retrieved `user`' sessions fails.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
     ///
@@ -68,18 +68,15 @@ impl CoturnTelnetClient {
     /// connection in pool.
     ///
     /// With [`CoturnCliError::CliError`] in case of unexpected protocol error.
-    pub async fn delete_sessions(
+    pub async fn delete_session(
         &self,
-        users: &[&IceUser],
+        user: &IceUsername,
     ) -> Result<(), CoturnCliError> {
         let mut conn = self.0.get().await?;
-        for u in users {
-            let sessions = conn
-                .print_sessions(u.user().clone().into())
-                .await?
-                .into_iter();
-            conn.delete_sessions(sessions).await?;
-        }
+
+        let sessions = conn.print_sessions(user.clone().into()).await?;
+        conn.delete_sessions(sessions).await?;
+
         Ok(())
     }
 }
