@@ -49,7 +49,7 @@ pub mod on_leave {
         LostConnection = 1,
         /// Medea media server is shutting down.
         ServerShutdown = 2,
-        /// Internal server error;
+        /// Member was forcefully disconnected by server.
         Kicked = 3,
     }
 }

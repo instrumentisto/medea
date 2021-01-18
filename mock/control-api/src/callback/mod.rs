@@ -99,7 +99,7 @@ mod leave {
         /// Server is shutting down.
         ServerShutdown,
 
-        /// User was forcefully disconnected by server.
+        /// `Member` was forcefully disconnected by server.
         Kicked,
     }
 
