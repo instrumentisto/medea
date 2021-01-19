@@ -117,7 +117,7 @@ enum IceUserKind {
 
 /// Credentials on Turn server.
 ///
-/// If this [`IceUser`] is [`IceUserKind::NonStatic`], then on [`Drop::drop`]
+/// If this [`IceUser`] is non-static, then on [`Drop::drop`]
 /// all records about this user and it's sessions will be removed.
 #[derive(Debug)]
 pub struct IceUser {

@@ -78,6 +78,8 @@ pub trait TurnDatabase: Send + Debug {
 impl_debug_by_struct_name!(MockTurnDatabase);
 
 /// Abstraction over object which manages [Coturn] server sessions.
+///
+/// [Coturn]: https://github.com/coturn/coturn
 #[cfg_attr(test, mockall::automock)]
 pub trait TurnSessionManager: Send + Debug {
     /// Forcibly closes provided [`IceUsername`]'s sessions on [Coturn] server.
@@ -89,14 +91,12 @@ pub trait TurnSessionManager: Send + Debug {
     /// - retrieving `user`' sessions from [Coturn] fails;
     /// - deleting retrieved `user`' sessions fails.
     ///
-    /// [Coturn]: https://github.com/coturn/coturn
-    ///
-    /// # Errors
-    ///
     /// With [`CoturnCliError::PoolError`] if could not get or establish new
     /// connection in pool.
     ///
     /// With [`CoturnCliError::CliError`] in case of unexpected protocol error.
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
     fn delete_session(
         &self,
         user: &'_ IceUsername,
