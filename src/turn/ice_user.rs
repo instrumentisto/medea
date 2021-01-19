@@ -50,14 +50,14 @@ impl IceUserHandle {
 
 impl Drop for IceUserHandle {
     fn drop(&mut self) {
-        let remove_task = self.turn_db.remove(&self.username);
-        let delete_task = self.coturn_cli.delete_session(&self.username);
+        let db_remove_fut = self.turn_db.remove(&self.username);
+        let session_delete_fut = self.coturn_cli.delete_session(&self.username);
 
         tokio::spawn(async move {
-            if let Err(e) = remove_task.await {
+            if let Err(e) = db_remove_fut.await {
                 warn!("Failed to remove IceUser from the database: {:?}", e);
             }
-            if let Err(e) = delete_task.await {
+            if let Err(e) = session_delete_fut.await {
                 warn!("Failed to remove IceUser from Coturn: {:?}", e);
             }
         });
