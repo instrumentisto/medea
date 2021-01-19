@@ -26,7 +26,7 @@ impl Room {
     /// will be changed to a [`WaitLocalSdp`] state.
     ///
     /// [`WaitLocalSdp`]: crate::media::peer::WaitLocalSdp
-    fn send_peer_created(&mut self, peer_id: PeerId) -> Result<(), RoomError> {
+    fn send_peer_created(&self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
             self.peers.take_inner_peer(peer.partner_peer_id())?;
