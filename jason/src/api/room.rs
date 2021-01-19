@@ -719,6 +719,25 @@ impl Room {
     }
 }
 
+#[cfg(feature = "mockable")]
+impl Room {
+    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with a provided
+    /// [`PeerId`].
+    pub fn reset_peer_negotiation_state(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
+        self.0
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or(RoomError::NoSuchPeer(peer_id))?
+            .reset_negotiation_role();
+
+        Ok(())
+    }
+}
+
 /// Actual data of a [`Room`].
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).

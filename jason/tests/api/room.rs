@@ -1548,11 +1548,12 @@ async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (room, peer, event_tx) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
     .await;
+    room.reset_peer_negotiation_state(peer.id()).unwrap();
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx

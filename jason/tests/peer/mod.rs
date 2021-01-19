@@ -260,7 +260,8 @@ async fn add_candidates_to_answerer_before_offer() {
     assert!(pc2.candidates_buffer_len() > 0);
 
     pc2.state()
-        .set_negotiation_role(NegotiationRole::Answerer(pc1_offer));
+        .set_negotiation_role(NegotiationRole::Answerer(pc1_offer))
+        .await;
     pc2.state().when_local_sdp_updated().await.unwrap();
     assert_eq!(pc2.candidates_buffer_len(), 0);
 }
@@ -313,7 +314,8 @@ async fn add_candidates_to_offerer_before_answer() {
 
     let offer = pc1.state().when_local_sdp_updated().await.unwrap();
     pc2.state()
-        .set_negotiation_role(NegotiationRole::Answerer(offer));
+        .set_negotiation_role(NegotiationRole::Answerer(offer))
+        .await;
     let answer = pc2.state().when_local_sdp_updated().await.unwrap();
 
     handle_ice_candidates(rx2, &pc1, 1).await;
@@ -375,7 +377,8 @@ async fn normal_exchange_of_candidates() {
 
     let offer = pc1.state().when_local_sdp_updated().await.unwrap();
     pc2.state()
-        .set_negotiation_role(NegotiationRole::Answerer(offer));
+        .set_negotiation_role(NegotiationRole::Answerer(offer))
+        .await;
     let answer = pc2.state().when_local_sdp_updated().await.unwrap();
     pc1.state().set_remote_sdp(answer);
     pc1.state().when_remote_sdp_processed().await;
@@ -1155,7 +1158,8 @@ async fn new_remote_track() {
             .unwrap();
         sender_peer
             .state()
-            .set_negotiation_role(NegotiationRole::Offerer);
+            .set_negotiation_role(NegotiationRole::Offerer)
+            .await;
 
         let sender_offer =
             sender_peer.state().when_local_sdp_updated().await.unwrap();
@@ -1221,7 +1225,8 @@ async fn new_remote_track() {
 
         rcvr_peer
             .state()
-            .set_negotiation_role(NegotiationRole::Answerer(sender_offer));
+            .set_negotiation_role(NegotiationRole::Answerer(sender_offer))
+            .await;
 
         let answer = rcvr_peer.state().when_local_sdp_updated().await.unwrap();
         // rcvr_peer.state().when_local_sdp_approve_needed().await;
@@ -1330,7 +1335,8 @@ async fn ice_restart_works() {
     peers
         .first_peer
         .state()
-        .set_negotiation_role(NegotiationRole::Offerer);
+        .set_negotiation_role(NegotiationRole::Offerer)
+        .await;
     let sdp_offer_before = peers
         .first_peer
         .state()
@@ -1345,7 +1351,8 @@ async fn ice_restart_works() {
     peers
         .first_peer
         .state()
-        .set_negotiation_role(NegotiationRole::Offerer);
+        .set_negotiation_role(NegotiationRole::Offerer)
+        .await;
     let sdp_offer_after = peers
         .first_peer
         .state()
