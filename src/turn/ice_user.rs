@@ -116,6 +116,9 @@ enum IceUserKind {
 }
 
 /// Credentials on Turn server.
+///
+/// If this [`IceUser`] is [`IceUserKind::NonStatic`], then on [`Drop::drop`]
+/// all records about this user and it's sessions will be removed.
 #[derive(Debug)]
 pub struct IceUser {
     /// Address of Turn server.
@@ -133,6 +136,9 @@ pub struct IceUser {
 
 impl IceUser {
     /// Build new non static [`IceUser`].
+    ///
+    /// Creates new credentials for provided [`RoomId`] and [`PeerId`], inserts
+    /// it to the [`TurnDatabase`].
     ///
     /// # Errors
     ///
