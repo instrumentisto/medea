@@ -8,11 +8,12 @@ use deadpool::managed::{PoolConfig, Timeouts};
 use deadpool_redis::{cmd, Pool, PoolError};
 use derive_more::{Display, From};
 use failure::Fail;
+use futures::future::BoxFuture;
 use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{
     log::prelude::*,
-    turn::{ice_user::IcePassword, IceUsername, COTURN_REALM},
+    turn::{ice_user::IcePassword, IceUsername, TurnDatabase, COTURN_REALM},
 };
 
 #[derive(Debug, Display, Fail, From)]
@@ -39,11 +40,11 @@ fn hmackey(username: &IceUsername, pass: &IcePassword) -> String {
 ///
 /// This struct can be cloned and transferred across thread boundaries.
 #[derive(Clone)]
-pub struct TurnDatabase {
+pub struct RedisTurnDatabase {
     pool: Pool,
 }
 
-impl TurnDatabase {
+impl RedisTurnDatabase {
     /// Creates new [`TurnDatabase`].
     ///
     /// # Errors
@@ -66,53 +67,48 @@ impl TurnDatabase {
             pool: Pool::from_config(manager, config),
         })
     }
-
-    /// Inserts provided [`IceUsername`] and [`IcePassword`] into remote Redis
-    /// database.
-    ///
-    /// # Errors
-    ///
-    /// Errors if unable to establish connection with database, or database
-    /// request fails.
-    pub async fn insert(
-        &self,
-        username: &IceUsername,
-        pass: &IcePassword,
-    ) -> Result<(), TurnDatabaseErr> {
-        debug!("Store ICE user: {}", username);
-
-        let mut conn = self.pool.get().await?;
-        Ok(cmd("SET")
-            .arg(username.as_redis_key())
-            .arg(hmackey(&username, &pass))
-            .query_async(&mut conn)
-            .await?)
-    }
-
-    /// Deletes provided [`IceUsername`].
-    ///
-    /// # Errors
-    ///
-    /// Errors if unable to establish connection with database, or database
-    /// request fails.
-    pub async fn remove(
-        &self,
-        username: &IceUsername,
-    ) -> Result<(), TurnDatabaseErr> {
-        debug!("Remove ICE user: {}", username);
-
-        let mut conn = self.pool.get().await?;
-        Ok(cmd("DEL")
-            .arg(username.as_redis_key())
-            .query_async(&mut conn)
-            .await?)
-    }
 }
 
-impl fmt::Debug for TurnDatabase {
+impl fmt::Debug for RedisTurnDatabase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TurnDatabase")
             .field("pool", &self.pool.status())
             .finish()
+    }
+}
+
+impl TurnDatabase for RedisTurnDatabase {
+    fn insert(
+        &self,
+        username: &IceUsername,
+        pass: &IcePassword,
+    ) -> BoxFuture<'static, Result<(), TurnDatabaseErr>> {
+        let pool = self.pool.clone();
+        let key = username.as_redis_key();
+        let value = hmackey(&username, &pass);
+        Box::pin(async move {
+            debug!("Store ICE user with a key: {}", key);
+
+            let mut conn = pool.get().await?;
+            Ok(cmd("SET")
+                .arg(key)
+                .arg(value)
+                .query_async(&mut conn)
+                .await?)
+        })
+    }
+
+    fn remove(
+        &self,
+        username: &IceUsername,
+    ) -> BoxFuture<'static, Result<(), TurnDatabaseErr>> {
+        let pool = self.pool.clone();
+        let key = username.as_redis_key();
+        Box::pin(async move {
+            debug!("Remove ICE user with a key: {}", key);
+
+            let mut conn = pool.get().await?;
+            Ok(cmd("DEL").arg(key).query_async(&mut conn).await?)
+        })
     }
 }

@@ -15,7 +15,7 @@ use crate::{
     conf,
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
-        repo::{TurnDatabase, TurnDatabaseErr},
+        repo::{RedisTurnDatabase, TurnDatabaseErr},
     },
 };
 
@@ -63,7 +63,7 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 #[derive(Debug)]
 struct Service {
     /// Turn credentials repository.
-    turn_db: TurnDatabase,
+    turn_db: RedisTurnDatabase,
 
     /// Client of [Coturn] server admin interface.
     ///
@@ -110,8 +110,8 @@ impl TurnAuthService for Service {
             self.turn_address.clone(),
             &room_id,
             peer_id,
-            self.turn_db.clone(),
-            self.coturn_cli.clone(),
+            Box::new(self.turn_db.clone()),
+            Box::new(self.coturn_cli.clone()),
         )
         .await
         {
@@ -133,7 +133,7 @@ impl TurnAuthService for Service {
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
-    let turn_db = TurnDatabase::new(
+    let turn_db = RedisTurnDatabase::new(
         cf.db.redis.connect_timeout,
         ConnectionInfo::from(&cf.db.redis),
     )?;

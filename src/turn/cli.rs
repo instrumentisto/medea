@@ -9,12 +9,13 @@ use bytes::Bytes;
 use deadpool::managed::PoolConfig;
 use derive_more::{Display, From};
 use failure::Fail;
+use futures::future::BoxFuture;
 use medea_coturn_telnet_client::{
     pool::{Error as PoolError, Manager as PoolManager, Pool},
     CoturnTelnetError,
 };
 
-use crate::turn::IceUsername;
+use crate::turn::{IceUsername, TurnSessionManager};
 
 /// Possible errors returned by [`CoturnTelnetClient`].
 #[derive(Display, Debug, Fail, From)]
@@ -50,35 +51,6 @@ impl CoturnTelnetClient {
             pool_config,
         ))
     }
-
-    /// Forcibly closes provided [`IceUsername`]'s sessions on [Coturn] server.
-    ///
-    /// # Errors
-    ///
-    /// When:
-    /// - establishing connection with [Coturn] fails;
-    /// - retrieving `user`' sessions from [Coturn] fails;
-    /// - deleting retrieved `user`' sessions fails.
-    ///
-    /// [Coturn]: https://github.com/coturn/coturn
-    ///
-    /// # Errors
-    ///
-    /// With [`CoturnCliError::PoolError`] if could not get or establish new
-    /// connection in pool.
-    ///
-    /// With [`CoturnCliError::CliError`] in case of unexpected protocol error.
-    pub async fn delete_session(
-        &self,
-        user: &IceUsername,
-    ) -> Result<(), CoturnCliError> {
-        let mut conn = self.0.get().await?;
-
-        let sessions = conn.print_sessions(user.clone().into()).await?;
-        conn.delete_sessions(sessions).await?;
-
-        Ok(())
-    }
 }
 
 impl fmt::Debug for CoturnTelnetClient {
@@ -86,5 +58,22 @@ impl fmt::Debug for CoturnTelnetClient {
         f.debug_struct("CoturnTelnetClient")
             .field("pool", &self.0.status())
             .finish()
+    }
+}
+
+impl TurnSessionManager for CoturnTelnetClient {
+    fn delete_session(
+        &self,
+        user: &IceUsername,
+    ) -> BoxFuture<'static, Result<(), CoturnCliError>> {
+        let pool = self.0.clone();
+        let user = user.to_string();
+        Box::pin(async move {
+            let mut conn = pool.get().await?;
+            let sessions = conn.print_sessions(user).await?;
+            conn.delete_sessions(sessions).await?;
+
+            Ok(())
+        })
     }
 }

@@ -8,9 +8,7 @@ use medea_client_api_proto::{IceServer, PeerId, RoomId};
 use crate::{
     log::prelude::*,
     turn::{
-        cli::CoturnTelnetClient,
-        repo::{TurnDatabase, TurnDatabaseErr},
-        COTURN_REALM,
+        repo::TurnDatabaseErr, TurnDatabase, TurnSessionManager, COTURN_REALM,
     },
     utils::generate_pass,
 };
@@ -23,12 +21,12 @@ static TURN_PASS_LEN: usize = 16;
 #[derive(Debug)]
 struct IceUserHandle {
     /// Turn credentials repository.
-    turn_db: TurnDatabase,
+    turn_db: Box<dyn TurnDatabase>,
 
     /// Client of [Coturn] server admin interface.
     ///
     /// [Coturn]: https://github.com/coturn/coturn
-    coturn_cli: CoturnTelnetClient,
+    coturn_cli: Box<dyn TurnSessionManager>,
 
     /// Username of the [`IceUser`] for which this [`IceUserHandle`] is
     /// created.
@@ -38,8 +36,8 @@ struct IceUserHandle {
 impl IceUserHandle {
     /// Returns new [`IceUserHandle`] for the provided [`IceUsername`].
     pub fn new(
-        turn_db: TurnDatabase,
-        coturn_cli: CoturnTelnetClient,
+        turn_db: Box<dyn TurnDatabase>,
+        coturn_cli: Box<dyn TurnSessionManager>,
         username: IceUsername,
     ) -> Self {
         Self {
@@ -52,15 +50,14 @@ impl IceUserHandle {
 
 impl Drop for IceUserHandle {
     fn drop(&mut self) {
-        let turn_db = self.turn_db.clone();
-        let coturn_cli = self.coturn_cli.clone();
-        let username = self.username.clone();
+        let remove_task = self.turn_db.remove(&self.username);
+        let delete_task = self.coturn_cli.delete_session(&self.username);
 
         tokio::spawn(async move {
-            if let Err(e) = turn_db.remove(&username).await {
+            if let Err(e) = remove_task.await {
                 warn!("Failed to remove IceUser from the database: {:?}", e);
             }
-            if let Err(e) = coturn_cli.delete_session(&username).await {
+            if let Err(e) = delete_task.await {
                 warn!("Failed to remove IceUser from Coturn: {:?}", e);
             }
         });
@@ -71,6 +68,7 @@ impl Drop for IceUserHandle {
 ///
 /// [Coturn]: https://github.com/coturn/coturn
 #[derive(AsRef, Clone, Debug, Display, From, Into)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 #[as_ref(forward)]
 pub struct IceUsername(String);
 
@@ -144,13 +142,14 @@ impl IceUser {
         address: String,
         room_id: &RoomId,
         peer_id: PeerId,
-        db: TurnDatabase,
-        cli: CoturnTelnetClient,
+        db: Box<dyn TurnDatabase>,
+        cli: Box<dyn TurnSessionManager>,
     ) -> Result<Self, TurnDatabaseErr> {
         let username = IceUsername::new(&room_id, peer_id);
         let pass = IcePassword::generate();
 
-        db.insert(&username, &pass).await?;
+        let insert_ice_user_fut = db.insert(&username, &pass);
+        insert_ice_user_fut.await?;
 
         Ok(Self {
             address,
@@ -192,5 +191,83 @@ impl IceUser {
             credential: Some(self.pass.to_string()),
         };
         vec![stun, turn]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::mem::forget;
+
+    use futures::future;
+
+    use super::*;
+
+    use crate::turn::{MockTurnDatabase, MockTurnSessionManager};
+
+    /// Tests that on [`IceUser::new_non_static`] record in the [`TurnDatabase`]
+    /// will be created.
+    #[tokio::test]
+    async fn ice_user_creates_record_in_db() {
+        let room_id = RoomId::from("foobar");
+        let peer_id = PeerId(0);
+        let ice_username = IceUsername::new(&room_id, peer_id);
+
+        let mut db = MockTurnDatabase::new();
+        db.expect_insert().times(1).returning(move |user, _| {
+            assert_eq!(*user, ice_username);
+
+            Box::pin(future::ok(()))
+        });
+
+        forget(
+            IceUser::new_non_static(
+                String::new(),
+                &room_id,
+                peer_id,
+                Box::new(db),
+                Box::new(MockTurnSessionManager::new()),
+            )
+            .await
+            .unwrap(),
+        );
+    }
+
+    /// Tests that on [`IceUser`] drop record from the [`TurnDatabase`] will be
+    /// removed and [`IceUser`]'s sessions will be removed.
+    #[tokio::test]
+    async fn ice_user_removes_on_drop() {
+        let room_id = RoomId::from("foobar");
+        let peer_id = PeerId(0);
+        let ice_username = IceUsername::new(&room_id, peer_id);
+
+        let mut db = MockTurnDatabase::new();
+        db.expect_remove().times(1).returning({
+            let ice_username = ice_username.clone();
+            move |user| {
+                assert_eq!(*user, ice_username);
+                Box::pin(future::ok(()))
+            }
+        });
+        db.expect_insert()
+            .returning(|_, _| Box::pin(future::ok(())));
+        let mut session_manager = MockTurnSessionManager::new();
+        session_manager.expect_delete_session().times(1).returning(
+            move |user| {
+                assert_eq!(*user, ice_username);
+                Box::pin(future::ok(()))
+            },
+        );
+
+        drop(
+            IceUser::new_non_static(
+                String::new(),
+                &room_id,
+                peer_id,
+                Box::new(db),
+                Box::new(session_manager),
+            )
+            .await
+            .unwrap(),
+        );
     }
 }
