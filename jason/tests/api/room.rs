@@ -2230,6 +2230,7 @@ mod set_local_media_settings {
 /// Checks that [`state::Room`] update can create [`PeerConnection`] and its
 /// [`Sender`]s/[`Receiver`]s.
 #[wasm_bindgen_test]
+#[cfg(feature = "todo")]
 async fn create_peer_by_state() {
     let mut rpc_session = MockRpcSession::new();
     rpc_session

@@ -1,6 +1,10 @@
 //! Local session description wrapper.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{
     future,
@@ -82,6 +86,16 @@ impl LocalSdp {
             self.0.current_sdp.borrow().as_ref() == Some(&sdp);
 
         if !is_current_approved {
+            let is_restart_needed = self
+                .0
+                .prev_sdp
+                .borrow()
+                .as_ref()
+                .map(|prev| prev == &sdp)
+                .unwrap_or_default();
+            if is_restart_needed {
+                self.0.restart_needed.set(true);
+            }
             self.0.current_sdp.replace(Some(sdp));
         }
         self.0.approved.set(true);
@@ -149,7 +163,7 @@ impl LocalSdp {
     /// completed.
     #[inline]
     pub fn is_restart_needed(&self) -> bool {
-        self.0.restart_needed
+        self.0.restart_needed.get()
     }
 }
 
@@ -173,7 +187,8 @@ struct Inner {
     /// Timeout of the [`Inner::approved`] transition.
     rollback_task_handle: RefCell<Option<ResettableDelayHandle>>,
 
-    restart_needed: bool,
+    /// Flag which indicates that negotiation restart is needed.
+    restart_needed: Cell<bool>,
 }
 
 impl Default for Inner {
@@ -184,7 +199,7 @@ impl Default for Inner {
             current_sdp: ObservableCell::new(None),
             approved: Rc::new(ObservableCell::new(true)),
             rollback_task_handle: RefCell::new(None),
-            restart_needed: false,
+            restart_needed: Cell::new(false),
         }
     }
 }

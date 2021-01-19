@@ -262,7 +262,10 @@ where
     S: SubscribersStore<(K, V), O>,
 {
     // TODO: better naming
-    pub fn remove_not_present<A>(&mut self, another: &std::collections::HashMap<K, A>) {
+    pub fn remove_not_present<A>(
+        &mut self,
+        another: &std::collections::HashMap<K, A>,
+    ) {
         self.iter()
             .filter_map(|(id, _)| {
                 if another.contains_key(id) {
@@ -277,7 +280,6 @@ where
                 self.remove(&id);
             });
     }
-
 
     /// Inserts a key-value pair to this [`HashMap`].
     ///

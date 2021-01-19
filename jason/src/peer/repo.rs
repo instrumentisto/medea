@@ -1,11 +1,15 @@
 //! Component responsible for the [`peer::Component`] creating and removing.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
-use std::collections::HashSet;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::PeerId;
 use medea_client_api_proto as proto;
+use medea_client_api_proto::PeerId;
 use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
@@ -19,9 +23,7 @@ use crate::{
 };
 
 use super::{PeerConnection, PeerEvent};
-use crate::{
-    utils::{AsProtoState, SynchronizableState},
-};
+use crate::utils::{AsProtoState, SynchronizableState};
 use std::hash::Hash;
 
 /// Component responsible for the [`peer::Component`] creating and removing.

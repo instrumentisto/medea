@@ -1,11 +1,13 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
-use std::collections::HashSet;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use derive_more::From;
 use futures::{future::LocalBoxFuture, stream::LocalBoxStream};
 use medea_client_api_proto::TrackId;
-use medea_reactive::{Guarded, ProgressableHashMap, AllProcessed};
-
+use medea_reactive::{AllProcessed, Guarded, ProgressableHashMap};
 
 use crate::{
     peer::media::sender,
@@ -54,9 +56,7 @@ impl<S> TracksRepository<S> {
 
 #[cfg(feature = "mockable")]
 impl<S> TracksRepository<S> {
-    pub fn when_insert_processed(
-        &self,
-    ) -> impl RecheckableFutureExt<Output = ()> {
+    pub fn when_insert_processed(&self) -> medea_reactive::Processed<'static> {
         self.0.borrow().when_insert_processed()
     }
 }
@@ -85,6 +85,13 @@ impl TracksRepository<sender::State> {
             .borrow()
             .values()
             .for_each(|s| s.connection_recovered());
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl TracksRepository<receiver::State> {
+    pub fn stabilize_all(&self) {
+        self.0.borrow().values().for_each(|r| r.stabilize());
     }
 }
 
@@ -147,10 +154,14 @@ where
     }
 
     fn when_updated(&self) -> AllProcessed<'static> {
-        let when_futs: Vec<_> =
-            self.0.borrow().values().map(|s| s.when_updated().into()).collect();
+        let when_futs: Vec<_> = self
+            .0
+            .borrow()
+            .values()
+            .map(|s| s.when_updated().into())
+            .collect();
 
-       medea_reactive::when_all_processed(when_futs)
+        medea_reactive::when_all_processed(when_futs)
     }
 }
 

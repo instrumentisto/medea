@@ -2,14 +2,13 @@
 
 use std::rc::Rc;
 
+use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto as proto;
-use futures::future::LocalBoxFuture;
-use futures::StreamExt as _;
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::watchers;
-use medea_reactive::{AllProcessed, Guarded, ProgressableCell, ObservableCell};
+use medea_reactive::{AllProcessed, Guarded, ObservableCell, ProgressableCell};
 
 use crate::{
     peer::{
@@ -22,10 +21,10 @@ use crate::{
 };
 
 use super::Receiver;
-use crate::peer::component::SyncState;
-use crate::peer::MediaExchangeState;
-use crate::utils::{Updatable, AsProtoState, SynchronizableState};
-use crate::peer::media::InTransition;
+use crate::{
+    peer::{component::SyncState, media::InTransition, MediaExchangeState},
+    utils::{AsProtoState, SynchronizableState, Updatable},
+};
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -47,7 +46,7 @@ pub struct State {
 
     media_exchange_state: Rc<MediaExchangeStateController>,
     general_media_exchange_state:
-    ProgressableCell<media_exchange_state::Stable>,
+        ProgressableCell<media_exchange_state::Stable>,
 
     sync_state: ObservableCell<SyncState>,
 }
@@ -122,9 +121,10 @@ impl Updatable for State {
     }
 
     fn when_updated(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![
-            self.media_exchange_state.when_processed().into(),
-        ])
+        medea_reactive::when_all_processed(vec![self
+            .media_exchange_state
+            .when_processed()
+            .into()])
     }
 }
 
@@ -364,7 +364,7 @@ impl Component {
     ) -> Result<()> {
         if let SyncState::Synced = sync_state {
             if let MediaExchangeState::Transition(transition) =
-            state.media_exchange_state.state()
+                state.media_exchange_state.state()
             {
                 receiver.send_media_exchange_state_intention(transition);
             }

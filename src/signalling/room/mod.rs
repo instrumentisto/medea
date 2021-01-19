@@ -207,18 +207,19 @@ impl Room {
         member_id: MemberId,
         e: Event,
     ) -> Result<(), RoomError> {
-        if let Event::ConnectionQualityUpdated { .. } = e {
-            self.members.send_event_to_member(
-                member_id,
-               e,
-            )?;
-        } else {
-            let state = self.get_state(&member_id);
-            self.members.send_event_to_member(
-                member_id,
-                Event::StateSynchronized { state },
-            )?;
-        }
+        self.members.send_event_to_member(member_id, e)?;
+        // if let Event::ConnectionQualityUpdated { .. } = e {
+        //     self.members.send_event_to_member(
+        //         member_id,
+        //        e,
+        //     )?;
+        // } else {
+        //     let state = self.get_state(&member_id);
+        //     self.members.send_event_to_member(
+        //         member_id,
+        //         Event::StateSynchronized { state },
+        //     )?;
+        // }
 
         Ok(())
     }

@@ -2,11 +2,13 @@
 
 use std::rc::Rc;
 
-use futures::{future, future::AbortHandle, Future, Stream, StreamExt};
-use wasm_bindgen_futures::spawn_local;
 use derive_more::Deref;
-use futures::{FutureExt as _};
-use futures::future::LocalBoxFuture;
+use futures::{
+    future,
+    future::{AbortHandle, LocalBoxFuture},
+    Future, FutureExt as _, Stream, StreamExt,
+};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::{JasonError, TaskHandle};
 use medea_reactive::AllProcessed;

@@ -740,7 +740,7 @@ impl Room {
     }
 
     /// Returns reference to the [`PeerRepositoryState`] of this [`Room`].
-    pub fn peers_state(&self) -> &peer::repo::PeersState {
+    pub fn peers_state(&self) -> &peer::repo::State {
         self.0.peers.state()
     }
 }

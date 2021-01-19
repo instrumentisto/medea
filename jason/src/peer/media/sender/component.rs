@@ -8,11 +8,12 @@ use medea_client_api_proto::{
     TrackPatchEvent,
 };
 use medea_macro::watchers;
-use medea_reactive::{AllProcessed, Guarded, ProgressableCell, ObservableCell};
+use medea_reactive::{AllProcessed, Guarded, ObservableCell, ProgressableCell};
 
 use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
+        component::SyncState,
         media::{media_exchange_state, mute_state, Result},
         MediaConnectionsError, MediaExchangeStateController, MediaState,
         MediaStateControllable, MuteStateController, TransceiverDirection,
@@ -21,11 +22,9 @@ use crate::{
     utils::{component, AsProtoState, SynchronizableState, Updatable},
     MediaKind,
 };
-use crate::peer::component::SyncState;
 
 use super::Sender;
-use crate::peer::{MediaExchangeState, MuteState};
-use crate::peer::media::InTransition;
+use crate::peer::{media::InTransition, MediaExchangeState, MuteState};
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
@@ -48,7 +47,7 @@ pub struct State {
     media_exchange_state: Rc<MediaExchangeStateController>,
     mute_state: Rc<MuteStateController>,
     general_media_exchange_state:
-    ProgressableCell<media_exchange_state::Stable>,
+        ProgressableCell<media_exchange_state::Stable>,
     send_constraints: LocalTracksConstraints,
     sync_state: ObservableCell<SyncState>,
 }
@@ -141,7 +140,7 @@ impl Updatable for State {
 
     fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
-           self.media_exchange_state.when_processed().into(),
+            self.media_exchange_state.when_processed().into(),
             self.mute_state.when_processed().into(),
         ])
     }

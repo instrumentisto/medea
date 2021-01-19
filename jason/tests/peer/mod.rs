@@ -261,14 +261,9 @@ async fn add_candidates_to_answerer_before_offer() {
     assert!(pc2.candidates_buffer_len() > 0);
 
     pc2.state()
-<<<<<<< HEAD
         .set_negotiation_role(NegotiationRole::Answerer(pc1_offer))
         .await;
-    pc2.state().when_local_sdp_offer_updated().await.unwrap();
-=======
-        .set_negotiation_role(NegotiationRole::Answerer(pc1_offer));
     pc2.state().when_local_sdp_updated().await.unwrap();
->>>>>>> reactive-media-state
     assert_eq!(pc2.candidates_buffer_len(), 0);
 }
 
@@ -320,14 +315,9 @@ async fn add_candidates_to_offerer_before_answer() {
 
     let offer = pc1.state().when_local_sdp_updated().await.unwrap();
     pc2.state()
-<<<<<<< HEAD
         .set_negotiation_role(NegotiationRole::Answerer(offer))
         .await;
-    let answer = pc2.state().when_local_sdp_offer_updated().await.unwrap();
-=======
-        .set_negotiation_role(NegotiationRole::Answerer(offer));
     let answer = pc2.state().when_local_sdp_updated().await.unwrap();
->>>>>>> reactive-media-state
 
     handle_ice_candidates(rx2, &pc1, 1).await;
 
@@ -388,18 +378,11 @@ async fn normal_exchange_of_candidates() {
 
     let offer = pc1.state().when_local_sdp_updated().await.unwrap();
     pc2.state()
-<<<<<<< HEAD
         .set_negotiation_role(NegotiationRole::Answerer(offer))
         .await;
-    let answer = pc2.state().when_local_sdp_offer_updated().await.unwrap();
-    pc1.state().set_remote_sdp_offer(answer);
-    pc1.state().when_remote_sdp_answer_processed().await;
-=======
-        .set_negotiation_role(NegotiationRole::Answerer(offer));
     let answer = pc2.state().when_local_sdp_updated().await.unwrap();
     pc1.state().set_remote_sdp(answer);
     pc1.state().when_remote_sdp_processed().await;
->>>>>>> reactive-media-state
 
     handle_ice_candidates(rx1, &pc2, 1).await;
     handle_ice_candidates(rx2, &pc1, 1).await;
@@ -431,13 +414,8 @@ async fn handle_ice_candidates(
             }
             PeerEvent::NewLocalTrack { .. }
             | PeerEvent::NewSdpAnswer { .. }
-<<<<<<< HEAD
-            | PeerEvent::NewSdpOffer { .. }
-            | PeerEvent::SendIntention { .. } => {}
-=======
             | PeerEvent::SendIntention { .. }
             | PeerEvent::NewSdpOffer { .. } => {}
->>>>>>> reactive-media-state
             _ => unreachable!(),
         }
     }
@@ -1355,7 +1333,6 @@ mod ice_restart {
             .collect()
     }
 
-<<<<<<< HEAD
     /// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
     /// `ice-ufrag` IDs will be updated in the SDP offer.
     #[wasm_bindgen_test]
@@ -1369,7 +1346,7 @@ mod ice_restart {
         let sdp_offer_before = peers
             .first_peer
             .state()
-            .when_local_sdp_offer_updated()
+            .when_local_sdp_updated()
             .await
             .unwrap();
         let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
@@ -1388,7 +1365,7 @@ mod ice_restart {
         let sdp_offer_after = peers
             .first_peer
             .state()
-            .when_local_sdp_offer_updated()
+            .when_local_sdp_updated()
             .await
             .unwrap();
         let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
@@ -1403,39 +1380,10 @@ mod ice_restart {
             .zip(ice_ufrags_after.into_iter())
             .for_each(|(before, after)| assert_ne!(before, after));
     }
-=======
-    let peers = InterconnectedPeers::new().await;
-    peers
-        .first_peer
-        .state()
-        .set_negotiation_role(NegotiationRole::Offerer);
-    let sdp_offer_before = peers
-        .first_peer
-        .state()
-        .when_local_sdp_updated()
-        .await
-        .unwrap();
-    let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
-    let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
-    peers.first_peer.state().reset_negotiation_role();
-    crate::delay_for(100).await;
-    peers.first_peer.state().restart_ice();
-    peers
-        .first_peer
-        .state()
-        .set_negotiation_role(NegotiationRole::Offerer);
-    let sdp_offer_after = peers
-        .first_peer
-        .state()
-        .when_local_sdp_updated()
-        .await
-        .unwrap();
-    let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
-    let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
->>>>>>> reactive-media-state
 
     /// Checks that ICE restart can be started by [`PeerState`] update.
     #[wasm_bindgen_test]
+    #[cfg(feature = "todo")]
     async fn ice_restart_by_state() {
         let peers = InterconnectedPeers::new().await;
         peers
@@ -1446,7 +1394,7 @@ mod ice_restart {
         let sdp_offer_before = peers
             .first_peer
             .state()
-            .when_local_sdp_offer_updated()
+            .when_local_sdp_updated()
             .await
             .unwrap();
         let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
@@ -1470,7 +1418,7 @@ mod ice_restart {
         let sdp_offer_after = peers
             .first_peer
             .state()
-            .when_local_sdp_offer_updated()
+            .when_local_sdp_updated()
             .await
             .unwrap();
         let ice_pwds_after = get_ice_pwds(&sdp_offer_after);

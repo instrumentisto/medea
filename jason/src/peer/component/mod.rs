@@ -12,7 +12,7 @@ use medea_client_api_proto::{
     self as proto, state as proto_state, IceCandidate, IceServer,
     NegotiationRole, PeerId, TrackId,
 };
-use medea_reactive::{ObservableCell, ProgressableCell, AllProcessed};
+use medea_reactive::{AllProcessed, ObservableCell, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
@@ -29,9 +29,9 @@ use self::{
     ice_candidates::IceCandidates, local_sdp::LocalSdp,
     tracks_repository::TracksRepository,
 };
+use crate::utils::delay_for;
 use futures::future::LocalBoxFuture;
 use wasm_bindgen_futures::spawn_local;
-use crate::utils::delay_for;
 
 /// Component responsible for the [`PeerConnection`] updating.
 pub type Component = component::Component<State, PeerConnection>;
@@ -336,7 +336,7 @@ impl State {
                             receivers.clone(),
                             send_constraints,
                         )
-                            .map_err(tracerr::map_from_and_wrap!())?,
+                        .map_err(tracerr::map_from_and_wrap!())?,
                     ),
                 );
             }
@@ -360,9 +360,7 @@ impl State {
     /// [`State::senders`]'s inserts/removes will be processed.
     #[inline]
     #[must_use]
-    fn when_all_senders_processed(
-        &self,
-    ) -> AllProcessed<'static> {
+    fn when_all_senders_processed(&self) -> AllProcessed<'static> {
         self.senders.when_all_processed()
     }
 
@@ -370,9 +368,7 @@ impl State {
     /// [`State::receivers`]'s inserts/removes will be processed.
     #[inline]
     #[must_use]
-    fn when_all_receivers_processed(
-        &self,
-    ) -> AllProcessed<'static> {
+    fn when_all_receivers_processed(&self) -> AllProcessed<'static> {
         self.receivers.when_all_processed()
     }
 
@@ -413,10 +409,10 @@ impl State {
 
 #[cfg(feature = "mockable")]
 impl State {
-    /// Waits for [`State::remote_sdp_offer`] change apply.
+    /// Waits for [`State::remote_sdp`] change to be applied.
     #[inline]
-    pub async fn when_remote_sdp_answer_processed(&self) {
-        self.remote_sdp_offer.when_all_processed().await;
+    pub async fn when_remote_sdp_processed(&self) {
+        self.remote_sdp.when_all_processed().await;
     }
 
     /// Resets [`NegotiationRole`] of this [`State`] to [`None`].
@@ -425,23 +421,41 @@ impl State {
         self.negotiation_role.set(None);
     }
 
-    /// Waits until [`State::sdp_offer`] will be resolved and returns it's new
-    /// value.
+    /// Returns [`Future`] which will be resolved when local SDP approve will be
+    /// needed.
     #[inline]
-    pub async fn when_local_sdp_offer_updated(&self) -> Option<String> {
-        use futures::StreamExt as _;
+    pub fn when_local_sdp_approve_needed(
+        &self,
+    ) -> impl futures::future::Future<Output = ()> {
+        use futures::FutureExt as _;
 
-        self.sdp_offer.subscribe().skip(1).next().await.unwrap()
+        self.negotiation_state
+            .when_eq(NegotiationState::WaitLocalSdpApprove)
+            .map(|_| ())
     }
 
-    /// Waits until all [`State::senders`] and [`State::receivers`] inserts will
-    /// be processed.
+    /// Stabilize all [`receiver::State`] from this [`State`].
+    #[inline]
+    pub fn stabilize_all(&self) {
+        self.receivers.stabilize_all();
+    }
+
+    /// Waits until [`State::local_sdp`] will be resolved and returns its new
+    /// value.
+    #[inline]
+    pub async fn when_local_sdp_updated(&self) -> Option<String> {
+        use futures::StreamExt as _;
+
+        self.local_sdp.subscribe().skip(1).next().await.unwrap()
+    }
+
+    /// Waits until all [`State::senders`]' and [`State::receivers`]' inserts
+    /// will be processed.
     #[inline]
     pub async fn when_all_tracks_created(&self) {
-        medea_reactive::join_all(vec![
-            Box::new(self.senders.when_insert_processed())
-                as Box<dyn RecheckableFutureExt<Output = ()>>,
-            Box::new(self.receivers.when_insert_processed()),
+        medea_reactive::when_all_processed(vec![
+            self.senders.when_insert_processed().into(),
+            self.receivers.when_insert_processed().into(),
         ])
         .await;
     }
@@ -526,7 +540,7 @@ impl Updatable for State {
     }
 
     fn when_updated(&self) -> AllProcessed<'static> {
-       medea_reactive::when_all_processed(vec![
+        medea_reactive::when_all_processed(vec![
             self.receivers.when_updated().into(),
             self.senders.when_updated().into(),
         ])

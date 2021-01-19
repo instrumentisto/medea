@@ -769,7 +769,10 @@ impl PeerRepository {
             .iter()
             .filter_map(|(id, p)| {
                 // TODO: this is bug fix
-                if &p.member_id() == member_id && (p.is_known_to_remote() || p.negotiation_role().is_some()) {
+                if &p.member_id() == member_id
+                    && (p.is_known_to_remote()
+                        || p.negotiation_role().is_some())
+                {
                     Some((*id, p.get_state()))
                 } else {
                     None

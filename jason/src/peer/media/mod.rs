@@ -30,9 +30,7 @@ use crate::{
     utils::{JsCaused, JsError},
 };
 
-use super::{
-    conn::RtcPeerConnection, tracks_request::TracksRequest,
-};
+use super::{conn::RtcPeerConnection, tracks_request::TracksRequest};
 
 pub use self::transitable_state::{
     media_exchange_state, mute_state, InStable, InTransition,
@@ -321,8 +319,6 @@ struct InnerMediaConnections {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    track_events_sender: mpsc::UnboundedSender<TrackEvent>,
-
     /// [`TrackId`] to its [`sender::Component`].
     senders: HashMap<TrackId, sender::Component>,
 
@@ -408,12 +404,10 @@ impl MediaConnections {
     pub fn new(
         peer: Rc<RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        track_events_sender: mpsc::UnboundedSender<TrackEvent>,
     ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
             peer_events_sender,
-            track_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
         }))

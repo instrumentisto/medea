@@ -327,7 +327,6 @@ impl PeerConnection {
         let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
             peer_events_sender.clone(),
-            track_events_tx.clone(),
         ));
 
         spawn_local({
