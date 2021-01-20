@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Length of the TURN server credentials.
-static TURN_PASS_LEN: usize = 16;
+pub static TURN_PASS_LEN: usize = 16;
 
 /// Username for authorization on [Coturn] server.
 ///
@@ -61,9 +61,6 @@ pub struct IceUser {
 
 impl IceUser {
     /// Build new non static [`IceUser`].
-    ///
-    /// Creates new credentials for provided [`RoomId`] and [`PeerId`], inserts
-    /// it to the [`TurnDatabase`].
     pub fn new_non_static(
         address: String,
         room_id: &RoomId,
