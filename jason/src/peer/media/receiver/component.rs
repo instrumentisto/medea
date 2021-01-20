@@ -38,6 +38,7 @@ pub struct State {
 
 impl State {
     /// Returns [`State`] with a provided data.
+    #[inline]
     #[must_use]
     pub fn new(
         id: TrackId,
