@@ -709,12 +709,9 @@ impl<T> Peer<T> {
                 self.context.track_changes_queue[i],
                 TrackChange::PartnerTrackPatch(_)
             ) {
-                partner_patches.push(
-                    self.context
-                        .track_changes_queue
-                        .remove(i)
-                        .as_track_update(self.partner_member_id()),
-                );
+                let change = self.context.track_changes_queue.remove(i).dispatch_with(self);
+                partner_patches
+                    .push(change.as_track_update(self.partner_member_id()));
             } else {
                 i += 1;
             }
