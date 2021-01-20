@@ -239,9 +239,9 @@ pub enum PeerEvent {
     },
 
     /// [`Component`] resends his intentions.
-    SendIntention {
+    MediaUpdateCommand {
         /// Actual intentions of the [`Component`].
-        intention: Command,
+        command: Command,
     },
 }
 
@@ -324,7 +324,7 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );
-        let (track_events_tx, mut track_events_rx) = mpsc::unbounded();
+        let (track_events_sender, mut track_events_rx) = mpsc::unbounded();
         let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
             peer_events_sender.clone(),
@@ -352,7 +352,7 @@ impl PeerConnection {
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
             connections,
-            track_events_sender: track_events_tx,
+            track_events_sender,
             recv_constraints,
         };
 
@@ -434,8 +434,8 @@ impl PeerConnection {
         };
 
         peer_events_sender
-            .unbounded_send(PeerEvent::SendIntention {
-                intention: Command::UpdateTracks {
+            .unbounded_send(PeerEvent::MediaUpdateCommand {
+                command: Command::UpdateTracks {
                     peer_id,
                     tracks_patches: vec![patch],
                 },

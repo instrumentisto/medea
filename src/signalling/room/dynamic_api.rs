@@ -46,7 +46,7 @@ impl Room {
         if self.members.get_member_by_id(member_id).is_ok() {
             self.disconnect_member(
                 member_id,
-                Some(CloseReason::Evicted),
+                CloseReason::Evicted,
                 None, /* No need to callback, since delete is initiated by
                        * Control Service. */
                 ctx,
@@ -237,7 +237,7 @@ impl Room {
                                 );
                                 this.disconnect_member(
                                     &member_id,
-                                    Some(CloseReason::InternalError),
+                                    CloseReason::InternalError,
                                     Some(OnLeaveReason::Kicked),
                                     ctx,
                                 );

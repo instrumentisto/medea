@@ -413,7 +413,7 @@ async fn handle_ice_candidates(
             }
             PeerEvent::NewLocalTrack { .. }
             | PeerEvent::NewSdpAnswer { .. }
-            | PeerEvent::SendIntention { .. }
+            | PeerEvent::MediaUpdateCommand { .. }
             | PeerEvent::NewSdpOffer { .. } => {}
             _ => unreachable!(),
         }

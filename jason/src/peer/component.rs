@@ -248,7 +248,8 @@ impl State {
     }
 
     /// Returns [`Future`] which will be resolved when all [`State::receivers`]
-    /// will be stabilized.
+    /// will be stabilized meaning that all [`ReceiverComponent`]s won't contain
+    /// any pending state change transitions.
     fn when_all_receivers_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self
             .receivers
@@ -261,7 +262,8 @@ impl State {
     }
 
     /// Returns [`Future`] which will be resolved when all [`State::senders`]
-    /// will be stabilized.
+    /// will be stabilized meaning that all [`SenderComponent`]s won't contain
+    /// any pending state change transitions.
     fn when_all_senders_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         let when_futs: Vec<_> = self
             .senders
@@ -382,61 +384,6 @@ impl State {
         } else if let Some(receiver) = self.get_receiver(track_patch.id) {
             receiver.update(track_patch);
         }
-    }
-}
-
-#[cfg(feature = "mockable")]
-impl State {
-    /// Waits for [`State::remote_sdp`] change to be applied.
-    #[inline]
-    pub async fn when_remote_sdp_processed(&self) {
-        self.remote_sdp.when_all_processed().await;
-    }
-
-    /// Resets [`NegotiationRole`] of this [`State`] to [`None`].
-    #[inline]
-    pub fn reset_negotiation_role(&self) {
-        self.negotiation_state.set(NegotiationState::Stable);
-        self.negotiation_role.set(None);
-    }
-
-    /// Returns [`Future`] which will be resolved when local SDP approve will be
-    /// needed.
-    #[inline]
-    pub fn when_local_sdp_approve_needed(
-        &self,
-    ) -> impl future::Future<Output = ()> {
-        self.negotiation_state
-            .when_eq(NegotiationState::WaitLocalSdpApprove)
-            .map(|_| ())
-    }
-
-    /// Stabilize all [`receiver::State`] from this [`State`].
-    #[inline]
-    pub fn stabilize_all(&self) {
-        self.receivers.borrow().values().for_each(|r| {
-            r.stabilize();
-        });
-    }
-
-    /// Waits until [`State::local_sdp`] will be resolved and returns its new
-    /// value.
-    #[inline]
-    pub async fn when_local_sdp_updated(&self) -> Option<String> {
-        use futures::StreamExt as _;
-
-        self.local_sdp.subscribe().skip(1).next().await.unwrap()
-    }
-
-    /// Waits until all [`State::senders`]' and [`State::receivers`]' inserts
-    /// will be processed.
-    #[inline]
-    pub async fn when_all_tracks_created(&self) {
-        medea_reactive::when_all_processed(vec![
-            self.senders.borrow().when_insert_processed().into(),
-            self.receivers.borrow().when_insert_processed().into(),
-        ])
-        .await;
     }
 }
 
@@ -823,5 +770,60 @@ impl Component {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl State {
+    /// Waits for [`State::remote_sdp`] change to be applied.
+    #[inline]
+    pub async fn when_remote_sdp_processed(&self) {
+        self.remote_sdp.when_all_processed().await;
+    }
+
+    /// Resets [`NegotiationRole`] of this [`State`] to [`None`].
+    #[inline]
+    pub fn reset_negotiation_role(&self) {
+        self.negotiation_state.set(NegotiationState::Stable);
+        self.negotiation_role.set(None);
+    }
+
+    /// Returns [`Future`] which will be resolved when local SDP approve will be
+    /// needed.
+    #[inline]
+    pub fn when_local_sdp_approve_needed(
+        &self,
+    ) -> impl future::Future<Output = ()> {
+        self.negotiation_state
+            .when_eq(NegotiationState::WaitLocalSdpApprove)
+            .map(|_| ())
+    }
+
+    /// Stabilize all [`receiver::State`] from this [`State`].
+    #[inline]
+    pub fn stabilize_all(&self) {
+        self.receivers.borrow().values().for_each(|r| {
+            r.stabilize();
+        });
+    }
+
+    /// Waits until [`State::local_sdp`] will be resolved and returns its new
+    /// value.
+    #[inline]
+    pub async fn when_local_sdp_updated(&self) -> Option<String> {
+        use futures::StreamExt as _;
+
+        self.local_sdp.subscribe().skip(1).next().await.unwrap()
+    }
+
+    /// Waits until all [`State::senders`]' and [`State::receivers`]' inserts
+    /// will be processed.
+    #[inline]
+    pub async fn when_all_tracks_created(&self) {
+        medea_reactive::when_all_processed(vec![
+            self.senders.borrow().when_insert_processed().into(),
+            self.receivers.borrow().when_insert_processed().into(),
+        ])
+        .await;
     }
 }

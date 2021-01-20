@@ -366,11 +366,11 @@ impl InnerMediaConnections {
         match direction {
             TrackDirection::Send => self
                 .iter_senders_with_kind_and_source_kind(kind, source_kind)
-                .map(|tx| tx.state_rc() as Rc<dyn TransceiverSide>)
+                .map(|tx| tx.state() as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
                 .iter_receivers_with_kind(kind)
-                .map(|rx| rx.state_rc() as Rc<dyn TransceiverSide>)
+                .map(|rx| rx.state() as Rc<dyn TransceiverSide>)
                 .collect(),
         }
     }
@@ -494,7 +494,6 @@ impl MediaConnections {
                 *track_id,
                 sender
                     .mid()
-                    .clone()
                     .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
@@ -541,12 +540,12 @@ impl MediaConnections {
         inner
             .senders
             .get(&track_id)
-            .map(|sndr| sndr.state_rc() as Rc<dyn TransceiverSide>)
+            .map(|sndr| sndr.state() as Rc<dyn TransceiverSide>)
             .or_else(|| {
                 inner
                     .receivers
                     .get(&track_id)
-                    .map(|rcvr| rcvr.state_rc() as Rc<dyn TransceiverSide>)
+                    .map(|rcvr| rcvr.state() as Rc<dyn TransceiverSide>)
             })
     }
 
@@ -724,12 +723,12 @@ impl MediaConnections {
         inner
             .senders
             .values()
-            .map(|s| s.state_rc() as Rc<dyn TransceiverSide>)
+            .map(|s| s.state() as Rc<dyn TransceiverSide>)
             .chain(
                 inner
                     .receivers
                     .values()
-                    .map(|r| r.state_rc() as Rc<dyn TransceiverSide>),
+                    .map(|r| r.state() as Rc<dyn TransceiverSide>),
             )
             .collect()
     }
@@ -839,16 +838,6 @@ impl MediaConnections {
     #[must_use]
     pub fn get_sender_by_id(&self, id: TrackId) -> Option<Rc<sender::Sender>> {
         self.0.borrow().senders.get(&id).map(|r| r.obj())
-    }
-
-    /// Returns [`sender::State`] with a provided [`TrackId`].
-    #[must_use]
-    #[inline]
-    pub fn get_sender_state_by_id(
-        &self,
-        id: TrackId,
-    ) -> Option<Rc<sender::State>> {
-        self.0.borrow().senders.get(&id).map(|r| r.state_rc())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
@@ -1007,5 +996,15 @@ impl MediaConnections {
             .values()
             .map(|sndr| sndr.obj())
             .collect()
+    }
+
+    /// Returns [`sender::State`] with a provided [`TrackId`].
+    #[must_use]
+    #[inline]
+    pub fn get_sender_state_by_id(
+        &self,
+        id: TrackId,
+    ) -> Option<Rc<sender::State>> {
+        self.0.borrow().senders.get(&id).map(|r| r.state())
     }
 }

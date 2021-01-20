@@ -685,17 +685,6 @@ impl Room {
         RoomHandle(Rc::downgrade(&self.0))
     }
 
-    /// Returns [`PeerConnection`] stored in repository by its ID.
-    ///
-    /// Used to inspect [`Room`]'s inner state in integration tests.
-    #[cfg(feature = "mockable")]
-    pub fn get_peer_by_id(
-        &self,
-        peer_id: PeerId,
-    ) -> Option<Rc<PeerConnection>> {
-        self.0.peers.get(peer_id)
-    }
-
     /// Indicates whether this [`Room`] reference is the same as the given
     /// [`Room`] reference. Compares pointers, not values.
     #[inline]
@@ -716,25 +705,6 @@ impl Room {
     #[inline]
     pub fn downgrade(&self) -> WeakRoom {
         WeakRoom(Rc::downgrade(&self.0))
-    }
-}
-
-#[cfg(feature = "mockable")]
-impl Room {
-    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with a provided
-    /// [`PeerId`].
-    pub fn reset_peer_negotiation_state(
-        &self,
-        peer_id: PeerId,
-    ) -> Result<(), RoomError> {
-        self.0
-            .peers
-            .state()
-            .get(peer_id)
-            .ok_or(RoomError::NoSuchPeer(peer_id))?
-            .reset_negotiation_role();
-
-        Ok(())
     }
 }
 
@@ -979,7 +949,7 @@ impl InnerRoom {
                     media_manager,
                     peer_event_sender,
                     send_constraints.clone(),
-                    recv_constraints.clone(),
+                    Rc::clone(&recv_constraints),
                     Rc::clone(&connections),
                 )),
                 Rc::new(peer::repo::State::default()),
@@ -1613,7 +1583,10 @@ impl PeerEventHandler for InnerRoom {
 
     /// Handles [`PeerEvent::SendIntention`] event by sending provided
     /// [`Command`] to the Media Server.
-    async fn on_send_intention(&self, intention: Command) -> Self::Output {
+    async fn on_media_update_command(
+        &self,
+        intention: Command,
+    ) -> Self::Output {
         self.rpc.send_command(intention);
         Ok(())
     }
@@ -1634,5 +1607,34 @@ impl Drop for InnerRoom {
         {
             log::error!("Failed to call Room::on_close callback: {:?}", e);
         }
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl Room {
+    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with a provided
+    /// [`PeerId`].
+    pub fn reset_peer_negotiation_state(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
+        self.0
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or(RoomError::NoSuchPeer(peer_id))?
+            .reset_negotiation_role();
+
+        Ok(())
+    }
+
+    /// Returns [`PeerConnection`] stored in repository by its ID.
+    ///
+    /// Used to inspect [`Room`]'s inner state in integration tests.
+    pub fn get_peer_by_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<Rc<PeerConnection>> {
+        self.0.peers.get(peer_id)
     }
 }

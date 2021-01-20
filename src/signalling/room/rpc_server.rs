@@ -164,7 +164,7 @@ impl Handler<CommandMessage> for Room {
             );
             self.disconnect_member(
                 &member_id,
-                Some(CloseReason::InternalError),
+                CloseReason::InternalError,
                 Some(OnLeaveReason::Kicked),
                 ctx,
             );
@@ -278,7 +278,7 @@ impl Handler<RpcConnectionClosed> for Room {
                 };
                 self.disconnect_member(
                     &msg.member_id,
-                    None, // RpcConnection is already closed.
+                    CloseReason::Finished,
                     Some(on_leave),
                     ctx,
                 );
