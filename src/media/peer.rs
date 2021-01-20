@@ -559,6 +559,8 @@ impl TrackPatchDeduper {
             }
             let patch = if let TrackChange::TrackPatch(patch) = change {
                 patch
+            } else if let TrackChange::PartnerTrackPatch(patch) = change {
+                patch
             } else {
                 return true;
             };
@@ -709,18 +711,38 @@ impl<T> Peer<T> {
                 self.context.track_changes_queue[i],
                 TrackChange::PartnerTrackPatch(_)
             ) {
-                let change = self.context.track_changes_queue.remove(i).dispatch_with(self);
-                partner_patches
-                    .push(change.as_track_update(self.partner_member_id()));
+                let change = self
+                    .context
+                    .track_changes_queue
+                    .remove(i)
+                    .dispatch_with(self);
+                partner_patches.push(change);
             } else {
                 i += 1;
             }
         }
 
-        if !partner_patches.is_empty() {
+        let mut deduper = TrackPatchDeduper::with_whitelist(
+            partner_patches
+                .iter()
+                .filter_map(|t| match t {
+                    TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                    _ => None,
+                })
+                .collect(),
+        );
+        deduper.drain_merge(&mut self.context.pending_track_updates);
+        deduper.drain_merge(&mut partner_patches);
+
+        let updates: Vec<_> = deduper
+            .into_inner()
+            .map(|c| c.as_track_update(self.partner_member_id()))
+            .collect();
+
+        if !updates.is_empty() {
             self.context
                 .peer_updates_sub
-                .force_update(self.id(), partner_patches);
+                .force_update(self.id(), updates);
         }
     }
 
@@ -744,6 +766,7 @@ impl<T> Peer<T> {
                 .iter()
                 .filter_map(|t| match t {
                     TrackChange::TrackPatch(patch) => Some(patch.id),
+                    TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
                     _ => None,
                 })
                 .collect(),

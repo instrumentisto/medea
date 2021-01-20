@@ -676,11 +676,6 @@ impl Component {
             state.remote_sdp.when_all_processed().into(),
         ])
         .await;
-        futures::future::join(
-            state.when_all_senders_stabilized(),
-            state.when_all_receivers_stabilized(),
-        )
-        .await;
 
         match negotiation_state {
             NegotiationState::Stable => {
