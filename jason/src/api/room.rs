@@ -266,21 +266,6 @@ impl RoomHandle {
                 })?;
         }
 
-        // Enabled senders may require new tracks to be inserted.
-        if let (
-            MediaState::MediaExchange(media_exchange_state::Stable::Enabled),
-            TrackDirection::Send,
-        ) = (new_state, direction)
-        {
-            for peer in inner.peers.get_all() {
-                peer.update_local_stream(
-                    LocalStreamUpdateCriteria::from_kinds(kind, source_kind),
-                )
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
-            }
-        }
-
         Ok(())
     }
 }

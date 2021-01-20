@@ -233,9 +233,12 @@ impl PeerStateMachine {
     pub fn can_forcibly_commit_partner_patches(&self) -> bool {
         match &self {
             PeerStateMachine::Stable(peer) => peer.context.is_known_to_remote,
-            PeerStateMachine::WaitLocalSdp(_) => true,
+            PeerStateMachine::WaitLocalSdp(peer) => {
+                !peer.context.is_known_to_remote
+            }
             PeerStateMachine::WaitRemoteSdp(peer) => {
                 peer.context.sdp_offer.is_some()
+                    && !peer.context.is_known_to_remote
             }
         }
     }
@@ -765,8 +768,8 @@ impl<T> Peer<T> {
             forcible_changes
                 .iter()
                 .filter_map(|t| match t {
-                    TrackChange::TrackPatch(patch) => Some(patch.id),
-                    TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                    TrackChange::TrackPatch(patch)
+                    | TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
                     _ => None,
                 })
                 .collect(),
