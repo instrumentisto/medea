@@ -780,7 +780,7 @@ docker.up.webdriver:
 ifeq ($(browser),firefox)
 	docker run --rm -d --network=host --shm-size 512m \
 		--name medea-webdriver-firefox \
-		instrumentisto/geckodriver:$(FIREFOX_VERSION)
+		ghcr.io/instrumentisto/geckodriver:$(FIREFOX_VERSION)
 else
 	docker run --rm -d --network=host \
 		--name medea-webdriver-chrome \
