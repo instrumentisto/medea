@@ -68,14 +68,10 @@ impl TurnDatabase {
         let key = user.user().redis_key();
         let value = user.redis_hmac_key();
 
-        let mut hasher = Md5::new();
-        hasher.input_str(&value);
-        let result = hasher.result_str();
-
         let mut conn = self.0.get().await?;
         Ok(cmd("SET")
             .arg(key)
-            .arg(result)
+            .arg(value)
             .query_async(&mut conn)
             .await?)
     }
