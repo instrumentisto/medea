@@ -1487,7 +1487,7 @@ impl EventHandler for InnerRoom {
         &self,
         state: proto_state::Room,
     ) -> Self::Output {
-        self.peers.state().apply(state);
+        self.peers.state().apply(state, &self.send_constraints);
 
         Ok(())
     }

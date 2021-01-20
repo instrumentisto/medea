@@ -199,17 +199,22 @@ impl State {
 
     /// Updates this [`PeersState`] with a provided
     /// [`proto::state::Room`].
-    pub fn apply(&self, state: proto::state::Room) {
+    pub fn apply(
+        &self,
+        state: proto::state::Room,
+        send_cons: &LocalTracksConstraints,
+    ) {
         self.0.borrow_mut().remove_not_present(&state.peers);
 
         for (id, peer_state) in state.peers {
             let peer = self.0.borrow().get(&id).cloned();
             if let Some(peer) = peer {
-                peer.apply(peer_state);
+                peer.apply(peer_state, send_cons);
             } else {
-                self.0
-                    .borrow_mut()
-                    .insert(id, Rc::new(peer::State::from_proto(peer_state)));
+                self.0.borrow_mut().insert(
+                    id,
+                    Rc::new(peer::State::from_proto(peer_state, send_cons)),
+                );
             }
         }
     }

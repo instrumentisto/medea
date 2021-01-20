@@ -72,8 +72,10 @@ impl AsProtoState for State {
 impl SynchronizableState for State {
     type Input = proto_state::Sender;
 
-    fn from_proto(input: Self::Input) -> Self {
-        todo!("Send constraints!!");
+    fn from_proto(
+        input: Self::Input,
+        send_constraints: &LocalTracksConstraints,
+    ) -> Self {
         Self {
             id: input.id,
             mid: input.mid,
@@ -89,12 +91,12 @@ impl SynchronizableState for State {
             general_media_exchange_state: ProgressableCell::new(
                 media_exchange_state::Stable::from(input.enabled_general),
             ),
-            send_constraints: Default::default(),
+            send_constraints: send_constraints.clone(),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 
-    fn apply(&self, input: Self::Input) {
+    fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints) {
         let new_media_exchange_state =
             media_exchange_state::Stable::from(input.enabled_individual);
         let current_media_exchange_state =
@@ -157,30 +159,6 @@ impl From<&State> for proto_state::Sender {
             enabled_general: state.general_media_exchange_state.get()
                 == media_exchange_state::Stable::Enabled,
             muted: state.mute_state.muted(),
-        }
-    }
-}
-
-impl From<proto_state::Sender> for State {
-    fn from(from: proto_state::Sender) -> Self {
-        todo!("send_constraints!!");
-        Self {
-            id: from.id,
-            mid: from.mid,
-            media_type: from.media_type,
-            receivers: from.receivers,
-            need_local_stream_update: Cell::new(false),
-            mute_state: MuteStateController::new(mute_state::Stable::from(
-                from.muted,
-            )),
-            media_exchange_state: MediaExchangeStateController::new(
-                media_exchange_state::Stable::from(from.enabled_individual),
-            ),
-            general_media_exchange_state: ProgressableCell::new(
-                media_exchange_state::Stable::from(from.enabled_general),
-            ),
-            send_constraints: Default::default(),
-            sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
 }

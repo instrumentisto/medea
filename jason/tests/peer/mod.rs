@@ -1383,7 +1383,7 @@ mod ice_restart {
 
     /// Checks that ICE restart can be started by [`PeerState`] update.
     #[wasm_bindgen_test]
-    #[cfg(feature = "todo")]
+    // #[cfg(feature = "todo")]
     async fn ice_restart_by_state() {
         let peers = InterconnectedPeers::new().await;
         peers
@@ -1408,7 +1408,10 @@ mod ice_restart {
         peers.first_peer.state().sdp_offer_applied("");
         let mut proto_state = peers.first_peer.state().as_proto();
         proto_state.restart_ice = true;
-        peers.first_peer.state().apply(proto_state);
+        peers
+            .first_peer
+            .state()
+            .apply(proto_state, &LocalTracksConstraints::default());
 
         peers
             .first_peer

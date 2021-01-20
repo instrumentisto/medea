@@ -15,6 +15,7 @@ use crate::{
 };
 
 use super::receiver;
+use crate::media::LocalTracksConstraints;
 
 /// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
 /// [`PeerComponent`].
@@ -116,25 +117,28 @@ where
 {
     type Input = HashMap<TrackId, S::Input>;
 
-    fn from_proto(input: Self::Input) -> Self {
+    fn from_proto(
+        input: Self::Input,
+        send_cons: &LocalTracksConstraints,
+    ) -> Self {
         Self(RefCell::new(
             input
                 .into_iter()
-                .map(|(id, t)| (id, Rc::new(S::from_proto(t))))
+                .map(|(id, t)| (id, Rc::new(S::from_proto(t, send_cons))))
                 .collect(),
         ))
     }
 
-    fn apply(&self, input: Self::Input) {
+    fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints) {
         self.0.borrow_mut().remove_not_present(&input);
 
         for (id, track) in input {
             if let Some(sync_track) = self.0.borrow().get(&id) {
-                sync_track.apply(track);
+                sync_track.apply(track, send_cons);
             } else {
                 self.0
                     .borrow_mut()
-                    .insert(id, Rc::new(S::from_proto(track)));
+                    .insert(id, Rc::new(S::from_proto(track, send_cons)));
             }
         }
     }

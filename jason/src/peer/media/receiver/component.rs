@@ -22,6 +22,7 @@ use crate::{
 
 use super::Receiver;
 use crate::{
+    media::LocalTracksConstraints,
     peer::{component::SyncState, media::InTransition, MediaExchangeState},
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
@@ -70,7 +71,10 @@ impl AsProtoState for State {
 impl SynchronizableState for State {
     type Input = proto::state::Receiver;
 
-    fn from_proto(input: Self::Input) -> Self {
+    fn from_proto(
+        input: Self::Input,
+        send_cons: &LocalTracksConstraints,
+    ) -> Self {
         Self {
             id: input.id,
             mid: input.mid,
@@ -86,7 +90,7 @@ impl SynchronizableState for State {
         }
     }
 
-    fn apply(&self, input: Self::Input) {
+    fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints) {
         let new_media_exchange_state =
             media_exchange_state::Stable::from(input.enabled_individual);
         let current_media_exchange_state =

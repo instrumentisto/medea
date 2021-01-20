@@ -4,7 +4,10 @@ use futures::stream::LocalBoxStream;
 use medea_client_api_proto::IceCandidate;
 use medea_reactive::ObservableHashSet;
 
-use crate::utils::{AsProtoState, SynchronizableState};
+use crate::{
+    media::LocalTracksConstraints,
+    utils::{AsProtoState, SynchronizableState},
+};
 
 /// Store of the all [`IceCandidate`]s of the [`PeerComponent`].
 #[derive(Debug)]
@@ -30,11 +33,11 @@ impl IceCandidates {
 impl SynchronizableState for IceCandidates {
     type Input = HashSet<IceCandidate>;
 
-    fn from_proto(input: Self::Input) -> Self {
+    fn from_proto(input: Self::Input, _: &LocalTracksConstraints) -> Self {
         Self(RefCell::new(input.into()))
     }
 
-    fn apply(&self, input: Self::Input) {
+    fn apply(&self, input: Self::Input, _: &LocalTracksConstraints) {
         self.0.borrow_mut().update(input);
     }
 }

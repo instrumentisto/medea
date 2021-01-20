@@ -10,7 +10,10 @@ use futures::{
 };
 use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::{JasonError, TaskHandle};
+use crate::{
+    media::LocalTracksConstraints,
+    utils::{JasonError, TaskHandle},
+};
 use medea_reactive::AllProcessed;
 
 /// Abstraction over state which can be transformed to the states from the
@@ -32,10 +35,13 @@ pub trait SynchronizableState {
     type Input;
 
     /// Creates state from the [`medea_client_api_proto::state`] representation.
-    fn from_proto(input: Self::Input) -> Self;
+    fn from_proto(
+        input: Self::Input,
+        send_cons: &LocalTracksConstraints,
+    ) -> Self;
 
     /// Updates this state with a provided [`medea_client_api_proto::state`].
-    fn apply(&self, input: Self::Input);
+    fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints);
 }
 
 /// Abstraction over state which can be updated by client side.

@@ -483,7 +483,10 @@ impl AsProtoState for State {
 impl SynchronizableState for State {
     type Input = proto_state::Peer;
 
-    fn from_proto(from: Self::Input) -> Self {
+    fn from_proto(
+        from: Self::Input,
+        send_cons: &LocalTracksConstraints,
+    ) -> Self {
         let state = Self::new(
             from.id,
             from.ice_servers,
@@ -492,14 +495,16 @@ impl SynchronizableState for State {
         );
 
         for (id, sender) in from.senders {
-            state
-                .senders
-                .insert(id, Rc::new(sender::State::from(sender)));
+            state.senders.insert(
+                id,
+                Rc::new(sender::State::from_proto(sender, send_cons)),
+            );
         }
         for (id, receiver) in from.receivers {
-            state
-                .receivers
-                .insert(id, Rc::new(receiver::State::from(receiver)));
+            state.receivers.insert(
+                id,
+                Rc::new(receiver::State::from_proto(receiver, send_cons)),
+            );
         }
         for ice_candidate in from.ice_candidates {
             state.ice_candidates.add(ice_candidate);
@@ -508,7 +513,7 @@ impl SynchronizableState for State {
         state
     }
 
-    fn apply(&self, state: Self::Input) {
+    fn apply(&self, state: Self::Input, send_cons: &LocalTracksConstraints) {
         if state.negotiation_role.is_some() {
             self.negotiation_role.set(state.negotiation_role);
         }
@@ -519,9 +524,9 @@ impl SynchronizableState for State {
             self.local_sdp.approved_set(sdp_offer);
         }
         self.remote_sdp.set(state.remote_sdp_offer);
-        self.ice_candidates.apply(state.ice_candidates);
-        self.senders.apply(state.senders);
-        self.receivers.apply(state.receivers);
+        self.ice_candidates.apply(state.ice_candidates, send_cons);
+        self.senders.apply(state.senders, send_cons);
+        self.receivers.apply(state.receivers, send_cons);
 
         self.sync_state.set(SyncState::Synced);
     }
