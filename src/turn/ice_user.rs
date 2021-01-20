@@ -7,68 +7,16 @@ use medea_client_api_proto::{IceServer, PeerId, RoomId};
 
 use crate::{
     log::prelude::*,
-    turn::{
-        repo::TurnDatabaseErr, TurnDatabase, TurnSessionManager, COTURN_REALM,
-    },
-    utils::generate_pass,
+    utils::{generate_token, MpscOneshotSender},
 };
 
 /// Length of the TURN server credentials.
 static TURN_PASS_LEN: usize = 16;
 
-/// [`IceUser`] handle which will remove it's credentials from remote storage
-/// and forcibly closes it's sessions on [Coturn] server.
-#[derive(Debug)]
-struct IceUserHandle {
-    /// Turn credentials repository.
-    turn_db: Box<dyn TurnDatabase>,
-
-    /// Client of [Coturn] server admin interface.
-    ///
-    /// [Coturn]: https://github.com/coturn/coturn
-    coturn_cli: Box<dyn TurnSessionManager>,
-
-    /// Username of the [`IceUser`] for which this [`IceUserHandle`] is
-    /// created.
-    username: IceUsername,
-}
-
-impl IceUserHandle {
-    /// Returns new [`IceUserHandle`] for the provided [`IceUsername`].
-    pub fn new(
-        turn_db: Box<dyn TurnDatabase>,
-        coturn_cli: Box<dyn TurnSessionManager>,
-        username: IceUsername,
-    ) -> Self {
-        Self {
-            turn_db,
-            coturn_cli,
-            username,
-        }
-    }
-}
-
-impl Drop for IceUserHandle {
-    fn drop(&mut self) {
-        let db_remove_fut = self.turn_db.remove(&self.username);
-        let session_delete_fut = self.coturn_cli.delete_session(&self.username);
-
-        tokio::spawn(async move {
-            if let Err(e) = db_remove_fut.await {
-                warn!("Failed to remove IceUser from the database: {:?}", e);
-            }
-            if let Err(e) = session_delete_fut.await {
-                warn!("Failed to remove IceUser from Coturn: {:?}", e);
-            }
-        });
-    }
-}
-
 /// Username for authorization on [Coturn] server.
 ///
 /// [Coturn]: https://github.com/coturn/coturn
-#[derive(AsRef, Clone, Debug, Display, From, Into)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(AsRef, Clone, Debug, Display, From, Into, PartialEq, Eq)]
 #[as_ref(forward)]
 pub struct IceUsername(String);
 
@@ -76,11 +24,6 @@ impl IceUsername {
     /// Returns new [`IceUsername`] for the provided [`RoomId`] and [`PeerId`].
     fn new(room_id: &RoomId, peer_id: PeerId) -> Self {
         Self(format!("{}_{}", room_id, peer_id))
-    }
-
-    /// Returns Redis key for this [`IceUsername`].
-    pub fn as_redis_key(&self) -> String {
-        format!("turn/realm/{}/user/{}/key", COTURN_REALM, self)
     }
 }
 
@@ -91,34 +34,14 @@ impl IceUsername {
 pub struct IcePassword(String);
 
 impl IcePassword {
-    /// Returns [`IcePassword`] for the [`IceUserKind::Static`] [`IceUser`].
-    fn new_static(pass: String) -> Self {
-        Self(pass)
-    }
-
     /// Generates new [`IcePassword`] with a [`TURN_PASS_LEN`] length for the
     /// [`IceUser`].
-    fn generate() -> Self {
-        Self(generate_pass(TURN_PASS_LEN))
+    pub fn generate() -> Self {
+        Self(generate_token(TURN_PASS_LEN))
     }
-}
-
-/// Kind of [`IceUser`].
-#[derive(Debug)]
-enum IceUserKind {
-    /// Static users are hardcoded on Turn server and do not
-    /// require any additional management.
-    Static,
-
-    /// Non static users are meant to be saved and deleted from some remote
-    /// storage
-    NonStatic(IceUserHandle),
 }
 
 /// Credentials on Turn server.
-///
-/// If this [`IceUser`] is non-static, then on [`Drop::drop`]
-/// all records about this user and it's sessions will be removed.
 #[derive(Debug)]
 pub struct IceUser {
     /// Address of Turn server.
@@ -130,8 +53,10 @@ pub struct IceUser {
     /// Password for authorization.
     pass: IcePassword,
 
-    /// Kind of this [`IceUser`].
-    kind: IceUserKind,
+    /// Sender into which [`IceUsername`] is sent in [`Drop`] implementation.
+    ///
+    /// `None` if [`IceUser`] is static.
+    on_drop: Option<MpscOneshotSender<IceUsername>>,
 }
 
 impl IceUser {
@@ -139,34 +64,19 @@ impl IceUser {
     ///
     /// Creates new credentials for provided [`RoomId`] and [`PeerId`], inserts
     /// it to the [`TurnDatabase`].
-    ///
-    /// # Errors
-    ///
-    /// Errors if unable to establish connection with database, or database
-    /// request fails.
-    pub async fn new_non_static(
+    pub fn new_non_static(
         address: String,
         room_id: &RoomId,
         peer_id: PeerId,
-        db: Box<dyn TurnDatabase>,
-        cli: Box<dyn TurnSessionManager>,
-    ) -> Result<Self, TurnDatabaseErr> {
-        let username = IceUsername::new(&room_id, peer_id);
-        let pass = IcePassword::generate();
-
-        let insert_ice_user_fut = db.insert(&username, &pass);
-        insert_ice_user_fut.await?;
-
-        Ok(Self {
+        pass: IcePassword,
+        on_drop: MpscOneshotSender<IceUsername>,
+    ) -> Self {
+        Self {
             address,
-            kind: IceUserKind::NonStatic(IceUserHandle::new(
-                db,
-                cli,
-                username.clone(),
-            )),
-            username,
+            username: IceUsername::new(&room_id, peer_id),
             pass,
-        })
+            on_drop: Some(on_drop),
+        }
     }
 
     /// Build new static [`IceUser`].
@@ -174,8 +84,8 @@ impl IceUser {
         Self {
             address,
             username: IceUsername(username),
-            pass: IcePassword::new_static(pass),
-            kind: IceUserKind::Static,
+            pass: IcePassword(pass),
+            on_drop: None,
         }
     }
 
@@ -198,82 +108,49 @@ impl IceUser {
         };
         vec![stun, turn]
     }
+
+    pub fn user(&self) -> &IceUsername {
+        &self.username
+    }
+
+    pub fn pass(&self) -> &IcePassword {
+        &self.pass
+    }
+}
+
+impl Drop for IceUser {
+    fn drop(&mut self) {
+        if let Some(tx) = self.on_drop.take() {
+            let name = std::mem::take(&mut self.username.0);
+            if let Err(user) = tx.send(IceUsername(name)) {
+                warn!("Failed to cleanup IceUser: {}", user);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::mem::forget;
-
-    use futures::future;
+    use futures::{channel::mpsc, StreamExt as _};
 
     use super::*;
 
-    use crate::turn::{MockTurnDatabase, MockTurnSessionManager};
-
-    /// Tests that on [`IceUser::new_non_static`] record in the [`TurnDatabase`]
-    /// will be created.
-    #[tokio::test]
-    async fn ice_user_creates_record_in_db() {
-        let room_id = RoomId::from("foobar");
-        let peer_id = PeerId(0);
-        let ice_username = IceUsername::new(&room_id, peer_id);
-
-        let mut db = MockTurnDatabase::new();
-        db.expect_insert().times(1).returning(move |user, _| {
-            assert_eq!(*user, ice_username);
-
-            Box::pin(future::ok(()))
-        });
-
-        forget(
-            IceUser::new_non_static(
-                String::new(),
-                &room_id,
-                peer_id,
-                Box::new(db),
-                Box::new(MockTurnSessionManager::new()),
-            )
-            .await
-            .unwrap(),
-        );
-    }
-
-    /// Tests that on [`IceUser`] drop record from the [`TurnDatabase`] will be
-    /// removed and [`IceUser`]'s sessions will be removed.
-    #[tokio::test]
+    #[actix_rt::test]
     async fn ice_user_removes_on_drop() {
-        let room_id = RoomId::from("foobar");
-        let peer_id = PeerId(0);
-        let ice_username = IceUsername::new(&room_id, peer_id);
+        let (tx, mut rx) = mpsc::unbounded();
 
-        let mut db = MockTurnDatabase::new();
-        db.expect_remove().times(1).returning({
-            let ice_username = ice_username.clone();
-            move |user| {
-                assert_eq!(*user, ice_username);
-                Box::pin(future::ok(()))
-            }
-        });
-        db.expect_insert()
-            .returning(|_, _| Box::pin(future::ok(())));
-        let mut session_manager = MockTurnSessionManager::new();
-        session_manager.expect_delete_session().times(1).returning(
-            move |user| {
-                assert_eq!(*user, ice_username);
-                Box::pin(future::ok(()))
-            },
+        let user = IceUser::new_non_static(
+            String::new(),
+            &RoomId::from("foobar"),
+            PeerId(0),
+            IcePassword::generate(),
+            MpscOneshotSender::from(tx),
         );
+        let user_name = user.username.clone();
 
-        drop(
-            IceUser::new_non_static(
-                String::new(),
-                &room_id,
-                peer_id,
-                Box::new(db),
-                Box::new(session_manager),
-            )
-            .await
-            .unwrap(),
-        );
+        drop(user);
+
+        assert_eq!(rx.next().await.unwrap(), user_name);
+        assert!(rx.next().await.is_none());
     }
 }

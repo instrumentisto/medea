@@ -318,7 +318,7 @@ impl Room {
     fn disconnect_member(
         &mut self,
         member_id: &MemberId,
-        ws_close_reason: Option<CloseReason>,
+        ws_close_reason: CloseReason,
         on_leave_reason: Option<OnLeaveReason>,
         ctx: &mut Context<Room>,
     ) {
@@ -328,10 +328,8 @@ impl Room {
             self.member_peers_removed(peers_ids, peer_member_id);
         }
 
-        if let Some(reason) = ws_close_reason {
-            self.members
-                .close_member_connection(&member_id, reason, ctx);
-        }
+        self.members
+            .close_member_connection(&member_id, ws_close_reason, ctx);
 
         if let Ok(member) = self.members.get_member_by_id(member_id) {
             if let (Some(url), Some(reason)) =

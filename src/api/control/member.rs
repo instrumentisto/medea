@@ -24,7 +24,7 @@ use crate::{
         EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
         WebRtcPlayId,
     },
-    utils::generate_pass,
+    utils,
 };
 
 /// Credentials of the `Member` element.
@@ -62,7 +62,7 @@ impl Credential {
 
 impl Default for Credential {
     fn default() -> Self {
-        Self::Plain(generate_pass(Self::LEN))
+        Self::Plain(utils::generate_token(Self::LEN))
     }
 }
 

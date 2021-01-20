@@ -5,6 +5,8 @@ mod actix_try_join_all;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
+use derive_more::From;
+use futures::channel::mpsc::{TrySendError, UnboundedSender};
 use rand::{distributions::Alphanumeric, Rng};
 
 pub use self::actix_try_join_all::actix_try_join_all;
@@ -127,10 +129,25 @@ pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
 }
 
 /// Generates random alphanumeric string of specified length.
-pub fn generate_pass(n: usize) -> String {
+pub fn generate_token(n: usize) -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(n)
         .map(char::from)
         .collect()
+}
+
+/// Cloneable oneshot sender backed by [`UnboundedSender`].
+#[derive(Clone, Debug, From)]
+pub struct MpscOneshotSender<T>(UnboundedSender<T>);
+
+impl<T> MpscOneshotSender<T> {
+    /// Sends provided message consuming `self`.
+    ///
+    /// # Errors
+    ///
+    /// If receiving side was dropped.
+    pub fn send(self, msg: T) -> Result<(), TrySendError<T>> {
+        self.0.unbounded_send(msg)
+    }
 }

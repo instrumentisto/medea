@@ -8,15 +8,23 @@ use std::{fmt, sync::Arc};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
+use futures::{
+    channel::mpsc,
+    future::{self, AbortHandle},
+    StreamExt as _,
+};
 use medea_client_api_proto::{PeerId, RoomId};
 use redis::ConnectionInfo;
 
 use crate::{
     conf,
+    log::prelude::*,
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
-        repo::{RedisTurnDatabase, TurnDatabaseErr},
+        ice_user::{IcePassword, IceUsername},
+        repo::{TurnDatabase, TurnDatabaseErr},
     },
+    utils::MpscOneshotSender,
 };
 
 use super::IceUser;
@@ -63,7 +71,7 @@ pub trait TurnAuthService: fmt::Debug + Send + Sync {
 #[derive(Debug)]
 struct Service {
     /// Turn credentials repository.
-    turn_db: RedisTurnDatabase,
+    turn_db: TurnDatabase,
 
     /// Client of [Coturn] server admin interface.
     ///
@@ -81,6 +89,17 @@ struct Service {
 
     /// Turn server static user password.
     turn_password: String,
+
+    /// Sender that is cloned into new [`IceUser`]s, that will signal that
+    /// [`IseUser`] is no longer used and should be removed from [Coturn].
+    ///
+    /// [Coturn]: https://github.com/coturn/coturn
+    drop_tx: MpscOneshotSender<IceUsername>,
+
+    // TODO: tokio v1 has abort() function in JoinHandle,
+    //       so we can use it directly.
+    /// [`AbortHandle`] to task that cleanups [`IceUser`]s.
+    users_cleanup_task: AbortHandle,
 }
 
 impl Service {
@@ -106,21 +125,27 @@ impl TurnAuthService for Service {
         peer_id: PeerId,
         policy: UnreachablePolicy,
     ) -> Result<IceUser, TurnServiceErr> {
-        match IceUser::new_non_static(
+        let ice_user = IceUser::new_non_static(
             self.turn_address.clone(),
             &room_id,
             peer_id,
-            Box::new(self.turn_db.clone()),
-            Box::new(self.coturn_cli.clone()),
-        )
-        .await
-        {
-            Ok(user) => Ok(user),
+            IcePassword::generate(),
+            self.drop_tx.clone(),
+        );
+
+        match self.turn_db.insert(&ice_user).await {
+            Ok(_) => Ok(ice_user),
             Err(err) => match policy {
                 UnreachablePolicy::ReturnErr => Err(err.into()),
                 UnreachablePolicy::ReturnStatic => Ok(self.static_user()),
             },
         }
+    }
+}
+
+impl Drop for Service {
+    fn drop(&mut self) {
+        self.users_cleanup_task.abort();
     }
 }
 
@@ -133,7 +158,7 @@ impl TurnAuthService for Service {
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> Result<Arc<dyn TurnAuthService + 'a>, TurnServiceErr> {
-    let turn_db = RedisTurnDatabase::new(
+    let turn_db = TurnDatabase::new(
         cf.db.redis.connect_timeout,
         ConnectionInfo::from(&cf.db.redis),
     )?;
@@ -144,6 +169,28 @@ pub fn new_turn_auth_service<'a>(
         cf.cli.pool.into(),
     );
 
+    let (tx, mut rx) = mpsc::unbounded();
+
+    let users_cleanup_task = {
+        let db = turn_db.clone();
+        let cli = coturn_cli.clone();
+        let (fut, handle) = future::abortable(async move {
+            while let Some(user) = rx.next().await {
+                if let Err(e) = db.remove(&[&user]).await {
+                    warn!(
+                        "Failed to remove IceUser from the database: {:?}",
+                        e
+                    );
+                }
+                if let Err(e) = cli.delete_sessions(&[&user]).await {
+                    warn!("Failed to remove IceUser from Coturn: {:?}", e);
+                }
+            }
+        });
+        tokio::spawn(fut);
+        handle
+    };
+
     let turn_service = Service {
         turn_db,
         coturn_cli,
@@ -151,6 +198,8 @@ pub fn new_turn_auth_service<'a>(
         turn_address: cf.addr(),
         turn_username: cf.user.to_string(),
         turn_password: cf.pass.to_string(),
+        drop_tx: MpscOneshotSender::from(tx),
+        users_cleanup_task,
     };
 
     Ok(Arc::new(turn_service))
