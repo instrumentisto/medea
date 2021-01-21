@@ -26,6 +26,8 @@ use super::{track::local, InputDeviceInfo};
 // TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
 //       stage atm, so there is no web-sys bindings for it.
 //       Discussion https://github.com/rustwasm/wasm-bindgen/issues/1950
+//       It was added in https://github.com/rustwasm/wasm-bindgen/pull/2423,
+//       use when > 0.2.69 version release.
 #[wasm_bindgen(inline_js = "export function get_display_media(media_devices, \
                             constraints) { return \
                             media_devices.getDisplayMedia(constraints) }")]
