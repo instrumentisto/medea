@@ -3,7 +3,7 @@
 //! [Coturn]: https://github.com/coturn/coturn
 //! [TURN]: https://webrtcglossary.com/turn/
 
-use std::{fmt, sync::Arc};
+use std::{fmt, slice, sync::Arc};
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
@@ -18,7 +18,7 @@ use redis::ConnectionInfo;
 
 use crate::{
     conf,
-    log::prelude::*,
+    log::prelude as log,
     turn::{
         cli::{CoturnCliError, CoturnTelnetClient},
         ice_user::{IcePassword, IceUsername},
@@ -90,13 +90,13 @@ struct Service {
     /// Turn server static user password.
     turn_password: String,
 
-    /// Sender that is cloned into new [`IceUser`]s, that will signal that
-    /// [`IseUser`] is no longer used and should be removed from [Coturn].
+    /// Channel sender signalling about an [`IseUser`] no longer being used and
+    /// that it should be removed from [Coturn].
     ///
     /// [Coturn]: https://github.com/coturn/coturn
     drop_tx: MpscOneshotSender<IceUsername>,
 
-    // TODO: tokio v1 has abort() function in JoinHandle,
+    // TODO: tokio 1.0 has abort() function in JoinHandle,
     //       so we can use it directly.
     /// [`AbortHandle`] to task that cleanups [`IceUser`]s.
     users_cleanup_task: AbortHandle,
@@ -144,6 +144,7 @@ impl TurnAuthService for Service {
 }
 
 impl Drop for Service {
+    #[inline]
     fn drop(&mut self) {
         self.users_cleanup_task.abort();
     }
@@ -176,14 +177,20 @@ pub fn new_turn_auth_service<'a>(
         let cli = coturn_cli.clone();
         let (fut, handle) = future::abortable(async move {
             while let Some(user) = rx.next().await {
-                if let Err(e) = db.remove(&[&user]).await {
-                    warn!(
-                        "Failed to remove IceUser from the database: {:?}",
-                        e
+                let users = slice::from_ref(&user);
+                if let Err(e) = db.remove(users).await {
+                    log::warn!(
+                        "Failed to remove IceUser(name: {}) from Redis: {}",
+                        user,
+                        e,
                     );
                 }
-                if let Err(e) = cli.delete_sessions(&[&user]).await {
-                    warn!("Failed to remove IceUser from Coturn: {:?}", e);
+                if let Err(e) = cli.delete_sessions(users).await {
+                    log::warn!(
+                        "Failed to remove IceUser(name: {}) from Coturn: {}",
+                        user,
+                        e,
+                    );
                 }
             }
         });

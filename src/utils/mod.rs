@@ -128,11 +128,12 @@ pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
         .map_or_else(|_| Utc::now(), |dur| Utc::now() - dur)
 }
 
-/// Generates random alphanumeric string of specified length.
-pub fn generate_token(n: usize) -> String {
+/// Generates random alphanumeric string of the specified `length`.
+#[must_use]
+pub fn generate_token(length: usize) -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(n)
+        .take(length)
         .map(char::from)
         .collect()
 }
@@ -142,12 +143,12 @@ pub fn generate_token(n: usize) -> String {
 pub struct MpscOneshotSender<T>(UnboundedSender<T>);
 
 impl<T> MpscOneshotSender<T> {
-    /// Sends provided message consuming `self`.
+    /// Sends the given `message` consuming `self`.
     ///
     /// # Errors
     ///
     /// If receiving side was dropped.
-    pub fn send(self, msg: T) -> Result<(), TrySendError<T>> {
-        self.0.unbounded_send(msg)
+    pub fn send(self, message: T) -> Result<(), TrySendError<T>> {
+        self.0.unbounded_send(message)
     }
 }

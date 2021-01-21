@@ -11,7 +11,7 @@ use failure::Fail;
 use redis::{IntoConnectionInfo, RedisError};
 
 use crate::{
-    log::prelude::*,
+    log::prelude as log,
     turn::{IceUser, IceUsername},
 };
 
@@ -63,7 +63,7 @@ impl TurnDatabase {
     /// Errors if unable to establish connection with database, or database
     /// request fails.
     pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
-        debug!("Store ICE user: {:?}", user);
+        log::debug!("Store ICE user: {:?}", user);
 
         let key = user.user().redis_key();
         let value = user.redis_hmac_key();
@@ -86,15 +86,15 @@ impl TurnDatabase {
     /// request fails.
     pub async fn remove(
         &self,
-        users: &[&IceUsername],
+        users: &[IceUsername],
     ) -> Result<(), TurnDatabaseErr> {
-        debug!("Remove ICE users: {:?}", users);
+        log::debug!("Remove ICE users: {:?}", users);
 
         if users.is_empty() {
             return Ok(());
         }
 
-        let keys: Vec<_> = users.iter().map(|u| u.redis_key()).collect();
+        let keys: Vec<_> = users.iter().map(IceUsername::redis_key).collect();
 
         let mut conn = self.0.get().await?;
         Ok(cmd("DEL").arg(keys).query_async(&mut conn).await?)
@@ -102,17 +102,18 @@ impl TurnDatabase {
 }
 
 impl IceUsername {
-    /// Returns Redis key for this [`IceUsername`].
+    /// Forms a Redis key of this [`IceUsername`].
+    #[must_use]
     fn redis_key(&self) -> String {
         format!("turn/realm/{}/user/{}/key", COTURN_REALM, self)
     }
 }
 
 impl IceUser {
-    /// Returns [Coturn]'s [HMAC key] for the provided [`IceUsername`] and
-    /// [`IcePassword`].
+    /// Forms a [Coturn]'s [HMAC key] of this [`IceUser`].
     ///
     /// [HMAC key]: https://tinyurl.com/y33qa86c
+    #[must_use]
     fn redis_hmac_key(&self) -> String {
         let mut hasher = Md5::new();
         hasher.input_str(&format!(
@@ -126,6 +127,7 @@ impl IceUser {
 }
 
 impl fmt::Debug for TurnDatabase {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TurnDatabase")
             .field("pool", &self.0.status())

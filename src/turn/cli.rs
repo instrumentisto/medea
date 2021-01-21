@@ -40,6 +40,7 @@ pub struct CoturnTelnetClient(Pool);
 impl CoturnTelnetClient {
     /// Creates new [`CoturnTelnetClient`] with the provided configuration.
     #[inline]
+    #[must_use]
     pub fn new<H: Into<String>, P: Into<Bytes>>(
         addr: (H, u16),
         pass: P,
@@ -51,7 +52,7 @@ impl CoturnTelnetClient {
         ))
     }
 
-    /// Forcibly closes sessions on [Coturn] server by provided
+    /// Forcibly closes sessions on [Coturn] server by the provided
     /// [`IceUsername`]s.
     ///
     /// # Errors
@@ -71,7 +72,7 @@ impl CoturnTelnetClient {
     /// With [`CoturnCliError::CliError`] in case of unexpected protocol error.
     pub async fn delete_sessions(
         &self,
-        users: &[&IceUsername],
+        users: &[IceUsername],
     ) -> Result<(), CoturnCliError> {
         let mut conn = self.0.get().await?;
         for u in users {
@@ -84,6 +85,7 @@ impl CoturnTelnetClient {
 }
 
 impl fmt::Debug for CoturnTelnetClient {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CoturnTelnetClient")
             .field("pool", &self.0.status())

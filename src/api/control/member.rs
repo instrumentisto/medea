@@ -61,6 +61,7 @@ impl Credential {
 }
 
 impl Default for Credential {
+    #[inline]
     fn default() -> Self {
         Self::Plain(utils::generate_token(Self::LEN))
     }
