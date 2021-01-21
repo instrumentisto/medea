@@ -45,7 +45,10 @@ message OnLeave {
     // Connection with Member was lost.
     LOST_CONNECTION = 1;
 
+    // Member was forcibly disconnected by server.
+    KICKED = 2;
+
     // Medea media server is shutting down.
-    SERVER_SHUTDOWN = 2;
+    SERVER_SHUTDOWN = 3;
   }
 }

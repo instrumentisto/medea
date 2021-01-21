@@ -50,6 +50,9 @@ pub enum OnLeaveReason {
     /// Connection with `Member` was lost.
     LostConnection,
 
+    /// `Member` was forcibly disconnected by server.
+    Kicked,
+
     /// Server is shutting down.
     ServerShutdown,
 }
@@ -60,6 +63,7 @@ impl Into<proto::on_leave::Reason> for OnLeaveReason {
             Self::LostConnection => proto::on_leave::Reason::LostConnection,
             Self::ServerShutdown => proto::on_leave::Reason::ServerShutdown,
             Self::Disconnected => proto::on_leave::Reason::Disconnected,
+            Self::Kicked => proto::on_leave::Reason::Kicked,
         }
     }
 }

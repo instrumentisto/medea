@@ -8,7 +8,7 @@ use futures::{
     stream::LocalBoxStream,
     FutureExt as _, StreamExt as _,
 };
-use medea_reactive::{Guarded, Processed, ProgressableCell};
+use medea_reactive::{Processed, ProgressableCell};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -230,13 +230,10 @@ where
     ///
     /// [`Future`]: std::future::Future
     pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        let mut sub = self.state.subscribe();
-
-        Box::pin(async move {
-            while let Some(TransitableState::Transition(_)) =
-                sub.next().await.map(Guarded::into_inner)
-            {}
-        })
+        let stable = self.subscribe_stable();
+        Box::pin(
+            async move { stable.fuse().select_next_some().map(|_| ()).await },
+        )
     }
 
     /// Updates [`TransitableStateController::state`].

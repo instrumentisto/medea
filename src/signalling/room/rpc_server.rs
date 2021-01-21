@@ -2,7 +2,7 @@
 
 use actix::{
     fut::{self, Either},
-    ActorFuture, Addr, ContextFutureSpawner as _, Handler, WrapFuture,
+    ActorFuture, Addr, Handler, WrapFuture,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -10,7 +10,9 @@ use futures::{
     future::{self, LocalBoxFuture, TryFutureExt as _},
     FutureExt,
 };
-use medea_client_api_proto::{Command, Credential, Event, MemberId, PeerId};
+use medea_client_api_proto::{
+    CloseReason, Command, Credential, Event, MemberId, PeerId,
+};
 
 use crate::{
     api::{
@@ -18,7 +20,7 @@ use crate::{
             ClosedReason, CommandMessage, RpcConnection, RpcConnectionClosed,
             RpcConnectionEstablished, RpcConnectionSettings, Synchronize,
         },
-        control::callback::{OnJoinEvent, OnLeaveEvent, OnLeaveReason},
+        control::callback::{OnJoinEvent, OnLeaveReason},
         RpcServer, RpcServerError,
     },
     log::prelude::*,
@@ -169,37 +171,39 @@ impl Handler<Synchronize> for Room {
 }
 
 impl Handler<CommandMessage> for Room {
-    type Result = ActFuture;
+    type Result = ();
 
     /// Receives [`Command`] from Web client and passes it to corresponding
-    /// handlers. Will emit `CloseRoom` on any error.
+    /// handlers.
     fn handle(
         &mut self,
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        match self.validate_command(&msg) {
-            Ok(_) => {
-                if let Err(err) = msg.command.dispatch_with(self) {
-                    error!(
-                        "Failed handle command, because {}. Room [id = {}] \
-                         will be stopped.",
-                        err, self.id,
-                    );
-                    self.close_gracefully(ctx)
-                } else {
-                    Box::pin(fut::ready(()))
-                }
-            }
-            Err(err) => {
-                warn!(
-                    "Ignoring Command from Member [{}] that failed validation \
-                     cause: {}",
-                    msg.member_id, err
-                );
-                Box::pin(fut::ready(()))
-            }
+        if let Err(err) = self.validate_command(&msg) {
+            warn!(
+                "Ignoring Command from Member [{}] that failed validation \
+                 cause: {}",
+                msg.member_id, err
+            );
+            return;
         }
+
+        let member_id = msg.member_id;
+        let command = msg.command;
+        if let Err(err) = command.dispatch_with(self) {
+            error!(
+                "Error when handling command from Member [id = {}] in Room \
+                 [id = {}]: {}",
+                member_id, self.id, err
+            );
+            self.disconnect_member(
+                &member_id,
+                CloseReason::InternalError,
+                Some(OnLeaveReason::Kicked),
+                ctx,
+            );
+        };
     }
 }
 
@@ -297,43 +301,22 @@ impl Handler<RpcConnectionClosed> for Room {
             msg.member_id, msg.reason
         );
 
-        self.members
-            .connection_closed(msg.member_id.clone(), msg.reason, ctx);
-
-        if let ClosedReason::Closed { normal } = msg.reason {
-            if let Ok(member) = self.members.get_member_by_id(&msg.member_id) {
-                if let Some(on_leave_url) = member.get_on_leave() {
-                    let reason = if normal {
-                        OnLeaveReason::Disconnected
-                    } else {
-                        OnLeaveReason::LostConnection
-                    };
-                    self.callbacks.do_send(
-                        on_leave_url,
-                        member.get_fid().into(),
-                        OnLeaveEvent::new(reason),
-                    );
-                }
-            } else {
-                error!(
-                    "Member [id = {}] with ID from RpcConnectionClosed not \
-                     found.",
-                    msg.member_id,
-                );
+        match msg.reason {
+            ClosedReason::Lost => {
+                self.members.connection_lost(msg.member_id, ctx);
             }
-
-            let removed_peers =
-                self.peers.remove_peers_related_to_member(&msg.member_id);
-
-            for (peer_member_id, peers_ids) in removed_peers {
-                // Here we may have some problems. If two participants
-                // disconnect at one moment then sending event
-                // to another participant fail,
-                // because connection already closed but we don't know about it
-                // because message in event loop.
-                self.member_peers_removed(peers_ids, peer_member_id)
-                    .map(|_, _, _| ())
-                    .spawn(ctx);
+            ClosedReason::Closed { normal } => {
+                let on_leave = if normal {
+                    OnLeaveReason::Disconnected
+                } else {
+                    OnLeaveReason::LostConnection
+                };
+                self.disconnect_member(
+                    &msg.member_id,
+                    CloseReason::Finished,
+                    Some(on_leave),
+                    ctx,
+                );
             }
         }
     }
@@ -356,7 +339,6 @@ mod test {
         signalling::{
             participants::ParticipantService,
             peers::{build_peers_traffic_watcher, PeersService},
-            room::State,
         },
         AppContext,
     };
@@ -381,7 +363,6 @@ mod test {
                 dummy_negotiation_sub_mock(),
             ),
             members: ParticipantService::new(&room_spec, &context).unwrap(),
-            state: State::Started,
             callbacks: context.callbacks.clone(),
         }
     }

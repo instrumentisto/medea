@@ -414,7 +414,7 @@ async fn handle_ice_candidates(
             }
             PeerEvent::NewLocalTrack { .. }
             | PeerEvent::NewSdpAnswer { .. }
-            | PeerEvent::SendIntention { .. }
+            | PeerEvent::MediaUpdateCommand { .. }
             | PeerEvent::NewSdpOffer { .. } => {}
             _ => unreachable!(),
         }
@@ -1356,6 +1356,7 @@ mod ice_restart {
             .state()
             .sdp_offer_applied(&sdp_offer_before);
         peers.first_peer.state().reset_negotiation_role();
+        crate::delay_for(100).await;
         peers.first_peer.state().restart_ice();
         peers
             .first_peer

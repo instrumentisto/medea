@@ -221,7 +221,11 @@ impl CommandHandler for Room {
         self.peers.map_peer_by_id_mut(partner_peer_id, |peer| {
             peer.as_changes_scheduler()
                 .partner_patch_tracks(tracks_patches);
-            peer.commit_scheduled_changes();
+            if !peer.commit_scheduled_changes()
+                && peer.can_forcibly_commit_partner_patches()
+            {
+                peer.force_commit_partner_changes();
+            }
         })?;
 
         Ok(())

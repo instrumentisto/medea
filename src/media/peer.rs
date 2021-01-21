@@ -196,6 +196,7 @@ impl PeerError {
 #[enum_delegate(pub fn is_ice_restart(&self) -> bool)]
 // #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
 #[enum_delegate(pub fn is_known_to_remote(&self) -> bool)]
+#[enum_delegate(pub fn force_commit_partner_changes(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -325,6 +326,23 @@ impl PeerStateMachine {
     #[must_use]
     pub fn is_stable(&self) -> bool {
         matches!(self, PeerStateMachine::Stable(_))
+    }
+
+    /// Returns `true` if this [`PeerStateMachine`] can forcibly commit
+    /// [`TrackChange::PartnerTrackPatch`].
+    #[inline]
+    #[must_use]
+    pub fn can_forcibly_commit_partner_patches(&self) -> bool {
+        match &self {
+            PeerStateMachine::Stable(peer) => peer.context.is_known_to_remote,
+            PeerStateMachine::WaitLocalSdp(peer) => {
+                !peer.context.is_known_to_remote
+            }
+            PeerStateMachine::WaitRemoteSdp(peer) => {
+                peer.context.sdp_offer.is_some()
+                    && !peer.context.is_known_to_remote
+            }
+        }
     }
 }
 
@@ -667,10 +685,10 @@ impl TrackPatchDeduper {
             if !change.can_force_apply() {
                 return true;
             }
-            let patch = if let TrackChange::TrackPatch(patch) = change {
-                patch
-            } else {
-                return true;
+            let patch = match change {
+                TrackChange::TrackPatch(patch)
+                | TrackChange::PartnerTrackPatch(patch) => patch,
+                _ => return true,
             };
 
             if self.whitelist.is_some()
@@ -821,6 +839,51 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
+    /// Forcibly commits all [`TrackChange::PartnerTrackPatch`].
+    pub fn force_commit_partner_changes(&mut self) {
+        let mut partner_patches = Vec::new();
+        // TODO: use drain_filter when its stable
+        let mut i = 0;
+        while i != self.context.track_changes_queue.len() {
+            if matches!(
+                self.context.track_changes_queue[i],
+                TrackChange::PartnerTrackPatch(_)
+            ) {
+                let change = self
+                    .context
+                    .track_changes_queue
+                    .remove(i)
+                    .dispatch_with(self);
+                partner_patches.push(change);
+            } else {
+                i += 1;
+            }
+        }
+
+        let mut deduper = TrackPatchDeduper::with_whitelist(
+            partner_patches
+                .iter()
+                .filter_map(|t| match t {
+                    TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                    _ => None,
+                })
+                .collect(),
+        );
+        deduper.drain_merge(&mut self.context.pending_track_updates);
+        deduper.drain_merge(&mut partner_patches);
+
+        let updates: Vec<_> = deduper
+            .into_inner()
+            .map(|c| c.as_track_update(self.partner_member_id()))
+            .collect();
+
+        if !updates.is_empty() {
+            self.context
+                .peer_updates_sub
+                .force_update(self.id(), updates);
+        }
+    }
+
     /// Commits all [`TrackChange`]s which are marked as forcible
     /// ([`TrackChange::can_force_apply`]).
     pub fn inner_force_commit_scheduled_changes(&mut self) {
@@ -840,7 +903,8 @@ impl<T> Peer<T> {
             forcible_changes
                 .iter()
                 .filter_map(|t| match t {
-                    TrackChange::TrackPatch(patch) => Some(patch.id),
+                    TrackChange::TrackPatch(patch)
+                    | TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
                     _ => None,
                 })
                 .collect(),
@@ -854,7 +918,10 @@ impl<T> Peer<T> {
             .collect();
 
         if !updates.is_empty() {
-            self.context.need_renegotiation = true;
+            // TODO: can be optimized after #167
+            if self.context.is_known_to_remote {
+                self.context.need_renegotiation = true;
+            }
             self.context
                 .peer_updates_sub
                 .force_update(self.id(), updates);
@@ -1516,7 +1583,7 @@ pub mod tests {
         assert!(peer.context.need_renegotiation);
 
         let peer = peer.set_local_offer(String::new());
-        let peer = peer.set_remote_answer(String::new());
+        peer.set_remote_answer(String::new());
 
         let peer_id = negotiation_needed_rx.recv().unwrap();
         assert_eq!(peer_id, PeerId(0));

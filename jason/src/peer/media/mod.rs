@@ -494,7 +494,6 @@ impl MediaConnections {
                 *track_id,
                 sender
                     .mid()
-                    .clone()
                     .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
@@ -842,16 +841,6 @@ impl MediaConnections {
         self.0.borrow().senders.get(&id).map(|r| r.obj())
     }
 
-    /// Returns [`sender::State`] with a provided [`TrackId`].
-    #[must_use]
-    #[inline]
-    pub fn get_sender_state_by_id(
-        &self,
-        id: TrackId,
-    ) -> Option<Rc<sender::State>> {
-        self.0.borrow().senders.get(&id).map(|r| r.state())
-    }
-
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.
     ///
     /// [`Sender`]: self::sender::Sender
@@ -1008,5 +997,15 @@ impl MediaConnections {
             .values()
             .map(|sndr| sndr.obj())
             .collect()
+    }
+
+    /// Returns [`sender::State`] with a provided [`TrackId`].
+    #[must_use]
+    #[inline]
+    pub fn get_sender_state_by_id(
+        &self,
+        id: TrackId,
+    ) -> Option<Rc<sender::State>> {
+        self.0.borrow().senders.get(&id).map(|r| r.state())
     }
 }

@@ -152,24 +152,17 @@ impl Receiver {
         &self,
         state: media_exchange_state::Transition,
     ) {
-        match state {
-            media_exchange_state::Transition::Enabling(_) => {
-                self.track_events_sender
-                    .unbounded_send(TrackEvent::MediaExchangeIntention {
-                        id: self.track_id,
-                        enabled: true,
-                    })
-                    .ok();
-            }
-            media_exchange_state::Transition::Disabling(_) => {
-                self.track_events_sender
-                    .unbounded_send(TrackEvent::MediaExchangeIntention {
-                        id: self.track_id,
-                        enabled: false,
-                    })
-                    .ok();
-            }
-        }
+        let enabled = match state {
+            media_exchange_state::Transition::Enabling(_) => true,
+            media_exchange_state::Transition::Disabling(_) => false,
+        };
+
+        self.track_events_sender
+            .unbounded_send(TrackEvent::MediaExchangeIntention {
+                id: self.track_id,
+                enabled,
+            })
+            .ok();
     }
 
     /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this

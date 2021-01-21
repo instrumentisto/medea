@@ -45,9 +45,8 @@ pub struct State {
     /// `Member`s which sends media to this [`ReceiverComponent`].
     sender_id: MemberId,
 
-    media_exchange_state: Rc<MediaExchangeStateController>,
-    general_media_exchange_state:
-        ProgressableCell<media_exchange_state::Stable>,
+    enabled_individual: Rc<MediaExchangeStateController>,
+    enabled_general: ProgressableCell<media_exchange_state::Stable>,
 
     sync_state: ObservableCell<SyncState>,
 }
@@ -77,10 +76,10 @@ impl SynchronizableState for State {
             mid: input.mid,
             media_type: input.media_type,
             sender_id: input.sender_id,
-            media_exchange_state: MediaExchangeStateController::new(
+            enabled_individual: MediaExchangeStateController::new(
                 input.enabled_individual.into(),
             ),
-            general_media_exchange_state: ProgressableCell::new(
+            enabled_general: ProgressableCell::new(
                 input.enabled_general.into(),
             ),
             sync_state: ObservableCell::new(SyncState::Synced),
@@ -90,21 +89,20 @@ impl SynchronizableState for State {
     fn apply(&self, input: Self::Input, _: &LocalTracksConstraints) {
         let new_media_exchange_state =
             media_exchange_state::Stable::from(input.enabled_individual);
-        let current_media_exchange_state =
-            match self.media_exchange_state.state() {
-                MediaExchangeState::Transition(transition) => {
-                    transition.into_inner()
-                }
-                MediaExchangeState::Stable(stable) => stable,
-            };
+        let current_media_exchange_state = match self.enabled_individual.state()
+        {
+            MediaExchangeState::Transition(transition) => {
+                transition.into_inner()
+            }
+            MediaExchangeState::Stable(stable) => stable,
+        };
         if current_media_exchange_state != new_media_exchange_state {
-            self.media_exchange_state.update(new_media_exchange_state);
+            self.enabled_individual.update(new_media_exchange_state);
         }
 
         let new_general_media_exchange_state =
             media_exchange_state::Stable::from(input.enabled_general);
-        self.general_media_exchange_state
-            .set(new_general_media_exchange_state);
+        self.enabled_general.set(new_general_media_exchange_state);
 
         self.sync_state.set(SyncState::Synced);
     }
@@ -115,7 +113,7 @@ impl Updatable for State {
         use futures::FutureExt as _;
         Box::pin(
             futures::future::join_all(vec![self
-                .media_exchange_state
+                .enabled_individual
                 .when_stabilized()])
             .map(|_| ()),
         )
@@ -123,7 +121,7 @@ impl Updatable for State {
 
     fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![self
-            .media_exchange_state
+            .enabled_individual
             .when_processed()
             .into()])
     }
@@ -150,12 +148,10 @@ impl From<proto::state::Receiver> for State {
             mid: from.mid,
             media_type: from.media_type,
             sender_id: from.sender_id,
-            media_exchange_state: MediaExchangeStateController::new(
+            enabled_individual: MediaExchangeStateController::new(
                 from.enabled_individual.into(),
             ),
-            general_media_exchange_state: ProgressableCell::new(
-                from.enabled_general.into(),
-            ),
+            enabled_general: ProgressableCell::new(from.enabled_general.into()),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
@@ -163,6 +159,8 @@ impl From<proto::state::Receiver> for State {
 
 impl State {
     /// Returns [`State`] with a provided data.
+    #[inline]
+    #[must_use]
     pub fn new(
         id: TrackId,
         mid: Option<String>,
@@ -174,10 +172,12 @@ impl State {
             mid,
             media_type,
             sender_id: sender,
-            media_exchange_state: MediaExchangeStateController::new(
-                true.into(),
+            enabled_individual: MediaExchangeStateController::new(
+                media_exchange_state::Stable::Enabled,
             ),
-            general_media_exchange_state: ProgressableCell::new(true.into()),
+            enabled_general: ProgressableCell::new(
+                media_exchange_state::Stable::Enabled,
+            ),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
@@ -215,15 +215,14 @@ impl State {
     #[inline]
     #[must_use]
     pub fn enabled_individual(&self) -> bool {
-        self.media_exchange_state.enabled()
+        self.enabled_individual.enabled()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
     #[must_use]
     pub fn enabled_general(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == media_exchange_state::Stable::Enabled
+        self.enabled_general.get() == media_exchange_state::Stable::Enabled
     }
 
     /// Updates this [`State`] with the provided [`TrackPatchEvent`].
@@ -232,11 +231,10 @@ impl State {
             return;
         }
         if let Some(enabled_general) = track_patch.enabled_general {
-            self.general_media_exchange_state
-                .set(enabled_general.into());
+            self.enabled_general.set(enabled_general.into());
         }
         if let Some(enabled_individual) = track_patch.enabled_individual {
-            self.media_exchange_state.update(enabled_individual.into());
+            self.enabled_individual.update(enabled_individual.into());
         }
     }
 
@@ -256,10 +254,8 @@ impl State {
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
-            self.media_exchange_state.when_processed().into(),
-            self.general_media_exchange_state
-                .when_all_processed()
-                .into(),
+            self.enabled_individual.when_processed().into(),
+            self.enabled_general.when_all_processed().into(),
         ])
     }
 
@@ -268,23 +264,7 @@ impl State {
     ///
     /// [`Future`]: std::future::Future
     pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        self.media_exchange_state.when_stabilized()
-    }
-}
-
-#[cfg(feature = "mockable")]
-impl State {
-    /// Stabilizes [`MediaExchangeState`] of this [`State`].
-    #[inline]
-    pub fn stabilize(&self) {
-        use crate::peer::media::InTransition as _;
-
-        if let crate::peer::MediaExchangeState::Transition(transition) =
-            self.media_exchange_state.state()
-        {
-            self.media_exchange_state.update(transition.intended());
-            self.general_media_exchange_state.set(transition.intended());
-        }
+        self.enabled_individual.when_stabilized()
     }
 }
 
@@ -295,7 +275,7 @@ impl Component {
     /// Updates [`Receiver`]'s general media exchange state. Adds or removes
     /// [`TransceiverDirection::RECV`] from the [`Transceiver`] of the
     /// [`Receiver`].
-    #[watch(self.general_media_exchange_state.subscribe())]
+    #[watch(self.enabled_general.subscribe())]
     async fn general_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
@@ -331,7 +311,7 @@ impl Component {
     /// Watcher for [`MediaExchangeState::Stable`] update.
     ///
     /// Updates [`Receiver::enabled_individual`] to the new state.
-    #[watch(self.media_exchange_state.subscribe_stable())]
+    #[watch(self.enabled_individual.subscribe_stable())]
     async fn stable_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
@@ -348,7 +328,7 @@ impl Component {
     ///
     /// Sends new intention by [`Receiver::send_media_exchange_state_intention`]
     /// call.
-    #[watch(self.media_exchange_state.subscribe_transition())]
+    #[watch(self.enabled_individual.subscribe_transition())]
     async fn transition_media_exchange_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
@@ -367,7 +347,7 @@ impl Component {
     ) -> Result<()> {
         if let SyncState::Synced = sync_state {
             if let MediaExchangeState::Transition(transition) =
-                state.media_exchange_state.state()
+                state.enabled_individual.state()
             {
                 receiver.send_media_exchange_state_intention(transition);
             }
@@ -377,35 +357,11 @@ impl Component {
     }
 }
 
-impl TransceiverSide for State {
-    fn track_id(&self) -> TrackId {
-        self.id
-    }
-
-    fn kind(&self) -> MediaKind {
-        match &self.media_type {
-            MediaType::Audio(_) => MediaKind::Audio,
-            MediaType::Video(_) => MediaKind::Video,
-        }
-    }
-
-    fn source_kind(&self) -> MediaSourceKind {
-        match &self.media_type {
-            MediaType::Audio(_) => MediaSourceKind::Device,
-            MediaType::Video(video) => video.source_kind,
-        }
-    }
-
-    fn is_transitable(&self) -> bool {
-        true
-    }
-}
-
 impl MediaStateControllable for State {
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {
-        Rc::clone(&self.media_exchange_state)
+        Rc::clone(&self.enabled_individual)
     }
 
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
@@ -435,5 +391,45 @@ impl MediaStateControllable for State {
     fn reset_media_state_transition_timeout(&self) {
         self.media_exchange_state_controller()
             .reset_transition_timeout();
+    }
+}
+
+impl TransceiverSide for State {
+    fn track_id(&self) -> TrackId {
+        self.id
+    }
+
+    fn kind(&self) -> MediaKind {
+        match &self.media_type {
+            MediaType::Audio(_) => MediaKind::Audio,
+            MediaType::Video(_) => MediaKind::Video,
+        }
+    }
+
+    fn source_kind(&self) -> MediaSourceKind {
+        match &self.media_type {
+            MediaType::Audio(_) => MediaSourceKind::Device,
+            MediaType::Video(video) => video.source_kind,
+        }
+    }
+
+    fn is_transitable(&self) -> bool {
+        true
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl State {
+    /// Stabilizes [`MediaExchangeState`] of this [`State`].
+    #[inline]
+    pub fn stabilize(&self) {
+        use crate::peer::media::InTransition as _;
+
+        if let crate::peer::MediaExchangeState::Transition(transition) =
+            self.enabled_individual.state()
+        {
+            self.enabled_individual.update(transition.intended());
+            self.enabled_general.set(transition.intended());
+        }
     }
 }

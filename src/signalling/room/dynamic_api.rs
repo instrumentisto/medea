@@ -3,17 +3,18 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use actix::{
-    fut, ActorFuture as _, AsyncContext as _, Context,
-    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
+    fut, ActorFuture as _, AsyncContext as _, AtomicResponse, Context, Handler,
+    Message, WrapFuture as _,
 };
-use medea_client_api_proto::{MemberId, PeerId};
+use medea_client_api_proto::{CloseReason, MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
+        callback::OnLeaveReason,
         endpoints::{
             WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
             WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
@@ -42,25 +43,15 @@ impl Room {
             "Deleting Member [id = {}] in Room [id = {}].",
             member_id, self.id
         );
-        if let Ok(member) = self.members.get_member_by_id(member_id) {
-            let peers: HashSet<PeerId> = member
-                .sinks()
-                .values()
-                .filter_map(WebRtcPlayEndpoint::peer_id)
-                .chain(
-                    member
-                        .srcs()
-                        .values()
-                        .flat_map(WebRtcPublishEndpoint::peer_ids),
-                )
-                .collect();
-
-            // Send PeersRemoved to `Member`s which have related to this
-            // `Member` `Peer`s.
-            self.remove_peers(&member.id(), &peers, ctx);
-
-            self.members.delete_member(member_id, ctx);
-
+        if self.members.get_member_by_id(member_id).is_ok() {
+            self.disconnect_member(
+                member_id,
+                CloseReason::Evicted,
+                None, /* No need to callback, since delete is initiated by
+                       * Control Service. */
+                ctx,
+            );
+            self.members.delete_member(member_id);
             debug!(
                 "Member [id = {}] deleted from Room [id = {}].",
                 member_id, self.id
@@ -73,7 +64,6 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         endpoint_id: EndpointId,
-        ctx: &mut Context<Self>,
     ) {
         let endpoint_id =
             if let Ok(member) = self.members.get_member_by_id(member_id) {
@@ -86,9 +76,7 @@ impl Room {
                             self.member_peers_removed(
                                 peers.into_iter().map(|p| p.id()).collect(),
                                 member_id,
-                            )
-                            .map(|_, _, _| ())
-                            .spawn(ctx);
+                            );
                         }
                     }
                 }
@@ -96,7 +84,7 @@ impl Room {
                 let publish_id = String::from(play_id).into();
                 if let Some(endpoint) = member.take_src(&publish_id) {
                     let peer_ids = endpoint.peer_ids();
-                    self.remove_peers(member_id, &peer_ids, ctx);
+                    self.remove_peers(member_id, &peer_ids);
                 }
 
                 publish_id.into()
@@ -244,12 +232,15 @@ impl Room {
                             if let Err(e) = res {
                                 error!(
                                     "Failed to interconnect Members, because \
-                                     {}. Connection with Member [id = {}, \
-                                     room_id: {}] will be stopped.",
-                                    e, member_id, this.id,
+                                     {}",
+                                    e,
                                 );
-                                this.members
-                                    .close_member_connection(&member_id, ctx);
+                                this.disconnect_member(
+                                    &member_id,
+                                    CloseReason::InternalError,
+                                    Some(OnLeaveReason::Kicked),
+                                    ctx,
+                                );
                             }
                         },
                     ));
@@ -272,7 +263,6 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         peer_ids_to_remove: Peers,
-        ctx: &mut Context<Self>,
     ) {
         debug!("Remove peers.");
         self.peers
@@ -282,9 +272,7 @@ impl Room {
                 self.member_peers_removed(
                     peers.into_iter().map(|p| p.id()).collect(),
                     member_id,
-                )
-                .map(|_, _, _| ())
-                .spawn(ctx);
+                );
             });
     }
 }
@@ -395,7 +383,7 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            self.delete_endpoint(&member_id, endpoint_id, ctx);
+            self.delete_endpoint(&member_id, endpoint_id);
         });
     }
 }
@@ -471,15 +459,14 @@ impl Handler<CreateEndpoint> for Room {
 pub struct Close;
 
 impl Handler<Close> for Room {
-    type Result = ();
+    type Result = AtomicResponse<Self, ()>;
 
-    fn handle(&mut self, _: Close, ctx: &mut Self::Context) {
+    fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
         for id in self.members.members().keys() {
             self.delete_member(id, ctx);
         }
-        self.members
-            .drop_connections(ctx)
-            .into_actor(self)
-            .wait(ctx);
+        AtomicResponse::new(Box::pin(
+            self.members.drop_connections(ctx).into_actor(self),
+        ))
     }
 }

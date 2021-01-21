@@ -624,7 +624,7 @@ impl Handler<CloseRoom> for WsSession {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if self.sessions.remove(&msg.room_id).is_some() {
-            self.send_left_room(ctx, msg.room_id, CloseReason::Finished);
+            self.send_left_room(ctx, msg.room_id, msg.close_description.reason);
             if self.sessions.is_empty() {
                 self.close_in_place(ctx, &msg.close_description);
             }
@@ -1149,7 +1149,7 @@ mod test {
             into_frame(ServerMsg::Event {
                 room_id: "room_id".into(),
                 event: Event::RoomLeft {
-                    close_reason: medea_client_api_proto::CloseReason::Finished,
+                    close_reason: medea_client_api_proto::CloseReason::Evicted,
                 }
             })
         );
