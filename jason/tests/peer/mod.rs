@@ -464,10 +464,7 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
-            PeerEvent::NewLocalTrack { .. }
-            | PeerEvent::NewSdpAnswer { .. }
-            | PeerEvent::NewSdpOffer { .. } => {}
-            _ => unreachable!(),
+            _ => (),
         }
     }
 }
