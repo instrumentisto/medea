@@ -11,21 +11,21 @@ use medea_macro::watchers;
 use medea_reactive::{AllProcessed, Guarded, ObservableCell, ProgressableCell};
 
 use crate::{
+    media::LocalTracksConstraints,
     peer::{
-        media::{transitable_state::media_exchange_state, Result},
-        MediaExchangeStateController, MediaStateControllable,
-        MuteStateController, TransceiverDirection, TransceiverSide,
+        component::SyncState,
+        media::{
+            transitable_state::media_exchange_state, InTransition, Result,
+        },
+        MediaExchangeState, MediaExchangeStateController,
+        MediaStateControllable, MuteStateController, TransceiverDirection,
+        TransceiverSide,
     },
-    utils::component,
+    utils::{component, AsProtoState, SynchronizableState, Updatable},
     MediaKind,
 };
 
 use super::Receiver;
-use crate::{
-    media::LocalTracksConstraints,
-    peer::{component::SyncState, media::InTransition, MediaExchangeState},
-    utils::{AsProtoState, SynchronizableState, Updatable},
-};
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -158,8 +158,7 @@ impl From<proto::state::Receiver> for State {
 }
 
 impl State {
-    /// Returns [`State`] with a provided data.
-    #[inline]
+    /// Returns [`State`] with the provided data.
     #[must_use]
     pub fn new(
         id: TrackId,

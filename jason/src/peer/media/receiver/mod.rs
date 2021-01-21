@@ -13,8 +13,8 @@ use web_sys as sys;
 use crate::{
     media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
     peer::{
-        transceiver::Transceiver, MediaConnections, MediaStateControllable,
-        PeerEvent, TransceiverDirection,
+        media::TrackEvent, transceiver::Transceiver, MediaConnections,
+        MediaStateControllable, PeerEvent, TransceiverDirection,
     },
 };
 
@@ -40,7 +40,6 @@ pub struct Receiver {
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     track_events_sender: mpsc::UnboundedSender<TrackEvent>,
 }
-use crate::peer::media::TrackEvent;
 
 impl Receiver {
     /// Creates new [`Transceiver`] if provided `mid` is `None`, otherwise

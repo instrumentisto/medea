@@ -6,12 +6,12 @@ use medea_client_api_proto::TrackId;
 use medea_reactive::{AllProcessed, Guarded, ProgressableHashMap};
 
 use crate::{
+    media::LocalTracksConstraints,
     peer::media::sender,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
 
 use super::receiver;
-use crate::media::LocalTracksConstraints;
 
 /// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
 /// [`PeerComponent`].

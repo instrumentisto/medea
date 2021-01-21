@@ -690,7 +690,6 @@ impl MediaConnections {
                 }
             }
         }
-
         Err(tracerr::new!(
             MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
         ))

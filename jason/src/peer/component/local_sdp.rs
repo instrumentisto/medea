@@ -101,6 +101,7 @@ impl LocalSdp {
         self.0.approved.set(true);
     }
 
+    /// Returns current SDP offer.
     pub fn current(&self) -> Option<String> {
         self.0.current_sdp.get()
     }

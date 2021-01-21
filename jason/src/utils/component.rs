@@ -6,13 +6,13 @@ use derive_more::Deref;
 use futures::{
     future, future::LocalBoxFuture, Future, FutureExt as _, Stream, StreamExt,
 };
+use medea_reactive::AllProcessed;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::LocalTracksConstraints,
     utils::{JasonError, TaskHandle},
 };
-use medea_reactive::AllProcessed;
 
 /// Abstraction over state which can be transformed to the states from the
 /// [`medea_client_api_proto::state`].

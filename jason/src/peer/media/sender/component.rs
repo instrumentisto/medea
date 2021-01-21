@@ -14,17 +14,16 @@ use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
         component::SyncState,
-        media::{media_exchange_state, mute_state, Result},
-        MediaConnectionsError, MediaExchangeStateController, MediaState,
-        MediaStateControllable, MuteStateController, TransceiverDirection,
-        TransceiverSide,
+        media::{media_exchange_state, mute_state, InTransition, Result},
+        MediaConnectionsError, MediaExchangeState,
+        MediaExchangeStateController, MediaState, MediaStateControllable,
+        MuteState, MuteStateController, TransceiverDirection, TransceiverSide,
     },
     utils::{component, AsProtoState, SynchronizableState, Updatable},
     MediaKind,
 };
 
 use super::Sender;
-use crate::peer::{media::InTransition, MediaExchangeState, MuteState};
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
