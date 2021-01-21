@@ -1641,9 +1641,7 @@ async fn only_one_gum_performed_on_enable() {
             })],
         })
         .unwrap();
-    JsFuture::from(room_handle.enable_audio())
-        .await
-        .unwrap_err();
+    JsFuture::from(room_handle.enable_audio()).await.unwrap();
     yield_now().await;
 
     assert_eq!(mock.get_user_media_requests_count(), 1);

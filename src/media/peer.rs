@@ -560,12 +560,10 @@ impl TrackPatchDeduper {
             if !change.can_force_apply() {
                 return true;
             }
-            let patch = if let TrackChange::TrackPatch(patch) = change {
-                patch
-            } else if let TrackChange::PartnerTrackPatch(patch) = change {
-                patch
-            } else {
-                return true;
+            let patch = match change {
+                TrackChange::TrackPatch(patch)
+                | TrackChange::PartnerTrackPatch(patch) => patch,
+                _ => return true,
             };
 
             if self.whitelist.is_some()
