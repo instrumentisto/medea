@@ -4,9 +4,7 @@ use std::rc::Rc;
 
 use derive_more::Deref;
 use futures::{
-    future,
-    future::{AbortHandle, LocalBoxFuture},
-    Future, FutureExt as _, Stream, StreamExt,
+    future, future::LocalBoxFuture, Future, FutureExt as _, Stream, StreamExt,
 };
 use wasm_bindgen_futures::spawn_local;
 
@@ -46,6 +44,8 @@ pub trait SynchronizableState {
 
 /// Abstraction over state which can be updated by client side.
 pub trait Updatable {
+    /// Returns [`Future`] which will be resolved when this [`Updateable`] will
+    /// resolve his intentions.
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()>;
 
     /// Returns [`Future`] which will be resolved when all client updates will
@@ -77,14 +77,7 @@ impl<S, O> Component<S, O> {
     /// Returns reference to the state of this [`Component`].
     #[inline]
     #[must_use]
-    pub fn state(&self) -> &S {
-        &self.state
-    }
-
-    /// Returns [`Rc`] to the state of this [`Component`].
-    #[inline]
-    #[must_use]
-    pub fn state_rc(&self) -> Rc<S> {
+    pub fn state(&self) -> Rc<S> {
         Rc::clone(&self.state)
     }
 }
@@ -103,11 +96,6 @@ impl<S: ComponentState<O> + 'static, O: 'static> Component<S, O> {
             obj,
             _spawned_watchers: watchers_spawner.finish(),
         }
-    }
-
-    // TODO (evdokimovs): Remove this function.
-    pub fn rc_state(&self) -> Rc<S> {
-        Rc::clone(&self.state)
     }
 }
 

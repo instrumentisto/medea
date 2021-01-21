@@ -126,12 +126,6 @@ pub enum TransitableState<S, T> {
     Stable(S),
 }
 
-impl<S, T> TransitableState<S, T> {
-    pub fn is_transition(&self) -> bool {
-        matches!(self, Self::Transition(_))
-    }
-}
-
 impl<S, T> TransitableState<S, T>
 where
     T: InTransition<Stable = S> + Into<TransitableState<S, T>>,

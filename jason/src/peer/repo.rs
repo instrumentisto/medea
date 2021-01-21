@@ -1,11 +1,6 @@
 //! Component responsible for the [`peer::Component`] creating and removing.
 
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    rc::Rc,
-    time::Duration,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
 use medea_client_api_proto as proto;
@@ -19,12 +14,12 @@ use crate::{
     api::{Connections, RoomError},
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer,
-    utils::{component, delay_for, TaskHandle},
+    utils::{
+        component, delay_for, AsProtoState, SynchronizableState, TaskHandle,
+    },
 };
 
 use super::{PeerConnection, PeerEvent};
-use crate::utils::{AsProtoState, SynchronizableState};
-use std::hash::Hash;
 
 /// Component responsible for the [`peer::Component`] creating and removing.
 pub type Component = component::Component<State, Repository>;

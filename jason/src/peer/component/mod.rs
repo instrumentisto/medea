@@ -7,7 +7,7 @@ mod watchers;
 
 use std::rc::Rc;
 
-use futures::channel::mpsc;
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     self as proto, state as proto_state, IceCandidate, IceServer,
     NegotiationRole, PeerId, TrackId,
@@ -16,11 +16,10 @@ use medea_reactive::{AllProcessed, ObservableCell, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
-    api::Connections,
-    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
+    media::LocalTracksConstraints,
     peer::{
         media::{receiver, sender},
-        LocalStreamUpdateCriteria, PeerConnection, PeerError, PeerEvent,
+        LocalStreamUpdateCriteria, PeerConnection, PeerError,
     },
     utils::{component, AsProtoState, SynchronizableState, Updatable},
 };
@@ -29,9 +28,6 @@ use self::{
     ice_candidates::IceCandidates, local_sdp::LocalSdp,
     tracks_repository::TracksRepository,
 };
-use crate::utils::delay_for;
-use futures::future::LocalBoxFuture;
-use wasm_bindgen_futures::spawn_local;
 
 /// Component responsible for the [`PeerConnection`] updating.
 pub type Component = component::Component<State, PeerConnection>;
@@ -359,7 +355,6 @@ impl State {
     /// Returns [`RecheckableFutureExt`] which will be resolved when all
     /// [`State::senders`]'s inserts/removes will be processed.
     #[inline]
-    #[must_use]
     fn when_all_senders_processed(&self) -> AllProcessed<'static> {
         self.senders.when_all_processed()
     }
@@ -367,7 +362,6 @@ impl State {
     /// Returns [`RecheckableFutureExt`] which will be resolved when all
     /// [`State::receivers`]'s inserts/removes will be processed.
     #[inline]
-    #[must_use]
     fn when_all_receivers_processed(&self) -> AllProcessed<'static> {
         self.receivers.when_all_processed()
     }

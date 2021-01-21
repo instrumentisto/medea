@@ -26,6 +26,7 @@ use medea_jason::{
         self, media_exchange_state, MediaStateControllable, PeerEvent,
         RtcStats, TrackDirection,
     },
+    utils::Updatable,
 };
 use wasm_bindgen_test::*;
 
@@ -33,7 +34,6 @@ use crate::{
     delay_for, get_media_stream_settings, get_test_recv_tracks,
     get_test_unrequired_tracks, local_constraints, timeout,
 };
-use medea_jason::utils::Updatable;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -1383,7 +1383,6 @@ mod ice_restart {
 
     /// Checks that ICE restart can be started by [`PeerState`] update.
     #[wasm_bindgen_test]
-    // #[cfg(feature = "todo")]
     async fn ice_restart_by_state() {
         let peers = InterconnectedPeers::new().await;
         peers
@@ -1468,6 +1467,7 @@ async fn disable_and_enable_all_tracks() {
         Rc::new(pc_state),
     );
     pc.state().when_all_tracks_created().await;
+    pc.state().when_updated().await;
 
     let audio_track = pc.obj().get_sender_by_id(audio_track_id).unwrap();
     let video_track = pc.obj().get_sender_by_id(video_track_id).unwrap();

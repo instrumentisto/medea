@@ -260,7 +260,6 @@ mod sender_patch {
     /// Checks that [`Sender`]'s mute and media exchange states can be changed
     /// by [`SenderState`] update.
     #[wasm_bindgen_test]
-    #[cfg(feature = "todo")]
     async fn update_by_state() {
         let (sender, _, _media_connections) = get_sender().await;
 
@@ -268,7 +267,9 @@ mod sender_patch {
         proto_state.enabled_general = false;
         proto_state.enabled_individual = false;
         proto_state.muted = true;
-        sender.state().apply(proto_state);
+        sender
+            .state()
+            .apply(proto_state, &LocalTracksConstraints::default());
         sender.state().when_updated().await;
 
         assert!(sender.general_disabled());
@@ -394,7 +395,6 @@ mod receiver_patch {
     /// Checks that [`Receiver`]'s media exchange state can be changed by
     /// [`ReceiverState`] update.
     #[wasm_bindgen_test]
-    #[cfg(feature = "todo")]
     async fn update_by_state() {
         let (receiver, _tx) = get_receiver();
 
@@ -402,12 +402,14 @@ mod receiver_patch {
         proto_state.enabled_individual = false;
         proto_state.enabled_general = false;
 
-        receiver.state().apply(proto_state);
+        receiver
+            .state()
+            .apply(proto_state, &LocalTracksConstraints::default());
 
         receiver.state().when_updated().await;
-        assert!(receiver.is_general_disabled());
+        assert!(!receiver.state().enabled_general());
         assert_eq!(
-            receiver.media_exchange_state(),
+            receiver.state().media_exchange_state(),
             MediaExchangeState::Stable(media_exchange_state::Stable::Disabled)
         );
     }

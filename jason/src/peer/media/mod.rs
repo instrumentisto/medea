@@ -11,7 +11,6 @@ use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
-use medea_client_api_proto::TrackPatchCommand;
 #[cfg(feature = "mockable")]
 use medea_client_api_proto::{MediaType, MemberId};
 use medea_reactive::DroppedError;
@@ -367,11 +366,11 @@ impl InnerMediaConnections {
         match direction {
             TrackDirection::Send => self
                 .iter_senders_with_kind_and_source_kind(kind, source_kind)
-                .map(|tx| tx.state_rc() as Rc<dyn TransceiverSide>)
+                .map(|tx| tx.state() as Rc<dyn TransceiverSide>)
                 .collect(),
             TrackDirection::Recv => self
                 .iter_receivers_with_kind(kind)
-                .map(|rx| rx.state_rc() as Rc<dyn TransceiverSide>)
+                .map(|rx| rx.state() as Rc<dyn TransceiverSide>)
                 .collect(),
         }
     }
@@ -542,12 +541,12 @@ impl MediaConnections {
         inner
             .senders
             .get(&track_id)
-            .map(|sndr| sndr.state_rc() as Rc<dyn TransceiverSide>)
+            .map(|sndr| sndr.state() as Rc<dyn TransceiverSide>)
             .or_else(|| {
                 inner
                     .receivers
                     .get(&track_id)
-                    .map(|rcvr| rcvr.state_rc() as Rc<dyn TransceiverSide>)
+                    .map(|rcvr| rcvr.state() as Rc<dyn TransceiverSide>)
             })
     }
 
@@ -726,12 +725,12 @@ impl MediaConnections {
         inner
             .senders
             .values()
-            .map(|s| s.state_rc() as Rc<dyn TransceiverSide>)
+            .map(|s| s.state() as Rc<dyn TransceiverSide>)
             .chain(
                 inner
                     .receivers
                     .values()
-                    .map(|r| r.state_rc() as Rc<dyn TransceiverSide>),
+                    .map(|r| r.state() as Rc<dyn TransceiverSide>),
             )
             .collect()
     }
@@ -850,7 +849,7 @@ impl MediaConnections {
         &self,
         id: TrackId,
     ) -> Option<Rc<sender::State>> {
-        self.0.borrow().senders.get(&id).map(|r| r.state_rc())
+        self.0.borrow().senders.get(&id).map(|r| r.state())
     }
 
     /// Indicates whether all [`Sender`]s with [`MediaKind::Audio`] are enabled.

@@ -46,14 +46,10 @@ impl Component {
     /// [`SyncState`] is [`SyncState::Synced`].
     #[watch(self.sync_state.subscribe())]
     async fn sync_state_watcher(
-        peer: Rc<PeerConnection>,
+        _: Rc<PeerConnection>,
         _: Rc<State>,
-        sync_state: SyncState,
+        _: SyncState,
     ) -> Result<(), Traced<PeerError>> {
-        if let SyncState::Synced = sync_state {
-            // peer.send_intentions();
-        }
-
         Ok(())
     }
 

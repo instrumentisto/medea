@@ -261,7 +261,7 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    // TODO: better naming
+    /// Removes all entries which are not presented in the provided [`HashMap`].
     pub fn remove_not_present<A>(
         &mut self,
         another: &std::collections::HashMap<K, A>,
@@ -277,7 +277,7 @@ where
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|id| {
-                self.remove(&id);
+                let _ = self.remove(&id);
             });
     }
 

@@ -96,7 +96,7 @@ impl SynchronizableState for State {
         }
     }
 
-    fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints) {
+    fn apply(&self, input: Self::Input, _: &LocalTracksConstraints) {
         let new_media_exchange_state =
             media_exchange_state::Stable::from(input.enabled_individual);
         let current_media_exchange_state =
@@ -197,10 +197,12 @@ impl State {
         })
     }
 
+    /// Notifies [`State`] about RPC connection loss.
     pub fn connection_lost(&self) {
         self.sync_state.set(SyncState::Desynced);
     }
 
+    /// Notifies [`State`] about RPC connection restore.
     pub fn connection_recovered(&self) {
         self.sync_state.set(SyncState::Syncing);
     }
