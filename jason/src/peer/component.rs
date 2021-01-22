@@ -2,10 +2,13 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{future, future::LocalBoxFuture, FutureExt, StreamExt as _};
+use futures::{
+    future, future::LocalBoxFuture, FutureExt, StreamExt as _, TryFutureExt,
+};
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
-    IceCandidate, IceServer, NegotiationRole, PeerId as Id, TrackId,
+    IceCandidate, IceServer, MediaSourceKind, NegotiationRole, PeerId as Id,
+    TrackId,
 };
 use medea_macro::watchers;
 use medea_reactive::{
@@ -19,9 +22,10 @@ use crate::{
     peer::{
         local_sdp::LocalSdp,
         media::{receiver, sender},
-        LocalStreamUpdateCriteria, PeerError,
+        LocalStreamUpdateCriteria, PeerError, TransceiverSide,
     },
     utils::{component, transpose_guarded},
+    MediaKind,
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -219,6 +223,43 @@ impl State {
         self.local_sdp.resume_timeout();
     }
 
+    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
+    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    ///
+    /// [`Result`] returned by this [`Future`] will be the same as result of the
+    /// gUM/gDM request.
+    ///
+    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
+    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
+    ///
+    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
+    /// [`MediaSourceKind`]s.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn local_stream_update_result(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        Box::pin(
+            future::try_join_all(self.senders.borrow().values().filter_map(
+                |s| {
+                    if s.media_kind() == kind
+                        && source_kind.map_or(true, |k| k == s.source_kind())
+                    {
+                        Some(
+                            s.local_stream_update_result()
+                                .map_err(tracerr::map_from_and_wrap!()),
+                        )
+                    } else {
+                        None
+                    }
+                },
+            ))
+            .map(|r| r.map(|_| ())),
+        )
+    }
+
     /// Returns [`Future`] resolving when all [`sender::State`]'s updates will
     /// be applied.
     ///
@@ -306,13 +347,20 @@ impl State {
         for s in &senders {
             criteria.add(s.media_kind(), s.media_source());
         }
-        peer.update_local_stream(criteria)
+        let res = peer
+            .update_local_stream(criteria)
             .await
-            .map_err(tracerr::map_from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())
+            .map(|_| ());
         for s in senders {
-            s.local_stream_updated();
+            if let Err(err) = res.clone() {
+                s.failed_local_stream_update(err);
+            } else {
+                s.local_stream_updated();
+            }
         }
-        Ok(())
+
+        res
     }
 
     /// Inserts the provided [`proto::Track`] to this [`State`].

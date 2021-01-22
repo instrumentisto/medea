@@ -2,8 +2,10 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use futures::{channel::mpsc, future};
-use medea_client_api_proto::PeerId;
+use futures::{
+    channel::mpsc, future, future::LocalBoxFuture, FutureExt as _, TryFutureExt,
+};
+use medea_client_api_proto::{MediaSourceKind, PeerId};
 use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
@@ -13,7 +15,9 @@ use crate::{
     api::{Connections, RoomError},
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer,
+    peer::PeerError,
     utils::{component, delay_for, TaskHandle},
+    MediaKind,
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -187,6 +191,33 @@ impl State {
     #[inline]
     pub fn remove(&self, peer_id: PeerId) {
         self.0.borrow_mut().remove(&peer_id);
+    }
+
+    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
+    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    ///
+    /// [`Result`] returned by this [`Future`] will be the same as result of the
+    /// gUM/gDM request.
+    ///
+    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
+    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
+    ///
+    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
+    /// [`MediaSourceKind`]s.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn local_stream_update_result(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        Box::pin(
+            future::try_join_all(self.0.borrow().values().map(|p| {
+                p.local_stream_update_result(kind, source_kind)
+                    .map_err(tracerr::map_from_and_wrap!())
+            }))
+            .map(|r| r.map(|_| ())),
+        )
     }
 }
 

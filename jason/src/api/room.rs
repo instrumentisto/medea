@@ -266,6 +266,19 @@ impl RoomHandle {
                 })?;
         }
 
+        if let (
+            MediaState::MediaExchange(media_exchange_state::Stable::Enabled),
+            TrackDirection::Send,
+        ) = (new_state, direction)
+        {
+            inner
+                .peers
+                .state()
+                .local_stream_update_result(kind, source_kind)
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+        }
+
         Ok(())
     }
 }

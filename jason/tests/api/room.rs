@@ -95,7 +95,7 @@ async fn get_test_room_and_exist_peer(
                         .into_iter()
                         .map(|p| TrackUpdate::Updated(p.into()))
                         .collect(),
-                    negotiation_role: None,
+                    negotiation_role: Some(NegotiationRole::Offerer),
                 })
                 .unwrap();
         }
@@ -124,6 +124,7 @@ async fn get_test_room_and_exist_peer(
 
     // wait until Event::PeerCreated is handled
     delay_for(200).await;
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
     (room, peer, event_tx)
 }
@@ -1548,12 +1549,11 @@ async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
     .await;
-    room.reset_peer_negotiation_state(peer.id()).unwrap();
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx
@@ -1614,7 +1614,7 @@ async fn only_one_gum_performed_on_enable() {
     event_tx
         .unbounded_send(Event::TracksApplied {
             peer_id: peer.id(),
-            negotiation_role: None,
+            negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
@@ -1624,6 +1624,7 @@ async fn only_one_gum_performed_on_enable() {
         })
         .unwrap();
     yield_now().await;
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
@@ -1632,7 +1633,7 @@ async fn only_one_gum_performed_on_enable() {
     event_tx
         .unbounded_send(Event::TracksApplied {
             peer_id: peer.id(),
-            negotiation_role: None,
+            negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
@@ -1641,10 +1642,48 @@ async fn only_one_gum_performed_on_enable() {
             })],
         })
         .unwrap();
-    JsFuture::from(room_handle.enable_audio()).await.unwrap();
+    JsFuture::from(room_handle.enable_audio())
+        .await
+        .unwrap_err();
     yield_now().await;
 
     assert_eq!(mock.get_user_media_requests_count(), 1);
+    mock.stop();
+}
+
+/// Tests that error from gUM/gDM request will be returned from the
+/// [`RoomHandle::enable_audio`]/[`RoomHandle::enable_video`].
+#[wasm_bindgen_test]
+async fn set_media_state_return_media_error() {
+    const ERROR_MSG: &str = "set_media_state_return_media_error";
+
+    let mock = MockNavigator::new();
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (room, _peer, _event_tx) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(false, false)),
+    )
+    .await;
+    let room_handle = room.new_handle();
+    JsFuture::from(room_handle.disable_audio()).await.unwrap();
+    yield_now().await;
+
+    mock.error_get_user_media(ERROR_MSG.into());
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+    let err = get_jason_error(
+        JsFuture::from(room_handle.enable_audio())
+            .await
+            .unwrap_err(),
+    );
+    assert_eq!(
+        err.message(),
+        format!(
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: {}",
+            ERROR_MSG
+        )
+    );
+
     mock.stop();
 }
 

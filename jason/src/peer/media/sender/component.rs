@@ -1,27 +1,56 @@
 //! [`Component`] for `MediaTrack` with a `Send` direction.
 
-use std::{cell::Cell, rc::Rc};
+use std::rc::Rc;
 
-use futures::{future, future::LocalBoxFuture, FutureExt as _};
+use futures::{future, future::LocalBoxFuture, FutureExt as _, StreamExt};
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::watchers;
-use medea_reactive::{AllProcessed, Guarded, ProgressableCell};
+use medea_reactive::{AllProcessed, Guarded, ObservableCell, ProgressableCell};
+use tracerr::Traced;
 
 use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
         media::{media_exchange_state, mute_state, Result},
         MediaConnectionsError, MediaExchangeStateController, MediaState,
-        MediaStateControllable, MuteStateController, TransceiverDirection,
-        TransceiverSide,
+        MediaStateControllable, MuteStateController, PeerError,
+        TransceiverDirection, TransceiverSide,
     },
     utils::component,
     MediaKind,
 };
 
 use super::Sender;
+
+/// State of the [`local::Track`] of the [`Sender`].
+///
+/// [`PartialEq`] implementation of this state will ignore
+/// [`LocalTrackState::Failed`] content.
+#[derive(Debug, Clone)]
+enum LocalTrackState {
+    /// Indicates that [`Sender`] is new, or [`local::Track`] is set.
+    Stable,
+
+    /// Indicates that [`Sender`] needs new [`local::Track`].
+    NeedUpdate,
+
+    /// Indicates that new [`local::Track`] getting is failed.
+    ///
+    /// Contains [`PeerError`] with which gUM/gDM request was failed.
+    Failed(Traced<PeerError>),
+}
+
+impl PartialEq for LocalTrackState {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Self::NeedUpdate => matches!(other, Self::NeedUpdate),
+            Self::Stable => matches!(other, Self::Stable),
+            Self::Failed(_) => matches!(other, Self::Failed(_)),
+        }
+    }
+}
 
 /// Component responsible for the [`Sender`] enabling/disabling and
 /// muting/unmuting.
@@ -34,12 +63,12 @@ pub struct State {
     mid: Option<String>,
     media_type: MediaType,
     receivers: Vec<MemberId>,
-    need_local_stream_update: Cell<bool>,
     media_exchange_state: Rc<MediaExchangeStateController>,
     mute_state: Rc<MuteStateController>,
     general_media_exchange_state:
         ProgressableCell<media_exchange_state::Stable>,
     send_constraints: LocalTracksConstraints,
+    local_track_state: ObservableCell<LocalTrackState>,
 }
 
 impl State {
@@ -61,7 +90,6 @@ impl State {
             mid,
             media_type,
             receivers,
-            need_local_stream_update: Cell::new(false),
             media_exchange_state: MediaExchangeStateController::new(
                 media_exchange_state::Stable::from(true),
             ),
@@ -72,6 +100,7 @@ impl State {
                 false,
             )),
             send_constraints,
+            local_track_state: ObservableCell::new(LocalTrackState::Stable),
         })
     }
 
@@ -133,6 +162,37 @@ impl State {
         self.mute_state.muted()
     }
 
+    /// Returns [`Future`] which will be resolved when gUM/gDM request for this
+    /// [`State`] will be resolved.
+    ///
+    /// [`Result`] returned by this [`Future`] will be the same as result of the
+    /// gUM/gDM request.
+    ///
+    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
+    /// requests are running for this [`State`].
+    ///
+    /// [`Future`]: std::future::Future
+    /// [`Result`]: std::result::Result
+    pub fn local_stream_update_result(
+        &self,
+    ) -> LocalBoxFuture<'static, std::result::Result<(), Traced<PeerError>>>
+    {
+        let mut local_track_state_rx = self.local_track_state.subscribe();
+        Box::pin(async move {
+            while let Some(s) = local_track_state_rx.next().await {
+                match s {
+                    LocalTrackState::Stable => return Ok(()),
+                    LocalTrackState::Failed(err) => {
+                        return Err(tracerr::new!(err))
+                    }
+                    LocalTrackState::NeedUpdate => (),
+                }
+            }
+
+            Ok(())
+        })
+    }
+
     /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if track_patch.id != self.id {
@@ -183,13 +243,19 @@ impl State {
     #[inline]
     #[must_use]
     pub fn is_local_stream_update_needed(&self) -> bool {
-        self.need_local_stream_update.get()
+        matches!(self.local_track_state.get(), LocalTrackState::NeedUpdate)
     }
 
-    /// Sets [`State::need_local_stream_update`] to `false`.
+    /// Transits [`State::local_track_state`] to failed state.
+    #[inline]
+    pub fn failed_local_stream_update(&self, error: Traced<PeerError>) {
+        self.local_track_state.set(LocalTrackState::Failed(error));
+    }
+
+    /// Transits [`State::local_track_state`] to stable state.
     #[inline]
     pub fn local_stream_updated(&self) {
-        self.need_local_stream_update.set(false);
+        self.local_track_state.set(LocalTrackState::Stable);
     }
 
     /// Returns [`MediaKind`] of this [`State`].
@@ -296,7 +362,7 @@ impl Component {
         );
         match new_state {
             media_exchange_state::Stable::Enabled => {
-                state.need_local_stream_update.set(true);
+                state.local_track_state.set(LocalTrackState::NeedUpdate);
             }
             media_exchange_state::Stable::Disabled => {
                 sender.remove_track().await;
