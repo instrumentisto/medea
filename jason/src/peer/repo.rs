@@ -206,10 +206,19 @@ impl Repository {
         for req in requests {
             let tracks = self
                 .media_manager
-                .get_tracks_handles(req)
+                .get_tracks(req)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
-            tracks_handles.extend(tracks);
+            for (track, is_new) in tracks {
+                if is_new {
+                    let _ = self.peer_event_sender.unbounded_send(
+                        PeerEvent::NewLocalTrack {
+                            local_track: Rc::clone(&track),
+                        },
+                    );
+                }
+                tracks_handles.push(track.into());
+            }
         }
 
         Ok(tracks_handles)

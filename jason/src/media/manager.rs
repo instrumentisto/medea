@@ -384,31 +384,6 @@ impl MediaManager {
         self.0.get_tracks(caps.into()).await
     }
 
-    /// Obtains [`local::TrackHandle`]s based on a provided
-    /// [`MediaStreamSettings`].
-    ///
-    /// # Errors
-    ///
-    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
-    /// request failed.
-    ///
-    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
-    /// [getDisplayMedia()][2] request failed.
-    ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    pub async fn get_tracks_handles<I: Into<MediaStreamSettings>>(
-        &self,
-        caps: I,
-    ) -> Result<Vec<local::TrackHandle>> {
-        Ok(self
-            .get_tracks(caps)
-            .await?
-            .into_iter()
-            .map(|(t, _)| t.into())
-            .collect())
-    }
-
     /// Instantiates new [`MediaManagerHandle`] for use on JS side.
     #[inline]
     pub fn new_handle(&self) -> MediaManagerHandle {
