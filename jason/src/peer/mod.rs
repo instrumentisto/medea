@@ -14,7 +14,7 @@ mod tracks_request;
 mod transceiver;
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{hash_map::DefaultHasher, HashMap},
     convert::TryFrom as _,
     hash::{Hash, Hasher},
@@ -264,7 +264,7 @@ pub struct PeerConnection {
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Indicates if underlying [`RtcPeerConnection`] has remote description.
-    has_remote_description: RefCell<bool>,
+    has_remote_description: Cell<bool>,
 
     /// Stores [`IceCandidate`]s received before remote description for
     /// underlying [`RtcPeerConnection`].
@@ -348,7 +348,7 @@ impl PeerConnection {
             media_manager,
             peer_events_sender,
             sent_stats_cache: RefCell::new(HashMap::new()),
-            has_remote_description: RefCell::new(false),
+            has_remote_description: Cell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
             connections,
@@ -893,7 +893,7 @@ impl PeerConnection {
             .set_remote_description(desc)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
-        *self.has_remote_description.borrow_mut() = true;
+        self.has_remote_description.set(true);
         self.media_connections.sync_receivers();
 
         let ice_candidates_buffer_flush_fut = future::try_join_all(
@@ -934,7 +934,7 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> Result<()> {
-        if *self.has_remote_description.borrow() {
+        if self.has_remote_description.get() {
             self.peer
                 .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
                 .await

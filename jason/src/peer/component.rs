@@ -1,6 +1,9 @@
 //! [`Component`] responsible for the [`PeerConnection`] updating.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use futures::{
     future, future::LocalBoxFuture, FutureExt, StreamExt as _, TryFutureExt,
@@ -90,7 +93,7 @@ pub struct State {
     negotiation_state: ObservableCell<NegotiationState>,
     local_sdp: LocalSdp,
     remote_sdp: ProgressableCell<Option<String>>,
-    restart_ice: ObservableCell<bool>,
+    restart_ice: Cell<bool>,
     ice_candidates: RefCell<ObservableVec<IceCandidate>>,
 }
 
@@ -114,7 +117,7 @@ impl State {
             remote_sdp: ProgressableCell::new(None),
             negotiation_role: ObservableCell::new(negotiation_role),
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
-            restart_ice: ObservableCell::new(false),
+            restart_ice: Cell::new(false),
             ice_candidates: RefCell::new(ObservableVec::new()),
         }
     }
@@ -500,25 +503,6 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for the [`State::restart_ice`] update.
-    ///
-    /// Calls [`PeerConnection::restart_ice()`] if new value is `true`.
-    ///
-    /// Resets [`State::restart_ice`] to `false` if new value is `true`.
-    #[inline]
-    #[watch(self.restart_ice.subscribe())]
-    async fn ice_restart_scheduled(
-        peer: Rc<PeerConnection>,
-        state: Rc<State>,
-        val: bool,
-    ) -> Result<(), Traced<PeerError>> {
-        if val {
-            peer.restart_ice();
-            state.restart_ice.set(false);
-        }
-        Ok(())
-    }
-
     /// Watcher for the [`State::senders`] insert update.
     ///
     /// Waits until [`ReceiverComponent`]s creation id finished.
@@ -718,7 +702,7 @@ impl Component {
     /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
     #[watch(self.negotiation_state.subscribe().skip(1))]
     async fn negotiation_state_changed(
-        ctx: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<State>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
@@ -738,7 +722,10 @@ impl Component {
                 if let Some(negotiation_role) = state.negotiation_role.get() {
                     match negotiation_role {
                         NegotiationRole::Offerer => {
-                            let sdp_offer = ctx
+                            if state.restart_ice.take() {
+                                peer.restart_ice();
+                            }
+                            let sdp_offer = peer
                                 .peer
                                 .create_offer()
                                 .await
@@ -746,7 +733,7 @@ impl Component {
                             state.local_sdp.unapproved_set(sdp_offer);
                         }
                         NegotiationRole::Answerer(_) => {
-                            let sdp_answer = ctx
+                            let sdp_answer = peer
                                 .peer
                                 .create_answer()
                                 .await
@@ -772,7 +759,6 @@ impl Component {
         state: Rc<State>,
         role: NegotiationRole,
     ) -> Result<(), Traced<PeerError>> {
-        let _ = state.restart_ice.when_eq(false).await;
         match role {
             NegotiationRole::Offerer => {
                 futures::future::join(
