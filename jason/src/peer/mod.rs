@@ -60,6 +60,7 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
+use std::collections::HashSet;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
@@ -292,6 +293,11 @@ pub struct PeerConnection {
     /// Constraints to the [`remote::Track`] from this [`PeerConnection`]. Used
     /// to disable or enable media receiving.
     recv_constraints: Rc<RecvConstraints>,
+
+    /// List of all [`local::Track`] IDs which was sent to the
+    /// [`PeerConnection::peer_events_sender`] with a
+    /// [`PeerEvent::NewLocalTrack`].
+    known_tracks_ids: RefCell<HashSet<String>>,
 }
 
 impl PeerConnection {
@@ -354,6 +360,7 @@ impl PeerConnection {
             connections,
             track_events_sender,
             recv_constraints,
+            known_tracks_ids: RefCell::new(HashSet::new()),
         };
 
         // Bind to `icecandidate` event.
@@ -807,9 +814,7 @@ impl PeerConnection {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
             let peer_tracks = required_caps
-                .parse_tracks(
-                    media_tracks.iter().map(|(t, _)| t).cloned().collect(),
-                )
+                .parse_tracks(media_tracks.to_vec())
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             let media_exchange_states_updates = self
@@ -818,8 +823,8 @@ impl PeerConnection {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            for (local_track, is_new) in media_tracks {
-                if is_new {
+            for local_track in media_tracks {
+                if self.known_tracks_ids.borrow_mut().insert(local_track.id()) {
                     let _ = self.peer_events_sender.unbounded_send(
                         PeerEvent::NewLocalTrack { local_track },
                     );

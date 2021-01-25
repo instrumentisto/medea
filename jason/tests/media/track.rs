@@ -22,8 +22,7 @@ async fn track_autostop() {
     let mut tracks = media_manager.get_tracks(caps).await.unwrap();
 
     assert_eq!(1, tracks.len());
-    let (strong_track, strong_track_is_new) = tracks.pop().unwrap();
-    assert!(strong_track_is_new);
+    let strong_track = tracks.pop().unwrap();
     let sys_track = Clone::clone(strong_track.sys_track());
     let weak_track = Rc::downgrade(&strong_track);
 

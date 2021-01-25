@@ -38,7 +38,7 @@ async fn video_constraints_satisfies() {
 
     assert_eq!(tracks.len(), 1);
 
-    let track = tracks.pop().unwrap().0;
+    let track = tracks.pop().unwrap();
 
     assert_eq!(track.kind(), MediaKind::Video);
     assert!(track_constraints.satisfies(track.sys_track()));
@@ -63,7 +63,7 @@ async fn audio_constraints_satisfies() {
 
     assert_eq!(tracks.len(), 1);
 
-    let track = tracks.pop().unwrap().0;
+    let track = tracks.pop().unwrap();
 
     assert_eq!(track.kind(), MediaKind::Audio);
     assert!(track_constraints.satisfies(track.sys_track()));
@@ -104,15 +104,14 @@ async fn both_constraints_satisfies() {
 
     assert_eq!(tracks.len(), 2);
 
-    let (mut audio, mut video): (Vec<_>, Vec<_>) = tracks
-        .into_iter()
-        .partition(|(track, _)| match track.kind() {
+    let (mut audio, mut video): (Vec<_>, Vec<_>) =
+        tracks.into_iter().partition(|track| match track.kind() {
             MediaKind::Audio => true,
             MediaKind::Video => false,
         });
 
-    let audio_track = audio.pop().unwrap().0;
-    let video_track = video.pop().unwrap().0;
+    let audio_track = audio.pop().unwrap();
+    let video_track = video.pop().unwrap();
 
     assert_eq!(audio_track.kind(), MediaKind::Audio);
     assert!(audio_constraints.satisfies(audio_track.sys_track()));
@@ -144,26 +143,22 @@ async fn equal_constraints_produce_equal_streams() {
 
     let audio_track = &tracks
         .iter()
-        .find(|(track, _)| track.kind() == MediaKind::Audio)
-        .unwrap()
-        .0;
+        .find(|track| track.kind() == MediaKind::Audio)
+        .unwrap();
     let some_audio_track = &another_tracks
         .iter()
-        .find(|(track, _)| track.kind() == MediaKind::Audio)
-        .unwrap()
-        .0;
+        .find(|track| track.kind() == MediaKind::Audio)
+        .unwrap();
     assert_eq!(audio_track.id(), some_audio_track.id());
 
     let video_track = &tracks
         .iter()
-        .find(|(track, _)| track.kind() == MediaKind::Video)
-        .unwrap()
-        .0;
+        .find(|track| track.kind() == MediaKind::Video)
+        .unwrap();
     let some_video_track = &another_tracks
         .iter()
-        .find(|(track, _)| track.kind() == MediaKind::Video)
-        .unwrap()
-        .0;
+        .find(|track| track.kind() == MediaKind::Video)
+        .unwrap();
     assert_eq!(video_track.id(), some_video_track.id());
 }
 
@@ -191,14 +186,12 @@ async fn different_constraints_produce_different_streams() {
 
         let audio_track = &tracks
             .iter()
-            .find(|(track, _)| track.kind() == MediaKind::Audio)
-            .unwrap()
-            .0;
+            .find(|track| track.kind() == MediaKind::Audio)
+            .unwrap();
         let another_audio_track = &another_tracks
             .iter()
-            .find(|(track, _)| track.kind() == MediaKind::Audio)
-            .unwrap()
-            .0;
+            .find(|track| track.kind() == MediaKind::Audio)
+            .unwrap();
         assert_ne!(audio_track.id(), another_audio_track.id());
     }
 }
@@ -521,18 +514,17 @@ async fn simultaneous_device_and_display() {
 
     assert_eq!(tracks.len(), 3);
 
-    let (mut audio, mut video): (Vec<_>, Vec<_>) = tracks
-        .into_iter()
-        .partition(|(track, _)| match track.kind() {
+    let (mut audio, mut video): (Vec<_>, Vec<_>) =
+        tracks.into_iter().partition(|track| match track.kind() {
             MediaKind::Audio => true,
             MediaKind::Video => false,
         });
 
-    let audio_track = audio.pop().unwrap().0;
+    let audio_track = audio.pop().unwrap();
     assert_eq!(audio_track.kind(), MediaKind::Audio);
     assert!(audio_constraints.satisfies(audio_track.sys_track()));
 
-    let display_video_track = video.pop().unwrap().0;
+    let display_video_track = video.pop().unwrap();
     assert_eq!(display_video_track.kind(), MediaKind::Video);
     assert!(
         display_video_constraints.satisfies(display_video_track.sys_track())
@@ -542,7 +534,7 @@ async fn simultaneous_device_and_display() {
         MediaSourceKind::Display
     );
 
-    let device_video_track = video.pop().unwrap().0;
+    let device_video_track = video.pop().unwrap();
     assert_eq!(device_video_track.kind(), MediaKind::Video);
     assert!(device_video_constraints.satisfies(device_video_track.sys_track()));
     assert_eq!(

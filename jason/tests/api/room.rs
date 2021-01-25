@@ -350,6 +350,7 @@ mod disable_send_tracks {
     };
 
     use super::*;
+    use crate::is_firefox;
 
     #[wasm_bindgen_test]
     async fn disable_enable_audio() {
@@ -470,7 +471,9 @@ mod disable_send_tracks {
         can_fail_in_firefox!(JsFuture::from(
             handle.enable_video(Some(JsMediaSourceKind::Display))
         ));
-        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        if !is_firefox() {
+            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        }
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
     }
 
