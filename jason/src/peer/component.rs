@@ -485,6 +485,7 @@ impl Component {
                     peer.set_remote_answer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                    peer.media_connections.sync_receivers();
                     state.negotiation_state.set(NegotiationState::Stable);
                     state.negotiation_role.set(None);
                 }
@@ -492,6 +493,7 @@ impl Component {
                     peer.set_remote_offer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
+                    peer.media_connections.sync_receivers();
                 }
             }
         }
@@ -636,6 +638,7 @@ impl Component {
                             .set_offer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        peer.media_connections.sync_receivers();
                         let mids = peer
                             .get_mids()
                             .map_err(tracerr::map_from_and_wrap!())?;
@@ -657,6 +660,7 @@ impl Component {
                             .set_answer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        peer.media_connections.sync_receivers();
                         peer.peer_events_sender
                             .unbounded_send(PeerEvent::NewSdpAnswer {
                                 peer_id: peer.id(),
@@ -685,7 +689,7 @@ impl Component {
     /// [`NegotiationState`] will be transited to the
     /// [`NegotiationState::Stable`].
     #[watch(self.local_sdp.on_approve().skip(1))]
-    async fn sdp_offer_approve_watcher(
+    async fn local_sdp_approved(
         _: Rc<PeerConnection>,
         state: Rc<State>,
         _: (),
@@ -713,7 +717,7 @@ impl Component {
     ///
     /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
     #[watch(self.negotiation_state.subscribe().skip(1))]
-    async fn negotiation_state_watcher(
+    async fn negotiation_state_changed(
         ctx: Rc<PeerConnection>,
         state: Rc<State>,
         negotiation_state: NegotiationState,
@@ -782,14 +786,10 @@ impl Component {
 
                 let _ = state.update_local_stream(&peer).await;
 
-                peer.media_connections.sync_receivers();
                 state.negotiation_state.set(NegotiationState::WaitLocalSdp);
-                peer.media_connections.sync_receivers();
             }
             NegotiationRole::Answerer(remote_sdp) => {
                 state.when_all_receivers_processed().await;
-                peer.media_connections.sync_receivers();
-
                 state.set_remote_sdp(remote_sdp);
 
                 medea_reactive::when_all_processed(vec![

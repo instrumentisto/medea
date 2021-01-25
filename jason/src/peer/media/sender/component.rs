@@ -15,7 +15,7 @@ use crate::{
     peer::{
         media::{media_exchange_state, mute_state, Result},
         MediaConnectionsError, MediaExchangeStateController, MediaState,
-        MediaStateControllable, MuteStateController, PeerError,
+        MediaStateControllable, MuteStateController, PeerError, TrackEvent,
         TransceiverDirection, TransceiverSide,
     },
     utils::component,
@@ -63,10 +63,9 @@ pub struct State {
     mid: Option<String>,
     media_type: MediaType,
     receivers: Vec<MemberId>,
-    media_exchange_state: Rc<MediaExchangeStateController>,
+    enabled_individual: Rc<MediaExchangeStateController>,
     mute_state: Rc<MuteStateController>,
-    general_media_exchange_state:
-        ProgressableCell<media_exchange_state::Stable>,
+    enabled_general: ProgressableCell<media_exchange_state::Stable>,
     send_constraints: LocalTracksConstraints,
     local_track_state: ObservableCell<LocalTrackState>,
 }
@@ -90,10 +89,10 @@ impl State {
             mid,
             media_type,
             receivers,
-            media_exchange_state: MediaExchangeStateController::new(
+            enabled_individual: MediaExchangeStateController::new(
                 media_exchange_state::Stable::from(true),
             ),
-            general_media_exchange_state: ProgressableCell::new(
+            enabled_general: ProgressableCell::new(
                 media_exchange_state::Stable::from(true),
             ),
             mute_state: MuteStateController::new(mute_state::Stable::from(
@@ -108,7 +107,7 @@ impl State {
     /// [`media_exchange_state::Stable::Enabled`].
     #[inline]
     pub fn enabled(&self) -> bool {
-        self.media_exchange_state.enabled()
+        self.enabled_individual.enabled()
     }
 
     /// Returns [`TrackId`] of this [`State`].
@@ -144,15 +143,14 @@ impl State {
     #[inline]
     #[must_use]
     pub fn is_enabled_individual(&self) -> bool {
-        self.media_exchange_state.enabled()
+        self.enabled_individual.enabled()
     }
 
     /// Returns current general media exchange state of this [`State`].
     #[inline]
     #[must_use]
     pub fn is_enabled_general(&self) -> bool {
-        self.general_media_exchange_state.get()
-            == media_exchange_state::Stable::Enabled
+        self.enabled_general.get() == media_exchange_state::Stable::Enabled
     }
 
     /// Returns current mute state of this [`State`].
@@ -199,11 +197,11 @@ impl State {
             return;
         }
         if let Some(enabled_general) = track_patch.enabled_general {
-            self.general_media_exchange_state
+            self.enabled_general
                 .set(media_exchange_state::Stable::from(enabled_general));
         }
         if let Some(enabled_individual) = track_patch.enabled_individual {
-            self.media_exchange_state
+            self.enabled_individual
                 .update(media_exchange_state::Stable::from(enabled_individual));
         }
         if let Some(muted) = track_patch.muted {
@@ -217,11 +215,9 @@ impl State {
     /// [`Future`]: std::future::Future
     pub fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
-            self.media_exchange_state.when_processed().into(),
+            self.enabled_individual.when_processed().into(),
             self.mute_state.when_processed().into(),
-            self.general_media_exchange_state
-                .when_all_processed()
-                .into(),
+            self.enabled_general.when_all_processed().into(),
         ])
     }
 
@@ -232,7 +228,7 @@ impl State {
     pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         Box::pin(
             future::join_all(vec![
-                self.media_exchange_state.when_stabilized(),
+                self.enabled_individual.when_stabilized(),
                 self.mute_state.when_stabilized(),
             ])
             .map(|_| ()),
@@ -283,49 +279,73 @@ impl State {
 impl Component {
     /// Watcher for [`MediaExchangeState::Transition`] update.
     ///
-    /// Sends new intention by [`Receiver::send_media_exchange_state_intention`]
-    /// call.
-    #[watch(self.media_exchange_state.subscribe_transition())]
-    async fn individual_media_exchange_state_transition_watcher(
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// [`media_exchange_state`].
+    #[watch(self.enabled_individual.subscribe_transition())]
+    async fn enabled_individual_transition_started(
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: media_exchange_state::Transition,
     ) -> Result<()> {
-        sender.send_media_exchange_state_intention(new_state);
+        match new_state {
+            media_exchange_state::Transition::Enabling(_) => {
+                sender
+                    .track_events_sender
+                    .unbounded_send(TrackEvent::MediaExchangeIntention {
+                        id: sender.track_id,
+                        enabled: true,
+                    })
+                    .ok();
+            }
+            media_exchange_state::Transition::Disabling(_) => {
+                sender
+                    .track_events_sender
+                    .unbounded_send(TrackEvent::MediaExchangeIntention {
+                        id: sender.track_id,
+                        enabled: false,
+                    })
+                    .ok();
+            }
+        }
 
         Ok(())
     }
 
     /// Watcher for [`MuteState::Transition`] update.
     ///
-    /// Sends new intention by [`Receiver::send_mute_state_intention`] call.
+    /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided mute state.
     #[watch(self.mute_state.subscribe_transition())]
     async fn mute_state_transition_watcher(
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: mute_state::Transition,
     ) -> Result<()> {
-        sender.send_mute_state_intention(new_state);
+        let _ = sender.track_events_sender.unbounded_send(
+            TrackEvent::MuteUpdateIntention {
+                id: sender.track_id,
+                muted: matches!(new_state, mute_state::Transition::Muting(_)),
+            },
+        );
 
         Ok(())
     }
 
-    /// Watcher for the [`State::general_media_exchange_state`] update.
+    /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Updates [`Sender`]'s general media exchange state. Adds or removes
     /// [`TransceiverDirection::SEND`] from the [`Transceiver`] of the
     /// [`Receiver`].
-    #[watch(self.general_media_exchange_state.subscribe())]
-    async fn general_media_exchange_state_watcher(
+    #[watch(self.enabled_general.subscribe())]
+    async fn enabled_general_state_changed(
         sender: Rc<Sender>,
         _: Rc<State>,
         new_state: Guarded<media_exchange_state::Stable>,
     ) -> Result<()> {
         let (new_state, _guard) = new_state.into_parts();
 
-        sender.set_enabled_general(
-            new_state == media_exchange_state::Stable::Enabled,
-        );
+        sender
+            .enabled_general
+            .set(new_state == media_exchange_state::Stable::Enabled);
         match new_state {
             media_exchange_state::Stable::Enabled => {
                 if sender.enabled_in_cons() {
@@ -351,15 +371,15 @@ impl Component {
     ///
     /// Sets [`State::need_local_stream_update`] to the `true` if state is
     /// [`media_exchange_state::Stable::Enabled`].
-    #[watch(self.media_exchange_state.subscribe_stable())]
-    async fn individual_media_exchange_state_stable_watcher(
+    #[watch(self.enabled_individual.subscribe_stable())]
+    async fn enabled_individual_stable_state_changed(
         sender: Rc<Sender>,
         state: Rc<State>,
         new_state: media_exchange_state::Stable,
     ) -> Result<()> {
-        sender.set_enabled_individual(
-            new_state == media_exchange_state::Stable::Enabled,
-        );
+        sender
+            .enabled_individual
+            .set(new_state == media_exchange_state::Stable::Enabled);
         match new_state {
             media_exchange_state::Stable::Enabled => {
                 state.local_track_state.set(LocalTrackState::NeedUpdate);
@@ -383,7 +403,7 @@ impl Component {
         _: Rc<State>,
         new_state: mute_state::Stable,
     ) -> Result<()> {
-        sender.set_muted(new_state == mute_state::Stable::Muted);
+        sender.muted.set(new_state == mute_state::Stable::Muted);
         match new_state {
             mute_state::Stable::Muted => {
                 sender.transceiver.set_send_track_enabled(false);
@@ -428,7 +448,7 @@ impl MediaStateControllable for State {
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {
-        Rc::clone(&self.media_exchange_state)
+        Rc::clone(&self.enabled_individual)
     }
 
     fn mute_state_controller(&self) -> Rc<MuteStateController> {

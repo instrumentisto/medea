@@ -18,7 +18,7 @@ use crate::{
     },
 };
 
-use super::{transitable_state::media_exchange_state, TransceiverSide};
+use super::TransceiverSide;
 
 pub use self::component::{Component, State};
 
@@ -145,25 +145,6 @@ impl Receiver {
         self.enabled_individual.get() && is_recv_direction
     }
 
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
-    /// [`media_exchange_state`].
-    pub fn send_media_exchange_state_intention(
-        &self,
-        state: media_exchange_state::Transition,
-    ) {
-        let enabled = match state {
-            media_exchange_state::Transition::Enabling(_) => true,
-            media_exchange_state::Transition::Disabling(_) => false,
-        };
-
-        self.track_events_sender
-            .unbounded_send(TrackEvent::MediaExchangeIntention {
-                id: self.track_id,
-                enabled,
-            })
-            .ok();
-    }
-
     /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this
     /// [`Receiver`].
     ///
@@ -215,6 +196,13 @@ impl Receiver {
         self.transceiver.borrow().clone()
     }
 
+    /// Indicates whether this [`Receiver`] is enabled.
+    #[inline]
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.enabled_individual.get()
+    }
+
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
     /// and has not notified yet.
     fn maybe_notify_track(&self) {
@@ -233,13 +221,6 @@ impl Receiver {
             );
             self.is_track_notified.set(true);
         }
-    }
-
-    /// Indicates whether this [`Receiver`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.enabled_individual.get()
     }
 }
 
