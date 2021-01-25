@@ -342,7 +342,7 @@ mod disable_recv_tracks {
 mod disable_send_tracks {
     use medea_client_api_proto::{
         AudioSettings, Direction, MediaSourceKind, MediaType, MemberId,
-        VideoSettings,
+        TrackPatchCommand, VideoSettings,
     };
     use medea_jason::{
         media::{JsMediaSourceKind, MediaKind},
@@ -730,7 +730,36 @@ mod disable_send_tracks {
             })
             .unwrap();
 
-        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::UpdateTracks {
+                peer_id,
+                mut tracks_patches,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(
+                    tracks_patches.pop().unwrap(),
+                    TrackPatchCommand {
+                        id: TrackId(1),
+                        enabled: Some(false),
+                        muted: None
+                    }
+                );
+            }
+            _ => unreachable!(),
+        }
+        event_tx
+            .unbounded_send(Event::TracksApplied {
+                peer_id: PeerId(1),
+                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_individual: Some(false),
+                    enabled_general: Some(false),
+                    muted: None,
+                })],
+                negotiation_role: None,
+            })
+            .unwrap();
+
         match commands_rx.next().await.unwrap() {
             Command::MakeSdpOffer {
                 peer_id,
@@ -746,7 +775,6 @@ mod disable_send_tracks {
                 assert!(!audio); // disabled
                 assert!(video); // enabled
             }
-            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
@@ -756,7 +784,88 @@ mod disable_send_tracks {
     }
 
     #[wasm_bindgen_test]
-    async fn enable_video_room_before_init_peer() {
+    async fn mute_audio_room_before_init_peer() {
+        let (event_tx, event_rx) = mpsc::unbounded();
+        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+            false,
+        ))
+        .await
+        .unwrap();
+
+        JsFuture::from(room.new_handle().mute_audio())
+            .await
+            .unwrap();
+
+        let (audio_track, video_track) = get_test_tracks(false, false);
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![audio_track, video_track],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        match commands_rx.next().await.unwrap() {
+            Command::UpdateTracks {
+                peer_id,
+                mut tracks_patches,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(
+                    tracks_patches.pop().unwrap(),
+                    TrackPatchCommand {
+                        id: TrackId(1),
+                        enabled: None,
+                        muted: Some(true)
+                    }
+                );
+            }
+            _ => unreachable!(),
+        }
+        event_tx
+            .unbounded_send(Event::TracksApplied {
+                peer_id: PeerId(1),
+                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_individual: None,
+                    enabled_general: None,
+                    muted: Some(true),
+                })],
+                negotiation_role: None,
+            })
+            .unwrap();
+
+        match commands_rx.next().await.unwrap() {
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer: _,
+                mids,
+                transceivers_statuses,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(mids.len(), 2);
+                let audio = transceivers_statuses.get(&TrackId(1)).unwrap();
+                let video = transceivers_statuses.get(&TrackId(2)).unwrap();
+
+                assert!(audio); // enabled
+                assert!(video); // enabled
+            }
+            _ => unreachable!(),
+        }
+
+        let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+        assert!(peer.is_send_video_enabled(None));
+        assert!(peer.is_send_audio_enabled());
+        assert!(!peer.is_send_audio_unmuted());
+    }
+
+    #[wasm_bindgen_test]
+    async fn disable_video_room_before_init_peer() {
         let (event_tx, event_rx) = mpsc::unbounded();
         let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
         JsFuture::from(room.new_handle().set_local_media_settings(
@@ -782,7 +891,36 @@ mod disable_send_tracks {
             })
             .unwrap();
 
-        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::UpdateTracks {
+                peer_id,
+                mut tracks_patches,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(
+                    tracks_patches.pop().unwrap(),
+                    TrackPatchCommand {
+                        id: TrackId(2),
+                        enabled: Some(false),
+                        muted: None
+                    }
+                );
+            }
+            _ => unreachable!(),
+        }
+        event_tx
+            .unbounded_send(Event::TracksApplied {
+                peer_id: PeerId(1),
+                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                    id: TrackId(2),
+                    enabled_individual: Some(false),
+                    enabled_general: Some(false),
+                    muted: None,
+                })],
+                negotiation_role: None,
+            })
+            .unwrap();
+
         match commands_rx.next().await.unwrap() {
             Command::MakeSdpOffer {
                 peer_id,
@@ -798,7 +936,6 @@ mod disable_send_tracks {
                 assert!(audio); // enabled
                 assert!(!video); // disabled
             }
-            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
