@@ -104,7 +104,7 @@ impl RoomCloseReason {
 }
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display, JsCaused)]
+#[derive(Debug, Display, Clone, JsCaused)]
 pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]

@@ -18,7 +18,7 @@ use crate::{
     },
     peer,
     peer::PeerError,
-    utils::{component, delay_for, TaskHandle},
+    utils::{component, delay_for, JasonError, TaskHandle},
     MediaKind,
 };
 
@@ -208,7 +208,16 @@ impl Repository {
                 .media_manager
                 .get_tracks(req)
                 .await
-                .map_err(tracerr::map_from_and_wrap!())?;
+                .map_err(tracerr::map_from_and_wrap!())
+                .map_err(|e| {
+                    let _ = self.peer_event_sender.unbounded_send(
+                        PeerEvent::FailedLocalMedia {
+                            error: JasonError::from(e.clone()),
+                        },
+                    );
+
+                    e
+                })?;
             for (track, is_new) in tracks {
                 if is_new {
                     let _ = self.peer_event_sender.unbounded_send(
