@@ -26,8 +26,8 @@ use crate::{
     api::connection::Connections,
     media::{
         track::{local, remote},
-        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
-        RecvConstraints,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
+        MediaStreamSettings, RecvConstraints,
     },
     peer::{
         self, media_exchange_state, mute_state, LocalStreamUpdateCriteria,
@@ -150,6 +150,10 @@ pub enum RoomError {
     /// [`RpcSession`] returned [`SessionError`].
     #[display(fmt = "WebSocketSession error occurred: {}", _0)]
     SessionError(#[js(cause)] SessionError),
+
+    /// [`peer::repo::Component`] returned [`MediaManagerError`].
+    #[display(fmt = "Failed to get local tracks: {}", _0)]
+    MediaManagerError(#[js(cause)] MediaManagerError),
 }
 
 impl From<PeerError> for RoomError {
@@ -183,6 +187,13 @@ impl From<SessionError> for RoomError {
     #[inline]
     fn from(e: SessionError) -> Self {
         Self::SessionError(e)
+    }
+}
+
+impl From<MediaManagerError> for RoomError {
+    #[inline]
+    fn from(e: MediaManagerError) -> Self {
+        Self::MediaManagerError(e)
     }
 }
 
@@ -246,6 +257,26 @@ impl RoomHandle {
             direction,
             source_kind,
         );
+
+        let send_direction = matches!(direction, TrackDirection::Send);
+        let enabling = matches!(
+            new_state,
+            MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
+        );
+        let send_enabling = send_direction && enabling;
+
+        // Try to get needed local MediaStreamTracks and hold they until Peers
+        // will start use they.
+        let _tracks_handles = if send_enabling {
+            inner
+                .peers
+                .get_local_track_handles(kind, source_kind)
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?
+        } else {
+            Vec::new()
+        };
+
         while !inner.is_all_peers_in_media_state(
             kind,
             direction,
@@ -266,17 +297,31 @@ impl RoomHandle {
                 })?;
         }
 
-        if let (
-            MediaState::MediaExchange(media_exchange_state::Stable::Enabled),
-            TrackDirection::Send,
-        ) = (new_state, direction)
-        {
-            inner
+        if send_enabling {
+            let res = inner
                 .peers
                 .state()
                 .local_stream_update_result(kind, source_kind)
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError));
+            if res.is_err() {
+                inner.set_constraints_media_state(
+                    new_state.opposite(),
+                    kind,
+                    direction,
+                    source_kind,
+                );
+                inner
+                    .toggle_media_state(
+                        new_state.opposite(),
+                        kind,
+                        direction,
+                        source_kind,
+                    )
+                    .await?;
+            }
+
+            res?;
         }
 
         Ok(())
@@ -1629,10 +1674,20 @@ impl Room {
     /// Returns [`PeerConnection`] stored in repository by its ID.
     ///
     /// Used to inspect [`Room`]'s inner state in integration tests.
+    #[inline]
     pub fn get_peer_by_id(
         &self,
         peer_id: PeerId,
     ) -> Option<Rc<PeerConnection>> {
         self.0.peers.get(peer_id)
+    }
+
+    /// Lookups [`peer::State`] by the provided [`PeerId`].
+    #[inline]
+    pub fn get_peer_state_by_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<Rc<peer::State>> {
+        self.0.peers.state().get(peer_id)
     }
 }

@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{
     channel::{
@@ -18,6 +18,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaKind, MediaStreamSettings},
+    peer,
     peer::PeerConnection,
     rpc::MockRpcSession,
     utils::JasonError,
@@ -83,23 +84,39 @@ async fn get_test_room_and_exist_peer(
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_close_with_reason().return_const(());
     let event_tx_clone = event_tx.clone();
-    rpc.expect_send_command().returning(move |cmd| match cmd {
-        Command::UpdateTracks {
-            peer_id,
-            tracks_patches,
-        } => {
-            event_tx_clone
-                .unbounded_send(Event::TracksApplied {
-                    peer_id,
-                    updates: tracks_patches
-                        .into_iter()
-                        .map(|p| TrackUpdate::Updated(p.into()))
-                        .collect(),
-                    negotiation_role: Some(NegotiationRole::Offerer),
-                })
-                .unwrap();
+    let peer_state: Rc<RefCell<Option<Rc<peer::State>>>> =
+        Rc::new(RefCell::new(None));
+    rpc.expect_send_command().returning_st({
+        let peer_state = Rc::clone(&peer_state);
+        move |cmd| match cmd {
+            Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } => {
+                let negotiation_role = if peer_state
+                    .borrow()
+                    .as_ref()
+                    .and_then(|s| s.negotiation_role())
+                    .is_some()
+                {
+                    None
+                } else {
+                    Some(NegotiationRole::Offerer)
+                };
+
+                event_tx_clone
+                    .unbounded_send(Event::TracksApplied {
+                        peer_id,
+                        updates: tracks_patches
+                            .into_iter()
+                            .map(|p| TrackUpdate::Updated(p.into()))
+                            .collect(),
+                        negotiation_role,
+                    })
+                    .unwrap();
+            }
+            _ => (),
         }
-        _ => (),
     });
 
     let room = Room::new(Rc::new(rpc), Rc::default());
@@ -126,6 +143,8 @@ async fn get_test_room_and_exist_peer(
     delay_for(200).await;
     room.reset_peer_negotiation_state(PeerId(1)).unwrap();
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+    *peer_state.borrow_mut() =
+        Some(room.get_peer_state_by_id(PeerId(1)).unwrap());
     (room, peer, event_tx)
 }
 
@@ -1699,7 +1718,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
         Some(media_stream_settings(true, true)),
     )
     .await;
-    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert_eq!(mock.get_user_media_requests_count(), 2);
 
     event_tx
         .unbounded_send(Event::TracksApplied {
@@ -1714,7 +1733,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
         })
         .unwrap();
     yield_now().await;
-    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert_eq!(mock.get_user_media_requests_count(), 2);
     assert!(!peer.is_send_audio_enabled());
 
     mock.error_get_user_media("only_one_gum_performed_on_enable".into());
@@ -1733,7 +1752,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
         .unwrap();
     yield_now().await;
 
-    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert_eq!(mock.get_user_media_requests_count(), 2);
     mock.stop();
 }
 

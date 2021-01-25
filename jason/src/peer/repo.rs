@@ -13,7 +13,9 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{Connections, RoomError},
-    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
+    media::{
+        track::local, LocalTracksConstraints, MediaManager, RecvConstraints,
+    },
     peer,
     peer::PeerError,
     utils::{component, delay_for, TaskHandle},
@@ -170,6 +172,47 @@ impl Repository {
         });
 
         abort.into()
+    }
+
+    /// Returns [`local::TrackHandle`]s for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If [`MediaSourceKind`] is [`None`] then [`local::TrackHandle`]s for all
+    /// needed [`MediaSourceKind`]s will be returned.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MediaManagerError`] if failed to obtain
+    /// [`local::TrackHandle`] from the [`MediaManager`].
+    ///
+    /// Errors with [`RoomError::PeerConnectionError`] if failed to get
+    /// [`MediaStreamSettings`].
+    ///
+    /// [`MediaStreamSettings`]: crate::MediaStreamSettings
+    pub async fn get_local_track_handles(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<Vec<local::TrackHandle>, Traced<RoomError>> {
+        let requests: Vec<_> = self
+            .peers
+            .borrow()
+            .values()
+            .filter_map(|p| p.get_media_settings(kind, source_kind).transpose())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        let mut tracks_handles = Vec::new();
+        for req in requests {
+            let tracks = self
+                .media_manager
+                .get_tracks_handles(req)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
+            tracks_handles.extend(tracks);
+        }
+
+        Ok(tracks_handles)
     }
 }
 

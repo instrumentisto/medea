@@ -735,21 +735,70 @@ impl PeerConnection {
         })
     }
 
+    /// Returns [`MediaStreamSettings`] for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If [`MediaSourceKind`] is [`None`] then [`MediaStreamSettings`] for all
+    /// [`MediaSourceKind`]s will be provided.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::TracksRequest`] if failed to create or merge
+    /// [`SimpleTracksRequest`].
+    pub fn get_media_settings(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<Option<MediaStreamSettings>> {
+        let mut criteria = LocalStreamUpdateCriteria::empty();
+        if let Some(source_kind) = source_kind {
+            criteria.add(kind, source_kind);
+        } else {
+            criteria.add(kind, MediaSourceKind::Device);
+            criteria.add(kind, MediaSourceKind::Display);
+        }
+
+        self.get_simple_tracks_request(criteria)
+            .map_err(tracerr::map_from_and_wrap!())
+            .map(|s| s.map(|s| MediaStreamSettings::from(&s)))
+    }
+
+    /// Returns [`SimpleTracksRequest`] for the provided
+    /// [`LocalStreamUpdateCriteria`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`Media::TracksRequest`] if failed to create or merge
+    /// [`SimpleTracksRequest`].
+    fn get_simple_tracks_request(
+        &self,
+        criteria: LocalStreamUpdateCriteria,
+    ) -> Result<Option<SimpleTracksRequest>> {
+        let request = if let Some(req) =
+            self.media_connections.get_tracks_request(criteria)
+        {
+            req
+        } else {
+            return Ok(None);
+        };
+        let mut required_caps = SimpleTracksRequest::try_from(request)
+            .map_err(tracerr::from_and_wrap!())?;
+        required_caps
+            .merge(self.send_constraints.inner())
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(Some(required_caps))
+    }
+
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        if let Some(request) =
-            self.media_connections.get_tracks_request(criteria)
+        if let Some(required_caps) = self
+            .get_simple_tracks_request(criteria)
+            .map_err(tracerr::map_from_and_wrap!())?
         {
-            let mut required_caps = SimpleTracksRequest::try_from(request)
-                .map_err(tracerr::from_and_wrap!())?;
-
-            required_caps
-                .merge(self.send_constraints.inner())
-                .map_err(tracerr::map_from_and_wrap!())?;
-
             let used_caps = MediaStreamSettings::from(&required_caps);
 
             let media_tracks = self

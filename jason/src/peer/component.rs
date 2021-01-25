@@ -179,7 +179,7 @@ impl State {
         &self,
         negotiation_role: NegotiationRole,
     ) {
-        self.negotiation_role.when(Option::is_none).await.ok();
+        let _ = self.negotiation_role.when(Option::is_none).await;
         self.negotiation_role.set(Some(negotiation_role));
     }
 
@@ -246,6 +246,7 @@ impl State {
                 |s| {
                     if s.media_kind() == kind
                         && source_kind.map_or(true, |k| k == s.source_kind())
+                        && s.is_local_stream_update_needed()
                     {
                         Some(
                             s.local_stream_update_result()
@@ -779,10 +780,7 @@ impl Component {
                 state.when_all_receivers_stabilized().await;
                 state.when_all_updated().await;
 
-                state
-                    .update_local_stream(&peer)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
+                let _ = state.update_local_stream(&peer).await;
 
                 peer.media_connections.sync_receivers();
                 state.negotiation_state.set(NegotiationState::WaitLocalSdp);
@@ -804,10 +802,7 @@ impl Component {
                 state.when_all_senders_stabilized().await;
                 state.when_all_receivers_stabilized().await;
 
-                state
-                    .update_local_stream(&peer)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
+                let _ = state.update_local_stream(&peer).await;
 
                 state.negotiation_state.set(NegotiationState::WaitLocalSdp);
             }
@@ -829,6 +824,12 @@ impl State {
     pub fn reset_negotiation_role(&self) {
         self.negotiation_state.set(NegotiationState::Stable);
         self.negotiation_role.set(None);
+    }
+
+    /// Returns current [`NegotiationRole`] of this [`State`].
+    #[inline]
+    pub fn negotiation_role(&self) -> Option<NegotiationRole> {
+        self.negotiation_role.get()
     }
 
     /// Returns [`Future`] which will be resolved when local SDP approve will be
