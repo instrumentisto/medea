@@ -152,18 +152,31 @@ impl InnerMediaManager {
     async fn get_tracks(
         &self,
         mut caps: MediaStreamSettings,
-    ) -> Result<Vec<Rc<local::Track>>> {
-        let tracks_from_storage = self.get_from_storage(&mut caps).into_iter();
+    ) -> Result<Vec<(Rc<local::Track>, bool)>> {
+        let tracks_from_storage = self
+            .get_from_storage(&mut caps)
+            .into_iter()
+            .map(|t| (t, false));
         match caps.into() {
             None => Ok(tracks_from_storage.collect()),
             Some(MultiSourceTracksConstraints::Display(caps)) => {
                 Ok(tracks_from_storage
-                    .chain(self.get_display_media(caps).await?.into_iter())
+                    .chain(
+                        self.get_display_media(caps)
+                            .await?
+                            .into_iter()
+                            .map(|t| (t, true)),
+                    )
                     .collect())
             }
             Some(MultiSourceTracksConstraints::Device(caps)) => {
                 Ok(tracks_from_storage
-                    .chain(self.get_user_media(caps).await?.into_iter())
+                    .chain(
+                        self.get_user_media(caps)
+                            .await?
+                            .into_iter()
+                            .map(|t| (t, true)),
+                    )
                     .collect())
             }
             Some(MultiSourceTracksConstraints::DeviceAndDisplay(
@@ -177,7 +190,8 @@ impl InnerMediaManager {
                     .chain(
                         device_tracks
                             .into_iter()
-                            .chain(display_tracks.into_iter()),
+                            .chain(display_tracks.into_iter())
+                            .map(|t| (t, true)),
                     )
                     .collect())
             }
@@ -366,7 +380,7 @@ impl MediaManager {
     pub async fn get_tracks<I: Into<MediaStreamSettings>>(
         &self,
         caps: I,
-    ) -> Result<Vec<Rc<local::Track>>> {
+    ) -> Result<Vec<(Rc<local::Track>, bool)>> {
         self.0.get_tracks(caps.into()).await
     }
 
@@ -391,7 +405,7 @@ impl MediaManager {
             .get_tracks(caps)
             .await?
             .into_iter()
-            .map(Into::into)
+            .map(|(t, _)| t.into())
             .collect())
     }
 
@@ -453,7 +467,7 @@ impl MediaManagerHandle {
                 .map(|tracks| {
                     tracks
                         .into_iter()
-                        .map(local::JsTrack::new)
+                        .map(|(t, _)| local::JsTrack::new(t))
                         .map(JsValue::from)
                         .collect::<js_sys::Array>()
                         .into()

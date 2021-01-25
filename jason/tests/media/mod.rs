@@ -60,7 +60,9 @@ async fn sendrecv_works() {
 
     media_connections
         .insert_local_tracks(
-            &caps.parse_tracks(tracks.into_iter().collect()).unwrap(),
+            &caps
+                .parse_tracks(tracks.into_iter().map(|(t, _)| t).collect())
+                .unwrap(),
         )
         .await
         .unwrap();

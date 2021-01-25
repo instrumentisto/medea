@@ -136,8 +136,9 @@ async fn same_track_for_same_constraints() {
         media_manager.get_tracks(constraints.clone()).await.unwrap();
 
     assert_eq!(tracks.len(), 1);
-    let track1 = tracks.pop().unwrap();
+    let (track1, track1_is_new) = tracks.pop().unwrap();
 
+    assert!(track1_is_new);
     assert_eq!(track1.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
@@ -146,8 +147,9 @@ async fn same_track_for_same_constraints() {
         media_manager.get_tracks(constraints.clone()).await.unwrap();
 
     assert_eq!(tracks.len(), 1);
-    let track2 = tracks.pop().unwrap();
+    let (track2, track2_is_new) = tracks.pop().unwrap();
 
+    assert!(!track2_is_new);
     assert_eq!(track1.id(), track2.id());
     assert_eq!(track2.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
@@ -174,9 +176,10 @@ async fn new_track_if_previous_dropped() {
         media_manager.get_tracks(constraints.clone()).await.unwrap();
 
     assert_eq!(tracks.len(), 1);
-    let track1 = tracks.pop().unwrap();
+    let (track1, track1_is_new) = tracks.pop().unwrap();
 
     assert_eq!(track1.kind(), MediaKind::Audio);
+    assert!(track1_is_new);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 1);
 
     // now drop track, and we got new track and second getUserMedia request
@@ -185,8 +188,9 @@ async fn new_track_if_previous_dropped() {
     let mut tracks = media_manager.get_tracks(constraints).await.unwrap();
 
     assert_eq!(tracks.len(), 1);
-    let track2 = tracks.pop().unwrap();
+    let (track2, track2_is_new) = tracks.pop().unwrap();
 
+    assert!(track2_is_new);
     assert_ne!(track2.id(), track1_id);
     assert_eq!(track2.kind(), MediaKind::Audio);
     assert_eq!(mock_navigator.get_user_media_requests_count(), 2);
@@ -214,12 +218,14 @@ async fn request_audio_video_then_audio_then_video() {
     let tracks = media_manager.get_tracks(constraints).await.unwrap();
     let (mut audio_tracks, mut video_tracks): (Vec<_>, Vec<_>) = tracks
         .into_iter()
-        .partition(|track| track.kind() == MediaKind::Audio);
+        .partition(|(track, _)| track.kind() == MediaKind::Audio);
     assert_eq!(audio_tracks.len(), 1);
     assert_eq!(video_tracks.len(), 1);
 
-    let audio_track = audio_tracks.pop().unwrap();
-    let video_track = video_tracks.pop().unwrap();
+    let (audio_track, audio_is_new) = audio_tracks.pop().unwrap();
+    let (video_track, video_is_new) = video_tracks.pop().unwrap();
+    assert!(audio_is_new);
+    assert!(video_is_new);
 
     // request audio only
     let audio_constraints = {
@@ -229,7 +235,8 @@ async fn request_audio_video_then_audio_then_video() {
     };
     let mut tracks = media_manager.get_tracks(audio_constraints).await.unwrap();
     assert_eq!(tracks.len(), 1);
-    let audio_track2 = tracks.pop().unwrap();
+    let (audio_track2, audio_track2_is_new) = tracks.pop().unwrap();
+    assert!(!audio_track2_is_new);
 
     // request video only
     let video_constraints = {
@@ -239,7 +246,8 @@ async fn request_audio_video_then_audio_then_video() {
     };
     let mut tracks = media_manager.get_tracks(video_constraints).await.unwrap();
     assert_eq!(tracks.len(), 1);
-    let video_track2 = tracks.pop().unwrap();
+    let (video_track2, video_track2_is_new) = tracks.pop().unwrap();
+    assert!(!video_track2_is_new);
 
     assert_eq!(audio_track.id(), audio_track2.id());
     assert_eq!(video_track.id(), video_track2.id());
@@ -271,10 +279,11 @@ async fn display_track_is_cached() {
 
     assert_eq!(tracks.len(), 2);
 
-    let video_track = tracks
+    let (video_track, video_track_is_new) = tracks
         .into_iter()
-        .find(|track| track.kind() == MediaKind::Video)
+        .find(|(track, _)| track.kind() == MediaKind::Video)
         .unwrap();
+    assert!(video_track_is_new);
 
     // do second request
     let constraints = {
@@ -287,7 +296,8 @@ async fn display_track_is_cached() {
 
     assert_eq!(tracks.len(), 1);
 
-    let video_track2 = tracks.pop().unwrap();
+    let (video_track2, video_track2_is_new) = tracks.pop().unwrap();
+    assert!(!video_track2_is_new);
     assert_eq!(video_track.id(), video_track2.id());
 
     assert_eq!(mock_navigator.get_display_media_requests_count(), 1);
@@ -310,6 +320,7 @@ async fn new_tracks_should_be_live() {
             .unwrap()
             .pop()
             .unwrap()
+            .0
             .sys_track(),
     );
     let ended_track = track.clone();
