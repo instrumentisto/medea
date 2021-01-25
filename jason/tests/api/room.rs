@@ -351,6 +351,8 @@ mod disable_send_tracks {
 
     use super::*;
 
+    use crate::is_firefox;
+
     #[wasm_bindgen_test]
     async fn disable_enable_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
@@ -430,11 +432,13 @@ mod disable_send_tracks {
         .await;
 
         let handle = room.new_handle();
-        can_fail_in_firefox!(JsFuture::from(
-            handle.disable_video(Some(JsMediaSourceKind::Device))
-        ));
-        assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
-        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        if !is_firefox() {
+            can_fail_in_firefox!(JsFuture::from(
+                handle.disable_video(Some(JsMediaSourceKind::Device))
+            ));
+            assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
+            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        }
         can_fail_in_firefox!(JsFuture::from(
             handle.enable_video(Some(JsMediaSourceKind::Device))
         ));
@@ -470,7 +474,9 @@ mod disable_send_tracks {
         can_fail_in_firefox!(JsFuture::from(
             handle.enable_video(Some(JsMediaSourceKind::Display))
         ));
-        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        if !is_firefox() {
+            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        }
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
     }
 
