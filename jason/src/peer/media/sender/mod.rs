@@ -86,7 +86,7 @@ impl Sender {
                         .add_transceiver(kind, TransceiverDirection::INACTIVE)
                 }),
             Some(mid) => connections
-                .get_transceiver_by_mid(&mid)
+                .get_transceiver_by_mid(mid)
                 .ok_or_else(|| {
                     MediaConnectionsError::TransceiverNotFound(mid.to_string())
                 })
@@ -116,26 +116,6 @@ impl Sender {
         }
 
         Ok(this)
-    }
-
-    /// Updates `enabled_general` property of this [`Sender`] to the provided
-    /// one.
-    #[inline]
-    pub fn set_enabled_general(&self, enabled_general: bool) {
-        self.enabled_general.set(enabled_general);
-    }
-
-    /// Updates `enabled_individual` property of this [`Sender`] to the provided
-    /// one.
-    #[inline]
-    pub fn set_enabled_individual(&self, enable_individual: bool) {
-        self.enabled_individual.set(enable_individual);
-    }
-
-    /// Updates `muted` property of this [`Sender`] to the provided one.
-    #[inline]
-    pub fn set_muted(&self, muted: bool) {
-        self.muted.set(muted);
     }
 
     /// Returns [`TrackConstraints`] of this [`Sender`].
@@ -194,27 +174,6 @@ impl Sender {
         Ok(())
     }
 
-    /// Indicates whether this [`Sender`] is enabled in
-    /// [`LocalTracksConstraints`].
-    fn enabled_in_cons(&self) -> bool {
-        self.send_constraints.is_track_enabled(
-            self.caps.media_kind(),
-            self.caps.media_source_kind(),
-        )
-    }
-
-    /// Changes underlying transceiver direction to
-    /// [`TransceiverDirection::SEND`] if this [`Sender`]s general media
-    /// exchange state is [`media_exchange_state::Stable::Enabled`].
-    pub fn maybe_enable(&self) {
-        if self.enabled_general.get()
-            && !self.transceiver.has_direction(TransceiverDirection::SEND)
-            && self.enabled_in_cons()
-        {
-            self.transceiver.add_direction(TransceiverDirection::SEND);
-        }
-    }
-
     /// Returns [`Transceiver`] of this [`Sender`].
     #[inline]
     #[must_use]
@@ -228,6 +187,15 @@ impl Sender {
     #[inline]
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
+    }
+
+    /// Indicates whether this [`Sender`] is enabled in
+    /// [`LocalTracksConstraints`].
+    fn enabled_in_cons(&self) -> bool {
+        self.send_constraints.is_track_enabled(
+            self.caps.media_kind(),
+            self.caps.media_source_kind(),
+        )
     }
 
     /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided

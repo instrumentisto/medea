@@ -412,11 +412,7 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
-            PeerEvent::NewLocalTrack { .. }
-            | PeerEvent::NewSdpAnswer { .. }
-            | PeerEvent::MediaUpdateCommand { .. }
-            | PeerEvent::NewSdpOffer { .. } => {}
-            _ => unreachable!(),
+            _ => (),
         }
     }
 }
@@ -1164,8 +1160,6 @@ async fn new_remote_track() {
 
         let sender_offer =
             sender_peer.state().when_local_sdp_updated().await.unwrap();
-        // sender_peer.state().when_local_sdp_approve_needed().await;
-        // sender_peer.state().apply_local_sdp(sender_offer.clone());
 
         let rcv_caps = RecvConstraints::default();
         rcv_caps.set_enabled(audio_rx_enabled, MediaKind::Audio);
@@ -1230,8 +1224,6 @@ async fn new_remote_track() {
             .await;
 
         let answer = rcvr_peer.state().when_local_sdp_updated().await.unwrap();
-        // rcvr_peer.state().when_local_sdp_approve_needed().await;
-        // rcvr_peer.state().apply_local_sdp(answer.clone());
 
         sender_peer.state().set_remote_sdp(answer);
         sender_peer.state().when_remote_sdp_processed().await;

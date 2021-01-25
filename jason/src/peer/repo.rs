@@ -2,9 +2,10 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use futures::{channel::mpsc, future};
-use medea_client_api_proto as proto;
-use medea_client_api_proto::PeerId;
+use futures::{
+    channel::mpsc, future, future::LocalBoxFuture, FutureExt as _, TryFutureExt,
+};
+use medea_client_api_proto::{self as proto, MediaSourceKind, PeerId};
 use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
@@ -12,11 +13,16 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{Connections, RoomError},
-    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
-    peer,
-    utils::{
-        component, delay_for, AsProtoState, SynchronizableState, TaskHandle,
+    media::{
+        track::local, LocalTracksConstraints, MediaManager, RecvConstraints,
     },
+    peer,
+    peer::PeerError,
+    utils::{
+        component, delay_for, AsProtoState, JasonError, SynchronizableState,
+        TaskHandle,
+    },
+    MediaKind,
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -170,6 +176,65 @@ impl Repository {
 
         abort.into()
     }
+
+    /// Returns [`local::TrackHandle`]s for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If [`MediaSourceKind`] is [`None`] then [`local::TrackHandle`]s for all
+    /// needed [`MediaSourceKind`]s will be returned.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MediaManagerError`] if failed to obtain
+    /// [`local::TrackHandle`] from the [`MediaManager`].
+    ///
+    /// Errors with [`RoomError::PeerConnectionError`] if failed to get
+    /// [`MediaStreamSettings`].
+    ///
+    /// [`MediaStreamSettings`]: crate::MediaStreamSettings
+    pub async fn get_local_track_handles(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<Vec<local::TrackHandle>, Traced<RoomError>> {
+        let requests: Vec<_> = self
+            .peers
+            .borrow()
+            .values()
+            .filter_map(|p| p.get_media_settings(kind, source_kind).transpose())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        let mut tracks_handles = Vec::new();
+        for req in requests {
+            let tracks = self
+                .media_manager
+                .get_tracks(req)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+                .map_err(|e| {
+                    let _ = self.peer_event_sender.unbounded_send(
+                        PeerEvent::FailedLocalMedia {
+                            error: JasonError::from(e.clone()),
+                        },
+                    );
+
+                    e
+                })?;
+            for (track, is_new) in tracks {
+                if is_new {
+                    let _ = self.peer_event_sender.unbounded_send(
+                        PeerEvent::NewLocalTrack {
+                            local_track: Rc::clone(&track),
+                        },
+                    );
+                }
+                tracks_handles.push(track.into());
+            }
+        }
+
+        Ok(tracks_handles)
+    }
 }
 
 impl State {
@@ -212,6 +277,33 @@ impl State {
                 );
             }
         }
+    }
+
+    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
+    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    ///
+    /// [`Result`] returned by this [`Future`] will be the same as result of the
+    /// gUM/gDM request.
+    ///
+    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
+    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
+    ///
+    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
+    /// [`MediaSourceKind`]s.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn local_stream_update_result(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        Box::pin(
+            future::try_join_all(self.0.borrow().values().map(|p| {
+                p.local_stream_update_result(kind, source_kind)
+                    .map_err(tracerr::map_from_and_wrap!())
+            }))
+            .map(|r| r.map(|_| ())),
+        )
     }
 }
 

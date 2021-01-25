@@ -10,7 +10,7 @@ use std::rc::Rc;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     self as proto, state as proto_state, IceCandidate, IceServer,
-    NegotiationRole, PeerId, TrackId,
+    MediaSourceKind, NegotiationRole, PeerId, TrackId,
 };
 use medea_reactive::{AllProcessed, ObservableCell, ProgressableCell};
 use tracerr::Traced;
@@ -22,6 +22,7 @@ use crate::{
         LocalStreamUpdateCriteria, PeerConnection, PeerError,
     },
     utils::{component, AsProtoState, SynchronizableState, Updatable},
+    MediaKind,
 };
 
 use self::{
@@ -268,6 +269,27 @@ impl State {
     #[inline]
     pub fn resume_timeouts(&self) {
         self.local_sdp.resume_timeout();
+    }
+
+    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
+    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    ///
+    /// [`Result`] returned by this [`Future`] will be the same as result of the
+    /// gUM/gDM request.
+    ///
+    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
+    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
+    ///
+    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
+    /// [`MediaSourceKind`]s.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn local_stream_update_result(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        self.senders.local_stream_update_result(kind, source_kind)
     }
 
     /// Notifies [`PeerComponent`] about RPC connection loss.

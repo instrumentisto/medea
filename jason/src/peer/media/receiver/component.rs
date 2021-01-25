@@ -14,9 +14,7 @@ use crate::{
     media::LocalTracksConstraints,
     peer::{
         component::SyncState,
-        media::{
-            transitable_state::media_exchange_state, InTransition, Result,
-        },
+        media::{transitable_state::media_exchange_state, Result},
         MediaExchangeState, MediaExchangeStateController,
         MediaStateControllable, MuteStateController, TransceiverDirection,
         TransceiverSide,
@@ -26,6 +24,7 @@ use crate::{
 };
 
 use super::Receiver;
+use crate::peer::media::InTransition;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -311,7 +310,7 @@ impl Component {
     ///
     /// Updates [`Receiver::enabled_individual`] to the new state.
     #[watch(self.enabled_individual.subscribe_stable())]
-    async fn stable_media_exchange_state_changed(
+    async fn enabled_individual_stable_state_changed(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Stable,
@@ -325,10 +324,10 @@ impl Component {
 
     /// Watcher for [`MediaExchangeState::Transition`] update.
     ///
-    /// Sends new intention by [`Receiver::send_media_exchange_state_intention`]
-    /// call.
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// [`media_exchange_state`].
     #[watch(self.enabled_individual.subscribe_transition())]
-    async fn transition_media_exchange_state_changed(
+    async fn enabled_individual_transition_started(
         receiver: Rc<Receiver>,
         _: Rc<State>,
         state: media_exchange_state::Transition,

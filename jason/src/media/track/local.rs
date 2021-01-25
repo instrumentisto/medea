@@ -6,6 +6,7 @@
 
 use std::rc::Rc;
 
+use derive_more::From;
 use medea_client_api_proto::MediaSourceKind;
 use wasm_bindgen::prelude::*;
 use web_sys as sys;
@@ -166,3 +167,7 @@ impl JsTrack {
         self.0.media_source_kind().into()
     }
 }
+
+/// Handle which holds [`Rc`] to the [`Track`].
+#[derive(Debug, From)]
+pub struct TrackHandle(Rc<Track>);

@@ -1,6 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     rc::Rc,
 };
@@ -21,6 +22,7 @@ use medea_client_api_proto::{
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaKind, MediaStreamSettings},
+    peer,
     peer::PeerConnection,
     rpc::MockRpcSession,
     utils::{AsProtoState, JasonError},
@@ -86,23 +88,39 @@ async fn get_test_room_and_exist_peer(
         .returning(|| stream::pending().boxed_local());
     rpc.expect_close_with_reason().return_const(());
     let event_tx_clone = event_tx.clone();
-    rpc.expect_send_command().returning(move |cmd| match cmd {
-        Command::UpdateTracks {
-            peer_id,
-            tracks_patches,
-        } => {
-            event_tx_clone
-                .unbounded_send(Event::TracksApplied {
-                    peer_id,
-                    updates: tracks_patches
-                        .into_iter()
-                        .map(|p| TrackUpdate::Updated(p.into()))
-                        .collect(),
-                    negotiation_role: None,
-                })
-                .unwrap();
+    let peer_state: Rc<RefCell<Option<Rc<peer::State>>>> =
+        Rc::new(RefCell::new(None));
+    rpc.expect_send_command().returning_st({
+        let peer_state = Rc::clone(&peer_state);
+        move |cmd| match cmd {
+            Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } => {
+                let negotiation_role = if peer_state
+                    .borrow()
+                    .as_ref()
+                    .and_then(|s| s.negotiation_role())
+                    .is_some()
+                {
+                    None
+                } else {
+                    Some(NegotiationRole::Offerer)
+                };
+
+                event_tx_clone
+                    .unbounded_send(Event::TracksApplied {
+                        peer_id,
+                        updates: tracks_patches
+                            .into_iter()
+                            .map(|p| TrackUpdate::Updated(p.into()))
+                            .collect(),
+                        negotiation_role,
+                    })
+                    .unwrap();
+            }
+            _ => (),
         }
-        _ => (),
     });
 
     let room = Room::new(Rc::new(rpc), Rc::default());
@@ -127,7 +145,10 @@ async fn get_test_room_and_exist_peer(
 
     // wait until Event::PeerCreated is handled
     delay_for(200).await;
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+    *peer_state.borrow_mut() =
+        Some(room.get_peer_state_by_id(PeerId(1)).unwrap());
     (room, peer, event_tx)
 }
 
@@ -325,7 +346,7 @@ mod disable_recv_tracks {
 mod disable_send_tracks {
     use medea_client_api_proto::{
         AudioSettings, Direction, MediaSourceKind, MediaType, MemberId,
-        VideoSettings,
+        TrackPatchCommand, VideoSettings,
     };
     use medea_jason::{
         media::{JsMediaSourceKind, MediaKind},
@@ -333,6 +354,8 @@ mod disable_send_tracks {
     };
 
     use super::*;
+
+    use crate::is_firefox;
 
     #[wasm_bindgen_test]
     async fn disable_enable_audio() {
@@ -413,11 +436,13 @@ mod disable_send_tracks {
         .await;
 
         let handle = room.new_handle();
-        can_fail_in_firefox!(JsFuture::from(
-            handle.disable_video(Some(JsMediaSourceKind::Device))
-        ));
-        assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
-        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        if !is_firefox() {
+            can_fail_in_firefox!(JsFuture::from(
+                handle.disable_video(Some(JsMediaSourceKind::Device))
+            ));
+            assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
+            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        }
         can_fail_in_firefox!(JsFuture::from(
             handle.enable_video(Some(JsMediaSourceKind::Device))
         ));
@@ -453,7 +478,9 @@ mod disable_send_tracks {
         can_fail_in_firefox!(JsFuture::from(
             handle.enable_video(Some(JsMediaSourceKind::Display))
         ));
-        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        if !is_firefox() {
+            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        }
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
     }
 
@@ -710,7 +737,36 @@ mod disable_send_tracks {
             })
             .unwrap();
 
-        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::UpdateTracks {
+                peer_id,
+                mut tracks_patches,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(
+                    tracks_patches.pop().unwrap(),
+                    TrackPatchCommand {
+                        id: TrackId(1),
+                        enabled: Some(false),
+                        muted: None
+                    }
+                );
+            }
+            _ => unreachable!(),
+        }
+        event_tx
+            .unbounded_send(Event::TracksApplied {
+                peer_id: PeerId(1),
+                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_individual: Some(false),
+                    enabled_general: Some(false),
+                    muted: None,
+                })],
+                negotiation_role: None,
+            })
+            .unwrap();
+
         match commands_rx.next().await.unwrap() {
             Command::MakeSdpOffer {
                 peer_id,
@@ -726,7 +782,6 @@ mod disable_send_tracks {
                 assert!(!audio); // disabled
                 assert!(video); // enabled
             }
-            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
@@ -736,7 +791,88 @@ mod disable_send_tracks {
     }
 
     #[wasm_bindgen_test]
-    async fn enable_video_room_before_init_peer() {
+    async fn mute_audio_room_before_init_peer() {
+        let (event_tx, event_rx) = mpsc::unbounded();
+        let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+        JsFuture::from(room.new_handle().set_local_media_settings(
+            &media_stream_settings(true, true),
+            false,
+            false,
+        ))
+        .await
+        .unwrap();
+
+        JsFuture::from(room.new_handle().mute_audio())
+            .await
+            .unwrap();
+
+        let (audio_track, video_track) = get_test_tracks(false, false);
+        event_tx
+            .unbounded_send(Event::PeerCreated {
+                peer_id: PeerId(1),
+                negotiation_role: NegotiationRole::Offerer,
+                tracks: vec![audio_track, video_track],
+                ice_servers: Vec::new(),
+                force_relay: false,
+            })
+            .unwrap();
+
+        match commands_rx.next().await.unwrap() {
+            Command::UpdateTracks {
+                peer_id,
+                mut tracks_patches,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(
+                    tracks_patches.pop().unwrap(),
+                    TrackPatchCommand {
+                        id: TrackId(1),
+                        enabled: None,
+                        muted: Some(true)
+                    }
+                );
+            }
+            _ => unreachable!(),
+        }
+        event_tx
+            .unbounded_send(Event::TracksApplied {
+                peer_id: PeerId(1),
+                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_individual: None,
+                    enabled_general: None,
+                    muted: Some(true),
+                })],
+                negotiation_role: None,
+            })
+            .unwrap();
+
+        match commands_rx.next().await.unwrap() {
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer: _,
+                mids,
+                transceivers_statuses,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(mids.len(), 2);
+                let audio = transceivers_statuses.get(&TrackId(1)).unwrap();
+                let video = transceivers_statuses.get(&TrackId(2)).unwrap();
+
+                assert!(audio); // enabled
+                assert!(video); // enabled
+            }
+            _ => unreachable!(),
+        }
+
+        let peer = room.get_peer_by_id(PeerId(1)).unwrap();
+        assert!(peer.is_send_video_enabled(None));
+        assert!(peer.is_send_audio_enabled());
+        assert!(!peer.is_send_audio_unmuted());
+    }
+
+    #[wasm_bindgen_test]
+    async fn disable_video_room_before_init_peer() {
         let (event_tx, event_rx) = mpsc::unbounded();
         let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
         JsFuture::from(room.new_handle().set_local_media_settings(
@@ -762,7 +898,36 @@ mod disable_send_tracks {
             })
             .unwrap();
 
-        delay_for(200).await;
+        match commands_rx.next().await.unwrap() {
+            Command::UpdateTracks {
+                peer_id,
+                mut tracks_patches,
+            } => {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(
+                    tracks_patches.pop().unwrap(),
+                    TrackPatchCommand {
+                        id: TrackId(2),
+                        enabled: Some(false),
+                        muted: None
+                    }
+                );
+            }
+            _ => unreachable!(),
+        }
+        event_tx
+            .unbounded_send(Event::TracksApplied {
+                peer_id: PeerId(1),
+                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                    id: TrackId(2),
+                    enabled_individual: Some(false),
+                    enabled_general: Some(false),
+                    muted: None,
+                })],
+                negotiation_role: None,
+            })
+            .unwrap();
+
         match commands_rx.next().await.unwrap() {
             Command::MakeSdpOffer {
                 peer_id,
@@ -778,7 +943,6 @@ mod disable_send_tracks {
                 assert!(audio); // enabled
                 assert!(!video); // disabled
             }
-            Command::UpdateTracks { .. } => (),
             _ => unreachable!(),
         }
 
@@ -1551,12 +1715,11 @@ async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
     .await;
-    room.reset_peer_negotiation_state(peer.id()).unwrap();
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx
@@ -1617,7 +1780,7 @@ async fn only_one_gum_performed_on_enable() {
     event_tx
         .unbounded_send(Event::TracksApplied {
             peer_id: peer.id(),
-            negotiation_role: None,
+            negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
@@ -1627,6 +1790,7 @@ async fn only_one_gum_performed_on_enable() {
         })
         .unwrap();
     yield_now().await;
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
@@ -1635,7 +1799,7 @@ async fn only_one_gum_performed_on_enable() {
     event_tx
         .unbounded_send(Event::TracksApplied {
             peer_id: peer.id(),
-            negotiation_role: None,
+            negotiation_role: Some(NegotiationRole::Offerer),
             updates: vec![TrackUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
@@ -1644,10 +1808,48 @@ async fn only_one_gum_performed_on_enable() {
             })],
         })
         .unwrap();
-    JsFuture::from(room_handle.enable_audio()).await.unwrap();
+    JsFuture::from(room_handle.enable_audio())
+        .await
+        .unwrap_err();
     yield_now().await;
 
     assert_eq!(mock.get_user_media_requests_count(), 1);
+    mock.stop();
+}
+
+/// Tests that error from gUM/gDM request will be returned from the
+/// [`RoomHandle::enable_audio`]/[`RoomHandle::enable_video`].
+#[wasm_bindgen_test]
+async fn set_media_state_return_media_error() {
+    const ERROR_MSG: &str = "set_media_state_return_media_error";
+
+    let mock = MockNavigator::new();
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let (room, _peer, _event_tx) = get_test_room_and_exist_peer(
+        vec![audio_track, video_track],
+        Some(media_stream_settings(false, false)),
+    )
+    .await;
+    let room_handle = room.new_handle();
+    JsFuture::from(room_handle.disable_audio()).await.unwrap();
+    yield_now().await;
+
+    mock.error_get_user_media(ERROR_MSG.into());
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+    let err = get_jason_error(
+        JsFuture::from(room_handle.enable_audio())
+            .await
+            .unwrap_err(),
+    );
+    assert_eq!(
+        err.message(),
+        format!(
+            "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: {}",
+            ERROR_MSG
+        )
+    );
+
     mock.stop();
 }
 
@@ -1698,6 +1900,80 @@ async fn only_one_gum_performed_on_enable_by_server() {
     yield_now().await;
 
     assert_eq!(mock.get_user_media_requests_count(), 1);
+    mock.stop();
+}
+
+/// Tests that [`Room::set_media_state`] will call gUM/gDM before doing anything
+/// with a [`MediaState`]s and doesn't updates [`MediaState`]s if gUM/gDM
+/// request fails.
+#[wasm_bindgen_test]
+async fn send_enabling_holds_local_tracks() {
+    let mut rpc = MockRpcSession::new();
+
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let video_track_id = video_track.id;
+    let (event_tx, event_rx) = mpsc::unbounded();
+    rpc.expect_subscribe()
+        .return_once(move || Box::pin(event_rx));
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_close_with_reason().return_const(());
+    rpc.expect_send_command().returning_st(|c| {
+        if matches!(c, Command::UpdateTracks { .. }) {
+            unreachable!("Client tries to send Command::UpdateTracks!");
+        }
+    });
+
+    let room = Room::new(Rc::new(rpc), Rc::default());
+    JsFuture::from(room.new_handle().set_local_media_settings(
+        &media_stream_settings(true, true),
+        false,
+        false,
+    ))
+    .await
+    .unwrap();
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+    // wait until Event::PeerCreated is handled
+    delay_for(200).await;
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: PeerId(1),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: video_track_id,
+                enabled_individual: Some(false),
+                enabled_general: Some(false),
+                muted: None,
+            })],
+        })
+        .unwrap();
+    // wait until Event::TracksApplied is handled
+    delay_for(50).await;
+
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
+    let mock = MockNavigator::new();
+    mock.error_get_user_media("foobar".into());
+    let err = get_jason_error(
+        JsFuture::from(room.new_handle().enable_video(None))
+            .await
+            .unwrap_err(),
+    );
+    assert_eq!(
+        err.message(),
+        "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+         Unknown JS error: foobar"
+    );
     mock.stop();
 }
 

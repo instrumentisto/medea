@@ -18,9 +18,10 @@ use crate::{
     },
 };
 
-use super::{transitable_state::media_exchange_state, TransceiverSide};
+use super::TransceiverSide;
 
 pub use self::component::{Component, State};
+use crate::peer::media::media_exchange_state;
 
 /// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
@@ -215,6 +216,13 @@ impl Receiver {
         self.transceiver.borrow().clone()
     }
 
+    /// Indicates whether this [`Receiver`] is enabled.
+    #[inline]
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.enabled_individual.get()
+    }
+
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
     /// and has not notified yet.
     fn maybe_notify_track(&self) {
@@ -233,13 +241,6 @@ impl Receiver {
             );
             self.is_track_notified.set(true);
         }
-    }
-
-    /// Indicates whether this [`Receiver`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.enabled_individual.get()
     }
 }
 

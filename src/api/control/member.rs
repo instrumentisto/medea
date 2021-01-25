@@ -10,19 +10,21 @@ use std::{
 
 use medea_client_api_proto::{self as client_proto, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
-use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
-use crate::api::control::{
-    callback::url::CallbackUrl,
-    endpoints::{
-        webrtc_play_endpoint::WebRtcPlayEndpoint,
-        webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+use crate::{
+    api::control::{
+        callback::url::CallbackUrl,
+        endpoints::{
+            webrtc_play_endpoint::WebRtcPlayEndpoint,
+            webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+        },
+        pipeline::Pipeline,
+        room::RoomElement,
+        EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
+        WebRtcPlayId,
     },
-    pipeline::Pipeline,
-    room::RoomElement,
-    EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
-    WebRtcPlayId,
+    utils,
 };
 
 /// Credentials of the `Member` element.
@@ -59,14 +61,9 @@ impl Credential {
 }
 
 impl Default for Credential {
+    #[inline]
     fn default() -> Self {
-        Self::Plain(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(Self::LEN)
-                .map(char::from)
-                .collect::<String>(),
-        )
+        Self::Plain(utils::generate_token(Self::LEN))
     }
 }
 
