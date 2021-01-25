@@ -1718,7 +1718,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
         Some(media_stream_settings(true, true)),
     )
     .await;
-    assert_eq!(mock.get_user_media_requests_count(), 2);
+    assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx
         .unbounded_send(Event::TracksApplied {
@@ -1733,7 +1733,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
         })
         .unwrap();
     yield_now().await;
-    assert_eq!(mock.get_user_media_requests_count(), 2);
+    assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
     mock.error_get_user_media("only_one_gum_performed_on_enable".into());
@@ -1752,7 +1752,81 @@ async fn only_one_gum_performed_on_enable_by_server() {
         .unwrap();
     yield_now().await;
 
-    assert_eq!(mock.get_user_media_requests_count(), 2);
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    mock.stop();
+}
+
+/// Tests that [`Room::set_media_state`] will call gUM/gDM before doing anything
+/// with a [`MediaState`]s and doesn't updates [`MediaState`]s if gUM/gDM
+/// request fails.
+#[wasm_bindgen_test]
+async fn send_enabling_holds_local_tracks() {
+    let mut rpc = MockRpcSession::new();
+
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let video_track_id = video_track.id;
+    let (event_tx, event_rx) = mpsc::unbounded();
+    rpc.expect_subscribe()
+        .return_once(move || Box::pin(event_rx));
+    rpc.expect_on_connection_loss()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_on_reconnected()
+        .return_once(|| stream::pending().boxed_local());
+    rpc.expect_close_with_reason().return_const(());
+    rpc.expect_send_command().returning_st(|c| {
+        if matches!(c, Command::UpdateTracks { .. }) {
+            unreachable!("Client tries to send Command::UpdateTracks!");
+        }
+    });
+
+    let room = Room::new(Rc::new(rpc), Rc::default());
+    JsFuture::from(room.new_handle().set_local_media_settings(
+        &media_stream_settings(true, true),
+        false,
+        false,
+    ))
+    .await
+    .unwrap();
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+    // wait until Event::PeerCreated is handled
+    delay_for(200).await;
+    event_tx
+        .unbounded_send(Event::TracksApplied {
+            peer_id: PeerId(1),
+            negotiation_role: None,
+            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                id: video_track_id,
+                enabled_individual: Some(false),
+                enabled_general: Some(false),
+                muted: None,
+            })],
+        })
+        .unwrap();
+    // wait until Event::TracksApplied is handled
+    delay_for(50).await;
+
+    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
+    let mock = MockNavigator::new();
+    mock.error_get_user_media("foobar".into());
+    let err = get_jason_error(
+        JsFuture::from(room.new_handle().enable_video(None))
+            .await
+            .unwrap_err(),
+    );
+    assert_eq!(
+        err.message(),
+        "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+         Unknown JS error: foobar"
+    );
     mock.stop();
 }
 
