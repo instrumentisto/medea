@@ -1397,7 +1397,7 @@ mod ice_restart {
             .state()
             .sdp_offer_applied(&sdp_offer_before);
         peers.first_peer.state().reset_negotiation_role();
-        peers.first_peer.state().sdp_offer_applied("");
+        delay_for(100).await;
         let mut proto_state = peers.first_peer.state().as_proto();
         proto_state.restart_ice = true;
         peers
