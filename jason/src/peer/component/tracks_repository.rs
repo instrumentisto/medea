@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use derive_more::From;
 use futures::{
-    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt,
+    future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt as _,
     TryFutureExt,
 };
 use medea_client_api_proto::{MediaSourceKind, TrackId};
@@ -185,8 +185,10 @@ impl<S> Updatable for TracksRepository<S>
 where
     S: Updatable,
 {
+    /// Returns [`Future`] which will be resolved when all tracks from the
+    /// [`TracksRepository`] will be stabilized meaning that all track's
+    /// component won't contain any pending state change transitions.
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        use futures::FutureExt as _;
         let when = futures::future::join_all(
             self.0.borrow().values().map(|s| s.when_stabilized()),
         );

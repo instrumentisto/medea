@@ -13,15 +13,16 @@ use web_sys as sys;
 use crate::{
     media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
     peer::{
-        media::TrackEvent, transceiver::Transceiver, MediaConnections,
-        MediaStateControllable, PeerEvent, TransceiverDirection,
+        media::{media_exchange_state, TrackEvent},
+        transceiver::Transceiver,
+        MediaConnections, MediaStateControllable, PeerEvent,
+        TransceiverDirection,
     },
 };
 
 use super::TransceiverSide;
 
 pub use self::component::{Component, State};
-use crate::peer::media::media_exchange_state;
 
 /// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.

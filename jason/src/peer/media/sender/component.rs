@@ -15,7 +15,7 @@ use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
         component::SyncState,
-        media::{media_exchange_state, mute_state, Result},
+        media::{media_exchange_state, mute_state, InTransition, Result},
         MediaConnectionsError, MediaExchangeState,
         MediaExchangeStateController, MediaState, MediaStateControllable,
         MuteState, MuteStateController, PeerError, TransceiverDirection,
@@ -26,7 +26,6 @@ use crate::{
 };
 
 use super::Sender;
-use crate::peer::media::InTransition;
 
 /// State of the [`local::Track`] of the [`Sender`].
 ///
@@ -64,14 +63,8 @@ pub type Component = component::Component<State, Sender>;
 #[derive(Debug)]
 pub struct State {
     id: TrackId,
-
-    /// Mid of this [`SenderComponent`].
     mid: Option<String>,
-
-    /// [`MediaType`] of this [`SenderComponent`].
     media_type: MediaType,
-
-    /// All `Member`s which are receives media from this [`SenderComponent`].
     receivers: Vec<MemberId>,
     enabled_individual: Rc<MediaExchangeStateController>,
     mute_state: Rc<MuteStateController>,
@@ -223,16 +216,6 @@ impl State {
             send_constraints,
             local_track_state: ObservableCell::new(LocalTrackState::Stable),
         })
-    }
-
-    /// Notifies [`State`] about RPC connection loss.
-    pub fn connection_lost(&self) {
-        self.sync_state.set(SyncState::Desynced);
-    }
-
-    /// Notifies [`State`] about RPC connection restore.
-    pub fn connection_recovered(&self) {
-        self.sync_state.set(SyncState::Syncing);
     }
 
     /// Indicates whether [`Sender`]'s media exchange state is in
@@ -404,6 +387,16 @@ impl State {
             MediaType::Audio(_) => MediaSourceKind::Device,
             MediaType::Video(video) => video.source_kind,
         }
+    }
+
+    /// Notifies [`State`] about RPC connection loss.
+    pub fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    /// Notifies [`State`] about RPC connection restore.
+    pub fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
     }
 }
 

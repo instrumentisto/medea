@@ -14,7 +14,9 @@ use crate::{
     media::LocalTracksConstraints,
     peer::{
         component::SyncState,
-        media::{transitable_state::media_exchange_state, Result},
+        media::{
+            transitable_state::media_exchange_state, InTransition, Result,
+        },
         MediaExchangeState, MediaExchangeStateController,
         MediaStateControllable, MuteStateController, TransceiverDirection,
         TransceiverSide,
@@ -24,7 +26,6 @@ use crate::{
 };
 
 use super::Receiver;
-use crate::peer::media::InTransition;
 
 /// Component responsible for the [`Receiver`] enabling/disabling and
 /// muting/unmuting.
@@ -157,7 +158,8 @@ impl From<proto::state::Receiver> for State {
 }
 
 impl State {
-    /// Returns [`State`] with the provided data.
+    /// Returns [`State`] with a provided data.
+    #[inline]
     #[must_use]
     pub fn new(
         id: TrackId,
@@ -236,16 +238,6 @@ impl State {
         }
     }
 
-    /// Notifies [`State`] about RPC connection loss.
-    pub fn connection_lost(&self) {
-        self.sync_state.set(SyncState::Desynced);
-    }
-
-    /// Notifies [`State`] about RPC connection restore.
-    pub fn connection_recovered(&self) {
-        self.sync_state.set(SyncState::Syncing);
-    }
-
     /// Returns [`Future`] resolving when [`State`] update will be applied onto
     /// [`Receiver`].
     ///
@@ -263,6 +255,16 @@ impl State {
     /// [`Future`]: std::future::Future
     pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
         self.enabled_individual.when_stabilized()
+    }
+
+    /// Notifies [`State`] about RPC connection loss.
+    pub fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    /// Notifies [`State`] about RPC connection restore.
+    pub fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
     }
 }
 

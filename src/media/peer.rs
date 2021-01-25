@@ -374,6 +374,16 @@ impl_peer_converts!(WaitLocalSdp);
 impl_peer_converts!(WaitRemoteSdp);
 impl_peer_converts!(Stable);
 
+/// Action which can be done on negotiation process finish.
+#[derive(Clone, Copy, Debug)]
+enum OnNegotiationFinish {
+    /// New negotiation should be started.
+    Renegotiate,
+
+    /// Nothing should be done.
+    Noop,
+}
+
 #[derive(Debug)]
 pub struct Context {
     /// [`PeerId`] of this [`Peer`].
@@ -440,9 +450,8 @@ pub struct Context {
     /// Current [`NegotiationRole`] of this [`Peer`].
     negotiation_role: Option<NegotiationRole>,
 
-    /// Flag which indicates that [`Peer`] needs renegotiation after
-    /// negotiation finish.
-    need_renegotiation: bool,
+    /// Action which should be done on negotiation process finish.
+    on_negotiation_finish: OnNegotiationFinish,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -890,7 +899,8 @@ impl<T> Peer<T> {
         if !updates.is_empty() {
             // TODO: can be optimized after #167
             if self.context.is_known_to_remote {
-                self.context.need_renegotiation = true;
+                self.context.on_negotiation_finish =
+                    OnNegotiationFinish::Renegotiate;
             }
             self.context
                 .peer_updates_sub
@@ -1102,7 +1112,7 @@ impl Peer<Stable> {
             ice_candidates: HashSet::new(),
             ice_restart: false,
             negotiation_role: None,
-            need_renegotiation: false,
+            on_negotiation_finish: OnNegotiationFinish::Noop,
         };
 
         Self {
@@ -1180,7 +1190,10 @@ impl Peer<Stable> {
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty()
-            || self.context.need_renegotiation
+            || matches!(
+                self.context.on_negotiation_finish,
+                OnNegotiationFinish::Renegotiate
+            )
         {
             let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
@@ -1195,7 +1208,10 @@ impl Peer<Stable> {
             self.dedup_pending_track_updates();
 
             if self.context.pending_track_updates.is_empty()
-                && !self.context.need_renegotiation
+                && matches!(
+                    self.context.on_negotiation_finish,
+                    OnNegotiationFinish::Noop
+                )
             {
                 self.context.peer_updates_sub.force_update(
                     self.id(),
@@ -1209,7 +1225,7 @@ impl Peer<Stable> {
                     .pending_track_updates
                     .append(&mut negotiationless_changes);
                 self.context.peer_updates_sub.negotiation_needed(self.id());
-                self.context.need_renegotiation = false;
+                self.context.on_negotiation_finish = OnNegotiationFinish::Noop;
             }
         }
     }
