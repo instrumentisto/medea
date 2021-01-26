@@ -210,7 +210,7 @@ impl<S> TracksRepository<S> {
 }
 
 #[cfg(feature = "mockable")]
-impl TracksRepository<receiver::State> {
+impl TracksRepository<super::receiver::State> {
     /// Stabilize all [`receiver::State`] from this [`State`].
     pub fn stabilize_all(&self) {
         self.0.borrow().values().for_each(|r| r.stabilize());
