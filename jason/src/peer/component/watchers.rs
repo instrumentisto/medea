@@ -343,14 +343,18 @@ impl Component {
     ) -> Result<(), Traced<PeerError>> {
         match role {
             NegotiationRole::Offerer => {
-                futures::future::join(
-                    state.when_all_senders_processed(),
-                    state.when_all_receivers_processed(),
-                )
+                medea_reactive::when_all_processed(vec![
+                    state.when_all_senders_processed().into(),
+                    state.when_all_receivers_processed().into(),
+                ])
                 .await;
-                state.senders.when_stabilized().await;
-                state.receivers.when_stabilized().await;
-                state.when_all_updated().await;
+
+                medea_reactive::when_all_processed(vec![
+                    state.senders.when_stabilized().into(),
+                    state.receivers.when_stabilized().into(),
+                    state.when_all_updated().into(),
+                ])
+                .await;
 
                 let _ = state.update_local_stream(&peer).await;
 
@@ -367,8 +371,12 @@ impl Component {
                     state.senders.when_updated().into(),
                 ])
                 .await;
-                state.senders.when_stabilized().await;
-                state.receivers.when_stabilized().await;
+
+                medea_reactive::when_all_processed(vec![
+                    state.senders.when_stabilized().into(),
+                    state.receivers.when_stabilized().into(),
+                ])
+                .await;
 
                 let _ = state.update_local_stream(&peer).await;
 

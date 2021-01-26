@@ -216,6 +216,7 @@ impl State {
 impl AsProtoState for State {
     type Output = proto::state::Room;
 
+    #[inline]
     fn as_proto(&self) -> Self::Output {
         Self::Output {
             peers: self

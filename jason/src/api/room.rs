@@ -15,7 +15,7 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    state as proto_state, Command, ConnectionQualityScore, Event as RpcEvent,
+    self as proto, Command, ConnectionQualityScore, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
     MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
     TrackId, TrackUpdate,
@@ -1558,11 +1558,11 @@ impl EventHandler for InnerRoom {
         unreachable!("Room can't receive Event::RoomLeft")
     }
 
-    /// Updates [`peer::repo::State`] with a provided [`proto_state::Room`].
+    /// Updates [`peer::repo::State`] with a provided [`proto::state::Room`].
     #[inline]
     async fn on_state_synchronized(
         &self,
-        state: proto_state::Room,
+        state: proto::state::Room,
     ) -> Self::Output {
         self.peers.state().apply(state, &self.send_constraints);
 

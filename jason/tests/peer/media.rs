@@ -10,6 +10,7 @@ use medea_jason::{
         media_exchange_state, LocalStreamUpdateCriteria, MediaConnections,
         MediaStateControllable, RtcPeerConnection, SimpleTracksRequest,
     },
+    utils::Updatable as _,
 };
 use wasm_bindgen_test::*;
 

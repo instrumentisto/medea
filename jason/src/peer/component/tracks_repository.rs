@@ -1,5 +1,7 @@
 //! Implementation of the store for the [`sender::State`]s and
 //! [`receiver::State`]s.
+//!
+//! [`receiver::State`]: super::receiver::State
 
 use std::{
     cell::RefCell,
@@ -18,11 +20,11 @@ use tracerr::Traced;
 
 use crate::{
     media::LocalTracksConstraints,
-    peer::{media::sender, PeerError},
+    peer::PeerError,
     utils::{AsProtoState, SynchronizableState, Updatable},
 };
 
-use super::receiver;
+use super::sender;
 
 /// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
 /// [`PeerComponent`].
@@ -75,19 +77,6 @@ impl TracksRepository<sender::State> {
             .collect()
     }
 
-    #[inline]
-    pub fn connection_lost(&self) {
-        self.0.borrow().values().for_each(|s| s.connection_lost());
-    }
-
-    #[inline]
-    pub fn connection_recovered(&self) {
-        self.0
-            .borrow()
-            .values()
-            .for_each(|s| s.connection_recovered());
-    }
-
     /// Returns [`Future`] which will be resolved when gUM/gDM request for the
     /// provided [`TrackId`]s will be resolved.
     ///
@@ -114,21 +103,6 @@ impl TracksRepository<sender::State> {
             }))
             .map(|r| r.map(|_| ())),
         )
-    }
-}
-
-impl TracksRepository<receiver::State> {
-    #[inline]
-    pub fn connection_lost(&self) {
-        self.0.borrow().values().for_each(|s| s.connection_lost());
-    }
-
-    #[inline]
-    pub fn connection_recovered(&self) {
-        self.0
-            .borrow()
-            .values()
-            .for_each(|s| s.connection_recovered());
     }
 }
 
@@ -172,14 +146,20 @@ where
     /// Returns [`Future`] which will be resolved when all tracks from the
     /// [`TracksRepository`] will be stabilized meaning that all track's
     /// component won't contain any pending state change transitions.
-    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        let when = futures::future::join_all(
-            self.0.borrow().values().map(|s| s.when_stabilized()),
-        );
-
-        Box::pin(when.map(|_| ()))
+    fn when_stabilized(&self) -> AllProcessed<'static> {
+        let when_futs: Vec<_> = self
+            .0
+            .borrow()
+            .values()
+            .map(|s| s.when_stabilized().into())
+            .collect();
+        medea_reactive::when_all_processed(when_futs)
     }
 
+    /// Returns [`Future`] resolving when all tracks updates will
+    /// be applied.
+    ///
+    /// [`Future`]: std::future::Future
     fn when_updated(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .0
@@ -187,8 +167,22 @@ where
             .values()
             .map(|s| s.when_updated().into())
             .collect();
-
         medea_reactive::when_all_processed(when_futs)
+    }
+
+    /// Notifies all tracks about RPC connection loss.
+    #[inline]
+    fn connection_lost(&self) {
+        self.0.borrow().values().for_each(|s| s.connection_lost());
+    }
+
+    /// Notifies all tracks about RPC connection recovering.
+    #[inline]
+    fn connection_recovered(&self) {
+        self.0
+            .borrow()
+            .values()
+            .for_each(|s| s.connection_recovered());
     }
 }
 

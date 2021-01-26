@@ -9,8 +9,8 @@ use std::{cell::Cell, collections::HashSet, rc::Rc};
 
 use futures::{future::LocalBoxFuture, TryFutureExt as _};
 use medea_client_api_proto::{
-    self as proto, state as proto_state, IceCandidate, IceServer,
-    NegotiationRole, PeerId as Id, TrackId,
+    self as proto, IceCandidate, IceServer, NegotiationRole, PeerId as Id,
+    TrackId,
 };
 use medea_reactive::{AllProcessed, ObservableCell, ProgressableCell};
 use tracerr::Traced;
@@ -399,29 +399,13 @@ impl State {
     pub fn current_sdp_offer(&self) -> Option<String> {
         self.local_sdp.current()
     }
-
-    /// Notifies [`Component`] about RPC connection loss.
-    #[inline]
-    pub fn connection_lost(&self) {
-        self.sync_state.set(SyncState::Desynced);
-        self.senders.connection_lost();
-        self.receivers.connection_lost();
-    }
-
-    /// Notifies [`Component`] about RPC connection restore.
-    #[inline]
-    pub fn reconnected(&self) {
-        self.sync_state.set(SyncState::Syncing);
-        self.senders.connection_recovered();
-        self.receivers.connection_recovered();
-    }
 }
 
 /// Component responsible for the [`PeerConnection`] updating.
 pub type Component = component::Component<State, PeerConnection>;
 
 impl AsProtoState for State {
-    type Output = proto_state::Peer;
+    type Output = proto::state::Peer;
 
     fn as_proto(&self) -> Self::Output {
         Self::Output {
@@ -440,7 +424,7 @@ impl AsProtoState for State {
 }
 
 impl SynchronizableState for State {
-    type Input = proto_state::Peer;
+    type Input = proto::state::Peer;
 
     fn from_proto(
         from: Self::Input,
@@ -492,22 +476,34 @@ impl SynchronizableState for State {
 }
 
 impl Updatable for State {
-    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        use futures::FutureExt as _;
-        Box::pin(
-            futures::future::join_all(vec![
-                self.senders.when_stabilized(),
-                self.receivers.when_stabilized(),
-            ])
-            .map(|_| ()),
-        )
+    #[inline]
+    fn when_stabilized(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            self.senders.when_stabilized().into(),
+            self.receivers.when_stabilized().into(),
+        ])
     }
 
+    #[inline]
     fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.receivers.when_updated().into(),
             self.senders.when_updated().into(),
         ])
+    }
+
+    #[inline]
+    fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+        self.senders.connection_lost();
+        self.receivers.connection_lost();
+    }
+
+    #[inline]
+    fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
+        self.senders.connection_recovered();
+        self.receivers.connection_recovered();
     }
 }
 

@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto::{
-    state as proto_state, MediaSourceKind, MediaType, MemberId, TrackId,
+    self as proto, MediaSourceKind, MediaType, MemberId, TrackId,
     TrackPatchEvent,
 };
 use medea_macro::watchers;
@@ -78,7 +78,7 @@ pub struct State {
 }
 
 impl AsProtoState for State {
-    type Output = proto_state::Sender;
+    type Output = proto::state::Sender;
 
     fn as_proto(&self) -> Self::Output {
         Self::Output {
@@ -95,7 +95,7 @@ impl AsProtoState for State {
 }
 
 impl SynchronizableState for State {
-    type Input = proto_state::Sender;
+    type Input = proto::state::Sender;
 
     fn from_proto(
         input: Self::Input,
@@ -153,26 +153,45 @@ impl SynchronizableState for State {
 }
 
 impl Updatable for State {
-    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        use futures::FutureExt as _;
-        Box::pin(
-            futures::future::join_all(vec![
-                Rc::clone(&self.enabled_individual).when_stabilized(),
-                Rc::clone(&self.mute_state).when_stabilized(),
-            ])
-            .map(|_| ()),
-        )
+    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
+    /// and [`mute_state`] will be stabilized.
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    fn when_stabilized(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            Rc::clone(&self.enabled_individual).when_stabilized().into(),
+            Rc::clone(&self.mute_state).when_stabilized().into(),
+        ])
     }
 
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Sender`].
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
     fn when_updated(&self) -> AllProcessed<'static> {
         medea_reactive::when_all_processed(vec![
             self.enabled_individual.when_processed().into(),
             self.mute_state.when_processed().into(),
+            self.enabled_general.when_all_processed().into(),
         ])
+    }
+
+    /// Notifies [`State`] about RPC connection loss.
+    #[inline]
+    fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    /// Notifies [`State`] about RPC connection restore.
+    #[inline]
+    fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
     }
 }
 
-impl From<&State> for proto_state::Sender {
+impl From<&State> for proto::state::Sender {
     fn from(state: &State) -> Self {
         Self {
             id: state.id,
@@ -319,29 +338,6 @@ impl State {
         }
     }
 
-    /// Returns [`Future`] resolving when [`State`] update will be applied onto
-    /// [`Sender`].
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![
-            self.enabled_individual.when_processed().into(),
-            self.mute_state.when_processed().into(),
-            self.enabled_general.when_all_processed().into(),
-        ])
-    }
-
-    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
-    /// and [`mute_state`] will be stabilized.
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![
-            Rc::clone(&self.enabled_individual).when_stabilized().into(),
-            Rc::clone(&self.mute_state).when_stabilized().into(),
-        ])
-    }
-
     /// Indicates whether local `MediaStream` update needed for this [`State`].
     #[inline]
     #[must_use]
@@ -379,16 +375,6 @@ impl State {
             MediaType::Audio(_) => MediaSourceKind::Device,
             MediaType::Video(video) => video.source_kind,
         }
-    }
-
-    /// Notifies [`State`] about RPC connection loss.
-    pub fn connection_lost(&self) {
-        self.sync_state.set(SyncState::Desynced);
-    }
-
-    /// Notifies [`State`] about RPC connection restore.
-    pub fn connection_recovered(&self) {
-        self.sync_state.set(SyncState::Syncing);
     }
 }
 

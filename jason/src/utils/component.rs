@@ -3,9 +3,7 @@
 use std::rc::Rc;
 
 use derive_more::Deref;
-use futures::{
-    future, future::LocalBoxFuture, Future, FutureExt as _, Stream, StreamExt,
-};
+use futures::{future, Future, FutureExt as _, Stream, StreamExt};
 use medea_reactive::AllProcessed;
 use wasm_bindgen_futures::spawn_local;
 
@@ -46,11 +44,17 @@ pub trait SynchronizableState {
 pub trait Updatable {
     /// Returns [`Future`] which will be resolved when this [`Updatable`] will
     /// resolve his intentions.
-    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()>;
+    fn when_stabilized(&self) -> AllProcessed<'static>;
 
     /// Returns [`Future`] which will be resolved when all client updates will
     /// be performed on this state.
     fn when_updated(&self) -> AllProcessed<'static>;
+
+    /// Notifies about RPC connection loss.
+    fn connection_lost(&self);
+
+    /// Notifies about RPC connection recovering.
+    fn connection_recovered(&self);
 }
 
 /// Component is a base that helps managing reactive components.

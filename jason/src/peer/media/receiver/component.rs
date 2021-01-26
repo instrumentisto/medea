@@ -2,14 +2,15 @@
 
 use std::rc::Rc;
 
-use futures::{future::LocalBoxFuture, StreamExt as _};
+use futures::StreamExt as _;
 use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::watchers;
 use medea_reactive::{
-    AllProcessed, Guarded, ObservableCell, Processed, ProgressableCell,
+    when_all_processed, AllProcessed, Guarded, ObservableCell, Processed,
+    ProgressableCell,
 };
 
 use crate::{
@@ -103,22 +104,46 @@ impl SynchronizableState for State {
 }
 
 impl Updatable for State {
-    fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        use futures::FutureExt as _;
-        Box::pin(
-            futures::future::join_all(vec![Rc::clone(
-                &self.enabled_individual,
-            )
-            .when_stabilized()])
-            .map(|_| ()),
-        )
+    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
+    /// will be stabilized.
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    fn when_stabilized(&self) -> AllProcessed<'static> {
+        let controller = Rc::clone(&self.enabled_individual);
+        when_all_processed(std::iter::once(
+            Processed::new(Box::new(move || {
+                let controller = Rc::clone(&controller);
+                Box::pin(async move {
+                    controller.when_stabilized().await;
+                })
+            }))
+            .into(),
+        ))
     }
 
+    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// [`Receiver`].
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
     fn when_updated(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![self
-            .enabled_individual
-            .when_processed()
-            .into()])
+        medea_reactive::when_all_processed(vec![
+            self.enabled_individual.when_processed().into(),
+            self.enabled_general.when_all_processed().into(),
+        ])
+    }
+
+    /// Notifies [`State`] about RPC connection loss.
+    #[inline]
+    fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    /// Notifies [`State`] about RPC connection restore.
+    #[inline]
+    fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
     }
 }
 
@@ -215,41 +240,6 @@ impl State {
         if let Some(enabled_individual) = track_patch.enabled_individual {
             self.enabled_individual.update(enabled_individual.into());
         }
-    }
-
-    /// Returns [`Future`] resolving when [`State`] update will be applied onto
-    /// [`Receiver`].
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![
-            self.enabled_individual.when_processed().into(),
-            self.enabled_general.when_all_processed().into(),
-        ])
-    }
-
-    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
-    /// will be stabilized.
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> Processed<'static> {
-        let controller = Rc::clone(&self.enabled_individual);
-        Processed::new(Box::new(move || {
-            let controller = Rc::clone(&controller);
-            Box::pin(async move {
-                controller.when_stabilized().await;
-            })
-        }))
-    }
-
-    /// Notifies [`State`] about RPC connection loss.
-    pub fn connection_lost(&self) {
-        self.sync_state.set(SyncState::Desynced);
-    }
-
-    /// Notifies [`State`] about RPC connection restore.
-    pub fn connection_recovered(&self) {
-        self.sync_state.set(SyncState::Syncing);
     }
 }
 

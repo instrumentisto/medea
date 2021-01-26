@@ -409,9 +409,9 @@ impl RpcSession for WebSocketRpcSession {
 
     /// Sends [`Command`] to the server if current [`SessionState`] is
     /// [`SessionState::Opened`].
+    #[inline]
     fn send_command(&self, command: Command) {
-        let state = self.state.get();
-        if let SessionState::Opened(info) = state {
+        if let SessionState::Opened(info) = self.state.get() {
             self.client.send_command(info.room_id.clone(), command);
         }
     }
