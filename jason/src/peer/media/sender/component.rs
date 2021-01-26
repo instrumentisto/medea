@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::{future, future::LocalBoxFuture, FutureExt as _, StreamExt};
+use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto::{
     state as proto_state, MediaSourceKind, MediaType, MemberId, TrackId,
     TrackPatchEvent,
@@ -14,12 +14,15 @@ use tracerr::Traced;
 use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
+        self,
         component::SyncState,
-        media::{media_exchange_state, mute_state, InTransition, Result},
-        MediaConnectionsError, MediaExchangeState,
-        MediaExchangeStateController, MediaState, MediaStateControllable,
-        MuteState, MuteStateController, PeerError, TransceiverDirection,
-        TransceiverSide,
+        media::{
+            media_exchange_state, mute_state, InTransition, MediaExchangeState,
+            MuteState, Result,
+        },
+        MediaConnectionsError, MediaExchangeStateController, MediaState,
+        MediaStateControllable, MuteStateController, PeerError,
+        TransceiverDirection, TransceiverSide,
     },
     utils::{component, AsProtoState, SynchronizableState, Updatable},
     MediaKind,
@@ -154,8 +157,8 @@ impl Updatable for State {
         use futures::FutureExt as _;
         Box::pin(
             futures::future::join_all(vec![
-                self.enabled_individual.when_stabilized(),
-                self.mute_state.when_stabilized(),
+                Rc::clone(&self.enabled_individual).when_stabilized(),
+                Rc::clone(&self.mute_state).when_stabilized(),
             ])
             .map(|_| ()),
         )
@@ -278,18 +281,10 @@ impl State {
     /// Returns [`Future`] which will be resolved when gUM/gDM request for this
     /// [`State`] will be resolved.
     ///
-    /// [`Result`] returned by this [`Future`] will be the same as result of the
-    /// gUM/gDM request.
-    ///
-    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for this [`State`].
-    ///
     /// [`Future`]: std::future::Future
-    /// [`Result`]: std::result::Result
     pub fn local_stream_update_result(
         &self,
-    ) -> LocalBoxFuture<'static, std::result::Result<(), Traced<PeerError>>>
-    {
+    ) -> LocalBoxFuture<'static, peer::Result<()>> {
         let mut local_track_state_rx = self.local_track_state.subscribe();
         Box::pin(async move {
             while let Some(s) = local_track_state_rx.next().await {
@@ -340,14 +335,11 @@ impl State {
     /// and [`mute_state`] will be stabilized.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(
-            future::join_all(vec![
-                self.enabled_individual.when_stabilized(),
-                self.mute_state.when_stabilized(),
-            ])
-            .map(|_| ()),
-        )
+    pub fn when_stabilized(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            Rc::clone(&self.enabled_individual).when_stabilized().into(),
+            Rc::clone(&self.mute_state).when_stabilized().into(),
+        ])
     }
 
     /// Indicates whether local `MediaStream` update needed for this [`State`].

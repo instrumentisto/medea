@@ -11,8 +11,7 @@ use async_recursion::async_recursion;
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use futures::{
-    channel::mpsc, future, future::LocalBoxFuture, FutureExt as _,
-    StreamExt as _, TryFutureExt as _,
+    channel::mpsc, future, FutureExt as _, StreamExt as _, TryFutureExt as _,
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -261,7 +260,7 @@ impl RoomHandle {
         // without additional requests.
         let _tracks_handles = if direction_send && enabling {
             inner
-                .get_local_track_handles(kind, source_kind)
+                .get_local_tracks(kind, source_kind)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?
         } else {
@@ -1068,7 +1067,7 @@ impl InnerRoom {
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
     ) -> Result<(), Traced<RoomError>> {
-        let stream_upd_sub = desired_states
+        let stream_upd_sub: HashMap<PeerId, HashSet<TrackId>> = desired_states
             .iter()
             .map(|(id, states)| {
                 (
@@ -1127,44 +1126,25 @@ impl InnerRoom {
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.local_stream_update_result(stream_upd_sub)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
+        future::try_join_all(stream_upd_sub.into_iter().filter_map(
+            |(id, tracks_ids)| {
+                Some(
+                    self.peers
+                        .state()
+                        .get(id)?
+                        .local_stream_update_result(tracks_ids)
+                        .map_err(tracerr::map_from_and_wrap!( => PeerError)),
+                )
+            },
+        ))
+        .map(|r| r.map(|_| ()))
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(())
     }
 
-    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`TrackId`]s will be resolved.
-    ///
-    /// [`Result`] returned by this [`Future`] will be the same as result of the
-    /// gUM/gDM request.
-    ///
-    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`TrackId`]s.
-    ///
-    /// [`Future`]: std::future::Future
-    fn local_stream_update_result(
-        &self,
-        ids: HashMap<PeerId, HashSet<TrackId>>,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
-        Box::pin(
-            future::try_join_all(ids.into_iter().filter_map(
-                |(id, tracks_ids)| {
-                    Some(
-                        self.peers
-                            .state()
-                            .get(id)?
-                            .local_stream_update_result(tracks_ids)
-                            .map_err(tracerr::map_from_and_wrap!()),
-                    )
-                },
-            ))
-            .map(|r| r.map(|_| ())),
-        )
-    }
-
-    /// Returns [`local::TrackHandle`]s for the provided [`MediaKind`] and
+    /// Returns [`local::Track`]s for the provided [`MediaKind`] and
     /// [`MediaSourceKind`].
     ///
     /// If [`MediaSourceKind`] is [`None`] then [`local::TrackHandle`]s for all
@@ -1179,7 +1159,7 @@ impl InnerRoom {
     /// [`MediaStreamSettings`].
     ///
     /// [`MediaStreamSettings`]: crate::MediaStreamSettings
-    async fn get_local_track_handles(
+    async fn get_local_tracks(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
@@ -1192,7 +1172,7 @@ impl InnerRoom {
             .collect::<Result<Vec<_>, _>>()
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        let mut tracks_handles = Vec::new();
+        let mut result = Vec::new();
         for req in requests {
             let tracks = self
                 .media_manager
@@ -1210,11 +1190,11 @@ impl InnerRoom {
                     self.on_local_track
                         .call(local::JsTrack::new(Rc::clone(&track)));
                 }
-                tracks_handles.push(track);
+                result.push(track);
             }
         }
 
-        Ok(tracks_handles)
+        Ok(result)
     }
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided

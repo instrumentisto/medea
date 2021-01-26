@@ -3,10 +3,8 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use futures::{
-    future,
-    future::{Either, LocalBoxFuture},
-    stream::LocalBoxStream,
-    FutureExt as _, StreamExt as _,
+    future, future::Either, stream::LocalBoxStream, FutureExt as _,
+    StreamExt as _,
 };
 use medea_reactive::{Processed, ProgressableCell};
 use wasm_bindgen_futures::spawn_local;
@@ -229,11 +227,13 @@ where
     /// be transited to the [`TransitableState::Stable`].
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        let stable = self.subscribe_stable();
-        Box::pin(
-            async move { stable.fuse().select_next_some().map(|_| ()).await },
-        )
+    pub fn when_stabilized(self: Rc<Self>) -> Processed<'static, ()> {
+        Processed::new(Box::new(move || {
+            let stable = self.subscribe_stable();
+            Box::pin(async move {
+                stable.fuse().select_next_some().map(|_| ()).await
+            })
+        }))
     }
 
     /// Updates [`TransitableStateController::state`].
