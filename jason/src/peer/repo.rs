@@ -1,11 +1,16 @@
 //! Component responsible for the [`peer::Component`] creating and removing.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{
     channel::mpsc, future, future::LocalBoxFuture, FutureExt as _, TryFutureExt,
 };
-use medea_client_api_proto::{MediaSourceKind, PeerId};
+use medea_client_api_proto::{MediaSourceKind, PeerId, TrackId};
 use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
@@ -255,28 +260,31 @@ impl State {
     }
 
     /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    /// provided [`TrackId`]s will be resolved.
     ///
     /// [`Result`] returned by this [`Future`] will be the same as result of the
     /// gUM/gDM request.
     ///
     /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
-    ///
-    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
-    /// [`MediaSourceKind`]s.
+    /// requests are running for the provided [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
     pub fn local_stream_update_result(
         &self,
-        kind: MediaKind,
-        source_kind: Option<MediaSourceKind>,
+        ids: HashMap<PeerId, HashSet<TrackId>>,
     ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        let peers = self.0.borrow();
         Box::pin(
-            future::try_join_all(self.0.borrow().values().map(|p| {
-                p.local_stream_update_result(kind, source_kind)
-                    .map_err(tracerr::map_from_and_wrap!())
-            }))
+            future::try_join_all(ids.into_iter().filter_map(
+                |(id, tracks_ids)| {
+                    Some(
+                        peers
+                            .get(&id)?
+                            .local_stream_update_result(tracks_ids)
+                            .map_err(tracerr::map_from_and_wrap!()),
+                    )
+                },
+            ))
             .map(|r| r.map(|_| ())),
         )
     }

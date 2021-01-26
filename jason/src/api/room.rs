@@ -283,45 +283,30 @@ impl RoomHandle {
             source_kind,
             new_state,
         ) {
-            inner
+            if let Err(e) = inner
                 .toggle_media_state(new_state, kind, direction, source_kind)
                 .await
-                .map_err::<Traced<RoomError>, _>(|e| {
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+            {
+                if send_enabling {
                     inner.set_constraints_media_state(
                         new_state.opposite(),
                         kind,
                         direction,
                         source_kind,
                     );
-                    tracerr::new!(e)
-                })?;
-        }
+                    inner
+                        .toggle_media_state(
+                            new_state.opposite(),
+                            kind,
+                            direction,
+                            source_kind,
+                        )
+                        .await?;
+                }
 
-        if send_enabling {
-            let res = inner
-                .peers
-                .state()
-                .local_stream_update_result(kind, source_kind)
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError));
-            if res.is_err() {
-                inner.set_constraints_media_state(
-                    new_state.opposite(),
-                    kind,
-                    direction,
-                    source_kind,
-                );
-                inner
-                    .toggle_media_state(
-                        new_state.opposite(),
-                        kind,
-                        direction,
-                        source_kind,
-                    )
-                    .await?;
+                return Err(e.into());
             }
-
-            res?;
         }
 
         Ok(())
@@ -1088,6 +1073,12 @@ impl InnerRoom {
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
     ) -> Result<(), Traced<RoomError>> {
+        let stream_upd_sub = desired_states
+            .iter()
+            .map(|(id, states)| {
+                (*id, states.iter().map(|(id, _)| *id).collect())
+            })
+            .collect();
         future::try_join_all(
             desired_states
                 .into_iter()
@@ -1123,6 +1114,13 @@ impl InnerRoom {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
+
+        self.peers
+            .state()
+            .local_stream_update_result(stream_upd_sub)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
     }
 
