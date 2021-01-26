@@ -1141,7 +1141,7 @@ impl InnerRoom {
     /// requests are running for the provided [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
-    pub fn local_stream_update_result(
+    fn local_stream_update_result(
         &self,
         ids: HashMap<PeerId, HashSet<TrackId>>,
     ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
@@ -1176,11 +1176,11 @@ impl InnerRoom {
     /// [`MediaStreamSettings`].
     ///
     /// [`MediaStreamSettings`]: crate::MediaStreamSettings
-    pub async fn get_local_track_handles(
+    async fn get_local_track_handles(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<Vec<local::TrackHandle>, Traced<RoomError>> {
+    ) -> Result<Vec<Rc<local::Track>>, Traced<RoomError>> {
         let requests: Vec<_> = self
             .peers
             .get_all()
@@ -1207,7 +1207,7 @@ impl InnerRoom {
                     self.on_local_track
                         .call(local::JsTrack::new(Rc::clone(&track)));
                 }
-                tracks_handles.push(track.into());
+                tracks_handles.push(track);
             }
         }
 
