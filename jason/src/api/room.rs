@@ -104,15 +104,17 @@ impl RoomCloseReason {
 }
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display, Clone, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
+    #[from(ignore)]
     CallbackNotSet(&'static str),
 
     /// Returned if the previously added local media tracks does not satisfy
     /// the tracks sent from the media server.
     #[display(fmt = "Invalid local tracks: {}", _0)]
+    #[from(ignore)]
     InvalidLocalTracks(#[js(cause)] PeerError),
 
     /// Returned if [`PeerConnection`] cannot receive the local tracks from
@@ -120,15 +122,18 @@ pub enum RoomError {
     ///
     /// [`MediaManager`]: crate::media::MediaManager
     #[display(fmt = "Failed to get local tracks: {}", _0)]
+    #[from(ignore)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
+    #[from(ignore)]
     NoSuchPeer(PeerId),
 
     /// Returned if an error occurred during the WebRTC signaling process
     /// with remote peer.
     #[display(fmt = "Some PeerConnection error: {}", _0)]
+    #[from(ignore)]
     PeerConnectionError(#[js(cause)] PeerError),
 
     /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
@@ -140,6 +145,7 @@ pub enum RoomError {
     ///
     /// [`track`]: crate::media::track
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
+    #[from(ignore)]
     FailedTrackPatch(TrackId),
 
     /// Typically, returned if [`RoomHandle::disable_audio`]-like functions
@@ -173,27 +179,6 @@ impl From<PeerError> for RoomError {
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
         }
-    }
-}
-
-impl From<MediaConnectionsError> for RoomError {
-    #[inline]
-    fn from(e: MediaConnectionsError) -> Self {
-        Self::MediaConnections(e)
-    }
-}
-
-impl From<SessionError> for RoomError {
-    #[inline]
-    fn from(e: SessionError) -> Self {
-        Self::SessionError(e)
-    }
-}
-
-impl From<MediaManagerError> for RoomError {
-    #[inline]
-    fn from(e: MediaManagerError) -> Self {
-        Self::MediaManagerError(e)
     }
 }
 
