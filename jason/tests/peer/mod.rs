@@ -1346,7 +1346,7 @@ mod ice_restart {
         peers
             .first_peer
             .state()
-            .sdp_offer_applied(&sdp_offer_before);
+            .apply_local_sdp(sdp_offer_before.clone());
         peers.first_peer.state().reset_negotiation_role();
         crate::delay_for(100).await;
         peers.first_peer.state().restart_ice();
@@ -1395,7 +1395,7 @@ mod ice_restart {
         peers
             .first_peer
             .state()
-            .sdp_offer_applied(&sdp_offer_before);
+            .apply_local_sdp(sdp_offer_before.clone());
         peers.first_peer.state().reset_negotiation_role();
         delay_for(100).await;
         let mut proto_state = peers.first_peer.state().as_proto();

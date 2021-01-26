@@ -1,4 +1,4 @@
-//! Implementation of the [`PeerComponent`].
+//! Implementation of the [`Component`].
 
 mod ice_candidates;
 mod local_sdp;
@@ -30,7 +30,7 @@ use self::{
     tracks_repository::TracksRepository,
 };
 
-/// Synchronization state of the [`PeerComponent`].
+/// Synchronization state of the [`Component`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SyncState {
     /// State desynced, and should be synced on RPC reconnect.
@@ -43,7 +43,7 @@ pub enum SyncState {
     Synced,
 }
 
-/// Negotiation state of the [`PeerComponent`].
+/// Negotiation state of the [`Component`].
 ///
 /// ```ignore
 ///           +--------+
@@ -78,42 +78,42 @@ pub enum SyncState {
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NegotiationState {
-    /// Means that [`PeerComponent`] is new or negotiation completed.
+    /// Means that [`Component`] is new or negotiation completed.
     Stable,
 
-    /// [`PeerComponent`] waits for local SDP offer generating.
+    /// [`Component`] waits for local SDP offer generating.
     WaitLocalSdp,
 
-    /// [`PeerComponent`] waits for local SDP approve by server.
+    /// [`Component`] waits for local SDP approve by server.
     WaitLocalSdpApprove,
 
-    /// [`PeerComponent`] waits for remote SDP offer.
+    /// [`Component`] waits for remote SDP offer.
     WaitRemoteSdp,
 }
 
 /// State of the [`Component`].
 #[derive(Debug)]
 pub struct State {
-    /// ID of the [`PeerComponent`].
+    /// ID of the [`Component`].
     id: Id,
 
-    /// All [`sender::State`]s of this [`PeerComponent`].
+    /// All [`sender::State`]s of this [`Component`].
     senders: TracksRepository<sender::State>,
 
-    /// All [`receiver::State`]s of this [`PeerComponent`].
+    /// All [`receiver::State`]s of this [`Component`].
     receivers: TracksRepository<receiver::State>,
 
-    /// Flag which indicates that this [`PeerComponent`] should relay all media
+    /// Flag which indicates that this [`Component`] should relay all media
     /// through a TURN server forcibly.
     force_relay: bool,
 
-    /// List of [`IceServer`]s which this [`PeerComponent`] should use.
+    /// List of [`IceServer`]s which this [`Component`] should use.
     ice_servers: Vec<IceServer>,
 
-    /// Current [`NegotiationRole`] of this [`PeerComponent`].
+    /// Current [`NegotiationRole`] of this [`Component`].
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
 
-    /// Negotiation state of the [`PeerComponent`].
+    /// Negotiation state of the [`Component`].
     negotiation_state: ObservableCell<NegotiationState>,
 
     local_sdp: LocalSdp,
@@ -123,10 +123,10 @@ pub struct State {
     /// Flag which indicates that ICE restart should be performed.
     restart_ice: Cell<bool>,
 
-    /// All [`IceCandidate`]s of this [`PeerComponent`].
+    /// All [`IceCandidate`]s of this [`Component`].
     ice_candidates: IceCandidates,
 
-    /// Synchronization state of the [`PeerComponent`].
+    /// Synchronization state of the [`Component`].
     sync_state: ObservableCell<SyncState>,
 }
 
@@ -238,7 +238,7 @@ impl State {
         self.ice_candidates.add(ice_candidate);
     }
 
-    /// Marks current [`LocalSdp`] as approved by server.
+    /// Marks current local SDP as approved by server.
     #[inline]
     pub fn apply_local_sdp(&self, sdp: String) {
         self.local_sdp.approved_set(sdp);
@@ -246,7 +246,7 @@ impl State {
 
     /// Stops all timeouts of the [`State`].
     ///
-    /// Stops [`LocalSdp`] rollback timeout.
+    /// Stops local SDP rollback timeout.
     #[inline]
     pub fn stop_timeouts(&self) {
         self.local_sdp.stop_timeout();
@@ -254,7 +254,7 @@ impl State {
 
     /// Resumes all timeouts of the [`State`].
     ///
-    /// Resumes [`LocalSdp`] rollback timeout.
+    /// Resumes local SDP rollback timeout.
     #[inline]
     pub fn resume_timeouts(&self) {
         self.local_sdp.resume_timeout();
@@ -399,14 +399,7 @@ impl State {
         self.local_sdp.current()
     }
 
-    /// Marks current [`LocalSdp`] as approved by server.
-    #[inline]
-    pub fn sdp_offer_applied(&self, sdp_offer: &str) {
-        // TODO: take String
-        self.local_sdp.approved_set(sdp_offer.to_string());
-    }
-
-    /// Notifies [`PeerComponent`] about RPC connection loss.
+    /// Notifies [`Component`] about RPC connection loss.
     #[inline]
     pub fn connection_lost(&self) {
         self.sync_state.set(SyncState::Desynced);
@@ -414,7 +407,7 @@ impl State {
         self.receivers.connection_lost();
     }
 
-    /// Notifies [`PeerComponent`] about RPC connection restore.
+    /// Notifies [`Component`] about RPC connection restore.
     #[inline]
     pub fn reconnected(&self) {
         self.sync_state.set(SyncState::Syncing);

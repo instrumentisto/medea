@@ -44,7 +44,7 @@ pub trait SynchronizableState {
 
 /// Abstraction over state which can be updated by client side.
 pub trait Updatable {
-    /// Returns [`Future`] which will be resolved when this [`Updateable`] will
+    /// Returns [`Future`] which will be resolved when this [`Updatable`] will
     /// resolve his intentions.
     fn when_stabilized(&self) -> LocalBoxFuture<'static, ()>;
 

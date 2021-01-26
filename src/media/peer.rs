@@ -1567,7 +1567,10 @@ pub mod tests {
         assert_eq!(peer_id, PeerId(0));
         assert_eq!(changes.len(), 2);
         assert!(peer.context.track_changes_queue.is_empty());
-        assert!(peer.context.need_renegotiation);
+        assert!(matches!(
+            peer.context.on_negotiation_finish,
+            OnNegotiationFinish::Renegotiate
+        ));
 
         let peer = peer.set_local_offer(String::new());
         peer.set_remote_answer(String::new());
@@ -2037,7 +2040,7 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-            peer.set_ice_user(IceUser::new(
+            peer.set_ice_user(IceUser::new_static(
                 String::new(),
                 String::new(),
                 String::new(),

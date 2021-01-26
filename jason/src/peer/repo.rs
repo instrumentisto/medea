@@ -257,8 +257,7 @@ impl State {
         self.0.borrow_mut().remove(&peer_id);
     }
 
-    /// Updates this [`PeersState`] with a provided
-    /// [`proto::state::Room`].
+    /// Updates this [`State`] with a provided [`proto::state::Room`].
     pub fn apply(
         &self,
         state: proto::state::Room,

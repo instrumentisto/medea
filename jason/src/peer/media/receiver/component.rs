@@ -36,13 +36,13 @@ pub type Component = component::Component<State, Receiver>;
 pub struct State {
     id: TrackId,
 
-    /// Mid of this [`ReceiverComponent`].
+    /// Mid of this [`Component`].
     mid: Option<String>,
 
-    /// [`MediaType`] of this [`ReceiverComponent`].
+    /// [`MediaType`] of this [`Component`].
     media_type: MediaType,
 
-    /// `Member`s which sends media to this [`ReceiverComponent`].
+    /// `Member`s which sends media to this [`Component`].
     sender_id: MemberId,
 
     enabled_individual: Rc<MediaExchangeStateController>,
