@@ -1,19 +1,22 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use derive_more::From;
 use futures::{
     future, future::LocalBoxFuture, stream::LocalBoxStream, FutureExt as _,
     TryFutureExt,
 };
-use medea_client_api_proto::{MediaSourceKind, TrackId};
+use medea_client_api_proto::TrackId;
 use medea_reactive::{AllProcessed, Guarded, ProgressableHashMap};
 use tracerr::Traced;
 
 use crate::{
     media::LocalTracksConstraints,
-    peer::{media::sender, PeerError, TransceiverSide},
+    peer::{media::sender, PeerError},
     utils::{AsProtoState, SynchronizableState, Updatable},
-    MediaKind,
 };
 
 use super::receiver;
@@ -90,36 +93,28 @@ impl TracksRepository<sender::State> {
     }
 
     /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    /// provided [`TrackId`]s will be resolved.
     ///
     /// [`Result`] returned by this [`Future`] will be the same as result of the
     /// gUM/gDM request.
     ///
     /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
-    ///
-    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
-    /// [`MediaSourceKind`]s.
+    /// requests are running for the provided [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
     pub fn local_stream_update_result(
         &self,
-        kind: MediaKind,
-        source_kind: Option<MediaSourceKind>,
+        tracks_ids: HashSet<TrackId>,
     ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        let senders = self.0.borrow();
         Box::pin(
-            future::try_join_all(self.0.borrow().values().filter_map(|s| {
-                if s.media_kind() == kind
-                    && source_kind.map_or(true, |k| k == s.source_kind())
-                    && s.is_local_stream_update_needed()
-                {
-                    Some(
-                        s.local_stream_update_result()
-                            .map_err(tracerr::map_from_and_wrap!()),
-                    )
-                } else {
-                    None
-                }
+            future::try_join_all(tracks_ids.into_iter().filter_map(|id| {
+                Some(
+                    senders
+                        .get(&id)?
+                        .local_stream_update_result()
+                        .map_err(tracerr::map_from_and_wrap!()),
+                )
             }))
             .map(|r| r.map(|_| ())),
         )

@@ -22,7 +22,7 @@ IMAGE_NAME := $(strip \
 	$(image))))
 
 RUST_VER := 1.49
-CHROME_VERSION := 87.0
+CHROME_VERSION := 88.0
 FIREFOX_VERSION := 84.0.2
 
 crate-dir = .

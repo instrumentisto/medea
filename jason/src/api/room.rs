@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ops::Deref as _,
     rc::{Rc, Weak},
 };
@@ -10,7 +10,10 @@ use std::{
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future, StreamExt as _};
+use futures::{
+    channel::mpsc, future, future::LocalBoxFuture, FutureExt as _,
+    StreamExt as _, TryFutureExt as _,
+};
 use js_sys::Promise;
 use medea_client_api_proto::{
     state as proto_state, Command, ConnectionQualityScore, Event as RpcEvent,
@@ -107,15 +110,17 @@ impl RoomCloseReason {
 }
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display, Clone, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
+    #[from(ignore)]
     CallbackNotSet(&'static str),
 
     /// Returned if the previously added local media tracks does not satisfy
     /// the tracks sent from the media server.
     #[display(fmt = "Invalid local tracks: {}", _0)]
+    #[from(ignore)]
     InvalidLocalTracks(#[js(cause)] PeerError),
 
     /// Returned if [`PeerConnection`] cannot receive the local tracks from
@@ -123,15 +128,18 @@ pub enum RoomError {
     ///
     /// [`MediaManager`]: crate::media::MediaManager
     #[display(fmt = "Failed to get local tracks: {}", _0)]
+    #[from(ignore)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
+    #[from(ignore)]
     NoSuchPeer(PeerId),
 
     /// Returned if an error occurred during the WebRTC signaling process
     /// with remote peer.
     #[display(fmt = "Some PeerConnection error: {}", _0)]
+    #[from(ignore)]
     PeerConnectionError(#[js(cause)] PeerError),
 
     /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
@@ -143,6 +151,7 @@ pub enum RoomError {
     ///
     /// [`track`]: crate::media::track
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
+    #[from(ignore)]
     FailedTrackPatch(TrackId),
 
     /// Typically, returned if [`RoomHandle::disable_audio`]-like functions
@@ -176,27 +185,6 @@ impl From<PeerError> for RoomError {
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
         }
-    }
-}
-
-impl From<MediaConnectionsError> for RoomError {
-    #[inline]
-    fn from(e: MediaConnectionsError) -> Self {
-        Self::MediaConnections(e)
-    }
-}
-
-impl From<SessionError> for RoomError {
-    #[inline]
-    fn from(e: SessionError) -> Self {
-        Self::SessionError(e)
-    }
-}
-
-impl From<MediaManagerError> for RoomError {
-    #[inline]
-    fn from(e: MediaManagerError) -> Self {
-        Self::MediaManagerError(e)
     }
 }
 
@@ -261,18 +249,18 @@ impl RoomHandle {
             source_kind,
         );
 
-        let send_direction = matches!(direction, TrackDirection::Send);
+        let direction_send = matches!(direction, TrackDirection::Send);
         let enabling = matches!(
             new_state,
             MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
         );
-        let send_enabling = send_direction && enabling;
 
-        // Try to get needed local MediaStreamTracks and hold they until Peers
-        // will start use they.
-        let _tracks_handles = if send_enabling {
+        // Perform gUM / gDM right away, so we can fail fast without touching
+        // senders states and starting all required messaging.
+        // Hold tracks through all process, to ensure that they will be reused
+        // without additional requests.
+        let _tracks_handles = if direction_send && enabling {
             inner
-                .peers
                 .get_local_track_handles(kind, source_kind)
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))?
@@ -286,45 +274,30 @@ impl RoomHandle {
             source_kind,
             new_state,
         ) {
-            inner
+            if let Err(e) = inner
                 .toggle_media_state(new_state, kind, direction, source_kind)
                 .await
-                .map_err::<Traced<RoomError>, _>(|e| {
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+            {
+                if direction_send && enabling {
                     inner.set_constraints_media_state(
                         new_state.opposite(),
                         kind,
                         direction,
                         source_kind,
                     );
-                    tracerr::new!(e)
-                })?;
-        }
+                    inner
+                        .toggle_media_state(
+                            new_state.opposite(),
+                            kind,
+                            direction,
+                            source_kind,
+                        )
+                        .await?;
+                }
 
-        if send_enabling {
-            let res = inner
-                .peers
-                .state()
-                .local_stream_update_result(kind, source_kind)
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError));
-            if res.is_err() {
-                inner.set_constraints_media_state(
-                    new_state.opposite(),
-                    kind,
-                    direction,
-                    source_kind,
-                );
-                inner
-                    .toggle_media_state(
-                        new_state.opposite(),
-                        kind,
-                        direction,
-                        source_kind,
-                    )
-                    .await?;
+                return Err(e.into());
             }
-
-            res?;
         }
 
         Ok(())
@@ -772,6 +745,9 @@ struct InnerRoom {
     /// [`peer::Component`]s repository.
     peers: peer::repo::Component,
 
+    /// [`MediaManager`] for pre-obtaining [`local::Track`]s.
+    media_manager: Rc<MediaManager>,
+
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
     /// [`Connection`]: crate::api::Connection
@@ -992,7 +968,7 @@ impl InnerRoom {
         Self {
             peers: peer::repo::Component::new(
                 Rc::new(peer::repo::Repository::new(
-                    media_manager,
+                    Rc::clone(&media_manager),
                     peer_event_sender,
                     send_constraints.clone(),
                     Rc::clone(&recv_constraints),
@@ -1000,6 +976,7 @@ impl InnerRoom {
                 )),
                 Rc::new(peer::repo::State::default()),
             ),
+            media_manager,
             rpc,
             send_constraints,
             recv_constraints,
@@ -1091,6 +1068,29 @@ impl InnerRoom {
         &self,
         desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
     ) -> Result<(), Traced<RoomError>> {
+        let stream_upd_sub = desired_states
+            .iter()
+            .map(|(id, states)| {
+                (
+                    *id,
+                    states
+                        .iter()
+                        .filter_map(|(id, state)| {
+                            if matches!(
+                                state,
+                                MediaState::MediaExchange(
+                                    media_exchange_state::Stable::Enabled
+                                )
+                            ) {
+                                Some(*id)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
         future::try_join_all(
             desired_states
                 .into_iter()
@@ -1126,7 +1126,95 @@ impl InnerRoom {
         )
         .await
         .map_err(tracerr::map_from_and_wrap!())?;
+
+        self.local_stream_update_result(stream_upd_sub)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
         Ok(())
+    }
+
+    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
+    /// provided [`TrackId`]s will be resolved.
+    ///
+    /// [`Result`] returned by this [`Future`] will be the same as result of the
+    /// gUM/gDM request.
+    ///
+    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
+    /// requests are running for the provided [`TrackId`]s.
+    ///
+    /// [`Future`]: std::future::Future
+    fn local_stream_update_result(
+        &self,
+        ids: HashMap<PeerId, HashSet<TrackId>>,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
+        Box::pin(
+            future::try_join_all(ids.into_iter().filter_map(
+                |(id, tracks_ids)| {
+                    Some(
+                        self.peers
+                            .state()
+                            .get(id)?
+                            .local_stream_update_result(tracks_ids)
+                            .map_err(tracerr::map_from_and_wrap!()),
+                    )
+                },
+            ))
+            .map(|r| r.map(|_| ())),
+        )
+    }
+
+    /// Returns [`local::TrackHandle`]s for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If [`MediaSourceKind`] is [`None`] then [`local::TrackHandle`]s for all
+    /// needed [`MediaSourceKind`]s will be returned.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MediaManagerError`] if failed to obtain
+    /// [`local::TrackHandle`] from the [`MediaManager`].
+    ///
+    /// Errors with [`RoomError::PeerConnectionError`] if failed to get
+    /// [`MediaStreamSettings`].
+    ///
+    /// [`MediaStreamSettings`]: crate::MediaStreamSettings
+    async fn get_local_track_handles(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<Vec<Rc<local::Track>>, Traced<RoomError>> {
+        let requests: Vec<_> = self
+            .peers
+            .get_all()
+            .into_iter()
+            .filter_map(|p| p.get_media_settings(kind, source_kind).transpose())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        let mut tracks_handles = Vec::new();
+        for req in requests {
+            let tracks = self
+                .media_manager
+                .get_tracks(req)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+                .map_err(|e| {
+                    self.on_failed_local_media
+                        .call(JasonError::from(e.clone()));
+
+                    e
+                })?;
+            for (track, is_new) in tracks {
+                if is_new {
+                    self.on_local_track
+                        .call(local::JsTrack::new(Rc::clone(&track)));
+                }
+                tracks_handles.push(track);
+            }
+        }
+
+        Ok(tracks_handles)
     }
 
     /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided

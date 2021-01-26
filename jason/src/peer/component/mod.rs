@@ -5,12 +5,12 @@ mod local_sdp;
 mod tracks_repository;
 mod watchers;
 
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, collections::HashSet, rc::Rc};
 
-use futures::future::LocalBoxFuture;
+use futures::{future::LocalBoxFuture, TryFutureExt as _};
 use medea_client_api_proto::{
     self as proto, state as proto_state, IceCandidate, IceServer,
-    MediaSourceKind, NegotiationRole, PeerId as Id, TrackId,
+    NegotiationRole, PeerId as Id, TrackId,
 };
 use medea_reactive::{AllProcessed, ObservableCell, ProgressableCell};
 use tracerr::Traced;
@@ -22,7 +22,6 @@ use crate::{
         LocalStreamUpdateCriteria, PeerConnection, PeerError,
     },
     utils::{component, AsProtoState, SynchronizableState, Updatable},
-    MediaKind,
 };
 
 use self::{
@@ -261,24 +260,24 @@ impl State {
     }
 
     /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`MediaKind`]/[`MediaSourceKind`] will be resolved.
+    /// provided [`TrackId`]s will be resolved.
     ///
     /// [`Result`] returned by this [`Future`] will be the same as result of the
     /// gUM/gDM request.
     ///
     /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`MediaKind`]/[`MediaSourceKind`].
-    ///
-    /// If provided [`None`] [`MediaSourceKind`] then result will be for all
-    /// [`MediaSourceKind`]s.
+    /// requests are running for the provided [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
     pub fn local_stream_update_result(
         &self,
-        kind: MediaKind,
-        source_kind: Option<MediaSourceKind>,
+        tracks_ids: HashSet<TrackId>,
     ) -> LocalBoxFuture<'static, Result<(), Traced<PeerError>>> {
-        self.senders.local_stream_update_result(kind, source_kind)
+        Box::pin(
+            self.senders
+                .local_stream_update_result(tracks_ids)
+                .map_err(tracerr::map_from_and_wrap!()),
+        )
     }
 
     /// Returns [`Future`] resolving when all [`sender::State`]'s and
