@@ -35,19 +35,11 @@ pub type Component = component::Component<State, Receiver>;
 #[derive(Debug)]
 pub struct State {
     id: TrackId,
-
-    /// Mid of this [`Component`].
     mid: Option<String>,
-
-    /// [`MediaType`] of this [`Component`].
     media_type: MediaType,
-
-    /// `Member`s which sends media to this [`Component`].
     sender_id: MemberId,
-
     enabled_individual: Rc<MediaExchangeStateController>,
     enabled_general: ProgressableCell<media_exchange_state::Stable>,
-
     sync_state: ObservableCell<SyncState>,
 }
 
