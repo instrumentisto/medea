@@ -1,3 +1,5 @@
+//! Implementation of the [`Component`] watchers.
+
 use std::rc::Rc;
 
 use futures::{future, StreamExt as _};

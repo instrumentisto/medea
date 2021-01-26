@@ -133,22 +133,6 @@ impl From<&State> for proto::state::Receiver {
     }
 }
 
-impl From<proto::state::Receiver> for State {
-    fn from(from: proto::state::Receiver) -> Self {
-        Self {
-            id: from.id,
-            mid: from.mid,
-            media_type: from.media_type,
-            sender_id: from.sender_id,
-            enabled_individual: MediaExchangeStateController::new(
-                from.enabled_individual.into(),
-            ),
-            enabled_general: ProgressableCell::new(from.enabled_general.into()),
-            sync_state: ObservableCell::new(SyncState::Synced),
-        }
-    }
-}
-
 impl State {
     /// Returns [`State`] with a provided data.
     #[inline]

@@ -1,3 +1,6 @@
+//! Implementation of the store for the [`sender::State`]s and
+//! [`receiver::State`]s.
+
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -59,13 +62,6 @@ impl<S> TracksRepository<S> {
     }
 }
 
-#[cfg(feature = "mockable")]
-impl<S> TracksRepository<S> {
-    pub fn when_insert_processed(&self) -> medea_reactive::Processed<'static> {
-        self.0.borrow().when_insert_processed()
-    }
-}
-
 impl TracksRepository<sender::State> {
     /// Returns all [`sender::State`]s which are requires local `MediaStream`
     /// update.
@@ -118,13 +114,6 @@ impl TracksRepository<sender::State> {
             }))
             .map(|r| r.map(|_| ())),
         )
-    }
-}
-
-#[cfg(feature = "mockable")]
-impl TracksRepository<receiver::State> {
-    pub fn stabilize_all(&self) {
-        self.0.borrow().values().for_each(|r| r.stabilize());
     }
 }
 
@@ -215,5 +204,21 @@ where
             .iter()
             .map(|(id, s)| (*id, s.as_proto()))
             .collect()
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl<S> TracksRepository<S> {
+    /// Waits until all track inserts will be processed.
+    pub fn when_insert_processed(&self) -> medea_reactive::Processed<'static> {
+        self.0.borrow().when_insert_processed()
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl TracksRepository<receiver::State> {
+    /// Stabilize all [`receiver::State`] from this [`State`].
+    pub fn stabilize_all(&self) {
+        self.0.borrow().values().for_each(|r| r.stabilize());
     }
 }

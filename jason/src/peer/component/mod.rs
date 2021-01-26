@@ -115,8 +115,10 @@ pub struct State {
     /// Negotiation state of the [`Component`].
     negotiation_state: ObservableCell<NegotiationState>,
 
+    /// Local session description of this [`Component`].
     local_sdp: LocalSdp,
 
+    /// Remote session description of this [`Component`].
     remote_sdp: ProgressableCell<Option<String>>,
 
     /// Flag which indicates that ICE restart should be performed.

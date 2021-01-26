@@ -1,3 +1,5 @@
+//! Implementation of the [`IceCandidate`]s store.
+
 use std::{cell::RefCell, collections::HashSet};
 
 use futures::stream::LocalBoxStream;

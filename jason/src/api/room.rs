@@ -1578,7 +1578,7 @@ impl EventHandler for InnerRoom {
         unreachable!("Room can't receive Event::RoomLeft")
     }
 
-    /// Updates [`PeerRepositoryState`] with a provided [`proto_state::Room`].
+    /// Updates [`peer::repo::State`] with a provided [`proto_state::Room`].
     #[inline]
     async fn on_state_synchronized(
         &self,
@@ -1790,7 +1790,7 @@ impl Room {
         self.0.peers.get(peer_id)
     }
 
-    /// Returns reference to the [`PeerRepositoryState`] of this [`Room`].
+    /// Returns reference to the [`peer::repo::State`] of this [`Room`].
     #[inline]
     pub fn peers_state(&self) -> Rc<peer::repo::State> {
         self.0.peers.state()

@@ -82,14 +82,14 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        self.send_event(
+        self.members.send_event_to_member(
             from_member_id,
             Event::LocalDescriptionApplied {
                 peer_id: from_peer_id,
                 sdp_offer,
             },
         )?;
-        self.send_event(to_member_id, event)
+        self.members.send_event_to_member(to_member_id, event)
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -126,14 +126,14 @@ impl CommandHandler for Room {
 
         self.peers.sync_peer_spec(from_peer_id)?;
 
-        self.send_event(
+        self.members.send_event_to_member(
             from_member_id,
             Event::LocalDescriptionApplied {
                 peer_id: from_peer_id,
                 sdp_offer: sdp_answer,
             },
         )?;
-        self.send_event(to_member_id, event)
+        self.members.send_event_to_member(to_member_id, event)
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
@@ -166,7 +166,7 @@ impl CommandHandler for Room {
             candidate,
         };
 
-        self.send_event(to_member_id, event)
+        self.members.send_event_to_member(to_member_id, event)
     }
 
     /// Adds new [`Peer`] connection metrics.

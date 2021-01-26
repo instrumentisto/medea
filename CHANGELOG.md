@@ -89,11 +89,8 @@ All user visible changes to this project will be documented in this file. This p
 [#153]: /../../pull/153
 [#155]: /../../pull/155
 [#156]: /../../pull/156
-<<<<<<< HEAD
 [#167]: /../../pull/167
-=======
 [#168]: /../../pull/168
->>>>>>> reactive-media-state
 
 
 

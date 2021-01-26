@@ -162,9 +162,10 @@ impl Handler<Synchronize> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let state = self.get_state(&msg.0);
-        if let Err(e) =
-            self.send_event(msg.0.clone(), Event::StateSynchronized { state })
-        {
+        if let Err(e) = self.members.send_event_to_member(
+            msg.0.clone(),
+            Event::StateSynchronized { state },
+        ) {
             error!("Failed to synchronize Member [id = {}]: {:?}", msg.0, e);
         }
     }

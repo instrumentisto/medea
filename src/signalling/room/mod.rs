@@ -180,38 +180,13 @@ impl Room {
         &self.id
     }
 
-    // TODO (evdokimovs): This function needed only for tests.
-    //                    Rollback it.
-    #[allow(clippy::missing_errors_doc)]
-    pub fn send_event(
-        &self,
-        member_id: MemberId,
-        e: Event,
-    ) -> Result<(), RoomError> {
-        self.members.send_event_to_member(member_id, e)?;
-        // if let Event::ConnectionQualityUpdated { .. } = e {
-        //     self.members.send_event_to_member(
-        //         member_id,
-        //        e,
-        //     )?;
-        // } else {
-        //     let state = self.get_state(&member_id);
-        //     self.members.send_event_to_member(
-        //         member_id,
-        //         Event::StateSynchronized { state },
-        //     )?;
-        // }
-
-        Ok(())
-    }
-
     /// Sends [`Event::PeersRemoved`] to [`Member`].
     fn send_peers_removed(
         &self,
         member_id: MemberId,
         removed_peers_ids: Vec<PeerId>,
     ) -> Result<(), RoomError> {
-        self.send_event(
+        self.members.send_event_to_member(
             member_id,
             Event::PeersRemoved {
                 peer_ids: removed_peers_ids,
@@ -331,7 +306,7 @@ impl Room {
         self.peers.add_peer(peer);
         self.peers.add_peer(partner_peer);
 
-        self.send_event(
+        self.members.send_event_to_member(
             member_id,
             Event::TracksApplied {
                 updates,
