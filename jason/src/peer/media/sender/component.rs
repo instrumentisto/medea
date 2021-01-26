@@ -13,6 +13,7 @@ use tracerr::Traced;
 use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
+        self,
         media::{media_exchange_state, mute_state, Result},
         MediaConnectionsError, MediaExchangeStateController, MediaState,
         MediaStateControllable, MuteStateController, PeerError, TrackEvent,
@@ -163,18 +164,10 @@ impl State {
     /// Returns [`Future`] which will be resolved when gUM/gDM request for this
     /// [`State`] will be resolved.
     ///
-    /// [`Result`] returned by this [`Future`] will be the same as result of the
-    /// gUM/gDM request.
-    ///
-    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for this [`State`].
-    ///
     /// [`Future`]: std::future::Future
-    /// [`Result`]: std::result::Result
     pub fn local_stream_update_result(
         &self,
-    ) -> LocalBoxFuture<'static, std::result::Result<(), Traced<PeerError>>>
-    {
+    ) -> LocalBoxFuture<'static, peer::Result<()>> {
         let mut local_track_state_rx = self.local_track_state.subscribe();
         Box::pin(async move {
             while let Some(s) = local_track_state_rx.next().await {
