@@ -23,21 +23,6 @@ use crate::{
 
 use super::{track::local, InputDeviceInfo};
 
-// TODO: Screen capture API (https://w3.org/TR/screen-capture/) is in draft
-//       stage atm, so there is no web-sys bindings for it.
-//       Discussion https://github.com/rustwasm/wasm-bindgen/issues/1950
-#[wasm_bindgen(inline_js = "export function get_display_media(media_devices, \
-                            constraints) { return \
-                            media_devices.getDisplayMedia(constraints) }")]
-extern "C" {
-    #[allow(clippy::needless_pass_by_value)]
-    #[wasm_bindgen(catch)]
-    fn get_display_media(
-        media_devices: &sys::MediaDevices,
-        constraints: &sys::MediaStreamConstraints,
-    ) -> std::result::Result<Promise, JsValue>;
-}
-
 /// Errors that may occur in a [`MediaManager`].
 #[derive(Clone, Debug, Display, JsCaused)]
 pub enum MediaManagerError {
@@ -286,7 +271,7 @@ impl InnerMediaManager {
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     async fn get_display_media(
         &self,
-        caps: sys::MediaStreamConstraints,
+        caps: sys::DisplayMediaStreamConstraints,
     ) -> Result<Vec<Rc<local::Track>>> {
         use MediaManagerError::{
             CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
@@ -300,7 +285,8 @@ impl InnerMediaManager {
             .map_err(tracerr::from_and_wrap!())?;
 
         let stream = JsFuture::from(
-            get_display_media(&media_devices, &caps)
+            media_devices
+                .get_display_media_with_constraints(&caps)
                 .map_err(JsError::from)
                 .map_err(GetDisplayMediaFailed)
                 .map_err(tracerr::from_and_wrap!())?,

@@ -646,13 +646,16 @@ pub enum MultiSourceTracksConstraints {
     /// Only [getDisplayMedia()][1] request is required.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    Display(sys::MediaStreamConstraints),
+    Display(sys::DisplayMediaStreamConstraints),
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    DeviceAndDisplay(sys::MediaStreamConstraints, sys::MediaStreamConstraints),
+    DeviceAndDisplay(
+        sys::MediaStreamConstraints,
+        sys::DisplayMediaStreamConstraints,
+    ),
 }
 
 impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
@@ -681,7 +684,7 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
                 constraints.display_video.constraints
             {
                 display_cons
-                    .get_or_insert_with(sys::MediaStreamConstraints::new)
+                    .get_or_insert_with(sys::DisplayMediaStreamConstraints::new)
                     .video(
                         &sys::MediaTrackConstraints::from(display_video_cons)
                             .into(),
