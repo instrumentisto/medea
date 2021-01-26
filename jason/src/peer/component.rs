@@ -284,29 +284,29 @@ impl State {
     /// Returns [`Future`] which will be resolved when all [`State::receivers`]
     /// will be stabilized meaning that all [`ReceiverComponent`]s won't contain
     /// any pending state change transitions.
-    fn when_all_receivers_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+    fn when_all_receivers_stabilized(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .receivers
             .borrow()
             .values()
-            .map(|s| s.when_stabilized())
+            .map(|s| s.when_stabilized().into())
             .collect();
 
-        Box::pin(futures::future::join_all(when_futs).map(|_| ()))
+        medea_reactive::when_all_processed(when_futs)
     }
 
     /// Returns [`Future`] which will be resolved when all [`State::senders`]
     /// will be stabilized meaning that all [`SenderComponent`]s won't contain
     /// any pending state change transitions.
-    fn when_all_senders_stabilized(&self) -> LocalBoxFuture<'static, ()> {
+    fn when_all_senders_stabilized(&self) -> AllProcessed<'static, ()> {
         let when_futs: Vec<_> = self
             .senders
             .borrow()
             .values()
-            .map(|s| s.when_stabilized())
+            .map(|s| s.when_stabilized().into())
             .collect();
 
-        Box::pin(futures::future::join_all(when_futs).map(|_| ()))
+        medea_reactive::when_all_processed(when_futs)
     }
 
     /// Returns [`Future`] resolving when all [`sender::State`]'s and
@@ -750,14 +750,18 @@ impl Component {
     ) -> Result<(), Traced<PeerError>> {
         match role {
             NegotiationRole::Offerer => {
-                futures::future::join(
-                    state.when_all_senders_processed(),
-                    state.when_all_receivers_processed(),
-                )
+                medea_reactive::when_all_processed(vec![
+                    state.when_all_senders_processed().into(),
+                    state.when_all_receivers_processed().into(),
+                ])
                 .await;
-                state.when_all_senders_stabilized().await;
-                state.when_all_receivers_stabilized().await;
-                state.when_all_updated().await;
+
+                medea_reactive::when_all_processed(vec![
+                    state.when_all_senders_stabilized().into(),
+                    state.when_all_receivers_stabilized().into(),
+                    state.when_all_updated().into(),
+                ])
+                .await;
 
                 let _ = state.update_local_stream(&peer).await;
 
@@ -774,8 +778,12 @@ impl Component {
                     state.when_all_senders_updated().into(),
                 ])
                 .await;
-                state.when_all_senders_stabilized().await;
-                state.when_all_receivers_stabilized().await;
+
+                medea_reactive::when_all_processed(vec![
+                    state.when_all_senders_stabilized().into(),
+                    state.when_all_receivers_stabilized().into(),
+                ])
+                .await;
 
                 let _ = state.update_local_stream(&peer).await;
 

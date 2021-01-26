@@ -2,12 +2,11 @@
 
 use std::rc::Rc;
 
-use futures::future::LocalBoxFuture;
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
 use medea_macro::watchers;
-use medea_reactive::{AllProcessed, Guarded, ProgressableCell};
+use medea_reactive::{AllProcessed, Guarded, Processed, ProgressableCell};
 
 use crate::{
     peer::{
@@ -131,8 +130,14 @@ impl State {
     /// will be stabilized.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        self.enabled_individual.when_stabilized()
+    pub fn when_stabilized(&self) -> Processed<'static> {
+        let controller = Rc::clone(&self.enabled_individual);
+        Processed::new(Box::new(move || {
+            let controller = Rc::clone(&controller);
+            Box::pin(async move {
+                controller.when_stabilized().await;
+            })
+        }))
     }
 }
 

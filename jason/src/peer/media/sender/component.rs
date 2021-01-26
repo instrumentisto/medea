@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::{future, future::LocalBoxFuture, FutureExt as _, StreamExt};
+use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto::{
     MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
 };
@@ -225,14 +225,11 @@ impl State {
     /// and [`mute_state`] will be stabilized.
     ///
     /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> LocalBoxFuture<'static, ()> {
-        Box::pin(
-            future::join_all(vec![
-                self.enabled_individual.when_stabilized(),
-                self.mute_state.when_stabilized(),
-            ])
-            .map(|_| ()),
-        )
+    pub fn when_stabilized(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            Rc::clone(&self.enabled_individual).when_stabilized().into(),
+            Rc::clone(&self.mute_state).when_stabilized().into(),
+        ])
     }
 
     /// Indicates whether local `MediaStream` update needed for this [`State`].
