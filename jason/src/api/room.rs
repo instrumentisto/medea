@@ -1076,7 +1076,13 @@ impl InnerRoom {
         let stream_upd_sub = desired_states
             .iter()
             .map(|(id, states)| {
-                (*id, states.iter().map(|(id, _)| *id).collect())
+                (*id, states.iter().filter_map(|(id, state)| {
+                    if matches!(state, MediaState::MediaExchange(media_exchange_state::Stable::Enabled)) {
+                        Some(*id)
+                    } else {
+                        None
+                    }
+                }).collect())
             })
             .collect();
         future::try_join_all(
