@@ -56,6 +56,9 @@ impl Transceiver {
         &self,
         new_track: Option<Rc<local::Track>>,
     ) -> Result<(), JsValue> {
+        if new_track.is_none() {
+            self.send_track.replace(None);
+        }
         let sys_track = new_track.as_ref().map(|t| t.sys_track());
         JsFuture::from(self.transceiver.sender().replace_track(sys_track))
             .await
