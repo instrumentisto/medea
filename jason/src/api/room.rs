@@ -258,16 +258,17 @@ impl RoomHandle {
             source_kind,
         );
 
-        let send_direction = matches!(direction, TrackDirection::Send);
+        let direction_send = matches!(direction, TrackDirection::Send);
         let enabling = matches!(
             new_state,
             MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
         );
-        let send_enabling = send_direction && enabling;
 
-        // Try to get needed local MediaStreamTracks and hold they until Peers
-        // will start use they.
-        let _tracks_handles = if send_enabling {
+        // Perform gUM / gDM right away, so we can fail fast without touching
+        // senders states and starting all required messaging.
+        // Hold tracks through all process, to ensure that they will be reused
+        // without additional requests.
+        let _tracks_handles = if direction_send && enabling {
             inner
                 .peers
                 .get_local_track_handles(kind, source_kind)
@@ -288,7 +289,7 @@ impl RoomHandle {
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
             {
-                if send_enabling {
+                if direction_send && enabling {
                     inner.set_constraints_media_state(
                         new_state.opposite(),
                         kind,

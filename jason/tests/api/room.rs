@@ -13,7 +13,7 @@ use futures::{
 use medea_client_api_proto::{
     Command, Direction, Event, IceConnectionState, MediaSourceKind, MediaType,
     MemberId, NegotiationRole, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatchEvent, TrackUpdate, VideoSettings,
+    TrackPatchCommand, TrackPatchEvent, TrackUpdate, VideoSettings,
 };
 use medea_jason::{
     api::Room,
@@ -35,16 +35,6 @@ use crate::{
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
-
-macro_rules! can_fail_in_firefox {
-    ($fut:expr) => {
-        if crate::is_firefox() {
-            let _ = $fut.await;
-        } else {
-            assert!($fut.await.is_ok());
-        }
-    };
-}
 
 /// Returns [`Room`] with [`MockRpcSession`] configured to emit events from
 /// provided stream and [`UnboundedReceiver`] of [`Command`]'s so you can assert
@@ -71,10 +61,16 @@ fn get_test_room(
 async fn get_test_room_and_exist_peer(
     tracks: Vec<Track>,
     media_stream_settings: Option<MediaStreamSettings>,
-) -> (Room, Rc<PeerConnection>, mpsc::UnboundedSender<Event>) {
+) -> (
+    Room,
+    Rc<PeerConnection>,
+    mpsc::UnboundedSender<Event>,
+    mpsc::UnboundedReceiver<Command>,
+) {
     let mut rpc = MockRpcSession::new();
 
     let (event_tx, event_rx) = mpsc::unbounded();
+    let (command_tx, command_rx) = mpsc::unbounded();
 
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
@@ -88,34 +84,37 @@ async fn get_test_room_and_exist_peer(
         Rc::new(RefCell::new(None));
     rpc.expect_send_command().returning_st({
         let peer_state = Rc::clone(&peer_state);
-        move |cmd| match cmd {
-            Command::UpdateTracks {
-                peer_id,
-                tracks_patches,
-            } => {
-                let negotiation_role = if peer_state
-                    .borrow()
-                    .as_ref()
-                    .and_then(|s| s.negotiation_role())
-                    .is_some()
-                {
-                    None
-                } else {
-                    Some(NegotiationRole::Offerer)
-                };
+        move |cmd| {
+            let _ = command_tx.unbounded_send(cmd.clone());
+            match cmd {
+                Command::UpdateTracks {
+                    peer_id,
+                    tracks_patches,
+                } => {
+                    let negotiation_role = if peer_state
+                        .borrow()
+                        .as_ref()
+                        .and_then(|s| s.negotiation_role())
+                        .is_some()
+                    {
+                        None
+                    } else {
+                        Some(NegotiationRole::Offerer)
+                    };
 
-                event_tx_clone
-                    .unbounded_send(Event::TracksApplied {
-                        peer_id,
-                        updates: tracks_patches
-                            .into_iter()
-                            .map(|p| TrackUpdate::Updated(p.into()))
-                            .collect(),
-                        negotiation_role,
-                    })
-                    .unwrap();
+                    event_tx_clone
+                        .unbounded_send(Event::TracksApplied {
+                            peer_id,
+                            updates: tracks_patches
+                                .into_iter()
+                                .map(|p| TrackUpdate::Updated(p.into()))
+                                .collect(),
+                            negotiation_role,
+                        })
+                        .unwrap();
+                }
+                _ => (),
             }
-            _ => (),
         }
     });
 
@@ -145,7 +144,7 @@ async fn get_test_room_and_exist_peer(
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
     *peer_state.borrow_mut() =
         Some(room.get_peer_state_by_id(PeerId(1)).unwrap());
-    (room, peer, event_tx)
+    (room, peer, event_tx, command_rx)
 }
 
 #[wasm_bindgen_test]
@@ -356,7 +355,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn disable_enable_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -364,6 +363,7 @@ mod disable_send_tracks {
 
         let handle = room.new_handle();
         assert!(JsFuture::from(handle.disable_audio()).await.is_ok());
+        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
         assert!(!peer.is_send_audio_enabled());
         assert!(JsFuture::from(handle.enable_audio()).await.is_ok());
         assert!(peer.is_send_audio_enabled());
@@ -372,7 +372,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn disable_enable_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -381,6 +381,7 @@ mod disable_send_tracks {
         let handle = room.new_handle();
         assert!(JsFuture::from(handle.disable_video(None)).await.is_ok());
         assert!(!peer.is_send_video_enabled(None));
+        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
         assert!(JsFuture::from(handle.enable_video(None)).await.is_ok());
         assert!(peer.is_send_video_enabled(None));
     }
@@ -425,23 +426,26 @@ mod disable_send_tracks {
         let display_video_track =
             video_track(TrackId(3), false, MediaSourceKind::Display);
 
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, device_video_track, display_video_track],
             Some(media_stream_settings(true, true)),
         )
         .await;
 
-        let handle = room.new_handle();
-        if !is_firefox() {
-            can_fail_in_firefox!(JsFuture::from(
-                handle.disable_video(Some(JsMediaSourceKind::Device))
-            ));
-            assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
-            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        if is_firefox() {
+            return;
         }
-        can_fail_in_firefox!(JsFuture::from(
-            handle.enable_video(Some(JsMediaSourceKind::Device))
-        ));
+
+        let handle = room.new_handle();
+        JsFuture::from(handle.disable_video(Some(JsMediaSourceKind::Device)))
+            .await
+            .unwrap();
+        assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
+        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
+        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+        JsFuture::from(handle.enable_video(Some(JsMediaSourceKind::Device)))
+            .await
+            .unwrap();
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
     }
@@ -457,11 +461,15 @@ mod disable_send_tracks {
         let display_video_track =
             video_track(TrackId(3), false, MediaSourceKind::Display);
 
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, device_video_track, display_video_track],
             Some(media_stream_settings(true, true)),
         )
         .await;
+
+        if is_firefox() {
+            return;
+        }
 
         let handle = room.new_handle();
         assert!(JsFuture::from(
@@ -471,12 +479,11 @@ mod disable_send_tracks {
         .is_ok());
         assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
-        can_fail_in_firefox!(JsFuture::from(
-            handle.enable_video(Some(JsMediaSourceKind::Display))
-        ));
-        if !is_firefox() {
-            assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
-        }
+        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+        JsFuture::from(handle.enable_video(Some(JsMediaSourceKind::Display)))
+            .await
+            .unwrap();
+        assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
     }
 
@@ -494,7 +501,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_two_audio_disables() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -531,7 +538,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_two_video_disables() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -570,7 +577,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_disable_and_enable_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -617,7 +624,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_disable_and_enable_video() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -666,7 +673,7 @@ mod disable_send_tracks {
     #[wasm_bindgen_test]
     async fn join_enable_and_disable_audio() {
         let (audio_track, video_track) = get_test_unrequired_tracks();
-        let (room, peer, _) = get_test_room_and_exist_peer(
+        let (room, peer, _, _) = get_test_room_and_exist_peer(
             vec![audio_track, video_track],
             Some(media_stream_settings(true, true)),
         )
@@ -689,6 +696,7 @@ mod disable_send_tracks {
             media_exchange_state::Stable::Disabled.into()
         ));
 
+        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
         let (disable_audio_result, enable_audio_result) =
             futures::future::join(
                 JsFuture::from(handle.disable_audio()),
@@ -1629,7 +1637,7 @@ mod patches_generation {
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
     let (audio_track, video_track) = get_test_tracks(false, false);
-    let (room, peer, _) = get_test_room_and_exist_peer(
+    let (room, peer, _, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1646,7 +1654,7 @@ async fn mute_unmute_audio() {
 #[wasm_bindgen_test]
 async fn remote_disable_enable_audio() {
     let (audio_track, video_track) = get_test_recv_tracks();
-    let (room, peer, _) = get_test_room_and_exist_peer(
+    let (room, peer, _, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1663,7 +1671,7 @@ async fn remote_disable_enable_audio() {
 #[wasm_bindgen_test]
 async fn remote_disable_enable_video() {
     let (audio_track, video_track) = get_test_recv_tracks();
-    let (room, peer, _) = get_test_room_and_exist_peer(
+    let (room, peer, _, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1681,7 +1689,7 @@ async fn remote_disable_enable_video() {
 async fn disable_by_server() {
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1711,7 +1719,7 @@ async fn enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1765,7 +1773,7 @@ async fn only_one_gum_performed_on_enable() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (room, peer, event_tx, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -1807,10 +1815,56 @@ async fn only_one_gum_performed_on_enable() {
     JsFuture::from(room_handle.enable_audio())
         .await
         .unwrap_err();
-    yield_now().await;
 
     assert_eq!(mock.get_user_media_requests_count(), 1);
     mock.stop();
+}
+
+#[wasm_bindgen_test]
+async fn no_updates_sent_if_gum_fails_on_enable() {
+    let mock = MockNavigator::new();
+    let (audio_track, _) = get_test_tracks(false, false);
+    let (room, peer, _, command_rx) = get_test_room_and_exist_peer(
+        vec![audio_track],
+        Some(media_stream_settings(true, false)),
+    )
+    .await;
+    let room_handle = room.new_handle();
+    assert_eq!(mock.get_user_media_requests_count(), 1);
+    assert!(peer.is_send_audio_enabled());
+
+    JsFuture::from(room_handle.disable_audio()).await.unwrap();
+    assert!(!peer.is_send_audio_enabled());
+
+    mock.error_get_user_media("gum error".into());
+
+    let err = JsFuture::from(room_handle.enable_audio())
+        .await
+        .unwrap_err();
+    let e = get_jason_error(err);
+    assert_eq!(e.name(), "MediaManagerError");
+    assert_eq!(
+        e.message(),
+        "Failed to get local tracks: MediaDevices.getUserMedia() failed: \
+         Unknown JS error: gum error",
+    );
+    mock.stop();
+    drop(room);
+
+    let last_command = command_rx.collect::<Vec<_>>().await.pop().unwrap();
+    // last command is from `disable_audio()` cause `enable_audio()` failed
+    // before changing senders state.
+    assert_eq!(
+        last_command,
+        Command::UpdateTracks {
+            peer_id: PeerId(1),
+            tracks_patches: vec![TrackPatchCommand {
+                id: TrackId(1),
+                enabled: Some(false),
+                muted: None
+            }]
+        }
+    );
 }
 
 /// Tests that error from gUM/gDM request will be returned from the
@@ -1821,14 +1875,13 @@ async fn set_media_state_return_media_error() {
 
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
-    let (room, _peer, _event_tx) = get_test_room_and_exist_peer(
+    let (room, _peer, _event_tx, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(false, false)),
     )
     .await;
     let room_handle = room.new_handle();
     JsFuture::from(room_handle.disable_audio()).await.unwrap();
-    yield_now().await;
 
     mock.error_get_user_media(ERROR_MSG.into());
     room.reset_peer_negotiation_state(PeerId(1)).unwrap();
@@ -1856,7 +1909,7 @@ async fn only_one_gum_performed_on_enable_by_server() {
     let mock = MockNavigator::new();
     let (audio_track, video_track) = get_test_tracks(false, false);
     let audio_track_id = audio_track.id;
-    let (_room, peer, event_tx) = get_test_room_and_exist_peer(
+    let (_room, peer, event_tx, _) = get_test_room_and_exist_peer(
         vec![audio_track, video_track],
         Some(media_stream_settings(true, true)),
     )
@@ -2187,7 +2240,7 @@ mod set_local_media_settings {
             );
         });
         let (audio_track, video_track) = get_test_required_tracks();
-        let (room, _peer, _) =
+        let (room, _peer, _, _) =
             get_test_room_and_exist_peer(vec![audio_track, video_track], None)
                 .await;
 
@@ -2230,7 +2283,7 @@ mod set_local_media_settings {
                 });
             let (audio_track, video_track) =
                 get_test_tracks(audio_required, video_required);
-            let (room, _peer, _) = get_test_room_and_exist_peer(
+            let (room, _peer, _, _) = get_test_room_and_exist_peer(
                 vec![audio_track, video_track],
                 None,
             )
@@ -2322,7 +2375,6 @@ mod set_local_media_settings {
             .await
             .unwrap();
         });
-        yield_now().await;
 
         let mut commands_rx = commands_rx.skip(1);
         while let Some(update_tracks_cmd) = commands_rx.next().await {
