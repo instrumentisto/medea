@@ -463,38 +463,6 @@ impl PeerConnection {
         self.media_connections.drop_send_tracks(kinds).await
     }
 
-    /// Stops inner state transitions expiry timers.
-    ///
-    /// Inner state transitions initiated via external APIs that can not be
-    /// performed immediately (must wait for Medea notification/approval) have
-    /// TTL, after which they are cancelled.
-    ///
-    /// In some cases you might want to stop expiry timers, e.g. when
-    /// connection to Medea is temporary lost.
-    ///
-    /// This currently affects only [`Sender`]s disable/enable transitions.
-    ///
-    /// [`Sender`]: sender::Sender
-    pub fn stop_state_transitions_timers(&self) {
-        self.media_connections.stop_state_transitions_timers()
-    }
-
-    /// Resets inner state transitions expiry timers.
-    ///
-    /// Inner state transitions initiated via external APIs that can not be
-    /// performed immediately (must wait for Medea notification/approval) have
-    /// TTL, after which they are cancelled.
-    ///
-    /// In some cases you might want to stop expiry timers, e.g. when
-    /// connection to Medea is temporary lost.
-    ///
-    /// This currently affects only [`Sender`]s disable/enable transitions.
-    ///
-    /// [`Sender`]: sender::Sender
-    pub fn reset_state_transitions_timers(&self) {
-        self.media_connections.reset_state_transitions_timers();
-    }
-
     /// Filters out already sent stats, and send new statss from
     /// provided [`RtcStats`].
     #[allow(clippy::option_if_let_else)]

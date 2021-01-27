@@ -383,17 +383,4 @@ impl Component {
         }
         Ok(())
     }
-
-    /// Watcher for the [`SyncState`] of this [`PeerComponent`].
-    ///
-    /// Will send intentions of the [`PeerComponent`] to the Media Server if
-    /// [`SyncState`] is [`SyncState::Synced`].
-    #[watch(self.sync_state.subscribe())]
-    async fn sync_state_watcher(
-        _: Rc<PeerConnection>,
-        _: Rc<State>,
-        _: SyncState,
-    ) -> Result<(), Traced<PeerError>> {
-        Ok(())
-    }
 }

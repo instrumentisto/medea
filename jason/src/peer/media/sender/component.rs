@@ -505,6 +505,41 @@ impl Component {
         }
         Ok(())
     }
+
+    /// Stops transition timeouts on [`SyncState::Desynced`].
+    ///
+    /// Sends media state intentions and resets transition timeouts on
+    /// [`SyncState::Synced`].
+    #[watch(self.sync_state.subscribe().skip(1))]
+    async fn sync_state_watcher(
+        sender: Rc<Sender>,
+        state: Rc<State>,
+        sync_state: SyncState,
+    ) -> Result<()> {
+        match sync_state {
+            SyncState::Synced => {
+                if let MediaExchangeState::Transition(transition) =
+                    state.enabled_individual.state()
+                {
+                    sender.send_media_exchange_state_intention(transition);
+                }
+                if let MuteState::Transition(transition) =
+                    state.mute_state.state()
+                {
+                    sender.send_mute_state_intention(transition);
+                }
+                state.enabled_individual.reset_transition_timeout();
+                state.mute_state.reset_transition_timeout();
+            }
+            SyncState::Desynced => {
+                state.enabled_individual.stop_transition_timeout();
+                state.mute_state.reset_transition_timeout();
+            }
+            SyncState::Syncing => (),
+        }
+
+        Ok(())
+    }
 }
 
 impl TransceiverSide for State {
@@ -578,5 +613,14 @@ impl MediaStateControllable for State {
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl State {
+    /// Sets [`State::sync_state`] to the [`SyncState::Synced`].
+    #[inline]
+    pub fn synced(&self) {
+        self.sync_state.set(SyncState::Synced);
     }
 }

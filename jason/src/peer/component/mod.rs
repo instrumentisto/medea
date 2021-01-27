@@ -569,4 +569,12 @@ impl State {
         ])
         .await;
     }
+
+    /// Sets [`State::sync_state`] to the [`SyncState::Synced`].
+    #[inline]
+    pub fn synced(&self) {
+        self.senders.synced();
+        self.receivers.synced();
+        self.sync_state.set(SyncState::Synced);
+    }
 }

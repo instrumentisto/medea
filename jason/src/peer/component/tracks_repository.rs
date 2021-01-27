@@ -225,10 +225,27 @@ impl<S> TracksRepository<S> {
 }
 
 #[cfg(feature = "mockable")]
+impl TracksRepository<sender::State> {
+    /// Sets [`SyncState`] of all [`sender::State`]s to the
+    /// [`SyncState::Synced`].
+    #[inline]
+    pub fn synced(&self) {
+        self.0.borrow().values().for_each(|s| s.synced());
+    }
+}
+
+#[cfg(feature = "mockable")]
 impl TracksRepository<super::receiver::State> {
     /// Stabilize all [`receiver::State`] from this [`State`].
     #[inline]
     pub fn stabilize_all(&self) {
         self.0.borrow().values().for_each(|r| r.stabilize());
+    }
+
+    /// Sets [`SyncState`] of all [`receiver::State`]s to the
+    /// [`SyncState::Synced`].
+    #[inline]
+    pub fn synced(&self) {
+        self.0.borrow().values().for_each(|r| r.synced());
     }
 }

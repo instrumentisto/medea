@@ -317,18 +317,29 @@ impl Component {
         Ok(())
     }
 
+    /// Stops transition timeouts on [`SyncState::Desynced`].
+    ///
+    /// Sends media state intentions and resets transition timeouts on
+    /// [`SyncState::Synced`].
     #[watch(self.sync_state.subscribe().skip(1))]
     async fn sync_state_watcher(
         receiver: Rc<Receiver>,
         state: Rc<State>,
         sync_state: SyncState,
     ) -> Result<()> {
-        if let SyncState::Synced = sync_state {
-            if let MediaExchangeState::Transition(transition) =
-                state.enabled_individual.state()
-            {
-                receiver.send_media_exchange_state_intention(transition);
+        match sync_state {
+            SyncState::Synced => {
+                if let MediaExchangeState::Transition(transition) =
+                    state.enabled_individual.state()
+                {
+                    receiver.send_media_exchange_state_intention(transition);
+                }
+                state.enabled_individual.reset_transition_timeout();
             }
+            SyncState::Desynced => {
+                state.enabled_individual.stop_transition_timeout();
+            }
+            SyncState::Syncing => (),
         }
 
         Ok(())
@@ -357,20 +368,6 @@ impl MediaStateControllable for State {
         // `MuteStateController` to some trait and creating some dummy
         // implementation. Not worth it atm.
         unreachable!("Receivers muting is not implemented");
-    }
-
-    /// Stops only [`MediaExchangeStateController`]'s state transition timer.
-    #[inline]
-    fn stop_media_state_transition_timeout(&self) {
-        self.media_exchange_state_controller()
-            .stop_transition_timeout();
-    }
-
-    /// Resets only [`MediaExchangeStateController`]'s state transition timer.
-    #[inline]
-    fn reset_media_state_transition_timeout(&self) {
-        self.media_exchange_state_controller()
-            .reset_transition_timeout();
     }
 }
 
@@ -414,5 +411,11 @@ impl State {
             self.enabled_individual.update(transition.intended());
             self.enabled_general.set(transition.intended());
         }
+    }
+
+    /// Sets [`State::sync_state`] to the [`SyncState::Synced`].
+    #[inline]
+    pub fn synced(&self) {
+        self.sync_state.set(SyncState::Synced);
     }
 }

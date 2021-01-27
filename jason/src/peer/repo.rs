@@ -15,6 +15,7 @@ use crate::{
     peer,
     utils::{
         component, delay_for, AsProtoState, SynchronizableState, TaskHandle,
+        Updatable as _,
     },
 };
 
@@ -42,21 +43,19 @@ impl Component {
             .collect()
     }
 
-    /// Stops all timeouts in the all [`peer::Component`]s.
+    /// Notifies all [`peer::Component`]s about RPC connection loss.
     #[inline]
-    pub fn stop_timeouts(&self) {
+    pub fn connection_lost(&self) {
         for peer in self.peers.borrow().values() {
-            peer.stop_state_transitions_timers();
-            peer.state().stop_timeouts();
+            peer.state().connection_lost();
         }
     }
 
-    /// Resumes all timeouts in the all [`peer::Component`]s.
+    /// Notifies all [`peer::Component`]s about RPC connection restore.
     #[inline]
-    pub fn resume_timeouts(&self) {
+    pub fn connection_recovered(&self) {
         for peer in self.peers.borrow().values() {
-            peer.reset_state_transitions_timers();
-            peer.state().resume_timeouts();
+            peer.state().connection_recovered();
         }
     }
 }

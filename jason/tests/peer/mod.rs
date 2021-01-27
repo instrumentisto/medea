@@ -1090,12 +1090,12 @@ async fn reset_transition_timers() {
     .shared();
 
     delay_for(400).await;
-    peer.stop_state_transitions_timers();
+    peer.state().connection_lost();
     timeout(600, all_enabled.clone()).await.unwrap_err();
 
-    peer.stop_state_transitions_timers();
+    peer.state().connection_lost();
     delay_for(30).await;
-    peer.reset_state_transitions_timers();
+    peer.state().synced();
 
     timeout(600, all_enabled).await.unwrap();
 }
