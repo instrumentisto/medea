@@ -119,6 +119,7 @@ impl Receiver {
 
     /// Returns [`TrackConstraints`] of this [`Receiver`].
     #[inline]
+    #[must_use]
     pub fn caps(&self) -> &TrackConstraints {
         &self.caps
     }
@@ -126,6 +127,7 @@ impl Receiver {
     /// Returns [`mid`] of this [`Receiver`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    #[must_use]
     pub fn mid(&self) -> Option<String> {
         if self.mid.borrow().is_none() && self.transceiver.borrow().is_some() {
             if let Some(transceiver) =
@@ -137,7 +139,8 @@ impl Receiver {
         self.mid.borrow().clone()
     }
 
-    /// Returns `true` if this [`Receiver`] is receives media data.
+    /// Indicates whether this [`Receiver`] receives media data.
+    #[must_use]
     pub fn is_receiving(&self) -> bool {
         let is_recv_direction =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {

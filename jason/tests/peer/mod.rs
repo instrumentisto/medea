@@ -1343,10 +1343,6 @@ mod ice_restart {
             .unwrap();
         let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
         let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
-        peers
-            .first_peer
-            .state()
-            .apply_local_sdp(sdp_offer_before.clone());
         peers.first_peer.state().reset_negotiation_role();
         crate::delay_for(100).await;
         peers.first_peer.state().restart_ice();

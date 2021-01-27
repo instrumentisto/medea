@@ -245,15 +245,14 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for the SDP offer approving.
+    /// Watcher for the SDP offer approving by server.
     ///
-    /// If current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
-    /// [`NegotiationState`] will be transited to the
+    /// If the current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
+    /// [`NegotiationState`] will transit to the
     /// [`NegotiationState::WaitRemoteSdp`].
     ///
-    /// If current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
-    /// [`NegotiationState`] will be transited to the
-    /// [`NegotiationState::Stable`].
+    /// If the current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
+    /// [`NegotiationState`] will transit to the [`NegotiationState::Stable`].
     #[watch(self.local_sdp.on_approve().skip(1))]
     async fn local_sdp_approved(
         _: Rc<PeerConnection>,
@@ -273,13 +272,12 @@ impl Component {
                 }
             }
         }
-
         Ok(())
     }
 
     /// Watcher for the [`NegotiationState`] change.
     ///
-    /// Resets [`NegotiationRole`] to `None` on [`NegotiationState::Stable`].
+    /// Resets [`NegotiationRole`] to [`None`] on [`NegotiationState::Stable`].
     ///
     /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
     #[watch(self.negotiation_state.subscribe().skip(1))]

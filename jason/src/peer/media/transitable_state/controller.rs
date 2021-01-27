@@ -217,16 +217,18 @@ where
         .boxed_local()
     }
 
-    /// Returns [`Processed`] that will be resolved when all the underlying data
-    /// updates will be processed by all subscribers.
+    /// Returns [`Processed`] that will be resolved once all the underlying data
+    /// updates are processed by all subscribers.
+    #[inline]
     pub fn when_processed(&self) -> Processed<'static> {
         self.state.when_all_processed()
     }
 
-    /// Returns [`Future`] which will be resolved when [`TransitableState`] will
-    /// be transited to the [`TransitableState::Stable`].
+    /// Returns [`Future`] which will be resolved once [`TransitableState`] is
+    /// transited to the [`TransitableState::Stable`].
     ///
     /// [`Future`]: std::future::Future
+    #[inline]
     pub fn when_stabilized(self: Rc<Self>) -> Processed<'static, ()> {
         Processed::new(Box::new(move || {
             let stable = self.subscribe_stable();

@@ -997,9 +997,9 @@ impl MediaConnections {
             .collect()
     }
 
-    /// Returns [`sender::State`] with a provided [`TrackId`].
-    #[must_use]
+    /// Returns [`sender::State`] with the provided [`TrackId`].
     #[inline]
+    #[must_use]
     pub fn get_sender_state_by_id(
         &self,
         id: TrackId,

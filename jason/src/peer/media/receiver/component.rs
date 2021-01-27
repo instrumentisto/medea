@@ -289,6 +289,7 @@ impl Component {
     /// Watcher for [`MediaExchangeState::Stable`] update.
     ///
     /// Updates [`Receiver::enabled_individual`] to the new state.
+    #[inline]
     #[watch(self.enabled_individual.subscribe_stable())]
     async fn enabled_individual_stable_state_changed(
         receiver: Rc<Receiver>,
@@ -298,14 +299,14 @@ impl Component {
         receiver
             .enabled_individual
             .set(state == media_exchange_state::Stable::Enabled);
-
         Ok(())
     }
 
     /// Watcher for [`MediaExchangeState::Transition`] update.
     ///
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
     /// [`media_exchange_state`].
+    #[inline]
     #[watch(self.enabled_individual.subscribe_transition())]
     async fn enabled_individual_transition_started(
         receiver: Rc<Receiver>,
@@ -313,7 +314,6 @@ impl Component {
         state: media_exchange_state::Transition,
     ) -> Result<()> {
         receiver.send_media_exchange_state_intention(state);
-
         Ok(())
     }
 
@@ -336,23 +336,25 @@ impl Component {
 }
 
 impl MediaStateControllable for State {
+    #[inline]
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {
         Rc::clone(&self.enabled_individual)
     }
 
+    #[inline]
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         // Receivers can be muted, but currently they are muted directly by
         // server events.
         //
-        // There is no point to provide external API for muting receivers, since
-        // muting is pipelined after demuxing and decoding, so it wont reduce
-        // incoming traffic or CPU usage. Therefore receivers muting do not
-        // require MuteStateController's state management.
+        // There is no point to provide an external API for muting receivers,
+        // since the muting is pipelined after demuxing and decoding, so it
+        // won't reduce incoming traffic or CPU usage. Therefore receivers
+        // muting don't require `MuteStateController`'s state management.
         //
-        // Removing this unreachable! would require abstracting
-        // MuteStateController to some trait and creating some dummy
+        // Removing this `unreachable!()` would require abstracting
+        // `MuteStateController` to some trait and creating some dummy
         // implementation. Not worth it atm.
         unreachable!("Receivers muting is not implemented");
     }
@@ -373,10 +375,12 @@ impl MediaStateControllable for State {
 }
 
 impl TransceiverSide for State {
+    #[inline]
     fn track_id(&self) -> TrackId {
         self.id
     }
 
+    #[inline]
     fn kind(&self) -> MediaKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaKind::Audio,
@@ -384,6 +388,7 @@ impl TransceiverSide for State {
         }
     }
 
+    #[inline]
     fn source_kind(&self) -> MediaSourceKind {
         match &self.media_type {
             MediaType::Audio(_) => MediaSourceKind::Device,
@@ -391,6 +396,7 @@ impl TransceiverSide for State {
         }
     }
 
+    #[inline]
     fn is_transitable(&self) -> bool {
         true
     }
@@ -399,7 +405,6 @@ impl TransceiverSide for State {
 #[cfg(feature = "mockable")]
 impl State {
     /// Stabilizes [`MediaExchangeState`] of this [`State`].
-    #[inline]
     pub fn stabilize(&self) {
         use crate::peer::media::InTransition as _;
 

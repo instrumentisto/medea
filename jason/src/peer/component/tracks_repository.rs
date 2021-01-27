@@ -87,16 +87,20 @@ impl TracksRepository<sender::State> {
             .collect()
     }
 
-    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`TrackId`]s will be resolved.
+    /// Returns [`Future`] which will be resolved once
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request for the provided
+    /// [`TrackId`]s is resolved.
     ///
-    /// [`Result`] returned by this [`Future`] will be the same as result of the
-    /// gUM/gDM request.
+    /// [`Result`] returned by this [`Future`] will be the same as the result of
+    /// the [getUserMedia()][1]/[getDisplayMedia()][2] request.
     ///
-    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`TrackId`]s.
+    /// Returns last known [getUserMedia()][1]/[getDisplayMedia()][2] request's
+    /// [`Result`], if currently no such requests are running for the provided
+    /// [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,

@@ -56,6 +56,7 @@ impl LocalSdp {
     /// approve.
     ///
     /// [`Stream`]: futures::stream::Stream
+    #[inline]
     pub fn on_approve(&self) -> LocalBoxStream<'static, ()> {
         Box::pin(self.0.approved.subscribe().filter_map(|approved| {
             future::ready(if approved { Some(()) } else { None })

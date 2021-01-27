@@ -87,27 +87,27 @@ pub enum PeerError {
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
-/// Events emitted from [`Sender`] or [`Receiver`].
+/// Events emitted from a [`Sender`] or a [`Receiver`].
 ///
-/// [`Sender`]: crate::peer::sender::Sender
 /// [`Receiver`]: crate::peer::receiver::Receiver
+/// [`Sender`]: crate::peer::sender::Sender
 #[derive(Debug)]
 pub enum TrackEvent {
     /// Intention of the `MediaTrack` to mute/unmute himself.
     MuteUpdateIntention {
-        /// Id of `MediaTrack` which sends this intention.
+        /// ID of the `MediaTrack` which sends this intention.
         id: TrackId,
 
-        /// Actual intention.
+        /// The muting intention itself.
         muted: bool,
     },
 
     /// Intention of the `MediaTrack` to enabled/disable himself.
     MediaExchangeIntention {
-        /// Id of `MediaTrack` which sends this intention.
+        /// ID of the `MediaTrack` which sends this intention.
         id: TrackId,
 
-        /// Actual intention.
+        /// The enabling/disabling intention itself.
         enabled: bool,
     },
 }
@@ -994,8 +994,9 @@ impl PeerConnection {
         self.media_connections.get_sender_by_id(id)
     }
 
-    /// Lookups [`media::sender::State`] by provided [`TrackId`].
+    /// Lookups [`media::sender::State`] by the provided [`TrackId`].
     #[inline]
+    #[must_use]
     pub fn get_sender_state_by_id(
         &self,
         id: TrackId,

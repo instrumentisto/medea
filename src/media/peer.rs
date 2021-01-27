@@ -289,7 +289,7 @@ impl PeerStateMachine {
         }
     }
 
-    /// Returns `true` if this [`PeerStateMachine`] currently in [`Stable`]
+    /// Indicates whether this [`PeerStateMachine`] is currently in a [`Stable`]
     /// state.
     #[inline]
     #[must_use]
@@ -297,7 +297,7 @@ impl PeerStateMachine {
         matches!(self, PeerStateMachine::Stable(_))
     }
 
-    /// Returns `true` if this [`PeerStateMachine`] can forcibly commit
+    /// Indicates whether this [`PeerStateMachine`] can forcibly commit a
     /// [`TrackChange::PartnerTrackPatch`].
     #[inline]
     #[must_use]
@@ -818,7 +818,7 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
-    /// Forcibly commits all [`TrackChange::PartnerTrackPatch`].
+    /// Forcibly commits all the [`TrackChange::PartnerTrackPatch`]es.
     pub fn force_commit_partner_changes(&mut self) {
         let mut partner_patches = Vec::new();
         // TODO: use drain_filter when its stable

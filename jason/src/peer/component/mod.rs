@@ -77,16 +77,16 @@ pub enum SyncState {
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NegotiationState {
-    /// Means that [`Component`] is new or negotiation completed.
+    /// [`Component`] is new or negotiation is completed.
     Stable,
 
-    /// [`Component`] waits for local SDP offer generating.
+    /// [`Component`] waits for a local SDP offer generating.
     WaitLocalSdp,
 
-    /// [`Component`] waits for local SDP approve by server.
+    /// [`Component`] waits for a local SDP being approved by server.
     WaitLocalSdpApprove,
 
-    /// [`Component`] waits for remote SDP offer.
+    /// [`Component`] waits for a remote SDP offer.
     WaitRemoteSdp,
 }
 
@@ -261,16 +261,20 @@ impl State {
         self.local_sdp.resume_timeout();
     }
 
-    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`TrackId`]s will be resolved.
+    /// Returns [`Future`] which will be resolved once
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request for the provided
+    /// [`TrackId`]s is resolved.
     ///
-    /// [`Result`] returned by this [`Future`] will be the same as result of the
-    /// gUM/gDM request.
+    /// [`Result`] returned by this [`Future`] will be the same as the result of
+    /// the [getUserMedia()][1]/[getDisplayMedia()][2] request.
     ///
-    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`TrackId`]s.
+    /// Returns last known [getUserMedia()][1]/[getDisplayMedia()][2] request's
+    /// [`Result`], if currently no such requests are running for the provided
+    /// [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,
@@ -319,7 +323,6 @@ impl State {
                 s.local_stream_updated();
             }
         }
-
         res
     }
 
@@ -524,11 +527,12 @@ impl State {
 
     /// Returns current [`NegotiationRole`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.negotiation_role.get()
     }
 
-    /// Returns [`Future`] which will be resolved when local SDP approve will be
+    /// Returns [`Future`] which will be resolved once local SDP approve is
     /// needed.
     #[inline]
     pub fn when_local_sdp_approve_needed(
@@ -540,15 +544,15 @@ impl State {
             .map(|_| ())
     }
 
-    /// Stabilize all [`receiver::State`] from this [`State`].
+    /// Stabilizes all [`receiver::State`]s of this [`State`].
     #[inline]
     pub fn stabilize_all(&self) {
         self.receivers.stabilize_all();
     }
 
-    /// Waits until [`State::local_sdp`] will be resolved and returns its new
-    /// value.
+    /// Waits until [`State::local_sdp`] is resolved and returns its new value.
     #[inline]
+    #[must_use]
     pub async fn when_local_sdp_updated(&self) -> Option<String> {
         use futures::StreamExt as _;
 
@@ -556,7 +560,7 @@ impl State {
     }
 
     /// Waits until all [`State::senders`]' and [`State::receivers`]' inserts
-    /// will be processed.
+    /// are processed.
     #[inline]
     pub async fn when_all_tracks_created(&self) {
         medea_reactive::when_all_processed(vec![
