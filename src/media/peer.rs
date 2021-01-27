@@ -173,8 +173,8 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
-#[enum_delegate(pub fn sdp_offer(&self) -> &Option<String>)]
-#[enum_delegate(pub fn partner_sdp_offer(&self) -> &Option<String>)]
+#[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
+#[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
 #[enum_delegate(pub fn ice_servers_list(&self) -> Option<Vec<IceServer>>)]
 #[enum_delegate(pub fn set_ice_user(&mut self, ice_user: IceUser))]
@@ -260,8 +260,8 @@ impl PeerStateMachine {
             force_relay: self.is_force_relayed(),
             ice_servers: self.ice_servers_list().unwrap(),
             negotiation_role: self.negotiation_role(),
-            sdp_offer: self.sdp_offer().clone(),
-            remote_sdp_offer: self.partner_sdp_offer().clone(),
+            local_sdp: self.local_sdp().map(ToOwned::to_owned),
+            remote_sdp: self.remote_sdp().map(ToOwned::to_owned),
             ice_candidates: self.ice_candidates().clone(),
             restart_ice: self.is_ice_restart(),
         }
@@ -308,7 +308,7 @@ impl PeerStateMachine {
                 !peer.context.is_known_to_remote
             }
             PeerStateMachine::WaitRemoteSdp(peer) => {
-                peer.context.sdp_offer.is_some()
+                peer.context.local_sdp.is_some()
                     && !peer.context.is_known_to_remote
             }
         }
@@ -406,12 +406,12 @@ pub struct Context {
     /// [SDP] offer of this [`Peer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    sdp_offer: Option<String>,
+    local_sdp: Option<String>,
 
     /// [SDP] of the partner [`Peer`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
-    partner_sdp_offer: Option<String>,
+    remote_sdp: Option<String>,
 
     /// All [`MediaTrack`]s with a `Recv` direction`.
     receivers: HashMap<TrackId, Rc<MediaTrack>>,
@@ -732,14 +732,14 @@ impl<T> Peer<T> {
 
     /// Returns SDP offer of this [`Peer`].
     #[inline]
-    pub fn sdp_offer(&self) -> &Option<String> {
-        &self.context.sdp_offer
+    pub fn local_sdp(&self) -> Option<&str> {
+        self.context.local_sdp.as_deref()
     }
 
     /// Returns SDP offer of the partner [`Peer`].
     #[inline]
-    pub fn partner_sdp_offer(&self) -> &Option<String> {
-        &self.context.partner_sdp_offer
+    pub fn remote_sdp(&self) -> Option<&str> {
+        self.context.remote_sdp.as_deref()
     }
 
     /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
@@ -985,9 +985,9 @@ impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
     /// state.
     #[inline]
-    pub fn set_local_offer(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
+    pub fn set_local_offer(self, local_sdp: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        context.sdp_offer = Some(sdp_offer);
+        context.local_sdp = Some(local_sdp);
         Peer {
             context,
             state: WaitRemoteSdp {},
@@ -999,7 +999,7 @@ impl Peer<WaitLocalSdp> {
     #[inline]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
-        context.sdp_offer = Some(sdp_answer);
+        context.local_sdp = Some(sdp_answer);
         let mut this = Peer {
             context,
             state: Stable {},
@@ -1055,7 +1055,7 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
-        self.context.partner_sdp_offer = Some(sdp_answer);
+        self.context.remote_sdp = Some(sdp_answer);
 
         let mut peer = Peer {
             context: self.context,
@@ -1072,7 +1072,7 @@ impl Peer<WaitRemoteSdp> {
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
         self.context.negotiation_role =
             Some(NegotiationRole::Answerer(sdp_offer.clone()));
-        self.context.partner_sdp_offer = Some(sdp_offer);
+        self.context.remote_sdp = Some(sdp_offer);
 
         Peer {
             context: self.context,
@@ -1099,8 +1099,8 @@ impl Peer<Stable> {
             partner_peer,
             partner_member,
             ice_user: None,
-            sdp_offer: None,
-            partner_sdp_offer: None,
+            local_sdp: None,
+            remote_sdp: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
             is_force_relayed,
@@ -1124,14 +1124,14 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Resets [`Context::sdp_offer`] and [`Context::partner_sdp_offer`].
+    /// Resets [`Context::local_sdp`] and [`Context::remote_sdp`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
     pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
-        context.sdp_offer = None;
-        context.partner_sdp_offer = None;
+        context.local_sdp = None;
+        context.remote_sdp = None;
 
         context.negotiation_role = Some(NegotiationRole::Offerer);
 
@@ -1144,14 +1144,14 @@ impl Peer<Stable> {
     /// Changes [`Peer`] state to [`WaitLocalSdp`] and discards previously saved
     /// [SDP] Offer and Answer.
     ///
-    /// Resets [`Context::sdp_offer`] and [`Context::partner_sdp_offer`].
+    /// Resets [`Context::local_sdp`] and [`Context::remote_sdp`].
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
     pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
-        context.sdp_offer = None;
-        context.partner_sdp_offer = None;
+        context.local_sdp = None;
+        context.remote_sdp = None;
 
         Peer {
             context,

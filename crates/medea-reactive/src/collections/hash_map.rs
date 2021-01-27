@@ -261,14 +261,16 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
-    /// Removes all entries which are not presented in the provided [`HashMap`].
+    /// Removes all entries which are not present in the provided [`HashMap`].
+    ///
+    /// [`HashMap`]: std::collections::HashMap
     pub fn remove_not_present<A>(
         &mut self,
-        another: &std::collections::HashMap<K, A>,
+        other: &std::collections::HashMap<K, A>,
     ) {
         self.iter()
             .filter_map(|(id, _)| {
-                if another.contains_key(id) {
+                if other.contains_key(id) {
                     None
                 } else {
                     Some(id.clone())

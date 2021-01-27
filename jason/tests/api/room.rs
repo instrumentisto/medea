@@ -2615,8 +2615,8 @@ async fn create_peer_by_state() {
             force_relay: false,
             ice_servers: vec![],
             negotiation_role: Some(NegotiationRole::Offerer),
-            sdp_offer: None,
-            remote_sdp_offer: None,
+            local_sdp: None,
+            remote_sdp: None,
             ice_candidates: HashSet::new(),
         },
     );
