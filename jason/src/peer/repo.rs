@@ -11,7 +11,7 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{Connections, RoomError},
-    media::{LocalTracksConstraints, MediaManager},
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer,
     utils::{component, delay_for, TaskHandle},
 };
@@ -86,7 +86,7 @@ pub struct Repository {
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Constraints to local [`local::Track`]s that are being published by
-    /// [`PeerConnection`]s in this [`Room`].
+    /// [`PeerConnection`]s from this [`Repository`].
     ///
     /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`Room`]: crate::api::Room
@@ -97,6 +97,14 @@ pub struct Repository {
     ///
     /// [`Connection`]: crate::api::Connection
     connections: Rc<Connections>,
+
+    /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
+    /// from this [`Repository`].
+    ///
+    /// Used to disable or enable media receiving.
+    ///
+    /// [`remote::Track`]: crate::media::track::remote::Track
+    recv_constraints: Rc<RecvConstraints>,
 }
 
 impl Repository {
@@ -110,6 +118,7 @@ impl Repository {
         media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
         send_constraints: LocalTracksConstraints,
+        recv_constraints: Rc<RecvConstraints>,
         connections: Rc<Connections>,
     ) -> Self {
         let peers = Rc::default();
@@ -121,6 +130,7 @@ impl Repository {
             peers,
             peer_event_sender,
             send_constraints,
+            recv_constraints,
             connections,
         }
     }
@@ -198,6 +208,7 @@ impl Component {
                 Rc::clone(&peers.media_manager),
                 peers.send_constraints.clone(),
                 Rc::clone(&peers.connections),
+                Rc::clone(&peers.recv_constraints),
             )
             .map_err(tracerr::map_from_and_wrap!())?,
             new_peer,

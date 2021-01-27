@@ -14,7 +14,7 @@ mod tracks_request;
 mod transceiver;
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{hash_map::DefaultHasher, HashMap},
     convert::TryFrom as _,
     hash::{Hash, Hasher},
@@ -22,13 +22,14 @@ use std::{
 };
 
 use derive_more::{Display, From};
-use futures::{channel::mpsc, future};
+use futures::{channel::mpsc, future, StreamExt as _};
 use medea_client_api_proto::{
-    stats::StatId, IceConnectionState, MediaSourceKind, MemberId,
-    PeerConnectionState, PeerId as Id, PeerId, TrackId,
+    stats::StatId, Command, IceConnectionState, MediaSourceKind, MemberId,
+    PeerConnectionState, PeerId as Id, PeerId, TrackId, TrackPatchCommand,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
@@ -36,6 +37,7 @@ use crate::{
     media::{
         track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
+        RecvConstraints,
     },
     utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
@@ -86,6 +88,31 @@ pub enum PeerError {
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
+
+/// Events emitted from a [`Sender`] or a [`Receiver`].
+///
+/// [`Receiver`]: crate::peer::receiver::Receiver
+/// [`Sender`]: crate::peer::sender::Sender
+#[derive(Debug)]
+pub enum TrackEvent {
+    /// Intention of the `MediaTrack` to mute/unmute himself.
+    MuteUpdateIntention {
+        /// ID of the `MediaTrack` which sends this intention.
+        id: TrackId,
+
+        /// The muting intention itself.
+        muted: bool,
+    },
+
+    /// Intention of the `MediaTrack` to enabled/disable himself.
+    MediaExchangeIntention {
+        /// ID of the `MediaTrack` which sends this intention.
+        id: TrackId,
+
+        /// The enabling/disabling intention itself.
+        enabled: bool,
+    },
+}
 
 #[dispatchable(self: &Self, async_trait(?Send))]
 #[derive(Clone)]
@@ -210,6 +237,12 @@ pub enum PeerEvent {
         /// Statuses of [`PeerConnection`] transceivers.
         transceivers_statuses: HashMap<TrackId, bool>,
     },
+
+    /// [`Component`] resends his intentions.
+    MediaUpdateCommand {
+        /// Actual intentions of the [`Component`].
+        command: Command,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -231,7 +264,7 @@ pub struct PeerConnection {
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Indicates if underlying [`RtcPeerConnection`] has remote description.
-    has_remote_description: RefCell<bool>,
+    has_remote_description: Cell<bool>,
 
     /// Stores [`IceCandidate`]s received before remote description for
     /// underlying [`RtcPeerConnection`].
@@ -251,6 +284,14 @@ pub struct PeerConnection {
     ///
     /// [`Connection`]: crate::api::Connection
     connections: Rc<Connections>,
+
+    /// Sender for the [`TrackEvent`]s which should be processed by this
+    /// [`PeerConnection`].
+    track_events_sender: mpsc::UnboundedSender<TrackEvent>,
+
+    /// Constraints to the [`remote::Track`] from this [`PeerConnection`]. Used
+    /// to disable or enable media receiving.
+    recv_constraints: Rc<RecvConstraints>,
 }
 
 impl PeerConnection {
@@ -274,6 +315,7 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         send_constraints: LocalTracksConstraints,
         connections: Rc<Connections>,
+        recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
             RtcPeerConnection::new(
@@ -282,10 +324,22 @@ impl PeerConnection {
             )
             .map_err(tracerr::map_from_and_wrap!())?,
         );
+        let (track_events_sender, mut track_events_rx) = mpsc::unbounded();
         let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
             peer_events_sender.clone(),
         ));
+
+        spawn_local({
+            let peer_events_sender = peer_events_sender.clone();
+            let peer_id = state.id();
+
+            async move {
+                while let Some(e) = track_events_rx.next().await {
+                    Self::handle_track_event(peer_id, &peer_events_sender, &e);
+                }
+            }
+        });
 
         let peer = Self {
             id: state.id(),
@@ -294,10 +348,12 @@ impl PeerConnection {
             media_manager,
             peer_events_sender,
             sent_stats_cache: RefCell::new(HashMap::new()),
-            has_remote_description: RefCell::new(false),
+            has_remote_description: Cell::new(false),
             ice_candidates_buffer: RefCell::new(Vec::new()),
             send_constraints,
             connections,
+            track_events_sender,
+            recv_constraints,
         };
 
         // Bind to `icecandidate` event.
@@ -348,6 +404,43 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(Rc::new(peer))
+    }
+
+    /// Handler [`TrackEvent`]s emitted from [`Sender`] or [`Receiver`].
+    ///
+    /// Sends [`PeerEvent::SendIntention`] with a [`Command::UpdateTracks`] on
+    /// [`TrackEvent::MediaExchangeIntention`] and
+    /// [`TrackEvent::MuteStateIntention`].
+    fn handle_track_event(
+        peer_id: PeerId,
+        peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
+        event: &TrackEvent,
+    ) {
+        let patch = match event {
+            TrackEvent::MediaExchangeIntention { id, enabled } => {
+                TrackPatchCommand {
+                    id: *id,
+                    muted: None,
+                    enabled: Some(*enabled),
+                }
+            }
+            TrackEvent::MuteUpdateIntention { id, muted } => {
+                TrackPatchCommand {
+                    id: *id,
+                    muted: Some(*muted),
+                    enabled: None,
+                }
+            }
+        };
+
+        peer_events_sender
+            .unbounded_send(PeerEvent::MediaUpdateCommand {
+                command: Command::UpdateTracks {
+                    peer_id,
+                    tracks_patches: vec![patch],
+                },
+            })
+            .ok();
     }
 
     /// Returns all [`TrackId`]s of [`Sender`]s that match the provided
@@ -642,21 +735,70 @@ impl PeerConnection {
         })
     }
 
+    /// Returns [`MediaStreamSettings`] for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If [`MediaSourceKind`] is [`None`] then [`MediaStreamSettings`] for all
+    /// [`MediaSourceKind`]s will be provided.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`PeerError::TracksRequest`] if failed to create or merge
+    /// [`SimpleTracksRequest`].
+    pub fn get_media_settings(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<Option<MediaStreamSettings>> {
+        let mut criteria = LocalStreamUpdateCriteria::empty();
+        if let Some(source_kind) = source_kind {
+            criteria.add(kind, source_kind);
+        } else {
+            criteria.add(kind, MediaSourceKind::Device);
+            criteria.add(kind, MediaSourceKind::Display);
+        }
+
+        self.get_simple_tracks_request(criteria)
+            .map_err(tracerr::map_from_and_wrap!())
+            .map(|s| s.map(|s| MediaStreamSettings::from(&s)))
+    }
+
+    /// Returns [`SimpleTracksRequest`] for the provided
+    /// [`LocalStreamUpdateCriteria`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`Media::TracksRequest`] if failed to create or merge
+    /// [`SimpleTracksRequest`].
+    fn get_simple_tracks_request(
+        &self,
+        criteria: LocalStreamUpdateCriteria,
+    ) -> Result<Option<SimpleTracksRequest>> {
+        let request = if let Some(req) =
+            self.media_connections.get_tracks_request(criteria)
+        {
+            req
+        } else {
+            return Ok(None);
+        };
+        let mut required_caps = SimpleTracksRequest::try_from(request)
+            .map_err(tracerr::from_and_wrap!())?;
+        required_caps
+            .merge(self.send_constraints.inner())
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(Some(required_caps))
+    }
+
     /// Implementation of the [`PeerConnection::update_local_stream`] method.
     async fn inner_update_local_stream(
         &self,
         criteria: LocalStreamUpdateCriteria,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
-        if let Some(request) =
-            self.media_connections.get_tracks_request(criteria)
+        if let Some(required_caps) = self
+            .get_simple_tracks_request(criteria)
+            .map_err(tracerr::map_from_and_wrap!())?
         {
-            let mut required_caps = SimpleTracksRequest::try_from(request)
-                .map_err(tracerr::from_and_wrap!())?;
-
-            required_caps
-                .merge(self.send_constraints.inner())
-                .map_err(tracerr::map_from_and_wrap!())?;
-
             let used_caps = MediaStreamSettings::from(&required_caps);
 
             let media_tracks = self
@@ -751,7 +893,7 @@ impl PeerConnection {
             .set_remote_description(desc)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
-        *self.has_remote_description.borrow_mut() = true;
+        self.has_remote_description.set(true);
         self.media_connections.sync_receivers();
 
         let ice_candidates_buffer_flush_fut = future::try_join_all(
@@ -792,7 +934,7 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> Result<()> {
-        if *self.has_remote_description.borrow() {
+        if self.has_remote_description.get() {
             self.peer
                 .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
                 .await
@@ -852,6 +994,16 @@ impl PeerConnection {
         id: TrackId,
     ) -> Option<Rc<media::sender::Sender>> {
         self.media_connections.get_sender_by_id(id)
+    }
+
+    /// Lookups [`media::sender::State`] by the provided [`TrackId`].
+    #[inline]
+    #[must_use]
+    pub fn get_sender_state_by_id(
+        &self,
+        id: TrackId,
+    ) -> Option<Rc<media::sender::State>> {
+        self.media_connections.get_sender_state_by_id(id)
     }
 
     /// Indicates whether all [`Sender`]s audio tracks are enabled.

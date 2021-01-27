@@ -32,8 +32,8 @@ impl<S, O> Component<S, O> {
     /// Returns reference to the state of this [`Component`].
     #[inline]
     #[must_use]
-    pub fn state(&self) -> &S {
-        &self.state
+    pub fn state(&self) -> Rc<S> {
+        Rc::clone(&self.state)
     }
 }
 
