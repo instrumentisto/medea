@@ -53,11 +53,12 @@ wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2"
 wee_alloc = { version = "0.4", optional = true }
 [dependencies.web-sys]
-    version = "0.3"
+    version = "0.3.47"
     features = [
         "console",
         "ConstrainDomStringParameters", "ConstrainDoubleRange",
         "CloseEvent",
+        "DisplayMediaStreamConstraints",
         "Event", "EventTarget",
         "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
         "MediaTrackConstraints", "MediaTrackSettings",
