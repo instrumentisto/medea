@@ -628,11 +628,6 @@ impl MediaStreamSettings {
     }
 }
 
-// TODO: DisplayMediaStreamConstraints should be used when it will be
-//       implemented by UA's.
-//       Added in https://github.com/rustwasm/wasm-bindgen/pull/2423, use
-//       when > 0.2.69 version release.
-
 /// Wrapper around [MediaStreamConstraints][1] that specifies concrete media
 /// source (device or display), and allows to group two requests with different
 /// sources.
