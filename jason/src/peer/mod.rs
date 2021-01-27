@@ -381,11 +381,11 @@ impl PeerConnection {
         let sender = peer.peer_events_sender.clone();
         peer.peer
             .on_connection_state_change(Some(move |peer_connection_state| {
-                let _ =
-                    sender.unbounded_send(PeerEvent::ConnectionStateChanged {
-                        peer_id: id,
-                        peer_connection_state,
-                    });
+                Self::on_connection_state_changed(
+                    id,
+                    &sender,
+                    peer_connection_state,
+                )
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -582,6 +582,39 @@ impl PeerConnection {
             peer_id,
             ice_connection_state,
         });
+    }
+
+    /// Handle `connectionstatechange` event from underlying peer emitting
+    /// [`PeerEvent::ConnectionStateChanged`] event into this peers
+    /// `peer_events_sender`.
+    fn on_connection_state_changed(
+        peer_id: Id,
+        sender: &mpsc::UnboundedSender<PeerEvent>,
+        peer_connection_state: PeerConnectionState,
+    ) {
+        let _ = sender.unbounded_send(PeerEvent::ConnectionStateChanged {
+            peer_id,
+            peer_connection_state,
+        });
+    }
+
+    /// Sends [`PeerConnection`]'s connection state and ICE connection state to
+    /// the server.
+    fn send_states(&self) {
+        let ice_connection_state = self.peer.ice_connection_state();
+        Self::on_ice_connection_state_changed(
+            self.id,
+            &self.peer_events_sender,
+            ice_connection_state,
+        );
+
+        if let Some(peer_connection_state) = self.peer.connection_state() {
+            Self::on_connection_state_changed(
+                self.id,
+                &self.peer_events_sender,
+                peer_connection_state,
+            );
+        }
     }
 
     /// Marks [`PeerConnection`] to trigger ICE restart.

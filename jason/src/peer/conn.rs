@@ -336,6 +336,18 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Returns [`RtcIceConnectionState`] of this [`RtcPeerConnection`].
+    pub fn ice_connection_state(&self) -> RtcIceConnectionState {
+        self.peer.ice_connection_state()
+    }
+
+    /// Returns [`PeerConnectionState`] of this [`RtcPeerConnection`].
+    ///
+    /// Returns [`None`] if failed to parse [`PeerConnectionState`].
+    pub fn connection_state(&self) -> Option<PeerConnectionState> {
+        get_peer_connection_state(&self.peer)?.parse().ok()
+    }
+
     /// Sets handler for [`iceconnectionstatechange`][1] event.
     ///
     /// # Errors
@@ -405,29 +417,15 @@ impl RtcPeerConnection {
                             if let Some(state) =
                                 get_peer_connection_state(&peer)
                             {
-                                let state = match state.as_ref() {
-                                    "new" => PeerConnectionState::New,
-                                    "connecting" => {
-                                        PeerConnectionState::Connecting
-                                    }
-                                    "connected" => {
-                                        PeerConnectionState::Connected
-                                    }
-                                    "disconnected" => {
-                                        PeerConnectionState::Disconnected
-                                    }
-                                    "failed" => PeerConnectionState::Failed,
-                                    "closed" => PeerConnectionState::Closed,
-                                    _ => {
-                                        log::error!(
-                                            "Unknown RTCPeerConnection \
-                                             connection state: {}.",
-                                            state,
-                                        );
-                                        return;
-                                    }
-                                };
-                                f(state);
+                                if let Ok(state) = state.parse() {
+                                    f(state);
+                                } else {
+                                    log::error!(
+                                        "Unknown RTCPeerConnection connection \
+                                         state: {}.",
+                                        state,
+                                    );
+                                }
                             } else {
                                 log::error!(
                                     "Could not receive RTCPeerConnection \

@@ -383,4 +383,21 @@ impl Component {
         }
         Ok(())
     }
+
+    /// Watcher for the [`State::sync_state`] updates.
+    ///
+    /// Sends [`PeerConnection`]'s connection state and ICE connection state to
+    /// the server.
+    #[watch(self.sync_state.subscribe().skip(1))]
+    async fn sync_state_changed(
+        peer: Rc<PeerConnection>,
+        _: Rc<State>,
+        sync_state: SyncState,
+    ) -> Result<(), Traced<PeerError>> {
+        if let SyncState::Synced = sync_state {
+            peer.send_states();
+        }
+
+        Ok(())
+    }
 }
