@@ -9,7 +9,7 @@ use actix_web::{
     web::{resource, Data, Payload, ServiceConfig},
     App, HttpRequest, HttpResponse, HttpServer,
 };
-use actix_web_actors::ws;
+use actix_web_actors::{ws, ws::WebsocketContext};
 use futures::FutureExt as _;
 
 use crate::{
@@ -20,6 +20,14 @@ use crate::{
     signalling::room_repo::RoomRepository,
 };
 
+/// Max size of WebSocket [frame].
+///
+/// This size is chosen because Chromium splits [frame]s with size > 131Kb by
+/// sending continuation [frame]s.
+///
+/// [frame]: https://tools.ietf.org/html/rfc6455#page-27
+const MAX_WS_FRAME_SIZE: usize = 131_000;
+
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
 async fn ws_index(
@@ -27,14 +35,16 @@ async fn ws_index(
     state: Data<Context>,
     payload: Payload,
 ) -> actix_web::Result<HttpResponse> {
-    ws::start(
-        WsSession::new(
-            Box::new(state.rooms.clone()),
-            state.config.idle_timeout,
-            state.config.ping_interval,
-        ),
-        &request,
-        payload,
+    Ok(
+        ws::handshake(&request)?.streaming(WebsocketContext::with_codec(
+            WsSession::new(
+                Box::new(state.rooms.clone()),
+                state.config.idle_timeout,
+                state.config.ping_interval,
+            ),
+            payload,
+            actix_http::ws::Codec::new().max_size(MAX_WS_FRAME_SIZE),
+        )),
     )
 }
 
