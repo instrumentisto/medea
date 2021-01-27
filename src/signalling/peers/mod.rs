@@ -521,7 +521,6 @@ impl PeersService {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
-    #[inline]
     pub(super) fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,

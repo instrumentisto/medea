@@ -27,23 +27,28 @@ use super::Sender;
 
 /// State of the [`local::Track`] of the [`Sender`].
 ///
-/// [`PartialEq`] implementation of this state will ignore
+/// [`PartialEq`] implementation of this state ignores
 /// [`LocalTrackState::Failed`] content.
 #[derive(Debug, Clone)]
 enum LocalTrackState {
     /// Indicates that [`Sender`] is new, or [`local::Track`] is set.
     Stable,
 
-    /// Indicates that [`Sender`] needs new [`local::Track`].
+    /// Indicates that [`Sender`] needs a new [`local::Track`].
     NeedUpdate,
 
     /// Indicates that new [`local::Track`] getting is failed.
     ///
-    /// Contains [`PeerError`] with which gUM/gDM request was failed.
+    /// Contains [`PeerError`] with which
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request was failed.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     Failed(Traced<PeerError>),
 }
 
 impl PartialEq for LocalTrackState {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
         match self {
             Self::NeedUpdate => matches!(other, Self::NeedUpdate),
@@ -104,9 +109,10 @@ impl State {
         })
     }
 
-    /// Indicates whether [`Sender`]'s media exchange state is in
+    /// Indicates whether this [`Sender`]'s media exchange state is in
     /// [`media_exchange_state::Stable::Enabled`].
     #[inline]
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.enabled_individual.enabled()
     }
@@ -161,10 +167,13 @@ impl State {
         self.mute_state.muted()
     }
 
-    /// Returns [`Future`] which will be resolved when gUM/gDM request for this
-    /// [`State`] will be resolved.
+    /// Returns [`Future`] which will be resolved once
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request for this [`State`] is
+    /// resolved.
     ///
     /// [`Future`]: std::future::Future
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
     ) -> LocalBoxFuture<'static, peer::Result<()>> {
@@ -214,8 +223,8 @@ impl State {
         ])
     }
 
-    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
-    /// and [`mute_state`] will be stabilized.
+    /// Returns [`Future`] which will be resolved once [`media_exchange_state`]
+    /// and [`mute_state`] are be stabilized.
     ///
     /// [`Future`]: std::future::Future
     pub fn when_stabilized(&self) -> AllProcessed<'static> {
@@ -232,13 +241,13 @@ impl State {
         matches!(self.local_track_state.get(), LocalTrackState::NeedUpdate)
     }
 
-    /// Transits [`State::local_track_state`] to failed state.
+    /// Transits [`State::local_track_state`] to a failed state.
     #[inline]
     pub fn failed_local_stream_update(&self, error: Traced<PeerError>) {
         self.local_track_state.set(LocalTrackState::Failed(error));
     }
 
-    /// Transits [`State::local_track_state`] to stable state.
+    /// Transits [`State::local_track_state`] to a stable state.
     #[inline]
     pub fn local_stream_updated(&self) {
         self.local_track_state.set(LocalTrackState::Stable);
@@ -269,7 +278,7 @@ impl State {
 impl Component {
     /// Watcher for [`MediaExchangeState::Transition`] update.
     ///
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
     /// [`media_exchange_state`].
     #[watch(self.enabled_individual.subscribe_transition())]
     async fn enabled_individual_transition_started(
@@ -303,7 +312,8 @@ impl Component {
 
     /// Watcher for [`MuteState::Transition`] update.
     ///
-    /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided mute state.
+    /// Sends [`TrackEvent::MuteUpdateIntention`] with the provided
+    /// [`mute_state`].
     #[watch(self.mute_state.subscribe_transition())]
     async fn mute_state_transition_watcher(
         sender: Rc<Sender>,
@@ -352,14 +362,14 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for [`MediaExchangeState::Stable`] update.
+    /// Watcher for the [`MediaExchangeState::Stable`] update.
     ///
-    /// Updates [`Receiver::enabled_individual`] to the new state.
+    /// Updates [`Receiver::enabled_individual`] to the `new_state`.
     ///
-    /// Removes `MediaTrack` from [`Transceiver`] if new state is
+    /// Removes `MediaTrack` from [`Transceiver`] if `new_state` is
     /// [`media_exchange_state::Stable::Disabled`].
     ///
-    /// Sets [`State::need_local_stream_update`] to the `true` if state is
+    /// Sets [`State::need_local_stream_update`] to the `true` if `new_state` is
     /// [`media_exchange_state::Stable::Enabled`].
     #[watch(self.enabled_individual.subscribe_stable())]
     async fn enabled_individual_stable_state_changed(
@@ -378,11 +388,10 @@ impl Component {
                 sender.remove_track().await;
             }
         }
-
         Ok(())
     }
 
-    /// Watcher for [`MuteState::Stable`] update.
+    /// Watcher for the [`MuteState::Stable`] update.
     ///
     /// Updates [`Sender`]'s mute state.
     ///
@@ -402,20 +411,22 @@ impl Component {
                 sender.transceiver.set_send_track_enabled(true);
             }
         }
-
         Ok(())
     }
 }
 
 impl TransceiverSide for State {
+    #[inline]
     fn track_id(&self) -> TrackId {
         self.id
     }
 
+    #[inline]
     fn kind(&self) -> MediaKind {
         self.media_kind()
     }
 
+    #[inline]
     fn source_kind(&self) -> MediaSourceKind {
         self.media_source()
     }
@@ -435,12 +446,14 @@ impl TransceiverSide for State {
 }
 
 impl MediaStateControllable for State {
+    #[inline]
     fn media_exchange_state_controller(
         &self,
     ) -> Rc<MediaExchangeStateController> {
         Rc::clone(&self.enabled_individual)
     }
 
+    #[inline]
     fn mute_state_controller(&self) -> Rc<MuteStateController> {
         Rc::clone(&self.mute_state)
     }

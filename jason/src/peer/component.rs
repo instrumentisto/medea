@@ -67,16 +67,16 @@ use super::{PeerConnection, PeerEvent};
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum NegotiationState {
-    /// Means that [`PeerComponent`] is new or negotiation completed.
+    /// [`PeerComponent`] is new or negotiation is completed.
     Stable,
 
-    /// [`PeerComponent`] waits for local SDP offer generating.
+    /// [`PeerComponent`] waits for a local SDP offer generating.
     WaitLocalSdp,
 
-    /// [`PeerComponent`] waits for local SDP approve by server.
+    /// [`PeerComponent`] waits for a local SDP being approved by server.
     WaitLocalSdpApprove,
 
-    /// [`PeerComponent`] waits for remote SDP offer.
+    /// [`PeerComponent`] waits for a remote SDP offer.
     WaitRemoteSdp,
 }
 
@@ -225,16 +225,20 @@ impl State {
         self.local_sdp.resume_timeout();
     }
 
-    /// Returns [`Future`] which will be resolved when gUM/gDM request for the
-    /// provided [`TrackId`]s will be resolved.
+    /// Returns [`Future`] which will be resolved once
+    /// [getUserMedia()][1]/[getDisplayMedia()][2] request for the provided
+    /// [`TrackId`]s is resolved.
     ///
-    /// [`Result`] returned by this [`Future`] will be the same as result of the
-    /// gUM/gDM request.
+    /// [`Result`] returned by this [`Future`] will be the same as the result of
+    /// the [getUserMedia()][1]/[getDisplayMedia()][2] request.
     ///
-    /// Returns last known gUM/gDM request's [`Result`], if currently no gUM/gDM
-    /// requests are running for the provided [`TrackId`]s.
+    /// Returns last known [getUserMedia()][1]/[getDisplayMedia()][2] request's
+    /// [`Result`], if currently no such requests are running for the provided
+    /// [`TrackId`]s.
     ///
     /// [`Future`]: std::future::Future
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub fn local_stream_update_result(
         &self,
         tracks_ids: HashSet<TrackId>,
@@ -281,32 +285,30 @@ impl State {
         medea_reactive::when_all_processed(when_futs)
     }
 
-    /// Returns [`Future`] which will be resolved when all [`State::receivers`]
-    /// will be stabilized meaning that all [`ReceiverComponent`]s won't contain
+    /// Returns [`Future`] which will be resolved once all [`State::receivers`]
+    /// are stabilized meaning that all [`ReceiverComponent`]s won't contain
     /// any pending state change transitions.
     fn when_all_receivers_stabilized(&self) -> AllProcessed<'static> {
-        let when_futs: Vec<_> = self
-            .receivers
-            .borrow()
-            .values()
-            .map(|s| s.when_stabilized().into())
-            .collect();
-
-        medea_reactive::when_all_processed(when_futs)
+        medea_reactive::when_all_processed(
+            self.receivers
+                .borrow()
+                .values()
+                .map(|s| s.when_stabilized().into())
+                .collect::<Vec<_>>(),
+        )
     }
 
-    /// Returns [`Future`] which will be resolved when all [`State::senders`]
-    /// will be stabilized meaning that all [`SenderComponent`]s won't contain
+    /// Returns [`Future`] which will be resolved once all [`State::senders`]
+    /// are stabilized meaning that all [`SenderComponent`]s won't contain
     /// any pending state change transitions.
     fn when_all_senders_stabilized(&self) -> AllProcessed<'static, ()> {
-        let when_futs: Vec<_> = self
-            .senders
-            .borrow()
-            .values()
-            .map(|s| s.when_stabilized().into())
-            .collect();
-
-        medea_reactive::when_all_processed(when_futs)
+        medea_reactive::when_all_processed(
+            self.senders
+                .borrow()
+                .values()
+                .map(|s| s.when_stabilized().into())
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Returns [`Future`] resolving when all [`sender::State`]'s and
@@ -352,7 +354,6 @@ impl State {
                 s.local_stream_updated();
             }
         }
-
         res
     }
 
@@ -652,15 +653,14 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for the SDP offer approving.
+    /// Watcher for the SDP offer approving by server.
     ///
-    /// If current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
-    /// [`NegotiationState`] will be transited to the
+    /// If the current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
+    /// [`NegotiationState`] will transit to the
     /// [`NegotiationState::WaitRemoteSdp`].
     ///
-    /// If current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
-    /// [`NegotiationState`] will be transited to the
-    /// [`NegotiationState::Stable`].
+    /// If the current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
+    /// [`NegotiationState`] will transit to the [`NegotiationState::Stable`].
     #[watch(self.local_sdp.on_approve().skip(1))]
     async fn local_sdp_approved(
         _: Rc<PeerConnection>,
@@ -680,13 +680,12 @@ impl Component {
                 }
             }
         }
-
         Ok(())
     }
 
     /// Watcher for the [`NegotiationState`] change.
     ///
-    /// Resets [`NegotiationRole`] to `None` on [`NegotiationState::Stable`].
+    /// Resets [`NegotiationRole`] to [`None`] on [`NegotiationState::Stable`].
     ///
     /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
     #[watch(self.negotiation_state.subscribe().skip(1))]
@@ -811,11 +810,12 @@ impl State {
 
     /// Returns current [`NegotiationRole`] of this [`State`].
     #[inline]
+    #[must_use]
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.negotiation_role.get()
     }
 
-    /// Returns [`Future`] which will be resolved when local SDP approve will be
+    /// Returns [`Future`] which will be resolved once local SDP approve is
     /// needed.
     #[inline]
     pub fn when_local_sdp_approve_needed(
@@ -826,7 +826,7 @@ impl State {
             .map(|_| ())
     }
 
-    /// Stabilize all [`receiver::State`] from this [`State`].
+    /// Stabilizes all [`receiver::State`]s of this [`State`].
     #[inline]
     pub fn stabilize_all(&self) {
         self.receivers.borrow().values().for_each(|r| {
@@ -834,9 +834,9 @@ impl State {
         });
     }
 
-    /// Waits until [`State::local_sdp`] will be resolved and returns its new
-    /// value.
+    /// Waits until [`State::local_sdp`] is resolved and returns its new value.
     #[inline]
+    #[must_use]
     pub async fn when_local_sdp_updated(&self) -> Option<String> {
         use futures::StreamExt as _;
 
@@ -844,7 +844,7 @@ impl State {
     }
 
     /// Waits until all [`State::senders`]' and [`State::receivers`]' inserts
-    /// will be processed.
+    /// are processed.
     #[inline]
     pub async fn when_all_tracks_created(&self) {
         medea_reactive::when_all_processed(vec![

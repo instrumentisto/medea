@@ -185,6 +185,7 @@ impl Sender {
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     #[inline]
+    #[must_use]
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }

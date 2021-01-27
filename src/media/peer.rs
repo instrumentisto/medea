@@ -218,7 +218,7 @@ impl PeerStateMachine {
         }
     }
 
-    /// Returns `true` if this [`PeerStateMachine`] currently in [`Stable`]
+    /// Indicates whether this [`PeerStateMachine`] is currently in a [`Stable`]
     /// state.
     #[inline]
     #[must_use]
@@ -226,7 +226,7 @@ impl PeerStateMachine {
         matches!(self, PeerStateMachine::Stable(_))
     }
 
-    /// Returns `true` if this [`PeerStateMachine`] can forcibly commit
+    /// Indicates whether this [`PeerStateMachine`] can forcibly commit a
     /// [`TrackChange::PartnerTrackPatch`].
     #[inline]
     #[must_use]
@@ -359,9 +359,9 @@ pub struct Context {
     /// should be started for this [`Peer`].
     peer_updates_sub: Rc<dyn PeerUpdatesSubscriber>,
 
-    /// Flag which indicates that [`Peer`] needs renegotiation after
-    /// negotiation finish.
-    need_renegotiation: bool,
+    /// Indicator whether this [`Peer`] needs renegotiation after a negotiation
+    /// has finished.
+    needs_renegotiation: bool,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -702,7 +702,7 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
-    /// Forcibly commits all [`TrackChange::PartnerTrackPatch`].
+    /// Forcibly commits all the [`TrackChange::PartnerTrackPatch`]es.
     pub fn force_commit_partner_changes(&mut self) {
         let mut partner_patches = Vec::new();
         // TODO: use drain_filter when its stable
@@ -783,7 +783,7 @@ impl<T> Peer<T> {
         if !updates.is_empty() {
             // TODO: can be optimized after #167
             if self.context.is_known_to_remote {
-                self.context.need_renegotiation = true;
+                self.context.needs_renegotiation = true;
             }
             self.context
                 .peer_updates_sub
@@ -969,7 +969,7 @@ impl Peer<Stable> {
             pending_track_updates: Vec::new(),
             track_changes_queue: Vec::new(),
             peer_updates_sub,
-            need_renegotiation: false,
+            needs_renegotiation: false,
         };
 
         Self {
@@ -1043,7 +1043,7 @@ impl Peer<Stable> {
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
         if !self.context.track_changes_queue.is_empty()
-            || self.context.need_renegotiation
+            || self.context.needs_renegotiation
         {
             let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
@@ -1058,7 +1058,7 @@ impl Peer<Stable> {
             self.dedup_pending_track_updates();
 
             if self.context.pending_track_updates.is_empty()
-                && !self.context.need_renegotiation
+                && !self.context.needs_renegotiation
             {
                 self.context.peer_updates_sub.force_update(
                     self.id(),
@@ -1072,7 +1072,7 @@ impl Peer<Stable> {
                     .pending_track_updates
                     .append(&mut negotiationless_changes);
                 self.context.peer_updates_sub.negotiation_needed(self.id());
-                self.context.need_renegotiation = false;
+                self.context.needs_renegotiation = false;
             }
         }
     }
@@ -1410,7 +1410,7 @@ pub mod tests {
         assert_eq!(peer_id, PeerId(0));
         assert_eq!(changes.len(), 2);
         assert!(peer.context.track_changes_queue.is_empty());
-        assert!(peer.context.need_renegotiation);
+        assert!(peer.context.needs_renegotiation);
 
         let peer = peer.set_local_offer(String::new());
         peer.set_remote_answer(String::new());

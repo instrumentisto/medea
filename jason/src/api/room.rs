@@ -251,8 +251,9 @@ impl RoomHandle {
             MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
         );
 
-        // Perform gUM / gDM right away, so we can fail fast without touching
-        // senders states and starting all required messaging.
+        // Perform `getUuserMedia()`/`getDisplayMedia()` right away, so we can
+        // fail fast without touching senders' states and starting all required
+        // messaging.
         // Hold tracks through all process, to ensure that they will be reused
         // without additional requests.
         let _tracks_handles = if direction_send && enabling {
@@ -291,11 +292,9 @@ impl RoomHandle {
                         )
                         .await?;
                 }
-
                 return Err(e.into());
             }
         }
-
         Ok(())
     }
 }
@@ -1130,15 +1129,14 @@ impl InnerRoom {
                         .state()
                         .get(id)?
                         .local_stream_update_result(tracks_ids)
-                        .map_err(tracerr::map_from_and_wrap!( => PeerError)),
+                        .map_err(tracerr::map_from_and_wrap!(=> PeerError)),
                 )
             },
         ))
         .map(|r| r.map(|_| ()))
         .await
-        .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(())
+        .map_err(tracerr::map_from_and_wrap!())
+        .map(|_| ())
     }
 
     /// Returns [`local::Track`]s for the provided [`MediaKind`] and
@@ -1149,11 +1147,10 @@ impl InnerRoom {
     ///
     /// # Errors
     ///
-    /// Errors with [`RoomError::MediaManagerError`] if failed to obtain
-    /// [`local::TrackHandle`] from the [`MediaManager`].
-    ///
-    /// Errors with [`RoomError::PeerConnectionError`] if failed to get
-    /// [`MediaStreamSettings`].
+    /// - [`RoomError::MediaManagerError`] if failed to obtain
+    ///   [`local::TrackHandle`] from the [`MediaManager`].
+    /// - [`RoomError::PeerConnectionError`] if failed to get
+    ///   [`MediaStreamSettings`].
     ///
     /// [`MediaStreamSettings`]: crate::MediaStreamSettings
     async fn get_local_tracks(
@@ -1692,8 +1689,8 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Handles [`PeerEvent::SendIntention`] event by sending provided
-    /// [`Command`] to the Media Server.
+    /// Handles [`PeerEvent::SendIntention`] event by sending the provided
+    /// [`Command`] to Media Server.
     async fn on_media_update_command(
         &self,
         intention: Command,
@@ -1723,7 +1720,7 @@ impl Drop for InnerRoom {
 
 #[cfg(feature = "mockable")]
 impl Room {
-    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with a provided
+    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with the provided
     /// [`PeerId`].
     pub fn reset_peer_negotiation_state(
         &self,
