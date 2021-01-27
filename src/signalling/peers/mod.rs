@@ -521,12 +521,23 @@ impl PeersService {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
-    #[inline]
     pub(super) fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,
     ) -> HashMap<MemberId, Vec<PeerId>> {
-        self.peers.remove_peers_related_to_member(member_id)
+        let peers = self.peers.remove_peers_related_to_member(member_id);
+
+        if !peers.is_empty() {
+            let all_peers: Vec<PeerId> =
+                peers.values().flatten().copied().collect();
+            self.peer_metrics_service
+                .borrow_mut()
+                .unregister_peers(&all_peers);
+            self.peers_traffic_watcher
+                .unregister_peers(self.room_id.clone(), all_peers);
+        }
+
+        peers
     }
 
     /// Updates tracks information of the [`Peer`] with provided [`PeerId`] in

@@ -82,7 +82,16 @@ async fn helper(
                 for update in updates {
                     match update {
                         TrackUpdate::Updated(patch) => {
-                            assert_eq!(patch.enabled_general, Some(enabled));
+                            if let Some(enabled_general) = patch.enabled_general
+                            {
+                                assert_eq!(enabled_general, enabled);
+                            } else if let Some(enabled_individual) =
+                                patch.enabled_individual
+                            {
+                                assert_eq!(enabled_individual, enabled);
+                            } else {
+                                unreachable!()
+                            }
                             if patch.id == TrackId(0) {
                                 first_disabled = true;
                             } else if patch.id == TrackId(1) {
