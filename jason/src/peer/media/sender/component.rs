@@ -533,7 +533,7 @@ impl Component {
             }
             SyncState::Desynced => {
                 state.enabled_individual.stop_transition_timeout();
-                state.mute_state.reset_transition_timeout();
+                state.mute_state.stop_transition_timeout();
             }
             SyncState::Syncing => (),
         }
