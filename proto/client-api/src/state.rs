@@ -40,10 +40,10 @@ pub struct Peer {
     pub negotiation_role: Option<NegotiationRole>,
 
     /// Current SDP offer of this [`Peer`].
-    pub sdp_offer: Option<String>,
+    pub local_sdp: Option<String>,
 
     /// Current SDP offer of the partner [`Peer`].
-    pub remote_sdp_offer: Option<String>,
+    pub remote_sdp: Option<String>,
 
     /// Flag which indicates that ICE restart should be performed.
     pub restart_ice: bool,

@@ -419,8 +419,8 @@ impl AsProtoState for State {
             force_relay: self.force_relay,
             ice_servers: self.ice_servers.clone(),
             negotiation_role: self.negotiation_role.get(),
-            sdp_offer: self.local_sdp.current(),
-            remote_sdp_offer: self.remote_sdp.get(),
+            local_sdp: self.local_sdp.current(),
+            remote_sdp: self.remote_sdp.get(),
             restart_ice: self.restart_ice.get(),
         }
     }
@@ -466,10 +466,10 @@ impl SynchronizableState for State {
         if state.restart_ice {
             self.restart_ice.set(true);
         }
-        if let Some(sdp_offer) = state.sdp_offer {
+        if let Some(sdp_offer) = state.local_sdp {
             self.local_sdp.approved_set(sdp_offer);
         }
-        self.remote_sdp.set(state.remote_sdp_offer);
+        self.remote_sdp.set(state.remote_sdp);
         self.ice_candidates.apply(state.ice_candidates, send_cons);
         self.senders.apply(state.senders, send_cons);
         self.receivers.apply(state.receivers, send_cons);
