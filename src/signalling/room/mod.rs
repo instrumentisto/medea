@@ -169,6 +169,8 @@ impl Room {
     }
 
     /// Returns [`state::Room`] for the provided [`MemberId`].
+    #[inline]
+    #[must_use]
     pub fn get_state(&self, member_id: &MemberId) -> state::Room {
         state::Room {
             peers: self.peers.get_peers_states(member_id),

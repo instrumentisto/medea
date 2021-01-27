@@ -27,7 +27,9 @@ use crate::{
 use super::sender;
 
 /// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
-/// [`PeerComponent`].
+/// [`Component`].
+///
+/// [`Component`]: super::Component
 #[derive(Debug, From)]
 pub struct TracksRepository<S: 'static>(
     RefCell<ProgressableHashMap<TrackId, Rc<S>>>,
@@ -35,28 +37,35 @@ pub struct TracksRepository<S: 'static>(
 
 impl<S> TracksRepository<S> {
     /// Returns new [`TracksRepository`] with a provided tracks.
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self(RefCell::new(ProgressableHashMap::new()))
     }
 
     /// Returns [`Future`] which will be resolved when all inserts/removes will
     /// be processed.
+    #[inline]
     pub fn when_all_processed(&self) -> AllProcessed<'static> {
         self.0.borrow().when_all_processed()
     }
 
     /// Inserts provided track.
+    #[inline]
     pub fn insert(&self, id: TrackId, track: Rc<S>) {
         self.0.borrow_mut().insert(id, track);
     }
 
     /// Returns track with a provided [`TrackId`].
+    #[inline]
+    #[must_use]
     pub fn get(&self, id: TrackId) -> Option<Rc<S>> {
         self.0.borrow().get(&id).cloned()
     }
 
     /// Returns [`Stream`] into which all [`TracksRepository::insert`]ions will
     /// be sent.
+    #[inline]
     pub fn on_insert(
         &self,
     ) -> LocalBoxStream<'static, Guarded<(TrackId, Rc<S>)>> {
@@ -68,6 +77,7 @@ impl TracksRepository<sender::State> {
     /// Returns all [`sender::State`]s which are requires local `MediaStream`
     /// update.
     #[inline]
+    #[must_use]
     pub fn get_outdated(&self) -> Vec<Rc<sender::State>> {
         self.0
             .borrow()
@@ -204,6 +214,7 @@ where
 #[cfg(feature = "mockable")]
 impl<S> TracksRepository<S> {
     /// Waits until all track inserts will be processed.
+    #[inline]
     pub fn when_insert_processed(&self) -> medea_reactive::Processed<'static> {
         self.0.borrow().when_insert_processed()
     }
@@ -212,6 +223,7 @@ impl<S> TracksRepository<S> {
 #[cfg(feature = "mockable")]
 impl TracksRepository<super::receiver::State> {
     /// Stabilize all [`receiver::State`] from this [`State`].
+    #[inline]
     pub fn stabilize_all(&self) {
         self.0.borrow().values().for_each(|r| r.stabilize());
     }

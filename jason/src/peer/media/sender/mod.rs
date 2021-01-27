@@ -200,51 +200,32 @@ impl Sender {
 
     /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
     /// [`media_exchange_state`].
+    #[inline]
     pub fn send_media_exchange_state_intention(
         &self,
         state: media_exchange_state::Transition,
     ) {
-        match state {
-            media_exchange_state::Transition::Enabling(_) => {
-                self.track_events_sender
-                    .unbounded_send(TrackEvent::MediaExchangeIntention {
-                        id: self.track_id,
-                        enabled: true,
-                    })
-                    .ok();
-            }
-            media_exchange_state::Transition::Disabling(_) => {
-                self.track_events_sender
-                    .unbounded_send(TrackEvent::MediaExchangeIntention {
-                        id: self.track_id,
-                        enabled: false,
-                    })
-                    .ok();
-            }
-        }
+        let _ = self.track_events_sender.unbounded_send(
+            TrackEvent::MediaExchangeIntention {
+                id: self.track_id,
+                enabled: matches!(
+                    state,
+                    media_exchange_state::Transition::Enabling(_)
+                ),
+            },
+        );
     }
 
     /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided
     /// [`mute_state`].
+    #[inline]
     pub fn send_mute_state_intention(&self, state: mute_state::Transition) {
-        match state {
-            mute_state::Transition::Muting(_) => {
-                self.track_events_sender
-                    .unbounded_send(TrackEvent::MuteUpdateIntention {
-                        id: self.track_id,
-                        muted: true,
-                    })
-                    .ok();
-            }
-            mute_state::Transition::Unmuting(_) => {
-                self.track_events_sender
-                    .unbounded_send(TrackEvent::MuteUpdateIntention {
-                        id: self.track_id,
-                        muted: false,
-                    })
-                    .ok();
-            }
-        }
+        let _ = self.track_events_sender.unbounded_send(
+            TrackEvent::MuteUpdateIntention {
+                id: self.track_id,
+                muted: matches!(state, mute_state::Transition::Muting(_)),
+            },
+        );
     }
 }
 

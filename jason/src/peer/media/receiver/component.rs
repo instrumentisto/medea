@@ -49,6 +49,7 @@ pub struct State {
 impl AsProtoState for State {
     type Output = proto::state::Receiver;
 
+    #[inline]
     fn as_proto(&self) -> Self::Output {
         Self::Output {
             id: self.id,
@@ -65,6 +66,7 @@ impl AsProtoState for State {
 impl SynchronizableState for State {
     type Input = proto::state::Receiver;
 
+    #[inline]
     fn from_proto(input: Self::Input, _: &LocalTracksConstraints) -> Self {
         Self {
             id: input.id,
@@ -148,6 +150,7 @@ impl Updatable for State {
 }
 
 impl From<&State> for proto::state::Receiver {
+    #[inline]
     fn from(from: &State) -> Self {
         Self {
             id: from.id,

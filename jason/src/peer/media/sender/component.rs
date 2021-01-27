@@ -80,6 +80,7 @@ pub struct State {
 impl AsProtoState for State {
     type Output = proto::state::Sender;
 
+    #[inline]
     fn as_proto(&self) -> Self::Output {
         Self::Output {
             id: self.id,
@@ -97,6 +98,7 @@ impl AsProtoState for State {
 impl SynchronizableState for State {
     type Input = proto::state::Sender;
 
+    #[inline]
     fn from_proto(
         input: Self::Input,
         send_constraints: &LocalTracksConstraints,
@@ -192,6 +194,7 @@ impl Updatable for State {
 }
 
 impl From<&State> for proto::state::Sender {
+    #[inline]
     fn from(state: &State) -> Self {
         Self {
             id: state.id,
@@ -384,6 +387,7 @@ impl Component {
     ///
     /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
     /// [`media_exchange_state`].
+    #[inline]
     #[watch(self.enabled_individual.subscribe_transition())]
     async fn enabled_individual_transition_started(
         sender: Rc<Sender>,
@@ -398,6 +402,7 @@ impl Component {
     /// Watcher for [`MuteState::Transition`] update.
     ///
     /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided mute state.
+    #[inline]
     #[watch(self.mute_state.subscribe_transition())]
     async fn mute_state_transition_watcher(
         sender: Rc<Sender>,

@@ -592,6 +592,7 @@ impl PeersService {
     /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
     /// [`MemberId`].
     #[inline]
+    #[must_use]
     pub(super) fn get_peers_states(
         &self,
         member_id: &MemberId,
@@ -769,6 +770,7 @@ impl PeerRepository {
 
     /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
     /// [`MemberId`].
+    #[must_use]
     pub fn get_peers_states(
         &self,
         member_id: &MemberId,

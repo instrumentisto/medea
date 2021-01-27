@@ -102,6 +102,8 @@ impl LocalSdp {
     }
 
     /// Returns current SDP offer.
+    #[inline]
+    #[must_use]
     pub fn current(&self) -> Option<String> {
         self.0.current_sdp.get()
     }
@@ -163,6 +165,7 @@ impl LocalSdp {
     /// Returns `true` if new SDP offer needed after rollback is
     /// completed.
     #[inline]
+    #[must_use]
     pub fn is_restart_needed(&self) -> bool {
         self.0.restart_needed.get()
     }

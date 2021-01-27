@@ -16,6 +16,7 @@ use crate::{
 pub struct IceCandidates(RefCell<ObservableHashSet<IceCandidate>>);
 
 impl IceCandidates {
+    /// Returns new empty [`IceCandidates`] store.
     pub fn new() -> Self {
         Self(RefCell::new(ObservableHashSet::new()))
     }
