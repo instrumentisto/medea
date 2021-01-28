@@ -28,7 +28,7 @@
 pub mod state;
 pub mod stats;
 
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
@@ -355,30 +355,6 @@ impl From<IceConnectionState> for PeerConnectionState {
             IceState::Disconnected => Self::Disconnected,
             IceState::Closed => Self::Closed,
         }
-    }
-}
-
-/// Error which indicates that [`PeerConnectionState`] parsing failed.
-#[cfg(feature = "jason")]
-#[derive(Debug, Clone, Copy)]
-pub struct PeerConnectionStateParseError;
-
-#[cfg(feature = "jason")]
-impl FromStr for PeerConnectionState {
-    type Err = PeerConnectionStateParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "new" => Self::New,
-            "connecting" => Self::Connecting,
-            "connected" => Self::Connected,
-            "disconnected" => Self::Disconnected,
-            "failed" => Self::Failed,
-            "closed" => Self::Closed,
-            _ => {
-                return Err(PeerConnectionStateParseError);
-            }
-        })
     }
 }
 

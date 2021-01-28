@@ -8,7 +8,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::{
     future::{self, LocalBoxFuture, TryFutureExt as _},
-    FutureExt,
+    FutureExt as _,
 };
 use medea_client_api_proto::{
     CloseReason, Command, Credential, Event, MemberId, PeerId,
@@ -149,28 +149,6 @@ impl RpcServer for Addr<Room> {
     }
 }
 
-impl Handler<Synchronize> for Room {
-    type Result = ();
-
-    /// Generates [`state::Room`] for the provided [`MemberId`] and sends
-    /// [`Event::StateSynchronized`].
-    ///
-    /// [`state::Room`]: medea_client_api_proto::state::Room
-    fn handle(
-        &mut self,
-        msg: Synchronize,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        let state = self.get_state(&msg.0);
-        if let Err(e) = self.members.send_event_to_member(
-            msg.0.clone(),
-            Event::StateSynchronized { state },
-        ) {
-            error!("Failed to synchronize Member [id = {}]: {:?}", msg.0, e);
-        }
-    }
-}
-
 impl Handler<CommandMessage> for Room {
     type Result = ();
 
@@ -205,6 +183,28 @@ impl Handler<CommandMessage> for Room {
                 ctx,
             );
         };
+    }
+}
+
+impl Handler<Synchronize> for Room {
+    type Result = ();
+
+    /// Generates [`state::Room`] for the provided [`MemberId`] and sends
+    /// [`Event::StateSynchronized`].
+    ///
+    /// [`state::Room`]: medea_client_api_proto::state::Room
+    fn handle(
+        &mut self,
+        msg: Synchronize,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let state = self.get_state(&msg.0);
+        if let Err(e) = self.members.send_event_to_member(
+            msg.0.clone(),
+            Event::StateSynchronized { state },
+        ) {
+            error!("Failed to synchronize Member [id = {}]: {:?}", msg.0, e);
+        }
     }
 }
 

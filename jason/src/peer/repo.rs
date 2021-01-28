@@ -58,6 +58,26 @@ impl Component {
             peer.state().connection_recovered();
         }
     }
+
+    /// Updates this [`State`] with a provided [`proto::state::Room`].
+    pub fn apply(&self, new_state: proto::state::Room) {
+        let state = self.state();
+        let send_cons = &self.obj().send_constraints;
+
+        state.0.borrow_mut().remove_not_present(&new_state.peers);
+
+        for (id, peer_state) in new_state.peers {
+            let peer = state.0.borrow().get(&id).cloned();
+            if let Some(peer) = peer {
+                peer.apply(peer_state, send_cons);
+            } else {
+                state.0.borrow_mut().insert(
+                    id,
+                    Rc::new(peer::State::from_proto(peer_state, send_cons)),
+                );
+            }
+        }
+    }
 }
 
 /// State of the [`Component`].
@@ -188,27 +208,6 @@ impl State {
     #[inline]
     pub fn remove(&self, peer_id: PeerId) {
         self.0.borrow_mut().remove(&peer_id);
-    }
-
-    /// Updates this [`State`] with a provided [`proto::state::Room`].
-    pub fn apply(
-        &self,
-        state: proto::state::Room,
-        send_cons: &LocalTracksConstraints,
-    ) {
-        self.0.borrow_mut().remove_not_present(&state.peers);
-
-        for (id, peer_state) in state.peers {
-            let peer = self.0.borrow().get(&id).cloned();
-            if let Some(peer) = peer {
-                peer.apply(peer_state, send_cons);
-            } else {
-                self.0.borrow_mut().insert(
-                    id,
-                    Rc::new(peer::State::from_proto(peer_state, send_cons)),
-                );
-            }
-        }
     }
 }
 

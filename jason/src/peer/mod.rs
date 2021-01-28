@@ -600,12 +600,11 @@ impl PeerConnection {
 
     /// Sends [`PeerConnection`]'s connection state and ICE connection state to
     /// the server.
-    fn send_states(&self) {
-        let ice_connection_state = self.peer.ice_connection_state();
+    fn send_current_connection_states(&self) {
         Self::on_ice_connection_state_changed(
             self.id,
             &self.peer_events_sender,
-            ice_connection_state,
+            self.peer.ice_connection_state(),
         );
 
         if let Some(peer_connection_state) = self.peer.connection_state() {

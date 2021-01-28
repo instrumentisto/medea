@@ -53,9 +53,9 @@ fn get_test_room(
     rpc.expect_subscribe().return_once(move || events);
     rpc.expect_close_with_reason().return_const(());
     rpc.expect_on_connection_loss()
-        .returning(|| stream::pending().boxed_local());
+        .return_once(|| stream::pending().boxed_local());
     rpc.expect_on_reconnected()
-        .returning(|| stream::pending().boxed_local());
+        .return_once(|| stream::pending().boxed_local());
     rpc.expect_send_command().returning(move |command| {
         let _ = tx.unbounded_send(command);
     });
@@ -80,9 +80,9 @@ async fn get_test_room_and_exist_peer(
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     rpc.expect_on_connection_loss()
-        .returning(|| stream::pending().boxed_local());
+        .return_once(|| stream::pending().boxed_local());
     rpc.expect_on_reconnected()
-        .returning(|| stream::pending().boxed_local());
+        .return_once(|| stream::pending().boxed_local());
     rpc.expect_close_with_reason().return_const(());
     let event_tx_clone = event_tx.clone();
     let peer_state: Rc<RefCell<Option<Rc<peer::State>>>> =
@@ -1088,9 +1088,9 @@ mod rpc_close_reason_on_room_drop {
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
         rpc.expect_on_connection_loss()
-            .returning(|| stream::pending().boxed_local());
+            .return_once(|| stream::pending().boxed_local());
         rpc.expect_on_reconnected()
-            .returning(|| stream::pending().boxed_local());
+            .return_once(|| stream::pending().boxed_local());
         let (test_tx, test_rx) = oneshot::channel();
         rpc.expect_close_with_reason().return_once(move |reason| {
             test_tx.send(reason).unwrap();
@@ -2554,80 +2554,88 @@ mod set_local_media_settings {
     }
 }
 
-/// Checks that [`state::Room`] update can create [`PeerConnection`] and its
-/// [`Sender`]s/[`Receiver`]s.
-#[wasm_bindgen_test]
-async fn create_peer_by_state() {
-    let mut rpc_session = MockRpcSession::new();
-    rpc_session
-        .expect_subscribe()
-        .returning(|| Box::pin(stream::pending()));
-    rpc_session
-        .expect_on_connection_loss()
-        .returning(|| Box::pin(stream::pending()));
-    rpc_session
-        .expect_on_reconnected()
-        .returning(|| Box::pin(stream::pending()));
-    rpc_session.expect_close_with_reason().returning(|_| ());
-    let (command_tx, mut command_rx) = mpsc::unbounded();
-    rpc_session.expect_send_command().returning(move |cmd| {
-        let _ = command_tx.unbounded_send(cmd);
-    });
-    let room = Room::new(
-        Rc::new(rpc_session),
-        Rc::new(medea_jason::media::MediaManager::default()),
-    );
+mod state_synchronization {
+    use super::*;
 
-    let mut senders = HashMap::new();
-    senders.insert(
-        TrackId(0),
-        state::Sender {
-            id: TrackId(0),
-            muted: false,
-            enabled_individual: true,
-            enabled_general: true,
-            receivers: Vec::new(),
-            media_type: MediaType::Audio(AudioSettings { required: true }),
-            mid: None,
-        },
-    );
-    let mut receivers = HashMap::new();
-    receivers.insert(
-        TrackId(1),
-        state::Receiver {
-            id: TrackId(1),
-            muted: false,
-            enabled_individual: true,
-            enabled_general: true,
-            sender_id: "".into(),
-            media_type: MediaType::Audio(AudioSettings { required: true }),
-            mid: None,
-        },
-    );
-    let mut room_proto = room.peers_state().as_proto();
-    room_proto.peers.insert(
-        PeerId(0),
-        state::Peer {
-            id: PeerId(0),
-            restart_ice: false,
-            senders,
-            receivers,
-            force_relay: false,
-            ice_servers: vec![],
-            negotiation_role: Some(NegotiationRole::Offerer),
-            local_sdp: None,
-            remote_sdp: None,
-            ice_candidates: HashSet::new(),
-        },
-    );
-    room.peers_state().apply(room_proto, &Default::default());
+    /// Checks that [`state::Room`] update can create [`PeerConnection`] and its
+    /// [`Sender`]s/[`Receiver`]s.
+    #[wasm_bindgen_test]
+    async fn create_peer_by_state() {
+        let (command_tx, mut command_rx) = mpsc::unbounded();
+        let (event_tx, event_rx) = mpsc::unbounded();
 
-    let command = timeout(1000, command_rx.next()).await.unwrap().unwrap();
-    assert!(matches!(command, Command::MakeSdpOffer { .. }));
+        let mut rpc_session = MockRpcSession::new();
+        rpc_session
+            .expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc_session
+            .expect_on_connection_loss()
+            .return_once(|| Box::pin(stream::pending()));
+        rpc_session
+            .expect_on_reconnected()
+            .return_once(|| Box::pin(stream::pending()));
+        rpc_session.expect_close_with_reason().returning(|_| ());
+        rpc_session.expect_send_command().returning(move |cmd| {
+            let _ = command_tx.unbounded_send(cmd);
+        });
+        let room = Room::new(
+            Rc::new(rpc_session),
+            Rc::new(medea_jason::media::MediaManager::default()),
+        );
 
-    let peer = room.get_peer_by_id(PeerId(0)).unwrap();
-    assert!(peer.get_sender_by_id(TrackId(0)).is_some());
-    assert!(peer.get_receiver_by_id(TrackId(1)).is_some());
+        let mut senders = HashMap::new();
+        senders.insert(
+            TrackId(0),
+            state::Sender {
+                id: TrackId(0),
+                muted: false,
+                enabled_individual: true,
+                enabled_general: true,
+                receivers: Vec::new(),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
+                mid: None,
+            },
+        );
+        let mut receivers = HashMap::new();
+        receivers.insert(
+            TrackId(1),
+            state::Receiver {
+                id: TrackId(1),
+                muted: false,
+                enabled_individual: true,
+                enabled_general: true,
+                sender_id: "".into(),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
+                mid: None,
+            },
+        );
+        let mut room_proto = room.peers_state().as_proto();
+        room_proto.peers.insert(
+            PeerId(0),
+            state::Peer {
+                id: PeerId(0),
+                restart_ice: false,
+                senders,
+                receivers,
+                force_relay: false,
+                ice_servers: vec![],
+                negotiation_role: Some(NegotiationRole::Offerer),
+                local_sdp: None,
+                remote_sdp: None,
+                ice_candidates: HashSet::new(),
+            },
+        );
+        event_tx
+            .unbounded_send(Event::StateSynchronized { state: room_proto })
+            .unwrap();
+
+        let command = timeout(1000, command_rx.next()).await.unwrap().unwrap();
+        assert!(matches!(command, Command::MakeSdpOffer { .. }));
+
+        let peer = room.get_peer_by_id(PeerId(0)).unwrap();
+        assert!(peer.get_sender_by_id(TrackId(0)).is_some());
+        assert!(peer.get_receiver_by_id(TrackId(1)).is_some());
+    }
 }
 
 /// Checks that [`MediaState`] intentions are sent after [`peer::State`]

@@ -184,7 +184,7 @@ impl Component {
         state: Rc<State>,
         sdp: String,
     ) -> Result<(), Traced<PeerError>> {
-        state.sync_state.when_eq(SyncState::Synced).await.ok();
+        let _ = state.sync_state.when_eq(SyncState::Synced).await;
         if let Some(role) = state.negotiation_role.get() {
             if state.local_sdp.is_rollback() {
                 peer.peer
@@ -395,7 +395,7 @@ impl Component {
         sync_state: SyncState,
     ) -> Result<(), Traced<PeerError>> {
         if let SyncState::Synced = sync_state {
-            peer.send_states();
+            peer.send_current_connection_states();
         }
 
         Ok(())
