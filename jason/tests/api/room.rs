@@ -2669,30 +2669,38 @@ async fn intentions_are_sent_on_reconnect() {
     spawn_local(async move {
         let _ = JsFuture::from(room_handle.disable_audio()).await;
     });
-    while let Some(cmd) = commands_rx.next().await {
-        if let Command::UpdateTracks {
-            peer_id,
-            tracks_patches,
-        } = cmd
-        {
-            assert_eq!(peer_id, PeerId(1));
-            assert_eq!(tracks_patches[0].id, audio_track_id);
-            assert_eq!(tracks_patches[0].enabled, Some(false));
-            break;
+    timeout(1000, async {
+        while let Some(cmd) = commands_rx.next().await {
+            if let Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } = cmd
+            {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(tracks_patches[0].id, audio_track_id);
+                assert_eq!(tracks_patches[0].enabled, Some(false));
+                break;
+            }
         }
-    }
+    })
+    .await
+    .unwrap();
 
     peer_state.synced();
-    while let Some(cmd) = commands_rx.next().await {
-        if let Command::UpdateTracks {
-            peer_id,
-            tracks_patches,
-        } = cmd
-        {
-            assert_eq!(peer_id, PeerId(1));
-            assert_eq!(tracks_patches[0].id, audio_track_id);
-            assert_eq!(tracks_patches[0].enabled, Some(false));
-            break;
+    timeout(1000, async {
+        while let Some(cmd) = commands_rx.next().await {
+            if let Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } = cmd
+            {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(tracks_patches[0].id, audio_track_id);
+                assert_eq!(tracks_patches[0].enabled, Some(false));
+                break;
+            }
         }
-    }
+    })
+    .await
+    .unwrap();
 }
