@@ -1,5 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
+mod transitable_state;
+
 use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
