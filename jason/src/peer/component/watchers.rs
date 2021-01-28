@@ -335,7 +335,7 @@ impl Component {
     /// renegotiates [`PeerConnection`].
     #[watch(self.negotiation_role.subscribe().filter_map(future::ready))]
     async fn negotiation_role_changed(
-        peer: Rc<PeerConnection>,
+        _: Rc<PeerConnection>,
         state: Rc<State>,
         role: NegotiationRole,
     ) -> Result<(), Traced<PeerError>> {
@@ -353,10 +353,6 @@ impl Component {
                     state.when_all_updated().into(),
                 ])
                 .await;
-
-                let _ = state.update_local_stream(&peer).await;
-
-                state.negotiation_state.set(NegotiationState::WaitLocalSdp);
             }
             NegotiationRole::Answerer(remote_sdp) => {
                 state.when_all_receivers_processed().await;
@@ -375,12 +371,14 @@ impl Component {
                     state.receivers.when_stabilized().into(),
                 ])
                 .await;
-
-                let _ = state.update_local_stream(&peer).await;
-
-                state.negotiation_state.set(NegotiationState::WaitLocalSdp);
             }
         }
+
+        state.maybe_local_stream_update.set(true);
+        let _ = state.maybe_local_stream_update.when_eq(false).await;
+
+        state.negotiation_state.set(NegotiationState::WaitLocalSdp);
+
         Ok(())
     }
 
@@ -398,6 +396,25 @@ impl Component {
             peer.send_current_connection_states();
         }
 
+        Ok(())
+    }
+
+    /// Watcher for the [`State::maybe_local_stream_update`] `true` updates.
+    ///
+    /// Waits for [`State::senders`] update and calls
+    /// [`State::update_local_stream`].
+    #[watch(
+        self.maybe_local_stream_update.subscribe().filter(|v| future::ready(*v))
+    )]
+    async fn maybe_local_stream_update_needed(
+        peer: Rc<PeerConnection>,
+        state: Rc<State>,
+        _: bool,
+    ) -> Result<(), Traced<PeerError>> {
+        state.senders.when_updated().await;
+        let _ = state.update_local_stream(&peer).await;
+
+        state.maybe_local_stream_update.set(false);
         Ok(())
     }
 }

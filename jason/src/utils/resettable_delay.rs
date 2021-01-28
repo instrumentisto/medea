@@ -1,11 +1,6 @@
 //! Delay that can be stopped and started over again.
 
-use std::{
-    cell::{RefCell},
-    future::Future,
-    rc::Rc,
-    time::Duration,
-};
+use std::{cell::RefCell, future::Future, rc::Rc, time::Duration};
 
 use futures::{
     channel::oneshot,

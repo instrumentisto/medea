@@ -1,6 +1,10 @@
 //! Component managing [`TransitableState`].
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{
     future, future::Either, stream::LocalBoxStream, FutureExt as _,
@@ -20,7 +24,6 @@ use crate::{
 };
 
 use super::TransitableState;
-use std::cell::Cell;
 
 /// [`TransitableStateController`] for the [`mute_state`].
 pub type MuteStateController =
@@ -41,7 +44,8 @@ pub struct TransitableStateController<S, T> {
     /// Timeout of the [`TransitableStateController::state`] transition.
     timeout_handle: RefCell<Option<ResettableDelayHandle>>,
 
-    /// Flag which indicates that [`Inner::timeout_handle`] timeout is stopped.
+    /// Flag which indicates that
+    /// [`TransitableStateController::timeout_handle`] timeout is stopped.
     is_transition_timeout_stopped: Cell<bool>,
 }
 
@@ -56,7 +60,7 @@ where
     const TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
 
     /// Returns new [`TransitableStateController`] with the provided
-    /// [`InStable`] state.
+    /// stable state.
     #[must_use]
     pub fn new(state: S) -> Rc<Self> {
         let this = Rc::new(Self {
