@@ -26,7 +26,7 @@ use medea_jason::{
     peer,
     peer::PeerConnection,
     rpc::MockRpcSession,
-    utils::{AsProtoState, JasonError},
+    utils::{AsProtoState, JasonError, Updatable},
     DeviceVideoTrackConstraints,
 };
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -38,7 +38,6 @@ use crate::{
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
 };
-use medea_jason::utils::Updatable;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
