@@ -897,7 +897,11 @@ impl<T> Peer<T> {
             .collect();
 
         if !updates.is_empty() {
-            // TODO: can be optimized after #167
+            // TODO: Renegotiation can be skipped if we will check that
+            //       client doesn't sent his local offer to us atm, if so, then
+            //       renegotiation for this force update is not needed, because
+            //       those changes will be reflected in the local offer, when
+            //       client will send it.
             if self.context.is_known_to_remote {
                 self.context.on_negotiation_finish =
                     OnNegotiationFinish::Renegotiate;
