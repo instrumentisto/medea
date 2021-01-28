@@ -38,6 +38,7 @@ use crate::{
     get_test_unrequired_tracks, media_stream_settings, timeout,
     wait_and_check_test_result, yield_now, MockNavigator, TEST_ROOM_URL,
 };
+use medea_jason::utils::Updatable;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -2628,4 +2629,71 @@ async fn create_peer_by_state() {
     let peer = room.get_peer_by_id(PeerId(0)).unwrap();
     assert!(peer.get_sender_by_id(TrackId(0)).is_some());
     assert!(peer.get_receiver_by_id(TrackId(1)).is_some());
+}
+
+/// Checks that [`MediaState`] intentions are sent after [`peer::State`]
+/// synchronization.
+#[wasm_bindgen_test]
+async fn intentions_are_sent_on_reconnect() {
+    let (event_tx, event_rx) = mpsc::unbounded();
+    let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+    JsFuture::from(room.new_handle().set_local_media_settings(
+        &media_stream_settings(true, true),
+        false,
+        false,
+    ))
+    .await
+    .unwrap();
+
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let audio_track_id = audio_track.id;
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+    while let Some(cmd) = commands_rx.next().await {
+        if let Command::MakeSdpOffer { peer_id, .. } = cmd {
+            assert_eq!(peer_id, PeerId(1));
+            break;
+        }
+    }
+
+    let room_handle = room.new_handle();
+    let peer_state = room.get_peer_state_by_id(PeerId(1)).unwrap();
+    peer_state.connection_lost();
+
+    spawn_local(async move {
+        let _ = JsFuture::from(room_handle.disable_audio()).await;
+    });
+    while let Some(cmd) = commands_rx.next().await {
+        if let Command::UpdateTracks {
+            peer_id,
+            tracks_patches,
+        } = cmd
+        {
+            assert_eq!(peer_id, PeerId(1));
+            assert_eq!(tracks_patches[0].id, audio_track_id);
+            assert_eq!(tracks_patches[0].enabled, Some(false));
+            break;
+        }
+    }
+
+    peer_state.synced();
+    while let Some(cmd) = commands_rx.next().await {
+        if let Command::UpdateTracks {
+            peer_id,
+            tracks_patches,
+        } = cmd
+        {
+            assert_eq!(peer_id, PeerId(1));
+            assert_eq!(tracks_patches[0].id, audio_track_id);
+            assert_eq!(tracks_patches[0].enabled, Some(false));
+            break;
+        }
+    }
 }
