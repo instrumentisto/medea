@@ -70,10 +70,10 @@ All user visible changes to this project will be documented in this file. This p
 - `StateSynchronized` server message ([#167]);
 - `SynchronizeMe` client message ([#167]);
 - States for the client and server synchronization ([#167]):
-  - `Room`;
-  - `Peer`;
-  - `Sender`;
-  - `Receiver`.
+    - `Room`;
+    - `Peer`;
+    - `Sender`;
+    - `Receiver`.
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58

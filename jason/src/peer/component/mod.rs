@@ -1,4 +1,4 @@
-//! Implementation of the [`Component`].
+//! Implementation of a [`Component`].
 
 mod ice_candidates;
 mod local_sdp;
@@ -29,10 +29,10 @@ use self::{
     tracks_repository::TracksRepository,
 };
 
-/// Synchronization state of the [`Component`].
+/// Synchronization state of a [`Component`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SyncState {
-    /// State desynced, and should be synced on RPC reconnect.
+    /// State desynced, and should be synced on a RPC reconnection.
     Desynced,
 
     /// State syncs with a Media Server state.
@@ -90,10 +90,10 @@ enum NegotiationState {
     WaitRemoteSdp,
 }
 
-/// State of the [`Component`].
+/// State of a [`Component`].
 #[derive(Debug)]
 pub struct State {
-    /// ID of the [`Component`].
+    /// ID of this [`Component`].
     id: Id,
 
     /// All [`sender::State`]s of this [`Component`].
@@ -102,8 +102,8 @@ pub struct State {
     /// All [`receiver::State`]s of this [`Component`].
     receivers: TracksRepository<receiver::State>,
 
-    /// Flag which indicates that this [`Component`] should relay all media
-    /// through a TURN server forcibly.
+    /// Indicator whether this [`Component`] should relay all media through a
+    /// TURN server forcibly.
     force_relay: bool,
 
     /// List of [`IceServer`]s which this [`Component`] should use.
@@ -112,7 +112,7 @@ pub struct State {
     /// Current [`NegotiationRole`] of this [`Component`].
     negotiation_role: ObservableCell<Option<NegotiationRole>>,
 
-    /// Negotiation state of the [`Component`].
+    /// Negotiation state of this [`Component`].
     negotiation_state: ObservableCell<NegotiationState>,
 
     /// Local session description of this [`Component`].
@@ -121,22 +121,22 @@ pub struct State {
     /// Remote session description of this [`Component`].
     remote_sdp: ProgressableCell<Option<String>>,
 
-    /// Flag which indicates that ICE restart should be performed.
+    /// Indicates whether ICE restart should be performed.
     restart_ice: Cell<bool>,
 
     /// All [`IceCandidate`]s of this [`Component`].
     ice_candidates: IceCandidates,
 
-    /// Indicates that [`State::update_local_stream`] method should be called
-    /// if some [`sender`] wants to update local stream.
+    /// Indicator whether [`State::update_local_stream`] method should be
+    /// called if some [`sender`] wants to update a local stream.
     maybe_update_local_stream: ObservableCell<bool>,
 
-    /// Synchronization state of the [`Component`].
+    /// Synchronization state of this [`Component`].
     sync_state: ObservableCell<SyncState>,
 }
 
 impl State {
-    /// Returns [`State`] with a provided data.
+    /// Creates a new [`State`] with the provided data.
     #[inline]
     #[must_use]
     pub fn new(
@@ -183,13 +183,13 @@ impl State {
         self.force_relay
     }
 
-    /// Inserts new [`sender::State`] into this [`State`].
+    /// Inserts a new [`sender::State`] into this [`State`].
     #[inline]
     pub fn insert_sender(&self, track_id: TrackId, sender: Rc<sender::State>) {
         self.senders.insert(track_id, sender);
     }
 
-    /// Inserts new [`receiver::State`] into this [`State`].
+    /// Inserts a new [`receiver::State`] into this [`State`].
     #[inline]
     pub fn insert_receiver(
         &self,
@@ -266,7 +266,7 @@ impl State {
         self.local_sdp.resume_timeout();
     }
 
-    /// Returns [`Future`] which will be resolved once
+    /// Returns [`Future`] resolving once
     /// [getUserMedia()][1]/[getDisplayMedia()][2] request for the provided
     /// [`TrackId`]s is resolved.
     ///
@@ -303,10 +303,10 @@ impl State {
         ])
     }
 
-    /// Updates local `MediaStream` based on
+    /// Updates a local `MediaStream` based on a
     /// [`sender::State::is_local_stream_update_needed`].
     ///
-    /// Resets [`sender::State`] local stream update when it's updated.
+    /// Resets a [`sender::State`] local stream update when it's updated.
     async fn update_local_stream(
         &self,
         peer: &Rc<PeerConnection>,
@@ -374,8 +374,8 @@ impl State {
         Ok(())
     }
 
-    /// Returns [`Future`] resolving when all [`State::senders`]' inserts and
-    /// removes will be processed.
+    /// Returns [`Future`] resolving once all [`State::senders`]' inserts and
+    /// removes are processed.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -383,8 +383,8 @@ impl State {
         self.senders.when_all_processed()
     }
 
-    /// Returns [`Future`] resolving when all [`State::receivers`]' inserts and
-    /// removes will be processed.
+    /// Returns [`Future`] resolving once all [`State::receivers`]' inserts and
+    /// removes are processed.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -395,7 +395,7 @@ impl State {
     /// Patches [`sender::State`] or [`receiver::State`] with the provided
     /// [`proto::TrackPatchEvent`].
     ///
-    /// Schedules local stream update.
+    /// Schedules a local stream update.
     pub fn patch_track(&self, track_patch: &proto::TrackPatchEvent) {
         if let Some(sender) = self.get_sender(track_patch.id) {
             sender.update(track_patch);
@@ -405,19 +405,21 @@ impl State {
         }
     }
 
-    /// Returns current SDP offer of this [`State`].
+    /// Returns the current SDP offer of this [`State`].
     #[inline]
+    #[must_use]
     pub fn current_sdp_offer(&self) -> Option<String> {
         self.local_sdp.current()
     }
 }
 
-/// Component responsible for the [`PeerConnection`] updating.
+/// Component responsible for a [`PeerConnection`] updating.
 pub type Component = component::Component<State, PeerConnection>;
 
 impl AsProtoState for State {
     type Output = proto::state::Peer;
 
+    #[inline]
     fn as_proto(&self) -> Self::Output {
         Self::Output {
             id: self.id,
@@ -520,28 +522,27 @@ impl Updatable for State {
 
 #[cfg(feature = "mockable")]
 impl State {
-    /// Waits for [`State::remote_sdp`] change to be applied.
+    /// Waits for a [`State::remote_sdp`] change to be applied.
     #[inline]
     pub async fn when_remote_sdp_processed(&self) {
         self.remote_sdp.when_all_processed().await;
     }
 
-    /// Resets [`NegotiationRole`] of this [`State`] to [`None`].
+    /// Resets a [`NegotiationRole`] of this [`State`] to [`None`].
     #[inline]
     pub fn reset_negotiation_role(&self) {
         self.negotiation_state.set(NegotiationState::Stable);
         self.negotiation_role.set(None);
     }
 
-    /// Returns current [`NegotiationRole`] of this [`State`].
+    /// Returns the current [`NegotiationRole`] of this [`State`].
     #[inline]
     #[must_use]
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.negotiation_role.get()
     }
 
-    /// Returns [`Future`] which will be resolved once local SDP approve is
-    /// needed.
+    /// Returns [`Future`] resolving once local SDP approve is needed.
     #[inline]
     pub fn when_local_sdp_approve_needed(
         &self,
@@ -558,7 +559,8 @@ impl State {
         self.receivers.stabilize_all();
     }
 
-    /// Waits until [`State::local_sdp`] is resolved and returns its new value.
+    /// Waits until a [`State::local_sdp`] is resolved and returns its new
+    /// value.
     #[inline]
     #[must_use]
     pub async fn when_local_sdp_updated(&self) -> Option<String> {

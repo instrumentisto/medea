@@ -310,7 +310,7 @@ impl WsSession {
     /// Handles [`Command::SynchronizeMe`].
     ///
     /// Sends [`RpcServer::synchronize`] to the [`RpcServer`] and locks
-    /// [`WsSession`] event loop until this message will be processed.
+    /// [`WsSession`] event loop until this message is processed.
     fn handle_synchronize_me(
         &mut self,
         ctx: &mut ws::WebsocketContext<Self>,

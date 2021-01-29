@@ -116,7 +116,7 @@ pub struct RpcConnectionClosed {
     pub reason: ClosedReason,
 }
 
-/// Signal of [`Member`] that his State needs synchronization.
+/// Signal of a [`Member`] which state needs synchronization.
 ///
 /// [`Member`]: crate::signalling::elements::Member
 #[derive(Debug, Message)]

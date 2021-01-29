@@ -1,5 +1,4 @@
-//! Implementation of the store for the [`sender::State`]s and
-//! [`receiver::State`]s.
+//! Implementation of a store of [`sender::State`]s and [`receiver::State`]s.
 //!
 //! [`receiver::State`]: super::receiver::State
 
@@ -26,7 +25,7 @@ use crate::{
 
 use super::sender;
 
-/// Repository for the all [`sender::State`]s/[`receiver::State`]s of the
+/// Repository of all the [`sender::State`]s/[`receiver::State`]s of a
 /// [`Component`].
 ///
 /// [`Component`]: super::Component
@@ -36,35 +35,33 @@ pub struct TracksRepository<S: 'static>(
 );
 
 impl<S> TracksRepository<S> {
-    /// Returns new [`TracksRepository`] with a provided tracks.
+    /// Creates a new [`TracksRepository`].
     #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self(RefCell::new(ProgressableHashMap::new()))
     }
 
-    /// Returns [`Future`] which will be resolved when all inserts/removes will
-    /// be processed.
+    /// Returns [`Future`] resolving once all inserts/removes are processed.
     #[inline]
     pub fn when_all_processed(&self) -> AllProcessed<'static> {
         self.0.borrow().when_all_processed()
     }
 
-    /// Inserts provided track.
+    /// Inserts the provided track identified by the given `id`.
     #[inline]
     pub fn insert(&self, id: TrackId, track: Rc<S>) {
         self.0.borrow_mut().insert(id, track);
     }
 
-    /// Returns track with a provided [`TrackId`].
+    /// Returns a track with the provided `id`.
     #[inline]
     #[must_use]
     pub fn get(&self, id: TrackId) -> Option<Rc<S>> {
         self.0.borrow().get(&id).cloned()
     }
 
-    /// Returns [`Stream`] into which all [`TracksRepository::insert`]ions will
-    /// be sent.
+    /// Returns a [`Stream`] streaming the all [`TracksRepository::insert`]ions.
     #[inline]
     pub fn on_insert(
         &self,
@@ -74,7 +71,7 @@ impl<S> TracksRepository<S> {
 }
 
 impl TracksRepository<sender::State> {
-    /// Returns all [`sender::State`]s which are requires local `MediaStream`
+    /// Returns all the [`sender::State`]s which require a local `MediaStream`
     /// update.
     #[inline]
     #[must_use]
@@ -87,7 +84,7 @@ impl TracksRepository<sender::State> {
             .collect()
     }
 
-    /// Returns [`Future`] which will be resolved once
+    /// Returns [`Future`] resolving once
     /// [getUserMedia()][1]/[getDisplayMedia()][2] request for the provided
     /// [`TrackId`]s is resolved.
     ///
@@ -157,9 +154,9 @@ impl<S> Updatable for TracksRepository<S>
 where
     S: Updatable,
 {
-    /// Returns [`Future`] which will be resolved when all tracks from the
+    /// Returns [`Future`] resolving once all tracks from this
     /// [`TracksRepository`] will be stabilized meaning that all track's
-    /// component won't contain any pending state change transitions.
+    /// components won't contain any pending state change transitions.
     fn when_stabilized(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .0
@@ -170,8 +167,7 @@ where
         medea_reactive::when_all_processed(when_futs)
     }
 
-    /// Returns [`Future`] resolving when all tracks updates will
-    /// be applied.
+    /// Returns [`Future`] resolving once all tracks updates are applied.
     ///
     /// [`Future`]: std::future::Future
     fn when_updated(&self) -> AllProcessed<'static> {
@@ -184,13 +180,13 @@ where
         medea_reactive::when_all_processed(when_futs)
     }
 
-    /// Notifies all tracks about RPC connection loss.
+    /// Notifies all the tracks about RPC connection loss.
     #[inline]
     fn connection_lost(&self) {
         self.0.borrow().values().for_each(|s| s.connection_lost());
     }
 
-    /// Notifies all tracks about RPC connection recovering.
+    /// Notifies all the tracks about RPC connection recovering.
     #[inline]
     fn connection_recovered(&self) {
         self.0
@@ -206,6 +202,7 @@ where
 {
     type Output = HashMap<TrackId, S::Output>;
 
+    #[inline]
     fn as_proto(&self) -> Self::Output {
         self.0
             .borrow()
@@ -217,7 +214,7 @@ where
 
 #[cfg(feature = "mockable")]
 impl<S> TracksRepository<S> {
-    /// Waits until all track inserts will be processed.
+    /// Waits until all the track inserts will be processed.
     #[inline]
     pub fn when_insert_processed(&self) -> medea_reactive::Processed<'static> {
         self.0.borrow().when_insert_processed()

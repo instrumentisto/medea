@@ -44,8 +44,8 @@ pub struct TransitableStateController<S, T> {
     /// Timeout of the [`TransitableStateController::state`] transition.
     timeout_handle: RefCell<Option<ResettableDelayHandle>>,
 
-    /// Flag which indicates that
-    /// [`TransitableStateController::timeout_handle`] timeout is stopped.
+    /// Indicator whether [`TransitableStateController::timeout_handle`]'s
+    /// timeout is stopped.
     is_transition_timeout_stopped: Cell<bool>,
 }
 

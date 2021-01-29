@@ -337,13 +337,17 @@ impl RtcPeerConnection {
     }
 
     /// Returns [`RtcIceConnectionState`] of this [`RtcPeerConnection`].
+    #[inline]
+    #[must_use]
     pub fn ice_connection_state(&self) -> RtcIceConnectionState {
         self.peer.ice_connection_state()
     }
 
     /// Returns [`PeerConnectionState`] of this [`RtcPeerConnection`].
     ///
-    /// Returns [`None`] if failed to parse [`PeerConnectionState`].
+    /// Returns [`None`] if failed to parse a [`PeerConnectionState`].
+    #[inline]
+    #[must_use]
     pub fn connection_state(&self) -> Option<PeerConnectionState> {
         get_peer_connection_state(&self.peer)?.ok()
     }

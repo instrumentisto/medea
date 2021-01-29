@@ -78,7 +78,7 @@ impl MediaTrack {
         self.transceiver_enabled.get()
     }
 
-    /// Returns `true` if this [`MediaTrack`] enabled for send and recv side.
+    /// Indicates whether this [`MediaTrack`] is enabled for send and recv side.
     #[inline]
     #[must_use]
     pub fn is_enabled_general(&self) -> bool {
@@ -103,14 +103,15 @@ impl MediaTrack {
 /// Media publishing/receiving state.
 #[derive(Debug, Eq, PartialEq)]
 pub struct MediaState {
-    /// Flag which indicates that [`MediaTrack`] is muted or unmuted.
+    /// Indicator whether [`MediaTrack`] is muted or unmuted.
     muted: Cell<bool>,
 
-    /// Flag which indicates that [`MediaTrack`] is enabled or disabled.
+    /// Indicator whether [`MediaTrack`] is enabled or disabled.
     enabled: Cell<bool>,
 }
 
 impl Default for MediaState {
+    #[inline]
     fn default() -> Self {
         Self {
             enabled: Cell::new(true),
@@ -120,22 +121,28 @@ impl Default for MediaState {
 }
 
 impl MediaState {
-    /// Returns `true` if this [`MediaState`] is enabled.
+    /// Indicates whether this [`MediaState`] is enabled.
+    #[inline]
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.enabled.get()
     }
 
-    /// Returns `true` if this [`MediaState`] is muted.
+    /// Indicates whether this [`MediaState`] is muted.
+    #[inline]
+    #[must_use]
     pub fn is_muted(&self) -> bool {
         self.muted.get()
     }
 
-    /// Sets current mute state to the provided one.
+    /// Sets the current mute state to the provided one.
+    #[inline]
     pub fn set_muted(&self, muted: bool) {
         self.muted.set(muted);
     }
 
-    /// Sets current media exchange state to the provided one.
+    /// Sets the current media exchange state to the provided one.
+    #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.enabled.set(enabled);
     }

@@ -106,8 +106,8 @@ impl SynchronizableState for State {
 }
 
 impl Updatable for State {
-    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
-    /// will be stabilized.
+    /// Returns [`Future`] resolving once [`media_exchange_state`] is
+    /// stabilized.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -124,8 +124,8 @@ impl Updatable for State {
         ))
     }
 
-    /// Returns [`Future`] resolving when [`State`] update will be applied onto
-    /// [`Receiver`].
+    /// Returns [`Future`] resolving once [`State`] update will be applied onto
+    /// the [`Receiver`].
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -136,13 +136,13 @@ impl Updatable for State {
         ])
     }
 
-    /// Notifies [`State`] about RPC connection loss.
+    /// Notifies [`State`] about a RPC connection loss.
     #[inline]
     fn connection_lost(&self) {
         self.sync_state.set(SyncState::Desynced);
     }
 
-    /// Notifies [`State`] about RPC connection restore.
+    /// Notifies [`State`] about a RPC connection restore.
     #[inline]
     fn connection_recovered(&self) {
         self.sync_state.set(SyncState::Syncing);
@@ -341,7 +341,6 @@ impl Component {
             }
             SyncState::Syncing => (),
         }
-
         Ok(())
     }
 }
@@ -413,7 +412,7 @@ impl State {
         }
     }
 
-    /// Sets [`State::sync_state`] to the [`SyncState::Synced`].
+    /// Sets the [`State::sync_state`] to a [`SyncState::Synced`].
     #[inline]
     pub fn synced(&self) {
         self.sync_state.set(SyncState::Synced);

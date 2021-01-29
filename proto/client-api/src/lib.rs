@@ -509,7 +509,7 @@ pub enum TrackUpdate {
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Hash, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,

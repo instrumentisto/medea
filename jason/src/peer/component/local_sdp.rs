@@ -100,7 +100,7 @@ impl LocalSdp {
         self.0.approved.set(true);
     }
 
-    /// Returns current SDP offer.
+    /// Returns the current SDP offer.
     #[inline]
     #[must_use]
     pub fn current(&self) -> Option<String> {
@@ -165,8 +165,7 @@ impl LocalSdp {
         self.0.rollback_task_handle.replace(Some(rollback_task));
     }
 
-    /// Returns `true` if new SDP offer needed after rollback is
-    /// completed.
+    /// Indicates whether a new SDP offer is needed after rollback's completion.
     #[inline]
     #[must_use]
     pub fn is_restart_needed(&self) -> bool {
@@ -194,11 +193,10 @@ struct Inner {
     /// Timeout of the [`Inner::approved`] transition.
     rollback_task_handle: RefCell<Option<ResettableDelayHandle>>,
 
-    /// Flag which indicates that [`Inner::rollback_task_handle`] timeout is
-    /// stopped.
+    /// Indicator whether [`Inner::rollback_task_handle`] timeout is stopped.
     is_rollback_timeout_stopped: Cell<bool>,
 
-    /// Flag which indicates that negotiation restart is needed.
+    /// Indicator whether negotiation restart is needed.
     restart_needed: Cell<bool>,
 }
 

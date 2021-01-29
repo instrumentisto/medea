@@ -70,7 +70,7 @@ pub trait RpcServer: Debug + Send {
     /// Sends [`Command`].
     fn send_command(&self, member_id: MemberId, msg: Command);
 
-    /// Sends [`Member`]'s request to synchronize his State.
+    /// Sends [`Member`]'s request to synchronize its state.
     ///
     /// [`Member`]: crate::signalling::elements::Member
     fn synchronize(&self, member_id: MemberId) -> LocalBoxFuture<'static, ()>;

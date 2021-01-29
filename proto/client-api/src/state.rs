@@ -10,17 +10,17 @@ use crate::{
     TrackId,
 };
 
-/// State of the `Room` element.
+/// State of a `Room` element.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Room {
     /// All [`Peer`]s of this [`Room`].
     pub peers: HashMap<PeerId, Peer>,
 }
 
-/// State of the `Peer` element.
+/// State of a `Peer` element.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Peer {
-    /// ID of the [`Peer`].
+    /// ID of this [`Peer`].
     pub id: PeerId,
 
     /// All [`Sender`]s of this [`Peer`].
@@ -29,8 +29,8 @@ pub struct Peer {
     /// All [`Receiver`]s of this [`Peer`].
     pub receivers: HashMap<TrackId, Receiver>,
 
-    /// Flag which indicates that this [`Peer`] should relay all media through
-    /// a TURN server forcibly.
+    /// Indicator whether this [`Peer`] should relay all media through a TURN
+    /// server forcibly.
     pub force_relay: bool,
 
     /// List of [`IceServer`]s which this [`Peer`] should use.
@@ -45,14 +45,14 @@ pub struct Peer {
     /// Current SDP offer of the partner [`Peer`].
     pub remote_sdp: Option<String>,
 
-    /// Flag which indicates that ICE restart should be performed.
+    /// Indicator whether ICE restart should be performed.
     pub restart_ice: bool,
 
     /// All [`IceCandidate`]s of this [`Peer`].
     pub ice_candidates: HashSet<IceCandidate>,
 }
 
-/// State of the `MediaTrack`s with a `Send` direction.
+/// State of `MediaTrack`s with a `Send` direction.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Sender {
     /// ID of this [`Sender`].
@@ -64,22 +64,22 @@ pub struct Sender {
     /// [`MediaType`] of this [`Sender`].
     pub media_type: MediaType,
 
-    /// All `Member`s which are receives media from this [`Sender`].
+    /// All `Member`s which receive media from this [`Sender`].
     pub receivers: Vec<MemberId>,
 
-    /// Flag which indicates that this [`Sender`] is enabled on `Send`
-    /// direction side.
+    /// Indicator whether this [`Sender`] is enabled on a `Send` direction
+    /// side.
     pub enabled_individual: bool,
 
-    /// Flag which indicates that this [`Sender`] is enabled on `Send` __and__
-    /// `Recv` direction sides.
+    /// Indicator whether this [`Sender`] is enabled on a `Send` __and__ `Recv`
+    /// direction sides.
     pub enabled_general: bool,
 
-    /// Flag which indicates that this [`Sender`] is muted.
+    /// Indicator whether this [`Sender`] is muted.
     pub muted: bool,
 }
 
-/// State of the `MediaTrack`s with a `Recv` direction.
+/// State of `MediaTrack`s with a `Recv` direction.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Receiver {
     /// ID of this [`Receiver`].
@@ -91,17 +91,17 @@ pub struct Receiver {
     /// [`MediaType`] of this [`Receiver`].
     pub media_type: MediaType,
 
-    /// `Member`s which sends media to this [`Receiver`].
+    /// `Member`s which send media to this [`Receiver`].
     pub sender_id: MemberId,
 
-    /// Flag which indicates that this [`Receiver`] is enabled on `Recv`
-    /// direction side.
+    /// Indicator whether this [`Receiver`] is enabled on a `Recv` direction
+    /// side.
     pub enabled_individual: bool,
 
-    /// Flag which indicates that this [`Receiver`] is enabled on `Send`
-    /// __and__ `Recv` direction sides.
+    /// Indicator whether this [`Receiver`] is enabled on a `Send` __and__
+    /// `Recv` direction sides.
     pub enabled_general: bool,
 
-    /// Flag which indicates that this [`Receiver`] is muted.
+    /// Indicator whether this [`Receiver`] is muted.
     pub muted: bool,
 }

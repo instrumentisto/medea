@@ -150,7 +150,7 @@ impl Receiver {
         self.enabled_individual.get() && is_recv_direction
     }
 
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
     /// [`media_exchange_state`].
     pub fn send_media_exchange_state_intention(
         &self,

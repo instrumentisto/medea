@@ -369,6 +369,7 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> FromIterator<(K, V)>
 where
     K: Hash + Eq,
 {
+    #[inline]
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         Self {
             store: std::collections::HashMap::from_iter(iter),

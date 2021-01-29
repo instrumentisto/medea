@@ -1,4 +1,4 @@
-//! Implementation of the [`Component`] watchers.
+//! Implementation of a [`Component`] watchers.
 
 use std::rc::Rc;
 
@@ -38,8 +38,7 @@ impl Component {
             candidate.sdp_mid,
         )
         .await
-        .map_err(tracerr::map_from_and_wrap!())?;
-        Ok(())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Watcher for the [`State::remote_sdp`] update.
@@ -82,12 +81,12 @@ impl Component {
 
     /// Watcher for the [`State::senders`] insert update.
     ///
-    /// Waits until [`ReceiverComponent`]s creation id finished.
+    /// Waits until [`ReceiverComponent`]s creation is finished.
     ///
-    /// Waits for remote SDP offer apply if the current [`NegotiationRole`] is
+    /// Waits for a remote SDP offer apply if the current [`NegotiationRole`] is
     /// an [`Answerer`].
     ///
-    /// Creates new [`SenderComponent`], creates new [`Connection`] with all
+    /// Creates a new [`SenderComponent`], creates a new [`Connection`] with all
     /// [`sender::State::receivers`] by calling
     /// [`Connections::create_connection()`].
     ///
@@ -132,13 +131,12 @@ impl Component {
         };
         peer.media_connections
             .insert_sender(sender::Component::new(sender, new_sender));
-
         Ok(())
     }
 
     /// Watcher for the [`State::receivers`] insert update.
     ///
-    /// Creates new [`ReceiverComponent`], creates new [`Connection`] with a
+    /// Creates a new [`ReceiverComponent`], creates a new [`Connection`] with a
     /// [`receiver::State::sender_id`] by calling
     /// [`Connections::create_connection()`].
     #[watch(self.receivers.on_insert())]
@@ -166,15 +164,15 @@ impl Component {
     /// Watcher for the [`State::local_sdp`] updates.
     ///
     /// Sets [`PeerConnection`]'s SDP offer to the provided one and sends
-    /// [`Command::MakeSdpOffer`] if [`Sdp`] is [`Sdp::Offer`] and
-    /// [`NegotiationRole`] is [`Offerer`].
+    /// a [`Command::MakeSdpOffer`] if the [`Sdp`] is a [`Sdp::Offer`] and
+    /// the [`NegotiationRole`] is an [`Offerer`].
     ///
     /// Sets [`PeerConnection`]'s SDP answer to the provided one and sends
-    /// [`Command::MakeSdpAnswer`] if [`Sdp`] is [`Sdp::Offer`] and
-    /// [`NegotiationRole`] is [`Answerer`].
+    /// a [`Command::MakeSdpAnswer`] if the [`Sdp`] is a [`Sdp::Offer`] and
+    /// the [`NegotiationRole`] is an [`Answerer`].
     ///
-    /// Rollbacks [`PeerConnection`] to the stable state if [`Sdp`] is
-    /// [`Sdp::Rollback`] and [`NegotiationRole`] is [`Some`].
+    /// Rollbacks [`PeerConnection`] to a stable state if the [`Sdp`] is a
+    /// [`Sdp::Rollback`] and the [`NegotiationRole`] is [`Some`].
     ///
     /// [`Answerer`]: NegotiationRole::Answerer
     /// [`Offerer`]: NegotiationRole::Offerer
@@ -247,12 +245,15 @@ impl Component {
 
     /// Watcher for the SDP offer approving by server.
     ///
-    /// If the current [`NegotiationRole`] is [`NegotiationRole::Offerer`] then
-    /// [`NegotiationState`] will transit to the
-    /// [`NegotiationState::WaitRemoteSdp`].
+    /// If the current [`NegotiationRole`] is an [`Offerer`] then
+    /// [`NegotiationState`] will transit to a [`WaitRemoteSdp`].
     ///
-    /// If the current [`NegotiationRole`] is [`NegotiationRole::Answerer`] then
-    /// [`NegotiationState`] will transit to the [`NegotiationState::Stable`].
+    /// If the current [`NegotiationRole`] is an [`Answerer`] then
+    /// [`NegotiationState`] will transit to a [`Stable`].
+    ///
+    /// [`Offerer`]: NegotiationRole::Offerer
+    /// [`Stable`]: NegotiationState::Stable
+    /// [`WaitRemoteSdp`]: NegotiationState::WaitRemoteSdp
     #[watch(self.local_sdp.on_approve().skip(1))]
     async fn local_sdp_approved(
         _: Rc<PeerConnection>,
@@ -277,9 +278,11 @@ impl Component {
 
     /// Watcher for the [`NegotiationState`] change.
     ///
-    /// Resets [`NegotiationRole`] to [`None`] on [`NegotiationState::Stable`].
+    /// Resets [`NegotiationRole`] to [`None`] on a
+    /// [`NegotiationState::Stable`].
     ///
-    /// Creates and sets local SDP offer on [`NegotiationState::WaitLocalSdp`].
+    /// Creates and sets local SDP offer on a
+    /// [`NegotiationState::WaitLocalSdp`].
     #[watch(self.negotiation_state.subscribe().skip(1))]
     async fn negotiation_state_changed(
         peer: Rc<PeerConnection>,
@@ -386,6 +389,7 @@ impl Component {
     ///
     /// Sends [`PeerConnection`]'s connection state and ICE connection state to
     /// the server.
+    #[inline]
     #[watch(self.sync_state.subscribe().skip(1))]
     async fn sync_state_changed(
         peer: Rc<PeerConnection>,
@@ -395,14 +399,13 @@ impl Component {
         if let SyncState::Synced = sync_state {
             peer.send_current_connection_states();
         }
-
         Ok(())
     }
 
     /// Watcher for the [`State::maybe_update_local_stream`] `true` updates.
     ///
     /// Waits for [`State::senders`] update and calls
-    /// [`State::update_local_stream`].
+    /// [`State::update_local_stream()`].
     #[watch(
         self.maybe_update_local_stream.subscribe().filter(|v| future::ready(*v))
     )]

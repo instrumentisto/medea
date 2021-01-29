@@ -45,7 +45,7 @@ All user visible changes to this project will be documented in this file. This p
     - Send `TrackUpdate::IceRestart` based on RTC stats analysis ([#138]);
     - Multiple `Room`s served by one RPC connection support ([#147]);
     - Muting/unmuting `MediaTrack`s ([#156]);
-    - State synchronization on RPC reconnection ([#167]).
+    - State synchronization on a RPC reconnection ([#167]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).

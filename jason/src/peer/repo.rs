@@ -43,7 +43,7 @@ impl Component {
             .collect()
     }
 
-    /// Notifies all [`peer::Component`]s about RPC connection loss.
+    /// Notifies all [`peer::Component`]s about a RPC connection loss.
     #[inline]
     pub fn connection_lost(&self) {
         for peer in self.peers.borrow().values() {
@@ -51,7 +51,7 @@ impl Component {
         }
     }
 
-    /// Notifies all [`peer::Component`]s about RPC connection restore.
+    /// Notifies all [`peer::Component`]s about a RPC connection restore.
     #[inline]
     pub fn connection_recovered(&self) {
         for peer in self.peers.borrow().values() {
@@ -59,7 +59,7 @@ impl Component {
         }
     }
 
-    /// Updates this [`State`] with a provided [`proto::state::Room`].
+    /// Updates this [`State`] with the provided [`proto::state::Room`].
     pub fn apply(&self, new_state: proto::state::Room) {
         let state = self.state();
         let send_cons = &self.obj().send_constraints;

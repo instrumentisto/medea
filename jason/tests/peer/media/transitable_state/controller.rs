@@ -21,7 +21,7 @@ async fn controller_inheritance_delay_freeze() {
         .unwrap_err();
 }
 
-/// Tests that [`TransitableStateController`] will unfreeze freezed on start
+/// Tests that [`TransitableStateController`] will unfreeze frozen on start
 /// transition timeout.
 #[wasm_bindgen_test]
 async fn unfreezes_inheritance_delay_freeze() {

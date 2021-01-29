@@ -160,8 +160,8 @@ impl SynchronizableState for State {
 }
 
 impl Updatable for State {
-    /// Returns [`Future`] which will be resolved when [`media_exchange_state`]
-    /// and [`mute_state`] will be stabilized.
+    /// Returns [`Future`] resolving once [`media_exchange_state`] and
+    /// [`mute_state`] are stabilized.
     ///
     /// [`Future`]: std::future::Future
     #[inline]
@@ -172,7 +172,7 @@ impl Updatable for State {
         ])
     }
 
-    /// Returns [`Future`] resolving when [`State`] update will be applied onto
+    /// Returns [`Future`] resolving once a [`State`] update is applied onto the
     /// [`Sender`].
     ///
     /// [`Future`]: std::future::Future
@@ -185,13 +185,13 @@ impl Updatable for State {
         ])
     }
 
-    /// Notifies [`State`] about RPC connection loss.
+    /// Notifies [`State`] about a RPC connection loss.
     #[inline]
     fn connection_lost(&self) {
         self.sync_state.set(SyncState::Desynced);
     }
 
-    /// Notifies [`State`] about RPC connection restore.
+    /// Notifies [`State`] about a RPC connection restore.
     #[inline]
     fn connection_recovered(&self) {
         self.sync_state.set(SyncState::Syncing);
@@ -403,7 +403,6 @@ impl Component {
         new_state: media_exchange_state::Transition,
     ) -> Result<()> {
         sender.send_media_exchange_state_intention(new_state);
-
         Ok(())
     }
 
@@ -418,7 +417,6 @@ impl Component {
         new_state: mute_state::Transition,
     ) -> Result<()> {
         sender.send_mute_state_intention(new_state);
-
         Ok(())
     }
 
@@ -506,9 +504,9 @@ impl Component {
         Ok(())
     }
 
-    /// Stops transition timeouts on [`SyncState::Desynced`].
+    /// Stops transition timeouts on a [`SyncState::Desynced`].
     ///
-    /// Sends media state intentions and resets transition timeouts on
+    /// Sends media state intentions and resets transition timeouts on a
     /// [`SyncState::Synced`].
     #[watch(self.sync_state.subscribe().skip(1))]
     async fn sync_state_watcher(
@@ -537,7 +535,6 @@ impl Component {
             }
             SyncState::Syncing => (),
         }
-
         Ok(())
     }
 }
@@ -618,7 +615,7 @@ impl MediaStateControllable for State {
 
 #[cfg(feature = "mockable")]
 impl State {
-    /// Sets [`State::sync_state`] to the [`SyncState::Synced`].
+    /// Sets the [`State::sync_state`] to a [`SyncState::Synced`].
     #[inline]
     pub fn synced(&self) {
         self.sync_state.set(SyncState::Synced);

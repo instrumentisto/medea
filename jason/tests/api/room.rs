@@ -2533,8 +2533,8 @@ mod set_local_media_settings {
 mod state_synchronization {
     use super::*;
 
-    /// Checks that [`state::Room`] update can create [`PeerConnection`] and its
-    /// [`Sender`]s/[`Receiver`]s.
+    /// Checks whether [`state::Room`] update can create a [`PeerConnection`]
+    /// and its [`Sender`]s/[`Receiver`]s.
     #[wasm_bindgen_test]
     async fn create_peer_by_state() {
         let (command_tx, mut command_rx) = mpsc::unbounded();

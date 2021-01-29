@@ -584,9 +584,10 @@ impl PeerConnection {
         });
     }
 
-    /// Handle `connectionstatechange` event from underlying peer emitting
+    /// Handles `connectionstatechange` event from the underlying peer emitting
     /// [`PeerEvent::ConnectionStateChanged`] event into this peers
     /// `peer_events_sender`.
+    #[inline]
     fn on_connection_state_changed(
         peer_id: Id,
         sender: &mpsc::UnboundedSender<PeerEvent>,
@@ -1050,7 +1051,7 @@ impl PeerConnection {
             .collect()
     }
 
-    /// Returns [`Rc`] to the [`Receiver`] with a provided [`TrackId`].
+    /// Returns [`Rc`] to the [`Receiver`] with the provided [`TrackId`].
     #[inline]
     #[must_use]
     pub fn get_receiver_by_id(

@@ -205,7 +205,8 @@ pub enum PeerStateMachine {
 }
 
 impl PeerStateMachine {
-    /// Returns all [`state::Sender`] of this [`PeerStateMachine`].
+    /// Returns all [`state::Sender`]s of this [`PeerStateMachine`].
+    #[must_use]
     fn get_senders_states(&self) -> HashMap<TrackId, state::Sender> {
         self.senders()
             .iter()
@@ -228,7 +229,8 @@ impl PeerStateMachine {
             .collect()
     }
 
-    /// Returns all [`state::Receiver`] of this [`PeerStateMachine`].
+    /// Returns all [`state::Receiver`]s of this [`PeerStateMachine`].
+    #[must_use]
     fn get_receivers_states(&self) -> HashMap<TrackId, state::Receiver> {
         self.receivers()
             .iter()
@@ -251,7 +253,8 @@ impl PeerStateMachine {
             .collect()
     }
 
-    /// Returns [`state::Peer`] of this [`PeerStateMachine`].
+    /// Returns a [`state::Peer`] of this [`PeerStateMachine`].
+    #[must_use]
     pub fn get_state(&self) -> state::Peer {
         state::Peer {
             id: self.id(),
@@ -374,7 +377,7 @@ impl_peer_converts!(WaitLocalSdp);
 impl_peer_converts!(WaitRemoteSdp);
 impl_peer_converts!(Stable);
 
-/// Action which can be done on negotiation process finish.
+/// Action which can be done on a negotiation process finish.
 #[derive(Clone, Copy, Debug)]
 enum OnNegotiationFinish {
     /// New negotiation should be started.
@@ -443,14 +446,13 @@ pub struct Context {
     /// All [`IceCandidate`]s received for this [`Peer`].
     ice_candidates: HashSet<IceCandidate>,
 
-    /// Flag which indicates that ICE restart should be performed for this
-    /// [`Peer`].
+    /// Indicator whether an ICE restart should be performed for this [`Peer`].
     ice_restart: bool,
 
     /// Current [`NegotiationRole`] of this [`Peer`].
     negotiation_role: Option<NegotiationRole>,
 
-    /// Action which should be done on negotiation process finish.
+    /// Action which should be done on a negotiation process finish.
     on_negotiation_finish: OnNegotiationFinish,
 }
 
@@ -616,7 +618,7 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::TrackPatch(patch)
     }
 
-    /// Sets [`Context::ice_restart`] flag to the `true`.
+    /// Sets [`Context::ice_restart`] flag to `true`.
     #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
         self.context.ice_restart = true;
@@ -732,12 +734,14 @@ impl<T> Peer<T> {
 
     /// Returns SDP offer of this [`Peer`].
     #[inline]
+    #[must_use]
     pub fn local_sdp(&self) -> Option<&str> {
         self.context.local_sdp.as_deref()
     }
 
     /// Returns SDP offer of the partner [`Peer`].
     #[inline]
+    #[must_use]
     pub fn remote_sdp(&self) -> Option<&str> {
         self.context.remote_sdp.as_deref()
     }
@@ -964,22 +968,29 @@ impl<T> Peer<T> {
             .extend(deduper.into_inner());
     }
 
-    /// Adds provided [`IceCandidate`] to this [`Peer`].
+    /// Adds the provided [`IceCandidate`] to this [`Peer`].
+    #[inline]
     pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
         self.context.ice_candidates.insert(ice_candidate);
     }
 
     /// Returns all [`IceCandidate`]s received for this [`Peer`].
+    #[inline]
+    #[must_use]
     pub fn ice_candidates(&self) -> &HashSet<IceCandidate> {
         &self.context.ice_candidates
     }
 
-    /// Returns `true` if ICE restart should be performed for this [`Peer`].
+    /// Indicates whether an ICE restart should be performed for this [`Peer`].
+    #[inline]
+    #[must_use]
     pub fn is_ice_restart(&self) -> bool {
         self.context.ice_restart
     }
 
-    /// Returns current [`NegotiationRole`] of this [`Peer`].
+    /// Returns the current [`NegotiationRole`] of this [`Peer`].
+    #[inline]
+    #[must_use]
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.context.negotiation_role.clone()
     }

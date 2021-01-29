@@ -9,10 +9,10 @@ pub mod server;
 
 pub use self::session::RpcServerRepository;
 
-/// Max size of WebSocket message in bytes.
+/// Maximum size of a WebSocket message in bytes.
 ///
-/// This limit also will be used for the fragmented message.
+/// This limit also is used for a fragmented message.
 ///
-/// `Room` state of 5 `Member`s with screen sharing, camera and audio will be
-/// ~300Kb, this value is multiplied by 3 just in case.
-const MAX_WS_MSG_SIZE: usize = 1000 * 1024;
+/// `Room` state of 5 `Member`s with a screen sharing, camera and audio will be
+/// around 300 Kb, so this value is multiplied by 3 and rounded just in case.
+const MAX_WS_MSG_SIZE: usize = 1024 * 1024; // 1 Mb

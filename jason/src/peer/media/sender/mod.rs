@@ -199,7 +199,7 @@ impl Sender {
         )
     }
 
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with a provided
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
     /// [`media_exchange_state`].
     #[inline]
     pub fn send_media_exchange_state_intention(
@@ -217,7 +217,7 @@ impl Sender {
         );
     }
 
-    /// Sends [`TrackEvent::MuteUpdateIntention`] with a provided
+    /// Sends [`TrackEvent::MuteUpdateIntention`] with the provided
     /// [`mute_state`].
     #[inline]
     pub fn send_mute_state_intention(&self, state: mute_state::Transition) {

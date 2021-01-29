@@ -12,7 +12,7 @@ use crate::{
     utils::{JasonError, TaskHandle},
 };
 
-/// Abstraction over state which can be transformed to the states from the
+/// Abstraction over a state which can be transformed to the states from the
 /// [`medea_client_api_proto::state`].
 pub trait AsProtoState {
     /// [`medea_client_api_proto::state`] into which this state can be
@@ -30,7 +30,8 @@ pub trait SynchronizableState {
     /// [`medea_client_api_proto::state`] by which this state can be updated.
     type Input;
 
-    /// Creates state from the [`medea_client_api_proto::state`] representation.
+    /// Creates a new state from the [`medea_client_api_proto::state`]
+    /// representation.
     fn from_proto(
         input: Self::Input,
         send_cons: &LocalTracksConstraints,
@@ -40,20 +41,20 @@ pub trait SynchronizableState {
     fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints);
 }
 
-/// Abstraction over state which can be updated by client side.
+/// Abstraction over a state which can be updated by a client side.
 pub trait Updatable {
-    /// Returns [`Future`] which will be resolved when this [`Updatable`] will
-    /// resolve his intentions.
+    /// Returns [`Future`] resolving once this [`Updatable`] state resolves its
+    /// intentions.
     fn when_stabilized(&self) -> AllProcessed<'static>;
 
-    /// Returns [`Future`] which will be resolved when all client updates will
-    /// be performed on this state.
+    /// Returns [`Future`] resolving once all the client updates are performed
+    /// on this state.
     fn when_updated(&self) -> AllProcessed<'static>;
 
-    /// Notifies about RPC connection loss.
+    /// Notifies about a RPC connection loss.
     fn connection_lost(&self);
 
-    /// Notifies about RPC connection recovering.
+    /// Notifies about a RPC connection recovering.
     fn connection_recovered(&self);
 }
 
