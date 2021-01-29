@@ -11,11 +11,12 @@ use medea_client_api_proto::{MediaType, TrackId as Id};
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 #[derive(Debug, Eq, PartialEq)]
 pub struct MediaTrack {
-    pub id: Id,
+    id: Id,
     mid: RefCell<Option<String>>,
-    pub media_type: MediaType,
+    media_type: MediaType,
     transceiver_enabled: Cell<bool>,
-    media_exchange_state: RefCell<MediaExchangeState>,
+    send_media_state: MediaState,
+    recv_media_state: MediaState,
 }
 
 impl MediaTrack {
@@ -28,103 +29,121 @@ impl MediaTrack {
             mid: RefCell::new(None),
             media_type,
             transceiver_enabled: Cell::new(true),
-            media_exchange_state: RefCell::new(MediaExchangeState::new()),
+            send_media_state: MediaState::default(),
+            recv_media_state: MediaState::default(),
         }
     }
 
+    /// Returns [`Id`] of this [`MediaTrack`].
+    #[inline]
+    #[must_use]
+    pub fn id(&self) -> Id {
+        self.id
+    }
+
+    /// Returns reference to the [`MediaType`] of this [`MediaTrack`].
+    #[inline]
+    #[must_use]
+    pub fn media_type(&self) -> &MediaType {
+        &self.media_type
+    }
+
+    /// Sets [`mid`] of this [`MediaTrack`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     #[inline]
     pub fn set_mid(&self, mid: String) {
         self.mid.borrow_mut().replace(mid);
     }
 
+    /// Returns [`mid`] of this [`MediaTrack`].
+    ///
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     #[inline]
     #[must_use]
     pub fn mid(&self) -> Option<String> {
         self.mid.borrow_mut().as_ref().cloned()
     }
 
+    /// Enables/disables transceiver publishing state.
     #[inline]
     pub fn set_transceiver_enabled(&self, enabled: bool) {
         self.transceiver_enabled.set(enabled);
     }
 
+    /// Returns transceiver publishing state of this [`MediaTrack`].
     #[inline]
     #[must_use]
     pub fn is_transceiver_enabled(&self) -> bool {
         self.transceiver_enabled.get()
     }
 
-    /// Indicates whether this [`MediaTrack`] is enabled currently.
+    /// Indicates whether this [`MediaTrack`] is enabled for send and recv side.
     #[inline]
     #[must_use]
-    pub fn is_media_exchange_enabled(&self) -> bool {
-        self.media_exchange_state.borrow().is_enabled()
+    pub fn is_enabled_general(&self) -> bool {
+        self.send_media_state.is_enabled() && self.recv_media_state.is_enabled()
     }
 
-    /// Sets media exchange state of the [`MediaTrack`]'s `Recv` side.
+    /// Returns [`MediaState`] for the recv side.
     #[inline]
-    pub fn set_recv_media_exchange_state(&self, is_enabled: bool) {
-        self.media_exchange_state.borrow_mut().set_recv(is_enabled);
+    #[must_use]
+    pub fn recv_media_state(&self) -> &MediaState {
+        &self.recv_media_state
     }
 
-    /// Sets media exchange state of the [`MediaTrack`]'s `Send` side.
+    /// Returns [`MediaState`] for the send side.
     #[inline]
-    pub fn set_send_media_exchange_state(&self, is_enabled: bool) {
-        self.media_exchange_state.borrow_mut().set_send(is_enabled);
+    #[must_use]
+    pub fn send_media_state(&self) -> &MediaState {
+        &self.send_media_state
     }
 }
 
-/// Media exchange state of the [`MediaTrack`].
-///
-/// Contains media exchange state for the `Send` and `Recv` side.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct MediaExchangeState {
-    /// Media exchange state of the `Send` side.
-    ///
-    /// If `true` then sender is enabled.
-    send_enabled: bool,
+/// Media publishing/receiving state.
+#[derive(Debug, Eq, PartialEq)]
+pub struct MediaState {
+    /// Indicator whether [`MediaTrack`] is muted or unmuted.
+    muted: Cell<bool>,
 
-    /// Media exchange state of the `Recv` side.
-    ///
-    /// If `true` then receiver is enabled.
-    recv_enabled: bool,
+    /// Indicator whether [`MediaTrack`] is enabled or disabled.
+    enabled: Cell<bool>,
 }
 
-impl Default for MediaExchangeState {
+impl Default for MediaState {
     #[inline]
     fn default() -> Self {
         Self {
-            send_enabled: true,
-            recv_enabled: true,
+            enabled: Cell::new(true),
+            muted: Cell::new(false),
         }
     }
 }
 
-impl MediaExchangeState {
-    /// Returns new default [`MediaExchangeState`].
+impl MediaState {
+    /// Indicates whether this [`MediaState`] is enabled.
     #[inline]
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.get()
     }
 
-    /// Indicates whether [`MediaExchangeState::send_enabled`] or
-    /// [`MediaExchangeState::recv_enabled`].
+    /// Indicates whether this [`MediaState`] is muted.
     #[inline]
     #[must_use]
-    pub fn is_enabled(self) -> bool {
-        self.send_enabled && self.recv_enabled
+    pub fn is_muted(&self) -> bool {
+        self.muted.get()
     }
 
-    /// Sets media exchange state for the `Recv` side of [`MediaTrack`].
+    /// Sets the current mute state to the provided one.
     #[inline]
-    pub fn set_recv(&mut self, is_enabled: bool) {
-        self.recv_enabled = is_enabled;
+    pub fn set_muted(&self, muted: bool) {
+        self.muted.set(muted);
     }
 
-    /// Sets media exchange state for the `Send` side of the [`MediaTrack`].
+    /// Sets the current media exchange state to the provided one.
     #[inline]
-    pub fn set_send(&mut self, is_enabled: bool) {
-        self.send_enabled = is_enabled;
+    pub fn set_enabled(&self, enabled: bool) {
+        self.enabled.set(enabled);
     }
 }

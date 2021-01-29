@@ -448,7 +448,7 @@ impl From<&Peer> for PeerTracks {
             .values()
             .filter(|t| t.is_transceiver_enabled())
         {
-            match sender.media_type {
+            match sender.media_type() {
                 MediaTypeProto::Audio(_) => audio_send += 1,
                 MediaTypeProto::Video(_) => video_send += 1,
             }
@@ -458,7 +458,7 @@ impl From<&Peer> for PeerTracks {
             .values()
             .filter(|t| t.is_transceiver_enabled())
         {
-            match receiver.media_type {
+            match receiver.media_type() {
                 MediaTypeProto::Audio(_) => audio_recv += 1,
                 MediaTypeProto::Video(_) => video_recv += 1,
             }

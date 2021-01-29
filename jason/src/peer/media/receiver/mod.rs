@@ -13,8 +13,10 @@ use web_sys as sys;
 use crate::{
     media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
     peer::{
-        media::TrackEvent, transceiver::Transceiver, MediaConnections,
-        MediaStateControllable, PeerEvent, TransceiverDirection,
+        media::{media_exchange_state, TrackEvent},
+        transceiver::Transceiver,
+        MediaConnections, MediaStateControllable, PeerEvent,
+        TransceiverDirection,
     },
 };
 
@@ -146,6 +148,23 @@ impl Receiver {
             });
 
         self.enabled_individual.get() && is_recv_direction
+    }
+
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
+    /// [`media_exchange_state`].
+    pub fn send_media_exchange_state_intention(
+        &self,
+        state: media_exchange_state::Transition,
+    ) {
+        let _ = self.track_events_sender.unbounded_send(
+            TrackEvent::MediaExchangeIntention {
+                id: self.track_id,
+                enabled: matches!(
+                    state,
+                    media_exchange_state::Transition::Enabling(_)
+                ),
+            },
+        );
     }
 
     /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this

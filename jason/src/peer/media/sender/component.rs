@@ -4,7 +4,8 @@ use std::rc::Rc;
 
 use futures::{future::LocalBoxFuture, StreamExt as _};
 use medea_client_api_proto::{
-    MediaSourceKind, MediaType, MemberId, TrackId, TrackPatchEvent,
+    self as proto, MediaSourceKind, MediaType, MemberId, TrackId,
+    TrackPatchEvent,
 };
 use medea_macro::watchers;
 use medea_reactive::{AllProcessed, Guarded, ObservableCell, ProgressableCell};
@@ -14,12 +15,16 @@ use crate::{
     media::{LocalTracksConstraints, TrackConstraints, VideoSource},
     peer::{
         self,
-        media::{media_exchange_state, mute_state, Result},
+        component::SyncState,
+        media::{
+            media_exchange_state, mute_state, InTransition, MediaExchangeState,
+            MuteState, Result,
+        },
         MediaConnectionsError, MediaExchangeStateController, MediaState,
-        MediaStateControllable, MuteStateController, PeerError, TrackEvent,
+        MediaStateControllable, MuteStateController, PeerError,
         TransceiverDirection, TransceiverSide,
     },
-    utils::component,
+    utils::{component, AsProtoState, SynchronizableState, Updatable},
     MediaKind,
 };
 
@@ -74,6 +79,139 @@ pub struct State {
     enabled_general: ProgressableCell<media_exchange_state::Stable>,
     send_constraints: LocalTracksConstraints,
     local_track_state: ObservableCell<LocalTrackState>,
+    sync_state: ObservableCell<SyncState>,
+}
+
+impl AsProtoState for State {
+    type Output = proto::state::Sender;
+
+    #[inline]
+    fn as_proto(&self) -> Self::Output {
+        Self::Output {
+            id: self.id,
+            mid: self.mid.clone(),
+            media_type: self.media_type.clone(),
+            receivers: self.receivers.clone(),
+            enabled_individual: self.enabled_individual.enabled(),
+            enabled_general: self.enabled_general.get()
+                == media_exchange_state::Stable::Enabled,
+            muted: self.mute_state.muted(),
+        }
+    }
+}
+
+impl SynchronizableState for State {
+    type Input = proto::state::Sender;
+
+    #[inline]
+    fn from_proto(
+        input: Self::Input,
+        send_constraints: &LocalTracksConstraints,
+    ) -> Self {
+        Self {
+            id: input.id,
+            mid: input.mid,
+            media_type: input.media_type,
+            receivers: input.receivers,
+            mute_state: MuteStateController::new(mute_state::Stable::from(
+                input.muted,
+            )),
+            enabled_individual: MediaExchangeStateController::new(
+                media_exchange_state::Stable::from(input.enabled_individual),
+            ),
+            enabled_general: ProgressableCell::new(
+                media_exchange_state::Stable::from(input.enabled_general),
+            ),
+            send_constraints: send_constraints.clone(),
+            local_track_state: ObservableCell::new(LocalTrackState::Stable),
+            sync_state: ObservableCell::new(SyncState::Synced),
+        }
+    }
+
+    fn apply(&self, input: Self::Input, _: &LocalTracksConstraints) {
+        let new_media_exchange_state =
+            media_exchange_state::Stable::from(input.enabled_individual);
+        let current_media_exchange_state = match self.enabled_individual.state()
+        {
+            MediaExchangeState::Transition(transition) => {
+                transition.into_inner()
+            }
+            MediaExchangeState::Stable(stable) => stable,
+        };
+        if current_media_exchange_state != new_media_exchange_state {
+            self.enabled_individual.update(new_media_exchange_state);
+        }
+
+        let new_mute_state = mute_state::Stable::from(input.muted);
+        let current_mute_state = match self.mute_state.state() {
+            MuteState::Stable(stable) => stable,
+            MuteState::Transition(transition) => transition.into_inner(),
+        };
+        if current_mute_state != new_mute_state {
+            self.mute_state.update(new_mute_state);
+        }
+
+        let new_general_media_exchange_state =
+            media_exchange_state::Stable::from(input.enabled_general);
+        self.enabled_general.set(new_general_media_exchange_state);
+
+        self.sync_state.set(SyncState::Synced);
+    }
+}
+
+impl Updatable for State {
+    /// Returns [`Future`] resolving once [`media_exchange_state`] and
+    /// [`mute_state`] are stabilized.
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    fn when_stabilized(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            Rc::clone(&self.enabled_individual).when_stabilized().into(),
+            Rc::clone(&self.mute_state).when_stabilized().into(),
+        ])
+    }
+
+    /// Returns [`Future`] resolving once a [`State`] update is applied onto the
+    /// [`Sender`].
+    ///
+    /// [`Future`]: std::future::Future
+    #[inline]
+    fn when_updated(&self) -> AllProcessed<'static> {
+        medea_reactive::when_all_processed(vec![
+            self.enabled_individual.when_processed().into(),
+            self.mute_state.when_processed().into(),
+            self.enabled_general.when_all_processed().into(),
+        ])
+    }
+
+    /// Notifies [`State`] about a RPC connection loss.
+    #[inline]
+    fn connection_lost(&self) {
+        self.sync_state.set(SyncState::Desynced);
+    }
+
+    /// Notifies [`State`] about a RPC connection restore.
+    #[inline]
+    fn connection_recovered(&self) {
+        self.sync_state.set(SyncState::Syncing);
+    }
+}
+
+impl From<&State> for proto::state::Sender {
+    #[inline]
+    fn from(state: &State) -> Self {
+        Self {
+            id: state.id,
+            mid: state.mid.clone(),
+            media_type: state.media_type.clone(),
+            receivers: state.receivers.clone(),
+            enabled_individual: state.enabled_individual.enabled(),
+            enabled_general: state.enabled_general.get()
+                == media_exchange_state::Stable::Enabled,
+            muted: state.mute_state.muted(),
+        }
+    }
 }
 
 impl State {
@@ -104,6 +242,7 @@ impl State {
             mute_state: MuteStateController::new(mute_state::Stable::from(
                 false,
             )),
+            sync_state: ObservableCell::new(SyncState::Synced),
             send_constraints,
             local_track_state: ObservableCell::new(LocalTrackState::Stable),
         })
@@ -211,29 +350,6 @@ impl State {
         }
     }
 
-    /// Returns [`Future`] resolving when [`State`] update will be applied onto
-    /// [`Sender`].
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_updated(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![
-            self.enabled_individual.when_processed().into(),
-            self.mute_state.when_processed().into(),
-            self.enabled_general.when_all_processed().into(),
-        ])
-    }
-
-    /// Returns [`Future`] which will be resolved once [`media_exchange_state`]
-    /// and [`mute_state`] are be stabilized.
-    ///
-    /// [`Future`]: std::future::Future
-    pub fn when_stabilized(&self) -> AllProcessed<'static> {
-        medea_reactive::when_all_processed(vec![
-            Rc::clone(&self.enabled_individual).when_stabilized().into(),
-            Rc::clone(&self.mute_state).when_stabilized().into(),
-        ])
-    }
-
     /// Indicates whether local `MediaStream` update needed for this [`State`].
     #[inline]
     #[must_use]
@@ -286,27 +402,7 @@ impl Component {
         _: Rc<State>,
         new_state: media_exchange_state::Transition,
     ) -> Result<()> {
-        match new_state {
-            media_exchange_state::Transition::Enabling(_) => {
-                sender
-                    .track_events_sender
-                    .unbounded_send(TrackEvent::MediaExchangeIntention {
-                        id: sender.track_id,
-                        enabled: true,
-                    })
-                    .ok();
-            }
-            media_exchange_state::Transition::Disabling(_) => {
-                sender
-                    .track_events_sender
-                    .unbounded_send(TrackEvent::MediaExchangeIntention {
-                        id: sender.track_id,
-                        enabled: false,
-                    })
-                    .ok();
-            }
-        }
-
+        sender.send_media_exchange_state_intention(new_state);
         Ok(())
     }
 
@@ -320,13 +416,7 @@ impl Component {
         _: Rc<State>,
         new_state: mute_state::Transition,
     ) -> Result<()> {
-        let _ = sender.track_events_sender.unbounded_send(
-            TrackEvent::MuteUpdateIntention {
-                id: sender.track_id,
-                muted: matches!(new_state, mute_state::Transition::Muting(_)),
-            },
-        );
-
+        sender.send_mute_state_intention(new_state);
         Ok(())
     }
 
@@ -413,6 +503,40 @@ impl Component {
         }
         Ok(())
     }
+
+    /// Stops transition timeouts on a [`SyncState::Desynced`].
+    ///
+    /// Sends media state intentions and resets transition timeouts on a
+    /// [`SyncState::Synced`].
+    #[watch(self.sync_state.subscribe().skip(1))]
+    async fn sync_state_watcher(
+        sender: Rc<Sender>,
+        state: Rc<State>,
+        sync_state: SyncState,
+    ) -> Result<()> {
+        match sync_state {
+            SyncState::Synced => {
+                if let MediaExchangeState::Transition(transition) =
+                    state.enabled_individual.state()
+                {
+                    sender.send_media_exchange_state_intention(transition);
+                }
+                if let MuteState::Transition(transition) =
+                    state.mute_state.state()
+                {
+                    sender.send_mute_state_intention(transition);
+                }
+                state.enabled_individual.reset_transition_timeout();
+                state.mute_state.reset_transition_timeout();
+            }
+            SyncState::Desynced => {
+                state.enabled_individual.stop_transition_timeout();
+                state.mute_state.stop_transition_timeout();
+            }
+            SyncState::Syncing => (),
+        }
+        Ok(())
+    }
 }
 
 impl TransceiverSide for State {
@@ -486,5 +610,14 @@ impl MediaStateControllable for State {
             }
             Ok(())
         }
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl State {
+    /// Sets the [`State::sync_state`] to a [`SyncState::Synced`].
+    #[inline]
+    pub fn synced(&self) {
+        self.sync_state.set(SyncState::Synced);
     }
 }

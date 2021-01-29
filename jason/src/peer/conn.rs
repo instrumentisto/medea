@@ -336,6 +336,22 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Returns [`RtcIceConnectionState`] of this [`RtcPeerConnection`].
+    #[inline]
+    #[must_use]
+    pub fn ice_connection_state(&self) -> RtcIceConnectionState {
+        self.peer.ice_connection_state()
+    }
+
+    /// Returns [`PeerConnectionState`] of this [`RtcPeerConnection`].
+    ///
+    /// Returns [`None`] if failed to parse a [`PeerConnectionState`].
+    #[inline]
+    #[must_use]
+    pub fn connection_state(&self) -> Option<PeerConnectionState> {
+        get_peer_connection_state(&self.peer)?.ok()
+    }
+
     /// Sets handler for [`iceconnectionstatechange`][1] event.
     ///
     /// # Errors
@@ -402,37 +418,23 @@ impl RtcPeerConnection {
                             // browser does not support the functionality of
                             // `RTCPeerConnection.connectionState`, then this
                             // callback won't fire.
-                            if let Some(state) =
-                                get_peer_connection_state(&peer)
-                            {
-                                let state = match state.as_ref() {
-                                    "new" => PeerConnectionState::New,
-                                    "connecting" => {
-                                        PeerConnectionState::Connecting
-                                    }
-                                    "connected" => {
-                                        PeerConnectionState::Connected
-                                    }
-                                    "disconnected" => {
-                                        PeerConnectionState::Disconnected
-                                    }
-                                    "failed" => PeerConnectionState::Failed,
-                                    "closed" => PeerConnectionState::Closed,
-                                    _ => {
-                                        log::error!(
-                                            "Unknown RTCPeerConnection \
-                                             connection state: {}.",
-                                            state,
-                                        );
-                                        return;
-                                    }
-                                };
-                                f(state);
-                            } else {
-                                log::error!(
-                                    "Could not receive RTCPeerConnection \
-                                     connection state",
-                                );
+                            match get_peer_connection_state(&peer) {
+                                Some(Ok(state)) => {
+                                    f(state);
+                                }
+                                Some(Err(state)) => {
+                                    log::error!(
+                                        "Unknown RTCPeerConnection connection \
+                                         state: {}.",
+                                        state,
+                                    );
+                                }
+                                None => {
+                                    log::error!(
+                                        "Could not receive RTCPeerConnection \
+                                         connection state",
+                                    );
+                                }
                             }
                         },
                     )
@@ -717,6 +719,20 @@ impl Drop for RtcPeerConnection {
 /// [`SysRtcPeerConnection`] using reflection.
 ///
 /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-connection-state
-fn get_peer_connection_state(peer: &SysRtcPeerConnection) -> Option<String> {
-    get_property_by_name(peer, "connectionState", |v| v.as_string())
+fn get_peer_connection_state(
+    peer: &SysRtcPeerConnection,
+) -> Option<std::result::Result<PeerConnectionState, String>> {
+    let state =
+        get_property_by_name(peer, "connectionState", |v| v.as_string())?;
+    Some(Ok(match state.as_str() {
+        "new" => PeerConnectionState::New,
+        "connecting" => PeerConnectionState::Connecting,
+        "connected" => PeerConnectionState::Connected,
+        "disconnected" => PeerConnectionState::Disconnected,
+        "failed" => PeerConnectionState::Failed,
+        "closed" => PeerConnectionState::Closed,
+        _ => {
+            return Some(Err(state));
+        }
+    }))
 }

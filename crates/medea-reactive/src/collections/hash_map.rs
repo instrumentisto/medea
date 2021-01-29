@@ -5,6 +5,7 @@
 use std::{
     collections::hash_map::{Iter, Values},
     hash::Hash,
+    iter::FromIterator,
     marker::PhantomData,
 };
 
@@ -260,6 +261,28 @@ where
     V: Clone,
     S: SubscribersStore<(K, V), O>,
 {
+    /// Removes all entries which are not present in the provided [`HashMap`].
+    ///
+    /// [`HashMap`]: std::collections::HashMap
+    pub fn remove_not_present<A>(
+        &mut self,
+        other: &std::collections::HashMap<K, A>,
+    ) {
+        self.iter()
+            .filter_map(|(id, _)| {
+                if other.contains_key(id) {
+                    None
+                } else {
+                    Some(id.clone())
+                }
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|id| {
+                let _ = self.remove(&id);
+            });
+    }
+
     /// Inserts a key-value pair to this [`HashMap`].
     ///
     /// Emits [`HashMap::on_insert()`] event and may emit
@@ -338,6 +361,22 @@ impl<K, V, S: SubscribersStore<(K, V), O>, O> Drop for HashMap<K, V, S, O> {
         store.drain().for_each(|(key, value)| {
             self.on_remove_subs.send_update((key, value));
         });
+    }
+}
+
+impl<K, V, S: SubscribersStore<(K, V), O>, O> FromIterator<(K, V)>
+    for HashMap<K, V, S, O>
+where
+    K: Hash + Eq,
+{
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        Self {
+            store: std::collections::HashMap::from_iter(iter),
+            on_remove_subs: S::default(),
+            on_insert_subs: S::default(),
+            _output: PhantomData::default(),
+        }
     }
 }
 

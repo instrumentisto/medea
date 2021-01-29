@@ -1,6 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use futures::{
     channel::{
@@ -11,17 +14,17 @@ use futures::{
     stream::{self, BoxStream, LocalBoxStream, StreamExt as _},
 };
 use medea_client_api_proto::{
-    Command, Direction, Event, IceConnectionState, MediaSourceKind, MediaType,
-    MemberId, NegotiationRole, PeerId, PeerMetrics, Track, TrackId,
-    TrackPatchCommand, TrackPatchEvent, TrackUpdate, VideoSettings,
+    state, AudioSettings, Command, Direction, Event, IceConnectionState,
+    MediaSourceKind, MediaType, MemberId, NegotiationRole, PeerId, PeerMetrics,
+    Track, TrackId, TrackPatchCommand, TrackPatchEvent, TrackUpdate,
+    VideoSettings,
 };
 use medea_jason::{
     api::Room,
     media::{AudioTrackConstraints, MediaKind, MediaStreamSettings},
-    peer,
     peer::PeerConnection,
     rpc::MockRpcSession,
-    utils::JasonError,
+    utils::{AsProtoState, JasonError, Updatable},
     DeviceVideoTrackConstraints,
 };
 use wasm_bindgen_futures::{spawn_local, JsFuture};
@@ -80,41 +83,25 @@ async fn get_test_room_and_exist_peer(
         .return_once(|| stream::pending().boxed_local());
     rpc.expect_close_with_reason().return_const(());
     let event_tx_clone = event_tx.clone();
-    let peer_state: Rc<RefCell<Option<Rc<peer::State>>>> =
-        Rc::new(RefCell::new(None));
-    rpc.expect_send_command().returning_st({
-        let peer_state = Rc::clone(&peer_state);
-        move |cmd| {
-            let _ = command_tx.unbounded_send(cmd.clone());
-            match cmd {
-                Command::UpdateTracks {
-                    peer_id,
-                    tracks_patches,
-                } => {
-                    let negotiation_role = if peer_state
-                        .borrow()
-                        .as_ref()
-                        .and_then(|s| s.negotiation_role())
-                        .is_some()
-                    {
-                        None
-                    } else {
-                        Some(NegotiationRole::Offerer)
-                    };
-
-                    event_tx_clone
-                        .unbounded_send(Event::TracksApplied {
-                            peer_id,
-                            updates: tracks_patches
-                                .into_iter()
-                                .map(|p| TrackUpdate::Updated(p.into()))
-                                .collect(),
-                            negotiation_role,
-                        })
-                        .unwrap();
-                }
-                _ => (),
+    rpc.expect_send_command().returning(move |cmd| {
+        let _ = command_tx.unbounded_send(cmd.clone());
+        match cmd {
+            Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } => {
+                event_tx_clone
+                    .unbounded_send(Event::TracksApplied {
+                        peer_id,
+                        updates: tracks_patches
+                            .into_iter()
+                            .map(|p| TrackUpdate::Updated(p.into()))
+                            .collect(),
+                        negotiation_role: None,
+                    })
+                    .unwrap();
             }
+            _ => (),
         }
     });
 
@@ -140,10 +127,7 @@ async fn get_test_room_and_exist_peer(
 
     // wait until Event::PeerCreated is handled
     delay_for(200).await;
-    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
     let peer = room.get_peer_by_id(PeerId(1)).unwrap();
-    *peer_state.borrow_mut() =
-        Some(room.get_peer_state_by_id(PeerId(1)).unwrap());
     (room, peer, event_tx, command_rx)
 }
 
@@ -363,7 +347,7 @@ mod disable_send_tracks {
 
         let handle = room.new_handle();
         assert!(JsFuture::from(handle.disable_audio()).await.is_ok());
-        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
         assert!(!peer.is_send_audio_enabled());
         assert!(JsFuture::from(handle.enable_audio()).await.is_ok());
         assert!(peer.is_send_audio_enabled());
@@ -381,7 +365,7 @@ mod disable_send_tracks {
         let handle = room.new_handle();
         assert!(JsFuture::from(handle.disable_video(None)).await.is_ok());
         assert!(!peer.is_send_video_enabled(None));
-        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
         assert!(JsFuture::from(handle.enable_video(None)).await.is_ok());
         assert!(peer.is_send_video_enabled(None));
     }
@@ -442,7 +426,7 @@ mod disable_send_tracks {
             .unwrap();
         assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
-        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
         JsFuture::from(handle.enable_video(Some(JsMediaSourceKind::Device)))
             .await
             .unwrap();
@@ -479,7 +463,7 @@ mod disable_send_tracks {
         .is_ok());
         assert!(!peer.is_send_video_enabled(Some(MediaSourceKind::Display)));
         assert!(peer.is_send_video_enabled(Some(MediaSourceKind::Device)));
-        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
         JsFuture::from(handle.enable_video(Some(JsMediaSourceKind::Display)))
             .await
             .unwrap();
@@ -696,7 +680,6 @@ mod disable_send_tracks {
             media_exchange_state::Stable::Disabled.into()
         ));
 
-        room.reset_peer_negotiation_state(PeerId(1)).unwrap();
         let (disable_audio_result, enable_audio_result) =
             futures::future::join(
                 JsFuture::from(handle.disable_audio()),
@@ -1794,7 +1777,7 @@ async fn only_one_gum_performed_on_enable() {
         })
         .unwrap();
     yield_now().await;
-    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
     assert_eq!(mock.get_user_media_requests_count(), 1);
     assert!(!peer.is_send_audio_enabled());
 
@@ -1884,7 +1867,7 @@ async fn set_media_state_return_media_error() {
     JsFuture::from(room_handle.disable_audio()).await.unwrap();
 
     mock.error_get_user_media(ERROR_MSG.into());
-    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
+
     let err = get_jason_error(
         JsFuture::from(room_handle.enable_audio())
             .await
@@ -2008,8 +1991,6 @@ async fn send_enabling_holds_local_tracks() {
         .unwrap();
     // wait until Event::TracksApplied is handled
     delay_for(50).await;
-
-    room.reset_peer_negotiation_state(PeerId(1)).unwrap();
 
     let mock = MockNavigator::new();
     mock.error_get_user_media("foobar".into());
@@ -2547,4 +2528,163 @@ mod set_local_media_settings {
         assert!(peer1.is_send_video_enabled(Some(MediaSourceKind::Device)));
         assert_eq!(peer1.get_send_tracks().len(), 1);
     }
+}
+
+mod state_synchronization {
+    use super::*;
+
+    /// Checks whether [`state::Room`] update can create a [`PeerConnection`]
+    /// and its [`Sender`]s/[`Receiver`]s.
+    #[wasm_bindgen_test]
+    async fn create_peer_by_state() {
+        let (command_tx, mut command_rx) = mpsc::unbounded();
+        let (event_tx, event_rx) = mpsc::unbounded();
+
+        let mut rpc_session = MockRpcSession::new();
+        rpc_session
+            .expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc_session
+            .expect_on_connection_loss()
+            .return_once(|| Box::pin(stream::pending()));
+        rpc_session
+            .expect_on_reconnected()
+            .return_once(|| Box::pin(stream::pending()));
+        rpc_session.expect_close_with_reason().returning(|_| ());
+        rpc_session.expect_send_command().returning(move |cmd| {
+            let _ = command_tx.unbounded_send(cmd);
+        });
+        let room = Room::new(
+            Rc::new(rpc_session),
+            Rc::new(medea_jason::media::MediaManager::default()),
+        );
+
+        let mut senders = HashMap::new();
+        senders.insert(
+            TrackId(0),
+            state::Sender {
+                id: TrackId(0),
+                muted: false,
+                enabled_individual: true,
+                enabled_general: true,
+                receivers: Vec::new(),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
+                mid: None,
+            },
+        );
+        let mut receivers = HashMap::new();
+        receivers.insert(
+            TrackId(1),
+            state::Receiver {
+                id: TrackId(1),
+                muted: false,
+                enabled_individual: true,
+                enabled_general: true,
+                sender_id: "".into(),
+                media_type: MediaType::Audio(AudioSettings { required: true }),
+                mid: None,
+            },
+        );
+        let mut room_proto = room.peers_state().as_proto();
+        room_proto.peers.insert(
+            PeerId(0),
+            state::Peer {
+                id: PeerId(0),
+                restart_ice: false,
+                senders,
+                receivers,
+                force_relay: false,
+                ice_servers: vec![],
+                negotiation_role: Some(NegotiationRole::Offerer),
+                local_sdp: None,
+                remote_sdp: None,
+                ice_candidates: HashSet::new(),
+            },
+        );
+        event_tx
+            .unbounded_send(Event::StateSynchronized { state: room_proto })
+            .unwrap();
+
+        let command = timeout(1000, command_rx.next()).await.unwrap().unwrap();
+        assert!(matches!(command, Command::MakeSdpOffer { .. }));
+
+        let peer = room.get_peer_by_id(PeerId(0)).unwrap();
+        assert!(peer.get_sender_by_id(TrackId(0)).is_some());
+        assert!(peer.get_receiver_by_id(TrackId(1)).is_some());
+    }
+}
+
+/// Checks that [`MediaState`] intentions are sent after [`peer::State`]
+/// synchronization.
+#[wasm_bindgen_test]
+async fn intentions_are_sent_on_reconnect() {
+    let (event_tx, event_rx) = mpsc::unbounded();
+    let (room, mut commands_rx) = get_test_room(Box::pin(event_rx));
+    JsFuture::from(room.new_handle().set_local_media_settings(
+        &media_stream_settings(true, true),
+        false,
+        false,
+    ))
+    .await
+    .unwrap();
+
+    let (audio_track, video_track) = get_test_tracks(false, false);
+    let audio_track_id = audio_track.id;
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            negotiation_role: NegotiationRole::Offerer,
+            tracks: vec![audio_track, video_track],
+            ice_servers: Vec::new(),
+            force_relay: false,
+        })
+        .unwrap();
+    while let Some(cmd) = commands_rx.next().await {
+        if let Command::MakeSdpOffer { peer_id, .. } = cmd {
+            assert_eq!(peer_id, PeerId(1));
+            break;
+        }
+    }
+
+    let room_handle = room.new_handle();
+    let peer_state = room.get_peer_state_by_id(PeerId(1)).unwrap();
+    peer_state.connection_lost();
+
+    spawn_local(async move {
+        let _ = JsFuture::from(room_handle.disable_audio()).await;
+    });
+    timeout(1000, async {
+        while let Some(cmd) = commands_rx.next().await {
+            if let Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } = cmd
+            {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(tracks_patches[0].id, audio_track_id);
+                assert_eq!(tracks_patches[0].enabled, Some(false));
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    peer_state.synced();
+    timeout(1000, async {
+        while let Some(cmd) = commands_rx.next().await {
+            if let Command::UpdateTracks {
+                peer_id,
+                tracks_patches,
+            } = cmd
+            {
+                assert_eq!(peer_id, PeerId(1));
+                assert_eq!(tracks_patches[0].id, audio_track_id);
+                assert_eq!(tracks_patches[0].enabled, Some(false));
+                break;
+            }
+        }
+    })
+    .await
+    .unwrap();
 }

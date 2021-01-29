@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 
+use medea_client_api_proto as proto;
 use medea_client_api_proto::{
     CommandHandler, Credential, Event, IceCandidate, MemberId, NegotiationRole,
     PeerId, PeerMetrics, TrackId, TrackPatchCommand,
@@ -138,6 +139,8 @@ impl CommandHandler for Room {
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
     /// Both [`Peer`]s may have any state except [`Stable`].
     ///
+    /// Adds [`IceCandidate`] to the [`Peer`].
+    ///
     /// [`Stable`]: crate::media::peer::Stable
     fn on_set_ice_candidate(
         &mut self,
@@ -153,9 +156,11 @@ impl CommandHandler for Room {
         let to_peer_id = self
             .peers
             .map_peer_by_id(from_peer_id, PeerStateMachine::partner_peer_id)?;
-        let to_member_id = self
-            .peers
-            .map_peer_by_id(to_peer_id, PeerStateMachine::member_id)?;
+        let to_member_id =
+            self.peers.map_peer_by_id_mut(to_peer_id, |to_peer| {
+                to_peer.add_ice_candidate(candidate.clone());
+                to_peer.member_id()
+            })?;
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,
@@ -224,5 +229,9 @@ impl CommandHandler for Room {
         })?;
 
         Ok(())
+    }
+
+    fn on_synchronize_me(&mut self, _: proto::state::Room) -> Self::Output {
+        unreachable!("Room can't receive Command::SynchronizeMe")
     }
 }

@@ -15,10 +15,10 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, ConnectionQualityScore, Event as RpcEvent, EventHandler,
-    IceCandidate, IceConnectionState, IceServer, MediaSourceKind, MemberId,
-    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
-    TrackUpdate,
+    self as proto, Command, ConnectionQualityScore, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
+    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
+    TrackId, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -40,7 +40,10 @@ use crate::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
-    utils::{Callback1, HandlerDetachedError, JasonError, JsCaused, JsError},
+    utils::{
+        AsProtoState, Callback1, HandlerDetachedError, JasonError, JsCaused,
+        JsError,
+    },
     JsMediaSourceKind,
 };
 
@@ -1364,15 +1367,21 @@ impl InnerRoom {
     /// Stops state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_lost(&self) {
-        self.peers.stop_timeouts();
+        self.peers.connection_lost();
         self.on_connection_loss
             .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
 
+    /// Sends [`Command::SynchronizeMe`] with a current Client state to the
+    /// Media Server.
+    ///
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
-        self.peers.resume_timeouts();
+        self.peers.connection_recovered();
+        self.rpc.send_command(Command::SynchronizeMe {
+            state: self.peers.state().as_proto(),
+        });
     }
 }
 
@@ -1544,6 +1553,16 @@ impl EventHandler for InnerRoom {
         _: medea_client_api_proto::CloseReason,
     ) -> Self::Output {
         unreachable!("Room can't receive Event::RoomLeft")
+    }
+
+    /// Updates [`peer::repo::State`] with the provided [`proto::state::Room`].
+    #[inline]
+    async fn on_state_synchronized(
+        &self,
+        state: proto::state::Room,
+    ) -> Self::Output {
+        self.peers.apply(state);
+        Ok(())
     }
 }
 
@@ -1720,22 +1739,6 @@ impl Drop for InnerRoom {
 
 #[cfg(feature = "mockable")]
 impl Room {
-    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with the provided
-    /// [`PeerId`].
-    pub fn reset_peer_negotiation_state(
-        &self,
-        peer_id: PeerId,
-    ) -> Result<(), RoomError> {
-        self.0
-            .peers
-            .state()
-            .get(peer_id)
-            .ok_or(RoomError::NoSuchPeer(peer_id))?
-            .reset_negotiation_role();
-
-        Ok(())
-    }
-
     /// Returns [`PeerConnection`] stored in repository by its ID.
     ///
     /// Used to inspect [`Room`]'s inner state in integration tests.
@@ -1745,6 +1748,12 @@ impl Room {
         peer_id: PeerId,
     ) -> Option<Rc<PeerConnection>> {
         self.0.peers.get(peer_id)
+    }
+
+    /// Returns reference to the [`peer::repo::State`] of this [`Room`].
+    #[inline]
+    pub fn peers_state(&self) -> Rc<peer::repo::State> {
+        self.0.peers.state()
     }
 
     /// Lookups [`peer::State`] by the provided [`PeerId`].

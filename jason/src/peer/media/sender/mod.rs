@@ -198,6 +198,36 @@ impl Sender {
             self.caps.media_source_kind(),
         )
     }
+
+    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
+    /// [`media_exchange_state`].
+    #[inline]
+    pub fn send_media_exchange_state_intention(
+        &self,
+        state: media_exchange_state::Transition,
+    ) {
+        let _ = self.track_events_sender.unbounded_send(
+            TrackEvent::MediaExchangeIntention {
+                id: self.track_id,
+                enabled: matches!(
+                    state,
+                    media_exchange_state::Transition::Enabling(_)
+                ),
+            },
+        );
+    }
+
+    /// Sends [`TrackEvent::MuteUpdateIntention`] with the provided
+    /// [`mute_state`].
+    #[inline]
+    pub fn send_mute_state_intention(&self, state: mute_state::Transition) {
+        let _ = self.track_events_sender.unbounded_send(
+            TrackEvent::MuteUpdateIntention {
+                id: self.track_id,
+                muted: matches!(state, mute_state::Transition::Muting(_)),
+            },
+        );
+    }
 }
 
 #[cfg(feature = "mockable")]

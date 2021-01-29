@@ -3,7 +3,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use futures::{channel::mpsc, future};
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{self as proto, PeerId};
 use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
@@ -13,7 +13,10 @@ use crate::{
     api::{Connections, RoomError},
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
     peer,
-    utils::{component, delay_for, TaskHandle},
+    utils::{
+        component, delay_for, AsProtoState, SynchronizableState, TaskHandle,
+        Updatable as _,
+    },
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -40,21 +43,39 @@ impl Component {
             .collect()
     }
 
-    /// Stops all timeouts in the all [`peer::Component`]s.
+    /// Notifies all [`peer::Component`]s about a RPC connection loss.
     #[inline]
-    pub fn stop_timeouts(&self) {
+    pub fn connection_lost(&self) {
         for peer in self.peers.borrow().values() {
-            peer.stop_state_transitions_timers();
-            peer.state().stop_timeouts();
+            peer.state().connection_lost();
         }
     }
 
-    /// Resumes all timeouts in the all [`peer::Component`]s.
+    /// Notifies all [`peer::Component`]s about a RPC connection restore.
     #[inline]
-    pub fn resume_timeouts(&self) {
+    pub fn connection_recovered(&self) {
         for peer in self.peers.borrow().values() {
-            peer.reset_state_transitions_timers();
-            peer.state().resume_timeouts();
+            peer.state().connection_recovered();
+        }
+    }
+
+    /// Updates this [`State`] with the provided [`proto::state::Room`].
+    pub fn apply(&self, new_state: proto::state::Room) {
+        let state = self.state();
+        let send_cons = &self.obj().send_constraints;
+
+        state.0.borrow_mut().remove_not_present(&new_state.peers);
+
+        for (id, peer_state) in new_state.peers {
+            let peer = state.0.borrow().get(&id).cloned();
+            if let Some(peer) = peer {
+                peer.apply(peer_state, send_cons);
+            } else {
+                state.0.borrow_mut().insert(
+                    id,
+                    Rc::new(peer::State::from_proto(peer_state, send_cons)),
+                );
+            }
         }
     }
 }
@@ -187,6 +208,22 @@ impl State {
     #[inline]
     pub fn remove(&self, peer_id: PeerId) {
         self.0.borrow_mut().remove(&peer_id);
+    }
+}
+
+impl AsProtoState for State {
+    type Output = proto::state::Room;
+
+    #[inline]
+    fn as_proto(&self) -> Self::Output {
+        Self::Output {
+            peers: self
+                .0
+                .borrow()
+                .iter()
+                .map(|(id, p)| (*id, p.as_proto()))
+                .collect(),
+        }
     }
 }
 

@@ -1,6 +1,10 @@
 //! Local session description wrapper.
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{
     future,
@@ -72,9 +76,7 @@ impl LocalSdp {
         let prev_sdp = self.0.current_sdp.replace(Some(sdp));
         self.0.prev_sdp.replace(prev_sdp);
         self.0.approved.set(false);
-        self.0
-            .rollback_task_handle
-            .replace(Some(self.spawn_rollback_task()));
+        self.spawn_rollback_task();
     }
 
     /// Approves the current [`LocalSdp`] offer.
@@ -83,9 +85,26 @@ impl LocalSdp {
             self.0.current_sdp.borrow().as_ref() == Some(&sdp);
 
         if !is_current_approved {
+            let is_restart_needed = self
+                .0
+                .prev_sdp
+                .borrow()
+                .as_ref()
+                .map(|prev| prev == &sdp)
+                .unwrap_or_default();
+            if is_restart_needed {
+                self.0.restart_needed.set(true);
+            }
             self.0.current_sdp.replace(Some(sdp));
         }
         self.0.approved.set(true);
+    }
+
+    /// Returns the current SDP offer.
+    #[inline]
+    #[must_use]
+    pub fn current(&self) -> Option<String> {
+        self.0.current_sdp.get()
     }
 
     /// Indicates whether current [`LocalSdp`] state is rollback, meaning that
@@ -109,6 +128,7 @@ impl LocalSdp {
     /// Stops the current SDP rollback task countdown, if any.
     #[inline]
     pub fn stop_timeout(&self) {
+        self.0.is_rollback_timeout_stopped.set(true);
         if let Some(handle) = self.0.rollback_task_handle.borrow().as_ref() {
             handle.stop();
         }
@@ -117,6 +137,7 @@ impl LocalSdp {
     /// Resets the current SDP rollback task countdown, if any.
     #[inline]
     pub fn resume_timeout(&self) {
+        self.0.is_rollback_timeout_stopped.set(false);
         if let Some(handle) = self.0.rollback_task_handle.borrow().as_ref() {
             handle.reset();
         }
@@ -124,10 +145,11 @@ impl LocalSdp {
 
     /// Spawns task that will call [`LocalSdp::rollback()`] if the current SDP
     /// won't be approved in [`DESCRIPTION_APPROVE_TIMEOUT`].
-    #[must_use]
-    fn spawn_rollback_task(&self) -> ResettableDelayHandle {
-        let (timeout, rollback_task) =
-            resettable_delay_for(DESCRIPTION_APPROVE_TIMEOUT);
+    fn spawn_rollback_task(&self) {
+        let (timeout, rollback_task) = resettable_delay_for(
+            DESCRIPTION_APPROVE_TIMEOUT,
+            self.0.is_rollback_timeout_stopped.get(),
+        );
         spawn_local({
             let this = self.clone();
             async move {
@@ -139,7 +161,15 @@ impl LocalSdp {
                 };
             }
         });
-        rollback_task
+
+        self.0.rollback_task_handle.replace(Some(rollback_task));
+    }
+
+    /// Indicates whether a new SDP offer is needed after rollback's completion.
+    #[inline]
+    #[must_use]
+    pub fn is_restart_needed(&self) -> bool {
+        self.0.restart_needed.get()
     }
 }
 
@@ -162,6 +192,12 @@ struct Inner {
 
     /// Timeout of the [`Inner::approved`] transition.
     rollback_task_handle: RefCell<Option<ResettableDelayHandle>>,
+
+    /// Indicator whether [`Inner::rollback_task_handle`] timeout is stopped.
+    is_rollback_timeout_stopped: Cell<bool>,
+
+    /// Indicator whether negotiation restart is needed.
+    restart_needed: Cell<bool>,
 }
 
 impl Default for Inner {
@@ -172,6 +208,8 @@ impl Default for Inner {
             current_sdp: ObservableCell::new(None),
             approved: Rc::new(ObservableCell::new(true)),
             rollback_task_handle: RefCell::new(None),
+            is_rollback_timeout_stopped: Cell::new(false),
+            restart_needed: Cell::new(false),
         }
     }
 }

@@ -3,10 +3,60 @@
 use std::rc::Rc;
 
 use derive_more::Deref;
-use futures::{future, Future, FutureExt as _, Stream, StreamExt as _};
+use futures::{future, Future, FutureExt as _, Stream, StreamExt};
+use medea_reactive::AllProcessed;
 use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::{JasonError, TaskHandle};
+use crate::{
+    media::LocalTracksConstraints,
+    utils::{JasonError, TaskHandle},
+};
+
+/// Abstraction over a state which can be transformed to the states from the
+/// [`medea_client_api_proto::state`].
+pub trait AsProtoState {
+    /// [`medea_client_api_proto::state`] into which this state can be
+    /// transformed.
+    type Output;
+
+    /// Converts this state to the [`medea_client_api_proto::state`]
+    /// representation.
+    fn as_proto(&self) -> Self::Output;
+}
+
+/// Abstraction of state which can be updated or created by the
+/// [`medea_client_api_proto::state`].
+pub trait SynchronizableState {
+    /// [`medea_client_api_proto::state`] by which this state can be updated.
+    type Input;
+
+    /// Creates a new state from the [`medea_client_api_proto::state`]
+    /// representation.
+    fn from_proto(
+        input: Self::Input,
+        send_cons: &LocalTracksConstraints,
+    ) -> Self;
+
+    /// Updates this state with a provided [`medea_client_api_proto::state`].
+    fn apply(&self, input: Self::Input, send_cons: &LocalTracksConstraints);
+}
+
+/// Abstraction over a state which can be updated by a client side.
+pub trait Updatable {
+    /// Returns [`Future`] resolving once this [`Updatable`] state resolves its
+    /// intentions.
+    fn when_stabilized(&self) -> AllProcessed<'static>;
+
+    /// Returns [`Future`] resolving once all the client updates are performed
+    /// on this state.
+    fn when_updated(&self) -> AllProcessed<'static>;
+
+    /// Notifies about a RPC connection loss.
+    fn connection_lost(&self);
+
+    /// Notifies about a RPC connection recovering.
+    fn connection_recovered(&self);
+}
 
 /// Component is a base that helps managing reactive components.
 ///

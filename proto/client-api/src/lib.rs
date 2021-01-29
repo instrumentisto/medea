@@ -25,6 +25,7 @@
 
 #![deny(broken_intra_doc_links)]
 
+pub mod state;
 pub mod stats;
 
 use std::collections::HashMap;
@@ -234,6 +235,10 @@ pub enum Command {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatchCommand>,
     },
+
+    /// Web Client asks Media Server to synchronize Client State with a Server
+    /// State.
+    SynchronizeMe { state: state::Room },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -462,6 +467,9 @@ pub enum Event {
         /// Estimated connection quality.
         quality_score: ConnectionQualityScore,
     },
+
+    /// Media Server synchronizes Web Client about State synchronization.
+    StateSynchronized { state: state::Room },
 }
 
 /// `Peer`'s negotiation role.
@@ -472,8 +480,9 @@ pub enum Event {
 /// - If [`Event`] contains [`NegotiationRole::Answerer`], then `Peer` is
 ///   expected to apply provided SDP Offer and provide its SDP Answer in a
 ///   [`Command::MakeSdpAnswer`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Clone, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Debug)]
 pub enum NegotiationRole {
     /// [`Command::MakeSdpOffer`] should be sent by client.
     Offerer,
@@ -500,7 +509,7 @@ pub enum TrackUpdate {
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,

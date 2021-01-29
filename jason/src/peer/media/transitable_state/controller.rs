@@ -1,6 +1,10 @@
 //! Component managing [`TransitableState`].
 
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 use futures::{
     future, future::Either, stream::LocalBoxStream, FutureExt as _,
@@ -39,6 +43,10 @@ pub struct TransitableStateController<S, T> {
 
     /// Timeout of the [`TransitableStateController::state`] transition.
     timeout_handle: RefCell<Option<ResettableDelayHandle>>,
+
+    /// Indicator whether [`TransitableStateController::timeout_handle`]'s
+    /// timeout is stopped.
+    is_transition_timeout_stopped: Cell<bool>,
 }
 
 impl<S, T> TransitableStateController<S, T>
@@ -52,12 +60,13 @@ where
     const TRANSITION_TIMEOUT: Duration = Duration::from_millis(500);
 
     /// Returns new [`TransitableStateController`] with the provided
-    /// [`InStable`] state.
+    /// stable state.
     #[must_use]
-    pub(in super::super) fn new(state: S) -> Rc<Self> {
+    pub fn new(state: S) -> Rc<Self> {
         let this = Rc::new(Self {
             state: ProgressableCell::new(state.into()),
             timeout_handle: RefCell::new(None),
+            is_transition_timeout_stopped: Cell::new(false),
         });
         this.clone().spawn();
         this
@@ -81,7 +90,10 @@ where
                         spawn_local(async move {
                             let mut states = this.state.subscribe().skip(1);
                             let (timeout, timeout_handle) =
-                                resettable_delay_for(Self::TRANSITION_TIMEOUT);
+                                resettable_delay_for(
+                                    Self::TRANSITION_TIMEOUT,
+                                    this.is_transition_timeout_stopped.get(),
+                                );
                             this.timeout_handle
                                 .borrow_mut()
                                 .replace(timeout_handle);
@@ -148,14 +160,16 @@ where
     }
 
     /// Stops disable/enable timeout of this [`TransitableStateController`].
-    pub(in super::super) fn stop_transition_timeout(&self) {
+    pub fn stop_transition_timeout(&self) {
+        self.is_transition_timeout_stopped.set(true);
         if let Some(timer) = &*self.timeout_handle.borrow() {
             timer.stop();
         }
     }
 
     /// Resets disable/enable timeout of this [`TransitableStateController`].
-    pub(in super::super) fn reset_transition_timeout(&self) {
+    pub fn reset_transition_timeout(&self) {
+        self.is_transition_timeout_stopped.set(false);
         if let Some(timer) = &*self.timeout_handle.borrow() {
             timer.reset();
         }
@@ -170,7 +184,7 @@ where
 
     /// Starts transition of the [`TransitableStateController::state`] to the
     /// provided one.
-    pub(in super::super) fn transition_to(&self, desired_state: S) {
+    pub fn transition_to(&self, desired_state: S) {
         let current_state = self.state.get();
         self.state.set(current_state.transition_to(desired_state));
     }

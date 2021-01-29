@@ -26,6 +26,7 @@ use medea_jason::{
         self, media_exchange_state, MediaStateControllable, PeerEvent,
         RtcStats, TrackDirection,
     },
+    utils::Updatable,
 };
 use wasm_bindgen_test::*;
 
@@ -87,13 +88,13 @@ async fn disable_enable_audio() {
 
     peer.state()
         .patch_track(&toggle_disable_track_update(AUDIO_TRACK_ID, false));
-    peer.state().when_all_updated().await;
+    peer.state().when_updated().await;
     assert!(!peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 
     peer.state()
         .patch_track(&toggle_disable_track_update(AUDIO_TRACK_ID, true));
-    peer.state().when_all_updated().await;
+    peer.state().when_updated().await;
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 }
@@ -136,13 +137,13 @@ async fn disable_enable_video() {
 
     peer.state()
         .patch_track(&toggle_disable_track_update(VIDEO_TRACK_ID, false));
-    peer.state().when_all_updated().await;
+    peer.state().when_updated().await;
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled(None));
 
     peer.state()
         .patch_track(&toggle_disable_track_update(VIDEO_TRACK_ID, true));
-    peer.state().when_all_updated().await;
+    peer.state().when_updated().await;
     assert!(peer.is_send_audio_enabled());
     assert!(peer.is_send_video_enabled(None));
 }
@@ -1089,12 +1090,12 @@ async fn reset_transition_timers() {
     .shared();
 
     delay_for(400).await;
-    peer.stop_state_transitions_timers();
+    peer.state().connection_lost();
     timeout(600, all_enabled.clone()).await.unwrap_err();
 
-    peer.stop_state_transitions_timers();
+    peer.state().connection_lost();
     delay_for(30).await;
-    peer.reset_state_transitions_timers();
+    peer.state().synced();
 
     timeout(600, all_enabled).await.unwrap();
 }
@@ -1293,10 +1294,11 @@ async fn new_remote_track() {
     }
 }
 
-/// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
-/// `ice-ufrag` IDs will be updated in the SDP offer.
-#[wasm_bindgen_test]
-async fn ice_restart_works() {
+mod ice_restart {
+    use medea_jason::utils::{AsProtoState, SynchronizableState};
+
+    use super::*;
+
     fn get_ice_pwds(offer: &str) -> Vec<&str> {
         offer
             .lines()
@@ -1323,45 +1325,105 @@ async fn ice_restart_works() {
             .collect()
     }
 
-    let peers = InterconnectedPeers::new().await;
-    peers
-        .first_peer
-        .state()
-        .set_negotiation_role(NegotiationRole::Offerer)
-        .await;
-    let sdp_offer_before = peers
-        .first_peer
-        .state()
-        .when_local_sdp_updated()
-        .await
-        .unwrap();
-    let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
-    let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
-    peers.first_peer.state().reset_negotiation_role();
-    crate::delay_for(100).await;
-    peers.first_peer.state().restart_ice();
-    peers
-        .first_peer
-        .state()
-        .set_negotiation_role(NegotiationRole::Offerer)
-        .await;
-    let sdp_offer_after = peers
-        .first_peer
-        .state()
-        .when_local_sdp_updated()
-        .await
-        .unwrap();
-    let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
-    let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
+    /// Tests that after [`PeerConnection::restart_ice`] call, `ice-pwd` and
+    /// `ice-ufrag` IDs will be updated in the SDP offer.
+    #[wasm_bindgen_test]
+    async fn ice_restart_works() {
+        let peers = InterconnectedPeers::new().await;
+        peers
+            .first_peer
+            .state()
+            .set_negotiation_role(NegotiationRole::Offerer)
+            .await;
+        let sdp_offer_before = peers
+            .first_peer
+            .state()
+            .when_local_sdp_updated()
+            .await
+            .unwrap();
+        let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
+        let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
+        peers.first_peer.state().reset_negotiation_role();
+        crate::delay_for(100).await;
+        peers.first_peer.state().restart_ice();
+        peers
+            .first_peer
+            .state()
+            .set_negotiation_role(NegotiationRole::Offerer)
+            .await;
+        let sdp_offer_after = peers
+            .first_peer
+            .state()
+            .when_local_sdp_updated()
+            .await
+            .unwrap();
+        let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
+        let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
 
-    ice_pwds_before
-        .into_iter()
-        .zip(ice_pwds_after.into_iter())
-        .for_each(|(before, after)| assert_ne!(before, after));
-    ice_ufrags_before
-        .into_iter()
-        .zip(ice_ufrags_after.into_iter())
-        .for_each(|(before, after)| assert_ne!(before, after));
+        ice_pwds_before
+            .into_iter()
+            .zip(ice_pwds_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+        ice_ufrags_before
+            .into_iter()
+            .zip(ice_ufrags_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+    }
+
+    /// Checks that ICE restart can be started by [`PeerState`] update.
+    #[wasm_bindgen_test]
+    async fn ice_restart_by_state() {
+        let peers = InterconnectedPeers::new().await;
+        peers
+            .first_peer
+            .state()
+            .set_negotiation_role(NegotiationRole::Offerer)
+            .await;
+        let sdp_offer_before = peers
+            .first_peer
+            .state()
+            .when_local_sdp_updated()
+            .await
+            .unwrap();
+        let ice_pwds_before = get_ice_pwds(&sdp_offer_before);
+        let ice_ufrags_before = get_ice_ufrags(&sdp_offer_before);
+
+        peers
+            .first_peer
+            .state()
+            .apply_local_sdp(sdp_offer_before.clone());
+        peers.first_peer.state().reset_negotiation_role();
+        delay_for(100).await;
+        let mut proto_state = peers.first_peer.state().as_proto();
+        proto_state.restart_ice = true;
+        peers
+            .first_peer
+            .state()
+            .apply(proto_state, &LocalTracksConstraints::default());
+
+        peers
+            .first_peer
+            .state()
+            .set_negotiation_role(NegotiationRole::Offerer)
+            .await;
+        let sdp_offer_after = peers
+            .first_peer
+            .state()
+            .when_local_sdp_updated()
+            .await
+            .unwrap();
+        let ice_pwds_after = get_ice_pwds(&sdp_offer_after);
+        let ice_ufrags_after = get_ice_ufrags(&sdp_offer_after);
+
+        ice_pwds_before
+            .into_iter()
+            .zip(ice_pwds_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+        ice_ufrags_before
+            .into_iter()
+            .zip(ice_ufrags_after.into_iter())
+            .for_each(|(before, after)| assert_ne!(before, after));
+    }
 }
 
 /// Tests [`peer::State::patch_track`] method.
@@ -1394,7 +1456,7 @@ async fn disable_and_enable_all_tracks() {
         Rc::new(pc_state),
     );
     pc.state().when_all_tracks_created().await;
-    pc.state().when_all_updated().await;
+    pc.state().when_updated().await;
 
     let audio_track = pc.obj().get_sender_by_id(audio_track_id).unwrap();
     let video_track = pc.obj().get_sender_by_id(video_track_id).unwrap();
@@ -1415,7 +1477,7 @@ async fn disable_and_enable_all_tracks() {
         enabled_individual: Some(false),
         muted: None,
     });
-    pc.state().when_all_updated().await;
+    pc.state().when_updated().await;
     assert!(audio_track.general_disabled());
     assert!(!video_track.general_disabled());
 
@@ -1428,7 +1490,7 @@ async fn disable_and_enable_all_tracks() {
         enabled_individual: Some(false),
         muted: None,
     });
-    pc.state().when_all_updated().await;
+    pc.state().when_updated().await;
     assert!(audio_track.general_disabled());
     assert!(video_track.general_disabled());
 
@@ -1441,7 +1503,7 @@ async fn disable_and_enable_all_tracks() {
         enabled_general: Some(true),
         muted: None,
     });
-    pc.state().when_all_updated().await;
+    pc.state().when_updated().await;
     assert!(!audio_track.general_disabled());
     assert!(video_track.general_disabled());
 
@@ -1454,7 +1516,7 @@ async fn disable_and_enable_all_tracks() {
         enabled_general: Some(true),
         muted: None,
     });
-    pc.state().when_all_updated().await;
+    pc.state().when_updated().await;
     assert!(!audio_track.general_disabled());
     assert!(!video_track.general_disabled());
 }

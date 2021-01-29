@@ -18,8 +18,8 @@ use std::{
 use derive_more::Display;
 use futures::{future, Stream};
 use medea_client_api_proto::{
-    stats::RtcStat, Incrementable, MemberId, PeerConnectionState, PeerId,
-    RoomId, TrackId,
+    state, stats::RtcStat, Incrementable, MemberId, PeerConnectionState,
+    PeerId, RoomId, TrackId,
 };
 
 use crate::{
@@ -587,6 +587,17 @@ impl PeersService {
     pub(super) fn check_peers(&self) {
         self.peer_metrics_service.borrow_mut().check();
     }
+
+    /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
+    /// [`MemberId`].
+    #[inline]
+    #[must_use]
+    pub(super) fn get_peers_states(
+        &self,
+        member_id: &MemberId,
+    ) -> HashMap<PeerId, state::Peer> {
+        self.peers.get_peers_states(member_id)
+    }
 }
 
 /// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
@@ -754,6 +765,29 @@ impl PeerRepository {
             });
 
         peers_to_remove
+    }
+
+    /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
+    /// [`MemberId`].
+    #[must_use]
+    pub fn get_peers_states(
+        &self,
+        member_id: &MemberId,
+    ) -> HashMap<PeerId, state::Peer> {
+        self.0
+            .borrow()
+            .iter()
+            .filter_map(|(id, p)| {
+                if &p.member_id() == member_id
+                    && (p.is_known_to_remote()
+                        || p.negotiation_role().is_some())
+                {
+                    Some((*id, p.get_state()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 

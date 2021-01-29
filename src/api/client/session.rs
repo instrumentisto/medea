@@ -18,8 +18,8 @@ use actix_web_actors::ws::{self, CloseCode};
 use bytes::{Buf, BytesMut};
 use futures::future::{FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Command, Credential, Event,
-    MemberId, RoomId, RpcSettings, ServerMsg,
+    state, ClientMsg, CloseDescription, CloseReason, Command, Credential,
+    Event, MemberId, RoomId, RpcSettings, ServerMsg,
 };
 
 use crate::{
@@ -31,6 +31,8 @@ use crate::{
     },
     log::prelude::*,
 };
+
+use super::MAX_WS_MSG_SIZE;
 
 /// Repository of the all [`RpcServer`]s registered on this Media Server.
 #[cfg_attr(test, mockall::automock)]
@@ -162,6 +164,9 @@ impl WsSession {
                             member_id,
                             ClosedReason::Closed { normal: true },
                         );
+                    }
+                    Command::SynchronizeMe { state } => {
+                        self.handle_synchronize_me(ctx, &room_id, &state);
                     }
                     _ => {
                         if let Some((member_id, room)) =
@@ -302,6 +307,22 @@ impl WsSession {
         }
     }
 
+    /// Handles [`Command::SynchronizeMe`].
+    ///
+    /// Sends [`RpcServer::synchronize`] to the [`RpcServer`] and locks
+    /// [`WsSession`] event loop until this message is processed.
+    fn handle_synchronize_me(
+        &mut self,
+        ctx: &mut ws::WebsocketContext<Self>,
+        room_id: &RoomId,
+        state: &state::Room,
+    ) {
+        debug!("{}: Received synchronization request: {:?}", self, state);
+        if let Some((member_id, room)) = self.sessions.get(&room_id) {
+            ctx.wait(room.synchronize(member_id.clone()).into_actor(self));
+        }
+    }
+
     /// Handles WebSocket close frame.
     fn handle_close(
         &mut self,
@@ -333,11 +354,18 @@ impl WsSession {
         ctx: &mut ws::WebsocketContext<Self>,
         frame: Item,
     ) {
-        // This is logged as at `WARN` level, because fragmentation usually
-        // happens only when dealing with large payloads (>128kb in Chrome).
-        // We will handle this message, but it probably signals that some
-        // bug occurred on sending side.
-        warn!("{}: Continuation frame received.", self);
+        if let Item::Continue(value) | Item::Last(value) = &frame {
+            if (self.fragmentation_buffer.len() + value.len()) > MAX_WS_MSG_SIZE
+            {
+                error!("{}: Fragmentation buffer overflow.", self);
+                self.close_in_place(
+                    ctx,
+                    &CloseDescription::new(CloseReason::Evicted),
+                );
+                return;
+            }
+        }
+
         match frame {
             Item::FirstText(value) => {
                 if !self.fragmentation_buffer.is_empty() {

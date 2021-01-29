@@ -192,22 +192,6 @@ pub trait MediaStateControllable {
                 .when_media_state_stable(desired_state),
         }
     }
-
-    /// Stops state transition timer of this [`MediaStateControllable`].
-    #[inline]
-    fn stop_media_state_transition_timeout(&self) {
-        self.media_exchange_state_controller()
-            .stop_transition_timeout();
-        self.mute_state_controller().stop_transition_timeout();
-    }
-
-    /// Resets state transition timer of this [`MediaStateControllable`].
-    #[inline]
-    fn reset_media_state_transition_timeout(&self) {
-        self.media_exchange_state_controller()
-            .reset_transition_timeout();
-        self.mute_state_controller().reset_transition_timeout();
-    }
 }
 
 /// Direction of the `MediaTrack`.
@@ -713,37 +697,6 @@ impl MediaConnections {
                 }
             }
         }
-    }
-
-    /// Returns all references to the [`TransceiverSide`]s from this
-    /// [`MediaConnections`].
-    fn get_all_transceivers_sides(&self) -> Vec<Rc<dyn TransceiverSide>> {
-        let inner = self.0.borrow();
-        inner
-            .senders
-            .values()
-            .map(|s| s.state() as Rc<dyn TransceiverSide>)
-            .chain(
-                inner
-                    .receivers
-                    .values()
-                    .map(|r| r.state() as Rc<dyn TransceiverSide>),
-            )
-            .collect()
-    }
-
-    /// Stops all [`TransceiverSide`]s state transitions expiry timers.
-    pub fn stop_state_transitions_timers(&self) {
-        self.get_all_transceivers_sides()
-            .into_iter()
-            .for_each(|t| t.stop_media_state_transition_timeout())
-    }
-
-    /// Resets all [`TransceiverSide`]s state transitions expiry timers.
-    pub fn reset_state_transitions_timers(&self) {
-        self.get_all_transceivers_sides()
-            .into_iter()
-            .for_each(|t| t.reset_media_state_transition_timeout());
     }
 
     /// Returns all [`Sender`]s which are matches provided

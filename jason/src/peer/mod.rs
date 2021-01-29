@@ -5,7 +5,6 @@
 mod component;
 mod conn;
 mod ice_server;
-mod local_sdp;
 mod media;
 pub mod repo;
 mod stats;
@@ -47,7 +46,6 @@ use crate::{
 pub use self::{
     component::{Component, State},
     conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
-    local_sdp::LocalSdp,
     media::{
         media_exchange_state, mute_state, receiver, sender, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
@@ -383,11 +381,11 @@ impl PeerConnection {
         let sender = peer.peer_events_sender.clone();
         peer.peer
             .on_connection_state_change(Some(move |peer_connection_state| {
-                let _ =
-                    sender.unbounded_send(PeerEvent::ConnectionStateChanged {
-                        peer_id: id,
-                        peer_connection_state,
-                    });
+                Self::on_connection_state_changed(
+                    id,
+                    &sender,
+                    peer_connection_state,
+                )
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 
@@ -463,38 +461,6 @@ impl PeerConnection {
     #[inline]
     pub async fn drop_send_tracks(&self, kinds: LocalStreamUpdateCriteria) {
         self.media_connections.drop_send_tracks(kinds).await
-    }
-
-    /// Stops inner state transitions expiry timers.
-    ///
-    /// Inner state transitions initiated via external APIs that can not be
-    /// performed immediately (must wait for Medea notification/approval) have
-    /// TTL, after which they are cancelled.
-    ///
-    /// In some cases you might want to stop expiry timers, e.g. when
-    /// connection to Medea is temporary lost.
-    ///
-    /// This currently affects only [`Sender`]s disable/enable transitions.
-    ///
-    /// [`Sender`]: sender::Sender
-    pub fn stop_state_transitions_timers(&self) {
-        self.media_connections.stop_state_transitions_timers()
-    }
-
-    /// Resets inner state transitions expiry timers.
-    ///
-    /// Inner state transitions initiated via external APIs that can not be
-    /// performed immediately (must wait for Medea notification/approval) have
-    /// TTL, after which they are cancelled.
-    ///
-    /// In some cases you might want to stop expiry timers, e.g. when
-    /// connection to Medea is temporary lost.
-    ///
-    /// This currently affects only [`Sender`]s disable/enable transitions.
-    ///
-    /// [`Sender`]: sender::Sender
-    pub fn reset_state_transitions_timers(&self) {
-        self.media_connections.reset_state_transitions_timers();
     }
 
     /// Filters out already sent stats, and send new statss from
@@ -616,6 +582,39 @@ impl PeerConnection {
             peer_id,
             ice_connection_state,
         });
+    }
+
+    /// Handles `connectionstatechange` event from the underlying peer emitting
+    /// [`PeerEvent::ConnectionStateChanged`] event into this peers
+    /// `peer_events_sender`.
+    #[inline]
+    fn on_connection_state_changed(
+        peer_id: Id,
+        sender: &mpsc::UnboundedSender<PeerEvent>,
+        peer_connection_state: PeerConnectionState,
+    ) {
+        let _ = sender.unbounded_send(PeerEvent::ConnectionStateChanged {
+            peer_id,
+            peer_connection_state,
+        });
+    }
+
+    /// Sends [`PeerConnection`]'s connection state and ICE connection state to
+    /// the server.
+    fn send_current_connection_states(&self) {
+        Self::on_ice_connection_state_changed(
+            self.id,
+            &self.peer_events_sender,
+            self.peer.ice_connection_state(),
+        );
+
+        if let Some(peer_connection_state) = self.peer.connection_state() {
+            Self::on_connection_state_changed(
+                self.id,
+                &self.peer_events_sender,
+                peer_connection_state,
+            );
+        }
     }
 
     /// Marks [`PeerConnection`] to trigger ICE restart.
@@ -1050,6 +1049,16 @@ impl PeerConnection {
             .into_iter()
             .filter_map(|sndr| sndr.transceiver().send_track())
             .collect()
+    }
+
+    /// Returns [`Rc`] to the [`Receiver`] with the provided [`TrackId`].
+    #[inline]
+    #[must_use]
+    pub fn get_receiver_by_id(
+        &self,
+        id: TrackId,
+    ) -> Option<Rc<receiver::Receiver>> {
+        self.media_connections.get_receiver_by_id(id)
     }
 }
 

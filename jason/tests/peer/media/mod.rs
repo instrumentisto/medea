@@ -1,5 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 
+mod transitable_state;
+
 use std::{convert::TryFrom, mem, rc::Rc};
 
 use futures::channel::mpsc;
@@ -10,6 +12,7 @@ use medea_jason::{
         media_exchange_state, LocalStreamUpdateCriteria, MediaConnections,
         MediaStateControllable, RtcPeerConnection, SimpleTracksRequest,
     },
+    utils::Updatable as _,
 };
 use wasm_bindgen_test::*;
 
@@ -151,7 +154,10 @@ async fn new_media_connections_with_disabled_video_tracks() {
 /// This tests checks that [`TrackPatch`] works as expected.
 mod sender_patch {
     use medea_client_api_proto::{AudioSettings, MediaType};
-    use medea_jason::peer::sender;
+    use medea_jason::{
+        peer::{sender, MediaExchangeState},
+        utils::{AsProtoState, SynchronizableState},
+    };
 
     use super::*;
 
@@ -253,13 +259,37 @@ mod sender_patch {
 
         assert!(!sender.general_disabled());
     }
+
+    /// Checks that [`Sender`]'s mute and media exchange states can be changed
+    /// by [`SenderState`] update.
+    #[wasm_bindgen_test]
+    async fn update_by_state() {
+        let (sender, _, _media_connections) = get_sender().await;
+
+        let mut proto_state = sender.state().as_proto();
+        proto_state.enabled_general = false;
+        proto_state.enabled_individual = false;
+        proto_state.muted = true;
+        sender
+            .state()
+            .apply(proto_state, &LocalTracksConstraints::default());
+        sender.state().when_updated().await;
+
+        assert!(sender.general_disabled());
+        assert_eq!(
+            sender.state().media_exchange_state(),
+            MediaExchangeState::Stable(media_exchange_state::Stable::Disabled)
+        );
+        assert!(sender.muted());
+    }
 }
 
 mod receiver_patch {
     use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
     use medea_jason::{
         media::RecvConstraints,
-        peer::{receiver, PeerEvent},
+        peer::{receiver, MediaExchangeState, PeerEvent},
+        utils::{AsProtoState, SynchronizableState},
     };
 
     use super::*;
@@ -363,5 +393,27 @@ mod receiver_patch {
         receiver.state().when_updated().await;
 
         assert!(receiver.enabled_general());
+    }
+
+    /// Checks that [`Receiver`]'s media exchange state can be changed by
+    /// [`ReceiverState`] update.
+    #[wasm_bindgen_test]
+    async fn update_by_state() {
+        let (receiver, _tx) = get_receiver();
+
+        let mut proto_state = receiver.state().as_proto();
+        proto_state.enabled_individual = false;
+        proto_state.enabled_general = false;
+
+        receiver
+            .state()
+            .apply(proto_state, &LocalTracksConstraints::default());
+
+        receiver.state().when_updated().await;
+        assert!(!receiver.state().enabled_general());
+        assert_eq!(
+            receiver.state().media_exchange_state(),
+            MediaExchangeState::Stable(media_exchange_state::Stable::Disabled)
+        );
     }
 }

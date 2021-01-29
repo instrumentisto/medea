@@ -16,7 +16,7 @@ use derive_more::{Display, From};
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{
-    CloseReason, Event, MemberId, NegotiationRole, PeerId, RoomId,
+    state, CloseReason, Event, MemberId, NegotiationRole, PeerId, RoomId,
 };
 
 use crate::{
@@ -166,6 +166,15 @@ impl Room {
         };
 
         Ok(ctx.run(this))
+    }
+
+    /// Returns [`state::Room`] for the provided [`MemberId`].
+    #[inline]
+    #[must_use]
+    pub fn get_state(&self, member_id: &MemberId) -> state::Room {
+        state::Room {
+            peers: self.peers.get_peers_states(member_id),
+        }
     }
 
     /// Returns [`RoomId`] of this [`Room`].

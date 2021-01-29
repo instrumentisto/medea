@@ -17,8 +17,9 @@ type FutureResolver = Rc<RefCell<Option<oneshot::Sender<()>>>>;
 /// [`ResettableDelayHandle`] that allows you to control delay future.
 pub fn resettable_delay_for(
     delay: Duration,
+    is_stopped: bool,
 ) -> (impl Future<Output = ()>, ResettableDelayHandle) {
-    ResettableDelayHandle::new(delay)
+    ResettableDelayHandle::new(delay, is_stopped)
 }
 
 /// Handler to delay which can be stopped and started over again [`Duration`].
@@ -51,7 +52,10 @@ impl ResettableDelayHandle {
 
     /// Creates delay [`Future`] and its [`ResettableDelayHandle`], schedules
     /// delay future completion.
-    fn new(timeout: Duration) -> (impl Future<Output = ()>, Self) {
+    fn new(
+        timeout: Duration,
+        is_stopped: bool,
+    ) -> (impl Future<Output = ()>, Self) {
         let (tx, rx) = oneshot::channel();
         let tx = Rc::new(RefCell::new(Some(tx)));
 
@@ -61,7 +65,9 @@ impl ResettableDelayHandle {
             abort_handle: RefCell::new(abort),
             timeout,
         };
-        this.spawn_timer();
+        if !is_stopped {
+            this.spawn_timer();
+        }
 
         let delay_fut = async move {
             if rx.await.is_err() {

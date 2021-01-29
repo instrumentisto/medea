@@ -23,6 +23,7 @@ pub use self::errors::console_error;
 #[doc(inline)]
 pub use self::{
     callback::{Callback0, Callback1, Callback2},
+    component::{AsProtoState, Component, SynchronizableState, Updatable},
     errors::{
         HandlerDetachedError, JasonError, JsCaused, JsError, JsonParseError,
     },
