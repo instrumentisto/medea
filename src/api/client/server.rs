@@ -20,13 +20,7 @@ use crate::{
     signalling::room_repo::RoomRepository,
 };
 
-/// Max size of WebSocket [frame].
-///
-/// This size is chosen because Chromium splits [frame]s with size > 131Kb by
-/// sending continuation [frame]s.
-///
-/// [frame]: https://tools.ietf.org/html/rfc6455#page-27
-const MAX_WS_FRAME_SIZE: usize = 131_000;
+use super::MAX_WS_MSG_SIZE;
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
@@ -43,7 +37,7 @@ async fn ws_index(
                 state.config.ping_interval,
             ),
             payload,
-            actix_http::ws::Codec::new().max_size(MAX_WS_FRAME_SIZE),
+            actix_http::ws::Codec::new().max_size(MAX_WS_MSG_SIZE),
         )),
     )
 }

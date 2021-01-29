@@ -32,6 +32,8 @@ use crate::{
     log::prelude::*,
 };
 
+use super::MAX_WS_MSG_SIZE;
+
 /// Repository of the all [`RpcServer`]s registered on this Media Server.
 #[cfg_attr(test, mockall::automock)]
 pub trait RpcServerRepository: Debug {
@@ -352,11 +354,17 @@ impl WsSession {
         ctx: &mut ws::WebsocketContext<Self>,
         frame: Item,
     ) {
-        // This is logged as at `WARN` level, because fragmentation usually
-        // happens only when dealing with large payloads (>128kb in Chrome).
-        // We will handle this message, but it probably signals that some
-        // bug occurred on sending side.
-        warn!("{}: Continuation frame received.", self);
+        if matches!(frame, Item::Continue(_) | Item::Last(_))
+            && self.fragmentation_buffer.len() > MAX_WS_MSG_SIZE
+        {
+            error!("{}: Fragmentation buffer overflow.", self);
+            self.close_in_place(
+                ctx,
+                &CloseDescription::new(CloseReason::Evicted),
+            );
+            return;
+        }
+
         match frame {
             Item::FirstText(value) => {
                 if !self.fragmentation_buffer.is_empty() {
