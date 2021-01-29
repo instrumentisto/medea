@@ -354,15 +354,16 @@ impl WsSession {
         ctx: &mut ws::WebsocketContext<Self>,
         frame: Item,
     ) {
-        if matches!(frame, Item::Continue(_) | Item::Last(_))
-            && self.fragmentation_buffer.len() > MAX_WS_MSG_SIZE
-        {
-            error!("{}: Fragmentation buffer overflow.", self);
-            self.close_in_place(
-                ctx,
-                &CloseDescription::new(CloseReason::Evicted),
-            );
-            return;
+        if let Item::Continue(value) | Item::Last(value) = &frame {
+            if (self.fragmentation_buffer.len() + value.len()) > MAX_WS_MSG_SIZE
+            {
+                error!("{}: Fragmentation buffer overflow.", self);
+                self.close_in_place(
+                    ctx,
+                    &CloseDescription::new(CloseReason::Evicted),
+                );
+                return;
+            }
         }
 
         match frame {
