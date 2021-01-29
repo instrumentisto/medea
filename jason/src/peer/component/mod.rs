@@ -129,7 +129,7 @@ pub struct State {
 
     /// Indicates that [`State::update_local_stream`] method should be called
     /// if some [`sender`] wants to update local stream.
-    maybe_local_stream_update: ObservableCell<bool>,
+    maybe_update_local_stream: ObservableCell<bool>,
 
     /// Synchronization state of the [`Component`].
     sync_state: ObservableCell<SyncState>,
@@ -157,7 +157,7 @@ impl State {
             negotiation_state: ObservableCell::new(NegotiationState::Stable),
             restart_ice: Cell::new(false),
             ice_candidates: IceCandidates::new(),
-            maybe_local_stream_update: ObservableCell::new(false),
+            maybe_update_local_stream: ObservableCell::new(false),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
@@ -399,7 +399,7 @@ impl State {
     pub fn patch_track(&self, track_patch: &proto::TrackPatchEvent) {
         if let Some(sender) = self.get_sender(track_patch.id) {
             sender.update(track_patch);
-            self.maybe_local_stream_update.set(true);
+            self.maybe_update_local_stream.set(true);
         } else if let Some(receiver) = self.get_receiver(track_patch.id) {
             receiver.update(track_patch);
         }

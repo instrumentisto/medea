@@ -374,8 +374,8 @@ impl Component {
             }
         }
 
-        state.maybe_local_stream_update.set(true);
-        let _ = state.maybe_local_stream_update.when_eq(false).await;
+        state.maybe_update_local_stream.set(true);
+        let _ = state.maybe_update_local_stream.when_eq(false).await;
 
         state.negotiation_state.set(NegotiationState::WaitLocalSdp);
 
@@ -399,12 +399,12 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for the [`State::maybe_local_stream_update`] `true` updates.
+    /// Watcher for the [`State::maybe_update_local_stream`] `true` updates.
     ///
     /// Waits for [`State::senders`] update and calls
     /// [`State::update_local_stream`].
     #[watch(
-        self.maybe_local_stream_update.subscribe().filter(|v| future::ready(*v))
+        self.maybe_update_local_stream.subscribe().filter(|v| future::ready(*v))
     )]
     async fn maybe_local_stream_update_needed(
         peer: Rc<PeerConnection>,
@@ -414,7 +414,7 @@ impl Component {
         state.senders.when_updated().await;
         let _ = state.update_local_stream(&peer).await;
 
-        state.maybe_local_stream_update.set(false);
+        state.maybe_update_local_stream.set(false);
         Ok(())
     }
 }

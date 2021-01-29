@@ -1740,22 +1740,6 @@ impl Drop for InnerRoom {
 
 #[cfg(feature = "mockable")]
 impl Room {
-    /// Resets [`NegotiationRole`] of the [`PeerConnection`] with the provided
-    /// [`PeerId`].
-    pub fn reset_peer_negotiation_state(
-        &self,
-        peer_id: PeerId,
-    ) -> Result<(), RoomError> {
-        self.0
-            .peers
-            .state()
-            .get(peer_id)
-            .ok_or(RoomError::NoSuchPeer(peer_id))?
-            .reset_negotiation_role();
-
-        Ok(())
-    }
-
     /// Returns [`PeerConnection`] stored in repository by its ID.
     ///
     /// Used to inspect [`Room`]'s inner state in integration tests.
