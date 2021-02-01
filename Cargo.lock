@@ -1838,7 +1838,7 @@ dependencies = [
 
 [[package]]
 name = "medea-control-api-mock"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
  "actix",
  "actix-cors",
@@ -1848,7 +1848,7 @@ dependencies = [
  "derive_more",
  "dotenv",
  "humantime-serde",
- "medea-control-api-proto 0.1.0",
+ "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf",
  "serde 1.0.123",
  "serde_json",

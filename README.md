@@ -8,6 +8,10 @@ Medea
 ![Crates.io license](https://img.shields.io/crates/l/medea)
 [![Rust docs](https://docs.rs/medea/badge.svg)](https://docs.rs/medea)
 
+[Docker Hub](https://hub.docker.com/r/instrumentisto/medea)
+| [GitHub Container Registry](https://github.com/orgs/instrumentisto/packages/container/package/medea)
+| [Quay.io](https://quay.io/repository/instrumentisto/medea)
+
 [Code Docs](https://docs.rs/medea) |
 [Changelog](https://github.com/instrumentisto/medea/blob/master/CHANGELOG.md)
 

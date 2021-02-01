@@ -276,11 +276,16 @@ jobs:
             export: ${{ github.ref == 'refs/heads/master'
                         || startsWith(github.ref, 'refs/tags/medea-') }}
             if: true
+
           - image: medea-control-api-mock
             cache: ${{ github.ref != 'refs/heads/master'
+                       && !startsWith(github.ref, 'refs/tags/medea-control-api-mock-')
                        && !contains(github.event.head_commit.message, '[fresh ci]') }}
-            export: ${{ github.ref == 'refs/heads/master' }}
-            if: ${{ !startsWith(github.ref, 'refs/tags/medea-') }}
+            export: ${{ github.ref == 'refs/heads/master'
+                        || startsWith(github.ref, 'refs/tags/medea-control-api-mock-') }}
+            if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+                    || startsWith(github.ref, 'refs/tags/medea-control-api-mock-') }}
+
           - image: medea-demo
             cache: ${{ github.ref != 'refs/heads/master'
                        && !contains(github.event.head_commit.message, '[fresh ci]') }}
@@ -366,7 +371,8 @@ jobs:
   release-cargo:
     name: Release on crates.io
     needs: ['release-github']
-    if: ${{ startsWith(github.ref, 'refs/tags/medea-') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/medea-')
+            && !startsWith(github.ref, 'refs/tags/medea-control-api-mock-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -477,11 +483,18 @@ jobs:
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
             readme_file: README.md
             if: ${{ github.ref == 'refs/heads/master' }}
+
+          - image: medea-control-api-mock
+            tags: latest,@versions
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: mock/control-api/README.md
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-control-api-mock-') }}
           - image: medea-control-api-mock
             tags: edge
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
             readme_file: mock/control-api/README.md
             if: ${{ github.ref == 'refs/heads/master' }}
+
           - image: medea-demo
             tags: latest
             repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
