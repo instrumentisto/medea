@@ -1,6 +1,6 @@
 [package]
 name = "medea"
-version = "0.2.0-dev"
+version = "0.2.0-rc.1"
 edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -68,7 +68,8 @@ toml = "0.5"
 tonic = "0.3"
 url = "2.1"
 [dependencies.medea-coturn-telnet-client]
-    path = "crates/medea-coturn-telnet-client"
+    version = "0.1"
+    #path = "crates/medea-coturn-telnet-client"
     features = ["pool"]
 [dependencies.slog]
     version = "2.5"

@@ -6,10 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2020-??-??
-[0.2.0]: /../../tree/medea-0.2.0
+## [0.2.0-rc.1] · 2021-02-01
+[0.2.0-rc.1]: /../../tree/medea-0.2.0-rc.1
 
-[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Diff](/../../compare/medea-0.1.0...medea-0.2.0-rc.1) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### BC Breaks
 
@@ -57,7 +57,7 @@ All user visible changes to this project will be documented in this file. This p
     - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
         - `max_lag`;
         - `init_timeout`.
-    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s Redis database server as ([#135]).
+    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s [Redis] database server as ([#135]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -118,4 +118,5 @@ All user visible changes to this project will be documented in this file. This p
 
 
 [Coturn]: https://github.com/coturn/coturn
+[Redis]: https://redis.io
 [Semantic Versioning 2.0.0]: https://semver.org

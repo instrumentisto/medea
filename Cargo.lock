@@ -1759,7 +1759,7 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "medea"
-version = "0.2.0-dev"
+version = "0.2.0-rc.1"
 dependencies = [
  "actix",
  "actix-codec",
@@ -1784,7 +1784,7 @@ dependencies = [
  "lazy_static",
  "medea-client-api-proto 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-coturn-telnet-client",
+ "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mockall",
  "rand 0.8.3",
@@ -1887,6 +1887,23 @@ dependencies = [
 [[package]]
 name = "medea-coturn-telnet-client"
 version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes 0.5.6",
+ "deadpool",
+ "derive_more",
+ "futures 0.3.12",
+ "once_cell",
+ "regex",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "medea-coturn-telnet-client"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5cad0c73b7523be968c728787697a8487b846b6c94c2b3ecebc01aa7ead7105"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
