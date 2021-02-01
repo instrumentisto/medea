@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.1.0] · 2020-??-??
+## [0.1.0] · 2021-02-01
 [0.1.0]: /../../tree/medea-coturn-telnet-client-0.1.0/crates/medea-coturn-telnet-client
 
 ### Added

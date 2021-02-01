@@ -474,7 +474,7 @@ wait.port:
 release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
 
 release.crates:
-ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-macro medea-reactive),)
+ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-coturn-telnet-client medea-macro medea-reactive),)
 	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
 		cargo publish --token $(release-crates-token) ,\
