@@ -1,6 +1,6 @@
 [package]
 name = "medea-reactive"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2018"
 description = "Reactive mutable data containers"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]

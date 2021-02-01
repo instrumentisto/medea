@@ -42,7 +42,7 @@ ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
 endif
 ifeq ($(crate),medea-reactive)
-crate-dir = "crates/medea-reactive"
+crate-dir = crates/medea-reactive
 endif
 ifeq ($(crate),medea-coturn-telnet-client)
 crate-dir = crates/medea-coturn-telnet-client
@@ -259,7 +259,7 @@ cargo-changelog-link-crate = $(if $(call eq,$(crate),),medea,$(crate))
 cargo-changelog-link-ver = $(if $(call eq,$(ver),),$(crate-ver),$(ver))
 
 cargo.changelog.link:
-	@printf "https://github.com/instrumentisto/medea/blob/$(cargo-changelog-link-crate)-$(cargo-changelog-link-ver)/CHANGELOG.md#$(shell sed -n '/^## \[$(cargo-changelog-link-ver)\]/{s/^## \[\(.*\)\][^0-9]*\([0-9].*\)/\1--\2/;s/[^0-9a-z-]*//g;p;}' CHANGELOG.md)"
+	@printf "https://github.com/instrumentisto/medea/blob/$(cargo-changelog-link-crate)-$(cargo-changelog-link-ver)/$(if $(call eq,$(crate-dir),.),,$(crate-dir)/)CHANGELOG.md#$(shell sed -n '/^## \[$(cargo-changelog-link-ver)\]/{s/^## \[\(.*\)\][^0-9]*\([0-9].*\)/\1--\2/;s/[^0-9a-z-]*//g;p;}' $(crate-dir)/CHANGELOG.md)"
 
 
 # Format Rust sources with rustfmt.
@@ -474,7 +474,7 @@ wait.port:
 release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
 
 release.crates:
-ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-macro),)
+ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-macro medea-reactive),)
 	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
 		cargo publish --token $(release-crates-token) ,\
