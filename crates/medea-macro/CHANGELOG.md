@@ -6,8 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2019-??-??
+## [0.2.0] · 2021-02-01
 [0.2.0]: /../../tree/medea-macro-0.2.0/crates/medea-macro
+
+[Diff](/../../compare/medea-macro-0.1.0...medea-macro-0.2.0)
 
 ### BC Breaks
 

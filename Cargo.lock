@@ -1907,7 +1907,7 @@ dependencies = [
 
 [[package]]
 name = "medea-macro"
-version = "0.2.0-dev"
+version = "0.2.0"
 dependencies = [
  "Inflector",
  "async-trait",
