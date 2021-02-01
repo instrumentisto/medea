@@ -351,11 +351,12 @@ docs.rust:
 ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
-	cargo doc \
-		$(if $(call eq,$(docs-rust-crate),@all),--all,-p $(docs-rust-crate)) \
-		--no-deps \
-		$(if $(call eq,$(dev),yes),--document-private-items,) \
-		$(if $(call eq,$(open),no),,--open)
+	$(if $(call eq,$(docs-rust-crate),@all),\
+		cargo doc --all,\
+		cd $(crate-dir)/ && cargo doc)\
+			--no-deps \
+			$(if $(call eq,$(dev),yes),--document-private-items,) \
+			$(if $(call eq,$(open),no),,--open)
 
 
 
@@ -406,7 +407,7 @@ else
 endif
 else
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate) --all-features
+	cargo test --all-features
 endif
 endif
 endif

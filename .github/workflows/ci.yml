@@ -186,6 +186,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+          target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
       - uses: jetli/wasm-pack-action@v0.3.0
@@ -365,7 +366,7 @@ jobs:
   release-cargo:
     name: Release on crates.io
     needs: ['release-github']
-    if: ${{ startsWith(github.ref, 'refs/tags/medea-') }}
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -402,8 +403,17 @@ jobs:
       - uses: actions/setup-node@v2-beta
         with:
           node-version: '15'
+      - name: Create NPM authorization
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPMJS_TOKEN }}"
+             > ~/.npmrc
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.3.0
       - name: Release ${{ steps.package.outputs.group2 }} version
-              of ${{ steps.package.outputs.group1 }} package
+              of '${{ steps.package.outputs.group1 }}' package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
         run: make release.npm crate=${{ steps.package.outputs.group1 }}

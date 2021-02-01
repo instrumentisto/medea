@@ -6,10 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2019-??-??
-[0.2.0]: /../../tree/medea-jason-0.2.0/jason
+## [0.2.0-rc.1] · 2021-02-01
+[0.2.0-rc.1]: /../../tree/medea-jason-0.2.0-rc.1/jason
 
-[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Diff](/../../compare/medea-jason-0.1.0...medea-jason-0.2.0-rc.1) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### BC Breaks
 
