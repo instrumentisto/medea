@@ -1,15 +1,15 @@
 [package]
 name = "medea-client-api-proto"
-version = "0.2.0-dev"
+version = "0.2.0"
 edition = "2018"
 description = "Client API protocol implementation for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-license = "MIT/Apache-2.0"
+license = "BlueOak-1.0.0"
 documentation = "https://docs.rs/medea-client-api-proto"
 homepage = "https://github.com/instrumentisto/medea/tree/master/proto/client-api"
 repository = "https://github.com/instrumentisto/medea/tree/master/proto/client-api"
 readme = "README.md"
-keywords = ["medea", "client-api"]
+keywords = ["medea", "client-api", "signalling", "webrtc"]
 categories = ["api-bindings", "web-programming"]
 
 [features]
@@ -21,7 +21,11 @@ extended-stats = []
 [dependencies]
 async-trait = { version = "0.1.34", optional = true }
 derive_more = "0.99"
-medea-macro = { path = "../../crates/medea-macro" }
+medea-macro = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "1.4"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

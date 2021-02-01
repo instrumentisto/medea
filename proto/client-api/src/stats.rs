@@ -266,6 +266,7 @@ pub enum RtcStatsType {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Contains statistics related to a specific [MediaStream].
 ///
 /// This is now obsolete.
@@ -393,6 +394,7 @@ pub enum KnownDataChannelState {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Stats for the [RTCPeerConnection] object.
 ///
 /// [`RtcStatsType::PeerConnection`] variant.
@@ -433,6 +435,7 @@ pub struct RtcPeerConnectionStats {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics for a contributing source (CSRC) that contributed to an inbound
 /// [RTP] stream.
 ///
@@ -595,6 +598,7 @@ pub struct RtcRemoteInboundRtpStreamStats {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// [RTCRtpTransceiverStats][1] object representing an [RTCRtpTransceiver] of an
 /// [RTCPeerConnection].
 ///
@@ -741,6 +745,7 @@ pub enum IceRole {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics related to a specific [RTCRtpSender] and the corresponding
 /// media-level metrics.
 ///
@@ -766,6 +771,7 @@ pub enum SenderStatsKind {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics related to a specific [RTCRtpReceiver] and the corresponding
 /// media-level metrics.
 ///
@@ -1412,6 +1418,7 @@ pub struct MediaSourceStats {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics for a codec that is currently used by [RTP] streams being sent or
 /// received by [RTCPeerConnection] object.
 ///
@@ -1440,6 +1447,7 @@ pub struct RtcCodecStats {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Information about a certificate used by [RTCIceTransport].
 ///
 /// [`RtcStatsType::Certificate`] variant.
@@ -1565,6 +1573,7 @@ impl PartialEq for Float {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Information about the connection to an ICE server (e.g. STUN or TURN).
 ///
 /// [`RtcStatsType::IceServer`] variant.
