@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.1.0] · 2019-??-??
+## [0.1.0] · 2021-02-01
 [0.1.0]: /../../tree/medea-control-api-proto-0.1.0/proto/control-api
 
 [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
