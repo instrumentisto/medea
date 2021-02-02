@@ -315,21 +315,31 @@ cargo.version:
 #
 # Usage:
 #	make yarn [cmd=('install --pure-lockfile'|<yarn-cmd>)]
-#	          [proj=(e2e|demo)]
+#	          [pkg=(e2e|medea-demo)]
 #	          [dockerized=(yes|no)]
 
 yarn-cmd = $(if $(call eq,$(cmd),),install --pure-lockfile,$(cmd))
-yarn-proj-dir = $(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
+yarn-pkg-dir = $(if $(call eq,$(pkg),medea-demo),jason/demo,jason/e2e-demo)
 
 yarn:
 ifneq ($(dockerized),no)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
 		node:latest \
-			make yarn cmd='$(yarn-cmd)' proj=$(proj) dockerized=no
+			make yarn cmd='$(yarn-cmd)' pkg=$(pkg) dockerized=no
 else
-	yarn --cwd=$(yarn-proj-dir) $(yarn-cmd)
+	yarn --cwd=$(yarn-pkg-dir) $(yarn-cmd)
 endif
+
+
+# Show version of project's Yarn package.
+#
+# Usage:
+#	make cargo.version [pkg=medea-demo]
+
+yarn.version:
+	@printf "$(strip $(shell grep -m1 '"version": "' jason/demo/package.json \
+	                         | cut -d '"' -f4))"
 
 
 
@@ -1002,4 +1012,4 @@ endef
         test test.e2e test.unit \
         up up.control up.coturn up.demo up.dev up.jason up.medea \
         wait.port \
-        yarn
+        yarn yarn.version

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2018"
 description = "Mock server for Medea's Control API."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+license = "BlueOak-1.0.0"
 documentation = "https://docs.rs/medea-control-api-mock"
 homepage = "https://github.com/instrumentisto/medea/tree/master/mock/control-api"
 repository = "https://github.com/instrumentisto/medea/tree/master/mock/control-api"
