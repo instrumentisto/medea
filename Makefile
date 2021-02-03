@@ -109,7 +109,7 @@ release: release.crates release.npm
 
 test:
 	@make test.unit
-	@make test.e2e up=yes dockerized=no
+	@make test.integration up=yes dockerized=no
 
 
 up: up.dev
@@ -423,32 +423,32 @@ endif
 endif
 
 
-# Run Rust E2E tests of project.
+# Run Rust integration tests of project.
 #
 # Usage:
-#	make test.e2e [( [up=no]
+#	make test.integration [( [up=no]
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [tag=(dev|<docker-tag>)]
 #	                                          [log=(no|yes)]
 #                                             [log-to-file=(no|yes)] )]
 #	                        [wait=(5|<seconds>)] )]
 
-test-e2e-env = RUST_BACKTRACE=1 \
+test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
 	MEDEA_CONF=tests/medea.config.toml
 
-test.e2e:
+test.integration:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
-	env $(test-e2e-env) \
+	env $(test-integration-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     tag=$(tag) \
 	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
-	RUST_BACKTRACE=1 cargo test --test e2e
+	RUST_BACKTRACE=1 cargo test --test integration
 ifeq ($(up),yes)
 	-make down
 endif
@@ -1009,7 +1009,7 @@ endef
         	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
-        test test.e2e test.unit \
+        test test.integration test.unit \
         up up.control up.coturn up.demo up.dev up.jason up.medea \
         wait.port \
         yarn yarn.version
