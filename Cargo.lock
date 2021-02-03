@@ -2323,6 +2323,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "cucumber_rust",
+ "derive_more",
  "fantoccini",
  "futures 0.3.12",
  "hyper 0.14.2",

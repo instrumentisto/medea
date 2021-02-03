@@ -5,6 +5,7 @@
 
 use std::iter;
 
+use derive_more::From;
 use fantoccini::{Client, ClientBuilder, Locator};
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
@@ -21,6 +22,16 @@ const CHROME_ARGS: &[&str] = &[
 ];
 const FIREFOX_ARGS: &[&str] = &[];
 
+#[derive(Debug, From)]
+pub enum Error {
+    #[from(ignore)]
+    Js(Json),
+    WebDriverCmd(fantoccini::error::CmdError),
+    WebDriverSession(fantoccini::error::NewSessionError),
+}
+
+type Result<T> = std::result::Result<T, Error>;
+
 /// Result which will be returned from the all JS code executed in browser.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -32,11 +43,11 @@ enum JsResult {
     Err(Json),
 }
 
-impl From<JsResult> for Result<Json, Json> {
+impl From<JsResult> for Result<Json> {
     fn from(from: JsResult) -> Self {
         match from {
             JsResult::Ok(ok) => Self::Ok(ok),
-            JsResult::Err(err) => Self::Err(err),
+            JsResult::Err(err) => Self::Err(Error::Js(err)),
         }
     }
 }
@@ -47,25 +58,22 @@ pub struct WebClient(Client);
 
 impl WebClient {
     /// Returns new [`WebClient`] connected to the WebDriver
-    pub async fn new() -> Self {
+    pub async fn new() -> Result<Self> {
         let mut c = ClientBuilder::native()
             .capabilities(Self::get_webdriver_capabilities())
             .connect(&conf::WEBDRIVER_ADDR)
-            .await
-            .unwrap();
+            .await?;
         c.goto(&format!("{}/index.html", *conf::FILE_SERVER_ADDR))
-            .await
-            .unwrap();
+            .await?;
         c.wait_for_navigation(Some(
             format!("{}/index.html", *conf::FILE_SERVER_ADDR)
                 .parse()
                 .unwrap(),
         ))
-        .await
-        .unwrap();
-        c.wait_for_find(Locator::Id("loaded")).await.unwrap();
+        .await?;
+        c.wait_for_find(Locator::Id("loaded")).await?;
 
-        Self(c)
+        Ok(Self(c))
     }
 
     /// Returns `moz:firefoxOptions` for the Firefox browser based on
@@ -104,17 +112,17 @@ impl WebClient {
         capabilities
     }
 
-    pub async fn execute(&mut self, executable: JsExecutable) -> Json {
+    pub async fn execute(&mut self, executable: JsExecutable) -> Result<Json> {
         let (mut js, args) = executable.finalize();
         js.push_str("return lastResult;\n");
 
-        self.0.execute(&js, args).await.unwrap()
+        Ok(self.0.execute(&js, args).await?)
     }
 
     pub async fn execute_async(
         &mut self,
         executable: JsExecutable,
-    ) -> Result<Json, Json> {
+    ) -> Result<Json> {
         let (inner_js, args) = executable.finalize();
 
         let js = format!(
@@ -144,7 +152,7 @@ impl WebClient {
         "#,
             executable_js = inner_js
         );
-        let res = self.0.execute_async(&js, args).await.unwrap();
+        let res = self.0.execute_async(&js, args).await?;
 
         serde_json::from_value::<JsResult>(res).unwrap().into()
     }

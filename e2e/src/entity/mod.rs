@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use serde_json::Value as Json;
 
-use crate::browser::{JsExecutable, WebClient};
+use crate::browser::{self, JsExecutable, WebClient};
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {
@@ -35,6 +35,7 @@ impl<T> Drop for Entity<T> {
 }
 
 impl<T> Entity<T> {
+    /// Returns [`Entity`] with a provided URI and [`WebClient`].
     pub fn new(uri: String, client: WebClient) -> Self {
         Self {
             id: uri,
@@ -43,11 +44,10 @@ impl<T> Entity<T> {
         }
     }
 
-    pub fn id(&self) -> String {
-        self.id.clone()
-    }
-
-    async fn execute(&mut self, js: JsExecutable) -> Json {
+    async fn execute(
+        &mut self,
+        js: JsExecutable,
+    ) -> Result<Json, browser::Error> {
         self.client
             .execute(
                 JsExecutable::new(
@@ -64,13 +64,15 @@ impl<T> Entity<T> {
             .await
     }
 
-    async fn execute_async(&mut self, js: JsExecutable) -> Json {
-        self.client
-            .execute_async(self.get_obj().and_then(js))
-            .await
-            .unwrap()
+    /// Executes provided [`JsExecutable`] in the browser.
+    async fn execute_async(
+        &mut self,
+        js: JsExecutable,
+    ) -> Result<Json, browser::Error> {
+        self.client.execute_async(self.get_obj().and_then(js)).await
     }
 
+    /// Returns [`JsExecutable`] which will obtain JS object of this [`Entity`].
     fn get_obj(&self) -> JsExecutable {
         JsExecutable::new(
             r#"
@@ -84,6 +86,9 @@ impl<T> Entity<T> {
     }
 }
 
+/// Abstraction which will be used for JS object creating for the [`Entity`].
 pub trait Builder {
+    /// Returns [`JsExecutable`] with which JS object for this object will be
+    /// created.
     fn build(self) -> JsExecutable;
 }

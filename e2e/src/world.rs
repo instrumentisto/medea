@@ -41,7 +41,8 @@ impl World for BrowserWorld {
     type Error = Infallible;
 
     async fn new() -> Result<Self, Infallible> {
-        Ok(Self::new(WebClient::new().await).await)
+        // TODO: unwrap
+        Ok(Self::new(WebClient::new().await.unwrap()).await)
     }
 }
 
