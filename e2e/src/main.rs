@@ -38,8 +38,11 @@ async fn given_member(
         todo!("Muting/Disabling not implemented");
     }
 
-    let member = Member::new(id, is_send, is_recv);
+    let member = Member::new(id.clone(), is_send, is_recv);
     world.create_member(member).await;
+    if is_joined {
+        world.join_room(&id).await;
+    }
 }
 
 #[tokio::main]

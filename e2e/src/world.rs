@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::{
     browser::{JsExecutable, WebClient},
     control::ControlApi,
-    entity::{Builder, Entity},
+    entity::{room::Room, Builder, Entity},
     model::member::Member,
 };
 use medea_control_api_mock::api::endpoint::AudioSettings;
@@ -59,7 +59,7 @@ impl BrowserWorld {
         }
     }
 
-    pub async fn create_member(&mut self, member: Member) {
+    pub async fn create_member(&mut self, mut member: Member) {
         let mut pipeline = HashMap::new();
         if member.is_send() {
             pipeline.insert(
@@ -141,8 +141,15 @@ impl BrowserWorld {
                 self.control_api.create(&path, element).await.unwrap();
             }
         }
+        let room = self.entity_factory.new_entity(Room).await;
+        member.set_room(room);
 
         self.members.insert(member.id().to_string(), member);
+    }
+
+    pub async fn join_room(&mut self, member_id: &str) {
+        let member = self.members.get_mut(member_id).unwrap();
+        member.join_room(&self.room_id).await;
     }
 }
 

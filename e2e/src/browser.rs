@@ -65,12 +65,12 @@ impl WebClient {
             .await?;
         c.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
             .await?;
-        c.wait_for_navigation(Some(
-            format!("http://{}/index.html", *conf::FILE_SERVER_ADDR)
-                .parse()
-                .unwrap(),
-        ))
-        .await?;
+        // c.wait_for_navigation(Some(
+        //     format!("http://{}/index.html", *conf::FILE_SERVER_ADDR)
+        //         .parse()
+        //         .unwrap(),
+        // ))
+        // .await?;
         c.wait_for_find(Locator::Id("loaded")).await?;
 
         Ok(Self(c))

@@ -1,5 +1,7 @@
 //! Implementation of the all browser-side entities.
 
+pub mod room;
+
 use std::marker::PhantomData;
 
 use serde_json::Value as Json;

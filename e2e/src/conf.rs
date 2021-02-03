@@ -13,7 +13,7 @@ pub static CONTROL_API_ADDR: Lazy<String> = Lazy::new(|| {
 
 pub static CLIENT_API_ADDR: Lazy<String> = Lazy::new(|| {
     env::var("CLIENT_API_ADDR")
-        .unwrap_or_else(|_| "http://127.0.0.1:8080/ws".to_string())
+        .unwrap_or_else(|_| "127.0.0.1:8080/ws".to_string())
 });
 
 pub static FILE_SERVER_ADDR: Lazy<String> = Lazy::new(|| {
