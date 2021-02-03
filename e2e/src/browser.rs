@@ -1,9 +1,14 @@
+//! Implementation of the object and methods for interracting with browser
+//! through [WebDriver] protocol.
+//!
+//! [WebDriver]: https://www.w3.org/TR/webdriver/
+
 use fantoccini::{Client, ClientBuilder, Locator};
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
 use webdriver::capabilities::Capabilities;
 
-use crate::entity::Entity;
+use crate::{conf, entity::Entity};
 
 const CHROME_ARGS: &[&str] = &[
     "--use-fake-device-for-media-stream",
@@ -14,10 +19,14 @@ const CHROME_ARGS: &[&str] = &[
 ];
 const FIREFOX_ARGS: &[&str] = &[];
 
+/// Result which will be returned from the all JS code executed in browser.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum JsResult {
+enum JsResult {
+    /// Contains the success [`Json`] value.
     Ok(Json),
+
+    /// Contains the error [`Json`] value.
     Err(Json),
 }
 
@@ -30,19 +39,25 @@ impl From<JsResult> for Result<Json, Json> {
     }
 }
 
+/// Client for interacting with browser through WebDriver.
 #[derive(Clone, Debug)]
 pub struct WebClient(Client);
 
 impl WebClient {
+    /// Returns new [`WebClient`] connected to the WebDriver
     pub async fn new() -> Self {
         let mut c = ClientBuilder::native()
             .capabilities(Self::get_webdriver_capabilities())
-            .connect("http://localhost:4444")
+            .connect(&conf::WEBDRIVER_ADDR)
             .await
             .unwrap();
-        c.goto("localhost:30000/index.html").await.unwrap();
+        c.goto(&format!("{}/index.html", *conf::FILE_SERVER_ADDR))
+            .await
+            .unwrap();
         c.wait_for_navigation(Some(
-            "localhost:30000/index.html".parse().unwrap(),
+            format!("{}/index.html", *conf::FILE_SERVER_ADDR)
+                .parse()
+                .unwrap(),
         ))
         .await
         .unwrap();

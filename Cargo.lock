@@ -2327,6 +2327,7 @@ dependencies = [
  "futures 0.3.12",
  "hyper 0.14.2",
  "medea-control-api-mock",
+ "once_cell",
  "reqwest",
  "serde 1.0.123",
  "serde_json",

@@ -1,5 +1,4 @@
-mod callback_subscriber;
-mod room;
+//! Implementation of the all browser-side entities.
 
 use std::marker::PhantomData;
 
@@ -7,12 +6,32 @@ use serde_json::Value as Json;
 
 use crate::browser::{JsExecutable, WebClient};
 
-pub use self::{callback_subscriber::CallbackSubscriber, room::Room};
-
+/// Representation of some object from the browser-side.
 pub struct Entity<T> {
     id: String,
     client: WebClient,
     _entity_type: PhantomData<T>,
+}
+
+impl<T> Drop for Entity<T> {
+    fn drop(&mut self) {
+        let id = self.id.clone();
+        let mut client = self.client.clone();
+        tokio::spawn(async move {
+            client
+                .execute_async(JsExecutable::new(
+                    r#"
+                    async () => {
+                        const [id] = args;
+                        window.holders.remove(id);
+                    }
+                "#,
+                    vec![id.into()],
+                ))
+                .await
+                .unwrap();
+        });
+    }
 }
 
 impl<T> Entity<T> {

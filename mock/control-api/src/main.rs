@@ -2,8 +2,7 @@ use clap::{
     app_from_crate, crate_authors, crate_description, crate_name,
     crate_version, Arg,
 };
-use medea_control_api_mock::init_logger;
-use medea_control_api_mock::{api, callback};
+use medea_control_api_mock::{api, callback, init_logger};
 
 #[actix_web::main]
 async fn main() {
@@ -42,6 +41,6 @@ async fn main() {
 
     let _log_guard = init_logger();
 
-    let callback_server =callback::server::run(&opts).await;
+    let callback_server = callback::server::run(&opts).await;
     api::run(&opts, callback_server).await;
 }

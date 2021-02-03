@@ -17,21 +17,13 @@ use slog_scope::GlobalLoggerGuard;
 
 pub mod proto {
     pub use crate::api::{
-        room::Room,
-        member::Member,
         endpoint::{
-            WebRtcPlayEndpoint,
-            WebRtcPublishEndpoint,
-            P2pMode,
-            PublishPolicy,
-            AudioSettings,
-            VideoSettings,
+            AudioSettings, P2pMode, PublishPolicy, VideoSettings,
+            WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         },
-        Element,
-        CreateResponse,
-        Response,
-        ErrorResponse,
-        SingleGetResponse,
+        member::Member,
+        room::Room,
+        CreateResponse, Element, ErrorResponse, Response, SingleGetResponse,
     };
 }
 

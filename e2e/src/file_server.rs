@@ -1,3 +1,6 @@
+//! Implementation of the HTTP file server which will share files required for
+//! tests.
+
 use std::{convert::TryFrom as _, path::PathBuf};
 
 use futures::{channel::oneshot, future::select};
@@ -8,8 +11,11 @@ use hyper::{
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
+use crate::conf;
+
 const NOT_FOUND: &[u8] = b"Not found";
 
+/// File server which will share `index.html` and compiled `jason` library.
 pub struct FileServer(Option<oneshot::Sender<()>>);
 
 impl FileServer {
@@ -17,8 +23,8 @@ impl FileServer {
         let make_service = make_service_fn(|_| async {
             Ok::<_, hyper::Error>(service_fn(response_files))
         });
-        let server =
-            Server::bind(&"0.0.0.0:30000".parse().unwrap()).serve(make_service);
+        let server = Server::bind(&conf::FILE_SERVER_ADDR.parse().unwrap())
+            .serve(make_service);
 
         let (tx, rx) = oneshot::channel();
         tokio::spawn(select(server, rx));
