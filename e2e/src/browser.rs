@@ -63,10 +63,10 @@ impl WebClient {
             .capabilities(Self::get_webdriver_capabilities())
             .connect(&conf::WEBDRIVER_ADDR)
             .await?;
-        c.goto(&format!("{}/index.html", *conf::FILE_SERVER_ADDR))
+        c.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
             .await?;
         c.wait_for_navigation(Some(
-            format!("{}/index.html", *conf::FILE_SERVER_ADDR)
+            format!("http://{}/index.html", *conf::FILE_SERVER_ADDR)
                 .parse()
                 .unwrap(),
         ))

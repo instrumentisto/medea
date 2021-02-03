@@ -14,39 +14,39 @@ use super::endpoint::Endpoint;
 pub struct Member {
     /// ID of `Member`.
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
 
     /// Pipeline of [Control API] `Member`.
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
-    pipeline: HashMap<String, Endpoint>,
+    pub pipeline: HashMap<String, Endpoint>,
 
     /// Optional `Member` credentials.
     ///
     /// If `None` then random credentials will be generated on Medea side.
-    credentials: Option<Credentials>,
+    pub credentials: Option<Credentials>,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_join: Option<String>,
+    pub on_join: Option<String>,
 
     /// URL to which `OnLeave` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_leave: Option<String>,
+    pub on_leave: Option<String>,
 
     /// Timeout of receiving heartbeat messages from the `Member` via Client
     /// API. Once reached, the `Member` is considered being idle.
     #[serde(default, with = "humantime_serde")]
-    idle_timeout: Option<Duration>,
+    pub idle_timeout: Option<Duration>,
 
     /// Timeout of the `Member` reconnecting via Client API.
     /// Once reached, the `Member` is considered disconnected.
     #[serde(default, with = "humantime_serde")]
-    reconnect_timeout: Option<Duration>,
+    pub reconnect_timeout: Option<Duration>,
 
     /// Interval of sending pings from Medea to the `Member` via Client API.
     #[serde(default, with = "humantime_serde")]
-    ping_interval: Option<Duration>,
+    pub ping_interval: Option<Duration>,
 }
 
 impl Member {
@@ -108,7 +108,7 @@ impl From<proto::Member> for Member {
 /// Credentials of the [`Member`].
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
-enum Credentials {
+pub enum Credentials {
     /// [Argon2] hash of the [`Member`] credentials.
     ///
     /// [Argon2]: https://en.wikipedia.org/wiki/Argon2

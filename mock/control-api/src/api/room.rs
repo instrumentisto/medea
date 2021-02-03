@@ -14,10 +14,10 @@ use super::member::Member;
 pub struct Room {
     /// ID of `Room`.
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
 
     /// Pipeline of `Room`.
-    pipeline: HashMap<String, RoomElement>,
+    pub pipeline: HashMap<String, RoomElement>,
 }
 
 impl Room {
