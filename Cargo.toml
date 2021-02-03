@@ -22,6 +22,7 @@ members = [
     "mock/control-api",
     "proto/client-api",
     "proto/control-api",
+    "e2e",
 ]
 
 [profile.release]

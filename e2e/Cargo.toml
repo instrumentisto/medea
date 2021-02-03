@@ -1,0 +1,20 @@
+[package]
+name = "medea-e2e-tests"
+version = "0.1.0"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.1", features = ["macros", "rt-multi-thread", "fs"] }
+cucumber_rust = { version = "0.8", features = ["macros"]}
+futures = "0.3"
+async-trait = "0.1"
+fantoccini = "0.17"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "0.8", features = ["v4"] }
+hyper = { version = "0.14", features = ["server"] }
+tokio-util = "0.6"
+webdriver = "0.43"
