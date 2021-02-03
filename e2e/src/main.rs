@@ -2,6 +2,7 @@ mod browser;
 mod entity;
 mod file_server;
 mod world;
+mod control;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
 
