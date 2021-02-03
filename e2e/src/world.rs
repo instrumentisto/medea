@@ -20,7 +20,7 @@ pub struct BrowserWorld {
 impl BrowserWorld {
     pub async fn new(mut client: WebClient) -> Self {
         client
-            .execute_async(JsExecutable::new(
+            .execute(JsExecutable::new(
                 r#"
                 async () => {
                     window.holders = new Map();
@@ -55,7 +55,7 @@ impl EntityFactory {
     {
         let id = Uuid::new_v4().to_string();
         self.0
-            .execute_async(obj.build().and_then(JsExecutable::new(
+            .execute(obj.build().and_then(JsExecutable::new(
                 r#"
                     async (obj) => {
                         const [id] = args;

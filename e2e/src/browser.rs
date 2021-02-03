@@ -113,16 +113,6 @@ impl WebClient {
     }
 
     pub async fn execute(&mut self, executable: JsExecutable) -> Result<Json> {
-        let (mut js, args) = executable.finalize();
-        js.push_str("return lastResult;\n");
-
-        Ok(self.0.execute(&js, args).await?)
-    }
-
-    pub async fn execute_async(
-        &mut self,
-        executable: JsExecutable,
-    ) -> Result<Json> {
         let (inner_js, args) = executable.finalize();
 
         let js = format!(

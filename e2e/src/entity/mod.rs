@@ -19,7 +19,7 @@ impl<T> Drop for Entity<T> {
         let mut client = self.client.clone();
         tokio::spawn(async move {
             client
-                .execute_async(JsExecutable::new(
+                .execute(JsExecutable::new(
                     r#"
                     async () => {
                         const [id] = args;
@@ -44,32 +44,16 @@ impl<T> Entity<T> {
         }
     }
 
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    /// Executes provided [`JsExecutable`] in the browser.
     async fn execute(
         &mut self,
         js: JsExecutable,
     ) -> Result<Json, browser::Error> {
-        self.client
-            .execute(
-                JsExecutable::new(
-                    r#"
-                    () => {
-                        const [id] = args;
-                        return window.holders.get(id);
-                    }
-                "#,
-                    vec![self.id.clone().into()],
-                )
-                .and_then(js),
-            )
-            .await
-    }
-
-    /// Executes provided [`JsExecutable`] in the browser.
-    async fn execute_async(
-        &mut self,
-        js: JsExecutable,
-    ) -> Result<Json, browser::Error> {
-        self.client.execute_async(self.get_obj().and_then(js)).await
+        self.client.execute(self.get_obj().and_then(js)).await
     }
 
     /// Returns [`JsExecutable`] which will obtain JS object of this [`Entity`].
