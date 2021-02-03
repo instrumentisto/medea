@@ -3,6 +3,8 @@
 //!
 //! [WebDriver]: https://www.w3.org/TR/webdriver/
 
+use std::iter;
+
 use fantoccini::{Client, ClientBuilder, Locator};
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
@@ -103,7 +105,7 @@ impl WebClient {
     }
 
     pub async fn execute(&mut self, executable: JsExecutable) -> Json {
-        let (mut js, args) = executable.into_js();
+        let (mut js, args) = executable.finalize();
         js.push_str("return lastResult;\n");
 
         self.0.execute(&js, args).await.unwrap()
@@ -113,27 +115,34 @@ impl WebClient {
         &mut self,
         executable: JsExecutable,
     ) -> Result<Json, Json> {
-        let mut js = "(async () => { try {".to_string();
-        let (inner_js, args) = executable.into_js();
-        js.push_str(&inner_js);
-        js.push_str("arguments[arguments.length - 1]({ ok: lastResult });\n");
-        js.push_str(
+        let (inner_js, args) = executable.finalize();
+
+        let js = format!(
             r#"
-        } catch (e) {
-            let callback = arguments[arguments.length - 1];
-            if (e.ptr != undefined) {
-                callback({
-                    err: {
-                        name: e.name(),
-                        message: e.message(),
-                        trace: e.trace(),
-                        source: e.source()
-                    }
-                });
-            } else {
-                callback({ err: e });
-            }
-        } } )();"#,
+            (
+                async () => {{
+                    let callback = arguments[arguments.length - 1];
+                    try {{
+                        {executable_js}
+                        callback({{ ok: lastResult }});
+                    }} catch (e) {{
+                        if (e.ptr != undefined) {{
+                            callback({{
+                                err: {{
+                                    name: e.name(),
+                                    message: e.message(),
+                                    trace: e.trace(),
+                                    source: e.source()
+                                }}
+                            }});
+                        }} else {{
+                            callback({{ err: e }});
+                        }}
+                    }}
+                }}
+            )();
+        "#,
+            executable_js = inner_js
         );
         let res = self.0.execute_async(&js, args).await.unwrap();
 
@@ -185,34 +194,28 @@ impl JsExecutable {
         }
     }
 
-    fn get_js_for_objs(&self) -> String {
-        let mut objs = String::new();
-        objs.push_str("objs = [];\n");
-        for obj in &self.objs {
-            objs.push_str(&format!(
-                "objs.push(window.holders.get('{}'));\n",
-                obj
-            ));
-        }
-
-        objs
+    fn objects_injection_js(&self) -> String {
+        iter::once("objs = [];\n".to_string())
+            .chain(self.objs.iter().map(|id| {
+                format!("objs.push(window.holders.get('{}'));\n", id)
+            }))
+            .collect()
     }
 
-    fn get_js(&self) -> String {
-        let args = format!("args = arguments[{}];\n", self.depth);
-        let objs = self.get_js_for_objs();
-        let expr =
-            format!("lastResult = await ({})(lastResult);\n", self.expression);
-
-        let mut out = String::new();
-        out.push_str(&args);
-        out.push_str(&objs);
-        out.push_str(&expr);
-
-        out
+    fn step_js(&self) -> String {
+        format!(
+            r#"
+            args = arguments[{depth}];
+            {objs_js}
+            lastResult = await ({expr})(lastResult);
+        "#,
+            depth = self.depth,
+            objs_js = self.objects_injection_js(),
+            expr = self.expression
+        )
     }
 
-    fn into_js(self) -> (String, Vec<Json>) {
+    fn finalize(self) -> (String, Vec<Json>) {
         let mut final_js = r#"
             let lastResult;
             let objs;
@@ -223,15 +226,11 @@ impl JsExecutable {
 
         let mut executable = Some(Box::new(self));
         while let Some(mut e) = executable.take() {
-            final_js.push_str(&e.get_js());
+            final_js.push_str(&e.step_js());
             args.push(std::mem::take(&mut e.args).into());
-            executable = e.pop();
+            executable = e.and_then;
         }
 
         (final_js, args)
-    }
-
-    fn pop(self) -> Option<Box<Self>> {
-        self.and_then
     }
 }
