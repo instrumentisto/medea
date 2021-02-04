@@ -187,3 +187,12 @@ impl World for BrowserWorld {
         Ok(Self::new(WebClient::new().await.unwrap()).await)
     }
 }
+
+impl Drop for BrowserWorld {
+    fn drop(&mut self) {
+        let mut client = self.client.clone();
+        tokio::spawn(async move {
+            client.close().await;
+        });
+    }
+}

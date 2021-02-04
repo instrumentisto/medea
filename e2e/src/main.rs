@@ -5,14 +5,16 @@ mod conf;
 mod control;
 mod entity;
 mod file_server;
+mod graceful_shutdown;
 mod model;
 mod world;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
 use medea_control_api_mock::proto;
 
-use self::{file_server::FileServer, world::BrowserWorld};
 use crate::{entity::room::MediaKind, model::member::Member};
+
+use self::{file_server::FileServer, world::BrowserWorld};
 
 #[given(regex = "^(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
                  with (disabled|muted) (audio|video|all))?$")]
@@ -117,7 +119,14 @@ async fn then_member_doesnt_receives_connection(
 
 #[tokio::main]
 async fn main() {
+    graceful_shutdown::init();
+
     let _server = FileServer::run();
     let runner = BrowserWorld::init(&["./features"]);
-    runner.run_and_exit().await;
+    let res = runner.run().await;
+
+    graceful_shutdown::wait_for_browser_close();
+
+    let exit_code = if res.failed() { 1 } else { 0 };
+    std::process::exit(exit_code);
 }

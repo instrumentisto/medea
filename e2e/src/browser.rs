@@ -14,6 +14,7 @@ use webdriver::capabilities::Capabilities;
 use crate::{
     conf,
     entity::{Entity, EntityPtr},
+    graceful_shutdown,
 };
 
 const CHROME_ARGS: &[&str] = &[
@@ -69,6 +70,8 @@ impl WebClient {
         c.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
             .await?;
         c.wait_for_find(Locator::Id("loaded")).await?;
+
+        graceful_shutdown::browser_opened();
 
         Ok(Self(c))
     }
@@ -143,6 +146,11 @@ impl WebClient {
         let res = self.0.execute_async(&js, args).await?;
 
         serde_json::from_value::<JsResult>(res).unwrap().into()
+    }
+
+    pub async fn close(&mut self) {
+        let _ = self.0.close().await;
+        graceful_shutdown::browser_closed();
     }
 }
 
