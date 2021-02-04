@@ -39,6 +39,7 @@ async fn given_member(
     world.create_member(member).await;
     if is_joined {
         world.join_room(&id).await;
+        world.wait_for_interconnection(&id).await;
     }
 
     let member = world.get_member(&id);

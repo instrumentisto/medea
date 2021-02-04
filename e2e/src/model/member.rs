@@ -1,6 +1,7 @@
 use crate::{
     conf,
     entity::{
+        connections_store::ConnectionStore,
         room::{MediaKind, MediaSourceKind, Room},
         Entity,
     },
@@ -11,6 +12,7 @@ pub struct Member {
     is_send: bool,
     is_recv: bool,
     room: Option<Entity<Room>>,
+    connection_store: Option<Entity<ConnectionStore>>,
 }
 
 impl Member {
@@ -20,6 +22,7 @@ impl Member {
             is_send,
             is_recv,
             room: None,
+            connection_store: None,
         }
     }
 
@@ -35,7 +38,8 @@ impl Member {
         self.is_recv
     }
 
-    pub fn set_room(&mut self, room: Entity<Room>) {
+    pub async fn set_room(&mut self, mut room: Entity<Room>) {
+        self.connection_store = Some(room.connections_store().await);
         self.room = Some(room);
     }
 
@@ -62,5 +66,9 @@ impl Member {
             .unwrap()
             .disable_media(kind, source_kind)
             .await;
+    }
+
+    pub fn connections(&mut self) -> &mut Entity<ConnectionStore> {
+        self.connection_store.as_mut().unwrap()
     }
 }

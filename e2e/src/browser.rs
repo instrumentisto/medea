@@ -121,6 +121,7 @@ impl WebClient {
                         {executable_js}
                         callback({{ ok: lastResult }});
                     }} catch (e) {{
+                        console.log(e);
                         if (e.ptr != undefined) {{
                             callback({{
                                 err: {{
@@ -131,7 +132,7 @@ impl WebClient {
                                 }}
                             }});
                         }} else {{
-                            callback({{ err: e }});
+                            callback({{ err: e.toString() }});
                         }}
                     }}
                 }}
@@ -197,14 +198,14 @@ impl JsExecutable {
             .collect()
     }
 
-    fn step_js(&self) -> String {
+    fn step_js(&self, i: usize) -> String {
         format!(
             r#"
             args = arguments[{depth}];
             {objs_js}
             lastResult = await ({expr})(lastResult);
         "#,
-            depth = self.depth,
+            depth = i,
             objs_js = self.objects_injection_js(),
             expr = self.expression
         )
@@ -220,8 +221,10 @@ impl JsExecutable {
         let mut args = Vec::new();
 
         let mut executable = Some(Box::new(self));
+        let mut i = 0;
         while let Some(mut e) = executable.take() {
-            final_js.push_str(&e.step_js());
+            final_js.push_str(&e.step_js(i));
+            i += 1;
             args.push(std::mem::take(&mut e.args).into());
             executable = e.and_then;
         }

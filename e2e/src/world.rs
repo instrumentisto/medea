@@ -144,7 +144,7 @@ impl BrowserWorld {
         }
         let mut jason = Entity::spawn(Jason, self.client.clone()).await;
         let room = jason.init_room().await;
-        member.set_room(room);
+        member.set_room(room).await;
 
         self.members.insert(member.id().to_string(), member);
         self.jasons.push(jason);
@@ -157,6 +157,20 @@ impl BrowserWorld {
     pub async fn join_room(&mut self, member_id: &str) {
         let member = self.members.get_mut(member_id).unwrap();
         member.join_room(&self.room_id).await;
+    }
+
+    pub async fn wait_for_interconnection(&mut self, member_id: &str) {
+        let interconnected_members: Vec<_> = self
+            .members
+            .values()
+            .filter(|m| m.id() != member_id && (m.is_recv() || m.is_send()))
+            .map(|m| m.id().to_string())
+            .collect();
+        let member = self.members.get_mut(member_id).unwrap();
+        let connections = member.connections();
+        for id in interconnected_members {
+            connections.wait_for_connection(id).await;
+        }
     }
 }
 

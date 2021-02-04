@@ -61,11 +61,13 @@ impl<T> Entity<T> {
             r#"
                 async (obj) => {
                     const [id] = args;
-                    window.holders.insert(id, obj);
+                    window.holders.set(id, obj);
                 }
             "#,
-            vec![id.clone().into()]
-        ))).await;
+            vec![id.clone().into()],
+        )))
+        .await
+        .unwrap();
 
         Entity::new(id, self.client.clone())
     }

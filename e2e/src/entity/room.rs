@@ -1,7 +1,9 @@
 use super::Builder;
 use crate::{
     browser::JsExecutable,
-    entity::{jason::Jason, Entity, EntityPtr},
+    entity::{
+        connections_store::ConnectionStore, jason::Jason, Entity, EntityPtr,
+    },
 };
 
 pub struct Room;
@@ -65,5 +67,30 @@ impl Entity<Room> {
         ))
         .await
         .unwrap();
+    }
+
+    pub async fn connections_store(&mut self) -> Entity<ConnectionStore> {
+        self.spawn_ent(JsExecutable::new(
+            r#"
+                async (room) => {
+                    let store = {
+                        connections: new Map(),
+                        subs: new Map(),
+                    };
+                    room.on_new_connection((conn) => {
+                        let id = conn.get_remote_member_id();
+                        store.connections.set(id, conn);
+                        let sub = store.subs.get(id);
+                        if (sub != undefined) {
+                            sub(conn);
+                        }
+                    });
+
+                    return store;
+                }
+            "#,
+            vec![],
+        ))
+        .await
     }
 }
