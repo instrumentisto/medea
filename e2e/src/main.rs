@@ -12,8 +12,7 @@ use cucumber_rust::{given, then, when, WorldInit as _};
 use medea_control_api_mock::proto;
 
 use self::{file_server::FileServer, world::BrowserWorld};
-use crate::model::member::Member;
-use crate::entity::room::MediaKind;
+use crate::{entity::room::MediaKind, model::member::Member};
 
 #[given(regex = "(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
                  with (disabled|muted) (audio|video))?")]

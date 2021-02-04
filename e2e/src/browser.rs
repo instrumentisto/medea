@@ -11,8 +11,10 @@ use serde::Deserialize;
 use serde_json::{json, Value as Json};
 use webdriver::capabilities::Capabilities;
 
-use crate::{conf, entity::Entity};
-use crate::entity::EntityPtr;
+use crate::{
+    conf,
+    entity::{Entity, EntityPtr},
+};
 
 const CHROME_ARGS: &[&str] = &[
     "--use-fake-device-for-media-stream",
@@ -162,15 +164,15 @@ impl JsExecutable {
         }
     }
 
-    pub fn with_objs<T>(
+    pub fn with_objs(
         expression: &str,
         args: Vec<Json>,
-        objs: Vec<&Entity<T>>,
+        objs: Vec<EntityPtr>,
     ) -> Self {
         Self {
             expression: expression.to_string(),
             args,
-            objs: objs.into_iter().map(|o| o.ptr()).collect(),
+            objs,
             and_then: None,
             depth: 0,
         }

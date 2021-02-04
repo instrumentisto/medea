@@ -1,12 +1,22 @@
 use super::Builder;
-use crate::{browser::JsExecutable, entity::Entity};
-use crate::entity::jason::Jason;
+use crate::{
+    browser::JsExecutable,
+    entity::{jason::Jason, Entity, EntityPtr},
+};
 
-pub struct Room;
+pub struct Room {
+    jason: EntityPtr,
+}
+
+impl Room {
+    pub fn new(jason: &Entity<Jason>) -> Self {
+        Self { jason: jason.ptr() }
+    }
+}
 
 impl Builder for Room {
     fn build(self) -> JsExecutable {
-        JsExecutable::new(
+        JsExecutable::with_objs(
             r#"
                 async () => {
                     const [jason] = objs;
@@ -18,6 +28,7 @@ impl Builder for Room {
                 }
             "#,
             vec![],
+            vec![self.jason],
         )
     }
 }
@@ -78,6 +89,8 @@ impl Entity<Room> {
                 disable
             ),
             vec![],
-        )).await.unwrap();
+        ))
+        .await
+        .unwrap();
     }
 }

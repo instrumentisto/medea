@@ -1,8 +1,10 @@
 use crate::{
     conf,
-    entity::{room::Room, Entity},
+    entity::{
+        room::{MediaKind, MediaSourceKind, Room},
+        Entity,
+    },
 };
-use crate::entity::room::{MediaSourceKind, MediaKind};
 
 pub struct Member {
     id: String,
@@ -50,7 +52,15 @@ impl Member {
             .await;
     }
 
-    pub async fn disable_media(&mut self, kind: MediaKind, source_kind: Option<MediaSourceKind>) {
-        self.room.as_mut().unwrap().disable_media(kind, source_kind).await;
+    pub async fn disable_media(
+        &mut self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) {
+        self.room
+            .as_mut()
+            .unwrap()
+            .disable_media(kind, source_kind)
+            .await;
     }
 }

@@ -5,26 +5,12 @@
     <script type="module">
         import init, {Jason} from "/jason/medea_jason.js";
 
-        let jason;
-
-        async function getJason() {
-            if (jason === undefined) {
-                await init();
-                jason = new Jason();
-                return jason;
-            } else {
-                return jason;
-            }
-        }
-
-        window.getJason = getJason;
-
-        let loadedDiv = document.createElement('div');
-        loadedDiv.id = 'loaded';
-        document.body.appendChild(loadedDiv);
-
         window.onload = async () => {
+            await init();
             window.rust = await import("/jason/medea_jason.js");
+            let loadedDiv = document.createElement('div');
+            loadedDiv.id = 'loaded';
+            document.body.appendChild(loadedDiv);
         }
     </script>
 </head>

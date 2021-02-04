@@ -1,5 +1,7 @@
-use crate::entity::{Builder, Entity};
-use crate::browser::JsExecutable;
+use crate::{
+    browser::JsExecutable,
+    entity::{Builder, Entity},
+};
 
 pub struct Jason;
 
@@ -8,7 +10,8 @@ impl Builder for Jason {
         JsExecutable::new(
             r#"
                 async () => {
-                    return new window.rust.Jason();
+                    let jason = new window.rust.Jason();
+                    return jason;
                 }
             "#,
             vec![],

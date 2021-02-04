@@ -1,7 +1,7 @@
 //! Implementation of the all browser-side entities.
 
-pub mod room;
 pub mod jason;
+pub mod room;
 
 use std::marker::PhantomData;
 

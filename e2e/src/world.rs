@@ -4,16 +4,15 @@ use std::{collections::HashMap, convert::Infallible};
 
 use async_trait::async_trait;
 use cucumber_rust::{World, WorldInit};
-use medea_control_api_mock::proto;
+use medea_control_api_mock::{api::endpoint::AudioSettings, proto};
 use uuid::Uuid;
 
 use crate::{
     browser::{JsExecutable, WebClient},
     control::ControlApi,
-    entity::{room::Room, Builder, Entity},
+    entity::{jason::Jason, room::Room, Builder, Entity},
     model::member::Member,
 };
-use medea_control_api_mock::api::endpoint::AudioSettings;
 
 /// World which will be used by all E2E tests.
 #[derive(WorldInit)]
@@ -22,6 +21,7 @@ pub struct BrowserWorld {
     entity_factory: EntityFactory,
     control_api: ControlApi,
     members: HashMap<String, Member>,
+    jasons: Vec<Entity<Jason>>,
 }
 
 impl BrowserWorld {
@@ -56,6 +56,7 @@ impl BrowserWorld {
             entity_factory: EntityFactory(client),
             control_api,
             members: HashMap::new(),
+            jasons: Vec::new(),
         }
     }
 
@@ -141,10 +142,12 @@ impl BrowserWorld {
                 self.control_api.create(&path, element).await.unwrap();
             }
         }
-        let room = self.entity_factory.new_entity(Room).await;
+        let jason = self.entity_factory.new_entity(Jason).await;
+        let room = self.entity_factory.new_entity(Room::new(&jason)).await;
         member.set_room(room);
 
         self.members.insert(member.id().to_string(), member);
+        self.jasons.push(jason);
     }
 
     pub fn get_member(&mut self, member_id: &str) -> &mut Member {
