@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     browser::{JsExecutable, WebClient},
+    browser_status,
     control::ControlApi,
     entity::{jason::Jason, room::Room, Builder, Entity},
     model::member::Member,
@@ -183,6 +184,7 @@ impl World for BrowserWorld {
     type Error = Infallible;
 
     async fn new() -> Result<Self, Infallible> {
+        browser_status::wait_for_close();
         // TODO: unwrap
         Ok(Self::new(WebClient::new().await.unwrap()).await)
     }

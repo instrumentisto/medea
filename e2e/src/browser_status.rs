@@ -6,22 +6,22 @@ static BROWSER_CLOSED: OnceCell<(Mutex<bool>, Condvar)> = OnceCell::new();
 
 pub fn init() {
     BROWSER_CLOSED
-        .set((Mutex::new(false), Condvar::new()))
+        .set((Mutex::new(true), Condvar::new()))
         .unwrap();
 }
 
-pub fn browser_opened() {
+pub fn opened() {
     let (closed, _) = BROWSER_CLOSED.get().unwrap();
     *closed.lock().unwrap() = false;
 }
 
-pub fn browser_closed() {
+pub fn closed() {
     let (closed, cvar) = BROWSER_CLOSED.get().unwrap();
     *closed.lock().unwrap() = true;
     cvar.notify_one();
 }
 
-pub fn wait_for_browser_close() {
+pub fn wait_for_close() {
     let (closed, cvar) = BROWSER_CLOSED.get().unwrap();
     let mut closed = closed.lock().unwrap();
     while !*closed {

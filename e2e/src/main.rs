@@ -5,7 +5,7 @@ mod conf;
 mod control;
 mod entity;
 mod file_server;
-mod graceful_shutdown;
+mod browser_status;
 mod model;
 mod world;
 
@@ -119,13 +119,13 @@ async fn then_member_doesnt_receives_connection(
 
 #[tokio::main]
 async fn main() {
-    graceful_shutdown::init();
+    browser_status::init();
 
     let _server = FileServer::run();
     let runner = BrowserWorld::init(&["./features"]);
     let res = runner.run().await;
 
-    graceful_shutdown::wait_for_browser_close();
+    browser_status::wait_for_close();
 
     let exit_code = if res.failed() { 1 } else { 0 };
     std::process::exit(exit_code);
