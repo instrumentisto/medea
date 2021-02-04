@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
 mod browser;
+mod browser_status;
 mod conf;
 mod control;
 mod entity;
 mod file_server;
-mod browser_status;
 mod model;
 mod world;
 

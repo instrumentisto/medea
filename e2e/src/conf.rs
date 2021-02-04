@@ -20,3 +20,7 @@ pub static FILE_SERVER_ADDR: Lazy<String> = Lazy::new(|| {
     env::var("FILE_SERVER_ADDR")
         .unwrap_or_else(|_| "127.0.0.1:30000".to_string())
 });
+
+pub static HEADLESS: Lazy<bool> = Lazy::new(|| {
+    env::var("HEADLESS").map_or(true, |v| v.to_ascii_lowercase() == "true")
+});

@@ -12,9 +12,8 @@ use serde_json::{json, Value as Json};
 use webdriver::capabilities::Capabilities;
 
 use crate::{
-    conf,
+    browser_status, conf,
     entity::{Entity, EntityPtr},
-    browser_status,
 };
 
 const CHROME_ARGS: &[&str] = &[
@@ -79,6 +78,10 @@ impl WebClient {
     /// Returns `moz:firefoxOptions` for the Firefox browser based on
     /// [`TestRunner`] configuration.
     fn get_firefox_caps() -> serde_json::Value {
+        let mut args = CHROME_ARGS.to_vec();
+        if *conf::HEADLESS {
+            args.push("--headless");
+        }
         json!({
             "prefs": {
                 "media.navigator.streams.fake": true,
@@ -88,14 +91,18 @@ impl WebClient {
                 "media.autoplay.ask-permission": false,
                 "media.autoplay.default": 0,
             },
-            "args": FIREFOX_ARGS,
+            "args": args,
         })
     }
 
     /// Returns `goog:chromeOptions` for the Chrome browser based on
     /// [`TestRunner`] configuration.
     fn get_chrome_caps() -> serde_json::Value {
-        json!({ "args": CHROME_ARGS })
+        let mut args = CHROME_ARGS.to_vec();
+        if *conf::HEADLESS {
+            args.push("--headless");
+        }
+        json!({ "args": args })
     }
 
     /// Returns [WebDriver capabilities] based on [`TestRunner`] configuration.
