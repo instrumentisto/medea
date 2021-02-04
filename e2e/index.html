@@ -22,6 +22,10 @@
         let loadedDiv = document.createElement('div');
         loadedDiv.id = 'loaded';
         document.body.appendChild(loadedDiv);
+
+        window.onload = async () => {
+            window.rust = await import("/jason/medea_jason.js");
+        }
     </script>
 </head>
 <body></body>

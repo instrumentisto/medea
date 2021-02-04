@@ -2,6 +2,7 @@ use crate::{
     conf,
     entity::{room::Room, Entity},
 };
+use crate::entity::room::{MediaSourceKind, MediaKind};
 
 pub struct Member {
     id: String,
@@ -41,11 +42,15 @@ impl Member {
             .as_mut()
             .unwrap()
             .join(format!(
-                "ws://{}/{}/{}?token=test",
+                "{}/{}/{}?token=test",
                 *conf::CLIENT_API_ADDR,
                 room_id,
                 self.id
             ))
             .await;
+    }
+
+    pub async fn disable_media(&mut self, kind: MediaKind, source_kind: Option<MediaSourceKind>) {
+        self.room.as_mut().unwrap().disable_media(kind, source_kind).await;
     }
 }

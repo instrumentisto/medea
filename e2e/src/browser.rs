@@ -12,6 +12,7 @@ use serde_json::{json, Value as Json};
 use webdriver::capabilities::Capabilities;
 
 use crate::{conf, entity::Entity};
+use crate::entity::EntityPtr;
 
 const CHROME_ARGS: &[&str] = &[
     "--use-fake-device-for-media-stream",
@@ -65,12 +66,6 @@ impl WebClient {
             .await?;
         c.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
             .await?;
-        // c.wait_for_navigation(Some(
-        //     format!("http://{}/index.html", *conf::FILE_SERVER_ADDR)
-        //         .parse()
-        //         .unwrap(),
-        // ))
-        // .await?;
         c.wait_for_find(Locator::Id("loaded")).await?;
 
         Ok(Self(c))
@@ -149,11 +144,11 @@ impl WebClient {
 }
 
 pub struct JsExecutable {
-    pub expression: String,
-    pub args: Vec<Json>,
-    pub objs: Vec<String>,
-    pub and_then: Option<Box<JsExecutable>>,
-    pub depth: u32,
+    expression: String,
+    args: Vec<Json>,
+    objs: Vec<EntityPtr>,
+    and_then: Option<Box<JsExecutable>>,
+    depth: u32,
 }
 
 impl JsExecutable {
@@ -175,7 +170,7 @@ impl JsExecutable {
         Self {
             expression: expression.to_string(),
             args,
-            objs: objs.into_iter().map(|o| o.id()).collect(),
+            objs: objs.into_iter().map(|o| o.ptr()).collect(),
             and_then: None,
             depth: 0,
         }

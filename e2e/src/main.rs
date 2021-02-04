@@ -13,6 +13,7 @@ use medea_control_api_mock::proto;
 
 use self::{file_server::FileServer, world::BrowserWorld};
 use crate::model::member::Member;
+use crate::entity::room::MediaKind;
 
 #[given(regex = "(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
                  with (disabled|muted) (audio|video))?")]
@@ -34,14 +35,23 @@ async fn given_member(
             direction.contains("receive-only"),
         )
     };
-    if !mute_disable.is_empty() {
-        todo!("Muting/Disabling not implemented");
-    }
 
     let member = Member::new(id.clone(), is_send, is_recv);
     world.create_member(member).await;
     if is_joined {
         world.join_room(&id).await;
+    }
+
+    let member = world.get_member(&id);
+    if !mute_disable.is_empty() {
+        if disabled_or_muted.contains("disabled") {
+            let kind = if audio_or_video.contains("audio") {
+                MediaKind::Audio
+            } else {
+                MediaKind::Video
+            };
+            member.disable_media(kind, None).await;
+        }
     }
 }
 

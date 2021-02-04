@@ -147,6 +147,10 @@ impl BrowserWorld {
         self.members.insert(member.id().to_string(), member);
     }
 
+    pub fn get_member(&mut self, member_id: &str) -> &mut Member {
+        self.members.get_mut(member_id).unwrap()
+    }
+
     pub async fn join_room(&mut self, member_id: &str) {
         let member = self.members.get_mut(member_id).unwrap();
         member.join_room(&self.room_id).await;

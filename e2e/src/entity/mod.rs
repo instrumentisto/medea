@@ -1,23 +1,25 @@
 //! Implementation of the all browser-side entities.
 
 pub mod room;
+pub mod jason;
 
 use std::marker::PhantomData;
 
+use derive_more::Display;
 use serde_json::Value as Json;
 
 use crate::browser::{self, JsExecutable, WebClient};
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {
-    id: String,
+    ptr: EntityPtr,
     client: WebClient,
     _entity_type: PhantomData<T>,
 }
 
 impl<T> Drop for Entity<T> {
     fn drop(&mut self) {
-        let id = self.id.clone();
+        let ptr = self.ptr.clone();
         let mut client = self.client.clone();
         tokio::spawn(async move {
             client
@@ -28,7 +30,7 @@ impl<T> Drop for Entity<T> {
                         window.holders.remove(id);
                     }
                 "#,
-                    vec![id.into()],
+                    vec![ptr.to_string().into()],
                 ))
                 .await
                 .unwrap();
@@ -40,14 +42,14 @@ impl<T> Entity<T> {
     /// Returns [`Entity`] with a provided URI and [`WebClient`].
     pub fn new(uri: String, client: WebClient) -> Self {
         Self {
-            id: uri,
+            ptr: EntityPtr(uri),
             client,
             _entity_type: PhantomData::default(),
         }
     }
 
-    pub fn id(&self) -> String {
-        self.id.clone()
+    pub fn ptr(&self) -> EntityPtr {
+        self.ptr.clone()
     }
 
     /// Executes provided [`JsExecutable`] in the browser.
@@ -67,7 +69,7 @@ impl<T> Entity<T> {
                     return window.holders.get(id);
                 }
             "#,
-            vec![self.id.clone().into()],
+            vec![self.ptr.to_string().into()],
         )
     }
 }
@@ -78,3 +80,6 @@ pub trait Builder {
     /// created.
     fn build(self) -> JsExecutable;
 }
+
+#[derive(Clone, Debug, Display)]
+pub struct EntityPtr(String);
