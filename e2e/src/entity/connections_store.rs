@@ -1,5 +1,7 @@
-use crate::entity::{EntityPtr, Builder};
-use crate::browser::JsExecutable;
+use crate::{
+    browser::JsExecutable,
+    entity::{connection::Connection, Builder, Entity, EntityPtr},
+};
 
 pub struct ConnectionStore {
     room: EntityPtr,
@@ -13,9 +15,15 @@ impl Builder for ConnectionStore {
                     const [room] = objs;
                     let store = {
                         connections: new Map(),
+                        subs: new Map(),
                     };
                     room.on_new_connection((conn) => {
-                        store.connections.set(conn.get_remote_member_id(), conn);
+                        let id = conn.get_remote_member_id();
+                        store.connections.set(id, conn);
+                        let sub = store.subs.get(id);
+                        if (sub != undefined) {
+                            sub(conn);
+                        }
                     });
 
                     return store;
@@ -24,5 +32,20 @@ impl Builder for ConnectionStore {
             vec![],
             vec![self.room],
         )
+    }
+}
+
+impl Entity<ConnectionStore> {
+    pub async fn get(
+        &mut self,
+        remote_id: String,
+    ) -> Option<Entity<Connection>> {
+        let mut connection =
+            self.spawn_entity(Connection::new(remote_id, &self)).await;
+        if connection.is_undefined().await {
+            None
+        } else {
+            Some(connection)
+        }
     }
 }

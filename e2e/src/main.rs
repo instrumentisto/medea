@@ -55,7 +55,12 @@ async fn given_member(
 }
 
 #[when(regex = "Member `(.*)` (disables|mutes) (audio|video)")]
-async fn when_disables_mutes(world: &mut BrowserWorld, id: String, disable_or_mutes: String, audio_or_video: String) {
+async fn when_disables_mutes(
+    world: &mut BrowserWorld,
+    id: String,
+    disable_or_mutes: String,
+    audio_or_video: String,
+) {
     let member = world.get_member(&id);
     if disable_or_mutes == "disables" {
         let kind = if audio_or_video.contains("audio") {

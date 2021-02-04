@@ -18,10 +18,10 @@ use crate::{
 #[derive(WorldInit)]
 pub struct BrowserWorld {
     room_id: String,
-    entity_factory: EntityFactory,
     control_api: ControlApi,
     members: HashMap<String, Member>,
     jasons: Vec<Entity<Jason>>,
+    client: WebClient,
 }
 
 impl BrowserWorld {
@@ -53,8 +53,8 @@ impl BrowserWorld {
 
         Self {
             room_id,
-            entity_factory: EntityFactory(client),
             control_api,
+            client,
             members: HashMap::new(),
             jasons: Vec::new(),
         }
@@ -142,8 +142,8 @@ impl BrowserWorld {
                 self.control_api.create(&path, element).await.unwrap();
             }
         }
-        let jason = self.entity_factory.new_entity(Jason).await;
-        let room = self.entity_factory.new_entity(Room::new(&jason)).await;
+        let mut jason = Entity::spawn(Jason, self.client.clone()).await;
+        let room = jason.init_room().await;
         member.set_room(room);
 
         self.members.insert(member.id().to_string(), member);
@@ -167,30 +167,5 @@ impl World for BrowserWorld {
     async fn new() -> Result<Self, Infallible> {
         // TODO: unwrap
         Ok(Self::new(WebClient::new().await.unwrap()).await)
-    }
-}
-
-struct EntityFactory(WebClient);
-
-impl EntityFactory {
-    pub async fn new_entity<T>(&mut self, obj: T) -> Entity<T>
-    where
-        T: Builder,
-    {
-        let id = Uuid::new_v4().to_string();
-        self.0
-            .execute(obj.build().and_then(JsExecutable::new(
-                r#"
-                    async (obj) => {
-                        const [id] = args;
-                        window.holders.set(id, obj);
-                    }
-                "#,
-                vec![id.clone().into()],
-            )))
-            .await
-            .unwrap();
-
-        Entity::new(id, self.0.clone())
     }
 }

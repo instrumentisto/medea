@@ -1,8 +1,9 @@
 //! Implementation of the all browser-side entities.
 
+pub mod connection;
+pub mod connections_store;
 pub mod jason;
 pub mod room;
-pub mod connections_store;
 
 use std::marker::PhantomData;
 
@@ -10,6 +11,7 @@ use derive_more::Display;
 use serde_json::Value as Json;
 
 use crate::browser::{self, JsExecutable, WebClient};
+use uuid::Uuid;
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {
@@ -53,6 +55,25 @@ impl<T> Entity<T> {
         self.ptr.clone()
     }
 
+    pub async fn spawn_entity<O: Builder>(&mut self, obj: O) -> Entity<O> {
+        Entity::spawn(obj, self.client.clone()).await
+    }
+
+    pub async fn is_undefined(&mut self) -> bool {
+        self.execute(JsExecutable::new(
+            r#"
+                async (o) => {
+                    return o === undefined;
+                }
+            "#,
+            vec![],
+        ))
+        .await
+        .unwrap()
+        .as_bool()
+        .unwrap()
+    }
+
     /// Executes provided [`JsExecutable`] in the browser.
     async fn execute(
         &mut self,
@@ -72,6 +93,26 @@ impl<T> Entity<T> {
             "#,
             vec![self.ptr.to_string().into()],
         )
+    }
+}
+
+impl<T: Builder> Entity<T> {
+    pub async fn spawn(obj: T, mut client: WebClient) -> Entity<T> {
+        let id = Uuid::new_v4().to_string();
+        client
+            .execute(obj.build().and_then(JsExecutable::new(
+                r#"
+                    async (obj) => {
+                        const [id] = args;
+                        window.holders.set(id, obj);
+                    }
+                "#,
+                vec![id.clone().into()],
+            )))
+            .await
+            .unwrap();
+
+        Entity::new(id, client)
     }
 }
 
