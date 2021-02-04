@@ -11,6 +11,7 @@ pub struct Member {
     id: String,
     is_send: bool,
     is_recv: bool,
+    is_joined: bool,
     room: Option<Entity<Room>>,
     connection_store: Option<Entity<ConnectionStore>>,
 }
@@ -21,6 +22,7 @@ impl Member {
             id,
             is_send,
             is_recv,
+            is_joined: false,
             room: None,
             connection_store: None,
         }
@@ -36,6 +38,10 @@ impl Member {
 
     pub fn is_recv(&self) -> bool {
         self.is_recv
+    }
+
+    pub fn is_joined(&self) -> bool {
+        self.is_joined
     }
 
     pub async fn set_room(&mut self, mut room: Entity<Room>) {
@@ -54,6 +60,7 @@ impl Member {
                 self.id
             ))
             .await;
+        self.is_joined = true;
     }
 
     pub async fn disable_media(

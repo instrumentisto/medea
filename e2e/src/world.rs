@@ -163,7 +163,11 @@ impl BrowserWorld {
         let interconnected_members: Vec<_> = self
             .members
             .values()
-            .filter(|m| m.id() != member_id && (m.is_recv() || m.is_send()))
+            .filter(|m| {
+                m.is_joined()
+                    && m.id() != member_id
+                    && (m.is_recv() || m.is_send())
+            })
             .map(|m| m.id().to_string())
             .collect();
         let member = self.members.get_mut(member_id).unwrap();

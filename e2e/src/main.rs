@@ -14,8 +14,8 @@ use medea_control_api_mock::proto;
 use self::{file_server::FileServer, world::BrowserWorld};
 use crate::{entity::room::MediaKind, model::member::Member};
 
-#[given(regex = "(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
-                 with (disabled|muted) (audio|video))?")]
+#[given(regex = "^(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
+                 with (disabled|muted) (audio|video|all))?$")]
 async fn given_member(
     world: &mut BrowserWorld,
     joined: String,
@@ -45,17 +45,23 @@ async fn given_member(
     let member = world.get_member(&id);
     if !mute_disable.is_empty() {
         if disabled_or_muted.contains("disabled") {
-            let kind = if audio_or_video.contains("audio") {
-                MediaKind::Audio
-            } else {
-                MediaKind::Video
+            let kind = match audio_or_video.as_str() {
+                "audio" => Some(MediaKind::Audio),
+                "video" => Some(MediaKind::Video),
+                "all" => None,
+                _ => unreachable!(),
             };
-            member.disable_media(kind, None).await;
+            if let Some(kind) = kind {
+                member.disable_media(kind, None).await;
+            } else {
+                member.disable_media(MediaKind::Audio, None).await;
+                member.disable_media(MediaKind::Video, None).await;
+            }
         }
     }
 }
 
-#[when(regex = "Member `(.*)` (disables|mutes) (audio|video)")]
+#[when(regex = "^Member `(.*)` (disables|mutes) (audio|video|all)$")]
 async fn when_disables_mutes(
     world: &mut BrowserWorld,
     id: String,
@@ -64,15 +70,49 @@ async fn when_disables_mutes(
 ) {
     let member = world.get_member(&id);
     if disable_or_mutes == "disables" {
-        let kind = if audio_or_video.contains("audio") {
-            MediaKind::Audio
-        } else {
-            MediaKind::Video
+        let kind = match audio_or_video.as_str() {
+            "audio" => Some(MediaKind::Audio),
+            "video" => Some(MediaKind::Video),
+            "all" => None,
+            _ => unreachable!(),
         };
-        member.disable_media(kind, None).await;
+        if let Some(kind) = kind {
+            member.disable_media(kind, None).await;
+        } else {
+            member.disable_media(MediaKind::Audio, None).await;
+            member.disable_media(MediaKind::Video, None).await;
+        }
     } else {
         todo!()
     }
+}
+
+#[when(regex = "^`(.*)` joins Room")]
+async fn when_member_joins_room(world: &mut BrowserWorld, id: String) {
+    world.join_room(&id).await;
+}
+
+#[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
+async fn then_member_receives_connection(
+    world: &mut BrowserWorld,
+    id: String,
+    partner_id: String,
+) {
+    let member = world.get_member(&id);
+    member
+        .connections()
+        .wait_for_connection(partner_id.clone())
+        .await;
+}
+
+#[then(regex = "^`(.*)` doesn't receives Connection with Member `(.*)`")]
+async fn then_member_doesnt_receives_connection(
+    world: &mut BrowserWorld,
+    id: String,
+    partner_id: String,
+) {
+    let member = world.get_member(&id);
+    assert!(member.connections().get(partner_id).await.is_none())
 }
 
 #[tokio::main]
