@@ -21,6 +21,13 @@ impl Builder for Jason {
 
 impl Entity<Jason> {
     pub async fn init_room(&mut self) -> Entity<Room> {
-        self.spawn_entity(Room::new(&self)).await
+        self.spawn_ent(JsExecutable::new(
+            r#"
+                async (jason) => {
+                    return jason.init_room();
+                }
+            "#,
+            vec![],
+        )).await
     }
 }

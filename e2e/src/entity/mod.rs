@@ -55,6 +55,21 @@ impl<T> Entity<T> {
         self.ptr.clone()
     }
 
+    pub async fn spawn_ent<O>(&mut self, exec: JsExecutable) -> Entity<O> {
+        let id = Uuid::new_v4().to_string();
+        self.execute(exec.and_then(JsExecutable::new(
+            r#"
+                async (obj) => {
+                    const [id] = args;
+                    window.holders.insert(id, obj);
+                }
+            "#,
+            vec![id.clone().into()]
+        ))).await;
+
+        Entity::new(id, self.client.clone())
+    }
+
     pub async fn spawn_entity<O: Builder>(&mut self, obj: O) -> Entity<O> {
         Entity::spawn(obj, self.client.clone()).await
     }

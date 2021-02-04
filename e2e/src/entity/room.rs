@@ -4,34 +4,7 @@ use crate::{
     entity::{jason::Jason, Entity, EntityPtr},
 };
 
-pub struct Room {
-    jason: EntityPtr,
-}
-
-impl Room {
-    pub fn new(jason: &Entity<Jason>) -> Self {
-        Self { jason: jason.ptr() }
-    }
-}
-
-impl Builder for Room {
-    fn build(self) -> JsExecutable {
-        JsExecutable::with_objs(
-            r#"
-                async () => {
-                    const [jason] = objs;
-                    let room = await jason.init_room();
-                    room.on_failed_local_media(() => {});
-                    room.on_connection_loss(() => {});
-
-                    return room;
-                }
-            "#,
-            vec![],
-            vec![self.jason],
-        )
-    }
-}
+pub struct Room;
 
 pub enum MediaKind {
     Audio,

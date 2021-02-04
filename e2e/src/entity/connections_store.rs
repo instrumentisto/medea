@@ -40,8 +40,16 @@ impl Entity<ConnectionStore> {
         &mut self,
         remote_id: String,
     ) -> Option<Entity<Connection>> {
-        let mut connection =
-            self.spawn_entity(Connection::new(remote_id, &self)).await;
+        let mut connection = self.spawn_ent(JsExecutable::new(
+            r#"
+                async (store) => {
+                    const [id] = args;
+                    return store.connections.get(id);
+                }
+            "#,
+            vec![remote_id.into()],
+        )).await;
+
         if connection.is_undefined().await {
             None
         } else {
