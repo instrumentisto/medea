@@ -2,6 +2,7 @@
 
 pub mod jason;
 pub mod room;
+pub mod connections_store;
 
 use std::marker::PhantomData;
 
