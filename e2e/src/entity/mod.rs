@@ -11,8 +11,7 @@ use derive_more::Display;
 use serde_json::Value as Json;
 use uuid::Uuid;
 
-use crate::browser::{self, JsExecutable, WebClient};
-use crate::browser::WindowWebClient;
+use crate::browser::{self, JsExecutable, WebClient, WindowWebClient};
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {
@@ -37,7 +36,8 @@ impl<T> Drop for Entity<T> {
                 "#,
                     vec![ptr.to_string().into()],
                 ))
-                .await.unwrap();
+                .await
+                .unwrap();
             tx.send(()).unwrap();
         });
         rx.recv().unwrap();

@@ -8,12 +8,11 @@ use medea_control_api_mock::proto;
 use uuid::Uuid;
 
 use crate::{
-    browser::{JsExecutable, WebClient},
+    browser::{JsExecutable, RootWebClient, WebClient},
     control::ControlApi,
     entity::{jason::Jason, Entity},
     model::member::Member,
 };
-use crate::browser::RootWebClient;
 
 /// World which will be used by all E2E tests.
 #[derive(WorldInit)]
@@ -131,7 +130,8 @@ impl BrowserWorld {
                 self.control_api.create(&path, element).await.unwrap();
             }
         }
-        let mut jason = Entity::spawn(Jason, self.client.new_window().await).await;
+        let mut jason =
+            Entity::spawn(Jason, self.client.new_window().await).await;
         let room = jason.init_room().await;
         member.set_room(room).await;
 
