@@ -62,9 +62,7 @@ async fn response_files(
             }
             path
         }
-        "index.html" => {
-            PathBuf::from(&*conf::INDEX_PATH)
-        }
+        "index.html" => PathBuf::from(&*conf::INDEX_PATH),
         _ => unreachable!(),
     };
 

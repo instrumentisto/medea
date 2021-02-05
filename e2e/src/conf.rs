@@ -32,3 +32,7 @@ pub static JASON_DIR_PATH: Lazy<String> = Lazy::new(|| {
 pub static INDEX_PATH: Lazy<String> = Lazy::new(|| {
     env::var("INDEX_PATH").unwrap_or_else(|_| "e2e/index.html".to_string())
 });
+
+pub static FEATURES_PATH: Lazy<String> = Lazy::new(|| {
+    env::var("FEATURES_PATH").unwrap_or_else(|_| "e2e/features".to_string())
+});

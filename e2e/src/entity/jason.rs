@@ -27,7 +27,7 @@ impl Entity<Jason> {
                     let room = await jason.init_room();
                     room.on_failed_local_media(() => {});
                     room.on_connection_loss(() => {});
-                    
+
                     return room;
                 }
             "#,

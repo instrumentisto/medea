@@ -118,6 +118,6 @@ async fn then_member_doesnt_receives_connection(
 #[tokio::main]
 async fn main() {
     let _server = FileServer::run();
-    let runner = BrowserWorld::init(&["e2e/features"]);
+    let runner = BrowserWorld::init(&[conf::FEATURES_PATH.as_str()]);
     runner.run_and_exit().await;
 }
