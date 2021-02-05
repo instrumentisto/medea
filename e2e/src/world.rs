@@ -8,7 +8,7 @@ use medea_control_api_mock::proto;
 use uuid::Uuid;
 
 use crate::{
-    browser::{RootWebClient, WebClient},
+    browser::RootWebClient,
     control::ControlApi,
     entity::{jason::Jason, Entity},
     model::member::Member,
@@ -25,7 +25,7 @@ pub struct BrowserWorld {
 }
 
 impl BrowserWorld {
-    pub async fn new(mut client: RootWebClient) -> Self {
+    pub async fn new(client: RootWebClient) -> Self {
         let room_id = Uuid::new_v4().to_string();
         let control_api = ControlApi::new();
         control_api

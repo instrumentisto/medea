@@ -11,7 +11,7 @@ use derive_more::Display;
 use serde_json::Value as Json;
 use uuid::Uuid;
 
-use crate::browser::{self, JsExecutable, WebClient, WindowWebClient};
+use crate::browser::{self, JsExecutable, WindowWebClient};
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {

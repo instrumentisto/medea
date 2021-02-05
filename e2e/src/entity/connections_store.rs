@@ -1,6 +1,6 @@
 use crate::{
     browser::JsExecutable,
-    entity::{connection::Connection, Builder, Entity, EntityPtr},
+    entity::{connection::Connection, Entity},
 };
 
 pub struct ConnectionStore;

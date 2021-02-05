@@ -1,7 +1,7 @@
 //! Implementation of the HTTP file server which will share files required for
 //! tests.
 
-use std::{convert::TryFrom as _, path::PathBuf};
+use std::path::PathBuf;
 
 use futures::{channel::oneshot, future::select};
 use hyper::{
