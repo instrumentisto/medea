@@ -1,9 +1,6 @@
-use super::Builder;
 use crate::{
     browser::JsExecutable,
-    entity::{
-        connections_store::ConnectionStore, jason::Jason, Entity, EntityPtr,
-    },
+    entity::{connections_store::ConnectionStore, Entity},
 };
 
 pub struct Room;

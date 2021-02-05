@@ -4,14 +4,13 @@ use std::{collections::HashMap, convert::Infallible};
 
 use async_trait::async_trait;
 use cucumber_rust::{World, WorldInit};
-use medea_control_api_mock::{api::endpoint::AudioSettings, proto};
+use medea_control_api_mock::proto;
 use uuid::Uuid;
 
 use crate::{
     browser::{JsExecutable, WebClient},
-    browser_status,
     control::ControlApi,
-    entity::{jason::Jason, room::Room, Builder, Entity},
+    entity::{jason::Jason, Entity},
     model::member::Member,
 };
 
@@ -184,7 +183,6 @@ impl World for BrowserWorld {
     type Error = Infallible;
 
     async fn new() -> Result<Self, Infallible> {
-        browser_status::wait_for_close();
         // TODO: unwrap
         Ok(Self::new(WebClient::new().await.unwrap()).await)
     }
@@ -192,9 +190,6 @@ impl World for BrowserWorld {
 
 impl Drop for BrowserWorld {
     fn drop(&mut self) {
-        let mut client = self.client.clone();
-        tokio::spawn(async move {
-            client.close().await;
-        });
+        self.client.blocking_close();
     }
 }

@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 mod browser;
-mod browser_status;
 mod conf;
 mod control;
 mod entity;
@@ -10,7 +9,6 @@ mod model;
 mod world;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
-use medea_control_api_mock::proto;
 
 use crate::{entity::room::MediaKind, model::member::Member};
 
@@ -119,14 +117,7 @@ async fn then_member_doesnt_receives_connection(
 
 #[tokio::main]
 async fn main() {
-    browser_status::init();
-
     let _server = FileServer::run();
     let runner = BrowserWorld::init(&["./features"]);
-    let res = runner.run().await;
-
-    browser_status::wait_for_close();
-
-    let exit_code = if res.failed() { 1 } else { 0 };
-    std::process::exit(exit_code);
+    runner.run_and_exit().await;
 }

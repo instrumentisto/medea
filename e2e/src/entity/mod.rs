@@ -9,9 +9,9 @@ use std::marker::PhantomData;
 
 use derive_more::Display;
 use serde_json::Value as Json;
+use uuid::Uuid;
 
 use crate::browser::{self, JsExecutable, WebClient};
-use uuid::Uuid;
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {

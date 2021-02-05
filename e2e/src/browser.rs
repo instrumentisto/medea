@@ -11,10 +11,7 @@ use serde::Deserialize;
 use serde_json::{json, Value as Json};
 use webdriver::capabilities::Capabilities;
 
-use crate::{
-    browser_status, conf,
-    entity::{Entity, EntityPtr},
-};
+use crate::{conf, entity::EntityPtr};
 
 const CHROME_ARGS: &[&str] = &[
     "--use-fake-device-for-media-stream",
@@ -69,8 +66,6 @@ impl WebClient {
         c.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
             .await?;
         c.wait_for_find(Locator::Id("loaded")).await?;
-
-        browser_status::opened();
 
         Ok(Self(c))
     }
@@ -131,7 +126,6 @@ impl WebClient {
                         {executable_js}
                         callback({{ ok: lastResult }});
                     }} catch (e) {{
-                        console.log(e);
                         if (e.ptr != undefined) {{
                             callback({{
                                 err: {{
@@ -155,9 +149,14 @@ impl WebClient {
         serde_json::from_value::<JsResult>(res).unwrap().into()
     }
 
-    pub async fn close(&mut self) {
-        let _ = self.0.close().await;
-        browser_status::closed();
+    pub fn blocking_close(&mut self) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut client = self.0.clone();
+        tokio::spawn(async move {
+            let _ = client.close().await;
+            tx.send(()).unwrap();
+        });
+        rx.recv().unwrap();
     }
 }
 
