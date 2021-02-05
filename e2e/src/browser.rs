@@ -10,6 +10,7 @@ use fantoccini::{Client, ClientBuilder, Locator};
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
 use webdriver::capabilities::Capabilities;
+use webdriver::common::WebWindow;
 
 use crate::{conf, entity::EntityPtr};
 
@@ -31,6 +32,64 @@ pub enum Error {
 }
 
 type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone)]
+pub struct WindowWebClient {
+    client: WebClient,
+    window: WebWindow,
+}
+
+impl WindowWebClient {
+    async fn new(mut client: WebClient, window: WebWindow) -> Self {
+        client.0.switch_to_window(window.clone()).await.unwrap();
+        client.0.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
+            .await
+            .unwrap();
+        client.0.wait_for_find(Locator::Id("loaded")).await.unwrap();
+        client
+            .execute(JsExecutable::new(
+                r#"
+                async () => {
+                    window.holders = new Map();
+                }
+            "#,
+                vec![],
+            ))
+            .await
+            .unwrap();
+
+        Self {
+            client,
+            window,
+        }
+    }
+
+    pub async fn execute(&mut self, exec: JsExecutable) -> Result<Json> {
+        self.client.0.switch_to_window(self.window.clone()).await.unwrap();
+
+        self.client.execute(exec).await
+    }
+}
+
+pub struct RootWebClient(WebClient);
+
+impl RootWebClient {
+    pub async fn new() -> Self {
+        Self(WebClient::new().await.unwrap())
+    }
+
+    pub async fn new_window(&mut self) -> WindowWebClient {
+        let window = WebWindow(self.0.0.new_window(true).await.unwrap().handle);
+
+        WindowWebClient::new(self.0.clone(), window).await
+    }
+}
+
+impl Drop for RootWebClient {
+    fn drop(&mut self) {
+        self.0.blocking_close();
+    }
+}
 
 /// Result which will be returned from the all JS code executed in browser.
 #[derive(Debug, Deserialize)]
@@ -63,9 +122,6 @@ impl WebClient {
             .capabilities(Self::get_webdriver_capabilities())
             .connect(&conf::WEBDRIVER_ADDR)
             .await?;
-        c.goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
-            .await?;
-        c.wait_for_find(Locator::Id("loaded")).await?;
 
         Ok(Self(c))
     }

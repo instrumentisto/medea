@@ -12,11 +12,12 @@ use serde_json::Value as Json;
 use uuid::Uuid;
 
 use crate::browser::{self, JsExecutable, WebClient};
+use crate::browser::WindowWebClient;
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {
     ptr: EntityPtr,
-    client: WebClient,
+    client: WindowWebClient,
     _entity_type: PhantomData<T>,
 }
 
@@ -24,26 +25,28 @@ impl<T> Drop for Entity<T> {
     fn drop(&mut self) {
         let ptr = self.ptr.clone();
         let mut client = self.client.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
         tokio::spawn(async move {
             client
                 .execute(JsExecutable::new(
                     r#"
                     async () => {
                         const [id] = args;
-                        window.holders.remove(id);
+                        window.holders.delete(id);
                     }
                 "#,
                     vec![ptr.to_string().into()],
                 ))
-                .await
-                .unwrap();
+                .await.unwrap();
+            tx.send(()).unwrap();
         });
+        rx.recv().unwrap();
     }
 }
 
 impl<T> Entity<T> {
     /// Returns [`Entity`] with a provided URI and [`WebClient`].
-    pub fn new(uri: String, client: WebClient) -> Self {
+    pub fn new(uri: String, client: WindowWebClient) -> Self {
         Self {
             ptr: EntityPtr(uri),
             client,
@@ -114,7 +117,7 @@ impl<T> Entity<T> {
 }
 
 impl<T: Builder> Entity<T> {
-    pub async fn spawn(obj: T, mut client: WebClient) -> Entity<T> {
+    pub async fn spawn(obj: T, mut client: WindowWebClient) -> Entity<T> {
         let id = Uuid::new_v4().to_string();
         client
             .execute(obj.build().and_then(JsExecutable::new(

@@ -13,6 +13,7 @@ use crate::{
     entity::{jason::Jason, Entity},
     model::member::Member,
 };
+use crate::browser::RootWebClient;
 
 /// World which will be used by all E2E tests.
 #[derive(WorldInit)]
@@ -21,23 +22,11 @@ pub struct BrowserWorld {
     control_api: ControlApi,
     members: HashMap<String, Member>,
     jasons: Vec<Entity<Jason>>,
-    client: WebClient,
+    client: RootWebClient,
 }
 
 impl BrowserWorld {
-    pub async fn new(mut client: WebClient) -> Self {
-        client
-            .execute(JsExecutable::new(
-                r#"
-                async () => {
-                    window.holders = new Map();
-                }
-            "#,
-                vec![],
-            ))
-            .await
-            .unwrap();
-
+    pub async fn new(mut client: RootWebClient) -> Self {
         let room_id = Uuid::new_v4().to_string();
         let control_api = ControlApi::new();
         control_api
@@ -142,7 +131,7 @@ impl BrowserWorld {
                 self.control_api.create(&path, element).await.unwrap();
             }
         }
-        let mut jason = Entity::spawn(Jason, self.client.clone()).await;
+        let mut jason = Entity::spawn(Jason, self.client.new_window().await).await;
         let room = jason.init_room().await;
         member.set_room(room).await;
 
@@ -184,12 +173,6 @@ impl World for BrowserWorld {
 
     async fn new() -> Result<Self, Infallible> {
         // TODO: unwrap
-        Ok(Self::new(WebClient::new().await.unwrap()).await)
-    }
-}
-
-impl Drop for BrowserWorld {
-    fn drop(&mut self) {
-        self.client.blocking_close();
+        Ok(Self::new(RootWebClient::new().await).await)
     }
 }
