@@ -52,11 +52,21 @@ async fn response_files(
     req: Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {
     let path = &req.uri().path()[1..];
-    let path: PathBuf = PathBuf::try_from(path).unwrap();
-
-    if !(path.starts_with("jason") || path.starts_with("index.html")) {
-        return Ok(not_found());
-    }
+    let mut splitted_path = path.split("/");
+    let first = splitted_path.next().unwrap_or_else(|| "index.html");
+    let path = match first {
+        "jason" => {
+            let mut path = PathBuf::from(&*conf::JASON_DIR_PATH);
+            for p in splitted_path {
+                path.push(p);
+            }
+            path
+        }
+        "index.html" => {
+            PathBuf::from(&*conf::INDEX_PATH)
+        }
+        _ => unreachable!(),
+    };
 
     let mime = match path.extension().unwrap().to_str().unwrap() {
         "js" => "text/javascript",

@@ -24,3 +24,11 @@ pub static FILE_SERVER_ADDR: Lazy<String> = Lazy::new(|| {
 pub static HEADLESS: Lazy<bool> = Lazy::new(|| {
     env::var("HEADLESS").map_or(true, |v| v.to_ascii_lowercase() == "true")
 });
+
+pub static JASON_DIR_PATH: Lazy<String> = Lazy::new(|| {
+    env::var("JASON_DIR_PATH").unwrap_or_else(|_| "jason/pkg".to_string())
+});
+
+pub static INDEX_PATH: Lazy<String> = Lazy::new(|| {
+    env::var("INDEX_PATH").unwrap_or_else(|_| "e2e/index.html".to_string())
+});
