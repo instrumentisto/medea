@@ -67,7 +67,7 @@ impl Entity<Room> {
     }
 
     pub async fn connections_store(&mut self) -> Entity<ConnectionStore> {
-        self.spawn_ent(JsExecutable::new(
+        self.spawn_entity(JsExecutable::new(
             r#"
                 async (room) => {
                     let store = {

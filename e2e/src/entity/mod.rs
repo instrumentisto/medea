@@ -58,7 +58,7 @@ impl<T> Entity<T> {
         self.ptr.clone()
     }
 
-    pub async fn spawn_ent<O>(&mut self, exec: JsExecutable) -> Entity<O> {
+    pub async fn spawn_entity<O>(&mut self, exec: JsExecutable) -> Entity<O> {
         let id = Uuid::new_v4().to_string();
         self.execute(exec.and_then(JsExecutable::new(
             r#"
@@ -73,10 +73,6 @@ impl<T> Entity<T> {
         .unwrap();
 
         Entity::new(id, self.client.clone())
-    }
-
-    pub async fn spawn_entity<O: Builder>(&mut self, obj: O) -> Entity<O> {
-        Entity::spawn(obj, self.client.clone()).await
     }
 
     pub async fn is_undefined(&mut self) -> bool {

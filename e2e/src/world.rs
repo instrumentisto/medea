@@ -8,7 +8,7 @@ use medea_control_api_mock::proto;
 use uuid::Uuid;
 
 use crate::{
-    browser::{JsExecutable, RootWebClient, WebClient},
+    browser::{RootWebClient, WebClient},
     control::ControlApi,
     entity::{jason::Jason, Entity},
     model::member::Member,

@@ -41,7 +41,7 @@ impl Entity<ConnectionStore> {
         remote_id: String,
     ) -> Option<Entity<Connection>> {
         let mut connection = self
-            .spawn_ent(JsExecutable::new(
+            .spawn_entity(JsExecutable::new(
                 r#"
                 async (store) => {
                     const [id] = args;
@@ -63,7 +63,7 @@ impl Entity<ConnectionStore> {
         &mut self,
         remote_id: String,
     ) -> Entity<Connection> {
-        self.spawn_ent(JsExecutable::new(
+        self.spawn_entity(JsExecutable::new(
             r#"
                 async (store) => {
                     const [remoteId] = args;
