@@ -115,7 +115,7 @@ async fn then_member_doesnt_receives_connection(
     assert!(member.connections().get(partner_id).await.is_none())
 }
 
-#[tokio::main]
+#[tokio::main(worker_threads = 1)]
 async fn main() {
     let _server = FileServer::run();
     let runner = BrowserWorld::init(&[conf::FEATURES_PATH.as_str()]);

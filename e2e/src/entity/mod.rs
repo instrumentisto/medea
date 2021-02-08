@@ -40,7 +40,9 @@ impl<T> Drop for Entity<T> {
                 .unwrap();
             tx.send(()).unwrap();
         });
-        rx.recv().unwrap();
+        tokio::task::block_in_place(move || {
+            rx.recv().unwrap();
+        });
     }
 }
 

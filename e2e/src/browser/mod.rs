@@ -65,14 +65,8 @@ impl WindowWebClient {
         }
     }
 
-    async fn switch_window(&mut self) {
-        self.client.switch_to_window(self.window.clone()).await;
-    }
-
     pub async fn execute(&mut self, exec: JsExecutable) -> Result<Json> {
-        self.switch_window().await;
-
-        self.client.execute(exec).await
+        self.client.switch_to_window_and_execute(self.window.clone(), exec).await
     }
 }
 
