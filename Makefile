@@ -476,6 +476,7 @@ endif
 	cargo run -p medea-e2e-tests
 ifeq ($(up),yes)
 	-make down
+	-make docker.down.webdriver browser=$(browser)
 endif
 
 

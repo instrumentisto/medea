@@ -1,3 +1,4 @@
+#![allow(clippy::module_name_repetitions)]
 #![allow(dead_code)]
 
 mod browser;
@@ -44,19 +45,23 @@ async fn given_member(
 
     let member = world.get_member(&id);
     if !mute_disable.is_empty() {
-        if disabled_or_muted.contains("disabled") {
-            let kind = match audio_or_video.as_str() {
-                "audio" => Some(MediaKind::Audio),
-                "video" => Some(MediaKind::Video),
-                "all" => None,
-                _ => unreachable!(),
-            };
-            if let Some(kind) = kind {
-                member.disable_media(kind, None).await;
-            } else {
-                member.disable_media(MediaKind::Audio, None).await;
-                member.disable_media(MediaKind::Video, None).await;
+        match disabled_or_muted.as_str() {
+            "disabled" => {
+                let kind = match audio_or_video.as_str() {
+                    "audio" => Some(MediaKind::Audio),
+                    "video" => Some(MediaKind::Video),
+                    "all" => None,
+                    _ => unreachable!(),
+                };
+                if let Some(kind) = kind {
+                    member.disable_media(kind, None).await;
+                } else {
+                    member.disable_media(MediaKind::Audio, None).await;
+                    member.disable_media(MediaKind::Video, None).await;
+                }
             }
+            "muted" => todo!("Muting is unimplemented atm"),
+            _ => unreachable!(),
         }
     }
 }

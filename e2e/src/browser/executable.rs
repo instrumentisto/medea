@@ -37,6 +37,7 @@ impl JsExecutable {
         }
     }
 
+    #[allow(clippy::option_if_let_else)]
     pub fn and_then(mut self, mut another: Self) -> Self {
         if let Some(e) = self.and_then {
             self.and_then = Some(Box::new(e.and_then(another)));

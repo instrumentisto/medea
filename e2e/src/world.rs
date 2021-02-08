@@ -107,23 +107,31 @@ impl BrowserWorld {
             let recv_endpoints: HashMap<_, _> = self
                 .members
                 .values()
-                .filter(|m| m.is_recv())
-                .map(|m| {
-                    let endpoint_id = format!("play-{}", member.id());
-                    (
-                        format!("{}/{}/{}", self.room_id, m.id(), endpoint_id),
-                        proto::Element::WebRtcPlayEndpoint(
-                            proto::WebRtcPlayEndpoint {
-                                id: endpoint_id,
-                                src: format!(
-                                    "local://{}/{}/publish",
-                                    self.room_id,
-                                    member.id()
-                                ),
-                                force_relay: false,
-                            },
-                        ),
-                    )
+                .filter_map(|m| {
+                    if m.is_recv() {
+                        let endpoint_id = format!("play-{}", member.id());
+                        Some((
+                            format!(
+                                "{}/{}/{}",
+                                self.room_id,
+                                m.id(),
+                                endpoint_id
+                            ),
+                            proto::Element::WebRtcPlayEndpoint(
+                                proto::WebRtcPlayEndpoint {
+                                    id: endpoint_id,
+                                    src: format!(
+                                        "local://{}/{}/publish",
+                                        self.room_id,
+                                        member.id()
+                                    ),
+                                    force_relay: false,
+                                },
+                            ),
+                        ))
+                    } else {
+                        None
+                    }
                 })
                 .collect();
             for (path, element) in recv_endpoints {
@@ -152,12 +160,16 @@ impl BrowserWorld {
         let interconnected_members: Vec<_> = self
             .members
             .values()
-            .filter(|m| {
-                m.is_joined()
+            .filter_map(|m| {
+                if m.is_joined()
                     && m.id() != member_id
                     && (m.is_recv() || m.is_send())
+                {
+                    Some(m.id().to_string())
+                } else {
+                    None
+                }
             })
-            .map(|m| m.id().to_string())
             .collect();
         let member = self.members.get_mut(member_id).unwrap();
         let connections = member.connections();

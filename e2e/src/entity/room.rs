@@ -35,16 +35,13 @@ impl Entity<Room> {
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
-        let media_source_kind = if let Some(source_kind) = source_kind {
-            match source_kind {
+        let media_source_kind =
+            source_kind.map_or("", |source_kind| match source_kind {
                 MediaSourceKind::Device => "window.rust.MediaSourceKind.DEVICE",
                 MediaSourceKind::Display => {
                     "window.rust.MediaSourceKind.DISPLAY"
                 }
-            }
-        } else {
-            ""
-        };
+            });
         let disable = match kind {
             MediaKind::Audio => "room.disable_audio()".to_string(),
             MediaKind::Video => {

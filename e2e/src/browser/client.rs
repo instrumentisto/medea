@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use fantoccini::{Client, ClientBuilder, Locator};
+use futures::lock::Mutex;
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
 use webdriver::{capabilities::Capabilities, common::WebWindow};
-use futures::lock::Mutex;
 
 use crate::conf;
 
@@ -94,13 +94,17 @@ impl Inner {
             "#,
             vec![],
         ))
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         window
     }
 
-    pub async fn switch_to_window_and_execute(&mut self, window: WebWindow, exec: JsExecutable) -> Result<Json> {
+    pub async fn switch_to_window_and_execute(
+        &mut self,
+        window: WebWindow,
+        exec: JsExecutable,
+    ) -> Result<Json> {
         self.0.switch_to_window(window).await.unwrap();
 
         Ok(self.execute(exec).await?)
@@ -180,13 +184,21 @@ impl WebClient {
         self.0.lock().await.new_window().await
     }
 
-    pub async fn switch_to_window_and_execute(&mut self, window: WebWindow, exec: JsExecutable) -> Result<Json> {
-        self.0.lock().await.switch_to_window_and_execute(window, exec).await
+    pub async fn switch_to_window_and_execute(
+        &mut self,
+        window: WebWindow,
+        exec: JsExecutable,
+    ) -> Result<Json> {
+        self.0
+            .lock()
+            .await
+            .switch_to_window_and_execute(window, exec)
+            .await
     }
 
     pub fn blocking_close(&mut self) {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut client = self.0.clone();
+        let client = self.0.clone();
         tokio::spawn(async move {
             let mut inner = client.lock().await;
             let _ = inner.0.close().await;
@@ -199,7 +211,7 @@ impl WebClient {
 
     pub fn blocking_window_close(&mut self, window: WebWindow) {
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut client = self.0.clone();
+        let client = self.0.clone();
         tokio::spawn(async move {
             let mut client = client.lock().await;
             client.close_window(window).await;
