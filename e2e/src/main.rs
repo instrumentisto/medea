@@ -3,15 +3,15 @@
 mod browser;
 mod conf;
 mod control;
-mod entity;
 mod file_server;
+mod object;
 mod world;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
 
 use self::{
-    entity::room::MediaKind,
     file_server::FileServer,
+    object::room::MediaKind,
     world::{BrowserWorld, MemberBuilder},
 };
 

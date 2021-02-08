@@ -5,7 +5,7 @@ use std::iter;
 
 use serde_json::Value as Json;
 
-use crate::entity::EntityPtr;
+use crate::object::ObjectPtr;
 
 /// Representation of the JS code which can be executed in the browser.
 ///
@@ -28,9 +28,9 @@ pub struct JsExecutable {
     /// as `args` array.
     args: Vec<Json>,
 
-    /// [`EntityPtr`] to the JS objects needed by [`JsExecutable::expression`]
+    /// [`ObjectPtr`] to the JS objects needed by [`JsExecutable::expression`]
     /// which will be provided as `objs` array.
-    objs: Vec<EntityPtr>,
+    objs: Vec<ObjectPtr>,
 
     /// [`JsExecutable`] which should be executed after this [`JsExecutable`].
     ///
@@ -68,7 +68,7 @@ impl JsExecutable {
     pub fn with_objs(
         expression: &str,
         args: Vec<Json>,
-        objs: Vec<EntityPtr>,
+        objs: Vec<ObjectPtr>,
     ) -> Self {
         Self {
             expression: expression.to_string(),

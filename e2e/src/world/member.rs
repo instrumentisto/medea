@@ -2,19 +2,19 @@ use derive_more::{Display, Error, From};
 
 use crate::{
     conf,
-    entity::{
+    object::{
         self,
         connections_store::ConnectionStore,
         room::{MediaKind, MediaSourceKind, Room},
-        Entity,
+        Object,
     },
 };
 
 /// All errors which can happen while working with [`Member`].
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
-    /// [`Room`] or [`ConnectionStore`] entity errored.
-    Entity(entity::Error),
+    /// [`Room`] or [`ConnectionStore`] object errored.
+    Object(object::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -33,7 +33,7 @@ pub struct MemberBuilder {
 
 impl MemberBuilder {
     /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
-    pub async fn build(self, room: Entity<Room>) -> Result<Member> {
+    pub async fn build(self, room: Object<Room>) -> Result<Member> {
         let connection_store = room.connections_store().await?;
         Ok(Member {
             id: self.id,
@@ -61,12 +61,12 @@ pub struct Member {
     is_joined: bool,
 
     /// Representation of the `Room` JS object.
-    room: Entity<Room>,
+    room: Object<Room>,
 
     /// Storage for the [`Connection`]s throws by this [`Member`]'s `Room`.
     ///
-    /// [`Connection`]: crate::entity::connection::Connection
-    connection_store: Entity<ConnectionStore>,
+    /// [`Connection`]: crate::object::connection::Connection
+    connection_store: Object<ConnectionStore>,
 }
 
 impl Member {
@@ -121,8 +121,8 @@ impl Member {
     /// Returns reference to the storage for the [`Connection`]s throws by this
     /// [`Member`]'s `Room`.
     ///
-    /// [`Connection`]: crate::entity::connection::Connection
-    pub fn connections(&self) -> &Entity<ConnectionStore> {
+    /// [`Connection`]: crate::object::connection::Connection
+    pub fn connections(&self) -> &Object<ConnectionStore> {
         &self.connection_store
     }
 }

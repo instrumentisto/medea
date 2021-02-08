@@ -3,13 +3,13 @@
 
 use crate::{
     browser::JsExecutable,
-    entity::{connection::Connection, Entity},
+    object::{connection::Connection, Object},
 };
 
 /// Storage for the [`Connection`]s thrown by `Room.on_new_connection` callback.
 pub struct ConnectionStore;
 
-impl Entity<ConnectionStore> {
+impl Object<ConnectionStore> {
     /// Returns [`Connection`] for the provided remote Member ID.
     ///
     /// Returns [`None`] if [`Connection`] with a provided remote Member ID is
@@ -17,9 +17,9 @@ impl Entity<ConnectionStore> {
     pub async fn get(
         &self,
         remote_id: String,
-    ) -> Result<Option<Entity<Connection>>, super::Error> {
+    ) -> Result<Option<Object<Connection>>, super::Error> {
         let connection = self
-            .spawn_entity(JsExecutable::new(
+            .spawn_object(JsExecutable::new(
                 r#"
                 async (store) => {
                     const [id] = args;
@@ -44,8 +44,8 @@ impl Entity<ConnectionStore> {
     pub async fn wait_for_connection(
         &self,
         remote_id: String,
-    ) -> Result<Entity<Connection>, super::Error> {
-        self.spawn_entity(JsExecutable::new(
+    ) -> Result<Object<Connection>, super::Error> {
+        self.spawn_object(JsExecutable::new(
             r#"
                 async (store) => {
                     const [remoteId] = args;

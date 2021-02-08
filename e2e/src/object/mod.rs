@@ -1,4 +1,4 @@
-//! Implementation of the all browser-side entities.
+//! Implementation of the all browser-side objects.
 
 pub mod connection;
 pub mod connections_store;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use crate::browser::{self, JsExecutable, WindowWebClient};
 
-/// All errors which can happen while working with entities.
+/// All errors which can happen while working with objects.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
     /// Error while interacting with browser.
@@ -26,23 +26,23 @@ pub enum Error {
 
 /// Pointer to the JS object on browser-side.
 #[derive(Clone, Debug, Display)]
-pub struct EntityPtr(String);
+pub struct ObjectPtr(String);
 
 /// Representation of some object from the browser-side.
 ///
-/// JS object on browser-side will be removed on this [`Entity`] [`Drop::drop`].
-pub struct Entity<T> {
+/// JS object on browser-side will be removed on this [`Object`] [`Drop::drop`].
+pub struct Object<T> {
     /// Pointer to the JS object on browser-side.
-    ptr: EntityPtr,
+    ptr: ObjectPtr,
 
-    /// [`WindowWebClient`] where this [`Entity`] is exists.
+    /// [`WindowWebClient`] where this [`Object`] is exists.
     client: WindowWebClient,
 
-    /// Type of [`Entity`].
-    _entity_type: PhantomData<T>,
+    /// Type of [`Object`].
+    _object_type: PhantomData<T>,
 }
 
-impl<T> Drop for Entity<T> {
+impl<T> Drop for Object<T> {
     fn drop(&mut self) {
         let ptr = self.ptr.clone();
         let client = self.client.clone();
@@ -68,25 +68,25 @@ impl<T> Drop for Entity<T> {
     }
 }
 
-impl<T> Entity<T> {
-    /// Returns [`Entity`] with a provided URI and [`WindowWebClient`].
+impl<T> Object<T> {
+    /// Returns [`Object`] with a provided URI and [`WindowWebClient`].
     pub fn new(uri: String, client: WindowWebClient) -> Self {
         Self {
-            ptr: EntityPtr(uri),
+            ptr: ObjectPtr(uri),
             client,
-            _entity_type: PhantomData::default(),
+            _object_type: PhantomData::default(),
         }
     }
 
-    /// Returns new [`Entity`] which will be created by the provided
+    /// Returns new [`Object`] which will be created by the provided
     /// [`JsExecutable`].
     ///
-    /// JS object which this [`Entity`] represents will be passed to the
+    /// JS object which this [`Object`] represents will be passed to the
     /// provided [`JsExecutable`] as lambda argument.
-    pub async fn spawn_entity<O>(
+    pub async fn spawn_object<O>(
         &self,
         exec: JsExecutable,
-    ) -> Result<Entity<O>, Error> {
+    ) -> Result<Object<O>, Error> {
         let id = Uuid::new_v4().to_string();
         self.execute(exec.and_then(JsExecutable::new(
             r#"
@@ -99,10 +99,10 @@ impl<T> Entity<T> {
         )))
         .await?;
 
-        Ok(Entity::new(id, self.client.clone()))
+        Ok(Object::new(id, self.client.clone()))
     }
 
-    /// Returns `true` if this [`Entity`] is `undefined`.
+    /// Returns `true` if this [`Object`] is `undefined`.
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         Ok(self
             .execute(JsExecutable::new(
@@ -120,13 +120,13 @@ impl<T> Entity<T> {
 
     /// Executes provided [`JsExecutable`] in the browser.
     ///
-    /// JS object which this [`Entity`] represents will be passed to the
+    /// JS object which this [`Object`] represents will be passed to the
     /// provided [`JsExecutable`] as lambda argument.
     async fn execute(&self, js: JsExecutable) -> Result<Json, Error> {
         Ok(self.client.execute(self.get_obj().and_then(js)).await?)
     }
 
-    /// Returns [`JsExecutable`] which will obtain JS object of this [`Entity`].
+    /// Returns [`JsExecutable`] which will obtain JS object of this [`Object`].
     fn get_obj(&self) -> JsExecutable {
         JsExecutable::new(
             r#"
@@ -140,12 +140,12 @@ impl<T> Entity<T> {
     }
 }
 
-impl<T: Builder> Entity<T> {
-    /// Spawns provided `obj` [`Entity`] in the provided [`WindowWebClient`].
+impl<T: Builder> Object<T> {
+    /// Spawns provided `obj` [`Object`] in the provided [`WindowWebClient`].
     pub async fn spawn(
         obj: T,
         client: WindowWebClient,
-    ) -> Result<Entity<T>, Error> {
+    ) -> Result<Object<T>, Error> {
         let id = Uuid::new_v4().to_string();
         client
             .execute(obj.build().and_then(JsExecutable::new(
@@ -159,11 +159,11 @@ impl<T: Builder> Entity<T> {
             )))
             .await?;
 
-        Ok(Entity::new(id, client))
+        Ok(Object::new(id, client))
     }
 }
 
-/// Abstraction which will be used for JS object creating for the [`Entity`].
+/// Abstraction which will be used for JS object creating for the [`Object`].
 pub trait Builder {
     /// Returns [`JsExecutable`] with which JS object for this object will be
     /// created.

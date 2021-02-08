@@ -3,7 +3,7 @@
 
 use crate::{
     browser::JsExecutable,
-    entity::{room::Room, Builder, Entity},
+    object::{room::Room, Builder, Object},
 };
 
 /// Representation of the `Jason` JS object.
@@ -23,10 +23,10 @@ impl Builder for Jason {
     }
 }
 
-impl Entity<Jason> {
+impl Object<Jason> {
     /// Returns new [`Room`] initiated in this [`Jason`].
-    pub async fn init_room(&self) -> Result<Entity<Room>, super::Error> {
-        self.spawn_entity(JsExecutable::new(
+    pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
+        self.spawn_object(JsExecutable::new(
             r#"
                 async (jason) => {
                     let room = await jason.init_room();

@@ -3,7 +3,7 @@
 
 use crate::{
     browser::JsExecutable,
-    entity::{connections_store::ConnectionStore, Entity},
+    object::{connections_store::ConnectionStore, Object},
 };
 
 /// Representation of the `Room` JS object.
@@ -36,7 +36,7 @@ impl MediaSourceKind {
     }
 }
 
-impl Entity<Room> {
+impl Object<Room> {
     /// Joins [`Room`] with a provided URI.
     pub async fn join(&self, uri: String) -> Result<(), super::Error> {
         self.execute(JsExecutable::new(
@@ -91,8 +91,8 @@ impl Entity<Room> {
     /// Returns [`ConnectionStore`] for this [`Room`].
     pub async fn connections_store(
         &self,
-    ) -> Result<Entity<ConnectionStore>, super::Error> {
-        self.spawn_entity(JsExecutable::new(
+    ) -> Result<Object<ConnectionStore>, super::Error> {
+        self.spawn_object(JsExecutable::new(
             r#"
                 async (room) => {
                     let store = {

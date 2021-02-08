@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     browser::{self, RootWebClient},
     control::{self, ControlApi},
-    entity::{self, jason::Jason, Entity},
+    object::{self, jason::Jason, Object},
 };
 
 use self::member::Member;
@@ -24,7 +24,7 @@ pub use self::member::MemberBuilder;
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
     Control(control::Error),
-    Entity(entity::Error),
+    Object(object::Error),
     Member(member::Error),
     Browser(browser::Error),
     MemberNotFound(#[error(not(source))] String),
@@ -45,7 +45,7 @@ pub struct BrowserWorld {
     members: HashMap<String, Member>,
 
     /// All [`Jason`]s created in this world.
-    jasons: Vec<Entity<Jason>>,
+    jasons: Vec<Object<Jason>>,
 
     /// [WebDriver] client where all objects from this world will be created.
     ///
@@ -173,7 +173,7 @@ impl BrowserWorld {
             }
         }
         let jason =
-            Entity::spawn(Jason, self.client.new_window().await).await?;
+            Object::spawn(Jason, self.client.new_window().await).await?;
         let room = jason.init_room().await?;
         let member = builder.build(room).await?;
 
