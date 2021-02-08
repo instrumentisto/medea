@@ -12,7 +12,7 @@ use crate::{
     browser::{self, RootWebClient},
     control::{self, ControlApi},
     entity::{self, jason::Jason, Entity},
-    model::member::{self, Member},
+    model::member::{self, Member, MemberBuilder},
 };
 
 #[derive(Debug, Display, Error, From)]
@@ -59,9 +59,12 @@ impl BrowserWorld {
         })
     }
 
-    pub async fn create_member(&mut self, mut member: Member) -> Result<()> {
+    pub async fn create_member(
+        &mut self,
+        builder: MemberBuilder,
+    ) -> Result<()> {
         let mut pipeline = HashMap::new();
-        if member.is_send() {
+        if builder.is_send {
             pipeline.insert(
                 "publish".to_string(),
                 proto::Endpoint::WebRtcPublishEndpoint(
@@ -75,7 +78,7 @@ impl BrowserWorld {
                 ),
             );
         }
-        if member.is_recv() {
+        if builder.is_recv {
             self.members.values().filter(|m| m.is_send()).for_each(|m| {
                 let endpoint_id = format!("play-{}", m.id());
                 pipeline.insert(
@@ -97,9 +100,9 @@ impl BrowserWorld {
 
         self.control_api
             .create(
-                &format!("{}/{}", self.room_id, member.id()),
+                &format!("{}/{}", self.room_id, builder.id),
                 proto::Element::Member(proto::Member {
-                    id: member.id().to_string(),
+                    id: builder.id.clone(),
                     pipeline,
                     credentials: Some(proto::Credentials::Plain(
                         "test".to_string(),
@@ -113,13 +116,13 @@ impl BrowserWorld {
             )
             .await?;
 
-        if member.is_send() {
+        if builder.is_send {
             let recv_endpoints: HashMap<_, _> = self
                 .members
                 .values()
                 .filter_map(|m| {
                     if m.is_recv() {
-                        let endpoint_id = format!("play-{}", member.id());
+                        let endpoint_id = format!("play-{}", builder.id);
                         Some((
                             format!(
                                 "{}/{}/{}",
@@ -132,8 +135,7 @@ impl BrowserWorld {
                                     id: endpoint_id,
                                     src: format!(
                                         "local://{}/{}/publish",
-                                        self.room_id,
-                                        member.id()
+                                        self.room_id, builder.id
                                     ),
                                     force_relay: false,
                                 },
@@ -151,7 +153,7 @@ impl BrowserWorld {
         let jason =
             Entity::spawn(Jason, self.client.new_window().await).await?;
         let room = jason.init_room().await?;
-        member.set_room(room).await?;
+        let member = builder.build(room).await?;
 
         self.members.insert(member.id().to_string(), member);
         self.jasons.push(jason);

@@ -10,7 +10,7 @@ mod world;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
 
-use crate::{entity::room::MediaKind, model::member::Member};
+use crate::{entity::room::MediaKind, model::member::MemberBuilder};
 
 use self::{file_server::FileServer, world::BrowserWorld};
 
@@ -35,7 +35,11 @@ async fn given_member(
         )
     };
 
-    let member = Member::new(id.clone(), is_send, is_recv);
+    let member = MemberBuilder {
+        id: id.clone(),
+        is_send,
+        is_recv,
+    };
     world.create_member(member).await.unwrap();
     if is_joined {
         world.join_room(&id).await.unwrap();

@@ -17,27 +17,36 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+pub struct MemberBuilder {
+    pub id: String,
+    pub is_send: bool,
+    pub is_recv: bool,
+}
+
+impl MemberBuilder {
+    pub async fn build(self, room: Entity<Room>) -> Result<Member> {
+        let connection_store = room.connections_store().await?;
+        Ok(Member {
+            id: self.id,
+            is_send: self.is_send,
+            is_recv: self.is_recv,
+            is_joined: false,
+            room,
+            connection_store,
+        })
+    }
+}
+
 pub struct Member {
     id: String,
     is_send: bool,
     is_recv: bool,
     is_joined: bool,
-    room: Option<Entity<Room>>,
-    connection_store: Option<Entity<ConnectionStore>>,
+    room: Entity<Room>,
+    connection_store: Entity<ConnectionStore>,
 }
 
 impl Member {
-    pub fn new(id: String, is_send: bool, is_recv: bool) -> Self {
-        Self {
-            id,
-            is_send,
-            is_recv,
-            is_joined: false,
-            room: None,
-            connection_store: None,
-        }
-    }
-
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -54,16 +63,8 @@ impl Member {
         self.is_joined
     }
 
-    pub async fn set_room(&mut self, room: Entity<Room>) -> Result<()> {
-        self.connection_store = Some(room.connections_store().await?);
-        self.room = Some(room);
-        Ok(())
-    }
-
     pub async fn join_room(&mut self, room_id: &str) -> Result<()> {
         self.room
-            .as_ref()
-            .unwrap()
             .join(format!(
                 "{}/{}/{}?token=test",
                 *conf::CLIENT_API_ADDR,
@@ -80,15 +81,11 @@ impl Member {
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<()> {
-        self.room
-            .as_ref()
-            .unwrap()
-            .disable_media(kind, source_kind)
-            .await?;
+        self.room.disable_media(kind, source_kind).await?;
         Ok(())
     }
 
     pub fn connections(&self) -> &Entity<ConnectionStore> {
-        self.connection_store.as_ref().unwrap()
+        &self.connection_store
     }
 }
