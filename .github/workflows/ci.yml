@@ -145,6 +145,37 @@ jobs:
       - run: make test.unit crate=${{ matrix.crate }}
         if: ${{ matrix.if && matrix.crate != 'medea-jason' }}
 
+  test-e2e:
+    name: E2E tests
+    if: ${{ github.ref == 'refs/heads/master'
+      || startsWith(github.ref, 'refs/tags/medea-')
+      || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ matrix.if
+          && !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - name: Parse wasm-bindgen-cli version from Cargo.lock
+        id: wasm-cli
+        run: echo ::set-output
+          name=VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*'
+          | grep -o '[0-9\.]*')
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: wasm-bindgen-cli
+          version: ${{ steps.wasm-cli.outputs.VERSION }}
+          use-tool-cache: true
+      - name: Chrome
+        run: make test.e2e up=yes browser=chrome
+      - name: Firefox
+        run: make test.e2e up=yes browser=firefox
+
   test-integration:
     name: Integration tests
     if: ${{ github.ref == 'refs/heads/master'
@@ -338,7 +369,7 @@ jobs:
 
   release-github:
     name: Release on GitHub
-    needs: ['clippy', 'rustfmt', 'rustdoc', 'test-integration', 'test-unit']
+    needs: ['clippy', 'rustfmt', 'rustdoc', 'test-e2e', 'test-integration', 'test-unit']
     if: ${{ startsWith(github.ref, 'refs/tags/medea-') }}
     runs-on: ubuntu-latest
     steps:

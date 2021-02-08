@@ -127,7 +127,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	kill -9 $(pidof medea-control-api-mock)
+	killall medea-control-api-mock
 
 
 down.coturn: docker.down.coturn
@@ -145,6 +145,7 @@ down.dev:
 	@make docker.down.medea dockerized=no
 	@make docker.down.medea dockerized=yes
 	@make docker.down.coturn
+	@make down.control
 
 
 down.medea: docker.down.medea
@@ -157,7 +158,12 @@ down.medea: docker.down.medea
 
 up.control:
 	make wait.port port=6565
-	cargo run -p medea-control-api-mock
+ifeq ($(log-to-file),yes)
+	@rm -f /tmp/medea-control-api-mock.log
+endif
+	cargo run -p medea-control-api-mock \
+		$(if $(call eq,$(log-to-file),yes),> /tmp/medea-control-api-mock.log,) \
+		$(if $(call eq,$(background),yes),&,)
 
 
 up.coturn: docker.up.coturn
@@ -449,6 +455,25 @@ ifeq ($(up),yes)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test integration
+ifeq ($(up),yes)
+	-make down
+endif
+
+test.e2e:
+ifeq ($(up),yes)
+	make docker.up.coturn background=yes
+	env $(test-integration-env) \
+	make docker.up.medea debug=$(debug) background=yes log=$(log) \
+	                     dockerized=$(dockerized) \
+	                     tag=$(tag) \
+	                     log-to-file=$(log-to-file)
+	make up.control background=yes log-to-file=$(log-to-file)
+	sleep $(if $(call eq,$(wait),),5,$(wait))
+endif
+	make build.jason
+	@make docker.up.webdriver browser=$(browser)
+	sleep 5
+	cargo run -p medea-e2e-tests
 ifeq ($(up),yes)
 	-make down
 endif
