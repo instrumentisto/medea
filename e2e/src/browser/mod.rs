@@ -55,7 +55,7 @@ impl Drop for WindowWebClient {
 }
 
 impl WindowWebClient {
-    async fn new(mut client: WebClient) -> Self {
+    async fn new(client: WebClient) -> Self {
         let window = client.new_window().await;
 
         Self {
@@ -65,7 +65,7 @@ impl WindowWebClient {
         }
     }
 
-    pub async fn execute(&mut self, exec: JsExecutable) -> Result<Json> {
+    pub async fn execute(&self, exec: JsExecutable) -> Result<Json> {
         self.client
             .switch_to_window_and_execute(self.window.clone(), exec)
             .await
@@ -79,7 +79,7 @@ impl RootWebClient {
         Self(WebClient::new().await.unwrap())
     }
 
-    pub async fn new_window(&mut self) -> WindowWebClient {
+    pub async fn new_window(&self) -> WindowWebClient {
         WindowWebClient::new(self.0.clone()).await
     }
 }

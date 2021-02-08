@@ -9,7 +9,6 @@ pub struct JsExecutable {
     args: Vec<Json>,
     objs: Vec<EntityPtr>,
     and_then: Option<Box<JsExecutable>>,
-    depth: u32,
 }
 
 impl JsExecutable {
@@ -19,10 +18,10 @@ impl JsExecutable {
             args,
             objs: Vec::new(),
             and_then: None,
-            depth: 0,
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_objs(
         expression: &str,
         args: Vec<Json>,
@@ -33,17 +32,15 @@ impl JsExecutable {
             args,
             objs,
             and_then: None,
-            depth: 0,
         }
     }
 
     #[allow(clippy::option_if_let_else)]
-    pub fn and_then(mut self, mut another: Self) -> Self {
+    pub fn and_then(mut self, another: Self) -> Self {
         if let Some(e) = self.and_then {
             self.and_then = Some(Box::new(e.and_then(another)));
             self
         } else {
-            another.depth = self.depth + 1;
             self.and_then = Some(Box::new(another));
             self
         }
@@ -81,11 +78,11 @@ impl JsExecutable {
     fn step_js(&self, i: usize) -> String {
         format!(
             r#"
-            args = arguments[{depth}];
+            args = arguments[{i}];
             {objs_js}
             lastResult = await ({expr})(lastResult);
         "#,
-            depth = i,
+            i = i,
             objs_js = self.objects_injection_js(),
             expr = self.expression
         )

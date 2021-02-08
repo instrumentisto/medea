@@ -6,11 +6,8 @@ use crate::{
 pub struct ConnectionStore;
 
 impl Entity<ConnectionStore> {
-    pub async fn get(
-        &mut self,
-        remote_id: String,
-    ) -> Option<Entity<Connection>> {
-        let mut connection = self
+    pub async fn get(&self, remote_id: String) -> Option<Entity<Connection>> {
+        let connection = self
             .spawn_entity(JsExecutable::new(
                 r#"
                 async (store) => {
@@ -30,7 +27,7 @@ impl Entity<ConnectionStore> {
     }
 
     pub async fn wait_for_connection(
-        &mut self,
+        &self,
         remote_id: String,
     ) -> Entity<Connection> {
         self.spawn_entity(JsExecutable::new(

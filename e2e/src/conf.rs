@@ -1,5 +1,6 @@
-use once_cell::sync::Lazy;
 use std::env;
+
+use once_cell::sync::Lazy;
 
 pub static WEBDRIVER_ADDR: Lazy<String> = Lazy::new(|| {
     env::var("WEBDRIVER_ADDR")

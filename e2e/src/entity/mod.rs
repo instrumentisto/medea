@@ -5,10 +5,11 @@ pub mod connections_store;
 pub mod jason;
 pub mod room;
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::mpsc};
 
 use derive_more::Display;
 use serde_json::Value as Json;
+use tokio::task;
 use uuid::Uuid;
 
 use crate::browser::{self, JsExecutable, WindowWebClient};
@@ -23,8 +24,8 @@ pub struct Entity<T> {
 impl<T> Drop for Entity<T> {
     fn drop(&mut self) {
         let ptr = self.ptr.clone();
-        let mut client = self.client.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
+        let client = self.client.clone();
+        let (tx, rx) = mpsc::channel();
         tokio::spawn(async move {
             client
                 .execute(JsExecutable::new(
@@ -40,7 +41,7 @@ impl<T> Drop for Entity<T> {
                 .unwrap();
             tx.send(()).unwrap();
         });
-        tokio::task::block_in_place(move || {
+        task::block_in_place(move || {
             rx.recv().unwrap();
         });
     }
@@ -56,11 +57,7 @@ impl<T> Entity<T> {
         }
     }
 
-    pub fn ptr(&self) -> EntityPtr {
-        self.ptr.clone()
-    }
-
-    pub async fn spawn_entity<O>(&mut self, exec: JsExecutable) -> Entity<O> {
+    pub async fn spawn_entity<O>(&self, exec: JsExecutable) -> Entity<O> {
         let id = Uuid::new_v4().to_string();
         self.execute(exec.and_then(JsExecutable::new(
             r#"
@@ -77,7 +74,7 @@ impl<T> Entity<T> {
         Entity::new(id, self.client.clone())
     }
 
-    pub async fn is_undefined(&mut self) -> bool {
+    pub async fn is_undefined(&self) -> bool {
         self.execute(JsExecutable::new(
             r#"
                 async (o) => {
@@ -93,10 +90,7 @@ impl<T> Entity<T> {
     }
 
     /// Executes provided [`JsExecutable`] in the browser.
-    async fn execute(
-        &mut self,
-        js: JsExecutable,
-    ) -> Result<Json, browser::Error> {
+    async fn execute(&self, js: JsExecutable) -> Result<Json, browser::Error> {
         self.client.execute(self.get_obj().and_then(js)).await
     }
 
@@ -115,7 +109,7 @@ impl<T> Entity<T> {
 }
 
 impl<T: Builder> Entity<T> {
-    pub async fn spawn(obj: T, mut client: WindowWebClient) -> Entity<T> {
+    pub async fn spawn(obj: T, client: WindowWebClient) -> Entity<T> {
         let id = Uuid::new_v4().to_string();
         client
             .execute(obj.build().and_then(JsExecutable::new(

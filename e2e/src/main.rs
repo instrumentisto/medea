@@ -1,5 +1,4 @@
 #![allow(clippy::module_name_repetitions)]
-#![allow(dead_code)]
 
 mod browser;
 mod conf;

@@ -1,9 +1,10 @@
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
 use fantoccini::{Client, ClientBuilder, Locator};
 use futures::lock::Mutex;
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
+use tokio::task;
 use webdriver::{capabilities::Capabilities, common::WebWindow};
 
 use crate::conf;
@@ -135,7 +136,7 @@ impl WebClient {
     /// Returns `moz:firefoxOptions` for the Firefox browser based on
     /// [`TestRunner`] configuration.
     fn get_firefox_caps() -> serde_json::Value {
-        let mut args = CHROME_ARGS.to_vec();
+        let mut args = FIREFOX_ARGS.to_vec();
         if *conf::HEADLESS {
             args.push("--headless");
         }
@@ -176,16 +177,12 @@ impl WebClient {
         capabilities
     }
 
-    pub async fn execute(&mut self, executable: JsExecutable) -> Result<Json> {
-        self.0.lock().await.execute(executable).await
-    }
-
-    pub async fn new_window(&mut self) -> WebWindow {
+    pub async fn new_window(&self) -> WebWindow {
         self.0.lock().await.new_window().await
     }
 
     pub async fn switch_to_window_and_execute(
-        &mut self,
+        &self,
         window: WebWindow,
         exec: JsExecutable,
     ) -> Result<Json> {
@@ -196,28 +193,28 @@ impl WebClient {
             .await
     }
 
-    pub fn blocking_close(&mut self) {
-        let (tx, rx) = std::sync::mpsc::channel();
+    pub fn blocking_close(&self) {
+        let (tx, rx) = mpsc::channel();
         let client = self.0.clone();
         tokio::spawn(async move {
             let mut inner = client.lock().await;
             let _ = inner.0.close().await;
             tx.send(()).unwrap();
         });
-        tokio::task::block_in_place(move || {
+        task::block_in_place(move || {
             rx.recv().unwrap();
         });
     }
 
-    pub fn blocking_window_close(&mut self, window: WebWindow) {
-        let (tx, rx) = std::sync::mpsc::channel();
+    pub fn blocking_window_close(&self, window: WebWindow) {
+        let (tx, rx) = mpsc::channel();
         let client = self.0.clone();
         tokio::spawn(async move {
             let mut client = client.lock().await;
             client.close_window(window).await;
             tx.send(()).unwrap();
         });
-        tokio::task::block_in_place(move || {
+        task::block_in_place(move || {
             rx.recv().unwrap();
         });
     }

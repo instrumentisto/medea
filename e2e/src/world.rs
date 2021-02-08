@@ -138,8 +138,7 @@ impl BrowserWorld {
                 self.control_api.create(&path, element).await.unwrap();
             }
         }
-        let mut jason =
-            Entity::spawn(Jason, self.client.new_window().await).await;
+        let jason = Entity::spawn(Jason, self.client.new_window().await).await;
         let room = jason.init_room().await;
         member.set_room(room).await;
 

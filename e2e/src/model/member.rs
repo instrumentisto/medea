@@ -44,14 +44,14 @@ impl Member {
         self.is_joined
     }
 
-    pub async fn set_room(&mut self, mut room: Entity<Room>) {
+    pub async fn set_room(&mut self, room: Entity<Room>) {
         self.connection_store = Some(room.connections_store().await);
         self.room = Some(room);
     }
 
     pub async fn join_room(&mut self, room_id: &str) {
         self.room
-            .as_mut()
+            .as_ref()
             .unwrap()
             .join(format!(
                 "{}/{}/{}?token=test",
@@ -64,18 +64,18 @@ impl Member {
     }
 
     pub async fn disable_media(
-        &mut self,
+        &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
         self.room
-            .as_mut()
+            .as_ref()
             .unwrap()
             .disable_media(kind, source_kind)
             .await;
     }
 
-    pub fn connections(&mut self) -> &mut Entity<ConnectionStore> {
-        self.connection_store.as_mut().unwrap()
+    pub fn connections(&self) -> &Entity<ConnectionStore> {
+        self.connection_store.as_ref().unwrap()
     }
 }

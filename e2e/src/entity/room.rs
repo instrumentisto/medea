@@ -10,13 +10,27 @@ pub enum MediaKind {
     Video,
 }
 
+#[allow(dead_code)]
 pub enum MediaSourceKind {
     Device,
     Display,
 }
 
+impl MediaSourceKind {
+    fn as_js(&self) -> String {
+        match self {
+            MediaSourceKind::Device => {
+                "window.rust.MediaSourceKind.DEVICE".to_string()
+            }
+            MediaSourceKind::Display => {
+                "window.rust.MediaSourceKind.DISPLAY".to_string()
+            }
+        }
+    }
+}
+
 impl Entity<Room> {
-    pub async fn join(&mut self, uri: String) {
+    pub async fn join(&self, uri: String) {
         self.execute(JsExecutable::new(
             r#"
                 async (room) => {
@@ -31,17 +45,13 @@ impl Entity<Room> {
     }
 
     pub async fn disable_media(
-        &mut self,
+        &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) {
-        let media_source_kind =
-            source_kind.map_or("", |source_kind| match source_kind {
-                MediaSourceKind::Device => "window.rust.MediaSourceKind.DEVICE",
-                MediaSourceKind::Display => {
-                    "window.rust.MediaSourceKind.DISPLAY"
-                }
-            });
+        let media_source_kind = source_kind
+            .as_ref()
+            .map_or_else(|| String::new(), MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.disable_audio()".to_string(),
             MediaKind::Video => {
@@ -63,7 +73,7 @@ impl Entity<Room> {
         .unwrap();
     }
 
-    pub async fn connections_store(&mut self) -> Entity<ConnectionStore> {
+    pub async fn connections_store(&self) -> Entity<ConnectionStore> {
         self.spawn_entity(JsExecutable::new(
             r#"
                 async (room) => {
