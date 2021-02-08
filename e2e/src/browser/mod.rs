@@ -1,4 +1,4 @@
-//! Implementation of the object and methods for interracting with browser
+//! Implementation of the object and methods for interacting with browser
 //! through [WebDriver] protocol.
 //!
 //! [WebDriver]: https://www.w3.org/TR/webdriver/
@@ -17,6 +17,7 @@ use webdriver::common::WebWindow;
 
 use self::client::WebClient;
 
+#[doc(inline)]
 pub use self::executable::JsExecutable;
 
 /// All errors which can happen while working with browser.

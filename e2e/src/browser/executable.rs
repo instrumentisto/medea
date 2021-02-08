@@ -8,6 +8,18 @@ use serde_json::Value as Json;
 use crate::entity::EntityPtr;
 
 /// Representation of the JS code which can be executed in the browser.
+///
+/// Example of JS expression:
+///
+/// ```js
+/// async (lastResult) => {
+///     const [room] = objs;
+///     const [id] = args;
+///     // ...
+///
+///     return "foobar";
+/// }
+/// ```
 pub struct JsExecutable {
     /// Actual JS code to execute.
     expression: String,
@@ -29,6 +41,18 @@ pub struct JsExecutable {
 
 impl JsExecutable {
     /// Returns new [`JsExecutable`] with a provided JS code and arguments.
+    ///
+    /// Example of JS expression:
+    ///
+    /// ```js
+    /// async (lastResult) => {
+    ///     const [room] = objs;
+    ///     const [id] = args;
+    ///     // ...
+    ///
+    ///     return "foobar";
+    /// }
+    /// ```
     pub fn new(expression: &str, args: Vec<Json>) -> Self {
         Self {
             expression: expression.to_string(),

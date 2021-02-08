@@ -10,8 +10,10 @@ use crate::{
     },
 };
 
+/// All errors which can happen while working with [`Member`].
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
+    /// [`Room`] or [`ConnectionStore`] entity errored.
     Entity(entity::Error),
 }
 

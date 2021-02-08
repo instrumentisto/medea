@@ -14,9 +14,13 @@ use uuid::Uuid;
 
 use crate::browser::{self, JsExecutable, WindowWebClient};
 
+/// All errors which can happen while working with entities.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
+    /// Error while interacting with browser.
     Browser(browser::Error),
+
+    /// Failed JS object type casting.
     TypeCast,
 }
 
@@ -76,6 +80,9 @@ impl<T> Entity<T> {
 
     /// Returns new [`Entity`] which will be created by the provided
     /// [`JsExecutable`].
+    ///
+    /// JS object which this [`Entity`] represents will be passed to the
+    /// provided [`JsExecutable`] as lambda argument.
     pub async fn spawn_entity<O>(
         &self,
         exec: JsExecutable,
@@ -112,6 +119,9 @@ impl<T> Entity<T> {
     }
 
     /// Executes provided [`JsExecutable`] in the browser.
+    ///
+    /// JS object which this [`Entity`] represents will be passed to the
+    /// provided [`JsExecutable`] as lambda argument.
     async fn execute(&self, js: JsExecutable) -> Result<Json, Error> {
         Ok(self.client.execute(self.get_obj().and_then(js)).await?)
     }

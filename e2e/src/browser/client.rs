@@ -1,3 +1,7 @@
+//! Implementation of client for the [WebDriver].
+//!
+//! [WebDriver]: https://www.w3.org/TR/webdriver/
+
 use std::sync::{mpsc, Arc};
 
 use fantoccini::{Client, ClientBuilder, Locator};
@@ -11,6 +15,7 @@ use crate::conf;
 
 use super::{executable::JsExecutable, Error, Result};
 
+/// Arguments for Chrome browser.
 const CHROME_ARGS: &[&str] = &[
     "--use-fake-device-for-media-stream",
     "--use-fake-ui-for-media-stream",
@@ -18,6 +23,8 @@ const CHROME_ARGS: &[&str] = &[
     "--disable-dev-shm-usage",
     "--no-sandbox",
 ];
+
+/// Arguments for Firefox browser.
 const FIREFOX_ARGS: &[&str] = &[];
 
 /// Result which will be returned from the all JS code executed in browser.
@@ -40,12 +47,16 @@ impl From<JsResult> for Result<Json> {
     }
 }
 
-/// Client for interacting with browser through WebDriver.
+/// Client for interacting with browser through [WebDriver].
+///
+/// [WebDriver]: https://www.w3.org/TR/webdriver/
 #[derive(Clone, Debug)]
 pub struct WebClient(Arc<Mutex<Inner>>);
 
 impl WebClient {
-    /// Returns new [`WebClient`] connected to the WebDriver
+    /// Returns new [`WebClient`] connected to the [WebDriver].
+    ///
+    /// [WebDriver]: https://www.w3.org/TR/webdriver/
     pub async fn new() -> Result<Self> {
         Ok(Self(Arc::new(Mutex::new(Inner::new().await?))))
     }
@@ -77,7 +88,7 @@ impl WebClient {
         let client = self.0.clone();
         tokio::spawn(async move {
             let mut inner = client.lock().await;
-            let _ = inner.0.close().await;
+            inner.0.close().await.map_err(|e| dbg!("{:?}", e)).unwrap();
             tx.send(()).unwrap();
         });
         task::block_in_place(move || {
