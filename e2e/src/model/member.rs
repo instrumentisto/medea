@@ -1,11 +1,21 @@
+use derive_more::{Display, Error, From};
+
 use crate::{
     conf,
     entity::{
+        self,
         connections_store::ConnectionStore,
         room::{MediaKind, MediaSourceKind, Room},
         Entity,
     },
 };
+
+#[derive(Debug, Display, Error, From)]
+pub enum Error {
+    Entity(entity::Error),
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 pub struct Member {
     id: String,
@@ -44,12 +54,13 @@ impl Member {
         self.is_joined
     }
 
-    pub async fn set_room(&mut self, room: Entity<Room>) {
-        self.connection_store = Some(room.connections_store().await);
+    pub async fn set_room(&mut self, room: Entity<Room>) -> Result<()> {
+        self.connection_store = Some(room.connections_store().await?);
         self.room = Some(room);
+        Ok(())
     }
 
-    pub async fn join_room(&mut self, room_id: &str) {
+    pub async fn join_room(&mut self, room_id: &str) -> Result<()> {
         self.room
             .as_ref()
             .unwrap()
@@ -59,20 +70,22 @@ impl Member {
                 room_id,
                 self.id
             ))
-            .await;
+            .await?;
         self.is_joined = true;
+        Ok(())
     }
 
     pub async fn disable_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) {
+    ) -> Result<()> {
         self.room
             .as_ref()
             .unwrap()
             .disable_media(kind, source_kind)
-            .await;
+            .await?;
+        Ok(())
     }
 
     pub fn connections(&self) -> &Entity<ConnectionStore> {

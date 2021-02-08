@@ -20,7 +20,7 @@ impl Builder for Jason {
 }
 
 impl Entity<Jason> {
-    pub async fn init_room(&self) -> Entity<Room> {
+    pub async fn init_room(&self) -> Result<Entity<Room>, super::Error> {
         self.spawn_entity(JsExecutable::new(
             r#"
                 async (jason) => {

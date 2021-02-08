@@ -75,17 +75,16 @@ impl Inner {
         );
         let res = self.0.execute_async(&js, args).await?;
 
-        serde_json::from_value::<JsResult>(res).unwrap().into()
+        serde_json::from_value::<JsResult>(res)?.into()
     }
 
-    pub async fn new_window(&mut self) -> WebWindow {
-        let window = WebWindow(self.0.new_window(true).await.unwrap().handle);
-        self.0.switch_to_window(window.clone()).await.unwrap();
+    pub async fn new_window(&mut self) -> Result<WebWindow> {
+        let window = WebWindow(self.0.new_window(true).await?.handle);
+        self.0.switch_to_window(window.clone()).await?;
         self.0
             .goto(&format!("http://{}/index.html", *conf::FILE_SERVER_ADDR))
-            .await
-            .unwrap();
-        self.0.wait_for_find(Locator::Id("loaded")).await.unwrap();
+            .await?;
+        self.0.wait_for_find(Locator::Id("loaded")).await?;
 
         self.execute(JsExecutable::new(
             r#"
@@ -95,10 +94,9 @@ impl Inner {
             "#,
             vec![],
         ))
-        .await
-        .unwrap();
+        .await?;
 
-        window
+        Ok(window)
     }
 
     pub async fn switch_to_window_and_execute(
@@ -106,7 +104,7 @@ impl Inner {
         window: WebWindow,
         exec: JsExecutable,
     ) -> Result<Json> {
-        self.0.switch_to_window(window).await.unwrap();
+        self.0.switch_to_window(window).await?;
 
         Ok(self.execute(exec).await?)
     }
@@ -177,7 +175,7 @@ impl WebClient {
         capabilities
     }
 
-    pub async fn new_window(&self) -> WebWindow {
+    pub async fn new_window(&self) -> Result<WebWindow> {
         self.0.lock().await.new_window().await
     }
 

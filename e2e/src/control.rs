@@ -1,6 +1,6 @@
 //! Implementation of the object for interacting with a Medea Control API.
 
-use derive_more::From;
+use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
     api::{Response, SingleGetResponse},
     proto::{CreateResponse, Element},
@@ -13,7 +13,7 @@ fn get_url(path: &str) -> String {
     format!("{}/{}", *conf::CONTROL_API_ADDR, path)
 }
 
-#[derive(Debug, From)]
+#[derive(Debug, Display, Error, From)]
 pub enum Error {
     Reqwest(reqwest::Error),
 }

@@ -1,18 +1,30 @@
 //! Implementation of world for the tests.
 
-use std::{collections::HashMap, convert::Infallible};
+use std::collections::HashMap;
 
 use async_trait::async_trait;
 use cucumber_rust::{World, WorldInit};
+use derive_more::{Display, Error, From};
 use medea_control_api_mock::proto;
 use uuid::Uuid;
 
 use crate::{
-    browser::RootWebClient,
-    control::ControlApi,
-    entity::{jason::Jason, Entity},
-    model::member::Member,
+    browser::{self, RootWebClient},
+    control::{self, ControlApi},
+    entity::{self, jason::Jason, Entity},
+    model::member::{self, Member},
 };
+
+#[derive(Debug, Display, Error, From)]
+pub enum Error {
+    Control(control::Error),
+    Entity(entity::Error),
+    Member(member::Error),
+    Browser(browser::Error),
+    MemberNotFound(#[error(not(source))] String),
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 /// World which will be used by all E2E tests.
 #[derive(WorldInit)]
@@ -25,7 +37,7 @@ pub struct BrowserWorld {
 }
 
 impl BrowserWorld {
-    pub async fn new(client: RootWebClient) -> Self {
+    pub async fn new(client: RootWebClient) -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
         let control_api = ControlApi::new();
         control_api
@@ -36,19 +48,18 @@ impl BrowserWorld {
                     pipeline: HashMap::new(),
                 }),
             )
-            .await
-            .unwrap();
+            .await?;
 
-        Self {
+        Ok(Self {
             room_id,
             control_api,
             client,
             members: HashMap::new(),
             jasons: Vec::new(),
-        }
+        })
     }
 
-    pub async fn create_member(&mut self, mut member: Member) {
+    pub async fn create_member(&mut self, mut member: Member) -> Result<()> {
         let mut pipeline = HashMap::new();
         if member.is_send() {
             pipeline.insert(
@@ -100,8 +111,7 @@ impl BrowserWorld {
                     ping_interval: None,
                 }),
             )
-            .await
-            .unwrap();
+            .await?;
 
         if member.is_send() {
             let recv_endpoints: HashMap<_, _> = self
@@ -135,27 +145,37 @@ impl BrowserWorld {
                 })
                 .collect();
             for (path, element) in recv_endpoints {
-                self.control_api.create(&path, element).await.unwrap();
+                self.control_api.create(&path, element).await?;
             }
         }
-        let jason = Entity::spawn(Jason, self.client.new_window().await).await;
-        let room = jason.init_room().await;
-        member.set_room(room).await;
+        let jason =
+            Entity::spawn(Jason, self.client.new_window().await).await?;
+        let room = jason.init_room().await?;
+        member.set_room(room).await?;
 
         self.members.insert(member.id().to_string(), member);
         self.jasons.push(jason);
+
+        Ok(())
     }
 
-    pub fn get_member(&mut self, member_id: &str) -> &mut Member {
-        self.members.get_mut(member_id).unwrap()
+    pub fn get_member(&self, member_id: &str) -> Option<&Member> {
+        self.members.get(member_id)
     }
 
-    pub async fn join_room(&mut self, member_id: &str) {
-        let member = self.members.get_mut(member_id).unwrap();
-        member.join_room(&self.room_id).await;
+    pub async fn join_room(&mut self, member_id: &str) -> Result<()> {
+        let member = self
+            .members
+            .get_mut(member_id)
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
+        member.join_room(&self.room_id).await?;
+        Ok(())
     }
 
-    pub async fn wait_for_interconnection(&mut self, member_id: &str) {
+    pub async fn wait_for_interconnection(
+        &mut self,
+        member_id: &str,
+    ) -> Result<()> {
         let interconnected_members: Vec<_> = self
             .members
             .values()
@@ -170,20 +190,24 @@ impl BrowserWorld {
                 }
             })
             .collect();
-        let member = self.members.get_mut(member_id).unwrap();
+        let member = self
+            .members
+            .get_mut(member_id)
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
         let connections = member.connections();
         for id in interconnected_members {
-            connections.wait_for_connection(id).await;
+            connections.wait_for_connection(id).await?;
         }
+
+        Ok(())
     }
 }
 
 #[async_trait(?Send)]
 impl World for BrowserWorld {
-    type Error = Infallible;
+    type Error = Error;
 
-    async fn new() -> Result<Self, Infallible> {
-        // TODO: unwrap
-        Ok(Self::new(RootWebClient::new().await).await)
+    async fn new() -> Result<Self> {
+        Ok(Self::new(RootWebClient::new().await?).await?)
     }
 }

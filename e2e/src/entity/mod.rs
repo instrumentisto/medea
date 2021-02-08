@@ -7,12 +7,18 @@ pub mod room;
 
 use std::{marker::PhantomData, sync::mpsc};
 
-use derive_more::Display;
+use derive_more::{Display, Error, From};
 use serde_json::Value as Json;
 use tokio::task;
 use uuid::Uuid;
 
 use crate::browser::{self, JsExecutable, WindowWebClient};
+
+#[derive(Debug, Display, Error, From)]
+pub enum Error {
+    Browser(browser::Error),
+    TypeCast,
+}
 
 /// Representation of some object from the browser-side.
 pub struct Entity<T> {
@@ -57,7 +63,10 @@ impl<T> Entity<T> {
         }
     }
 
-    pub async fn spawn_entity<O>(&self, exec: JsExecutable) -> Entity<O> {
+    pub async fn spawn_entity<O>(
+        &self,
+        exec: JsExecutable,
+    ) -> Result<Entity<O>, Error> {
         let id = Uuid::new_v4().to_string();
         self.execute(exec.and_then(JsExecutable::new(
             r#"
@@ -68,30 +77,29 @@ impl<T> Entity<T> {
             "#,
             vec![id.clone().into()],
         )))
-        .await
-        .unwrap();
+        .await?;
 
-        Entity::new(id, self.client.clone())
+        Ok(Entity::new(id, self.client.clone()))
     }
 
-    pub async fn is_undefined(&self) -> bool {
-        self.execute(JsExecutable::new(
-            r#"
+    pub async fn is_undefined(&self) -> Result<bool, Error> {
+        Ok(self
+            .execute(JsExecutable::new(
+                r#"
                 async (o) => {
                     return o === undefined;
                 }
             "#,
-            vec![],
-        ))
-        .await
-        .unwrap()
-        .as_bool()
-        .unwrap()
+                vec![],
+            ))
+            .await?
+            .as_bool()
+            .ok_or(Error::TypeCast)?)
     }
 
     /// Executes provided [`JsExecutable`] in the browser.
-    async fn execute(&self, js: JsExecutable) -> Result<Json, browser::Error> {
-        self.client.execute(self.get_obj().and_then(js)).await
+    async fn execute(&self, js: JsExecutable) -> Result<Json, Error> {
+        Ok(self.client.execute(self.get_obj().and_then(js)).await?)
     }
 
     /// Returns [`JsExecutable`] which will obtain JS object of this [`Entity`].
@@ -109,7 +117,10 @@ impl<T> Entity<T> {
 }
 
 impl<T: Builder> Entity<T> {
-    pub async fn spawn(obj: T, client: WindowWebClient) -> Entity<T> {
+    pub async fn spawn(
+        obj: T,
+        client: WindowWebClient,
+    ) -> Result<Entity<T>, Error> {
         let id = Uuid::new_v4().to_string();
         client
             .execute(obj.build().and_then(JsExecutable::new(
@@ -121,10 +132,9 @@ impl<T: Builder> Entity<T> {
                 "#,
                 vec![id.clone().into()],
             )))
-            .await
-            .unwrap();
+            .await?;
 
-        Entity::new(id, client)
+        Ok(Entity::new(id, client))
     }
 }
 

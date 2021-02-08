@@ -11,7 +11,7 @@ use std::sync::{
     Arc,
 };
 
-use derive_more::From;
+use derive_more::{Display, Error, From};
 use serde_json::Value as Json;
 use webdriver::common::WebWindow;
 
@@ -19,12 +19,13 @@ use self::client::WebClient;
 
 pub use self::executable::JsExecutable;
 
-#[derive(Debug, From)]
+#[derive(Debug, Display, Error, From)]
 pub enum Error {
     #[from(ignore)]
-    Js(Json),
+    Js(#[error(not(source))] Json),
     WebDriverCmd(fantoccini::error::CmdError),
     WebDriverSession(fantoccini::error::NewSessionError),
+    ResultDeserialize(serde_json::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -56,7 +57,7 @@ impl Drop for WindowWebClient {
 
 impl WindowWebClient {
     async fn new(client: WebClient) -> Self {
-        let window = client.new_window().await;
+        let window = client.new_window().await.unwrap();
 
         Self {
             client,
@@ -75,8 +76,8 @@ impl WindowWebClient {
 pub struct RootWebClient(WebClient);
 
 impl RootWebClient {
-    pub async fn new() -> Self {
-        Self(WebClient::new().await.unwrap())
+    pub async fn new() -> Result<Self> {
+        Ok(Self(WebClient::new().await?))
     }
 
     pub async fn new_window(&self) -> WindowWebClient {

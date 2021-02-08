@@ -36,13 +36,13 @@ async fn given_member(
     };
 
     let member = Member::new(id.clone(), is_send, is_recv);
-    world.create_member(member).await;
+    world.create_member(member).await.unwrap();
     if is_joined {
-        world.join_room(&id).await;
-        world.wait_for_interconnection(&id).await;
+        world.join_room(&id).await.unwrap();
+        world.wait_for_interconnection(&id).await.unwrap();
     }
 
-    let member = world.get_member(&id);
+    let member = world.get_member(&id).unwrap();
     if !mute_disable.is_empty() {
         match disabled_or_muted.as_str() {
             "disabled" => {
@@ -53,10 +53,10 @@ async fn given_member(
                     _ => unreachable!(),
                 };
                 if let Some(kind) = kind {
-                    member.disable_media(kind, None).await;
+                    member.disable_media(kind, None).await.unwrap();
                 } else {
-                    member.disable_media(MediaKind::Audio, None).await;
-                    member.disable_media(MediaKind::Video, None).await;
+                    member.disable_media(MediaKind::Audio, None).await.unwrap();
+                    member.disable_media(MediaKind::Video, None).await.unwrap();
                 }
             }
             "muted" => todo!("Muting is unimplemented atm"),
@@ -72,7 +72,7 @@ async fn when_disables_mutes(
     disable_or_mutes: String,
     audio_or_video: String,
 ) {
-    let member = world.get_member(&id);
+    let member = world.get_member(&id).unwrap();
     if disable_or_mutes == "disables" {
         let kind = match audio_or_video.as_str() {
             "audio" => Some(MediaKind::Audio),
@@ -81,10 +81,10 @@ async fn when_disables_mutes(
             _ => unreachable!(),
         };
         if let Some(kind) = kind {
-            member.disable_media(kind, None).await;
+            member.disable_media(kind, None).await.unwrap();
         } else {
-            member.disable_media(MediaKind::Audio, None).await;
-            member.disable_media(MediaKind::Video, None).await;
+            member.disable_media(MediaKind::Audio, None).await.unwrap();
+            member.disable_media(MediaKind::Video, None).await.unwrap();
         }
     } else {
         todo!()
@@ -93,7 +93,7 @@ async fn when_disables_mutes(
 
 #[when(regex = "^`(.*)` joins Room")]
 async fn when_member_joins_room(world: &mut BrowserWorld, id: String) {
-    world.join_room(&id).await;
+    world.join_room(&id).await.unwrap();
 }
 
 #[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
@@ -102,11 +102,12 @@ async fn then_member_receives_connection(
     id: String,
     partner_id: String,
 ) {
-    let member = world.get_member(&id);
+    let member = world.get_member(&id).unwrap();
     member
         .connections()
         .wait_for_connection(partner_id.clone())
-        .await;
+        .await
+        .unwrap();
 }
 
 #[then(regex = "^`(.*)` doesn't receives Connection with Member `(.*)`")]
@@ -115,8 +116,13 @@ async fn then_member_doesnt_receives_connection(
     id: String,
     partner_id: String,
 ) {
-    let member = world.get_member(&id);
-    assert!(member.connections().get(partner_id).await.is_none())
+    let member = world.get_member(&id).unwrap();
+    assert!(member
+        .connections()
+        .get(partner_id)
+        .await
+        .unwrap()
+        .is_none())
 }
 
 #[tokio::main(worker_threads = 1)]

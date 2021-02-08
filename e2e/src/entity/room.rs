@@ -30,7 +30,7 @@ impl MediaSourceKind {
 }
 
 impl Entity<Room> {
-    pub async fn join(&self, uri: String) {
+    pub async fn join(&self, uri: String) -> Result<(), super::Error> {
         self.execute(JsExecutable::new(
             r#"
                 async (room) => {
@@ -40,15 +40,16 @@ impl Entity<Room> {
             "#,
             vec![uri.into()],
         ))
-        .await
-        .unwrap();
+        .await?;
+
+        Ok(())
     }
 
     pub async fn disable_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) {
+    ) -> Result<(), super::Error> {
         let media_source_kind = source_kind
             .as_ref()
             .map_or_else(|| String::new(), MediaSourceKind::as_js);
@@ -69,11 +70,14 @@ impl Entity<Room> {
             ),
             vec![],
         ))
-        .await
-        .unwrap();
+        .await?;
+
+        Ok(())
     }
 
-    pub async fn connections_store(&self) -> Entity<ConnectionStore> {
+    pub async fn connections_store(
+        &self,
+    ) -> Result<Entity<ConnectionStore>, super::Error> {
         self.spawn_entity(JsExecutable::new(
             r#"
                 async (room) => {
