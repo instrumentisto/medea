@@ -1,11 +1,19 @@
+//! Implementation and definition for the object which will store all
+//! [`Connection`]s thrown by `Room.on_new_connection` callback.
+
 use crate::{
     browser::JsExecutable,
     entity::{connection::Connection, Entity},
 };
 
+/// Storage for the [`Connection`]s thrown by `Room.on_new_connection` callback.
 pub struct ConnectionStore;
 
 impl Entity<ConnectionStore> {
+    /// Returns [`Connection`] for the provided remote Member ID.
+    ///
+    /// Returns [`None`] if [`Connection`] with a provided remote Member ID is
+    /// not exist.
     pub async fn get(
         &self,
         remote_id: String,
@@ -29,6 +37,10 @@ impl Entity<ConnectionStore> {
         })
     }
 
+    /// Returns [`Connection`] for the provided remote Member ID.
+    ///
+    /// If this [`Connection`] currently not exists then this method will wait
+    /// for it.
     pub async fn wait_for_connection(
         &self,
         remote_id: String,

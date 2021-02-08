@@ -20,10 +20,21 @@ pub enum Error {
     TypeCast,
 }
 
+/// Pointer to the JS object on browser-side.
+#[derive(Clone, Debug, Display)]
+pub struct EntityPtr(String);
+
 /// Representation of some object from the browser-side.
+///
+/// JS object on browser-side will be removed on this [`Entity`] [`Drop::drop`].
 pub struct Entity<T> {
+    /// Pointer to the JS object on browser-side.
     ptr: EntityPtr,
+
+    /// [`WindowWebClient`] where this [`Entity`] is exists.
     client: WindowWebClient,
+
+    /// Type of [`Entity`].
     _entity_type: PhantomData<T>,
 }
 
@@ -54,7 +65,7 @@ impl<T> Drop for Entity<T> {
 }
 
 impl<T> Entity<T> {
-    /// Returns [`Entity`] with a provided URI and [`WebClient`].
+    /// Returns [`Entity`] with a provided URI and [`WindowWebClient`].
     pub fn new(uri: String, client: WindowWebClient) -> Self {
         Self {
             ptr: EntityPtr(uri),
@@ -63,6 +74,8 @@ impl<T> Entity<T> {
         }
     }
 
+    /// Returns new [`Entity`] which will be created by the provided
+    /// [`JsExecutable`].
     pub async fn spawn_entity<O>(
         &self,
         exec: JsExecutable,
@@ -82,6 +95,7 @@ impl<T> Entity<T> {
         Ok(Entity::new(id, self.client.clone()))
     }
 
+    /// Returns `true` if this [`Entity`] is `undefined`.
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         Ok(self
             .execute(JsExecutable::new(
@@ -117,6 +131,7 @@ impl<T> Entity<T> {
 }
 
 impl<T: Builder> Entity<T> {
+    /// Spawns provided `obj` [`Entity`] in the provided [`WindowWebClient`].
     pub async fn spawn(
         obj: T,
         client: WindowWebClient,
@@ -144,6 +159,3 @@ pub trait Builder {
     /// created.
     fn build(self) -> JsExecutable;
 }
-
-#[derive(Clone, Debug, Display)]
-pub struct EntityPtr(String);

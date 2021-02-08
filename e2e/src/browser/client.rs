@@ -50,10 +50,13 @@ impl WebClient {
         Ok(Self(Arc::new(Mutex::new(Inner::new().await?))))
     }
 
+    /// Creates new window and returns it's ID.
     pub async fn new_window(&self) -> Result<WebWindow> {
         self.0.lock().await.new_window().await
     }
 
+    /// Switches to the provided [`WebWindow`] and executes provided
+    /// [`JsExecutable`] in it.
     pub async fn switch_to_window_and_execute(
         &self,
         window: WebWindow,
@@ -66,6 +69,9 @@ impl WebClient {
             .await
     }
 
+    /// Synchronously closes [WebDriver] session.
+    ///
+    /// [WebDriver]: https://www.w3.org/TR/webdriver/
     pub fn blocking_close(&self) {
         let (tx, rx) = mpsc::channel();
         let client = self.0.clone();
@@ -79,6 +85,7 @@ impl WebClient {
         });
     }
 
+    /// Synchronously closes provided [`WebWindow`].
     pub fn blocking_window_close(&self, window: WebWindow) {
         let (tx, rx) = mpsc::channel();
         let client = self.0.clone();
@@ -93,9 +100,13 @@ impl WebClient {
     }
 }
 
+/// Inner for the [`WebClient`].
 struct Inner(Client);
 
 impl Inner {
+    /// Creates new [WebDriver] session.
+    ///
+    /// [WebDriver]: https://www.w3.org/TR/webdriver/
     pub async fn new() -> Result<Self> {
         let c = ClientBuilder::native()
             .capabilities(Self::get_webdriver_capabilities())
@@ -105,6 +116,7 @@ impl Inner {
         Ok(Self(c))
     }
 
+    /// Executes provided [`JsExecutable`] in the current [`WebWindow`].
     pub async fn execute(&mut self, executable: JsExecutable) -> Result<Json> {
         let (inner_js, args) = executable.finalize();
 
@@ -140,6 +152,9 @@ impl Inner {
         serde_json::from_value::<JsResult>(res)?.into()
     }
 
+    /// Creates new [`WebWindow`] and returns it's ID.
+    ///
+    /// Creates `holders` in the created [`WebWindow`].
     pub async fn new_window(&mut self) -> Result<WebWindow> {
         let window = WebWindow(self.0.new_window(true).await?.handle);
         self.0.switch_to_window(window.clone()).await?;
@@ -161,6 +176,8 @@ impl Inner {
         Ok(window)
     }
 
+    /// Switches to the provided [`WebWindow`] and executes provided
+    /// [`JsExecutable`].
     pub async fn switch_to_window_and_execute(
         &mut self,
         window: WebWindow,
@@ -171,14 +188,14 @@ impl Inner {
         Ok(self.execute(exec).await?)
     }
 
+    /// Closes provided [`WebWindow`].
     pub async fn close_window(&mut self, window: WebWindow) {
         if self.0.switch_to_window(window).await.is_ok() {
             let _ = self.0.close_window().await;
         }
     }
 
-    /// Returns `moz:firefoxOptions` for the Firefox browser based on
-    /// [`TestRunner`] configuration.
+    /// Returns `moz:firefoxOptions` for the Firefox browser.
     fn get_firefox_caps() -> serde_json::Value {
         let mut args = FIREFOX_ARGS.to_vec();
         if *conf::HEADLESS {
@@ -197,8 +214,7 @@ impl Inner {
         })
     }
 
-    /// Returns `goog:chromeOptions` for the Chrome browser based on
-    /// [`TestRunner`] configuration.
+    /// Returns `goog:chromeOptions` for the Chrome browser.
     fn get_chrome_caps() -> serde_json::Value {
         let mut args = CHROME_ARGS.to_vec();
         if *conf::HEADLESS {
@@ -207,7 +223,7 @@ impl Inner {
         json!({ "args": args })
     }
 
-    /// Returns [WebDriver capabilities] based on [`TestRunner`] configuration.
+    /// Returns [WebDriver capabilities] for Chrome and Firefox browsers.
     ///
     /// [WebDriver capabilities]:
     /// https://developer.mozilla.org/en-US/docs/Web/WebDriver/Capabilities

@@ -17,13 +17,20 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Builder for the [`Member`].
 pub struct MemberBuilder {
+    /// ID with which [`Member`] will be created.
     pub id: String,
+
+    /// Flag which indicates that [`Member`] will publish media.
     pub is_send: bool,
+
+    /// Flag which indicates that [`Member`] will receive media.
     pub is_recv: bool,
 }
 
 impl MemberBuilder {
+    /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
     pub async fn build(self, room: Entity<Room>) -> Result<Member> {
         let connection_store = room.connections_store().await?;
         Ok(Member {
@@ -37,32 +44,51 @@ impl MemberBuilder {
     }
 }
 
+/// Object which represents some connected to the Media Server `Member`.
 pub struct Member {
+    /// ID of [`Member`] on the Media Server.
     id: String,
+
+    /// Flag which indicates that [`Member`] should publish media.
     is_send: bool,
+
+    /// Flag which indicates that [`Member`] should receive media.
     is_recv: bool,
+
+    /// Flag which indicates that [`Member`] is joined to the `Room`.
     is_joined: bool,
+
+    /// Representation of the `Room` JS object.
     room: Entity<Room>,
+
+    /// Storage for the [`Connection`]s throws by this [`Member`]'s `Room`.
+    ///
+    /// [`Connection`]: crate::entity::connection::Connection
     connection_store: Entity<ConnectionStore>,
 }
 
 impl Member {
+    /// Returns ID of [`Member`] on the Media Server.
     pub fn id(&self) -> &str {
         &self.id
     }
 
+    /// Returns flag which indicates that [`Member`] should publish media.
     pub fn is_send(&self) -> bool {
         self.is_send
     }
 
+    /// Returns flag which indicates that [`Member`] should receive media.
     pub fn is_recv(&self) -> bool {
         self.is_recv
     }
 
+    /// Returns flag which indicates that [`Member`] is joined to the `Room`.
     pub fn is_joined(&self) -> bool {
         self.is_joined
     }
 
+    /// Joins into `Room` with a provided ID.
     pub async fn join_room(&mut self, room_id: &str) -> Result<()> {
         self.room
             .join(format!(
@@ -76,6 +102,11 @@ impl Member {
         Ok(())
     }
 
+    /// Disabled media publishing for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media publishing will be
+    /// disabled for all [`MediaSourceKind`]s.
     pub async fn disable_media(
         &self,
         kind: MediaKind,
@@ -85,6 +116,10 @@ impl Member {
         Ok(())
     }
 
+    /// Returns reference to the storage for the [`Connection`]s throws by this
+    /// [`Member`]'s `Room`.
+    ///
+    /// [`Connection`]: crate::entity::connection::Connection
     pub fn connections(&self) -> &Entity<ConnectionStore> {
         &self.connection_store
     }

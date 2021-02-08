@@ -1,15 +1,21 @@
+//! Implementation and definition for the object which represents `Room` JS
+//! object.
+
 use crate::{
     browser::JsExecutable,
     entity::{connections_store::ConnectionStore, Entity},
 };
 
+/// Representation of the `Room` JS object.
 pub struct Room;
 
+/// Representation of the `MediaKind` JS enum.
 pub enum MediaKind {
     Audio,
     Video,
 }
 
+/// Representation of the `MediaSourceKind` JS enum.
 #[allow(dead_code)]
 pub enum MediaSourceKind {
     Device,
@@ -17,6 +23,7 @@ pub enum MediaSourceKind {
 }
 
 impl MediaSourceKind {
+    /// Converts this [`MediaSourceKind`] to the JS code for this enum variant.
     fn as_js(&self) -> String {
         match self {
             MediaSourceKind::Device => {
@@ -30,6 +37,7 @@ impl MediaSourceKind {
 }
 
 impl Entity<Room> {
+    /// Joins [`Room`] with a provided URI.
     pub async fn join(&self, uri: String) -> Result<(), super::Error> {
         self.execute(JsExecutable::new(
             r#"
@@ -45,6 +53,11 @@ impl Entity<Room> {
         Ok(())
     }
 
+    /// Disabled media publishing for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media publishing will be
+    /// disabled for all [`MediaSourceKind`]s.
     pub async fn disable_media(
         &self,
         kind: MediaKind,
@@ -52,7 +65,7 @@ impl Entity<Room> {
     ) -> Result<(), super::Error> {
         let media_source_kind = source_kind
             .as_ref()
-            .map_or_else(|| String::new(), MediaSourceKind::as_js);
+            .map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.disable_audio()".to_string(),
             MediaKind::Video => {
@@ -75,6 +88,7 @@ impl Entity<Room> {
         Ok(())
     }
 
+    /// Returns [`ConnectionStore`] for this [`Room`].
     pub async fn connections_store(
         &self,
     ) -> Result<Entity<ConnectionStore>, super::Error> {

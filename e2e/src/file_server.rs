@@ -19,6 +19,8 @@ const NOT_FOUND: &[u8] = b"Not found";
 pub struct FileServer(Option<oneshot::Sender<()>>);
 
 impl FileServer {
+    /// Starts file server which will share `index.html` and compiled `jason`
+    /// library.
     pub fn run() -> Self {
         let make_service = make_service_fn(|_| async {
             Ok::<_, hyper::Error>(service_fn(response_files))
@@ -41,6 +43,7 @@ impl Drop for FileServer {
     }
 }
 
+/// [`Response`] for the files which are not found on the server.
 fn not_found() -> Response<Body> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
@@ -48,6 +51,10 @@ fn not_found() -> Response<Body> {
         .unwrap()
 }
 
+/// Handles all files requests to this [`FileServer`].
+///
+/// Returns [`not_found`] if path is not for `jason` directory or `index.html`
+/// file.
 async fn response_files(
     req: Request<Body>,
 ) -> Result<Response<Body>, hyper::Error> {

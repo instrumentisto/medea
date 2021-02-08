@@ -18,6 +18,7 @@ use crate::{
 
 use self::member::Member;
 
+#[doc(inline)]
 pub use self::member::MemberBuilder;
 
 #[derive(Debug, Display, Error, From)]
@@ -34,14 +35,26 @@ type Result<T> = std::result::Result<T, Error>;
 /// World which will be used by all E2E tests.
 #[derive(WorldInit)]
 pub struct BrowserWorld {
+    /// ID of `Room` created for this [`BrowserWorld`].
     room_id: String,
+
+    /// Client for the Control API.
     control_api: ControlApi,
+
+    /// All [`Member`]s created in this world.
     members: HashMap<String, Member>,
+
+    /// All [`Jason`]s created in this world.
     jasons: Vec<Entity<Jason>>,
+
+    /// [WebDriver] client where all objects from this world will be created.
+    ///
+    /// [WebDriver]: https://www.w3.org/TR/webdriver/
     client: RootWebClient,
 }
 
 impl BrowserWorld {
+    /// Returns new [`BrowserWorld`] for the provided [`RootWebClient`].
     pub async fn new(client: RootWebClient) -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
         let control_api = ControlApi::new();
@@ -64,6 +77,10 @@ impl BrowserWorld {
         })
     }
 
+    /// Creates new [`Member`] from the provided [`MemberBuilder`].
+    ///
+    /// `Room` for this [`Member`] will be created, but joining will not be
+    /// performed.
     pub async fn create_member(
         &mut self,
         builder: MemberBuilder,
@@ -166,10 +183,15 @@ impl BrowserWorld {
         Ok(())
     }
 
+    /// Returns reference to the [`Member`] with a provided ID.
+    ///
+    /// Returns [`None`] if [`Member`] with a provided ID is not exists.
     pub fn get_member(&self, member_id: &str) -> Option<&Member> {
         self.members.get(member_id)
     }
 
+    /// [`Member`] with a provided ID will be joined to the `Room` created for
+    /// this [`BrowserWorld`].
     pub async fn join_room(&mut self, member_id: &str) -> Result<()> {
         let member = self
             .members
@@ -179,6 +201,10 @@ impl BrowserWorld {
         Ok(())
     }
 
+    /// [`Future`] which will be resolved when [`Member`] with a provided ID
+    /// will connect with his partners.
+    ///
+    /// [`Future`]: std::future::Future
     pub async fn wait_for_interconnection(
         &mut self,
         member_id: &str,

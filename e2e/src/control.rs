@@ -20,13 +20,16 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Client for the Control API.
 pub struct ControlApi(Client);
 
 impl ControlApi {
+    /// Returns new [`ControlApi`] client.
     pub fn new() -> Self {
         Self(Client::new())
     }
 
+    /// Creates provided [`Element`] in the provided `path`.
     pub async fn create(
         &self,
         path: &str,
@@ -42,11 +45,13 @@ impl ControlApi {
             .await?)
     }
 
+    /// Deletes [`Element`] in the provided `path`.
     #[allow(dead_code)]
     pub async fn delete(&self, path: &str) -> Result<Response> {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
     }
 
+    /// Returns [`Element`] from the provided `path`.
     #[allow(dead_code)]
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
         Ok(self.0.get(&get_url(path)).send().await?.json().await?)
