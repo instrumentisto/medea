@@ -5,14 +5,15 @@ mod conf;
 mod control;
 mod entity;
 mod file_server;
-mod model;
 mod world;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
 
-use crate::{entity::room::MediaKind, model::member::MemberBuilder};
-
-use self::{file_server::FileServer, world::BrowserWorld};
+use self::{
+    entity::room::MediaKind,
+    file_server::FileServer,
+    world::{BrowserWorld, MemberBuilder},
+};
 
 #[given(regex = "^(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
                  with (disabled|muted) (audio|video|all))?$")]

@@ -1,5 +1,7 @@
 //! Implementation of world for the tests.
 
+mod member;
+
 use std::collections::HashMap;
 
 use async_trait::async_trait;
@@ -12,8 +14,11 @@ use crate::{
     browser::{self, RootWebClient},
     control::{self, ControlApi},
     entity::{self, jason::Jason, Entity},
-    model::member::{self, Member, MemberBuilder},
 };
+
+use self::member::Member;
+
+pub use self::member::MemberBuilder;
 
 #[derive(Debug, Display, Error, From)]
 pub enum Error {

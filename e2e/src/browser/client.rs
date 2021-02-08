@@ -40,9 +40,71 @@ impl From<JsResult> for Result<Json> {
     }
 }
 
+/// Client for interacting with browser through WebDriver.
+#[derive(Clone, Debug)]
+pub struct WebClient(Arc<Mutex<Inner>>);
+
+impl WebClient {
+    /// Returns new [`WebClient`] connected to the WebDriver
+    pub async fn new() -> Result<Self> {
+        Ok(Self(Arc::new(Mutex::new(Inner::new().await?))))
+    }
+
+    pub async fn new_window(&self) -> Result<WebWindow> {
+        self.0.lock().await.new_window().await
+    }
+
+    pub async fn switch_to_window_and_execute(
+        &self,
+        window: WebWindow,
+        exec: JsExecutable,
+    ) -> Result<Json> {
+        self.0
+            .lock()
+            .await
+            .switch_to_window_and_execute(window, exec)
+            .await
+    }
+
+    pub fn blocking_close(&self) {
+        let (tx, rx) = mpsc::channel();
+        let client = self.0.clone();
+        tokio::spawn(async move {
+            let mut inner = client.lock().await;
+            let _ = inner.0.close().await;
+            tx.send(()).unwrap();
+        });
+        task::block_in_place(move || {
+            rx.recv().unwrap();
+        });
+    }
+
+    pub fn blocking_window_close(&self, window: WebWindow) {
+        let (tx, rx) = mpsc::channel();
+        let client = self.0.clone();
+        tokio::spawn(async move {
+            let mut client = client.lock().await;
+            client.close_window(window).await;
+            tx.send(()).unwrap();
+        });
+        task::block_in_place(move || {
+            rx.recv().unwrap();
+        });
+    }
+}
+
 struct Inner(Client);
 
 impl Inner {
+    pub async fn new() -> Result<Self> {
+        let c = ClientBuilder::native()
+            .capabilities(Self::get_webdriver_capabilities())
+            .connect(&conf::WEBDRIVER_ADDR)
+            .await?;
+
+        Ok(Self(c))
+    }
+
     pub async fn execute(&mut self, executable: JsExecutable) -> Result<Json> {
         let (inner_js, args) = executable.finalize();
 
@@ -114,22 +176,6 @@ impl Inner {
             let _ = self.0.close_window().await;
         }
     }
-}
-
-/// Client for interacting with browser through WebDriver.
-#[derive(Clone, Debug)]
-pub struct WebClient(Arc<Mutex<Inner>>);
-
-impl WebClient {
-    /// Returns new [`WebClient`] connected to the WebDriver
-    pub async fn new() -> Result<Self> {
-        let c = ClientBuilder::native()
-            .capabilities(Self::get_webdriver_capabilities())
-            .connect(&conf::WEBDRIVER_ADDR)
-            .await?;
-
-        Ok(Self(Arc::new(Mutex::new(Inner(c)))))
-    }
 
     /// Returns `moz:firefoxOptions` for the Firefox browser based on
     /// [`TestRunner`] configuration.
@@ -173,47 +219,5 @@ impl WebClient {
             .insert("goog:chromeOptions".to_string(), Self::get_chrome_caps());
 
         capabilities
-    }
-
-    pub async fn new_window(&self) -> Result<WebWindow> {
-        self.0.lock().await.new_window().await
-    }
-
-    pub async fn switch_to_window_and_execute(
-        &self,
-        window: WebWindow,
-        exec: JsExecutable,
-    ) -> Result<Json> {
-        self.0
-            .lock()
-            .await
-            .switch_to_window_and_execute(window, exec)
-            .await
-    }
-
-    pub fn blocking_close(&self) {
-        let (tx, rx) = mpsc::channel();
-        let client = self.0.clone();
-        tokio::spawn(async move {
-            let mut inner = client.lock().await;
-            let _ = inner.0.close().await;
-            tx.send(()).unwrap();
-        });
-        task::block_in_place(move || {
-            rx.recv().unwrap();
-        });
-    }
-
-    pub fn blocking_window_close(&self, window: WebWindow) {
-        let (tx, rx) = mpsc::channel();
-        let client = self.0.clone();
-        tokio::spawn(async move {
-            let mut client = client.lock().await;
-            client.close_window(window).await;
-            tx.send(()).unwrap();
-        });
-        task::block_in_place(move || {
-            rx.recv().unwrap();
-        });
     }
 }
