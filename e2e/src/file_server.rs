@@ -70,14 +70,18 @@ async fn response_files(
             path
         }
         "index.html" => PathBuf::from(&*conf::INDEX_PATH),
-        _ => unreachable!(),
+        _ => unreachable!(
+            "File Server shares only index.html and jason directory."
+        ),
     };
 
     let mime = match path.extension().unwrap().to_str().unwrap() {
         "js" => "text/javascript",
         "html" => "text/html",
         "wasm" => "application/wasm",
-        _ => panic!(),
+        _ => unreachable!(
+            "Only JS, HTML and WASM files should be shared by this server."
+        ),
     };
 
     if req.method() == Method::GET {

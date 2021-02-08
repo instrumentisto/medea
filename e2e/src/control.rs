@@ -9,10 +9,12 @@ use reqwest::Client;
 
 use crate::conf;
 
+/// Returns URL to the Control API for the provided [`Element`] path.
 fn get_url(path: &str) -> String {
     format!("{}/{}", *conf::CONTROL_API_ADDR, path)
 }
 
+/// All errors which can happen while working with Control API.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
     Reqwest(reqwest::Error),

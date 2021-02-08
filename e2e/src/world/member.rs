@@ -1,3 +1,5 @@
+//! Implementation of the object which represents Media Server Member.
+
 use derive_more::{Display, Error, From};
 
 use crate::{

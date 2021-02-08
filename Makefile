@@ -459,6 +459,19 @@ ifeq ($(up),yes)
 	-make down
 endif
 
+
+# Run E2E tests of project.
+#
+# Usage:
+#	make test.e2e [( [up=no]
+#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
+#	                         | dockerized=yes [tag=(dev|<docker-tag>)]
+#	                                          [log=(no|yes)]
+#                                             [log-to-file=(no|yes)] )]
+#	                        )]
+#                 [wait=(5|<seconds>)]
+#                 [browser=(chrome|firefox)]
+
 test.e2e:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
@@ -468,16 +481,16 @@ ifeq ($(up),yes)
 	                     tag=$(tag) \
 	                     log-to-file=$(log-to-file)
 	make up.control background=yes log-to-file=$(log-to-file)
-	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	make build.jason
 	@make docker.up.webdriver browser=$(browser)
-	sleep 5
+	sleep $(if $(call eq,$(wait),),5,$(wait))
 	cargo run -p medea-e2e-tests
 ifeq ($(up),yes)
 	-make down
 	-make docker.down.webdriver browser=$(browser)
 endif
+
 
 
 
@@ -1035,7 +1048,7 @@ endef
         	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
-        test test.integration test.unit \
+        test test.e2e test.integration test.unit \
         up up.control up.coturn up.demo up.dev up.jason up.medea \
         wait.port \
         yarn yarn.version

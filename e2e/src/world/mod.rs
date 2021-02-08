@@ -5,7 +5,7 @@ mod member;
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use cucumber_rust::{World, WorldInit};
+use cucumber_rust::WorldInit;
 use derive_more::{Display, Error, From};
 use medea_control_api_mock::proto;
 use uuid::Uuid;
@@ -21,6 +21,7 @@ use self::member::Member;
 #[doc(inline)]
 pub use self::member::MemberBuilder;
 
+/// All errors which can happen while working with [`World`].
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
     Control(control::Error),
@@ -34,17 +35,17 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// World which will be used by all E2E tests.
 #[derive(WorldInit)]
-pub struct BrowserWorld {
-    /// ID of `Room` created for this [`BrowserWorld`].
+pub struct World {
+    /// ID of `Room` created for this [`World`].
     room_id: String,
 
     /// Client for the Control API.
     control_api: ControlApi,
 
-    /// All [`Member`]s created in this world.
+    /// All [`Member`]s created in this [`World`].
     members: HashMap<String, Member>,
 
-    /// All [`Jason`]s created in this world.
+    /// All [`Jason`]s created in this [`World`].
     jasons: Vec<Object<Jason>>,
 
     /// [WebDriver] client where all objects from this world will be created.
@@ -53,8 +54,8 @@ pub struct BrowserWorld {
     client: RootWebClient,
 }
 
-impl BrowserWorld {
-    /// Returns new [`BrowserWorld`] for the provided [`RootWebClient`].
+impl World {
+    /// Returns new [`World`] for the provided [`RootWebClient`].
     pub async fn new(client: RootWebClient) -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
         let control_api = ControlApi::new();
@@ -191,7 +192,7 @@ impl BrowserWorld {
     }
 
     /// [`Member`] with a provided ID will be joined to the `Room` created for
-    /// this [`BrowserWorld`].
+    /// this [`World`].
     pub async fn join_room(&mut self, member_id: &str) -> Result<()> {
         let member = self
             .members
@@ -237,7 +238,7 @@ impl BrowserWorld {
 }
 
 #[async_trait(?Send)]
-impl World for BrowserWorld {
+impl cucumber_rust::World for World {
     type Error = Error;
 
     async fn new() -> Result<Self> {

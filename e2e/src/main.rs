@@ -12,13 +12,29 @@ use cucumber_rust::{given, then, when, WorldInit as _};
 use self::{
     file_server::FileServer,
     object::room::MediaKind,
-    world::{BrowserWorld, MemberBuilder},
+    world::{MemberBuilder, World},
 };
+
+#[tokio::main]
+async fn main() {
+    let _server = FileServer::run();
+    let runner = World::init(&[conf::FEATURES_PATH.as_str()]);
+    runner.run_and_exit().await;
+}
+
+fn parse_media_kind(text: &str) -> Option<MediaKind> {
+    match text {
+        "audio" => Some(MediaKind::Audio),
+        "video" => Some(MediaKind::Video),
+        "all" => None,
+        _ => unreachable!(),
+    }
+}
 
 #[given(regex = "^(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
                  with (disabled|muted) (audio|video|all))?$")]
 async fn given_member(
-    world: &mut BrowserWorld,
+    world: &mut World,
     joined: String,
     direction: String,
     id: String,
@@ -36,12 +52,12 @@ async fn given_member(
         )
     };
 
-    let member = MemberBuilder {
+    let member_builder = MemberBuilder {
         id: id.clone(),
         is_send,
         is_recv,
     };
-    world.create_member(member).await.unwrap();
+    world.create_member(member_builder).await.unwrap();
     if is_joined {
         world.join_room(&id).await.unwrap();
         world.wait_for_interconnection(&id).await.unwrap();
@@ -51,13 +67,7 @@ async fn given_member(
     if !mute_disable.is_empty() {
         match disabled_or_muted.as_str() {
             "disabled" => {
-                let kind = match audio_or_video.as_str() {
-                    "audio" => Some(MediaKind::Audio),
-                    "video" => Some(MediaKind::Video),
-                    "all" => None,
-                    _ => unreachable!(),
-                };
-                if let Some(kind) = kind {
+                if let Some(kind) = parse_media_kind(&audio_or_video) {
                     member.disable_media(kind, None).await.unwrap();
                 } else {
                     member.disable_media(MediaKind::Audio, None).await.unwrap();
@@ -72,38 +82,32 @@ async fn given_member(
 
 #[when(regex = "^Member `(.*)` (disables|mutes) (audio|video|all)$")]
 async fn when_disables_mutes(
-    world: &mut BrowserWorld,
+    world: &mut World,
     id: String,
     disable_or_mutes: String,
     audio_or_video: String,
 ) {
     let member = world.get_member(&id).unwrap();
     if disable_or_mutes == "disables" {
-        let kind = match audio_or_video.as_str() {
-            "audio" => Some(MediaKind::Audio),
-            "video" => Some(MediaKind::Video),
-            "all" => None,
-            _ => unreachable!(),
-        };
-        if let Some(kind) = kind {
+        if let Some(kind) = parse_media_kind(&audio_or_video) {
             member.disable_media(kind, None).await.unwrap();
         } else {
             member.disable_media(MediaKind::Audio, None).await.unwrap();
             member.disable_media(MediaKind::Video, None).await.unwrap();
         }
     } else {
-        todo!()
+        todo!("Muting is unimplemented atm.")
     }
 }
 
 #[when(regex = "^`(.*)` joins Room")]
-async fn when_member_joins_room(world: &mut BrowserWorld, id: String) {
+async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
 }
 
 #[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
 async fn then_member_receives_connection(
-    world: &mut BrowserWorld,
+    world: &mut World,
     id: String,
     partner_id: String,
 ) {
@@ -117,7 +121,7 @@ async fn then_member_receives_connection(
 
 #[then(regex = "^`(.*)` doesn't receives Connection with Member `(.*)`")]
 async fn then_member_doesnt_receives_connection(
-    world: &mut BrowserWorld,
+    world: &mut World,
     id: String,
     partner_id: String,
 ) {
@@ -128,11 +132,4 @@ async fn then_member_doesnt_receives_connection(
         .await
         .unwrap()
         .is_none())
-}
-
-#[tokio::main(worker_threads = 1)]
-async fn main() {
-    let _server = FileServer::run();
-    let runner = BrowserWorld::init(&[conf::FEATURES_PATH.as_str()]);
-    runner.run_and_exit().await;
 }

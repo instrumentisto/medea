@@ -69,10 +69,10 @@ impl<T> Drop for Object<T> {
 }
 
 impl<T> Object<T> {
-    /// Returns [`Object`] with a provided URI and [`WindowWebClient`].
-    pub fn new(uri: String, client: WindowWebClient) -> Self {
+    /// Returns [`Object`] with a provided ID and [`WindowWebClient`].
+    pub fn new(id: String, client: WindowWebClient) -> Self {
         Self {
-            ptr: ObjectPtr(uri),
+            ptr: ObjectPtr(id),
             client,
             _object_type: PhantomData::default(),
         }
