@@ -20,4 +20,19 @@ impl Object<Connection> {
             vec![],
         )).await.unwrap()
     }
+
+    pub async fn wait_for_close(&self) {
+        self.execute(JsExecutable::new(
+            r#"
+                async (conn) => {
+                    if (!conn.closeListener.isClosed) {
+                        await new Promise((resolve, reject) => {
+                            conn.closeListener.subs.push(resolve);
+                        });
+                    }
+                }
+            "#,
+            vec![]
+        )).await.unwrap();
+    }
 }

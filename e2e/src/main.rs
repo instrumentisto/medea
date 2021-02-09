@@ -267,3 +267,14 @@ async fn when_control_api_removes_room(
 ) {
     world.delete_room_element().await;
 }
+
+#[then(regex = "^`(.*)`'s Connection with `(.*)` closes$")]
+async fn then_connection_closes(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let connection = member.connections().get(partner_id).await.unwrap().unwrap();
+    connection.wait_for_close().await;
+}

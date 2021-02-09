@@ -203,13 +203,18 @@ impl Object<Room> {
                         subs: new Map(),
                     };
                     room.room.on_new_connection((conn) => {
+                        let closeListener = {
+                            isClosed: false,
+                            subs: [],
+                        };
                         let tracksStore = {
                             tracks: [],
                             subs: []
                         };
                         let connection = {
                             conn: conn,
-                            tracksStore: tracksStore
+                            tracksStore: tracksStore,
+                            closeListener: closeListener
                         };
                         conn.on_remote_track_added((track) => {
                             tracksStore.tracks.push(track);
@@ -217,6 +222,12 @@ impl Object<Room> {
                                 return sub(track);
                             });
                             tracksStore.subs = newStoreSubs;
+                        });
+                        conn.on_close(() => {
+                            closeListener.isClosed = true;
+                            for (sub of closeListener.subs) {
+                                sub();
+                            }
                         });
                         let id = conn.get_remote_member_id();
                         store.connections.set(id, connection);
