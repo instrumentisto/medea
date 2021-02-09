@@ -15,6 +15,19 @@ pub enum MediaKind {
     Video,
 }
 
+impl MediaKind {
+    pub fn as_js(&self) -> String {
+        match self {
+            MediaKind::Audio => {
+                "window.rust.MediaKind.Audio".to_string()
+            }
+            MediaKind::Video => {
+                "window.rust.MediaKind.Video".to_string()
+            }
+        }
+    }
+}
+
 /// Representation of the `MediaSourceKind` JS enum.
 #[allow(dead_code)]
 pub enum MediaSourceKind {
@@ -24,13 +37,13 @@ pub enum MediaSourceKind {
 
 impl MediaSourceKind {
     /// Converts this [`MediaSourceKind`] to the JS code for this enum variant.
-    fn as_js(&self) -> String {
+    pub fn as_js(&self) -> String {
         match self {
             MediaSourceKind::Device => {
-                "window.rust.MediaSourceKind.DEVICE".to_string()
+                "window.rust.MediaSourceKind.Device".to_string()
             }
             MediaSourceKind::Display => {
-                "window.rust.MediaSourceKind.DISPLAY".to_string()
+                "window.rust.MediaSourceKind.Display".to_string()
             }
         }
     }
@@ -88,6 +101,96 @@ impl Object<Room> {
         Ok(())
     }
 
+    pub async fn enable_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), super::Error> {
+        let media_source_kind = source_kind
+            .as_ref()
+            .map_or_else(String::new, MediaSourceKind::as_js);
+        let disable = match kind {
+            MediaKind::Audio => "room.enable_audio()".to_string(),
+            MediaKind::Video => {
+                format!("room.enable_video({})", media_source_kind)
+            }
+        };
+        self.execute(JsExecutable::new(
+            &format!(
+                r#"
+                async (room) => {{
+                    await {};
+                }}
+            "#,
+                disable
+            ),
+            vec![],
+        ))
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn mute_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), super::Error> {
+        let media_source_kind = source_kind
+            .as_ref()
+            .map_or_else(String::new, MediaSourceKind::as_js);
+        let disable = match kind {
+            MediaKind::Audio => "room.mute_audio()".to_string(),
+            MediaKind::Video => {
+                format!("room.mute_video({})", media_source_kind)
+            }
+        };
+        self.execute(JsExecutable::new(
+            &format!(
+                r#"
+                async (room) => {{
+                    await {};
+                }}
+            "#,
+                disable
+            ),
+            vec![],
+        ))
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn unmute_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), super::Error> {
+        let media_source_kind = source_kind
+            .as_ref()
+            .map_or_else(String::new, MediaSourceKind::as_js);
+        let disable = match kind {
+            MediaKind::Audio => "room.unmute_audio()".to_string(),
+            MediaKind::Video => {
+                format!("room.unmute_video({})", media_source_kind)
+            }
+        };
+        self.execute(JsExecutable::new(
+            &format!(
+                r#"
+                async (room) => {{
+                    await {};
+                }}
+            "#,
+                disable
+            ),
+            vec![],
+        ))
+            .await?;
+
+        Ok(())
+    }
+
     /// Returns [`ConnectionStore`] for this [`Room`].
     pub async fn connections_store(
         &self,
@@ -100,11 +203,26 @@ impl Object<Room> {
                         subs: new Map(),
                     };
                     room.on_new_connection((conn) => {
+                        let tracksStore = {
+                            tracks: [],
+                            subs: []
+                        };
+                        let connection = {
+                            conn: conn,
+                            tracksStore: tracksStore
+                        };
+                        conn.on_remote_track_added((track) => {
+                            tracksStore.tracks.push(track);
+                            let newStoreSubs = tracksStore.subs.filter((sub) => {
+                                return sub(track);
+                            });
+                            tracksStore.subs = newStoreSubs;
+                        });
                         let id = conn.get_remote_member_id();
-                        store.connections.set(id, conn);
+                        store.connections.set(id, connection);
                         let sub = store.subs.get(id);
                         if (sub != undefined) {
-                            sub(conn);
+                            sub(connection);
                         }
                     });
 

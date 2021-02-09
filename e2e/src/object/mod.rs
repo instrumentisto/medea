@@ -4,6 +4,8 @@ pub mod connection;
 pub mod connections_store;
 pub mod jason;
 pub mod room;
+pub mod track;
+pub mod track_store;
 
 use std::{marker::PhantomData, sync::mpsc};
 

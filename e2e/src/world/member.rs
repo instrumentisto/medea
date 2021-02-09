@@ -120,6 +120,33 @@ impl Member {
         Ok(())
     }
 
+    pub async fn enable_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<()> {
+        self.room.enable_media(kind, source_kind).await?;
+        Ok(())
+    }
+
+    pub async fn mute_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<()> {
+        self.room.mute_media(kind, source_kind).await?;
+        Ok(())
+    }
+
+    pub async fn unmute_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<()> {
+        self.room.unmute_media(kind, source_kind).await?;
+        Ok(())
+    }
+
     /// Returns reference to the storage for the [`Connection`]s throws by this
     /// [`Member`]'s `Room`.
     ///
