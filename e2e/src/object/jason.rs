@@ -32,12 +32,51 @@ impl Object<Jason> {
                     let room = await jason.init_room();
                     room.on_failed_local_media(() => {});
                     room.on_connection_loss(() => {});
+                    let closeListener = {
+                        closeReason: null,
+                        isClosed: false,
+                        subs: [],
+                    };
+                    room.on_close((reason) => {
+                        closeListener.closeReason = reason;
+                        closeListener.isClosed = true;
+                        for (sub of subs) {
+                            sub(reason);
+                        }
+                    });
 
-                    return room;
+                    return {
+                        room: room,
+                        closeListener: closeListener
+                    };
                 }
             "#,
             vec![],
         ))
         .await
+    }
+
+    pub async fn close_room(&self, room: &Object<Room>) {
+        self.execute(JsExecutable::with_objs(
+            r#"
+                async (jason) => {
+                    const [room] = objs;
+                    jason.close_room(room.room);
+                }
+            "#,
+            vec![],
+            vec![room.ptr()]
+        )).await.unwrap();
+    }
+
+    pub async fn dispose(self) {
+        self.execute(JsExecutable::new(
+            r#"
+                async (jason) => {
+                    jason.dispose();
+                }
+            "#,
+            vec![]
+        )).await.unwrap();
     }
 }

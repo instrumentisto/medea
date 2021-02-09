@@ -46,7 +46,7 @@ pub struct World {
     members: HashMap<String, Member>,
 
     /// All [`Jason`]s created in this [`World`].
-    jasons: Vec<Object<Jason>>,
+    jasons: HashMap<String, Object<Jason>>,
 
     /// [WebDriver] client where all objects from this world will be created.
     ///
@@ -74,7 +74,7 @@ impl World {
             control_api,
             client,
             members: HashMap::new(),
-            jasons: Vec::new(),
+            jasons: HashMap::new(),
         })
     }
 
@@ -178,8 +178,8 @@ impl World {
         let room = jason.init_room().await?;
         let member = builder.build(room).await?;
 
+        self.jasons.insert(member.id().to_string(), jason);
         self.members.insert(member.id().to_string(), member);
-        self.jasons.push(jason);
 
         Ok(())
     }
@@ -234,6 +234,34 @@ impl World {
         }
 
         Ok(())
+    }
+
+    pub async fn close_room(&mut self, member_id: &str) {
+        let jason = self.jasons.get(member_id).unwrap();
+        let member = self.members.get(member_id).unwrap();
+        let room = member.room();
+        jason.close_room(room).await;
+    }
+
+    pub async fn wait_for_on_close(&self, member_id: &str) -> String {
+        let member =  self.members.get(member_id).unwrap();
+
+        member.room().wait_for_close().await
+    }
+
+    pub async fn dispose_jason(&mut self, member_id: &str) {
+        let jason = self.jasons.remove(member_id).unwrap();
+        jason.dispose().await;
+    }
+
+    pub async fn delete_member_element(&mut self, member_id: &str) {
+        let resposne = self.control_api.delete(&format!("{}/{}", self.room_id, member_id)).await.unwrap();
+        assert!(resposne.error.is_none());
+    }
+
+    pub async fn delete_room_element(&mut self) {
+        let resp = self.control_api.delete(self.room_id.as_str()).await.unwrap();
+        assert!(resp.error.is_none());
     }
 }
 

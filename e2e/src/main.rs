@@ -226,3 +226,44 @@ async fn then_doesnt_have_remote_track(
 
     assert!(!tracks_with_partner.has_track(kind, source_kind).await);
 }
+
+#[when(regex = "^`(.*)`'s Room closed by client$")]
+async fn when_room_closed_by_client(
+    world: &mut World,
+    id: String,
+) {
+    world.close_room(&id).await;
+}
+
+#[then(regex = "^`(.*)`'s Room.on_close callback fires with `(.*)` reason$")]
+async fn then_on_close_fires(
+    world: &mut World,
+    id: String,
+    expect_reason: String
+) {
+    let reason = world.wait_for_on_close(&id).await;
+    assert_eq!(expect_reason, reason);
+}
+
+#[when(regex = "^`(.*)`'s Jason object disposes$")]
+async fn when_jason_object_disposes(
+    world: &mut World,
+    id: String,
+) {
+    world.dispose_jason(&id).await;
+}
+
+#[when(regex = "Control API removes Member `(.*)`")]
+async fn when_control_api_removes_member(
+    world: &mut World,
+    id: String,
+) {
+    world.delete_member_element(&id).await;
+}
+
+#[when(regex = "^Control API removes Room$")]
+async fn when_control_api_removes_room(
+    world: &mut World,
+) {
+    world.delete_room_element().await;
+}

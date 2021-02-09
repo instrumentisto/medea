@@ -154,4 +154,8 @@ impl Member {
     pub fn connections(&self) -> &Object<ConnectionStore> {
         &self.connection_store
     }
+
+    pub fn room(&self) -> &Object<Room> {
+        &self.room
+    }
 }

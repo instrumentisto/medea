@@ -56,7 +56,7 @@ impl Object<Room> {
             r#"
                 async (room) => {
                     const [uri] = args;
-                    await room.join(uri);
+                    await room.room.join(uri);
                 }
             "#,
             vec![uri.into()],
@@ -80,9 +80,9 @@ impl Object<Room> {
             .as_ref()
             .map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
-            MediaKind::Audio => "room.disable_audio()".to_string(),
+            MediaKind::Audio => "room.room.disable_audio()".to_string(),
             MediaKind::Video => {
-                format!("room.disable_video({})", media_source_kind)
+                format!("room.room.disable_video({})", media_source_kind)
             }
         };
         self.execute(JsExecutable::new(
@@ -110,9 +110,9 @@ impl Object<Room> {
             .as_ref()
             .map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
-            MediaKind::Audio => "room.enable_audio()".to_string(),
+            MediaKind::Audio => "room.room.enable_audio()".to_string(),
             MediaKind::Video => {
-                format!("room.enable_video({})", media_source_kind)
+                format!("room.room.enable_video({})", media_source_kind)
             }
         };
         self.execute(JsExecutable::new(
@@ -140,9 +140,9 @@ impl Object<Room> {
             .as_ref()
             .map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
-            MediaKind::Audio => "room.mute_audio()".to_string(),
+            MediaKind::Audio => "room.room.mute_audio()".to_string(),
             MediaKind::Video => {
-                format!("room.mute_video({})", media_source_kind)
+                format!("room.room.mute_video({})", media_source_kind)
             }
         };
         self.execute(JsExecutable::new(
@@ -170,9 +170,9 @@ impl Object<Room> {
             .as_ref()
             .map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
-            MediaKind::Audio => "room.unmute_audio()".to_string(),
+            MediaKind::Audio => "room.room.unmute_audio()".to_string(),
             MediaKind::Video => {
-                format!("room.unmute_video({})", media_source_kind)
+                format!("room.room.unmute_video({})", media_source_kind)
             }
         };
         self.execute(JsExecutable::new(
@@ -202,7 +202,7 @@ impl Object<Room> {
                         connections: new Map(),
                         subs: new Map(),
                     };
-                    room.on_new_connection((conn) => {
+                    room.room.on_new_connection((conn) => {
                         let tracksStore = {
                             tracks: [],
                             subs: []
@@ -232,5 +232,25 @@ impl Object<Room> {
             vec![],
         ))
         .await
+    }
+
+    pub async fn wait_for_close(&self) -> String {
+        self.execute(JsExecutable::new(
+            r#"
+                async (room) => {
+                    if (room.closeListener.isClosed) {
+                        return room.closeListener.closeReason.reason();
+                    } else {
+                        let waiter = new Promise((resolve, reject) => {
+                            room.closeListener.subs.push(resolve);
+                        });
+
+                        let closeReason = await waiter;
+                        return closeReason.reason();
+                    }
+                }
+            "#,
+            vec![]
+        )).await.unwrap().as_str().unwrap().to_string()
     }
 }

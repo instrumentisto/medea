@@ -80,6 +80,10 @@ impl<T> Object<T> {
         }
     }
 
+    pub fn ptr(&self) -> ObjectPtr {
+        self.ptr.clone()
+    }
+
     /// Returns new [`Object`] which will be created by the provided
     /// [`JsExecutable`].
     ///
