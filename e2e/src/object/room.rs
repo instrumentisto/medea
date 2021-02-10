@@ -130,6 +130,71 @@ impl Object<Room> {
         Ok(())
     }
 
+    /// Disabled media publishing for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media publishing will be
+    /// disabled for all [`MediaSourceKind`]s.
+    pub async fn disable_remote_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), super::Error> {
+        let media_source_kind = source_kind
+            .as_ref()
+            .map_or_else(String::new, MediaSourceKind::as_js);
+        let disable = match kind {
+            MediaKind::Audio => "room.room.disable_remote_audio()".to_string(),
+            MediaKind::Video => {
+                format!("room.room.disable_remote_video({})", media_source_kind)
+            }
+        };
+        self.execute(JsExecutable::new(
+            &format!(
+                r#"
+                async (room) => {{
+                    await {};
+                }}
+            "#,
+                disable
+            ),
+            vec![],
+        ))
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn enable_remote_media(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), super::Error> {
+        let media_source_kind = source_kind
+            .as_ref()
+            .map_or_else(String::new, MediaSourceKind::as_js);
+        let disable = match kind {
+            MediaKind::Audio => "room.room.enable_remote_audio()".to_string(),
+            MediaKind::Video => {
+                format!("room.room.enable_remote_video({})", media_source_kind)
+            }
+        };
+        self.execute(JsExecutable::new(
+            &format!(
+                r#"
+                async (room) => {{
+                    await {};
+                }}
+            "#,
+                disable
+            ),
+            vec![],
+        ))
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn mute_media(
         &self,
         kind: MediaKind,

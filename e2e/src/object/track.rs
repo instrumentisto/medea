@@ -22,7 +22,6 @@ impl Object<Track> {
         self.execute(JsExecutable::new(
             r#"
                 async (track) => {
-                    console.log(track.get_track());
                     return track.get_track().enabled;
                 }
             "#,
