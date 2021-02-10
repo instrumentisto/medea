@@ -1,14 +1,23 @@
-use crate::object::Object;
-use crate::object::room::{MediaKind, MediaSourceKind};
-use crate::object::track::Track;
-use crate::browser::JsExecutable;
+use crate::{
+    browser::JsExecutable,
+    object::{
+        room::{MediaKind, MediaSourceKind},
+        track::Track,
+        Object,
+    },
+};
 
 pub struct TrackStore;
 
 impl Object<TrackStore> {
-    pub async fn has_track(&self, kind: MediaKind, source_kind: MediaSourceKind) -> bool {
+    pub async fn has_track(
+        &self,
+        kind: MediaKind,
+        source_kind: MediaSourceKind,
+    ) -> bool {
         let kind_js = JsExecutable::new(
-            &format!(r#"
+            &format!(
+                r#"
                 async (store) => {{
                     return {{
                         store: store,
@@ -16,25 +25,41 @@ impl Object<TrackStore> {
                         sourceKind: {source_kind}
                     }};
                 }}
-            "#, source_kind = source_kind.as_js(), kind = kind.as_js()),
+            "#,
+                source_kind = source_kind.as_js(),
+                kind = kind.as_js()
+            ),
             vec![],
         );
 
-        self.execute(kind_js.and_then(JsExecutable::new(r#"
+        self.execute(kind_js.and_then(JsExecutable::new(
+            r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
-                    if (track.kind() === meta.kind && track.media_source_kind() === meta.sourceKind) {
+                    if (track.kind() === meta.kind
+                        && track.media_source_kind() === meta.sourceKind) {
                         return true;
                     }
                 }
                 return false;
             }
-        "#, vec![]))).await.unwrap().as_bool().unwrap()
+        "#,
+            vec![],
+        )))
+        .await
+        .unwrap()
+        .as_bool()
+        .unwrap()
     }
 
-    pub async fn get_track(&self, kind: MediaKind, source_kind: MediaSourceKind) -> Object<Track> {
+    pub async fn get_track(
+        &self,
+        kind: MediaKind,
+        source_kind: MediaSourceKind,
+    ) -> Object<Track> {
         let kind_js = JsExecutable::new(
-            &format!(r#"
+            &format!(
+                r#"
                 async (store) => {{
                     return {{
                         store: store,
@@ -42,7 +67,10 @@ impl Object<TrackStore> {
                         sourceKind: {source_kind}
                     }};
                 }}
-            "#, source_kind = source_kind.as_js(), kind = kind.as_js()),
+            "#,
+                source_kind = source_kind.as_js(),
+                kind = kind.as_js()
+            ),
             vec![],
         );
 
@@ -50,13 +78,17 @@ impl Object<TrackStore> {
             r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {
-                        if (track.kind() === meta.kind && track.media_source_kind() === meta.sourceKind) {
+                        if (track.kind() === meta.kind
+                            && track.media_source_kind() === meta.sourceKind) {
                             return track;
                         }
                     }
                     let waiter = new Promise((resolve, reject) => {
                         meta.store.subs.push((track) => {
-                            if (track.kind() === meta.kind && track.media_source_kind() === meta.sourceKind) {
+                            let kind = track.kind();
+                            let sourceKind = track.media_source_kind();
+                            if (kind === meta.kind
+                                && sourceKind === meta.sourceKind) {
                                 resolve(track);
                                 return true;
                             } else {
@@ -69,6 +101,8 @@ impl Object<TrackStore> {
                 }
             "#,
             vec![],
-        ))).await.unwrap()
+        )))
+        .await
+        .unwrap()
     }
 }

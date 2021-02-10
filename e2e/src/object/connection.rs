@@ -1,9 +1,12 @@
 use crate::{
     browser::JsExecutable,
-    object::{track_store::TrackStore, Object},
+    object::{
+        room::{MediaKind, MediaSourceKind},
+        track::Track,
+        track_store::TrackStore,
+        Object,
+    },
 };
-use crate::object::room::{MediaKind, MediaSourceKind};
-use crate::object::track::Track;
 use futures::Stream;
 
 /// Representation of the `Connection` JS object.
@@ -18,7 +21,9 @@ impl Object<Connection> {
                 }
             "#,
             vec![],
-        )).await.unwrap()
+        ))
+        .await
+        .unwrap()
     }
 
     pub async fn wait_for_close(&self) {
@@ -32,7 +37,9 @@ impl Object<Connection> {
                     }
                 }
             "#,
-            vec![]
-        )).await.unwrap();
+            vec![],
+        ))
+        .await
+        .unwrap();
     }
 }

@@ -83,7 +83,7 @@ async fn given_member(
                     member.mute_media(MediaKind::Audio, None).await.unwrap();
                     member.mute_media(MediaKind::Video, None).await.unwrap();
                 }
-            },
+            }
             _ => unreachable!(),
         }
     }
@@ -174,7 +174,8 @@ async fn then_member_doesnt_receives_connection(
         .is_none())
 }
 
-#[then(regex = "^`(.*)`'s (audio|(display|device) video) RemoteMediaTrack with `(.*)` is (enabled|disabled|muted|unmuted)$")]
+#[then(regex = "^`(.*)`'s (audio|(display|device) video) RemoteMediaTrack \
+                with `(.*)` is (enabled|disabled|muted|unmuted)$")]
 async fn then_remote_media_track(
     world: &mut World,
     id: String,
@@ -184,14 +185,18 @@ async fn then_remote_media_track(
     state: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let partner_connection = member.connections().wait_for_connection(partner_id).await.unwrap();
+    let partner_connection = member
+        .connections()
+        .wait_for_connection(partner_id)
+        .await
+        .unwrap();
     let tracks_with_partner = partner_connection.tracks_store().await;
 
     let (kind, source_kind) = match kind.as_str() {
         "audio" => (MediaKind::Audio, MediaSourceKind::Device),
         "display video" => (MediaKind::Video, MediaSourceKind::Display),
         "device video" => (MediaKind::Video, MediaSourceKind::Device),
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     let track = tracks_with_partner.get_track(kind, source_kind).await;
 
@@ -200,12 +205,13 @@ async fn then_remote_media_track(
         "disabled" => !track.enabled().await,
         "muted" => track.muted().await,
         "unmuted" => !track.muted().await,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     assert!(check, "RemoteMediaTrack isn't {}", state);
 }
 
-#[then(regex = "^`(.*)` doesn't have (audio|(device|display) video) RemoteMediaTrack with `(.*)`$")]
+#[then(regex = "^`(.*)` doesn't have (audio|(device|display) video) \
+                RemoteMediaTrack with `(.*)`$")]
 async fn then_doesnt_have_remote_track(
     world: &mut World,
     id: String,
@@ -214,24 +220,25 @@ async fn then_doesnt_have_remote_track(
     partner_id: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let partner_connection = member.connections().wait_for_connection(partner_id).await.unwrap();
+    let partner_connection = member
+        .connections()
+        .wait_for_connection(partner_id)
+        .await
+        .unwrap();
     let tracks_with_partner = partner_connection.tracks_store().await;
 
     let (kind, source_kind) = match kind.as_str() {
         "audio" => (MediaKind::Audio, MediaSourceKind::Device),
         "display video" => (MediaKind::Video, MediaSourceKind::Display),
         "device video" => (MediaKind::Video, MediaSourceKind::Device),
-        _ => unreachable!()
+        _ => unreachable!(),
     };
 
     assert!(!tracks_with_partner.has_track(kind, source_kind).await);
 }
 
 #[when(regex = "^`(.*)`'s Room closed by client$")]
-async fn when_room_closed_by_client(
-    world: &mut World,
-    id: String,
-) {
+async fn when_room_closed_by_client(world: &mut World, id: String) {
     world.close_room(&id).await;
 }
 
@@ -239,32 +246,24 @@ async fn when_room_closed_by_client(
 async fn then_on_close_fires(
     world: &mut World,
     id: String,
-    expect_reason: String
+    expect_reason: String,
 ) {
     let reason = world.wait_for_on_close(&id).await;
     assert_eq!(expect_reason, reason);
 }
 
 #[when(regex = "^`(.*)`'s Jason object disposes$")]
-async fn when_jason_object_disposes(
-    world: &mut World,
-    id: String,
-) {
+async fn when_jason_object_disposes(world: &mut World, id: String) {
     world.dispose_jason(&id).await;
 }
 
 #[when(regex = "Control API removes Member `(.*)`")]
-async fn when_control_api_removes_member(
-    world: &mut World,
-    id: String,
-) {
+async fn when_control_api_removes_member(world: &mut World, id: String) {
     world.delete_member_element(&id).await;
 }
 
 #[when(regex = "^Control API removes Room$")]
-async fn when_control_api_removes_room(
-    world: &mut World,
-) {
+async fn when_control_api_removes_room(world: &mut World) {
     world.delete_room_element().await;
 }
 
@@ -275,6 +274,7 @@ async fn then_connection_closes(
     partner_id: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let connection = member.connections().get(partner_id).await.unwrap().unwrap();
+    let connection =
+        member.connections().get(partner_id).await.unwrap().unwrap();
     connection.wait_for_close().await;
 }

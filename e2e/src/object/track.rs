@@ -1,5 +1,4 @@
-use crate::object::Object;
-use crate::browser::JsExecutable;
+use crate::{browser::JsExecutable, object::Object};
 
 pub struct Track;
 
@@ -12,7 +11,11 @@ impl Object<Track> {
                 }
             "#,
             vec![],
-        )).await.unwrap().as_bool().unwrap()
+        ))
+        .await
+        .unwrap()
+        .as_bool()
+        .unwrap()
     }
 
     pub async fn muted(&self) -> bool {
@@ -24,6 +27,10 @@ impl Object<Track> {
                 }
             "#,
             vec![],
-        )).await.unwrap().as_bool().unwrap()
+        ))
+        .await
+        .unwrap()
+        .as_bool()
+        .unwrap()
     }
 }

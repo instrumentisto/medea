@@ -65,8 +65,10 @@ impl Object<Jason> {
                 }
             "#,
             vec![],
-            vec![room.ptr()]
-        )).await.unwrap();
+            vec![room.ptr()],
+        ))
+        .await
+        .unwrap();
     }
 
     pub async fn dispose(self) {
@@ -76,7 +78,9 @@ impl Object<Jason> {
                     jason.dispose();
                 }
             "#,
-            vec![]
-        )).await.unwrap();
+            vec![],
+        ))
+        .await
+        .unwrap();
     }
 }

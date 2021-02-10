@@ -18,12 +18,8 @@ pub enum MediaKind {
 impl MediaKind {
     pub fn as_js(&self) -> String {
         match self {
-            MediaKind::Audio => {
-                "window.rust.MediaKind.Audio".to_string()
-            }
-            MediaKind::Video => {
-                "window.rust.MediaKind.Video".to_string()
-            }
+            MediaKind::Audio => "window.rust.MediaKind.Audio".to_string(),
+            MediaKind::Video => "window.rust.MediaKind.Video".to_string(),
         }
     }
 }
@@ -126,7 +122,7 @@ impl Object<Room> {
             ),
             vec![],
         ))
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -156,7 +152,7 @@ impl Object<Room> {
             ),
             vec![],
         ))
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -186,7 +182,7 @@ impl Object<Room> {
             ),
             vec![],
         ))
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -218,9 +214,10 @@ impl Object<Room> {
                         };
                         conn.on_remote_track_added((track) => {
                             tracksStore.tracks.push(track);
-                            let newStoreSubs = tracksStore.subs.filter((sub) => {
-                                return sub(track);
-                            });
+                            let newStoreSubs = tracksStore.subs
+                                .filter((sub) => {
+                                    return sub(track);
+                                });
                             tracksStore.subs = newStoreSubs;
                         });
                         conn.on_close(() => {
@@ -261,7 +258,12 @@ impl Object<Room> {
                     }
                 }
             "#,
-            vec![]
-        )).await.unwrap().as_str().unwrap().to_string()
+            vec![],
+        ))
+        .await
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string()
     }
 }

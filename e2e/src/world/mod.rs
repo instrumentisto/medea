@@ -244,7 +244,7 @@ impl World {
     }
 
     pub async fn wait_for_on_close(&self, member_id: &str) -> String {
-        let member =  self.members.get(member_id).unwrap();
+        let member = self.members.get(member_id).unwrap();
 
         member.room().wait_for_close().await
     }
@@ -255,12 +255,20 @@ impl World {
     }
 
     pub async fn delete_member_element(&mut self, member_id: &str) {
-        let resposne = self.control_api.delete(&format!("{}/{}", self.room_id, member_id)).await.unwrap();
+        let resposne = self
+            .control_api
+            .delete(&format!("{}/{}", self.room_id, member_id))
+            .await
+            .unwrap();
         assert!(resposne.error.is_none());
     }
 
     pub async fn delete_room_element(&mut self) {
-        let resp = self.control_api.delete(self.room_id.as_str()).await.unwrap();
+        let resp = self
+            .control_api
+            .delete(self.room_id.as_str())
+            .await
+            .unwrap();
         assert!(resp.error.is_none());
     }
 }
