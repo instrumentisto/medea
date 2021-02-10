@@ -2,8 +2,8 @@
 
 pub mod connection;
 pub mod connections_store;
-pub mod jason;
-pub mod room;
+mod jason;
+mod room;
 
 use std::{marker::PhantomData, sync::mpsc};
 
@@ -12,7 +12,12 @@ use serde_json::Value as Json;
 use tokio::task;
 use uuid::Uuid;
 
-use crate::browser::{self, JsExecutable, WindowWebClient};
+use crate::browser::{self, Statement};
+
+pub use self::{
+    jason::Jason,
+    room::{MediaKind, MediaSourceKind, Room},
+};
 
 /// All errors which can happen while working with objects.
 #[derive(Debug, Display, Error, From)]
@@ -35,25 +40,25 @@ pub struct Object<T> {
     /// Pointer to the JS object on browser-side.
     ptr: ObjectPtr,
 
-    /// [`WindowWebClient`] where this [`Object`] is exists.
-    client: WindowWebClient,
+    /// [`Window`] where this [`Object`] is exists.
+    window: browser::Window,
 
     /// Type of [`Object`].
-    _object_type: PhantomData<T>,
+    _kind: PhantomData<T>,
 }
 
 impl<T> Drop for Object<T> {
     fn drop(&mut self) {
         let ptr = self.ptr.clone();
-        let client = self.client.clone();
+        let window = self.window.clone();
         let (tx, rx) = mpsc::channel();
         tokio::spawn(async move {
-            client
-                .execute(JsExecutable::new(
+            window
+                .execute(Statement::new(
                     r#"
                     async () => {
                         const [id] = args;
-                        window.holders.delete(id);
+                        window.registry.delete(id);
                     }
                 "#,
                     vec![ptr.to_string().into()],
@@ -69,43 +74,39 @@ impl<T> Drop for Object<T> {
 }
 
 impl<T> Object<T> {
-    /// Returns [`Object`] with a provided ID and [`WindowWebClient`].
-    pub fn new(id: String, client: WindowWebClient) -> Self {
+    /// Returns [`Object`] with a provided ID and [`Window`].
+    pub fn new(id: String, window: browser::Window) -> Self {
         Self {
             ptr: ObjectPtr(id),
-            client,
-            _object_type: PhantomData::default(),
+            window,
+            _kind: PhantomData::default(),
         }
     }
 
-    /// Returns new [`Object`] which will be created by the provided
-    /// [`JsExecutable`].
-    ///
-    /// JS object which this [`Object`] represents will be passed to the
-    /// provided [`JsExecutable`] as lambda argument.
-    pub async fn spawn_object<O>(
+    /// Executes provided statement that returns [`Object`].
+    pub async fn execute_and_fetch<O>(
         &self,
-        exec: JsExecutable,
+        statement: Statement,
     ) -> Result<Object<O>, Error> {
         let id = Uuid::new_v4().to_string();
-        self.execute(exec.and_then(JsExecutable::new(
+        self.execute(statement.and_then(Statement::new(
             r#"
                 async (obj) => {
                     const [id] = args;
-                    window.holders.set(id, obj);
+                    window.registry.set(id, obj);
                 }
             "#,
             vec![id.clone().into()],
         )))
         .await?;
 
-        Ok(Object::new(id, self.client.clone()))
+        Ok(Object::new(id, self.window.clone()))
     }
 
     /// Returns `true` if this [`Object`] is `undefined`.
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (o) => {
                     return o === undefined;
@@ -118,21 +119,21 @@ impl<T> Object<T> {
             .ok_or(Error::TypeCast)?)
     }
 
-    /// Executes provided [`JsExecutable`] in the browser.
+    /// Executes provided [`Statement`] in the browser.
     ///
     /// JS object which this [`Object`] represents will be passed to the
-    /// provided [`JsExecutable`] as lambda argument.
-    async fn execute(&self, js: JsExecutable) -> Result<Json, Error> {
-        Ok(self.client.execute(self.get_obj().and_then(js)).await?)
+    /// provided [`Statement`] as lambda argument.
+    async fn execute(&self, js: Statement) -> Result<Json, Error> {
+        Ok(self.window.execute(self.get_obj().and_then(js)).await?)
     }
 
-    /// Returns [`JsExecutable`] which will obtain JS object of this [`Object`].
-    fn get_obj(&self) -> JsExecutable {
-        JsExecutable::new(
+    /// Returns [`Statement`] which will obtain JS object of this [`Object`].
+    fn get_obj(&self) -> Statement {
+        Statement::new(
             r#"
                 async () => {
                     const [id] = args;
-                    return window.holders.get(id);
+                    return window.registry.get(id);
                 }
             "#,
             vec![self.ptr.to_string().into()],
@@ -141,31 +142,31 @@ impl<T> Object<T> {
 }
 
 impl<T: Builder> Object<T> {
-    /// Spawns provided `obj` [`Object`] in the provided [`WindowWebClient`].
+    /// Spawns provided `obj` [`Object`] in the provided [`Window`].
     pub async fn spawn(
         obj: T,
-        client: WindowWebClient,
+        window: browser::Window,
     ) -> Result<Object<T>, Error> {
         let id = Uuid::new_v4().to_string();
-        client
-            .execute(obj.build().and_then(JsExecutable::new(
+        window
+            .execute(obj.build().and_then(Statement::new(
                 r#"
                     async (obj) => {
                         const [id] = args;
-                        window.holders.set(id, obj);
+                        window.registry.set(id, obj);
                     }
                 "#,
                 vec![id.clone().into()],
             )))
             .await?;
 
-        Ok(Object::new(id, client))
+        Ok(Object::new(id, window))
     }
 }
 
 /// Abstraction which will be used for JS object creating for the [`Object`].
 pub trait Builder {
-    /// Returns [`JsExecutable`] with which JS object for this object will be
+    /// Returns [`Statement`] with which JS object for this object will be
     /// created.
-    fn build(self) -> JsExecutable;
+    fn build(self) -> Statement;
 }

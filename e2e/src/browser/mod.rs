@@ -4,7 +4,7 @@
 //! [WebDriver]: https://www.w3.org/TR/webdriver/
 
 mod client;
-mod executable;
+mod js;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -15,10 +15,10 @@ use derive_more::{Display, Error, From};
 use serde_json::Value as Json;
 use webdriver::common::WebWindow;
 
-use self::client::WebClient;
+use self::client::WebDriverClient;
 
 #[doc(inline)]
-pub use self::executable::JsExecutable;
+pub use self::js::Statement;
 
 /// All errors which can happen while working with browser.
 #[derive(Debug, Display, Error, From)]
@@ -40,37 +40,37 @@ pub enum Error {
     /// Failed to deserialize result from the executed JS code.
     ///
     /// Should never happen.
-    ResultDeserialize(serde_json::Error),
+    Deserialize(serde_json::Error),
 }
 
 type Result<T> = std::result::Result<T, Error>;
 
 /// [WebDriver] for some concrete browser window.
 ///
-/// All JS executed by [`WindowWebClient::execute`] will be ran in the right
+/// All JS executed by [`Window::execute`] will be ran in the right
 /// browser window.
 ///
-/// Window will be closed when all [`WindowWebClient`] for this window will be
+/// Window will be closed when all [`Window`] for this window will be
 /// [`Drop`]ped.
 ///
 /// [WebDriver]: https://www.w3.org/TR/webdriver/
-pub struct WindowWebClient {
+pub struct Window {
     /// Client for interacting with browser through [WebDriver].
     ///
     /// [WebDriver]: https://www.w3.org/TR/webdriver/
-    client: WebClient,
+    client: WebDriverClient,
 
-    /// ID of window in which this [`WindowWebClient`] should execute
+    /// ID of window in which this [`Window`] should execute
     /// everything.
     window: WebWindow,
 
-    /// Count of [`WindowWebClient`] references.
+    /// Count of [`Window`] references.
     ///
-    /// Used in the [`Drop`] implementation of the [`WindowWebClient`].
+    /// Used in the [`Drop`] implementation of the [`Window`].
     rc: Arc<AtomicUsize>,
 }
 
-impl Clone for WindowWebClient {
+impl Clone for Window {
     fn clone(&self) -> Self {
         self.rc.fetch_add(1, Ordering::SeqCst);
         Self {
@@ -81,7 +81,7 @@ impl Clone for WindowWebClient {
     }
 }
 
-impl Drop for WindowWebClient {
+impl Drop for Window {
     fn drop(&mut self) {
         if self.rc.fetch_sub(1, Ordering::SeqCst) == 1 {
             self.client.blocking_window_close(self.window.clone());
@@ -89,10 +89,10 @@ impl Drop for WindowWebClient {
     }
 }
 
-impl WindowWebClient {
+impl Window {
     /// Creates new window in the provided [`WebClient`] and returns
-    /// [`WindowWebClient`] for the created window.
-    async fn new(client: WebClient) -> Self {
+    /// [`Window`] for the created window.
+    async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();
 
         Self {
@@ -102,9 +102,9 @@ impl WindowWebClient {
         }
     }
 
-    /// Executes provided [`JsExecutable`] in window which this
-    /// [`WindowWebClient`] represents.
-    pub async fn execute(&self, exec: JsExecutable) -> Result<Json> {
+    /// Executes provided [`Statement`] in window which this [`Window`]
+    /// represents.
+    pub async fn execute(&self, exec: Statement) -> Result<Json> {
         self.client
             .switch_to_window_and_execute(self.window.clone(), exec)
             .await
@@ -113,26 +113,26 @@ impl WindowWebClient {
 
 /// Root [WebDriver] client for some browser.
 ///
-/// This client can create new [`WindowWebClient`]s.
+/// This client can create new [`Window`]s.
 ///
 /// [WebDriver] session will be closed on this object [`Drop::drop`].
 ///
 /// [WebDriver]: https://www.w3.org/TR/webdriver/
-pub struct RootWebClient(WebClient);
+pub struct WindowFactory(WebDriverClient);
 
-impl RootWebClient {
-    /// Returns new [`RootWebClient`].
+impl WindowFactory {
+    /// Returns new [`WindowFactory`].
     pub async fn new() -> Result<Self> {
-        Ok(Self(WebClient::new().await?))
+        Ok(Self(WebDriverClient::new().await?))
     }
 
-    /// Creates and returns new [`WindowWebClient`].
-    pub async fn new_window(&self) -> WindowWebClient {
-        WindowWebClient::new(self.0.clone()).await
+    /// Creates and returns new [`Window`].
+    pub async fn new_window(&self) -> Window {
+        Window::new(self.0.clone()).await
     }
 }
 
-impl Drop for RootWebClient {
+impl Drop for WindowFactory {
     fn drop(&mut self) {
         self.0.blocking_close();
     }

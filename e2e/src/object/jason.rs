@@ -2,7 +2,7 @@
 //! object.
 
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{room::Room, Builder, Object},
 };
 
@@ -10,8 +10,8 @@ use crate::{
 pub struct Jason;
 
 impl Builder for Jason {
-    fn build(self) -> JsExecutable {
-        JsExecutable::new(
+    fn build(self) -> Statement {
+        Statement::new(
             r#"
                 async () => {
                     let jason = new window.rust.Jason();
@@ -26,7 +26,7 @@ impl Builder for Jason {
 impl Object<Jason> {
     /// Returns new [`Room`] initiated in this [`Jason`].
     pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
-        self.spawn_object(JsExecutable::new(
+        self.execute_and_fetch(Statement::new(
             r#"
                 async (jason) => {
                     let room = await jason.init_room();

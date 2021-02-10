@@ -1,4 +1,4 @@
-Feature: Room joining
+Feature: `on_new_connection` callback fires
   Scenario: Member joined
     Given joined Member `Alice`
     And Member `Bob`

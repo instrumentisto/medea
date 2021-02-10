@@ -1,14 +1,12 @@
-//! Implementation of the object which represents Media Server Member.
+//! Representation of Media Server Member used in tests.
 
 use derive_more::{Display, Error, From};
 
 use crate::{
     conf,
     object::{
-        self,
-        connections_store::ConnectionStore,
-        room::{MediaKind, MediaSourceKind, Room},
-        Object,
+        self, connections_store::ConnectionStore, MediaKind, MediaSourceKind,
+        Object, Room,
     },
 };
 
@@ -111,12 +109,12 @@ impl Member {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be
     /// disabled for all [`MediaSourceKind`]s.
-    pub async fn disable_media(
+    pub async fn disable_media_send(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<()> {
-        self.room.disable_media(kind, source_kind).await?;
+        self.room.disable_media_send(kind, source_kind).await?;
         Ok(())
     }
 

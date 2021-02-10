@@ -148,8 +148,8 @@ jobs:
   test-e2e:
     name: E2E tests
     if: ${{ github.ref == 'refs/heads/master'
-      || startsWith(github.ref, 'refs/tags/medea-')
-      || !contains(github.event.head_commit.message, '[skip ci]') }}
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

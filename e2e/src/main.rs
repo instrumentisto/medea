@@ -11,7 +11,7 @@ use cucumber_rust::{given, then, when, WorldInit as _};
 
 use self::{
     file_server::FileServer,
-    object::room::MediaKind,
+    object::MediaKind,
     world::{MemberBuilder, World},
 };
 
@@ -68,10 +68,16 @@ async fn given_member(
         match disabled_or_muted.as_str() {
             "disabled" => {
                 if let Some(kind) = parse_media_kind(&audio_or_video) {
-                    member.disable_media(kind, None).await.unwrap();
+                    member.disable_media_send(kind, None).await.unwrap();
                 } else {
-                    member.disable_media(MediaKind::Audio, None).await.unwrap();
-                    member.disable_media(MediaKind::Video, None).await.unwrap();
+                    member
+                        .disable_media_send(MediaKind::Audio, None)
+                        .await
+                        .unwrap();
+                    member
+                        .disable_media_send(MediaKind::Video, None)
+                        .await
+                        .unwrap();
                 }
             }
             "muted" => todo!("Muting is unimplemented atm"),
@@ -90,10 +96,16 @@ async fn when_disables_mutes(
     let member = world.get_member(&id).unwrap();
     if disable_or_mutes == "disables" {
         if let Some(kind) = parse_media_kind(&audio_or_video) {
-            member.disable_media(kind, None).await.unwrap();
+            member.disable_media_send(kind, None).await.unwrap();
         } else {
-            member.disable_media(MediaKind::Audio, None).await.unwrap();
-            member.disable_media(MediaKind::Video, None).await.unwrap();
+            member
+                .disable_media_send(MediaKind::Audio, None)
+                .await
+                .unwrap();
+            member
+                .disable_media_send(MediaKind::Video, None)
+                .await
+                .unwrap();
         }
     } else {
         todo!("Muting is unimplemented atm.")

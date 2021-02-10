@@ -2,7 +2,7 @@
 //! [`Connection`]s thrown by `Room.on_new_connection` callback.
 
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{connection::Connection, Object},
 };
 
@@ -19,7 +19,7 @@ impl Object<ConnectionStore> {
         remote_id: String,
     ) -> Result<Option<Object<Connection>>, super::Error> {
         let connection = self
-            .spawn_object(JsExecutable::new(
+            .execute_and_fetch(Statement::new(
                 r#"
                 async (store) => {
                     const [id] = args;
@@ -45,7 +45,7 @@ impl Object<ConnectionStore> {
         &self,
         remote_id: String,
     ) -> Result<Object<Connection>, super::Error> {
-        self.spawn_object(JsExecutable::new(
+        self.execute_and_fetch(Statement::new(
             r#"
                 async (store) => {
                     const [remoteId] = args;

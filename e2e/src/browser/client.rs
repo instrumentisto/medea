@@ -13,7 +13,7 @@ use webdriver::{capabilities::Capabilities, common::WebWindow};
 
 use crate::conf;
 
-use super::{executable::JsExecutable, Error, Result};
+use super::{js::Statement, Error, Result};
 
 /// Arguments for Chrome browser.
 const CHROME_ARGS: &[&str] = &[
@@ -51,9 +51,9 @@ impl From<JsResult> for Result<Json> {
 ///
 /// [WebDriver]: https://www.w3.org/TR/webdriver/
 #[derive(Clone, Debug)]
-pub struct WebClient(Arc<Mutex<Inner>>);
+pub struct WebDriverClient(Arc<Mutex<Inner>>);
 
-impl WebClient {
+impl WebDriverClient {
     /// Returns new [`WebClient`] connected to the [WebDriver].
     ///
     /// [WebDriver]: https://www.w3.org/TR/webdriver/
@@ -67,11 +67,11 @@ impl WebClient {
     }
 
     /// Switches to the provided [`WebWindow`] and executes provided
-    /// [`JsExecutable`] in it.
+    /// [`Statement`] in it.
     pub async fn switch_to_window_and_execute(
         &self,
         window: WebWindow,
-        exec: JsExecutable,
+        exec: Statement,
     ) -> Result<Json> {
         self.0
             .lock()
@@ -127,9 +127,9 @@ impl Inner {
         Ok(Self(c))
     }
 
-    /// Executes provided [`JsExecutable`] in the current [`WebWindow`].
-    pub async fn execute(&mut self, executable: JsExecutable) -> Result<Json> {
-        let (inner_js, args) = executable.finalize();
+    /// Executes provided [`Statement`] in the current [`WebWindow`].
+    pub async fn execute(&mut self, statement: Statement) -> Result<Json> {
+        let (inner_js, args) = statement.prepare();
 
         let js = format!(
             r#"
@@ -165,7 +165,7 @@ impl Inner {
 
     /// Creates new [`WebWindow`] and returns it's ID.
     ///
-    /// Creates `holders` in the created [`WebWindow`].
+    /// Creates `registry` in the created [`WebWindow`].
     pub async fn new_window(&mut self) -> Result<WebWindow> {
         let window = WebWindow(self.0.new_window(true).await?.handle);
         self.0.switch_to_window(window.clone()).await?;
@@ -174,10 +174,10 @@ impl Inner {
             .await?;
         self.0.wait_for_find(Locator::Id("loaded")).await?;
 
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             r#"
                 async () => {
-                    window.holders = new Map();
+                    window.registry = new Map();
                 }
             "#,
             vec![],
@@ -188,11 +188,11 @@ impl Inner {
     }
 
     /// Switches to the provided [`WebWindow`] and executes provided
-    /// [`JsExecutable`].
+    /// [`Statement`].
     pub async fn switch_to_window_and_execute(
         &mut self,
         window: WebWindow,
-        exec: JsExecutable,
+        exec: Statement,
     ) -> Result<Json> {
         self.0.switch_to_window(window).await?;
 

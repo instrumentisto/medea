@@ -1,4 +1,6 @@
-//! Implementation of world for the tests.
+//! Implementation of [`World`][1] for the tests.
+//!
+//! [1]: cucumber_rust::World
 
 mod member;
 
@@ -11,9 +13,9 @@ use medea_control_api_mock::proto;
 use uuid::Uuid;
 
 use crate::{
-    browser::{self, RootWebClient},
-    control::{self, ControlApi},
-    object::{self, jason::Jason, Object},
+    browser::{self, WindowFactory},
+    control,
+    object::{self, Jason, Object},
 };
 
 use self::member::Member;
@@ -40,7 +42,7 @@ pub struct World {
     room_id: String,
 
     /// Client for the Control API.
-    control_api: ControlApi,
+    control_client: control::Client,
 
     /// All [`Member`]s created in this [`World`].
     members: HashMap<String, Member>,
@@ -51,15 +53,17 @@ pub struct World {
     /// [WebDriver] client where all objects from this world will be created.
     ///
     /// [WebDriver]: https://www.w3.org/TR/webdriver/
-    client: RootWebClient,
+    window_factory: WindowFactory,
 }
 
-impl World {
-    /// Returns new [`World`] for the provided [`RootWebClient`].
-    pub async fn new(client: RootWebClient) -> Result<Self> {
+#[async_trait(? Send)]
+impl cucumber_rust::World for World {
+    type Error = Error;
+
+    async fn new() -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
-        let control_api = ControlApi::new();
-        control_api
+        let control_client = control::Client::new();
+        control_client
             .create(
                 &room_id,
                 proto::Element::Room(proto::Room {
@@ -71,13 +75,15 @@ impl World {
 
         Ok(Self {
             room_id,
-            control_api,
-            client,
+            control_client,
+            window_factory: WindowFactory::new().await?,
             members: HashMap::new(),
             jasons: Vec::new(),
         })
     }
+}
 
+impl World {
     /// Creates new [`Member`] from the provided [`MemberBuilder`].
     ///
     /// `Room` for this [`Member`] will be created, but joining will not be
@@ -121,7 +127,7 @@ impl World {
             });
         }
 
-        self.control_api
+        self.control_client
             .create(
                 &format!("{}/{}", self.room_id, builder.id),
                 proto::Element::Member(proto::Member {
@@ -170,11 +176,12 @@ impl World {
                 })
                 .collect();
             for (path, element) in recv_endpoints {
-                self.control_api.create(&path, element).await?;
+                self.control_client.create(&path, element).await?;
             }
         }
         let jason =
-            Object::spawn(Jason, self.client.new_window().await).await?;
+            Object::spawn(Jason, self.window_factory.new_window().await)
+                .await?;
         let room = jason.init_room().await?;
         let member = builder.build(room).await?;
 
@@ -234,14 +241,5 @@ impl World {
         }
 
         Ok(())
-    }
-}
-
-#[async_trait(?Send)]
-impl cucumber_rust::World for World {
-    type Error = Error;
-
-    async fn new() -> Result<Self> {
-        Ok(Self::new(RootWebClient::new().await?).await?)
     }
 }

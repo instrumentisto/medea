@@ -23,7 +23,7 @@ IMAGE_NAME := $(strip \
 
 RUST_VER := 1.49
 CHROME_VERSION := 88.0
-FIREFOX_VERSION := 85.0
+FIREFOX_VERSION := 85.0.2
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -110,6 +110,7 @@ release: release.crates release.npm
 test:
 	@make test.unit
 	@make test.integration up=yes dockerized=no
+	@make test.e2e up=yes dockerized=no
 
 
 up: up.dev
@@ -127,7 +128,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	killall medea-control-api-mock
+	kill $(shell pidof medea-control-api-mock)
 
 
 down.coturn: docker.down.coturn
@@ -154,7 +155,7 @@ down.medea: docker.down.medea
 # Run Control API mock server.
 #
 # Usage:
-#  make up.control
+#  make up.control [log-to-file=(no|yes)] [background=(yes|no)]
 
 up.control:
 	make wait.port port=6565
@@ -485,12 +486,11 @@ endif
 	make build.jason
 	@make docker.up.webdriver browser=$(browser)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
-	cargo run -p medea-e2e-tests
+	RUST_BACKTRACE=1 cargo run -p medea-e2e-tests
 ifeq ($(up),yes)
 	-make down
 	-make docker.down.webdriver browser=$(browser)
 endif
-
 
 
 
@@ -632,7 +632,7 @@ docker.down.medea:
 ifeq ($(dockerized),yes)
 	docker-compose -f docker-compose.medea.yml down --rmi=local -v
 else
-	-killall medea
+	-kill $(shell pidof medea)
 endif
 
 

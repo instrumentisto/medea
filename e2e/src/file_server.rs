@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use futures::{channel::oneshot, future::select};
+use futures::{channel::oneshot, future};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -13,51 +13,27 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::conf;
 
-const NOT_FOUND: &[u8] = b"Not found";
-
 /// File server which will share `index.html` and compiled `jason` library.
-pub struct FileServer(Option<oneshot::Sender<()>>);
+pub struct FileServer(oneshot::Sender<()>);
 
 impl FileServer {
     /// Starts file server which will share `index.html` and compiled `jason`
     /// library.
     pub fn run() -> Self {
-        let make_service = make_service_fn(|_| async {
-            Ok::<_, hyper::Error>(service_fn(response_files))
-        });
         let server = Server::bind(&conf::FILE_SERVER_ADDR.parse().unwrap())
-            .serve(make_service);
+            .serve(make_service_fn(|_| async {
+                Ok::<_, hyper::Error>(service_fn(serve))
+            }));
 
-        let (tx, rx) = oneshot::channel();
-        tokio::spawn(select(server, rx));
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        tokio::spawn(future::select(server, shutdown_rx));
 
-        Self(Some(tx))
+        Self(shutdown_tx)
     }
-}
-
-impl Drop for FileServer {
-    fn drop(&mut self) {
-        if let Some(tx) = self.0.take() {
-            let _ = tx.send(());
-        }
-    }
-}
-
-/// [`Response`] for the files which are not found on the server.
-fn not_found() -> Response<Body> {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(NOT_FOUND.into())
-        .unwrap()
 }
 
 /// Handles all files requests to this [`FileServer`].
-///
-/// Returns [`not_found`] if path is not for `jason` directory or `index.html`
-/// file.
-async fn response_files(
-    req: Request<Body>,
-) -> Result<Response<Body>, hyper::Error> {
+async fn serve(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let path = &req.uri().path()[1..];
     let mut splitted_path = path.split('/');
     let first = splitted_path.next().unwrap_or("index.html");
@@ -70,31 +46,44 @@ async fn response_files(
             path
         }
         "index.html" => PathBuf::from(&*conf::INDEX_PATH),
-        _ => unreachable!(
-            "File Server shares only index.html and jason directory."
-        ),
+        _ => {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body("Unknown directory requested".into())
+                .unwrap());
+        }
     };
 
-    let mime = match path.extension().unwrap().to_str().unwrap() {
+    if req.method() != Method::GET {
+        return Ok(Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .body("Only GET method is expected".into())
+            .unwrap());
+    }
+
+    let content_type = match path.extension().unwrap().to_str().unwrap() {
         "js" => "text/javascript",
         "html" => "text/html",
         "wasm" => "application/wasm",
-        _ => unreachable!(
-            "Only JS, HTML and WASM files should be shared by this server."
-        ),
+        _ => {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body("Only js, html and wasm files are expected".into())
+                .unwrap())
+        }
     };
 
-    if req.method() == Method::GET {
-        if let Ok(file) = File::open(path).await {
-            let stream = FramedRead::new(file, BytesCodec::new());
-            let body = Body::wrap_stream(stream);
+    let file = if let Ok(file) = File::open(path).await {
+        FramedRead::new(file, BytesCodec::new())
+    } else {
+        return Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body("File not found".into())
+            .unwrap());
+    };
 
-            return Ok(Response::builder()
-                .header("Content-Type", mime)
-                .body(body)
-                .unwrap());
-        }
-    }
-
-    Ok(not_found())
+    Ok(Response::builder()
+        .header("Content-Type", content_type)
+        .body(Body::wrap_stream(file))
+        .unwrap())
 }

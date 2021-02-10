@@ -2,7 +2,7 @@
 //! object.
 
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{connections_store::ConnectionStore, Object},
 };
 
@@ -39,7 +39,7 @@ impl MediaSourceKind {
 impl Object<Room> {
     /// Joins [`Room`] with a provided URI.
     pub async fn join(&self, uri: String) -> Result<(), super::Error> {
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             r#"
                 async (room) => {
                     const [uri] = args;
@@ -58,7 +58,7 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be
     /// disabled for all [`MediaSourceKind`]s.
-    pub async fn disable_media(
+    pub async fn disable_media_send(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
@@ -72,7 +72,7 @@ impl Object<Room> {
                 format!("room.disable_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -92,7 +92,7 @@ impl Object<Room> {
     pub async fn connections_store(
         &self,
     ) -> Result<Object<ConnectionStore>, super::Error> {
-        self.spawn_object(JsExecutable::new(
+        self.execute_and_fetch(Statement::new(
             r#"
                 async (room) => {
                     let store = {
