@@ -40,8 +40,12 @@ impl Object<Track> {
                     return track.on_enabled_fire_count;
                 }
             "#,
-            vec![]
-        )).await.unwrap().as_u64().unwrap()
+            vec![],
+        ))
+        .await
+        .unwrap()
+        .as_u64()
+        .unwrap()
     }
 
     pub async fn on_disabled_fire_count(&self) -> u64 {
@@ -51,7 +55,11 @@ impl Object<Track> {
                     return track.on_disabled_fire_count;
                 }
             "#,
-            vec![]
-        )).await.unwrap().as_u64().unwrap()
+            vec![],
+        ))
+        .await
+        .unwrap()
+        .as_u64()
+        .unwrap()
     }
 }

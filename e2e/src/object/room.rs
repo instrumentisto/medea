@@ -160,7 +160,7 @@ impl Object<Room> {
             ),
             vec![],
         ))
-            .await?;
+        .await?;
 
         Ok(())
     }
@@ -190,7 +190,7 @@ impl Object<Room> {
             ),
             vec![],
         ))
-            .await?;
+        .await?;
 
         Ok(())
     }

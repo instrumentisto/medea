@@ -36,8 +36,9 @@ impl Object<TrackStore> {
             r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
-                    if (track.track.kind() === meta.kind
-                        && track.track.media_source_kind() === meta.sourceKind) {
+                    if (track.track.kind() === meta.kind && track
+                        .track.media_source_kind() === meta
+                        .sourceKind) {
                         return true;
                     }
                 }
@@ -78,8 +79,10 @@ impl Object<TrackStore> {
             r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {
-                        if (track.track.kind() === meta.kind
-                            && track.track.media_source_kind() === meta.sourceKind) {
+                        let isKindEq = track.track.kind() === meta.kind;
+                        let isSourceKindEq = track.track.media_source_kind()
+                            === meta.sourceKind;
+                        if (isKindEq && isSourceKindEq) {
                             return track;
                         }
                     }

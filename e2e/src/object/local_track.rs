@@ -1,5 +1,4 @@
-use crate::object::Object;
-use crate::browser::JsExecutable;
+use crate::{browser::JsExecutable, object::Object};
 
 pub struct LocalTrack;
 
@@ -13,7 +12,11 @@ impl Object<LocalTrack> {
                     return sysTrack.muted;
                 }
             "#,
-            vec![]
-        )).await.unwrap().as_bool().unwrap()
+            vec![],
+        ))
+        .await
+        .unwrap()
+        .as_bool()
+        .unwrap()
     }
 }

@@ -74,15 +74,33 @@ async fn given_member(
                     if remote_or_local == " local" {
                         member.disable_media(kind, None).await.unwrap();
                     } else {
-                        member.room().disable_remote_media(kind, None).await.unwrap();
+                        member
+                            .room()
+                            .disable_remote_media(kind, None)
+                            .await
+                            .unwrap();
                     }
                 } else {
                     if remote_or_local == " local" {
-                        member.disable_media(MediaKind::Audio, None).await.unwrap();
-                        member.disable_media(MediaKind::Video, None).await.unwrap();
+                        member
+                            .disable_media(MediaKind::Audio, None)
+                            .await
+                            .unwrap();
+                        member
+                            .disable_media(MediaKind::Video, None)
+                            .await
+                            .unwrap();
                     } else {
-                        member.room().disable_remote_media(MediaKind::Audio, None).await.unwrap();
-                        member.room().disable_remote_media(MediaKind::Video, None).await.unwrap();
+                        member
+                            .room()
+                            .disable_remote_media(MediaKind::Audio, None)
+                            .await
+                            .unwrap();
+                        member
+                            .room()
+                            .disable_remote_media(MediaKind::Video, None)
+                            .await
+                            .unwrap();
                     }
                 }
             }
@@ -339,7 +357,7 @@ async fn when_member_enables_remote_track(
     let member = world.get_member(&id).unwrap();
     let media_kind = if kind.contains("audio") {
         MediaKind::Audio
-    } else  if kind.contains("video") {
+    } else if kind.contains("video") {
         MediaKind::Video
     } else {
         unreachable!()
@@ -351,10 +369,16 @@ async fn when_member_enables_remote_track(
     } else {
         None
     };
-    member.room().enable_remote_media(media_kind, source_kind).await.unwrap();
+    member
+        .room()
+        .enable_remote_media(media_kind, source_kind)
+        .await
+        .unwrap();
 }
 
-#[when(regex = "Member `(.*)` disables remote (audio|(device |display )?video)")]
+#[when(
+    regex = "^Member `(.*)` disables remote (audio|(device |display )?video)$"
+)]
 async fn when_member_disables_remote_track(
     world: &mut World,
     id: String,
@@ -364,7 +388,7 @@ async fn when_member_disables_remote_track(
     let member = world.get_member(&id).unwrap();
     let media_kind = if kind.contains("audio") {
         MediaKind::Audio
-    } else  if kind.contains("video") {
+    } else if kind.contains("video") {
         MediaKind::Video
     } else {
         unreachable!()
@@ -376,10 +400,15 @@ async fn when_member_disables_remote_track(
     } else {
         None
     };
-    member.room().disable_remote_media(media_kind, source_kind).await.unwrap();
+    member
+        .room()
+        .disable_remote_media(media_kind, source_kind)
+        .await
+        .unwrap();
 }
 
-#[then(regex = "^`(.*)` remote (audio|(device |display )?video) Track from `(.*)` disables")]
+#[then(regex = "^`(.*)` remote (audio|(device |display )?video) Track from \
+                `(.*)` disables")]
 async fn then_remote_track_stops(
     world: &mut World,
     id: String,
@@ -403,11 +432,16 @@ async fn then_remote_track_stops(
         unreachable!()
     };
     let conn = member.connections().get(remote_id).await.unwrap().unwrap();
-    let track = conn.tracks_store().await.get_track(media_kind, source_kind).await;
+    let track = conn
+        .tracks_store()
+        .await
+        .get_track(media_kind, source_kind)
+        .await;
     assert!(track.muted().await);
 }
 
-#[then(regex = "^on_disabled callback fires (\\d*) time on `(.*)`'s remote (audio|(device |display )?video) Track from `(.*)`$")]
+#[then(regex = "^on_disabled callback fires (\\d*) time on `(.*)`'s remote \
+                (audio|(device |display )?video) Track from `(.*)`$")]
 async fn then_on_remote_disabled_callback_fires(
     world: &mut World,
     times: u64,
@@ -417,7 +451,8 @@ async fn then_on_remote_disabled_callback_fires(
     remote_id: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let remote_conn = member.connections().get(remote_id).await.unwrap().unwrap();
+    let remote_conn =
+        member.connections().get(remote_id).await.unwrap().unwrap();
     let (media_kind, source_kind) = if kind.contains("audio") {
         (MediaKind::Audio, MediaSourceKind::Device)
     } else if kind.contains("video") {
@@ -433,11 +468,16 @@ async fn then_on_remote_disabled_callback_fires(
         unreachable!()
     };
 
-    let track = remote_conn.tracks_store().await.get_track(media_kind, source_kind).await;
+    let track = remote_conn
+        .tracks_store()
+        .await
+        .get_track(media_kind, source_kind)
+        .await;
     assert_eq!(track.on_disabled_fire_count().await, times);
 }
 
-#[then(regex = "^on_enabled callback fires (\\d*) time on `(.*)`'s remote (audio|(device |display )?video) Track from `(.*)`$")]
+#[then(regex = "^on_enabled callback fires (\\d*) time on `(.*)`'s remote \
+                (audio|(device |display )?video) Track from `(.*)`$")]
 async fn then_on_remote_enabled_callback_fires(
     world: &mut World,
     times: u64,
@@ -447,7 +487,8 @@ async fn then_on_remote_enabled_callback_fires(
     remote_id: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let remote_conn = member.connections().get(remote_id).await.unwrap().unwrap();
+    let remote_conn =
+        member.connections().get(remote_id).await.unwrap().unwrap();
     let (media_kind, source_kind) = if kind.contains("audio") {
         (MediaKind::Audio, MediaSourceKind::Device)
     } else if kind.contains("video") {
@@ -463,6 +504,10 @@ async fn then_on_remote_enabled_callback_fires(
         unreachable!()
     };
 
-    let track = remote_conn.tracks_store().await.get_track(media_kind, source_kind).await;
+    let track = remote_conn
+        .tracks_store()
+        .await
+        .get_track(media_kind, source_kind)
+        .await;
     assert_eq!(track.on_enabled_fire_count().await, times);
 }
