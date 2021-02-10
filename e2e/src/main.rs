@@ -318,3 +318,56 @@ async fn then_has_local_track(
 
     assert!(tracks.has_track(media_kind, source_kind).await)
 }
+
+#[when(regex = "Member `(.*)` disables remote (audio|(device |display )?video)")]
+async fn when_member_disables_remote_track(
+    world: &mut World,
+    id: String,
+    kind: String,
+    source_kind: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let media_kind = if kind.contains("audio") {
+        MediaKind::Audio
+    } else  if kind.contains("video") {
+        MediaKind::Video
+    } else {
+        unreachable!()
+    };
+    let source_kind = if source_kind.contains("device") {
+        Some(MediaSourceKind::Device)
+    } else if source_kind.contains("display") {
+        Some(MediaSourceKind::Display)
+    } else {
+        None
+    };
+    member.room().disable_remote_media(media_kind, source_kind).await.unwrap();
+}
+
+#[then(regex = "^`(.*)` remote (audio|(device |display )?video) Track from `(.*)` disables")]
+async fn then_remote_track_stops(
+    world: &mut World,
+    id: String,
+    kind: String,
+    source_kind: String,
+    remote_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let (media_kind, source_kind) = if kind.contains("audio") {
+        (MediaKind::Audio, MediaSourceKind::Device)
+    } else if kind.contains("video") {
+        let source_kind = if source_kind.contains("device") {
+            MediaSourceKind::Device
+        } else if source_kind.contains("display") {
+            MediaSourceKind::Display
+        } else {
+            todo!("Implement None for TrackStore::get_track")
+        };
+        (MediaKind::Video, source_kind)
+    } else {
+        unreachable!()
+    };
+    let conn = member.connections().get(remote_id).await.unwrap().unwrap();
+    let track = conn.tracks_store().await.get_track(media_kind, source_kind).await;
+    assert!(track.muted().await);
+}
