@@ -33,7 +33,7 @@ fn parse_media_kind(text: &str) -> Option<MediaKind> {
 }
 
 #[given(regex = "^(joined )?(send-only |receive-only |empty )?Member `(.*)`( \
-                 with (disabled|muted) (audio|video|all))?$")]
+                 with (disabled|muted)( remote| local)? (audio|video|all))?$")]
 async fn given_member(
     world: &mut World,
     joined: String,
@@ -41,6 +41,7 @@ async fn given_member(
     id: String,
     mute_disable: String,
     disabled_or_muted: String,
+    remote_or_local: String,
     audio_or_video: String,
 ) {
     let is_joined = !joined.is_empty();
@@ -70,10 +71,19 @@ async fn given_member(
         match disabled_or_muted.as_str() {
             "disabled" => {
                 if let Some(kind) = parse_media_kind(&audio_or_video) {
-                    member.disable_media(kind, None).await.unwrap();
+                    if remote_or_local == " local" {
+                        member.disable_media(kind, None).await.unwrap();
+                    } else {
+                        member.room().disable_remote_media(kind, None).await.unwrap();
+                    }
                 } else {
-                    member.disable_media(MediaKind::Audio, None).await.unwrap();
-                    member.disable_media(MediaKind::Video, None).await.unwrap();
+                    if remote_or_local == " local" {
+                        member.disable_media(MediaKind::Audio, None).await.unwrap();
+                        member.disable_media(MediaKind::Video, None).await.unwrap();
+                    } else {
+                        member.room().disable_remote_media(MediaKind::Audio, None).await.unwrap();
+                        member.room().disable_remote_media(MediaKind::Video, None).await.unwrap();
+                    }
                 }
             }
             "muted" => {
@@ -319,6 +329,31 @@ async fn then_has_local_track(
     assert!(tracks.has_track(media_kind, source_kind).await)
 }
 
+#[when(regex = "Member `(.*)` enables remote (audio|(device |display )?video)")]
+async fn when_member_enables_remote_track(
+    world: &mut World,
+    id: String,
+    kind: String,
+    source_kind: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let media_kind = if kind.contains("audio") {
+        MediaKind::Audio
+    } else  if kind.contains("video") {
+        MediaKind::Video
+    } else {
+        unreachable!()
+    };
+    let source_kind = if source_kind.contains("device") {
+        Some(MediaSourceKind::Device)
+    } else if source_kind.contains("display") {
+        Some(MediaSourceKind::Display)
+    } else {
+        None
+    };
+    member.room().enable_remote_media(media_kind, source_kind).await.unwrap();
+}
+
 #[when(regex = "Member `(.*)` disables remote (audio|(device |display )?video)")]
 async fn when_member_disables_remote_track(
     world: &mut World,
@@ -370,4 +405,64 @@ async fn then_remote_track_stops(
     let conn = member.connections().get(remote_id).await.unwrap().unwrap();
     let track = conn.tracks_store().await.get_track(media_kind, source_kind).await;
     assert!(track.muted().await);
+}
+
+#[then(regex = "^on_disabled callback fires (\\d*) time on `(.*)`'s remote (audio|(device |display )?video) Track from `(.*)`$")]
+async fn then_on_remote_disabled_callback_fires(
+    world: &mut World,
+    times: u64,
+    id: String,
+    kind: String,
+    source_kind: String,
+    remote_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let remote_conn = member.connections().get(remote_id).await.unwrap().unwrap();
+    let (media_kind, source_kind) = if kind.contains("audio") {
+        (MediaKind::Audio, MediaSourceKind::Device)
+    } else if kind.contains("video") {
+        let source_kind = if source_kind.contains("device") {
+            MediaSourceKind::Device
+        } else if source_kind.contains("display") {
+            MediaSourceKind::Display
+        } else {
+            todo!("Implement None for TrackStore::get_track")
+        };
+        (MediaKind::Video, source_kind)
+    } else {
+        unreachable!()
+    };
+
+    let track = remote_conn.tracks_store().await.get_track(media_kind, source_kind).await;
+    assert_eq!(track.on_disabled_fire_count().await, times);
+}
+
+#[then(regex = "^on_enabled callback fires (\\d*) time on `(.*)`'s remote (audio|(device |display )?video) Track from `(.*)`$")]
+async fn then_on_remote_enabled_callback_fires(
+    world: &mut World,
+    times: u64,
+    id: String,
+    kind: String,
+    source_kind: String,
+    remote_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let remote_conn = member.connections().get(remote_id).await.unwrap().unwrap();
+    let (media_kind, source_kind) = if kind.contains("audio") {
+        (MediaKind::Audio, MediaSourceKind::Device)
+    } else if kind.contains("video") {
+        let source_kind = if source_kind.contains("device") {
+            MediaSourceKind::Device
+        } else if source_kind.contains("display") {
+            MediaSourceKind::Display
+        } else {
+            todo!("Implement None for TrackStore::get_track")
+        };
+        (MediaKind::Video, source_kind)
+    } else {
+        unreachable!()
+    };
+
+    let track = remote_conn.tracks_store().await.get_track(media_kind, source_kind).await;
+    assert_eq!(track.on_enabled_fire_count().await, times);
 }

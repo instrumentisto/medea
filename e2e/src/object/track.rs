@@ -7,7 +7,7 @@ impl Object<Track> {
         self.execute(JsExecutable::new(
             r#"
                 async (track) => {
-                    return track.enabled();
+                    return track.track.enabled();
                 }
             "#,
             vec![],
@@ -22,7 +22,7 @@ impl Object<Track> {
         self.execute(JsExecutable::new(
             r#"
                 async (track) => {
-                    return track.get_track().enabled;
+                    return track.track.get_track().enabled;
                 }
             "#,
             vec![],
@@ -31,5 +31,27 @@ impl Object<Track> {
         .unwrap()
         .as_bool()
         .unwrap()
+    }
+
+    pub async fn on_enabled_fire_count(&self) -> u64 {
+        self.execute(JsExecutable::new(
+            r#"
+                async (track) => {
+                    return track.on_enabled_fire_count;
+                }
+            "#,
+            vec![]
+        )).await.unwrap().as_u64().unwrap()
+    }
+
+    pub async fn on_disabled_fire_count(&self) -> u64 {
+        self.execute(JsExecutable::new(
+            r#"
+                async (track) => {
+                    return track.on_disabled_fire_count;
+                }
+            "#,
+            vec![]
+        )).await.unwrap().as_u64().unwrap()
     }
 }

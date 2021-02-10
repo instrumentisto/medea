@@ -36,8 +36,8 @@ impl Object<TrackStore> {
             r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
-                    if (track.kind() === meta.kind
-                        && track.media_source_kind() === meta.sourceKind) {
+                    if (track.track.kind() === meta.kind
+                        && track.track.media_source_kind() === meta.sourceKind) {
                         return true;
                     }
                 }
@@ -78,15 +78,15 @@ impl Object<TrackStore> {
             r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {
-                        if (track.kind() === meta.kind
-                            && track.media_source_kind() === meta.sourceKind) {
+                        if (track.track.kind() === meta.kind
+                            && track.track.media_source_kind() === meta.sourceKind) {
                             return track;
                         }
                     }
                     let waiter = new Promise((resolve, reject) => {
                         meta.store.subs.push((track) => {
-                            let kind = track.kind();
-                            let sourceKind = track.media_source_kind();
+                            let kind = track.track.kind();
+                            let sourceKind = track.track.media_source_kind();
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
                                 resolve(track);

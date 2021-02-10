@@ -7,7 +7,7 @@ Feature: Room joining
     And `Bob` receives Connection with Member `Alice`
 
   Scenario: Member joined with disabled media
-    Given Member `Alice` with disabled all
+    Given Member `Alice` with disabled local all
     And joined Member `Bob`
     When `Alice` joins Room
     Then `Alice` receives Connection with Member `Bob`

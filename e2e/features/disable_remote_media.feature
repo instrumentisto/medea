@@ -11,3 +11,27 @@ Feature: Remote media disabling
     And joined Member `Bob`
     When  Member `Alice` disables remote audio
     Then `Bob` remote audio Track from `Alice` disables
+
+  Scenario: Remote Track.on_disabled fires on disable audio
+    Given joined Member `Alice`
+    And joined Member `Bob`
+    When Member `Alice` disables remote audio
+    Then on_disabled callback fires 1 time on `Alice`'s remote audio Track from `Bob`
+
+  Scenario: Remote Track.on_disabled fires on disable video
+    Given joined Member `Alice`
+    And joined Member `Bob`
+    When Member `Alice` disables remote video
+    Then on_disabled callback fires 1 time on `Alice`'s remote device video Track from `Bob`
+
+  Scenario: Remote Member disables video
+    Given joined Member `Alice`
+    And joined Member `Bob`
+    When Member `Bob` disables video
+    Then on_disabled callback fires 1 time on `Alice`'s remote device video Track from `Bob`
+
+  Scenario: Remote Member disables audio
+    Given joined Member `Alice`
+    And joined Member `Bob`
+    When Member `Bob` disables audio
+    Then on_disabled callback fires 1 time on `Alice`'s remote audio Track from `Bob`
