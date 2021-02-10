@@ -278,3 +278,43 @@ async fn then_connection_closes(
         member.connections().get(partner_id).await.unwrap().unwrap();
     connection.wait_for_close().await;
 }
+
+#[then(regex = "^Member `(.*)` has (\\d*) local Tracks$")]
+async fn then_member_has_local_tracks(
+    world: &mut World,
+    id: String,
+    count: u64,
+) {
+    let member = world.get_member(&id).unwrap();
+    let room = member.room();
+    let tracks = room.local_tracks().await;
+    assert_eq!(count, tracks.count().await);
+}
+
+#[then(regex = "^`(.*)` has local (audio|(device |display )?video)$")]
+async fn then_has_local_track(
+    world: &mut World,
+    id: String,
+    kind: String,
+    foobar: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let room = member.room();
+    let tracks = room.local_tracks().await;
+    let media_kind = if kind.contains("video") {
+        MediaKind::Video
+    } else if kind.contains("audio") {
+        MediaKind::Audio
+    } else {
+        unreachable!()
+    };
+    let source_kind = if foobar.contains("device") {
+        Some(MediaSourceKind::Device)
+    } else if foobar.contains("display") {
+        Some(MediaSourceKind::Display)
+    } else {
+        None
+    };
+
+    assert!(tracks.has_track(media_kind, source_kind).await)
+}

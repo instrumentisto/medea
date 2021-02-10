@@ -37,6 +37,10 @@ impl Object<Jason> {
                         isClosed: false,
                         subs: [],
                     };
+                    let localTracksStore = {
+                        tracks: [],
+                        subs: []
+                    };
                     room.on_close((reason) => {
                         closeListener.closeReason = reason;
                         closeListener.isClosed = true;
@@ -44,10 +48,17 @@ impl Object<Jason> {
                             sub(reason);
                         }
                     });
+                    room.on_local_track((track) => {
+                        localTracksStore.tracks.push(track);
+                        for (sub of room.localTracksStore.subs) {
+                            sub(track);
+                        }
+                    });
 
                     return {
                         room: room,
-                        closeListener: closeListener
+                        closeListener: closeListener,
+                        localTracksStore: localTracksStore
                     };
                 }
             "#,

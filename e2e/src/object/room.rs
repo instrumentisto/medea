@@ -3,7 +3,10 @@
 
 use crate::{
     browser::JsExecutable,
-    object::{connections_store::ConnectionStore, Object},
+    object::{
+        connections_store::ConnectionStore,
+        local_tracks_store::LocalTracksStore, Object,
+    },
 };
 
 /// Representation of the `Room` JS object.
@@ -240,6 +243,19 @@ impl Object<Room> {
             vec![],
         ))
         .await
+    }
+
+    pub async fn local_tracks(&self) -> Object<LocalTracksStore> {
+        self.spawn_object(JsExecutable::new(
+            r#"
+                async (room) => {
+                    return room.localTracksStore;
+                }
+            "#,
+            vec![],
+        ))
+        .await
+        .unwrap()
     }
 
     pub async fn wait_for_close(&self) -> String {

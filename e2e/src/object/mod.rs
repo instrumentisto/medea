@@ -3,6 +3,8 @@
 pub mod connection;
 pub mod connections_store;
 pub mod jason;
+pub mod local_track;
+pub mod local_tracks_store;
 pub mod room;
 pub mod track;
 pub mod track_store;
