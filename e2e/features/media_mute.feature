@@ -12,54 +12,26 @@ Feature: Media send muting
     When `Bob` joins Room
     Then `Alice`'s audio RemoteMediaTrack with `Bob` is enabled
 
-  Scenario: Member mutes audio before call
+  Scenario: Local Track doesn't mutes when Member mutes audio before call
     Given joined Member `Alice`
     And Member `Bob` with muted audio
     When `Bob` joins Room
-    Then `Alice`'s audio RemoteMediaTrack with `Bob` is muted
+    Then `Bob`'s audio local Track is unmuted
 
-  Scenario: Member mutes video before call
+  Scenario: Local Track doesn't mutes when Member mutes video before call
     Given joined Member `Alice`
     And Member `Bob` with muted video
     When `Bob` joins Room
-    Then `Alice`'s device video RemoteMediaTrack with `Bob` is muted
+    Then `Bob`'s device video local Track is unmuted
 
-  Scenario: Member mutes audio while call
+  Scenario: Local Track doesn't mutes when Member mutes audio while call
     Given joined Member `Alice`
     And joined Member `Bob`
     When Member `Bob` mutes video
-    Then `Alice`'s device video RemoteMediaTrack with `Bob` is muted
+    Then `Bob`'s device video local Track is unmuted
 
-  Scenario: Member mutes audio while call
+  Scenario: Local Track doesn't mutes when Member mutes audio while call
     Given joined Member `Alice`
     And joined Member `Bob`
     When Member `Bob` mutes audio
-    Then `Alice`'s audio RemoteMediaTrack with `Bob` is muted
-
-#  Scenario: Member mutes video before call and unmutes while call
-#    Given joined Member `Alice`
-#    And Member `Bob` with muted video
-#    When `Bob` joins Room
-#    And Member `Bob` unmutes video
-#    Then `Alice`'s device video RemoteMediaTrack with `Bob` is unmuted
-#
-#  Scenario: Member mutes audio before call and unmutes while call
-#    Given joined Member `Alice`
-#    And Member `Bob` with muted audio
-#    When `Bob` joins Room
-#    And Member `Bob` unmutes audio
-#    Then `Alice`'s audio RemoteMediaTrack with `Bob` is unmuted
-#
-#  Scenario: Member mutes and unmutes video while call
-#    Given joined Member `Alice`
-#    And joined Member `Bob`
-#    When Member `Bob` mutes video
-#    And Member `Bob` unmutes video
-#    Then `Alice`'s device video RemoteMediaTrack with `Bob` is unmuted
-#
-#  Scenario: Member mutes and unmutes video while call
-#    Given joined Member `Alice`
-#    And joined Member `Bob`
-#    When Member `Bob` mutes audio
-#    And Member `Bob` unmutes audio
-#    Then `Alice`'s audio RemoteMediaTrack with `Bob` is unmuted
+    Then `Bob`'s audio local Track is unmuted

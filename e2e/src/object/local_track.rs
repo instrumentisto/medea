@@ -19,4 +19,19 @@ impl Object<LocalTrack> {
         .as_bool()
         .unwrap()
     }
+
+    pub async fn muted(&self) -> bool {
+        self.execute(JsExecutable::new(
+            r#"
+                async (track) => {
+                    return !track.get_track().enabled;
+                }
+            "#,
+            vec![],
+        ))
+            .await
+            .unwrap()
+            .as_bool()
+            .unwrap()
+    }
 }

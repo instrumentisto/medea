@@ -511,3 +511,35 @@ async fn then_on_remote_enabled_callback_fires(
         .await;
     assert_eq!(track.on_enabled_fire_count().await, times);
 }
+
+#[then(regex = "^`(.*)`'s (audio|(device|display) video) local Track is (muted|unmuted)$")]
+async fn then_local_track_mute_state(
+    world: &mut World,
+    id: String,
+    kind: String,
+    source_kind: String,
+    muted: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let kind = if kind.contains("audio") {
+        MediaKind::Audio
+    } else if kind.contains("video") {
+        MediaKind::Video
+    } else {
+        unreachable!()
+    };
+    let source_kind = if source_kind.contains("display") {
+        MediaSourceKind::Display
+    } else if source_kind.contains("device") {
+        MediaSourceKind::Device
+    } else {
+        if matches!(kind, MediaKind::Audio) {
+            MediaSourceKind::Device
+        } else {
+            unreachable!()
+        }
+    };
+    let track = member.room().local_tracks().await.get_track(kind, source_kind).await;
+    let muted = muted.as_str() == "muted";
+    assert_eq!(muted, track.muted().await);
+}

@@ -22,7 +22,7 @@ impl Object<Track> {
         self.execute(JsExecutable::new(
             r#"
                 async (track) => {
-                    return track.track.get_track().enabled;
+                    return !track.track.get_track().enabled;
                 }
             "#,
             vec![],
