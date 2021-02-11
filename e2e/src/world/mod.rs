@@ -236,6 +236,7 @@ impl World {
         Ok(())
     }
 
+    /// Closes [`Room`] of the provided [`Member`].
     pub async fn close_room(&mut self, member_id: &str) {
         let jason = self.jasons.get(member_id).unwrap();
         let member = self.members.get(member_id).unwrap();
@@ -243,17 +244,20 @@ impl World {
         jason.close_room(room).await;
     }
 
+    /// Wait for [`Member`]'s [`Room`] close.
     pub async fn wait_for_on_close(&self, member_id: &str) -> String {
         let member = self.members.get(member_id).unwrap();
 
         member.room().wait_for_close().await
     }
 
+    /// Disposes [`Jason`] object of the provided [`Member`] ID.
     pub async fn dispose_jason(&mut self, member_id: &str) {
         let jason = self.jasons.remove(member_id).unwrap();
         jason.dispose().await;
     }
 
+    /// Deletes Control API element of the [`Member`] with a provided ID.
     pub async fn delete_member_element(&mut self, member_id: &str) {
         let resposne = self
             .control_api
@@ -263,6 +267,7 @@ impl World {
         assert!(resposne.error.is_none());
     }
 
+    /// Deletes Control API element of the [`Room`] with a provided ID.
     pub async fn delete_room_element(&mut self) {
         let resp = self
             .control_api

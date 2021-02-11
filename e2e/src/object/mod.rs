@@ -4,10 +4,9 @@ pub mod connection;
 pub mod connections_store;
 pub mod jason;
 pub mod local_track;
-pub mod local_tracks_store;
+pub mod remote_track;
 pub mod room;
-pub mod track;
-pub mod track_store;
+pub mod tracks_store;
 
 use std::{marker::PhantomData, sync::mpsc};
 
@@ -82,6 +81,7 @@ impl<T> Object<T> {
         }
     }
 
+    /// Returns [`ObjectPrt`] for this [`Object`].
     pub fn ptr(&self) -> ObjectPtr {
         self.ptr.clone()
     }

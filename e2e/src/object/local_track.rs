@@ -3,12 +3,14 @@ use crate::{browser::JsExecutable, object::Object};
 pub struct LocalTrack;
 
 impl Object<LocalTrack> {
+    /// Drops this [`LocalTrack`] and returns `readyState` of the
+    /// `MediaStreamTrack`.
     pub async fn free_and_check(self) -> bool {
         self.execute(JsExecutable::new(
             r#"
                 async (track) => {
-                    let sysTrack = track.get_track();
-                    track.free();
+                    let sysTrack = track.track.get_track();
+                    track.track.free();
                     return sysTrack.readyState == "ended";
                 }
             "#,
@@ -20,11 +22,13 @@ impl Object<LocalTrack> {
         .unwrap()
     }
 
+    /// Returns `MediaStreamTrack.enabled` status of underlying
+    /// `MediaStreamTrack`.
     pub async fn muted(&self) -> bool {
         self.execute(JsExecutable::new(
             r#"
                 async (track) => {
-                    return !track.get_track().enabled;
+                    return !track.track.get_track().enabled;
                 }
             "#,
             vec![],

@@ -1,8 +1,9 @@
 use crate::{browser::JsExecutable, object::Object};
 
-pub struct Track;
+pub struct RemoteTrack;
 
-impl Object<Track> {
+impl Object<RemoteTrack> {
+    /// Returns `true` if this [`Track`] is enabled.
     pub async fn enabled(&self) -> bool {
         self.execute(JsExecutable::new(
             r#"
@@ -18,6 +19,8 @@ impl Object<Track> {
         .unwrap()
     }
 
+    /// Returns `true` if this [`Track`] underlying `MediaStreamTrack.enabled`
+    /// if `false`.
     pub async fn muted(&self) -> bool {
         self.execute(JsExecutable::new(
             r#"
@@ -33,6 +36,7 @@ impl Object<Track> {
         .unwrap()
     }
 
+    /// Returns count of `RemoteMediaTrack.on_enabled` callback fires.
     pub async fn on_enabled_fire_count(&self) -> u64 {
         self.execute(JsExecutable::new(
             r#"
@@ -48,6 +52,7 @@ impl Object<Track> {
         .unwrap()
     }
 
+    /// Returns count of `RemoteMediaTrack.on_disabled` callback fires.
     pub async fn on_disabled_fire_count(&self) -> u64 {
         self.execute(JsExecutable::new(
             r#"

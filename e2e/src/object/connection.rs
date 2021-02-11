@@ -1,13 +1,14 @@
 use crate::{
     browser::JsExecutable,
-    object::{track_store::TrackStore, Object},
+    object::{tracks_store::RemoteTracksStore, Object},
 };
 
 /// Representation of the `Connection` JS object.
 pub struct Connection;
 
 impl Object<Connection> {
-    pub async fn tracks_store(&self) -> Object<TrackStore> {
+    /// Returns [`TrackStore`] of this [`Connection`].
+    pub async fn tracks_store(&self) -> Object<RemoteTracksStore> {
         self.spawn_object(JsExecutable::new(
             r#"
                 async (conn) => {
@@ -20,6 +21,8 @@ impl Object<Connection> {
         .unwrap()
     }
 
+    /// Returns [`Future`] which will be resolved when `Connection.on_close`
+    /// callback will fire.
     pub async fn wait_for_close(&self) {
         self.execute(JsExecutable::new(
             r#"

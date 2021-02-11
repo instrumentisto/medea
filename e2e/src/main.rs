@@ -11,10 +11,9 @@ use cucumber_rust::{given, then, when, WorldInit as _};
 
 use self::{
     file_server::FileServer,
-    object::room::MediaKind,
+    object::room::{FailedParsing, MediaKind, MediaSourceKind},
     world::{MemberBuilder, World},
 };
-use crate::object::room::{FailedParsing, MediaSourceKind};
 
 #[tokio::main]
 async fn main() {
@@ -183,7 +182,7 @@ async fn then_member_doesnt_receives_connection(
 }
 
 #[then(regex = "^`(.*)`'s (audio|(?:display|device) video) RemoteMediaTrack \
-                with `(.*)` is (enabled|disabled|muted|unmuted)$")]
+                with `(.*)` is (enabled|disabled)$")]
 async fn then_remote_media_track(
     world: &mut World,
     id: String,
@@ -205,8 +204,6 @@ async fn then_remote_media_track(
     let check = match state.as_str() {
         "enabled" => track.enabled().await,
         "disabled" => !track.enabled().await,
-        "muted" => track.muted().await,
-        "unmuted" => !track.muted().await,
         _ => unreachable!(),
     };
     assert!(check, "RemoteMediaTrack isn't {}", state);
@@ -229,7 +226,11 @@ async fn then_doesnt_have_remote_track(
     let tracks_with_partner = partner_connection.tracks_store().await;
     let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
 
-    assert!(!tracks_with_partner.has_track(media_kind, source_kind).await);
+    assert!(
+        !tracks_with_partner
+            .has_track(media_kind, Some(source_kind))
+            .await
+    );
 }
 
 #[when(regex = "^`(.*)`'s Room closed by client$")]

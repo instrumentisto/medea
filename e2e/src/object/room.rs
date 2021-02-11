@@ -1,14 +1,15 @@
 //! Implementation and definition for the object which represents `Room` JS
 //! object.
 
+use std::str::FromStr;
+
 use crate::{
     browser::JsExecutable,
     object::{
-        connections_store::ConnectionStore,
-        local_tracks_store::LocalTracksStore, Object,
+        connections_store::ConnectionStore, tracks_store::LocalTracksStore,
+        Object,
     },
 };
-use std::str::FromStr;
 
 /// Representation of the `Room` JS object.
 pub struct Room;
@@ -38,7 +39,7 @@ impl FromStr for MediaKind {
 }
 
 impl MediaKind {
-    pub fn as_js(&self) -> String {
+    pub fn as_js(self) -> String {
         match self {
             MediaKind::Audio => "window.rust.MediaKind.Audio".to_string(),
             MediaKind::Video => "window.rust.MediaKind.Video".to_string(),
@@ -69,7 +70,7 @@ impl FromStr for MediaSourceKind {
 
 impl MediaSourceKind {
     /// Converts this [`MediaSourceKind`] to the JS code for this enum variant.
-    pub fn as_js(&self) -> String {
+    pub fn as_js(self) -> String {
         match self {
             MediaSourceKind::Device => {
                 "window.rust.MediaSourceKind.Device".to_string()
@@ -108,9 +109,8 @@ impl Object<Room> {
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), super::Error> {
-        let media_source_kind = source_kind
-            .as_ref()
-            .map_or_else(String::new, MediaSourceKind::as_js);
+        let media_source_kind =
+            source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.room.disable_audio()".to_string(),
             MediaKind::Video => {
@@ -133,14 +133,18 @@ impl Object<Room> {
         Ok(())
     }
 
+    /// Enables media publishing for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media publishing will be
+    /// enabled for all [`MediaSourceKind`]s.
     pub async fn enable_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), super::Error> {
-        let media_source_kind = source_kind
-            .as_ref()
-            .map_or_else(String::new, MediaSourceKind::as_js);
+        let media_source_kind =
+            source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.room.enable_audio()".to_string(),
             MediaKind::Video => {
@@ -163,19 +167,18 @@ impl Object<Room> {
         Ok(())
     }
 
-    /// Disabled media publishing for the provided [`MediaKind`] and
+    /// Disables remote media receiving for the provided [`MediaKind`] and
     /// [`MediaSourceKind`].
     ///
-    /// If provided [`None`] `source_kind` then media publishing will be
+    /// If provided [`None`] `source_kind` then media receiving will be
     /// disabled for all [`MediaSourceKind`]s.
     pub async fn disable_remote_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), super::Error> {
-        let media_source_kind = source_kind
-            .as_ref()
-            .map_or_else(String::new, MediaSourceKind::as_js);
+        let media_source_kind =
+            source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.room.disable_remote_audio()".to_string(),
             MediaKind::Video => {
@@ -198,14 +201,18 @@ impl Object<Room> {
         Ok(())
     }
 
+    /// Enables remote media receiving for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media receiving will be
+    /// enabled for all [`MediaSourceKind`]s.
     pub async fn enable_remote_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), super::Error> {
-        let media_source_kind = source_kind
-            .as_ref()
-            .map_or_else(String::new, MediaSourceKind::as_js);
+        let media_source_kind =
+            source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.room.enable_remote_audio()".to_string(),
             MediaKind::Video => {
@@ -228,14 +235,18 @@ impl Object<Room> {
         Ok(())
     }
 
+    /// Mutes media publishing for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media publishing will be
+    /// muted for all [`MediaSourceKind`]s.
     pub async fn mute_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), super::Error> {
-        let media_source_kind = source_kind
-            .as_ref()
-            .map_or_else(String::new, MediaSourceKind::as_js);
+        let media_source_kind =
+            source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.room.mute_audio()".to_string(),
             MediaKind::Video => {
@@ -258,14 +269,18 @@ impl Object<Room> {
         Ok(())
     }
 
+    /// Unmutes media publishing for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If provided [`None`] `source_kind` then media publishing will be
+    /// unmuted for all [`MediaSourceKind`]s.
     pub async fn unmute_media(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<(), super::Error> {
-        let media_source_kind = source_kind
-            .as_ref()
-            .map_or_else(String::new, MediaSourceKind::as_js);
+        let media_source_kind =
+            source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
             MediaKind::Audio => "room.room.unmute_audio()".to_string(),
             MediaKind::Video => {
@@ -354,6 +369,7 @@ impl Object<Room> {
         .await
     }
 
+    /// Returns this [`Room`]'s [`LocalTrack`]s store.
     pub async fn local_tracks(&self) -> Object<LocalTracksStore> {
         self.spawn_object(JsExecutable::new(
             r#"
@@ -367,6 +383,8 @@ impl Object<Room> {
         .unwrap()
     }
 
+    /// Returns [`Future`] which will be resolved when `Room.on_close` callback
+    /// will fire.
     pub async fn wait_for_close(&self) -> String {
         self.execute(JsExecutable::new(
             r#"

@@ -1,15 +1,22 @@
+use std::marker::PhantomData;
+
 use crate::{
     browser::JsExecutable,
     object::{
         local_track::LocalTrack,
+        remote_track::RemoteTrack,
         room::{MediaKind, MediaSourceKind},
         Object,
     },
 };
 
-pub struct LocalTracksStore;
+pub type LocalTracksStore = TracksStore<LocalTrack>;
+pub type RemoteTracksStore = TracksStore<RemoteTrack>;
 
-impl Object<LocalTracksStore> {
+pub struct TracksStore<T>(PhantomData<T>);
+
+impl<T> Object<TracksStore<T>> {
+    /// Returns count of [`LocalTrack`]s stored in this [`LocalTracksStore`].
     pub async fn count(&self) -> u64 {
         self.execute(JsExecutable::new(
             r#"
@@ -25,13 +32,15 @@ impl Object<LocalTracksStore> {
         .unwrap()
     }
 
+    /// Returns `true` if this [`LocalTracksStore`] contains [`LocalTrack`] with
+    /// a provided [`MediaKind`] and [`MediaSourceKind`].
     pub async fn has_track(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> bool {
-        let source_kind_js =
-            source_kind.map_or_else(|| "undefined".to_string(), |k| k.as_js());
+        let source_kind_js = source_kind
+            .map_or_else(|| "undefined".to_string(), MediaSourceKind::as_js);
         let kind_js = JsExecutable::new(
             &format!(
                 r#"
@@ -53,8 +62,8 @@ impl Object<LocalTracksStore> {
             r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
-                    if (track.kind() === meta.kind
-                        && (track.media_source_kind() === meta.sourceKind
+                    if (track.track.kind() === meta.kind
+                        && (track.track.media_source_kind() === meta.sourceKind
                             || meta.sourceKind === undefined)) {
                         return true;
                     }
@@ -70,11 +79,13 @@ impl Object<LocalTracksStore> {
         .unwrap()
     }
 
+    /// Returns [`LocalTrack`] from this [`LocalTracksStore`] with a provided
+    /// [`MediaKind`] and [`MediaSourceKind`].
     pub async fn get_track(
         &self,
         kind: MediaKind,
         source_kind: MediaSourceKind,
-    ) -> Object<LocalTrack> {
+    ) -> Object<T> {
         let kind_js = JsExecutable::new(
             &format!(
                 r#"
@@ -96,15 +107,17 @@ impl Object<LocalTracksStore> {
             r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {
-                        if (track.kind() === meta.kind
-                            && track.media_source_kind() === meta.sourceKind) {
+                        let kind = track.track.kind();
+                        let sourceKind = track.track.media_source_kind();
+                        if (kind === meta.kind
+                            && sourceKind === meta.sourceKind) {
                             return track;
                         }
                     }
                     let waiter = new Promise((resolve, reject) => {
                         meta.store.subs.push((track) => {
-                            let kind = track.kind();
-                            let sourceKind = track.media_source_kind();
+                            let kind = track.track.kind();
+                            let sourceKind = track.track.media_source_kind();
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
                                 resolve(track);

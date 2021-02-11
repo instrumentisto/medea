@@ -48,7 +48,8 @@ impl Object<Jason> {
                             sub(reason);
                         }
                     });
-                    room.on_local_track((track) => {
+                    room.on_local_track((t) => {
+                        let track = { track: t };
                         localTracksStore.tracks.push(track);
                         for (sub of room.localTracksStore.subs) {
                             sub(track);
@@ -67,6 +68,7 @@ impl Object<Jason> {
         .await
     }
 
+    /// Closes the provided [`Room`].
     pub async fn close_room(&self, room: &Object<Room>) {
         self.execute(JsExecutable::with_objs(
             r#"
@@ -82,6 +84,8 @@ impl Object<Jason> {
         .unwrap();
     }
 
+    /// Drops [`Jason`] API object, so all related objects (rooms, connections,
+    /// streams etc.) respectively.
     pub async fn dispose(self) {
         self.execute(JsExecutable::new(
             r#"

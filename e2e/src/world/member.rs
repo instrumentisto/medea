@@ -106,6 +106,7 @@ impl Member {
         Ok(())
     }
 
+    /// Toggles media state of this [`Member`]'s [`Room`].
     pub async fn toggle_media(
         &self,
         kind: Option<MediaKind>,
@@ -123,21 +124,20 @@ impl Member {
                     .enable_media(MediaKind::Audio, source_kind)
                     .await?;
             }
+        } else if let Some(kind) = kind {
+            self.room.disable_media(kind, source_kind).await?;
         } else {
-            if let Some(kind) = kind {
-                self.room.disable_media(kind, source_kind).await?;
-            } else {
-                self.room
-                    .disable_media(MediaKind::Audio, source_kind)
-                    .await?;
-                self.room
-                    .disable_media(MediaKind::Video, source_kind)
-                    .await?;
-            }
+            self.room
+                .disable_media(MediaKind::Audio, source_kind)
+                .await?;
+            self.room
+                .disable_media(MediaKind::Video, source_kind)
+                .await?;
         }
         Ok(())
     }
 
+    /// Toggles mute state of this [`Member`]'s [`Room`].
     pub async fn toggle_mute(
         &self,
         kind: Option<MediaKind>,
@@ -151,22 +151,21 @@ impl Member {
                 self.room.mute_media(MediaKind::Audio, source_kind).await?;
                 self.room.mute_media(MediaKind::Video, source_kind).await?;
             }
+        } else if let Some(kind) = kind {
+            self.room.unmute_media(kind, source_kind).await?;
         } else {
-            if let Some(kind) = kind {
-                self.room.unmute_media(kind, source_kind).await?;
-            } else {
-                self.room
-                    .unmute_media(MediaKind::Audio, source_kind)
-                    .await?;
-                self.room
-                    .unmute_media(MediaKind::Video, source_kind)
-                    .await?;
-            }
+            self.room
+                .unmute_media(MediaKind::Audio, source_kind)
+                .await?;
+            self.room
+                .unmute_media(MediaKind::Video, source_kind)
+                .await?;
         }
 
         Ok(())
     }
 
+    /// Toggles remote media state of this [`Member`]'s [`Room`].
     pub async fn toggle_remote_media(
         &self,
         kind: Option<MediaKind>,
@@ -184,17 +183,15 @@ impl Member {
                     .enable_remote_media(MediaKind::Video, source_kind)
                     .await?;
             }
+        } else if let Some(kind) = kind {
+            self.room.disable_remote_media(kind, source_kind).await?;
         } else {
-            if let Some(kind) = kind {
-                self.room.disable_remote_media(kind, source_kind).await?;
-            } else {
-                self.room
-                    .disable_remote_media(MediaKind::Audio, source_kind)
-                    .await?;
-                self.room
-                    .disable_remote_media(MediaKind::Video, source_kind)
-                    .await?;
-            }
+            self.room
+                .disable_remote_media(MediaKind::Audio, source_kind)
+                .await?;
+            self.room
+                .disable_remote_media(MediaKind::Video, source_kind)
+                .await?;
         }
 
         Ok(())
@@ -208,6 +205,7 @@ impl Member {
         &self.connection_store
     }
 
+    /// Returns reference to the [`Room`] of this [`Member`].
     pub fn room(&self) -> &Object<Room> {
         &self.room
     }
