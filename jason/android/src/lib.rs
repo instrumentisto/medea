@@ -58,16 +58,22 @@ impl ConnectionHandle {
     pub fn on_close(&self, _f: Box<dyn Callback>) -> Result<(), String> {
         Ok(())
     }
+
     pub fn get_remote_member_id(&self) -> Result<String, String> {
         Ok(String::from("remote_member_id"))
     }
+
     pub fn on_remote_track_added(
         &self,
         _f: Box<dyn Consumer<RemoteMediaTrack>>,
     ) -> Result<(), String> {
         Ok(())
     }
-    pub fn on_quality_score_update(&self, _f: Box<dyn Consumer<u8>>) -> Result<(), String> {
+
+    pub fn on_quality_score_update(
+        &self,
+        _f: Box<dyn Consumer<u8>>,
+    ) -> Result<(), String> {
         Ok(())
     }
 }
@@ -83,22 +89,39 @@ impl RoomHandle {
         Ok(())
     }
 
-    pub fn on_close(&mut self, _f: Box<dyn Consumer<RoomCloseReason>>) -> Result<(), String> {
+    pub fn on_close(
+        &mut self,
+        _f: Box<dyn Consumer<RoomCloseReason>>,
+    ) -> Result<(), String> {
         Ok(())
     }
-    pub fn on_local_track(&self, _f: Box<dyn Consumer<LocalMediaTrack>>) -> Result<(), String> {
+
+    pub fn on_local_track(
+        &self,
+        _f: Box<dyn Consumer<LocalMediaTrack>>,
+    ) -> Result<(), String> {
         Ok(())
     }
-    pub fn on_failed_local_media(&self, _f: Box<dyn Consumer<JasonError>>) -> Result<(), String> {
+
+    pub fn on_failed_local_media(
+        &self,
+        _f: Box<dyn Consumer<JasonError>>,
+    ) -> Result<(), String> {
         Ok(())
     }
-    pub fn on_connection_loss(&self, _f: Box<dyn Consumer<ReconnectHandle>>) -> Result<(), String> {
+
+    pub fn on_connection_loss(
+        &self,
+        _f: Box<dyn Consumer<ReconnectHandle>>,
+    ) -> Result<(), String> {
         Ok(())
     }
+
     pub fn join(&self, _token: String) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn set_local_media_settings(
         &self,
         _settings: &MediaStreamSettings,
@@ -108,50 +131,74 @@ impl RoomHandle {
         // async ConstraintsUpdateException
         Ok(())
     }
+
     pub fn mute_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn unmute_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
-    pub fn mute_video(&self, _source_kind: Option<MediaSourceKind>) -> Result<(), String> {
+
+    pub fn mute_video(
+        &self,
+        _source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), String> {
         // async
         Ok(())
     }
-    pub fn unmute_video(&self, _source_kind: Option<MediaSourceKind>) -> Result<(), String> {
+
+    pub fn unmute_video(
+        &self,
+        _source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn disable_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn enable_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
-    pub fn disable_video(&self, _source_kind: Option<MediaSourceKind>) -> Result<(), String> {
+
+    pub fn disable_video(
+        &self,
+        _source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), String> {
         // async
         Ok(())
     }
-    pub fn enable_video(&self, _source_kind: Option<MediaSourceKind>) -> Result<(), String> {
+
+    pub fn enable_video(
+        &self,
+        _source_kind: Option<MediaSourceKind>,
+    ) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn disable_remote_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn disable_remote_video(&self) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn enable_remote_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
+
     pub fn enable_remote_video(&self) -> Result<(), String> {
         // async
         Ok(())
@@ -167,25 +214,30 @@ pub trait Callback {
 }
 
 // struct RoomHandle
-// pub fn on_new_connection(&self, f: Callback<ConnectionHandle>) -> Result<(), JasonError>
-// pub fn on_close(&mut self, f: Callback<RoomCloseReason>) -> Result<(), JasonError>
-// pub fn on_local_track(&self, f: Callback<LocalMediaTrack>) -> Result<(), JasonError>
-// pub fn on_failed_local_media(&self, f: Callback<JasonError>) -> Result<(), JasonError>
-// pub fn on_connection_loss(&self, f: Callback<ReconnectHandle>) -> Result<(), JasonError>
-// pub fn join(&self, token: String) -> Promise<Result<(), JasonError>>
-// pub fn set_local_media_settings(&self, settings: &MediaStreamSettings, stop_first: bool, rollback_on_fail: bool) -> Promise<Result<(), ConstraintsUpdateException>>
-// pub fn mute_audio(&self) -> Promise<Result<(), JasonError>>
-// pub fn unmute_audio(&self) -> Promise<Result<(), JasonError>>
-// pub fn mute_video(&self, source_kind: Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
-// pub fn unmute_video(&self, source_kind: Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
-// pub fn disable_audio(&self) -> Promise<Result<(), JasonError>>
-// pub fn enable_audio(&self) -> Promise<Result<(), JasonError>>
-// pub fn disable_video(&self, source_kind: Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
-// pub fn enable_video(&self,source_kind: Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
-// pub fn disable_remote_audio(&self) -> Promise<Result<(), JasonError>>
-// pub fn disable_remote_video(&self) -> Promise<Result<(), JasonError>>
-// pub fn enable_remote_audio(&self) -> Promise<Result<(), JasonError>>
-// pub fn enable_remote_video(&self) -> Promise<Result<(), JasonError>>
+// pub fn on_new_connection(&self, f: Callback<ConnectionHandle>) -> Result<(),
+// JasonError> pub fn on_close(&mut self, f: Callback<RoomCloseReason>) ->
+// Result<(), JasonError> pub fn on_local_track(&self, f:
+// Callback<LocalMediaTrack>) -> Result<(), JasonError>
+// pub fn on_failed_local_media(&self, f: Callback<JasonError>) -> Result<(),
+// JasonError> pub fn on_connection_loss(&self, f: Callback<ReconnectHandle>) ->
+// Result<(), JasonError> pub fn join(&self, token: String) ->
+// Promise<Result<(), JasonError>> pub fn set_local_media_settings(&self,
+// settings: &MediaStreamSettings, stop_first: bool, rollback_on_fail: bool) ->
+// Promise<Result<(), ConstraintsUpdateException>> pub fn mute_audio(&self) ->
+// Promise<Result<(), JasonError>> pub fn unmute_audio(&self) ->
+// Promise<Result<(), JasonError>> pub fn mute_video(&self, source_kind:
+// Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
+// pub fn unmute_video(&self, source_kind: Option<MediaSourceKind>) ->
+// Promise<Result<(), JasonError>> pub fn disable_audio(&self) ->
+// Promise<Result<(), JasonError>> pub fn enable_audio(&self) ->
+// Promise<Result<(), JasonError>> pub fn disable_video(&self, source_kind:
+// Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
+// pub fn enable_video(&self,source_kind: Option<MediaSourceKind>) ->
+// Promise<Result<(), JasonError>> pub fn disable_remote_audio(&self) ->
+// Promise<Result<(), JasonError>> pub fn disable_remote_video(&self) ->
+// Promise<Result<(), JasonError>> pub fn enable_remote_audio(&self) ->
+// Promise<Result<(), JasonError>> pub fn enable_remote_video(&self) ->
+// Promise<Result<(), JasonError>>
 
 pub struct MediaManagerHandle;
 
@@ -247,7 +299,11 @@ impl MediaStreamSettings {
 
     pub fn device_video(&mut self, _constraints: DeviceVideoTrackConstraints) {}
 
-    pub fn display_video(&mut self, _constraints: DisplayVideoTrackConstraints) {}
+    pub fn display_video(
+        &mut self,
+        _constraints: DisplayVideoTrackConstraints,
+    ) {
+    }
 }
 
 pub struct DisplayVideoTrackConstraints;
@@ -262,13 +318,21 @@ pub struct DeviceVideoTrackConstraints;
 
 impl DeviceVideoTrackConstraints {
     pub fn device_id(&mut self, _device_id: String) {}
+
     pub fn exact_facing_mode(&mut self, _facing_mode: FacingMode) {}
+
     pub fn ideal_facing_mode(&mut self, _facing_mode: FacingMode) {}
+
     pub fn exact_height(&mut self, _height: u32) {}
+
     pub fn ideal_height(&mut self, _height: u32) {}
+
     pub fn height_in_range(&mut self, _min: u32, _max: u32) {}
+
     pub fn exact_width(&mut self, _width: u32) {}
+
     pub fn ideal_width(&mut self, _width: u32) {}
+
     pub fn width_in_range(&mut self, _min: u32, _max: u32) {}
 }
 
@@ -279,6 +343,7 @@ impl LocalMediaTrack {
     pub fn kind(&self) -> MediaKind {
         MediaKind::Video
     }
+
     pub fn media_source_kind(&self) -> MediaSourceKind {
         MediaSourceKind::Display
     }
@@ -291,11 +356,15 @@ impl RemoteMediaTrack {
     pub fn enabled(&self) -> bool {
         true
     }
+
     pub fn on_enabled(&self, _cb: Box<dyn Callback>) {}
+
     pub fn on_disabled(&self, _cb: Box<dyn Callback>) {}
+
     pub fn kind(&self) -> MediaKind {
         MediaKind::Video
     }
+
     pub fn media_source_kind(&self) -> MediaSourceKind {
         MediaSourceKind::Device
     }
@@ -307,9 +376,11 @@ impl RoomCloseReason {
     pub fn reason(&self) -> String {
         String::from("RoomCloseReason::reason")
     }
+
     pub fn is_closed_by_server(&self) -> bool {
         false
     }
+
     pub fn is_err(&self) -> bool {
         false
     }
@@ -321,12 +392,15 @@ impl ConstraintsUpdateException {
     pub fn name(&self) -> String {
         String::from("ConstraintsUpdateException::name")
     }
+
     pub fn recover_reason(&self) -> Option<JasonError> {
         None
     }
+
     pub fn recover_fail_reasons(&self) -> Option<JasonError> {
         None
     }
+
     pub fn error(&self) -> Option<JasonError> {
         None
     }
