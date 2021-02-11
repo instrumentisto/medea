@@ -1,0 +1,24 @@
+buildscript {
+    repositories {
+        jcenter()
+        google()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.1.2'
+        classpath "org.codehaus.groovy:groovy-json:2.5.6"
+    }
+}
+
+allprojects {
+    repositories {
+        jcenter()
+        google()
+        maven {
+            url "https://maven.google.com"
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir, 'app/src/main/libs'
+}

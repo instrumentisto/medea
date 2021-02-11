@@ -1,0 +1,18 @@
+[package]
+name = "jason-android"
+version = "0.0.1"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+edition = "2018"
+
+[lib]
+name = "jason_java"
+crate-type = ["cdylib"]
+
+[dependencies]
+android_logger = "0.9"
+futures = "0.3"
+ndk-sys = "0.2"
+log = "0.4"
+log-panics = "2.0"
+once_cell = "1.5"
+tokio = { version = "1.2", features = ["full"]}
