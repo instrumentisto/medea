@@ -1,13 +1,7 @@
 use crate::{
     browser::JsExecutable,
-    object::{
-        room::{MediaKind, MediaSourceKind},
-        track::Track,
-        track_store::TrackStore,
-        Object,
-    },
+    object::{track_store::TrackStore, Object},
 };
-use futures::Stream;
 
 /// Representation of the `Connection` JS object.
 pub struct Connection;

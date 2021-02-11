@@ -414,3 +414,19 @@ async fn then_local_track_mute_state(
     let muted = muted.as_str() == "muted";
     assert_eq!(muted, track.muted().await);
 }
+
+#[then(regex = "^`(.*)`'s (audio|(?:device|display) video) local Track is \
+                stopped$")]
+async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
+    let member = world.get_member(&id).unwrap();
+    let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
+    let is_stopped = member
+        .room()
+        .local_tracks()
+        .await
+        .get_track(media_kind, source_kind)
+        .await
+        .free_and_check()
+        .await;
+    assert!(is_stopped);
+}

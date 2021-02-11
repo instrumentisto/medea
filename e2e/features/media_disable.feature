@@ -41,3 +41,15 @@ Feature: Send Media disabling
     When `Bob` joins Room
     And Member `Bob` enables video
     Then `Alice`'s device video RemoteMediaTrack with `Bob` is enabled
+
+  Scenario: Local Track is dropped on video disable
+    Given joined Member `Alice`
+    And joined Member `Bob`
+    When Member `Bob` disables video
+    Then `Bob`'s device video local Track is stopped
+
+  Scenario: Local Track is dropped on audio disable
+    Given joined Member `Alice`
+    And joined Member `Bob`
+    When Member `Bob` disables audio
+    Then `Bob`'s audio local Track is stopped
