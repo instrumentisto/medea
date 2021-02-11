@@ -323,11 +323,24 @@ impl Object<Room> {
                             tracks: [],
                             subs: []
                         };
+                        let qualityScoreListener = {
+                            score: 0,
+                            subs: []
+                        };
                         let connection = {
                             conn: conn,
                             tracksStore: tracksStore,
-                            closeListener: closeListener
+                            closeListener: closeListener,
+                            qualityScoreListener: qualityScoreListener,
                         };
+                        conn.on_quality_score_update((score) => {
+                            qualityScoreListener.score = score;
+                            let newSubs = qualityScoreListener.subs
+                                .filter((sub) => {
+                                    return sub(score);
+                                });
+                            qualityScoreListener.subs = newSubs;
+                        });
                         conn.on_remote_track_added((t) => {
                             let track = {
                                 track: t,

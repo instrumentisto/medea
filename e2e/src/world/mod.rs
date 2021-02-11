@@ -230,7 +230,8 @@ impl World {
             .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
         let connections = member.connections();
         for id in interconnected_members {
-            connections.wait_for_connection(id).await?;
+            let conn = connections.wait_for_connection(id).await?;
+            conn.wait_for_quality_score().await;
         }
 
         Ok(())

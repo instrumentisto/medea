@@ -39,4 +39,22 @@ impl Object<Connection> {
         .await
         .unwrap();
     }
+
+    pub async fn wait_for_quality_score(&self) {
+        self.execute(JsExecutable::new(
+            r#"
+                async (conn) => {
+                    if (conn.qualityScoreListener.score === 0) {
+                        let waiter = new Promise((resolved, rejected) => {
+                            conn.qualityScoreListener.subs.push(resolved);
+                        });
+                        return await waiter;
+                    } else {
+                        return conn.qualityScoreListener.score;
+                    }
+                }
+            "#,
+            vec![]
+        )).await.unwrap();
+    }
 }

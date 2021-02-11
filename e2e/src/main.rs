@@ -75,7 +75,6 @@ async fn given_member_new(
     if is_joined {
         world.join_room(&id).await.unwrap();
         world.wait_for_interconnection(&id).await.unwrap();
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 
     if !media_state.is_empty() {
@@ -149,7 +148,7 @@ async fn when_enables_mutes(
 #[when(regex = "^`(.*)` joins Room")]
 async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
-    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    world.wait_for_interconnection(&id).await.unwrap();
 }
 
 #[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
