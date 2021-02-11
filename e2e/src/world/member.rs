@@ -106,44 +106,97 @@ impl Member {
         Ok(())
     }
 
-    /// Disabled media publishing for the provided [`MediaKind`] and
-    /// [`MediaSourceKind`].
-    ///
-    /// If provided [`None`] `source_kind` then media publishing will be
-    /// disabled for all [`MediaSourceKind`]s.
-    pub async fn disable_media(
+    pub async fn toggle_media(
         &self,
-        kind: MediaKind,
+        kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
+        enabled: bool,
     ) -> Result<()> {
-        self.room.disable_media(kind, source_kind).await?;
+        if enabled {
+            if let Some(kind) = kind {
+                self.room.enable_media(kind, source_kind).await?;
+            } else {
+                self.room
+                    .enable_media(MediaKind::Video, source_kind)
+                    .await?;
+                self.room
+                    .enable_media(MediaKind::Audio, source_kind)
+                    .await?;
+            }
+        } else {
+            if let Some(kind) = kind {
+                self.room.disable_media(kind, source_kind).await?;
+            } else {
+                self.room
+                    .disable_media(MediaKind::Audio, source_kind)
+                    .await?;
+                self.room
+                    .disable_media(MediaKind::Video, source_kind)
+                    .await?;
+            }
+        }
         Ok(())
     }
 
-    pub async fn enable_media(
+    pub async fn toggle_mute(
         &self,
-        kind: MediaKind,
+        kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
+        muted: bool,
     ) -> Result<()> {
-        self.room.enable_media(kind, source_kind).await?;
+        if muted {
+            if let Some(kind) = kind {
+                self.room.mute_media(kind, source_kind).await?;
+            } else {
+                self.room.mute_media(MediaKind::Audio, source_kind).await?;
+                self.room.mute_media(MediaKind::Video, source_kind).await?;
+            }
+        } else {
+            if let Some(kind) = kind {
+                self.room.unmute_media(kind, source_kind).await?;
+            } else {
+                self.room
+                    .unmute_media(MediaKind::Audio, source_kind)
+                    .await?;
+                self.room
+                    .unmute_media(MediaKind::Video, source_kind)
+                    .await?;
+            }
+        }
+
         Ok(())
     }
 
-    pub async fn mute_media(
+    pub async fn toggle_remote_media(
         &self,
-        kind: MediaKind,
+        kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
+        enabled: bool,
     ) -> Result<()> {
-        self.room.mute_media(kind, source_kind).await?;
-        Ok(())
-    }
+        if enabled {
+            if let Some(kind) = kind {
+                self.room.enable_remote_media(kind, source_kind).await?;
+            } else {
+                self.room
+                    .enable_remote_media(MediaKind::Audio, source_kind)
+                    .await?;
+                self.room
+                    .enable_remote_media(MediaKind::Video, source_kind)
+                    .await?;
+            }
+        } else {
+            if let Some(kind) = kind {
+                self.room.disable_remote_media(kind, source_kind).await?;
+            } else {
+                self.room
+                    .disable_remote_media(MediaKind::Audio, source_kind)
+                    .await?;
+                self.room
+                    .disable_remote_media(MediaKind::Video, source_kind)
+                    .await?;
+            }
+        }
 
-    pub async fn unmute_media(
-        &self,
-        kind: MediaKind,
-        source_kind: Option<MediaSourceKind>,
-    ) -> Result<()> {
-        self.room.unmute_media(kind, source_kind).await?;
         Ok(())
     }
 

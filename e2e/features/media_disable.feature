@@ -41,5 +41,3 @@ Feature: Send Media disabling
     When `Bob` joins Room
     And Member `Bob` enables video
     Then `Alice`'s device video RemoteMediaTrack with `Bob` is enabled
-
-

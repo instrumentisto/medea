@@ -8,14 +8,33 @@ use crate::{
         local_tracks_store::LocalTracksStore, Object,
     },
 };
+use std::str::FromStr;
 
 /// Representation of the `Room` JS object.
 pub struct Room;
 
 /// Representation of the `MediaKind` JS enum.
+#[derive(Clone, Copy)]
 pub enum MediaKind {
     Audio,
     Video,
+}
+
+#[derive(Debug)]
+pub struct FailedParsing;
+
+impl FromStr for MediaKind {
+    type Err = FailedParsing;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains("audio") {
+            Ok(Self::Audio)
+        } else if s.contains("video") {
+            Ok(Self::Video)
+        } else {
+            Err(FailedParsing)
+        }
+    }
 }
 
 impl MediaKind {
@@ -28,10 +47,24 @@ impl MediaKind {
 }
 
 /// Representation of the `MediaSourceKind` JS enum.
-#[allow(dead_code)]
+#[derive(Clone, Copy)]
 pub enum MediaSourceKind {
     Device,
     Display,
+}
+
+impl FromStr for MediaSourceKind {
+    type Err = FailedParsing;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains("device") {
+            Ok(Self::Device)
+        } else if s.contains("display") {
+            Ok(Self::Display)
+        } else {
+            Err(FailedParsing)
+        }
+    }
 }
 
 impl MediaSourceKind {

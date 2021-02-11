@@ -29,9 +29,9 @@ impl Object<LocalTrack> {
             "#,
             vec![],
         ))
-            .await
-            .unwrap()
-            .as_bool()
-            .unwrap()
+        .await
+        .unwrap()
+        .as_bool()
+        .unwrap()
     }
 }
