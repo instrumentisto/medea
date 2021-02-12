@@ -42,17 +42,17 @@ impl<T> Object<TracksStore<T>> {
                 async (store) => {
                     const [neededCount] = args;
                     let currentCount = store.tracks.length;
-                    if (currentCount >= neededCount) {
+                    if (currentCount === neededCount) {
                         return;
                     } else {
                         let waiter = new Promise((resolve, reject) => {
                             store.subs.push((track) => {
                                 currentCount += 1;
-                                if (currentCount >= neededCount) {
+                                if (currentCount === neededCount) {
                                     resolve();
-                                    return true;
+                                    return false;
                                 }
-                                return false;
+                                return true;
                             });
                         });
                         await waiter;

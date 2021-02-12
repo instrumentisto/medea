@@ -183,24 +183,12 @@ impl Member {
     /// Returns count of [`LocalTrack`]s and [`RemoteTrack`]s of this [`Member`]
     /// with a provided partner [`Member`].
     pub fn count_of_tracks_between_members(&self, another: &Self) -> (u64, u64) {
-        let mut send_count = 0;
-        let mut recv_count = 0;
-        for (key, enabled) in self.send_state.borrow().iter() {
-            if let Some(another_enabled) = another.recv_state.borrow().get(key)
-            {
-                if *another_enabled && *enabled {
-                    send_count += 1;
-                }
-            }
-        }
-        for (key, enabled) in self.recv_state.borrow().iter() {
-            if let Some(another_enabled) = another.send_state.borrow().get(key)
-            {
-                if *another_enabled && *enabled {
-                    recv_count += 1;
-                }
-            }
-        }
+        let send_count = self.send_state.borrow().iter()
+            .filter(|(key, enabled)| another.recv_state.borrow().get(key).copied().unwrap_or(false) && **enabled)
+            .count() as u64;
+        let recv_count = self.recv_state.borrow().iter()
+            .filter(|(key, enabled)| another.send_state.borrow().get(key).copied().unwrap_or(false) && **enabled)
+            .count() as u64;
 
         (send_count, recv_count)
 
