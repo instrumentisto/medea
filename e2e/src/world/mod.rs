@@ -227,10 +227,15 @@ impl World {
                 .connections()
                 .wait_for_connection(partner.id().to_string())
                 .await?;
-            conn.tracks_store()
-                .await?
-                .wait_for_count(track_count)
-                .await?;
+            // conn.tracks_store()
+            //     .await?
+            //     .wait_for_count(track_count)
+            //     .await?;
+            loop {
+                if conn.tracks_store().await?.count().await? == track_count {
+                    break;
+                }
+            }
             partner
                 .connections()
                 .wait_for_connection(member_id.to_string())
