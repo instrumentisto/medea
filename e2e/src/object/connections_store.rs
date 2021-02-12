@@ -47,7 +47,7 @@ impl Object<ConnectionStore> {
     ) -> Result<Object<Connection>, super::Error> {
         self.spawn_object(JsExecutable::new(
             r#"
-                async (store) => {
+                async (store) => g
                     const [remoteId] = args;
                     let conn = store.connections.get(remoteId);
                     if (conn != undefined) {

@@ -6,6 +6,8 @@ use crate::{
     object::{room::Room, Builder, Object},
 };
 
+use super::Error;
+
 /// Representation of the `Jason` JS object.
 pub struct Jason;
 
@@ -25,7 +27,7 @@ impl Builder for Jason {
 
 impl Object<Jason> {
     /// Returns new [`Room`] initiated in this [`Jason`].
-    pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
+    pub async fn init_room(&self) -> Result<Object<Room>, Error> {
         self.spawn_object(JsExecutable::new(
             r#"
                 async (jason) => {
@@ -76,7 +78,7 @@ impl Object<Jason> {
     }
 
     /// Closes the provided [`Room`].
-    pub async fn close_room(&self, room: &Object<Room>) {
+    pub async fn close_room(&self, room: &Object<Room>) -> Result<(), Error> {
         self.execute(JsExecutable::with_objs(
             r#"
                 async (jason) => {
@@ -87,13 +89,13 @@ impl Object<Jason> {
             vec![],
             vec![room.ptr()],
         ))
-        .await
-        .unwrap();
+        .await?;
+        Ok(())
     }
 
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,
     /// streams etc.) respectively.
-    pub async fn dispose(self) {
+    pub async fn dispose(self) -> Result<(), Error> {
         self.execute(JsExecutable::new(
             r#"
                 async (jason) => {
@@ -102,7 +104,7 @@ impl Object<Jason> {
             "#,
             vec![],
         ))
-        .await
-        .unwrap();
+        .await?;
+        Ok(())
     }
 }

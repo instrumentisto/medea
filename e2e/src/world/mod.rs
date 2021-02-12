@@ -220,7 +220,10 @@ impl World {
                 .connections()
                 .wait_for_connection(partner.id().to_string())
                 .await?;
-            conn.tracks_store().await.wait_for_count(track_count).await;
+            conn.tracks_store()
+                .await?
+                .wait_for_count(track_count)
+                .await?;
             partner
                 .connections()
                 .wait_for_connection(member_id.to_string())
@@ -231,24 +234,29 @@ impl World {
     }
 
     /// Closes [`Room`] of the provided [`Member`].
-    pub async fn close_room(&mut self, member_id: &str) {
+    pub async fn close_room(&mut self, member_id: &str) -> Result<()> {
         let jason = self.jasons.get(member_id).unwrap();
         let member = self.members.get(member_id).unwrap();
         let room = member.room();
-        jason.close_room(room).await;
+        jason.close_room(room).await?;
+        Ok(())
     }
 
     /// Wait for [`Member`]'s [`Room`] close.
-    pub async fn wait_for_on_close(&self, member_id: &str) -> String {
-        let member = self.members.get(member_id).unwrap();
+    pub async fn wait_for_on_close(&self, member_id: &str) -> Result<String> {
+        let member = self
+            .members
+            .get(member_id)
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
 
-        member.room().wait_for_close().await
+        Ok(member.room().wait_for_close().await?)
     }
 
     /// Disposes [`Jason`] object of the provided [`Member`] ID.
-    pub async fn dispose_jason(&mut self, member_id: &str) {
+    pub async fn dispose_jason(&mut self, member_id: &str) -> Result<()> {
         let jason = self.jasons.remove(member_id).unwrap();
-        jason.dispose().await;
+        jason.dispose().await?;
+        Ok(())
     }
 
     /// Deletes Control API element of the [`Member`] with a provided ID.

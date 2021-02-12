@@ -11,6 +11,8 @@ use crate::{
     },
 };
 
+use super::Error;
+
 /// Representation of the `Room` JS object.
 pub struct Room;
 
@@ -84,7 +86,7 @@ impl MediaSourceKind {
 
 impl Object<Room> {
     /// Joins [`Room`] with a provided URI.
-    pub async fn join(&self, uri: String) -> Result<(), super::Error> {
+    pub async fn join(&self, uri: String) -> Result<(), Error> {
         self.execute(JsExecutable::new(
             r#"
                 async (room) => {
@@ -108,7 +110,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -142,7 +144,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -176,7 +178,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -210,7 +212,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -244,7 +246,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -278,7 +280,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -306,7 +308,7 @@ impl Object<Room> {
     /// Returns [`ConnectionStore`] for this [`Room`].
     pub async fn connections_store(
         &self,
-    ) -> Result<Object<ConnectionStore>, super::Error> {
+    ) -> Result<Object<ConnectionStore>, Error> {
         self.spawn_object(JsExecutable::new(
             r#"
                 async (room) => {
@@ -383,24 +385,27 @@ impl Object<Room> {
     }
 
     /// Returns this [`Room`]'s [`LocalTrack`]s store.
-    pub async fn local_tracks(&self) -> Object<LocalTracksStore> {
-        self.spawn_object(JsExecutable::new(
-            r#"
+    pub async fn local_tracks(
+        &self,
+    ) -> Result<Object<LocalTracksStore>, Error> {
+        Ok(self
+            .spawn_object(JsExecutable::new(
+                r#"
                 async (room) => {
                     return room.localTracksStore;
                 }
             "#,
-            vec![],
-        ))
-        .await
-        .unwrap()
+                vec![],
+            ))
+            .await?)
     }
 
     /// Returns [`Future`] which will be resolved when `Room.on_close` callback
     /// will fire.
-    pub async fn wait_for_close(&self) -> String {
-        self.execute(JsExecutable::new(
-            r#"
+    pub async fn wait_for_close(&self) -> Result<String, Error> {
+        Ok(self
+            .execute(JsExecutable::new(
+                r#"
                 async (room) => {
                     if (room.closeListener.isClosed) {
                         return room.closeListener.closeReason.reason();
@@ -414,12 +419,11 @@ impl Object<Room> {
                     }
                 }
             "#,
-            vec![],
-        ))
-        .await
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string()
+                vec![],
+            ))
+            .await?
+            .as_str()
+            .ok_or(Error::TypeCast)?
+            .to_string())
     }
 }

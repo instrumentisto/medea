@@ -195,14 +195,17 @@ async fn then_remote_media_track(
         .wait_for_connection(partner_id)
         .await
         .unwrap();
-    let tracks_with_partner = partner_connection.tracks_store().await;
+    let tracks_with_partner = partner_connection.tracks_store().await.unwrap();
 
     let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
-    let track = tracks_with_partner.get_track(media_kind, source_kind).await;
+    let track = tracks_with_partner
+        .get_track(media_kind, source_kind)
+        .await
+        .unwrap();
 
     let check = match state.as_str() {
-        "enabled" => track.enabled().await,
-        "disabled" => !track.enabled().await,
+        "enabled" => track.enabled().await.unwrap(),
+        "disabled" => !track.enabled().await.unwrap(),
         _ => unreachable!(),
     };
     assert!(check, "RemoteMediaTrack isn't {}", state);
@@ -222,19 +225,18 @@ async fn then_doesnt_have_remote_track(
         .wait_for_connection(partner_id)
         .await
         .unwrap();
-    let tracks_with_partner = partner_connection.tracks_store().await;
+    let tracks_with_partner = partner_connection.tracks_store().await.unwrap();
     let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
 
-    assert!(
-        !tracks_with_partner
-            .has_track(media_kind, Some(source_kind))
-            .await
-    );
+    assert!(!tracks_with_partner
+        .has_track(media_kind, Some(source_kind))
+        .await
+        .unwrap());
 }
 
 #[when(regex = "^`(.*)`'s Room closed by client$")]
 async fn when_room_closed_by_client(world: &mut World, id: String) {
-    world.close_room(&id).await;
+    world.close_room(&id).await.unwrap();
 }
 
 #[then(regex = "^`(.*)`'s Room.on_close callback fires with `(.*)` reason$")]
@@ -243,13 +245,13 @@ async fn then_on_close_fires(
     id: String,
     expect_reason: String,
 ) {
-    let reason = world.wait_for_on_close(&id).await;
+    let reason = world.wait_for_on_close(&id).await.unwrap();
     assert_eq!(expect_reason, reason);
 }
 
 #[when(regex = "^`(.*)`'s Jason object disposes$")]
 async fn when_jason_object_disposes(world: &mut World, id: String) {
-    world.dispose_jason(&id).await;
+    world.dispose_jason(&id).await.unwrap();
 }
 
 #[when(regex = "^Control API removes Member `(.*)`$")]
@@ -271,7 +273,7 @@ async fn then_connection_closes(
     let member = world.get_member(&id).unwrap();
     let connection =
         member.connections().get(partner_id).await.unwrap().unwrap();
-    connection.wait_for_close().await;
+    connection.wait_for_close().await.unwrap();
 }
 
 #[then(regex = "^Member `(.*)` has (\\d*) local Tracks$")]
@@ -282,19 +284,19 @@ async fn then_member_has_local_tracks(
 ) {
     let member = world.get_member(&id).unwrap();
     let room = member.room();
-    let tracks = room.local_tracks().await;
-    assert_eq!(count, tracks.count().await);
+    let tracks = room.local_tracks().await.unwrap();
+    assert_eq!(count, tracks.count().await.unwrap());
 }
 
 #[then(regex = "^`(.*)` has local (audio|(?:device |display )?video)$")]
 async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let member = world.get_member(&id).unwrap();
     let room = member.room();
-    let tracks = room.local_tracks().await;
+    let tracks = room.local_tracks().await.unwrap();
     let media_kind = kind.parse().unwrap();
     let source_kind = kind.parse().ok();
 
-    assert!(tracks.has_track(media_kind, source_kind).await)
+    assert!(tracks.has_track(media_kind, source_kind).await.unwrap())
 }
 
 #[when(
@@ -347,9 +349,11 @@ async fn then_remote_track_stops(
     let track = conn
         .tracks_store()
         .await
+        .unwrap()
         .get_track(media_kind, source_kind)
-        .await;
-    assert!(track.muted().await);
+        .await
+        .unwrap();
+    assert!(track.muted().await.unwrap());
 }
 
 #[then(regex = "^on_disabled callback fires (\\d*) time on `(.*)`'s remote \
@@ -369,9 +373,11 @@ async fn then_on_remote_disabled_callback_fires(
     let track = remote_conn
         .tracks_store()
         .await
+        .unwrap()
         .get_track(media_kind, source_kind)
-        .await;
-    assert_eq!(track.on_disabled_fire_count().await, times);
+        .await
+        .unwrap();
+    assert_eq!(track.on_disabled_fire_count().await.unwrap(), times);
 }
 
 #[then(regex = "^on_enabled callback fires (\\d*) time on `(.*)`'s remote \
@@ -390,9 +396,11 @@ async fn then_on_remote_enabled_callback_fires(
     let track = remote_conn
         .tracks_store()
         .await
+        .unwrap()
         .get_track(media_kind, source_kind)
-        .await;
-    assert_eq!(track.on_enabled_fire_count().await, times);
+        .await
+        .unwrap();
+    assert_eq!(track.on_enabled_fire_count().await.unwrap(), times);
 }
 
 #[then(regex = "^`(.*)`'s (audio|(?:device|display) video) local Track is \
@@ -409,10 +417,12 @@ async fn then_local_track_mute_state(
         .room()
         .local_tracks()
         .await
+        .unwrap()
         .get_track(media_kind, source_kind)
-        .await;
+        .await
+        .unwrap();
     let muted = muted.as_str() == "muted";
-    assert_eq!(muted, track.muted().await);
+    assert_eq!(muted, track.muted().await.unwrap());
 }
 
 #[then(regex = "^`(.*)`'s (audio|(?:device|display) video) local Track is \
@@ -424,9 +434,12 @@ async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
         .room()
         .local_tracks()
         .await
+        .unwrap()
         .get_track(media_kind, source_kind)
         .await
+        .unwrap()
         .free_and_check()
-        .await;
+        .await
+        .unwrap();
     assert!(is_stopped);
 }

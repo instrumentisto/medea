@@ -10,6 +10,8 @@ use crate::{
     },
 };
 
+use super::Error;
+
 pub type LocalTracksStore = TracksStore<LocalTrack>;
 pub type RemoteTracksStore = TracksStore<RemoteTrack>;
 
@@ -17,24 +19,24 @@ pub struct TracksStore<T>(PhantomData<T>);
 
 impl<T> Object<TracksStore<T>> {
     /// Returns count of [`LocalTrack`]s stored in this [`LocalTracksStore`].
-    pub async fn count(&self) -> u64 {
-        self.execute(JsExecutable::new(
-            r#"
+    pub async fn count(&self) -> Result<u64, Error> {
+        Ok(self
+            .execute(JsExecutable::new(
+                r#"
                 async (store) => {
                     return store.tracks.length;
                 }
             "#,
-            vec![],
-        ))
-        .await
-        .unwrap()
-        .as_u64()
-        .unwrap()
+                vec![],
+            ))
+            .await?
+            .as_u64()
+            .ok_or(Error::TypeCast)?)
     }
 
     /// Returns [`Future`] which will be resolved when count of `MediaTrack`s
     /// will be same as provided one.
-    pub async fn wait_for_count(&self, count: u64) {
+    pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
         self.execute(JsExecutable::new(
             r#"
                 async (store) => {
@@ -59,8 +61,8 @@ impl<T> Object<TracksStore<T>> {
             "#,
             vec![count.into()],
         ))
-        .await
-        .unwrap();
+        .await?;
+        Ok(())
     }
 
     /// Returns `true` if this [`LocalTracksStore`] contains [`LocalTrack`] with
@@ -69,7 +71,7 @@ impl<T> Object<TracksStore<T>> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let source_kind_js = source_kind
             .map_or_else(|| "undefined".to_string(), MediaSourceKind::as_js);
         let kind_js = JsExecutable::new(
@@ -89,8 +91,9 @@ impl<T> Object<TracksStore<T>> {
             vec![],
         );
 
-        self.execute(kind_js.and_then(JsExecutable::new(
-            r#"
+        Ok(self
+            .execute(kind_js.and_then(JsExecutable::new(
+                r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
                     if (track.track.kind() === meta.kind
@@ -102,12 +105,11 @@ impl<T> Object<TracksStore<T>> {
                 return false;
             }
         "#,
-            vec![],
-        )))
-        .await
-        .unwrap()
-        .as_bool()
-        .unwrap()
+                vec![],
+            )))
+            .await?
+            .as_bool()
+            .ok_or(Error::TypeCast)?)
     }
 
     /// Returns [`LocalTrack`] from this [`LocalTracksStore`] with a provided
@@ -116,7 +118,7 @@ impl<T> Object<TracksStore<T>> {
         &self,
         kind: MediaKind,
         source_kind: MediaSourceKind,
-    ) -> Object<T> {
+    ) -> Result<Object<T>, Error> {
         let kind_js = JsExecutable::new(
             &format!(
                 r#"
@@ -134,8 +136,9 @@ impl<T> Object<TracksStore<T>> {
             vec![],
         );
 
-        self.spawn_object(kind_js.and_then(JsExecutable::new(
-            r#"
+        Ok(self
+            .spawn_object(kind_js.and_then(JsExecutable::new(
+                r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {
                         let kind = track.track.kind();
@@ -162,9 +165,8 @@ impl<T> Object<TracksStore<T>> {
                     return waiter;
                 }
             "#,
-            vec![],
-        )))
-        .await
-        .unwrap()
+                vec![],
+            )))
+            .await?)
     }
 }
