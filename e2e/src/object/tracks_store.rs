@@ -32,6 +32,37 @@ impl<T> Object<TracksStore<T>> {
         .unwrap()
     }
 
+    /// Returns [`Future`] which will be resolved when count of `MediaTrack`s
+    /// will be same as provided one.
+    pub async fn wait_for_count(&self, count: u64) {
+        self.execute(JsExecutable::new(
+            r#"
+                async (store) => {
+                    const [neededCount] = args;
+                    let currentCount = store.tracks.length;
+                    if (currentCount >= neededCount) {
+                        return;
+                    } else {
+                        let waiter = new Promise((resolve, reject) => {
+                            store.subs.push((track) => {
+                                currentCount += 1;
+                                if (currentCount >= neededCount) {
+                                    resolve();
+                                    return true;
+                                }
+                                return false;
+                            });
+                        });
+                        await waiter;
+                    }
+                }
+            "#,
+            vec![count.into()],
+        ))
+        .await
+        .unwrap();
+    }
+
     /// Returns `true` if this [`LocalTracksStore`] contains [`LocalTrack`] with
     /// a provided [`MediaKind`] and [`MediaSourceKind`].
     pub async fn has_track(

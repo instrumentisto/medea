@@ -210,47 +210,21 @@ impl World {
         &mut self,
         member_id: &str,
     ) -> Result<()> {
-        let interconnected_members: Vec<_> = self
-            .members
-            .values()
-            .filter_map(|m| {
-                if m.is_joined()
-                    && m.id() != member_id
-                    && (m.is_recv() || m.is_send())
-                {
-                    Some(m.id().to_string())
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        for member in &interconnected_members {
-            let partner = self.members.get(member).unwrap();
-            let me = self.members.get(member_id).unwrap();
-            let (recv_count, count) = me.tracks_between(partner);
-            let conn = me
+        let interconnected_members = self.members.values().filter(|m| {
+            m.is_joined() && m.id() != member_id && (m.is_recv() || m.is_send())
+        });
+        let member = self.members.get(member_id).unwrap();
+        for partner in interconnected_members {
+            let track_count = member.count_of_tracks_between_members(partner);
+            let conn = member
                 .connections()
-                .wait_for_connection(member.to_string())
-                .await
-                .unwrap();
-            loop {
-                if conn.tracks_store().await.count().await == count {
-                    break;
-                }
-            }
-
-            let partner_conn = partner
+                .wait_for_connection(partner.id().to_string())
+                .await?;
+            conn.tracks_store().await.wait_for_count(track_count).await;
+            partner
                 .connections()
                 .wait_for_connection(member_id.to_string())
-                .await
-                .unwrap();
-            loop {
-                if partner_conn.tracks_store().await.count().await == recv_count
-                {
-                    break;
-                }
-            }
+                .await?;
         }
 
         Ok(())
