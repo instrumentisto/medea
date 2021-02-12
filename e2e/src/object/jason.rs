@@ -2,7 +2,7 @@
 //! object.
 
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{room::Room, Builder, Object},
 };
 
@@ -12,8 +12,8 @@ use super::Error;
 pub struct Jason;
 
 impl Builder for Jason {
-    fn build(self) -> JsExecutable {
-        JsExecutable::new(
+    fn build(self) -> Statement {
+        Statement::new(
             r#"
                 async () => {
                     let jason = new window.rust.Jason();
@@ -28,7 +28,7 @@ impl Builder for Jason {
 impl Object<Jason> {
     /// Returns new [`Room`] initiated in this [`Jason`].
     pub async fn init_room(&self) -> Result<Object<Room>, Error> {
-        self.spawn_object(JsExecutable::new(
+        self.execute_and_fetch(Statement::new(
             r#"
                 async (jason) => {
                     let room = await jason.init_room();
@@ -79,7 +79,7 @@ impl Object<Jason> {
 
     /// Closes the provided [`Room`].
     pub async fn close_room(&self, room: &Object<Room>) -> Result<(), Error> {
-        self.execute(JsExecutable::with_objs(
+        self.execute(Statement::with_objs(
             r#"
                 async (jason) => {
                     const [room] = objs;
@@ -96,7 +96,7 @@ impl Object<Jason> {
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,
     /// streams etc.) respectively.
     pub async fn dispose(self) -> Result<(), Error> {
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             r#"
                 async (jason) => {
                     jason.dispose();

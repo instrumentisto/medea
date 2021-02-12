@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{
         local_track::LocalTrack,
         remote_track::RemoteTrack,
@@ -21,7 +21,7 @@ impl<T> Object<TracksStore<T>> {
     /// Returns count of [`LocalTrack`]s stored in this [`LocalTracksStore`].
     pub async fn count(&self) -> Result<u64, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (store) => {
                     return store.tracks.length;
@@ -37,7 +37,7 @@ impl<T> Object<TracksStore<T>> {
     /// Returns [`Future`] which will be resolved when count of `MediaTrack`s
     /// will be same as provided one.
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             r#"
                 async (store) => {
                     const [neededCount] = args;
@@ -74,7 +74,7 @@ impl<T> Object<TracksStore<T>> {
     ) -> Result<bool, Error> {
         let source_kind_js = source_kind
             .map_or_else(|| "undefined".to_string(), MediaSourceKind::as_js);
-        let kind_js = JsExecutable::new(
+        let kind_js = Statement::new(
             &format!(
                 r#"
                 async (store) => {{
@@ -92,7 +92,7 @@ impl<T> Object<TracksStore<T>> {
         );
 
         Ok(self
-            .execute(kind_js.and_then(JsExecutable::new(
+            .execute(kind_js.and_then(Statement::new(
                 r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
@@ -119,7 +119,7 @@ impl<T> Object<TracksStore<T>> {
         kind: MediaKind,
         source_kind: MediaSourceKind,
     ) -> Result<Object<T>, Error> {
-        let kind_js = JsExecutable::new(
+        let kind_js = Statement::new(
             &format!(
                 r#"
                 async (store) => {{
@@ -137,7 +137,7 @@ impl<T> Object<TracksStore<T>> {
         );
 
         Ok(self
-            .spawn_object(kind_js.and_then(JsExecutable::new(
+            .execute_and_fetch(kind_js.and_then(Statement::new(
                 r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {

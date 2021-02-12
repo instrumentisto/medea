@@ -1,4 +1,4 @@
-use crate::{browser::JsExecutable, object::Object};
+use crate::{browser::Statement, object::Object};
 
 use super::Error;
 
@@ -9,7 +9,7 @@ impl Object<LocalTrack> {
     /// `MediaStreamTrack`.
     pub async fn free_and_check(self) -> Result<bool, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (track) => {
                     let sysTrack = track.track.get_track();
@@ -28,7 +28,7 @@ impl Object<LocalTrack> {
     /// `MediaStreamTrack`.
     pub async fn muted(&self) -> Result<bool, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (track) => {
                     return !track.track.get_track().enabled;

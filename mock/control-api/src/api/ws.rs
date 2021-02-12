@@ -63,6 +63,7 @@ enum NotificationVariants<'a> {
 
 impl Notification {
     /// Builds `method: Created` [`Notification`].
+    #[must_use]
     pub fn created(fid: &Fid, element: &Element) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Created {
@@ -74,6 +75,7 @@ impl Notification {
     }
 
     /// Builds `method: Deleted` [`Notification`].
+    #[must_use]
     pub fn deleted(fid: &Fid) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Deleted {
@@ -84,6 +86,7 @@ impl Notification {
     }
 
     /// Builds `method: Broadcast` [`Notification`].
+    #[must_use]
     pub fn broadcast(payload: Value) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Broadcast { payload })

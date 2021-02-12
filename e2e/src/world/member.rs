@@ -1,14 +1,12 @@
-//! Implementation of the object which represents Media Server Member.
+//! Representation of Media Server Member used in tests.
 
 use derive_more::{Display, Error, From};
 
 use crate::{
     conf,
     object::{
-        self,
-        connections_store::ConnectionStore,
-        room::{MediaKind, MediaSourceKind, Room},
-        Object,
+        self, connections_store::ConnectionStore, MediaKind, MediaSourceKind,
+        Object, Room,
     },
 };
 use std::{cell::RefCell, collections::HashMap};
@@ -206,23 +204,23 @@ impl Member {
         self.update_media_state(kind, source_kind, enabled);
         if enabled {
             if let Some(kind) = kind {
-                self.room.enable_media(kind, source_kind).await?;
+                self.room.enable_media_send(kind, source_kind).await?;
             } else {
                 self.room
-                    .enable_media(MediaKind::Video, source_kind)
+                    .enable_media_send(MediaKind::Video, source_kind)
                     .await?;
                 self.room
-                    .enable_media(MediaKind::Audio, source_kind)
+                    .enable_media_send(MediaKind::Audio, source_kind)
                     .await?;
             }
         } else if let Some(kind) = kind {
-            self.room.disable_media(kind, source_kind).await?;
+            self.room.disable_media_send(kind, source_kind).await?;
         } else {
             self.room
-                .disable_media(MediaKind::Audio, source_kind)
+                .disable_media_send(MediaKind::Audio, source_kind)
                 .await?;
             self.room
-                .disable_media(MediaKind::Video, source_kind)
+                .disable_media_send(MediaKind::Video, source_kind)
                 .await?;
         }
         Ok(())

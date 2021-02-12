@@ -20,27 +20,27 @@ use crate::object::ObjectPtr;
 ///     return "foobar";
 /// }
 /// ```
-pub struct JsExecutable {
+pub struct Statement {
     /// Actual JS code to execute.
     expression: String,
 
-    /// Arguments for the [`JsExecutable::expression`] which will be provided
+    /// Arguments for the [`Statement::expression`] which will be provided
     /// as `args` array.
     args: Vec<Json>,
 
-    /// [`ObjectPtr`] to the JS objects needed by [`JsExecutable::expression`]
+    /// [`ObjectPtr`] to the JS objects needed by [`Statement::expression`]
     /// which will be provided as `objs` array.
     objs: Vec<ObjectPtr>,
 
-    /// [`JsExecutable`] which should be executed after this [`JsExecutable`].
+    /// [`Statement`] which should be executed after this [`Statement`].
     ///
-    /// Result returned from this [`JsExecutable`] will be provided to the
-    /// [`JsExecutable::and_then`].
-    and_then: Option<Box<JsExecutable>>,
+    /// Result returned from this [`Statement`] will be provided to the
+    /// [`Statement::and_then`].
+    and_then: Option<Box<Statement>>,
 }
 
-impl JsExecutable {
-    /// Returns new [`JsExecutable`] with a provided JS code and arguments.
+impl Statement {
+    /// Returns new [`Statement`] with a provided JS code and arguments.
     ///
     /// Example of JS expression:
     ///
@@ -62,7 +62,7 @@ impl JsExecutable {
         }
     }
 
-    /// Returns new [`JsExecutable`] with a provided JS code, arguments and
+    /// Returns new [`Statement`] with a provided JS code, arguments and
     /// objects.
     #[allow(dead_code)]
     pub fn with_objs(
@@ -78,9 +78,9 @@ impl JsExecutable {
         }
     }
 
-    /// Executes another [`JsExecutable`] after this one executed successfully.
+    /// Executes another [`Statement`] after this one executed successfully.
     ///
-    /// The success value is passed to a next [`JsExecutable`] as JS lambda
+    /// The success value is passed to a next [`Statement`] as JS lambda
     /// argument.
     #[allow(clippy::option_if_let_else)]
     pub fn and_then(mut self, another: Self) -> Self {
@@ -95,7 +95,7 @@ impl JsExecutable {
 
     /// Returns JS code which should be executed in the browser and [`Json`]
     /// arguments for this code.
-    pub(super) fn finalize(self) -> (String, Vec<Json>) {
+    pub(super) fn prepare(self) -> (String, Vec<Json>) {
         let mut final_js = r#"
             let lastResult;
             let objs;
@@ -104,32 +104,32 @@ impl JsExecutable {
         .to_string();
         let mut args = Vec::new();
 
-        let mut executable = Some(Box::new(self));
+        let mut statement = Some(Box::new(self));
         let mut i = 0;
-        while let Some(mut e) = executable.take() {
+        while let Some(mut e) = statement.take() {
             final_js.push_str(&e.step_js(i));
             i += 1;
             args.push(std::mem::take(&mut e.args).into());
-            executable = e.and_then;
+            statement = e.and_then;
         }
 
         (final_js, args)
     }
 
-    /// Returns JS code which obtains [`JsExecutable::objs`] JS objects.
+    /// Returns JS code which obtains [`Statement::objs`] JS objects.
     ///
-    /// Should be injected to the [`JsExecutable::step_js`] code.
+    /// Should be injected to the [`Statement::step_js`] code.
     fn objects_injection_js(&self) -> String {
         iter::once("objs = [];\n".to_string())
             .chain(self.objs.iter().map(|id| {
-                format!("objs.push(window.holders.get('{}'));\n", id)
+                format!("objs.push(window.registry.get('{}'));\n", id)
             }))
             .collect()
     }
 
-    /// Returns JS code for this [`JsExecutable`].
+    /// Returns JS code for this [`Statement`].
     ///
-    /// Doesn't generates code for the [`JsExecutable::and_then`].
+    /// Doesn't generates code for the [`Statement::and_then`].
     fn step_js(&self, i: usize) -> String {
         format!(
             r#"

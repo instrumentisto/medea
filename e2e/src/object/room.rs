@@ -4,7 +4,7 @@
 use std::str::FromStr;
 
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{
         connections_store::ConnectionStore, tracks_store::LocalTracksStore,
         Object,
@@ -87,7 +87,7 @@ impl MediaSourceKind {
 impl Object<Room> {
     /// Joins [`Room`] with a provided URI.
     pub async fn join(&self, uri: String) -> Result<(), Error> {
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             r#"
                 async (room) => {
                     const [uri] = args;
@@ -106,7 +106,7 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be
     /// disabled for all [`MediaSourceKind`]s.
-    pub async fn disable_media(
+    pub async fn disable_media_send(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
@@ -119,7 +119,7 @@ impl Object<Room> {
                 format!("room.room.disable_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -140,7 +140,7 @@ impl Object<Room> {
     ///
     /// If provided [`None`] `source_kind` then media publishing will be
     /// enabled for all [`MediaSourceKind`]s.
-    pub async fn enable_media(
+    pub async fn enable_media_send(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
@@ -153,7 +153,7 @@ impl Object<Room> {
                 format!("room.room.enable_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -187,7 +187,7 @@ impl Object<Room> {
                 format!("room.room.disable_remote_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -221,7 +221,7 @@ impl Object<Room> {
                 format!("room.room.enable_remote_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -255,7 +255,7 @@ impl Object<Room> {
                 format!("room.room.mute_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -289,7 +289,7 @@ impl Object<Room> {
                 format!("room.room.unmute_video({})", media_source_kind)
             }
         };
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             &format!(
                 r#"
                 async (room) => {{
@@ -309,7 +309,7 @@ impl Object<Room> {
     pub async fn connections_store(
         &self,
     ) -> Result<Object<ConnectionStore>, Error> {
-        self.spawn_object(JsExecutable::new(
+        self.execute_and_fetch(Statement::new(
             r#"
                 async (room) => {
                     let store = {
@@ -389,7 +389,7 @@ impl Object<Room> {
         &self,
     ) -> Result<Object<LocalTracksStore>, Error> {
         Ok(self
-            .spawn_object(JsExecutable::new(
+            .execute_and_fetch(Statement::new(
                 r#"
                 async (room) => {
                     return room.localTracksStore;
@@ -404,7 +404,7 @@ impl Object<Room> {
     /// will fire.
     pub async fn wait_for_close(&self) -> Result<String, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (room) => {
                     if (room.closeListener.isClosed) {

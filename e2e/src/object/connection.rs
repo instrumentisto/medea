@@ -1,5 +1,5 @@
 use crate::{
-    browser::JsExecutable,
+    browser::Statement,
     object::{tracks_store::RemoteTracksStore, Object},
 };
 
@@ -14,7 +14,7 @@ impl Object<Connection> {
         &self,
     ) -> Result<Object<RemoteTracksStore>, Error> {
         Ok(self
-            .spawn_object(JsExecutable::new(
+            .execute_and_fetch(Statement::new(
                 r#"
                 async (conn) => {
                     return conn.tracksStore;
@@ -28,7 +28,7 @@ impl Object<Connection> {
     /// Returns [`Future`] which will be resolved when `Connection.on_close`
     /// callback will fire.
     pub async fn wait_for_close(&self) -> Result<(), Error> {
-        self.execute(JsExecutable::new(
+        self.execute(Statement::new(
             r#"
                 async (conn) => {
                     if (!conn.closeListener.isClosed) {

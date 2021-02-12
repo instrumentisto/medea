@@ -1,18 +1,12 @@
-//! Implementation of the object for interacting with a Medea Control API.
+//! HTTP client that interacts with Medea via Control API.
 
 use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
     api::{Response, SingleGetResponse},
     proto::{CreateResponse, Element},
 };
-use reqwest::Client;
 
 use crate::conf;
-
-/// Returns URL to the Control API for the provided [`Element`] path.
-fn get_url(path: &str) -> String {
-    format!("{}/{}", *conf::CONTROL_API_ADDR, path)
-}
 
 /// All errors which can happen while working with Control API.
 #[derive(Debug, Display, Error, From)]
@@ -23,12 +17,12 @@ pub enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 /// Client for the Control API.
-pub struct ControlApi(Client);
+pub struct Client(reqwest::Client);
 
-impl ControlApi {
+impl Client {
     /// Returns new [`ControlApi`] client.
     pub fn new() -> Self {
-        Self(Client::new())
+        Self(reqwest::Client::new())
     }
 
     /// Creates provided [`Element`] in the provided `path`.
@@ -58,4 +52,9 @@ impl ControlApi {
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
         Ok(self.0.get(&get_url(path)).send().await?.json().await?)
     }
+}
+
+/// Returns URL to the Control API for the provided [`Element`] path.
+fn get_url(path: &str) -> String {
+    format!("{}/{}", *conf::CONTROL_API_ADDR, path)
 }

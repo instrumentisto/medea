@@ -1,4 +1,4 @@
-use crate::{browser::JsExecutable, object::Object};
+use crate::{browser::Statement, object::Object};
 
 use super::Error;
 
@@ -8,7 +8,7 @@ impl Object<RemoteTrack> {
     /// Returns `true` if this [`Track`] is enabled.
     pub async fn enabled(&self) -> Result<bool, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (track) => {
                     return track.track.enabled();
@@ -25,7 +25,7 @@ impl Object<RemoteTrack> {
     /// if `false`.
     pub async fn muted(&self) -> Result<bool, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (track) => {
                     return !track.track.get_track().enabled;
@@ -41,7 +41,7 @@ impl Object<RemoteTrack> {
     /// Returns count of `RemoteMediaTrack.on_enabled` callback fires.
     pub async fn on_enabled_fire_count(&self) -> Result<u64, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (track) => {
                     return track.on_enabled_fire_count;
@@ -57,7 +57,7 @@ impl Object<RemoteTrack> {
     /// Returns count of `RemoteMediaTrack.on_disabled` callback fires.
     pub async fn on_disabled_fire_count(&self) -> Result<u64, Error> {
         Ok(self
-            .execute(JsExecutable::new(
+            .execute(Statement::new(
                 r#"
                 async (track) => {
                     return track.on_disabled_fire_count;
