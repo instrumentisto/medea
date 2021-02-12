@@ -56,6 +56,13 @@ impl Object<Jason> {
                         }
                     });
 
+                    let constraints = new rust.MediaStreamSettings();
+                    let audio = new window.rust.AudioTrackConstraints();
+                    constraints.audio(audio);
+                    let video = new window.rust.DeviceVideoTrackConstraints();
+                    constraints.device_video(video);
+                    room.set_local_media_settings(constraints, false, false);
+
                     return {
                         room: room,
                         closeListener: closeListener,

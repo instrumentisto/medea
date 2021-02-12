@@ -4,7 +4,7 @@ Feature: Local Track are created
     Given Member `Alice`
     And joined Member `Bob`
     When `Alice` joins Room
-    Then Member `Alice` has 3 local Tracks
+    Then Member `Alice` has 2 local Tracks
     And `Alice` has local device video
     And `Alice` has local audio
 
@@ -18,7 +18,7 @@ Feature: Local Track are created
     Given joined Member `Alice` with disabled local all
     And joined Member `Bob`
     When Member `Alice` enables video
-    Then Member `Alice` has 2 local Tracks
+    Then Member `Alice` has 1 local Tracks
     And `Alice` has local device video
 
   Scenario: Local Track creates when Member enables audio

@@ -224,14 +224,33 @@ impl World {
                 }
             })
             .collect();
-        let member = self
-            .members
-            .get_mut(member_id)
-            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
-        let connections = member.connections();
-        for id in interconnected_members {
-            let conn = connections.wait_for_connection(id).await?;
-            conn.wait_for_quality_score().await;
+
+        for member in &interconnected_members {
+            let partner = self.members.get(member).unwrap();
+            let me = self.members.get(member_id).unwrap();
+            let (recv_count, count) = me.tracks_between(partner);
+            let conn = me
+                .connections()
+                .wait_for_connection(member.to_string())
+                .await
+                .unwrap();
+            loop {
+                if conn.tracks_store().await.count().await == count {
+                    break;
+                }
+            }
+
+            let partner_conn = partner
+                .connections()
+                .wait_for_connection(member_id.to_string())
+                .await
+                .unwrap();
+            loop {
+                if partner_conn.tracks_store().await.count().await == recv_count
+                {
+                    break;
+                }
+            }
         }
 
         Ok(())

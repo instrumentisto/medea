@@ -15,7 +15,7 @@ use crate::{
 pub struct Room;
 
 /// Representation of the `MediaKind` JS enum.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MediaKind {
     Audio,
     Video,
@@ -48,7 +48,7 @@ impl MediaKind {
 }
 
 /// Representation of the `MediaSourceKind` JS enum.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MediaSourceKind {
     Device,
     Display,

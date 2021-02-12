@@ -11,6 +11,7 @@ use crate::{
         Object,
     },
 };
+use std::{cell::RefCell, collections::HashMap};
 
 /// All errors which can happen while working with [`Member`].
 #[derive(Debug, Display, Error, From)]
@@ -33,6 +34,14 @@ pub struct MemberBuilder {
     pub is_recv: bool,
 }
 
+fn media_state_store() -> HashMap<(MediaKind, MediaSourceKind), bool> {
+    let mut store = HashMap::new();
+    store.insert((MediaKind::Audio, MediaSourceKind::Device), true);
+    store.insert((MediaKind::Video, MediaSourceKind::Device), true);
+    store.insert((MediaKind::Video, MediaSourceKind::Display), false);
+    store
+}
+
 impl MemberBuilder {
     /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
     pub async fn build(self, room: Object<Room>) -> Result<Member> {
@@ -42,6 +51,8 @@ impl MemberBuilder {
             is_send: self.is_send,
             is_recv: self.is_recv,
             is_joined: false,
+            send_state: RefCell::new(media_state_store()),
+            recv_state: RefCell::new(media_state_store()),
             room,
             connection_store,
         })
@@ -61,6 +72,9 @@ pub struct Member {
 
     /// Flag which indicates that [`Member`] is joined to the `Room`.
     is_joined: bool,
+
+    send_state: RefCell<HashMap<(MediaKind, MediaSourceKind), bool>>,
+    recv_state: RefCell<HashMap<(MediaKind, MediaSourceKind), bool>>,
 
     /// Representation of the `Room` JS object.
     room: Object<Room>,
@@ -106,6 +120,87 @@ impl Member {
         Ok(())
     }
 
+    fn kinds_and_source_kinds(
+        kind: Option<MediaKind>,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Vec<(MediaKind, MediaSourceKind)> {
+        let mut kinds_and_source_kinds = Vec::new();
+        if let Some(kind) = kind {
+            if let Some(source_kind) = source_kind {
+                kinds_and_source_kinds.push((kind, source_kind));
+            } else {
+                kinds_and_source_kinds.push((kind, MediaSourceKind::Device));
+            }
+        } else if let Some(source_kind) = source_kind {
+            kinds_and_source_kinds.push((MediaKind::Audio, source_kind));
+            kinds_and_source_kinds.push((MediaKind::Video, source_kind));
+        } else {
+            kinds_and_source_kinds
+                .push((MediaKind::Video, MediaSourceKind::Device));
+            kinds_and_source_kinds
+                .push((MediaKind::Audio, MediaSourceKind::Device));
+        }
+
+        kinds_and_source_kinds
+    }
+
+    fn update_media_state(
+        &self,
+        kind: Option<MediaKind>,
+        source_kind: Option<MediaSourceKind>,
+        enabled: bool,
+    ) {
+        for (kind, source_kind) in
+            Self::kinds_and_source_kinds(kind, source_kind)
+        {
+            *self
+                .send_state
+                .borrow_mut()
+                .entry((kind, source_kind))
+                .or_insert_with(|| enabled) = enabled;
+        }
+    }
+
+    fn update_recv_media_state(
+        &self,
+        kind: Option<MediaKind>,
+        source_kind: Option<MediaSourceKind>,
+        enabled: bool,
+    ) {
+        for (kind, source_kind) in
+            Self::kinds_and_source_kinds(kind, source_kind)
+        {
+            *self
+                .recv_state
+                .borrow_mut()
+                .entry((kind, source_kind))
+                .or_insert_with(|| enabled) = enabled;
+        }
+    }
+
+    pub fn tracks_between(&self, another: &Self) -> (u64, u64) {
+        let mut send_count = 0;
+        let mut recv_count = 0;
+        for (key, enabled) in self.send_state.borrow().iter() {
+            if let Some(another_enabled) = another.recv_state.borrow().get(key)
+            {
+                if *another_enabled && *enabled {
+                    send_count += 1;
+                }
+            }
+        }
+        for (key, enabled) in self.recv_state.borrow().iter() {
+            if let Some(another_enabled) = another.send_state.borrow().get(key)
+            {
+                if *another_enabled && *enabled {
+                    recv_count += 1;
+                }
+            }
+        }
+
+        (send_count, recv_count)
+    }
+
     /// Toggles media state of this [`Member`]'s [`Room`].
     pub async fn toggle_media(
         &self,
@@ -113,6 +208,7 @@ impl Member {
         source_kind: Option<MediaSourceKind>,
         enabled: bool,
     ) -> Result<()> {
+        self.update_media_state(kind, source_kind, enabled);
         if enabled {
             if let Some(kind) = kind {
                 self.room.enable_media(kind, source_kind).await?;
@@ -172,6 +268,7 @@ impl Member {
         source_kind: Option<MediaSourceKind>,
         enabled: bool,
     ) -> Result<()> {
+        self.update_recv_media_state(kind, source_kind, enabled);
         if enabled {
             if let Some(kind) = kind {
                 self.room.enable_remote_media(kind, source_kind).await?;
