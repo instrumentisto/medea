@@ -54,7 +54,9 @@ impl Object<Connection> {
                     }
                 }
             "#,
-            vec![]
-        )).await.unwrap();
+            vec![],
+        ))
+        .await
+        .unwrap();
     }
 }

@@ -3,7 +3,7 @@
 
 max_width = 80
 format_strings = true
-merge_imports = true
+imports_granularity='Crate'
 normalize_comments = true
 wrap_comments = true
 
