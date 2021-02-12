@@ -6,19 +6,40 @@ pub struct RemoteTrack;
 
 impl Object<RemoteTrack> {
     /// Returns `true` if this [`Track`] is enabled.
-    pub async fn enabled(&self) -> Result<bool, Error> {
-        Ok(self
-            .execute(Statement::new(
-                r#"
+    pub async fn wait_for_enabled(&self) -> Result<(), Error> {
+        self.execute(Statement::new(
+            r#"
                 async (track) => {
-                    return track.track.enabled();
+                    if (!track.track.enabled()) {
+                        let waiter = new Promise((resolve, reject) => {
+                            track.onEnabledSubs.push(resolve);
+                        });
+                        await waiter;
+                    }
                 }
             "#,
-                vec![],
-            ))
-            .await?
-            .as_bool()
-            .ok_or(Error::TypeCast)?)
+            vec![],
+        ))
+        .await?;
+        Ok(())
+    }
+
+    pub async fn wait_for_disabled(&self) -> Result<(), Error> {
+        self.execute(Statement::new(
+            r#"
+                async (track) => {
+                    if (track.track.enabled()) {
+                        let waiter = new Promise((resolve, reject) => {
+                            track.onDisabledSubs.push(resolve);
+                        });
+                        await waiter;
+                    }
+                }
+            "#,
+            vec![],
+        ))
+        .await?;
+        Ok(())
     }
 
     /// Returns `true` if this [`Track`] underlying `MediaStreamTrack.enabled`

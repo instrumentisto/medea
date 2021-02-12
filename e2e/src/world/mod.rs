@@ -222,18 +222,26 @@ impl World {
         });
         let member = self.members.get(member_id).unwrap();
         for partner in interconnected_members {
-            let (send_count, recv_count) = member.count_of_tracks_between_members(partner);
+            let (send_count, recv_count) =
+                member.count_of_tracks_between_members(partner);
             let conn = member
                 .connections()
                 .wait_for_connection(partner.id().to_string())
                 .await?;
-            conn.tracks_store().await?.wait_for_count(recv_count).await?;
+            conn.tracks_store()
+                .await?
+                .wait_for_count(recv_count)
+                .await?;
 
             let partner_conn = partner
                 .connections()
                 .wait_for_connection(member_id.to_string())
                 .await?;
-            partner_conn.tracks_store().await?.wait_for_count(send_count).await?;
+            partner_conn
+                .tracks_store()
+                .await?
+                .wait_for_count(send_count)
+                .await?;
         }
 
         Ok(())

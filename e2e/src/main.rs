@@ -203,12 +203,11 @@ async fn then_remote_media_track(
         .await
         .unwrap();
 
-    let check = match state.as_str() {
-        "enabled" => track.enabled().await.unwrap(),
-        "disabled" => !track.enabled().await.unwrap(),
+    match state.as_str() {
+        "enabled" => track.wait_for_enabled().await.unwrap(),
+        "disabled" => track.wait_for_disabled().await.unwrap(),
         _ => unreachable!(),
     };
-    assert!(check, "RemoteMediaTrack isn't {}", state);
 }
 
 #[then(regex = "^`(.*)` doesn't have (audio|(?:device|display) video) \

@@ -347,13 +347,23 @@ impl Object<Room> {
                             let track = {
                                 track: t,
                                 on_enabled_fire_count: 0,
-                                on_disabled_fire_count: 0
+                                on_disabled_fire_count: 0,
+                                onEnabledSubs: [],
+                                onDisabledSubs: []
                             };
                             track.track.on_enabled(() => {
                                 track.on_enabled_fire_count++;
+                                for (sub of track.onEnabledSubs) {
+                                    sub();
+                                }
+                                track.onEnabledSubs = [];
                             });
                             track.track.on_disabled(() => {
                                 track.on_disabled_fire_count++;
+                                for (sub of track.onDisabledSubs) {
+                                    sub();
+                                }
+                                track.onDisabledSubs = [];
                             });
                             tracksStore.tracks.push(track);
                             let newStoreSubs = tracksStore.subs
