@@ -222,7 +222,7 @@ impl World {
         });
         let member = self.members.get(member_id).unwrap();
         for partner in interconnected_members {
-            let (_, track_count) = member.count_of_tracks_between_members(partner);
+            let (recv_count, track_count) = member.count_of_tracks_between_members(partner);
             let conn = member
                 .connections()
                 .wait_for_connection(partner.id().to_string())
@@ -236,10 +236,16 @@ impl World {
                     break;
                 }
             }
-            partner
+            let partner_conn = partner
                 .connections()
                 .wait_for_connection(member_id.to_string())
                 .await?;
+            loop {
+                if partner_conn.tracks_store().await?.count().await? == recv_count
+                {
+                    break;
+                }
+            }
         }
 
         Ok(())
