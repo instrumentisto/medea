@@ -222,7 +222,7 @@ impl World {
         });
         let member = self.members.get(member_id).unwrap();
         for partner in interconnected_members {
-            let track_count = member.count_of_tracks_between_members(partner);
+            let (_, track_count) = member.count_of_tracks_between_members(partner);
             let conn = member
                 .connections()
                 .wait_for_connection(partner.id().to_string())
