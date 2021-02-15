@@ -4,7 +4,7 @@
 
 mod member;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
 use cucumber_rust::WorldInit;
@@ -22,6 +22,7 @@ use self::member::Member;
 
 #[doc(inline)]
 pub use self::member::MemberBuilder;
+use medea_control_api_mock::callback::{CallbackEvent, CallbackItem};
 
 /// All errors which can happen while working with [`World`].
 #[derive(Debug, Display, Error, From)]
@@ -136,8 +137,8 @@ impl World {
                     credentials: Some(proto::Credentials::Plain(
                         "test".to_string(),
                     )),
-                    on_join: None,
-                    on_leave: None,
+                    on_join: Some("grpc://127.0.0.1:9099".to_string()),
+                    on_leave: Some("grpc://127.0.0.1:9099".to_string()),
                     idle_timeout: None,
                     reconnect_timeout: None,
                     ping_interval: None,
@@ -297,5 +298,56 @@ impl World {
             .await
             .unwrap();
         assert!(resp.error.is_none());
+    }
+
+    pub async fn wait_for_on_leave(
+        &mut self,
+        member_id: String,
+        reason: String,
+    ) {
+        let mut interval = tokio::time::interval(Duration::from_millis(50));
+        loop {
+            interval.tick().await;
+            let callbacks = self.get_callbacks().await;
+            let on_leave = callbacks
+                .into_iter()
+                .filter(|e| e.fid.contains(&member_id))
+                .find_map(|e| {
+                    if let CallbackEvent::OnLeave(on_leave) = e.event {
+                        Some(on_leave)
+                    } else {
+                        None
+                    }
+                });
+            if let Some(on_leave) = on_leave {
+                assert_eq!(on_leave.reason.to_string(), reason);
+                break;
+            }
+        }
+    }
+
+    pub async fn wait_for_on_join(&mut self, member_id: String) {
+        let mut interval = tokio::time::interval(Duration::from_millis(50));
+        loop {
+            interval.tick().await;
+            let callbacks = self.get_callbacks().await;
+            let on_join_found = callbacks
+                .into_iter()
+                .filter(|e| e.fid.contains(&member_id))
+                .any(|e| matches!(e.event, CallbackEvent::OnJoin(_)));
+            if on_join_found {
+                break;
+            }
+        }
+    }
+
+    pub async fn get_callbacks(&mut self) -> Vec<CallbackItem> {
+        self.control_client
+            .callbacks()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|i| i.fid.contains(&self.room_id))
+            .collect()
     }
 }

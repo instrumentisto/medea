@@ -7,6 +7,7 @@ use medea_control_api_mock::{
 };
 
 use crate::conf;
+use medea_control_api_mock::callback::CallbackItem;
 
 /// All errors which can happen while working with Control API.
 #[derive(Debug, Display, Error, From)]
@@ -33,7 +34,7 @@ impl Client {
     ) -> Result<CreateResponse> {
         Ok(self
             .0
-            .post(&get_url(path))
+            .post(&get_url_to_element(path))
             .json(&element)
             .send()
             .await?
@@ -43,17 +44,39 @@ impl Client {
 
     /// Deletes [`Element`] in the provided `path`.
     pub async fn delete(&self, path: &str) -> Result<Response> {
-        Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
+        Ok(self
+            .0
+            .delete(&get_url_to_element(path))
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 
     /// Returns [`Element`] from the provided `path`.
     #[allow(dead_code)]
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
-        Ok(self.0.get(&get_url(path)).send().await?.json().await?)
+        Ok(self
+            .0
+            .get(&get_url_to_element(path))
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
+
+    pub async fn callbacks(&self) -> Result<Vec<CallbackItem>> {
+        Ok(self
+            .0
+            .get(&format!("{}/callbacks", *conf::CONTROL_API_ADDR))
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 }
 
 /// Returns URL to the Control API for the provided [`Element`] path.
-fn get_url(path: &str) -> String {
-    format!("{}/{}", *conf::CONTROL_API_ADDR, path)
+fn get_url_to_element(path: &str) -> String {
+    format!("{}/control-api/{}", *conf::CONTROL_API_ADDR, path)
 }

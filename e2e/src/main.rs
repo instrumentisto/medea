@@ -7,7 +7,10 @@ mod file_server;
 mod object;
 mod world;
 
+use std::time::Duration;
+
 use cucumber_rust::{given, then, when, WorldInit as _};
+use tokio::time::timeout;
 
 use self::{
     file_server::FileServer,
@@ -445,4 +448,33 @@ async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
         .await
         .unwrap();
     assert!(is_stopped);
+}
+
+#[then(regex = "^Control API sends OnLeave callback with `(.*)` reason for \
+                Member `(.*)`$")]
+async fn then_control_api_sends_on_leave(
+    world: &mut World,
+    reason: String,
+    id: String,
+) {
+    timeout(Duration::from_secs(10), world.wait_for_on_leave(id, reason))
+        .await
+        .unwrap();
+}
+
+#[then(regex = "^Control API doesn't sends OnLeave callback for Member `(.*)`$")]
+async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
+    timeout(
+        Duration::from_millis(300),
+        world.wait_for_on_leave(id, "".to_string()),
+    )
+    .await
+    .unwrap_err();
+}
+
+#[then(regex = "^Control API sends OnJoin callback for Member `(.*)`$")]
+async fn then_control_api_sends_on_join(world: &mut World, id: String) {
+    timeout(Duration::from_secs(10), world.wait_for_on_join(id))
+        .await
+        .unwrap();
 }
