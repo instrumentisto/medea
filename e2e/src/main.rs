@@ -380,7 +380,7 @@ async fn then_on_remote_disabled_callback_fires(
         .get_track(media_kind, source_kind)
         .await
         .unwrap();
-    assert_eq!(track.on_disabled_fire_count().await.unwrap(), times);
+    track.wait_for_on_disabled_fire_count(times).await.unwrap();
 }
 
 #[then(regex = "^on_enabled callback fires (\\d*) time on `(.*)`'s remote \
@@ -403,7 +403,7 @@ async fn then_on_remote_enabled_callback_fires(
         .get_track(media_kind, source_kind)
         .await
         .unwrap();
-    assert_eq!(track.on_enabled_fire_count().await.unwrap(), times);
+    track.wait_for_on_enabled_fire_count(times).await.unwrap();
 }
 
 #[then(regex = "^`(.*)`'s (audio|(?:device|display) video) local Track is \

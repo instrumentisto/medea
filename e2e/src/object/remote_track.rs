@@ -65,35 +65,61 @@ impl Object<RemoteTrack> {
             .ok_or(Error::TypeCast)?)
     }
 
-    /// Returns count of `RemoteMediaTrack.on_enabled` callback fires.
-    pub async fn on_enabled_fire_count(&self) -> Result<u64, Error> {
-        Ok(self
-            .execute(Statement::new(
-                r#"
+    /// Returns [`Future`] which will be resolved when count of
+    /// `RemoteMediaTrack.on_disabled` fires will be same as provided one.
+    ///
+    /// [`Future`]: std::future::Future
+    pub async fn wait_for_on_disabled_fire_count(
+        &self,
+        count: u64,
+    ) -> Result<(), Error> {
+        self.execute(Statement::new(
+            r#"
                 async (track) => {
-                    return track.on_enabled_fire_count;
+                    const [count] = args;
+                    while (track.on_disabled_fire_count != count) {
+                        await new Promise((resolve, reject) => {
+                            if (track.on_disabled_fire_count != count) {
+                                track.onDisabledSubs.push(resolve);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    }
                 }
             "#,
-                vec![],
-            ))
-            .await?
-            .as_u64()
-            .ok_or(Error::TypeCast)?)
+            vec![count.into()],
+        ))
+        .await?;
+        Ok(())
     }
 
-    /// Returns count of `RemoteMediaTrack.on_disabled` callback fires.
-    pub async fn on_disabled_fire_count(&self) -> Result<u64, Error> {
-        Ok(self
-            .execute(Statement::new(
-                r#"
+    /// Returns [`Future`] which will be resolved when count of
+    /// `RemoteMediaTrack.on_enabled` fires will be same as provided one.
+    ///
+    /// [`Future`]: std::future::Future
+    pub async fn wait_for_on_enabled_fire_count(
+        &self,
+        count: u64,
+    ) -> Result<(), Error> {
+        self.execute(Statement::new(
+            r#"
                 async (track) => {
-                    return track.on_disabled_fire_count;
+                    const [count] = args;
+                    while (track.on_enabled_fire_count != count) {
+                        await new Promise((resolve, reject) => {
+                            if (track.on_enabled_fire_count != count) {
+                                track.onEnabledSubs.push(resolve);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    }
                 }
             "#,
-                vec![],
-            ))
-            .await?
-            .as_u64()
-            .ok_or(Error::TypeCast)?)
+            vec![count.into()],
+        ))
+        .await?;
+        Ok(())
     }
 }
