@@ -33,11 +33,13 @@ impl Object<Connection> {
         self.execute(Statement::new(
             r#"
                 async (conn) => {
-                    if (!conn.closeListener.isClosed) {
-                        await new Promise((resolve, reject) => {
+                    await new Promise((resolve, reject) => {
+                        if (!conn.closeListener.isClosed) {
                             conn.closeListener.subs.push(resolve);
-                        });
-                    }
+                        } else {
+                            resolve();
+                        }
+                    });
                 }
             "#,
             vec![],

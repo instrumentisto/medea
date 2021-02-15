@@ -42,7 +42,6 @@ impl Client {
     }
 
     /// Deletes [`Element`] in the provided `path`.
-    #[allow(dead_code)]
     pub async fn delete(&self, path: &str) -> Result<Response> {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
     }
