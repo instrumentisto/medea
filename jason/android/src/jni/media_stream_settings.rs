@@ -11,26 +11,15 @@ impl ForeignClass for MediaStreamSettings {
         unsafe { FOREIGN_CLASS_MEDIASTREAMSETTINGS_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<MediaStreamSettings> = Box::new(this);
-        let this: *mut MediaStreamSettings = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
+    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
         let x: *mut MediaStreamSettings = unsafe {
             jlong_to_pointer::<MediaStreamSettings>(x).as_mut().unwrap()
         };
-        let x: Box<MediaStreamSettings> = unsafe { Box::from_raw(x) };
-        let x: MediaStreamSettings = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut MediaStreamSettings = unsafe {
-            jlong_to_pointer::<MediaStreamSettings>(x).as_mut().unwrap()
-        };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
     }
 }
 
@@ -54,8 +43,7 @@ pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeAudio(
             .as_mut()
             .unwrap()
     };
-    let ret: () = MediaStreamSettings::audio(this, constraints);
-    ret
+    this.audio(constraints)
 }
 
 #[no_mangle]
@@ -78,8 +66,7 @@ pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeDeviceVideo(
             .as_mut()
             .unwrap()
     };
-    let ret: () = MediaStreamSettings::device_video(this, constraints);
-    ret
+    this.device_video(constraints)
 }
 
 #[no_mangle]
@@ -102,21 +89,14 @@ pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeDisplayVideo(
             .as_mut()
             .unwrap()
     };
-    let ret: () = MediaStreamSettings::display_video(this, constraints);
-    ret
+    this.display_video(constraints);
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut MediaStreamSettings = unsafe {
-        jlong_to_pointer::<MediaStreamSettings>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let this: Box<MediaStreamSettings> = unsafe { Box::from_raw(this) };
-    drop(this);
+    MediaStreamSettings::get_boxed(ptr);
 }

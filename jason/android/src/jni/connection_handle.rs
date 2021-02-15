@@ -1,4 +1,16 @@
-use super::*;
+use std::ptr;
+
+use jni_sys::{jclass, jfieldID, jlong, jobject, jstring, JNIEnv};
+
+use crate::{
+    jlong_to_pointer,
+    jni::{
+        from_std_string_jstring, jni_throw_exception, ForeignClass, SwigFrom,
+        FOREIGN_CLASS_CONNECTIONHANDLE,
+        FOREIGN_CLASS_CONNECTIONHANDLE_NATIVEPTR_FIELD,
+    },
+    ConnectionHandle, Consumer, RemoteMediaTrack,
+};
 
 impl ForeignClass for ConnectionHandle {
     type PointedType = ConnectionHandle;
@@ -11,26 +23,15 @@ impl ForeignClass for ConnectionHandle {
         unsafe { FOREIGN_CLASS_CONNECTIONHANDLE_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<ConnectionHandle> = Box::new(this);
-        let this: *mut ConnectionHandle = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
-        let x: *mut ConnectionHandle = unsafe {
-            jlong_to_pointer::<ConnectionHandle>(x).as_mut().unwrap()
+    fn get_ptr(ptr: jlong) -> ptr::NonNull<Self::PointedType> {
+        let this = unsafe {
+            jlong_to_pointer::<ConnectionHandle>(ptr).as_mut().unwrap()
         };
-        let x: Box<ConnectionHandle> = unsafe { Box::from_raw(x) };
-        let x: ConnectionHandle = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut ConnectionHandle = unsafe {
-            jlong_to_pointer::<ConnectionHandle>(x).as_mut().unwrap()
-        };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(this).unwrap()
     }
 }
 
@@ -39,20 +40,14 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnClose(
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    f: jobject,
+    cb: jobject,
 ) {
-    let f: Box<dyn Callback> = <Box<dyn Callback>>::swig_from(f, env);
-    let this: &ConnectionHandle =
+    let cb = <Box<dyn Consumer<()>>>::swig_from(cb, env);
+    let this =
         unsafe { jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = ConnectionHandle::on_close(this, f);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.on_close(cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -61,21 +56,15 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeGetRemoteMemberId(
     _: jclass,
     this: jlong,
 ) -> jstring {
-    let this: &ConnectionHandle =
+    let this =
         unsafe { jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap() };
-    let ret: Result<String, String> =
-        ConnectionHandle::get_remote_member_id(this);
-    let ret: jstring = match ret {
-        Ok(x) => {
-            let ret: jstring = from_std_string_jstring(x, env);
-            ret
-        }
+    match this.get_remote_member_id() {
+        Ok(x) => from_std_string_jstring(x, env),
         Err(msg) => {
             jni_throw_exception(env, &msg);
-            return <jstring>::jni_invalid_value();
+            ptr::null_mut()
         }
-    };
-    ret
+    }
 }
 
 #[no_mangle]
@@ -89,16 +78,9 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnRemoteTrackAdded(
         <Box<dyn Consumer<RemoteMediaTrack>>>::swig_from(f, env);
     let this: &ConnectionHandle =
         unsafe { jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> =
-        ConnectionHandle::on_remote_track_added(this, f);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = ConnectionHandle::on_remote_track_added(this, f) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -106,31 +88,21 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnQualityScoreUpdate
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    f: jobject,
+    cb: jobject,
 ) {
-    let f: Box<dyn Consumer<u8>> = <Box<dyn Consumer<u8>>>::swig_from(f, env);
-    let this: &ConnectionHandle =
+    let cb = <Box<dyn Consumer<u8>>>::swig_from(cb, env);
+    let this =
         unsafe { jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> =
-        ConnectionHandle::on_quality_score_update(this, f);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.on_quality_score_update(cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut ConnectionHandle =
-        unsafe { jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap() };
-    let this: Box<ConnectionHandle> = unsafe { Box::from_raw(this) };
-    drop(this);
+    ConnectionHandle::get_boxed(ptr);
 }

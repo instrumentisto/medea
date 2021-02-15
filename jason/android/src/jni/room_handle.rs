@@ -11,24 +11,15 @@ impl ForeignClass for RoomHandle {
         unsafe { FOREIGN_CLASS_ROOMHANDLE_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<RoomHandle> = Box::new(this);
-        let this: *mut RoomHandle = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        let this = Box::new(self);
+        Box::into_raw(this) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
-        let x: *mut RoomHandle =
+    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
+        let this =
             unsafe { jlong_to_pointer::<RoomHandle>(x).as_mut().unwrap() };
-        let x: Box<RoomHandle> = unsafe { Box::from_raw(x) };
-        let x: RoomHandle = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut RoomHandle =
-            unsafe { jlong_to_pointer::<RoomHandle>(x).as_mut().unwrap() };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(this).unwrap()
     }
 }
 
@@ -39,20 +30,12 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeJoin(
     this: jlong,
     token: jstring,
 ) {
-    let token: JavaString = JavaString::new(env, token);
-    let token: &str = token.to_str();
-    let token: String = token.to_string();
-    let this: &RoomHandle =
+    let token = JavaString::new(env, token).to_str().to_owned();
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::join(this, token);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.join(token) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -60,21 +43,15 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnNewConnection(
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    a0: jobject,
+    cb: jobject,
 ) {
-    let a0: Box<dyn Consumer<ConnectionHandle>> =
-        <Box<dyn Consumer<ConnectionHandle>>>::swig_from(a0, env);
+    let cb: Box<dyn Consumer<ConnectionHandle>> =
+        <Box<dyn Consumer<ConnectionHandle>>>::swig_from(cb, env);
     let this: &mut RoomHandle =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::on_new_connection(this, a0);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = RoomHandle::on_new_connection(this, cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -82,21 +59,15 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnClose(
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    a0: jobject,
+    cb: jobject,
 ) {
-    let a0: Box<dyn Consumer<RoomCloseReason>> =
-        <Box<dyn Consumer<RoomCloseReason>>>::swig_from(a0, env);
-    let this: &mut RoomHandle =
+    let cb = <Box<dyn Consumer<RoomCloseReason>>>::swig_from(cb, env);
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::on_close(this, a0);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+
+    if let Err(msg) = this.on_close(cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -104,21 +75,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnLocalTrack(
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    a0: jobject,
+    cb: jobject,
 ) {
-    let a0: Box<dyn Consumer<LocalMediaTrack>> =
-        <Box<dyn Consumer<LocalMediaTrack>>>::swig_from(a0, env);
-    let this: &mut RoomHandle =
+    let cb = <Box<dyn Consumer<LocalMediaTrack>>>::swig_from(cb, env);
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::on_local_track(this, a0);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.on_local_track(cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -126,21 +90,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnFailedLocalMedia(
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    a0: jobject,
+    cb: jobject,
 ) {
-    let a0: Box<dyn Consumer<JasonError>> =
-        <Box<dyn Consumer<JasonError>>>::swig_from(a0, env);
-    let this: &mut RoomHandle =
+    let cb = <Box<dyn Consumer<JasonError>>>::swig_from(cb, env);
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::on_failed_local_media(this, a0);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = RoomHandle::on_failed_local_media(this, cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -148,21 +105,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnConnectionLoss(
     env: *mut JNIEnv,
     _: jclass,
     this: jlong,
-    a0: jobject,
+    cb: jobject,
 ) {
-    let a0: Box<dyn Consumer<ReconnectHandle>> =
-        <Box<dyn Consumer<ReconnectHandle>>>::swig_from(a0, env);
-    let this: &mut RoomHandle =
+    let cb = <Box<dyn Consumer<ReconnectHandle>>>::swig_from(cb, env);
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::on_connection_loss(this, a0);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.on_connection_loss(cb) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -183,20 +133,12 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeSetLocalMediaSettings(
     let rollback_on_fail: bool = rollback_on_fail != 0;
     let this: &RoomHandle =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::set_local_media_settings(
-        this,
-        settings,
-        stop_first,
-        rollback_on_fail,
-    );
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+
+    if let Err(msg) =
+        this.set_local_media_settings(settings, stop_first, rollback_on_fail)
+    {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -207,15 +149,10 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeMuteAudio(
 ) {
     let this: &RoomHandle =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::mute_audio(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+
+    if let Err(msg) = this.mute_audio() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -224,17 +161,11 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeUnmuteAudio(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::unmute_audio(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.unmute_audio() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -244,22 +175,16 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeMuteVideo(
     this: jlong,
     source_kind: jint,
 ) {
-    let source_kind: Option<MediaSourceKind> = if source_kind != -1 {
-        Some(<MediaSourceKind>::from_jint(source_kind))
-    } else {
+    let source_kind = if source_kind == -1 {
         None
+    } else {
+        Some(<MediaSourceKind>::from_jint(source_kind))
     };
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::mute_video(this, source_kind);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.mute_video(source_kind) {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -269,22 +194,16 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeUnmuteVideo(
     this: jlong,
     source_kind: jint,
 ) {
-    let source_kind: Option<MediaSourceKind> = if source_kind != -1 {
-        Some(<MediaSourceKind>::from_jint(source_kind))
-    } else {
+    let source_kind = if source_kind == -1 {
         None
+    } else {
+        Some(<MediaSourceKind>::from_jint(source_kind))
     };
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::unmute_video(this, source_kind);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.unmute_video(source_kind) {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -293,17 +212,11 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableAudio(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::disable_audio(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.disable_audio() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -312,17 +225,11 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableAudio(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::enable_audio(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.enable_audio() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -332,22 +239,16 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableVideo(
     this: jlong,
     source_kind: jint,
 ) {
-    let source_kind: Option<MediaSourceKind> = if source_kind != -1 {
-        Some(<MediaSourceKind>::from_jint(source_kind))
-    } else {
+    let source_kind = if source_kind == -1 {
         None
+    } else {
+        Some(<MediaSourceKind>::from_jint(source_kind))
     };
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::disable_video(this, source_kind);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.disable_video(source_kind) {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -357,22 +258,16 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableVideo(
     this: jlong,
     source_kind: jint,
 ) {
-    let source_kind: Option<MediaSourceKind> = if source_kind != -1 {
-        Some(<MediaSourceKind>::from_jint(source_kind))
-    } else {
+    let source_kind = if source_kind == -1 {
         None
+    } else {
+        Some(<MediaSourceKind>::from_jint(source_kind))
     };
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::enable_video(this, source_kind);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.enable_video(source_kind) {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -381,17 +276,11 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableRemoteAudio(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::disable_remote_audio(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.disable_remote_audio() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -400,17 +289,11 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableRemoteVideo(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::disable_remote_video(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.disable_remote_video() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -419,17 +302,11 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableRemoteAudio(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::enable_remote_audio(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.enable_remote_audio() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
@@ -438,27 +315,18 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableRemoteVideo(
     _: jclass,
     this: jlong,
 ) {
-    let this: &RoomHandle =
+    let this =
         unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = RoomHandle::enable_remote_video(this);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.enable_remote_video() {
+        jni_throw_exception(env, &msg)
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_RoomHandle_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut RoomHandle =
-        unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
-    let this: Box<RoomHandle> = unsafe { Box::from_raw(this) };
-    drop(this);
+    RoomHandle::get_boxed(ptr);
 }

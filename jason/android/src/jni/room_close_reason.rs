@@ -11,24 +11,14 @@ impl ForeignClass for RoomCloseReason {
         unsafe { FOREIGN_CLASS_ROOMCLOSEREASON_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<RoomCloseReason> = Box::new(this);
-        let this: *mut RoomCloseReason = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
+    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
         let x: *mut RoomCloseReason =
             unsafe { jlong_to_pointer::<RoomCloseReason>(x).as_mut().unwrap() };
-        let x: Box<RoomCloseReason> = unsafe { Box::from_raw(x) };
-        let x: RoomCloseReason = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut RoomCloseReason =
-            unsafe { jlong_to_pointer::<RoomCloseReason>(x).as_mut().unwrap() };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
     }
 }
 
@@ -38,11 +28,9 @@ pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeReason(
     _: jclass,
     this: jlong,
 ) -> jstring {
-    let this: &RoomCloseReason =
+    let this =
         unsafe { jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap() };
-    let ret: String = RoomCloseReason::reason(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
+    from_std_string_jstring(this.reason(), env)
 }
 
 #[no_mangle]
@@ -73,10 +61,7 @@ pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeRoomCloseReason(
 pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut RoomCloseReason =
-        unsafe { jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap() };
-    let this: Box<RoomCloseReason> = unsafe { Box::from_raw(this) };
-    drop(this);
+    RoomCloseReason::get_boxed(ptr);
 }

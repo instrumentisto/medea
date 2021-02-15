@@ -2,12 +2,17 @@ package com.jason.api;
 
 import android.util.Log;
 
-import androidx.annotation.NonNull;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Test;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @SmallTest
 public class InstrumentedTest {
@@ -16,17 +21,38 @@ public class InstrumentedTest {
 
     @Test
     public void newJason() throws Exception {
-        Log.e(TAG, "newJason");
-        Log.e(TAG, "1: " + Thread.currentThread().getId() + " " + Thread.currentThread().getName());
+        final CountDownLatch done = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         Jason jason = new Jason();
-        RoomHandle room = jason.initRoom();
-        room.onNewConnection(new ConsumerConnectionHandle() {
-            @Override
-            public void accept(@NonNull ConnectionHandle handle) {
-                Log.e(TAG, "2:" + Thread.currentThread().getId() + " " + Thread.currentThread().getName());
+
+        new Thread(() -> {
+            try {
+                Log.e(TAG, "newJason");
+                Log.e(TAG, "1: " + Thread.currentThread().getId() + " " + Thread.currentThread().getName());
+                RoomHandle room = jason.initRoom();
+                room.onNewConnection(handle -> {
+                    Log.e(TAG, "2:" + Thread.currentThread().getId() + " " + Thread.currentThread().getName());
+
+                    try {
+                        handle.onRemoteTrackAdded(remoteMediaTrack -> {
+                            assertTrue(remoteMediaTrack.enabled());
+
+                            remoteMediaTrack.onEnabled(aVoid -> {
+                                Log.e(TAG, "remoteMediaTrack onEnabled fired");
+                                done.countDown();
+                            });
+                        });
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+                assertEquals(0, jason.mediaManager().enumerateDevices().length);
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        });
-        assertEquals(0, jason.mediaManager().enumerateDevices().length);
+        }).start();
+
+        done.await();
         jason.free();
     }
 }

@@ -1,4 +1,15 @@
-use super::*;
+use std::ptr;
+
+use jni_sys::{jclass, jfieldID, jlong, jstring, JNIEnv};
+
+use crate::{
+    jni::{
+        jlong_to_pointer, ForeignClass, JavaString,
+        FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS,
+        FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS_NATIVEPTR_FIELD,
+    },
+    AudioTrackConstraints,
+};
 
 impl ForeignClass for AudioTrackConstraints {
     type PointedType = AudioTrackConstraints;
@@ -11,30 +22,17 @@ impl ForeignClass for AudioTrackConstraints {
         unsafe { FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<AudioTrackConstraints> = Box::new(this);
-        let this: *mut AudioTrackConstraints = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
-        let x: *mut AudioTrackConstraints = unsafe {
-            jlong_to_pointer::<AudioTrackConstraints>(x)
+    fn get_ptr(ptr: jlong) -> ptr::NonNull<Self::PointedType> {
+        let this = unsafe {
+            jlong_to_pointer::<AudioTrackConstraints>(ptr)
                 .as_mut()
                 .unwrap()
         };
-        let x: Box<AudioTrackConstraints> = unsafe { Box::from_raw(x) };
-        let x: AudioTrackConstraints = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut AudioTrackConstraints = unsafe {
-            jlong_to_pointer::<AudioTrackConstraints>(x)
-                .as_mut()
-                .unwrap()
-        };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(this).unwrap()
     }
 }
 
@@ -45,29 +43,20 @@ pub extern "C" fn Java_com_jason_api_AudioTrackConstraints_nativeDeviceId(
     this: jlong,
     device_id: jstring,
 ) {
-    let device_id: JavaString = JavaString::new(env, device_id);
-    let device_id: &str = device_id.to_str();
-    let device_id: String = device_id.to_string();
-    let this: &mut AudioTrackConstraints = unsafe {
+    let device_id = JavaString::new(env, device_id).to_str().to_owned();
+    let this = unsafe {
         jlong_to_pointer::<AudioTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = AudioTrackConstraints::device_id(this, device_id);
-    ret
+    this.device_id(device_id);
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_AudioTrackConstraints_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut AudioTrackConstraints = unsafe {
-        jlong_to_pointer::<AudioTrackConstraints>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let this: Box<AudioTrackConstraints> = unsafe { Box::from_raw(this) };
-    drop(this);
+    AudioTrackConstraints::get_boxed(ptr);
 }

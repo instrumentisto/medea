@@ -3,6 +3,8 @@ package com.jason.api;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.function.Consumer;
+
 public final class RoomHandle {
 
     volatile long nativePtr;
@@ -16,24 +18,24 @@ public final class RoomHandle {
         nativeJoin(nativePtr, token);
     }
 
-    public void onNewConnection(@NonNull ConsumerConnectionHandle a0) throws Exception {
-        nativeOnNewConnection(nativePtr, a0);
+    public void onNewConnection(@NonNull Consumer<ConnectionHandle> cb) throws Exception {
+        nativeOnNewConnection(nativePtr, cb);
     }
 
-    public void onClose(@NonNull ConsumerRoomCloseReason a0) throws Exception {
-        nativeOnClose(nativePtr, a0);
+    public void onClose(@NonNull Consumer<RoomCloseReason> cb) throws Exception {
+        nativeOnClose(nativePtr, cb);
     }
 
-    public void onLocalTrack(@NonNull ConsumerLocalMediaTrack a0) throws Exception {
-        nativeOnLocalTrack(nativePtr, a0);
+    public void onLocalTrack(@NonNull Consumer<LocalMediaTrack> cb) throws Exception {
+        nativeOnLocalTrack(nativePtr, cb);
     }
 
-    public void onFailedLocalMedia(@NonNull ConsumerJasonError a0) throws Exception {
-        nativeOnFailedLocalMedia(nativePtr, a0);
+    public void onFailedLocalMedia(@NonNull Consumer<JasonError> cb) throws Exception {
+        nativeOnFailedLocalMedia(nativePtr, cb);
     }
 
-    public void onConnectionLoss(@NonNull ConsumerReconnectHandle a0) throws Exception {
-        nativeOnConnectionLoss(nativePtr, a0);
+    public void onConnectionLoss(@NonNull Consumer<ReconnectHandle> cb) throws Exception {
+        nativeOnConnectionLoss(nativePtr, cb);
     }
 
     public void setLocalMediaSettings(@NonNull MediaStreamSettings settings, boolean stopFirst, boolean rollbackOnFail) throws Exception {
@@ -120,15 +122,15 @@ public final class RoomHandle {
 
     private static native void nativeJoin(long self, @NonNull String token) throws Exception;
 
-    private static native void nativeOnNewConnection(long self, ConsumerConnectionHandle a0) throws Exception;
+    private static native void nativeOnNewConnection(long self, Consumer<ConnectionHandle> cb) throws Exception;
 
-    private static native void nativeOnClose(long self, ConsumerRoomCloseReason a0) throws Exception;
+    private static native void nativeOnClose(long self, Consumer<RoomCloseReason> cb) throws Exception;
 
-    private static native void nativeOnLocalTrack(long self, ConsumerLocalMediaTrack a0) throws Exception;
+    private static native void nativeOnLocalTrack(long self, Consumer<LocalMediaTrack> cb) throws Exception;
 
-    private static native void nativeOnFailedLocalMedia(long self, ConsumerJasonError a0) throws Exception;
+    private static native void nativeOnFailedLocalMedia(long self, Consumer<JasonError> cb) throws Exception;
 
-    private static native void nativeOnConnectionLoss(long self, ConsumerReconnectHandle a0) throws Exception;
+    private static native void nativeOnConnectionLoss(long self, Consumer<ReconnectHandle> cb) throws Exception;
 
     private static native void nativeSetLocalMediaSettings(long self, long settings, boolean stopFirst, boolean rollbackOnFail) throws Exception;
 

@@ -11,24 +11,14 @@ impl ForeignClass for InputDeviceInfo {
         unsafe { FOREIGN_CLASS_INPUTDEVICEINFO_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<InputDeviceInfo> = Box::new(this);
-        let this: *mut InputDeviceInfo = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
+    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
         let x: *mut InputDeviceInfo =
             unsafe { jlong_to_pointer::<InputDeviceInfo>(x).as_mut().unwrap() };
-        let x: Box<InputDeviceInfo> = unsafe { Box::from_raw(x) };
-        let x: InputDeviceInfo = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut InputDeviceInfo =
-            unsafe { jlong_to_pointer::<InputDeviceInfo>(x).as_mut().unwrap() };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
     }
 }
 
@@ -88,10 +78,7 @@ pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId(
 pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut InputDeviceInfo =
-        unsafe { jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap() };
-    let this: Box<InputDeviceInfo> = unsafe { Box::from_raw(this) };
-    drop(this);
+    InputDeviceInfo::get_boxed(ptr);
 }

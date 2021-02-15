@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use futures::{
     channel::mpsc,
     future::{BoxFuture, Future},

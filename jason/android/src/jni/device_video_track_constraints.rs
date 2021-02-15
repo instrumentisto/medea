@@ -11,30 +11,17 @@ impl ForeignClass for DeviceVideoTrackConstraints {
         unsafe { FOREIGN_CLASS_DEVICEVIDEOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<DeviceVideoTrackConstraints> = Box::new(this);
-        let this: *mut DeviceVideoTrackConstraints = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
+    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
         let x: *mut DeviceVideoTrackConstraints = unsafe {
             jlong_to_pointer::<DeviceVideoTrackConstraints>(x)
                 .as_mut()
                 .unwrap()
         };
-        let x: Box<DeviceVideoTrackConstraints> = unsafe { Box::from_raw(x) };
-        let x: DeviceVideoTrackConstraints = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut DeviceVideoTrackConstraints = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(x)
-                .as_mut()
-                .unwrap()
-        };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
     }
 }
 
@@ -53,8 +40,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeDeviceId(
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::device_id(this, device_id);
-    ret
+    this.device_id(device_id);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactFacingMode(
@@ -69,9 +55,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactFaci
             .as_mut()
             .unwrap()
     };
-    let ret: () =
-        DeviceVideoTrackConstraints::exact_facing_mode(this, facing_mode);
-    ret
+    this.exact_facing_mode(facing_mode);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealFacingMode(
@@ -86,9 +70,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealFaci
             .as_mut()
             .unwrap()
     };
-    let ret: () =
-        DeviceVideoTrackConstraints::ideal_facing_mode(this, facing_mode);
-    ret
+    this.ideal_facing_mode(facing_mode);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactHeight(
@@ -97,15 +79,14 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactHeig
     this: jlong,
     height: jlong,
 ) {
-    let height: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(height)
+    let height = u32::try_from(height)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &mut DeviceVideoTrackConstraints = unsafe {
+    let this = unsafe {
         jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::exact_height(this, height);
-    ret
+    this.exact_height(height);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealHeight(
@@ -114,15 +95,14 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealHeig
     this: jlong,
     height: jlong,
 ) {
-    let height: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(height)
+    let height = u32::try_from(height)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &mut DeviceVideoTrackConstraints = unsafe {
+    let this = unsafe {
         jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::ideal_height(this, height);
-    ret
+    this.ideal_height(height);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeHeightInRange(
@@ -132,17 +112,16 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeHeightInR
     min: jlong,
     max: jlong,
 ) {
-    let min: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(min)
+    let min = u32::try_from(min)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let max: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(max)
+    let max = u32::try_from(max)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &mut DeviceVideoTrackConstraints = unsafe {
+    let this = unsafe {
         jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::height_in_range(this, min, max);
-    ret
+    this.height_in_range(min, max);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactWidth(
@@ -151,15 +130,14 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactWidt
     this: jlong,
     width: jlong,
 ) {
-    let width: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(width)
+    let width = u32::try_from(width)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &mut DeviceVideoTrackConstraints = unsafe {
+    let this = unsafe {
         jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::exact_width(this, width);
-    ret
+    this.exact_width(width);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealWidth(
@@ -168,15 +146,14 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealWidt
     this: jlong,
     width: jlong,
 ) {
-    let width: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(width)
+    let width = u32::try_from(width)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &mut DeviceVideoTrackConstraints = unsafe {
+    let this = unsafe {
         jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::ideal_width(this, width);
-    ret
+    this.ideal_width(width);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeWidthInRange(
@@ -186,29 +163,22 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeWidthInRa
     min: jlong,
     max: jlong,
 ) {
-    let min: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(min)
+    let min = u32::try_from(min)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let max: u32 = <u32 as ::std::convert::TryFrom<jlong>>::try_from(max)
+    let max = u32::try_from(max)
         .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &mut DeviceVideoTrackConstraints = unsafe {
+    let this = unsafe {
         jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
             .as_mut()
             .unwrap()
     };
-    let ret: () = DeviceVideoTrackConstraints::width_in_range(this, min, max);
-    ret
+    this.width_in_range(min, max);
 }
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut DeviceVideoTrackConstraints = unsafe {
-        jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let this: Box<DeviceVideoTrackConstraints> = unsafe { Box::from_raw(this) };
-    drop(this);
+    DeviceVideoTrackConstraints::get_boxed(ptr);
 }

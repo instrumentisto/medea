@@ -1,9 +1,20 @@
-#![allow(clippy::new_without_default)]
+#![allow(
+    clippy::new_without_default,
+    clippy::module_name_repetitions,
+    clippy::items_after_statements,
+    clippy::wildcard_imports,
+    clippy::must_use_candidate,
+    clippy::unused_self,
+    clippy::missing_errors_doc,
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines,
+    clippy::shadow_unrelated
+)]
 
 use android_logger::Config;
 use log::{info, Level};
 
-mod context;
+// mod context;
 mod jni;
 
 pub use crate::jni::*;
@@ -52,10 +63,16 @@ impl Jason {
     pub fn dispose(&self) {}
 }
 
+impl Drop for Jason {
+    fn drop(&mut self) {
+        info!("Drop for Jason");
+    }
+}
+
 pub struct ConnectionHandle;
 
 impl ConnectionHandle {
-    pub fn on_close(&self, _f: Box<dyn Callback>) -> Result<(), String> {
+    pub fn on_close(&self, _f: Box<dyn Consumer<()>>) -> Result<(), String> {
         Ok(())
     }
 
@@ -65,8 +82,9 @@ impl ConnectionHandle {
 
     pub fn on_remote_track_added(
         &self,
-        _f: Box<dyn Consumer<RemoteMediaTrack>>,
+        cb: Box<dyn Consumer<RemoteMediaTrack>>,
     ) -> Result<(), String> {
+        cb.accept(RemoteMediaTrack);
         Ok(())
     }
 
@@ -209,36 +227,6 @@ pub trait Consumer<T> {
     fn accept(&self, val: T);
 }
 
-pub trait Callback {
-    fn call(&self);
-}
-
-// struct RoomHandle
-// pub fn on_new_connection(&self, f: Callback<ConnectionHandle>) -> Result<(),
-// JasonError> pub fn on_close(&mut self, f: Callback<RoomCloseReason>) ->
-// Result<(), JasonError> pub fn on_local_track(&self, f:
-// Callback<LocalMediaTrack>) -> Result<(), JasonError>
-// pub fn on_failed_local_media(&self, f: Callback<JasonError>) -> Result<(),
-// JasonError> pub fn on_connection_loss(&self, f: Callback<ReconnectHandle>) ->
-// Result<(), JasonError> pub fn join(&self, token: String) ->
-// Promise<Result<(), JasonError>> pub fn set_local_media_settings(&self,
-// settings: &MediaStreamSettings, stop_first: bool, rollback_on_fail: bool) ->
-// Promise<Result<(), ConstraintsUpdateException>> pub fn mute_audio(&self) ->
-// Promise<Result<(), JasonError>> pub fn unmute_audio(&self) ->
-// Promise<Result<(), JasonError>> pub fn mute_video(&self, source_kind:
-// Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
-// pub fn unmute_video(&self, source_kind: Option<MediaSourceKind>) ->
-// Promise<Result<(), JasonError>> pub fn disable_audio(&self) ->
-// Promise<Result<(), JasonError>> pub fn enable_audio(&self) ->
-// Promise<Result<(), JasonError>> pub fn disable_video(&self, source_kind:
-// Option<MediaSourceKind>) -> Promise<Result<(), JasonError>>
-// pub fn enable_video(&self,source_kind: Option<MediaSourceKind>) ->
-// Promise<Result<(), JasonError>> pub fn disable_remote_audio(&self) ->
-// Promise<Result<(), JasonError>> pub fn disable_remote_video(&self) ->
-// Promise<Result<(), JasonError>> pub fn enable_remote_audio(&self) ->
-// Promise<Result<(), JasonError>> pub fn enable_remote_video(&self) ->
-// Promise<Result<(), JasonError>>
-
 pub struct MediaManagerHandle;
 
 impl MediaManagerHandle {
@@ -357,9 +345,11 @@ impl RemoteMediaTrack {
         true
     }
 
-    pub fn on_enabled(&self, _cb: Box<dyn Callback>) {}
+    pub fn on_enabled(&self, cb: Box<dyn Consumer<()>>) {
+        cb.accept(());
+    }
 
-    pub fn on_disabled(&self, _cb: Box<dyn Callback>) {}
+    pub fn on_disabled(&self, _cb: Box<dyn Consumer<()>>) {}
 
     pub fn kind(&self) -> MediaKind {
         MediaKind::Video

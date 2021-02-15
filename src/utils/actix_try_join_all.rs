@@ -87,7 +87,7 @@ where
                 Poll::Ready(Ok(results))
             }
             FinalState::Error(e) => {
-                let _ = mem::replace(&mut self.elems, Box::pin([]));
+                let _elems = mem::replace(&mut self.elems, Box::pin([]));
                 Poll::Ready(Err(e))
             }
         }

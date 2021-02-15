@@ -11,24 +11,14 @@ impl ForeignClass for ReconnectHandle {
         unsafe { FOREIGN_CLASS_RECONNECTHANDLE_NATIVEPTR_FIELD }
     }
 
-    fn box_object(this: Self) -> jlong {
-        let this: Box<ReconnectHandle> = Box::new(this);
-        let this: *mut ReconnectHandle = Box::into_raw(this);
-        this as jlong
+    fn box_object(self) -> jlong {
+        Box::into_raw(Box::new(self)) as i64
     }
 
-    fn unbox_object(x: jlong) -> Self {
+    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
         let x: *mut ReconnectHandle =
             unsafe { jlong_to_pointer::<ReconnectHandle>(x).as_mut().unwrap() };
-        let x: Box<ReconnectHandle> = unsafe { Box::from_raw(x) };
-        let x: ReconnectHandle = *x;
-        x
-    }
-
-    fn as_pointer(x: jlong) -> ::std::ptr::NonNull<Self::PointedType> {
-        let x: *mut ReconnectHandle =
-            unsafe { jlong_to_pointer::<ReconnectHandle>(x).as_mut().unwrap() };
-        ::std::ptr::NonNull::<Self::PointedType>::new(x).unwrap()
+        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
     }
 }
 
@@ -39,21 +29,13 @@ pub extern "C" fn Java_com_jason_api_ReconnectHandle_nativeReconnectWithDelay(
     this: jlong,
     delay_ms: jlong,
 ) {
-    let delay_ms: u32 =
-        <u32 as ::std::convert::TryFrom<jlong>>::try_from(delay_ms)
-            .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &ReconnectHandle =
+    let delay_ms = u32::try_from(delay_ms)
+        .expect("invalid jlong, in jlong => u32 conversation");
+    let this =
         unsafe { jlong_to_pointer::<ReconnectHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> =
-        ReconnectHandle::reconnect_with_delay(this, delay_ms);
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+    if let Err(msg) = this.reconnect_with_delay(delay_ms) {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
@@ -65,39 +47,25 @@ pub extern "C" fn Java_com_jason_api_ReconnectHandle_nativeReconnectWithBackoff(
     multiplier: jfloat,
     max_delay: jlong,
 ) {
-    let starting_delay_ms: u32 =
-        <u32 as ::std::convert::TryFrom<jlong>>::try_from(starting_delay_ms)
-            .expect("invalid jlong, in jlong => u32 conversation");
-    let multiplier: f32 = multiplier;
-    let max_delay: u32 =
-        <u32 as ::std::convert::TryFrom<jlong>>::try_from(max_delay)
-            .expect("invalid jlong, in jlong => u32 conversation");
-    let this: &ReconnectHandle =
+    let starting_delay_ms = u32::try_from(starting_delay_ms)
+        .expect("invalid jlong, in jlong => u32 conversation");
+    let max_delay = u32::try_from(max_delay)
+        .expect("invalid jlong, in jlong => u32 conversation");
+    let this =
         unsafe { jlong_to_pointer::<ReconnectHandle>(this).as_mut().unwrap() };
-    let ret: Result<(), String> = ReconnectHandle::reconnect_with_backoff(
-        this,
-        starting_delay_ms,
-        multiplier,
-        max_delay,
-    );
-    let ret: () = match ret {
-        Ok(x) => x,
-        Err(msg) => {
-            jni_throw_exception(env, &msg);
-            return <()>::jni_invalid_value();
-        }
-    };
-    ret
+
+    if let Err(msg) =
+        this.reconnect_with_backoff(starting_delay_ms, multiplier, max_delay)
+    {
+        jni_throw_exception(env, &msg);
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_ReconnectHandle_nativeFree(
     _: *mut JNIEnv,
     _: jclass,
-    this: jlong,
+    ptr: jlong,
 ) {
-    let this: *mut ReconnectHandle =
-        unsafe { jlong_to_pointer::<ReconnectHandle>(this).as_mut().unwrap() };
-    let this: Box<ReconnectHandle> = unsafe { Box::from_raw(this) };
-    drop(this);
+    ReconnectHandle::get_boxed(ptr);
 }
