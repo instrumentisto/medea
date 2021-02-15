@@ -1,5 +1,7 @@
 //! Representation of Media Server Member used in tests.
 
+use std::{cell::RefCell, collections::HashMap};
+
 use derive_more::{Display, Error, From};
 
 use crate::{
@@ -9,7 +11,6 @@ use crate::{
         Object, Room,
     },
 };
-use std::{cell::RefCell, collections::HashMap};
 
 /// All errors which can happen while working with [`Member`].
 #[derive(Debug, Display, Error, From)]
@@ -32,25 +33,21 @@ pub struct MemberBuilder {
     pub is_recv: bool,
 }
 
-fn media_state_store() -> HashMap<(MediaKind, MediaSourceKind), bool> {
-    let mut store = HashMap::new();
-    store.insert((MediaKind::Audio, MediaSourceKind::Device), true);
-    store.insert((MediaKind::Video, MediaSourceKind::Device), true);
-    store.insert((MediaKind::Video, MediaSourceKind::Display), false);
-    store
-}
-
 impl MemberBuilder {
     /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
     pub async fn build(self, room: Object<Room>) -> Result<Member> {
         let connection_store = room.connections_store().await?;
+        let mut media_state = HashMap::new();
+        media_state.insert((MediaKind::Audio, MediaSourceKind::Device), true);
+        media_state.insert((MediaKind::Video, MediaSourceKind::Device), true);
+        media_state.insert((MediaKind::Video, MediaSourceKind::Display), false);
         Ok(Member {
             id: self.id,
             is_send: self.is_send,
             is_recv: self.is_recv,
             is_joined: false,
-            send_state: RefCell::new(media_state_store()),
-            recv_state: RefCell::new(media_state_store()),
+            send_state: RefCell::new(media_state.clone()),
+            recv_state: RefCell::new(media_state),
             room,
             connection_store,
         })
@@ -71,7 +68,16 @@ pub struct Member {
     /// Flag which indicates that [`Member`] is joined to the `Room`.
     is_joined: bool,
 
+    /// Publishing media state of this [`Member`].
+    ///
+    /// If value is `true` then this [`MediaKind`] and [`MediaSourceKind`] is
+    /// enabled.
     send_state: RefCell<HashMap<(MediaKind, MediaSourceKind), bool>>,
+
+    /// Receiving media state of this [`Member`].
+    ///
+    /// If value is `true` then this [`MediaKind`] and [`MediaSourceKind`] is
+    /// enabled.
     recv_state: RefCell<HashMap<(MediaKind, MediaSourceKind), bool>>,
 
     /// Representation of the `Room` JS object.
@@ -182,6 +188,9 @@ impl Member {
 
     /// Returns count of [`LocalTrack`]s and [`RemoteTrack`]s of this [`Member`]
     /// with a provided partner [`Member`].
+    ///
+    /// [`LocalTrack`]: crate::object::local_track::LocalTrack
+    /// [`RemoteTrack`]: crate::object::remote_track::RemoteTrack
     pub fn count_of_tracks_between_members(
         &self,
         another: &Self,

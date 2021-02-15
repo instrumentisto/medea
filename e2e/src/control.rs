@@ -20,7 +20,7 @@ type Result<T> = std::result::Result<T, Error>;
 pub struct Client(reqwest::Client);
 
 impl Client {
-    /// Returns new [`ControlApi`] client.
+    /// Returns new [`Client`] client.
     pub fn new() -> Self {
         Self(reqwest::Client::new())
     }

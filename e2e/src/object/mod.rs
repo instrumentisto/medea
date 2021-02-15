@@ -43,7 +43,7 @@ pub struct Object<T> {
     /// Pointer to the JS object on browser-side.
     ptr: ObjectPtr,
 
-    /// [`Window`] where this [`Object`] is exists.
+    /// [`browser::Window`] where this [`Object`] is exists.
     window: browser::Window,
 
     /// Type of [`Object`].
@@ -77,7 +77,7 @@ impl<T> Drop for Object<T> {
 }
 
 impl<T> Object<T> {
-    /// Returns [`Object`] with a provided ID and [`Window`].
+    /// Returns [`Object`] with a provided ID and [`browser::Window`].
     pub fn new(id: String, window: browser::Window) -> Self {
         Self {
             ptr: ObjectPtr(id),
@@ -86,7 +86,7 @@ impl<T> Object<T> {
         }
     }
 
-    /// Returns [`ObjectPrt`] for this [`Object`].
+    /// Returns [`ObjectPtr`] for this [`Object`].
     pub fn ptr(&self) -> ObjectPtr {
         self.ptr.clone()
     }
@@ -150,7 +150,7 @@ impl<T> Object<T> {
 }
 
 impl<T: Builder> Object<T> {
-    /// Spawns provided `obj` [`Object`] in the provided [`Window`].
+    /// Spawns provided `obj` [`Object`] in the provided [`browser::Window`].
     pub async fn spawn(
         obj: T,
         window: browser::Window,

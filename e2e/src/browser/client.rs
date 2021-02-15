@@ -54,7 +54,7 @@ impl From<JsResult> for Result<Json> {
 pub struct WebDriverClient(Arc<Mutex<Inner>>);
 
 impl WebDriverClient {
-    /// Returns new [`WebClient`] connected to the [WebDriver].
+    /// Returns new [`WebDriverClient`] connected to the [WebDriver].
     ///
     /// [WebDriver]: https://www.w3.org/TR/webdriver/
     pub async fn new() -> Result<Self> {
@@ -111,7 +111,7 @@ impl WebDriverClient {
     }
 }
 
-/// Inner for the [`WebClient`].
+/// Inner for the [`WebDriverClient`].
 struct Inner(Client);
 
 impl Inner {

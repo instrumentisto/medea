@@ -248,6 +248,8 @@ impl World {
     }
 
     /// Closes [`Room`] of the provided [`Member`].
+    ///
+    /// [`Room`]: crate::object::room::Room
     pub async fn close_room(&mut self, member_id: &str) -> Result<()> {
         let jason = self.jasons.get(member_id).unwrap();
         let member = self.members.get(member_id).unwrap();
@@ -257,6 +259,8 @@ impl World {
     }
 
     /// Wait for [`Member`]'s [`Room`] close.
+    ///
+    /// [`Room`]: crate::object::room::Room
     pub async fn wait_for_on_close(&self, member_id: &str) -> Result<String> {
         let member = self
             .members
@@ -284,6 +288,8 @@ impl World {
     }
 
     /// Deletes Control API element of the [`Room`] with a provided ID.
+    ///
+    /// [`Room`]: crate::object::room::Room
     pub async fn delete_room_element(&mut self) {
         let resp = self
             .control_client

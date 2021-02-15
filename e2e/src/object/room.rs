@@ -17,12 +17,13 @@ use super::Error;
 pub struct Room;
 
 /// Representation of the `MediaKind` JS enum.
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum MediaKind {
     Audio,
     Video,
 }
 
+/// Error which can happen while [`MediaKind`] or [`MediaSourceKind`] parsing.
 #[derive(Debug)]
 pub struct FailedParsing;
 
@@ -41,6 +42,7 @@ impl FromStr for MediaKind {
 }
 
 impl MediaKind {
+    /// Converts this [`MediaKind`] to the JS code for this enum variant.
     pub fn as_js(self) -> String {
         match self {
             MediaKind::Audio => "window.rust.MediaKind.Audio".to_string(),
@@ -50,7 +52,7 @@ impl MediaKind {
 }
 
 /// Representation of the `MediaSourceKind` JS enum.
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum MediaSourceKind {
     Device,
     Display,
@@ -325,24 +327,11 @@ impl Object<Room> {
                             tracks: [],
                             subs: []
                         };
-                        let qualityScoreListener = {
-                            score: 0,
-                            subs: []
-                        };
                         let connection = {
                             conn: conn,
                             tracksStore: tracksStore,
                             closeListener: closeListener,
-                            qualityScoreListener: qualityScoreListener,
                         };
-                        conn.on_quality_score_update((score) => {
-                            qualityScoreListener.score = score;
-                            let newSubs = qualityScoreListener.subs
-                                .filter((sub) => {
-                                    return sub(score);
-                                });
-                            qualityScoreListener.subs = newSubs;
-                        });
                         conn.on_remote_track_added((t) => {
                             let track = {
                                 track: t,
@@ -395,6 +384,8 @@ impl Object<Room> {
     }
 
     /// Returns this [`Room`]'s [`LocalTrack`]s store.
+    ///
+    /// [`LocalTrack`]: crate::object::local_track::LocalTrack
     pub async fn local_tracks(
         &self,
     ) -> Result<Object<LocalTracksStore>, Error> {
@@ -412,6 +403,8 @@ impl Object<Room> {
 
     /// Returns [`Future`] which will be resolved when `Room.on_close` callback
     /// will fire.
+    ///
+    /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<String, Error> {
         Ok(self
             .execute(Statement::new(

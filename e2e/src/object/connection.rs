@@ -9,7 +9,7 @@ use super::Error;
 pub struct Connection;
 
 impl Object<Connection> {
-    /// Returns [`TrackStore`] of this [`Connection`].
+    /// Returns [`RemoteTracksStore`] of this [`Connection`].
     pub async fn tracks_store(
         &self,
     ) -> Result<Object<RemoteTracksStore>, Error> {
@@ -27,6 +27,8 @@ impl Object<Connection> {
 
     /// Returns [`Future`] which will be resolved when `Connection.on_close`
     /// callback will fire.
+    ///
+    /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             r#"

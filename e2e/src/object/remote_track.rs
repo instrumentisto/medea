@@ -2,10 +2,11 @@ use crate::{browser::Statement, object::Object};
 
 use super::Error;
 
+/// Representation of the `RemoteMediaTrack` object.
 pub struct RemoteTrack;
 
 impl Object<RemoteTrack> {
-    /// Returns `true` if this [`Track`] is enabled.
+    /// Returns `true` if this [`RemoteTrack`] is enabled.
     pub async fn wait_for_enabled(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             r#"
@@ -24,6 +25,11 @@ impl Object<RemoteTrack> {
         Ok(())
     }
 
+    /// Returns [`Future`] which will be resolved id `RemoteMediaTrack.enabled`
+    /// will be `false` or when `RemoteMediaTrack.on_disabled` callback will
+    /// fire.
+    ///
+    /// [`Future`]: std::future::Future
     pub async fn wait_for_disabled(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             r#"
@@ -42,8 +48,8 @@ impl Object<RemoteTrack> {
         Ok(())
     }
 
-    /// Returns `true` if this [`Track`] underlying `MediaStreamTrack.enabled`
-    /// if `false`.
+    /// Returns `true` if this [`RemoteTrack`] underlying
+    /// `MediaStreamTrack.enabled` is `false`.
     pub async fn muted(&self) -> Result<bool, Error> {
         Ok(self
             .execute(Statement::new(

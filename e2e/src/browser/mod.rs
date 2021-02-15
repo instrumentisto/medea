@@ -90,7 +90,7 @@ impl Drop for Window {
 }
 
 impl Window {
-    /// Creates new window in the provided [`WebClient`] and returns
+    /// Creates new window in the provided [`WebDriverClient`] and returns
     /// [`Window`] for the created window.
     async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();

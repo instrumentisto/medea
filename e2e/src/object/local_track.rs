@@ -2,6 +2,7 @@ use crate::{browser::Statement, object::Object};
 
 use super::Error;
 
+/// Representation of the `LocalMediaTrack` object.
 pub struct LocalTrack;
 
 impl Object<LocalTrack> {

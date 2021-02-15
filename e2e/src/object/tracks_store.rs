@@ -1,3 +1,6 @@
+//! Implementation and definition of store for the [`LocalTrack`]s and
+//! [`RemoteTrack`]s.
+
 use std::marker::PhantomData;
 
 use crate::{
@@ -15,10 +18,11 @@ use super::Error;
 pub type LocalTracksStore = TracksStore<LocalTrack>;
 pub type RemoteTracksStore = TracksStore<RemoteTrack>;
 
+/// Store for the [`LocalTrack`]s or [`RemoteTrack`]s.
 pub struct TracksStore<T>(PhantomData<T>);
 
 impl<T> Object<TracksStore<T>> {
-    /// Returns count of [`LocalTrack`]s stored in this [`LocalTracksStore`].
+    /// Returns count of Tracks stored in this [`TracksStore`].
     pub async fn count(&self) -> Result<u64, Error> {
         Ok(self
             .execute(Statement::new(
@@ -34,8 +38,10 @@ impl<T> Object<TracksStore<T>> {
             .ok_or(Error::TypeCast)?)
     }
 
-    /// Returns [`Future`] which will be resolved when count of `MediaTrack`s
+    /// Returns [`Future`] which will be resolved when count of Tracks
     /// will be same as provided one.
+    ///
+    /// [`Future`]: std::future::Future
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
         self.execute(Statement::new(
             r#"
@@ -65,7 +71,7 @@ impl<T> Object<TracksStore<T>> {
         Ok(())
     }
 
-    /// Returns `true` if this [`LocalTracksStore`] contains [`LocalTrack`] with
+    /// Returns `true` if this [`TracksStore`] contains Track with
     /// a provided [`MediaKind`] and [`MediaSourceKind`].
     pub async fn has_track(
         &self,
@@ -112,8 +118,8 @@ impl<T> Object<TracksStore<T>> {
             .ok_or(Error::TypeCast)?)
     }
 
-    /// Returns [`LocalTrack`] from this [`LocalTracksStore`] with a provided
-    /// [`MediaKind`] and [`MediaSourceKind`].
+    /// Returns Track from this [`TracksStore`] with a provided [`MediaKind`]
+    /// and [`MediaSourceKind`].
     pub async fn get_track(
         &self,
         kind: MediaKind,
