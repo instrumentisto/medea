@@ -12,7 +12,7 @@ use std::{marker::PhantomData, sync::mpsc};
 
 use derive_more::{Display, Error, From};
 use serde_json::Value as Json;
-use tokio::task;
+use tokio_1::{self as tokio, task};
 use uuid::Uuid;
 
 use crate::browser::{self, Statement};

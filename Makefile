@@ -21,7 +21,7 @@ IMAGE_NAME := $(strip \
 	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
 	$(image))))
 
-RUST_VER := 1.49
+RUST_VER := 1.50
 CHROME_VERSION := 88.0
 FIREFOX_VERSION := 85.0.2
 
@@ -442,8 +442,8 @@ endif
 
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/integration/specs/ \
+	MEDEA_CONF=tests/integration/medea.config.toml
 
 test.integration:
 ifeq ($(up),yes)
@@ -486,7 +486,7 @@ endif
 	make build.jason
 	@make docker.up.webdriver browser=$(browser)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
-	RUST_BACKTRACE=1 cargo run -p medea-e2e-tests
+	RUST_BACKTRACE=1 cargo test --test e2e
 ifeq ($(up),yes)
 	-make down
 	-make docker.down.webdriver browser=$(browser)

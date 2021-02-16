@@ -8,7 +8,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use tokio::fs::File;
+use tokio_1::{self as tokio, fs::File};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::conf;
