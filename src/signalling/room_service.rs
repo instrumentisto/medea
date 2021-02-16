@@ -679,13 +679,14 @@ mod room_service_specs {
     use super::*;
 
     /// Returns [`RoomSpec`] parsed from
-    /// `../../tests/specs/pub-sub-video-call.yml` file.
+    /// `../../tests/integration/specs/pub-sub-video-call.yml` file.
     ///
     /// Note that YAML spec is loads on compile time with [`include_str`]
     /// macro.
     fn room_spec() -> RoomSpec {
-        const ROOM_SPEC: &str =
-            include_str!("../../tests/specs/pub-sub-video-call.yml");
+        const ROOM_SPEC: &str = include_str!(
+            "../../tests/integration/specs/pub-sub-video-call.yml"
+        );
 
         let parsed: RootElement = serde_yaml::from_str(ROOM_SPEC).unwrap();
         RoomSpec::try_from(&parsed).unwrap()
