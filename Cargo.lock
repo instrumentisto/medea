@@ -2173,23 +2173,29 @@ dependencies = [
  "bytes 0.5.6",
  "chrono",
  "config",
+ "cucumber_rust",
  "deadpool",
  "deadpool-redis",
  "derive_builder",
  "derive_more",
  "dotenv",
  "failure",
+ "fantoccini",
  "function_name",
  "futures 0.3.12",
  "humantime-serde",
+ "hyper 0.14.4",
  "lazy_static",
  "medea-client-api-proto 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-control-api-mock",
  "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mockall",
+ "once_cell",
  "rand 0.8.3",
  "redis",
+ "reqwest",
  "rust-argon2",
  "rust-crypto",
  "serde 1.0.123",
@@ -2206,9 +2212,13 @@ dependencies = [
  "subtle",
  "tempfile",
  "tokio 0.2.25",
+ "tokio 1.2.0",
+ "tokio-util 0.6.3",
  "toml",
  "tonic",
  "url",
+ "uuid",
+ "webdriver",
 ]
 
 [[package]]
@@ -2315,27 +2325,6 @@ dependencies = [
  "regex",
  "tokio 0.2.25",
  "tokio-util 0.3.1",
-]
-
-[[package]]
-name = "medea-e2e-tests"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "cucumber_rust",
- "derive_more",
- "fantoccini",
- "futures 0.3.12",
- "hyper 0.14.4",
- "medea-control-api-mock",
- "once_cell",
- "reqwest",
- "serde 1.0.123",
- "serde_json",
- "tokio 1.2.0",
- "tokio-util 0.6.3",
- "uuid",
- "webdriver",
 ]
 
 [[package]]

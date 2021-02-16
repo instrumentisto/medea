@@ -8,7 +8,7 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
 };
-use tokio::fs::File;
+use tokio_e2e::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::conf;
@@ -26,7 +26,7 @@ impl FileServer {
             }));
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        tokio::spawn(future::select(server, shutdown_rx));
+        tokio_e2e::spawn(future::select(server, shutdown_rx));
 
         Self(shutdown_tx)
     }

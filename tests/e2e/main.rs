@@ -15,11 +15,16 @@ use self::{
     world::{MemberBuilder, World},
 };
 
-#[tokio::main]
-async fn main() {
-    let _server = FileServer::run();
-    let runner = World::init(&[conf::FEATURES_PATH.as_str()]);
-    runner.run_and_exit().await;
+fn main() {
+    tokio_e2e::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let _server = FileServer::run();
+            let runner = World::init(&[conf::FEATURES_PATH.as_str()]);
+            runner.run_and_exit().await;
+        })
 }
 
 fn parse_media_kind(text: &str) -> Option<MediaKind> {

@@ -66,13 +66,13 @@ env_var!(
 env_var!(
     /// Path to the `index.html` for all tests.
     INDEX_PATH
-        || "e2e/index.html"
+        || "tests/e2e/index.html"
 );
 
 env_var!(
     /// Path to the Cucumber Features which are should be ran.
     FEATURES_PATH
-        || "e2e/features"
+        || "tests/e2e/features"
 );
 
 /// Flag which indicates that tests should be ran in the headless browser.

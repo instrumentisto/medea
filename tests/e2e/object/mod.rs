@@ -9,7 +9,7 @@ use std::{marker::PhantomData, sync::mpsc};
 
 use derive_more::{Display, Error, From};
 use serde_json::Value as Json;
-use tokio::task;
+use tokio_e2e::task;
 use uuid::Uuid;
 
 use crate::browser::{self, Statement};
@@ -52,7 +52,7 @@ impl<T> Drop for Object<T> {
         let ptr = self.ptr.clone();
         let window = self.window.clone();
         let (tx, rx) = mpsc::channel();
-        tokio::spawn(async move {
+        tokio_e2e::spawn(async move {
             window
                 .execute(Statement::new(
                     r#"

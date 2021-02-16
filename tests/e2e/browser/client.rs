@@ -8,7 +8,7 @@ use fantoccini::{Client, ClientBuilder, Locator};
 use futures::lock::Mutex;
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
-use tokio::task;
+use tokio_e2e::task;
 use webdriver::{capabilities::Capabilities, common::WebWindow};
 
 use crate::conf;
@@ -86,7 +86,7 @@ impl WebDriverClient {
     pub fn blocking_close(&self) {
         let (tx, rx) = mpsc::channel();
         let client = self.0.clone();
-        tokio::spawn(async move {
+        tokio_e2e::spawn(async move {
             let mut inner = client.lock().await;
             inner.0.close().await.map_err(|e| dbg!("{:?}", e)).unwrap();
             tx.send(()).unwrap();
@@ -100,7 +100,7 @@ impl WebDriverClient {
     pub fn blocking_window_close(&self, window: WebWindow) {
         let (tx, rx) = mpsc::channel();
         let client = self.0.clone();
-        tokio::spawn(async move {
+        tokio_e2e::spawn(async move {
             let mut client = client.lock().await;
             client.close_window(window).await;
             tx.send(()).unwrap();
