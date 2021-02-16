@@ -29,15 +29,27 @@ impl Room {
     fn send_peer_created(&self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
-            self.peers.take_inner_peer(peer.partner_peer_id())?;
+            match self.peers.take_inner_peer(peer.partner_peer_id()) {
+                Ok(peer) => peer,
+                Err(e) => {
+                    self.peers.add_peer(peer);
+                    return Err(e);
+                }
+            };
+
+        let member_id = peer.member_id();
+        let ice_servers = match peer.ice_servers_list() {
+            Some(ice_servers) => ice_servers,
+            None => {
+                self.peers.add_peer(peer);
+                self.peers.add_peer(partner_peer);
+                return Err(RoomError::NoTurnCredentials(member_id.clone()));
+            }
+        };
 
         let peer = peer.start_as_offerer();
         let partner_peer = partner_peer.start_as_answerer();
 
-        let member_id = peer.member_id();
-        let ice_servers = peer
-            .ice_servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             negotiation_role: NegotiationRole::Offerer,

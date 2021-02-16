@@ -105,6 +105,14 @@ impl Member {
         self.is_recv
     }
 
+    pub fn set_is_send(&mut self, is_send: bool) {
+        self.is_send = is_send;
+    }
+
+    pub fn set_is_recv(&mut self, is_recv: bool) {
+        self.is_recv = is_recv;
+    }
+
     /// Returns flag which indicates that [`Member`] is joined to the `Room`.
     pub fn is_joined(&self) -> bool {
         self.is_joined

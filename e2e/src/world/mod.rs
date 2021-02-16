@@ -24,6 +24,18 @@ use self::member::Member;
 pub use self::member::MemberBuilder;
 use medea_control_api_mock::callback::{CallbackEvent, CallbackItem};
 
+macro_rules! control_url {
+    ($room_id:expr) => {
+        format!("{}", $room_id)
+    };
+    ($room_id:expr, $member_id:expr) => {
+        format!("{}/{}", $room_id, $member_id)
+    };
+    ($room_id:expr, $member_id:expr, $endpoint_id:expr) => {
+        format!("{}/{}/{}", $room_id, $member_id, $endpoint_id)
+    };
+}
+
 /// All errors which can happen while working with [`World`].
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
@@ -349,5 +361,117 @@ impl World {
             .into_iter()
             .filter(|i| i.fid.contains(&self.room_id))
             .collect()
+    }
+
+    pub async fn interconnect_members(&mut self, pair: MembersPair) {
+        if pair.left.is_send() {
+            self.control_client
+                .create(
+                    &control_url!(self.room_id, pair.left.id, "publish"),
+                    proto::WebRtcPublishEndpoint {
+                        id: "publish".to_string(),
+                        p2p: proto::P2pMode::Always,
+                        force_relay: false,
+                        audio_settings: pair
+                            .left
+                            .send_audio
+                            .clone()
+                            .unwrap_or_default(),
+                        video_settings: pair
+                            .left
+                            .send_video
+                            .clone()
+                            .unwrap_or_default(),
+                    }
+                    .into(),
+                )
+                .await;
+        }
+        if pair.right.is_send() {
+            self.control_client
+                .create(
+                    &control_url!(self.room_id, pair.right.id, "publish"),
+                    proto::WebRtcPublishEndpoint {
+                        id: "publish".to_string(),
+                        p2p: proto::P2pMode::Always,
+                        force_relay: false,
+                        audio_settings: pair
+                            .right
+                            .send_audio
+                            .clone()
+                            .unwrap_or_default(),
+                        video_settings: pair
+                            .right
+                            .send_video
+                            .clone()
+                            .unwrap_or_default(),
+                    }
+                    .into(),
+                )
+                .await;
+        }
+
+        if pair.left.recv {
+            let id = format!("play-{}", pair.right.id);
+            self.control_client
+                .create(
+                    &control_url!(self.room_id, pair.left.id, id),
+                    proto::WebRtcPlayEndpoint {
+                        id,
+                        src: format!(
+                            "local://{}/{}/{}",
+                            self.room_id, pair.right.id, "publish"
+                        ),
+                        force_relay: false,
+                    }
+                    .into(),
+                )
+                .await;
+        }
+        if pair.right.recv {
+            let id = format!("play-{}", pair.left.id);
+            self.control_client
+                .create(
+                    &control_url!(self.room_id, pair.right.id, id),
+                    proto::WebRtcPlayEndpoint {
+                        id,
+                        src: format!(
+                            "local://{}/{}/{}",
+                            self.room_id, pair.left.id, "publish"
+                        ),
+                        force_relay: false,
+                    }
+                    .into(),
+                )
+                .await;
+        }
+        {
+            let left_member = self.members.get_mut(&pair.left.id).unwrap();
+            left_member.set_is_send(pair.left.is_send());
+            left_member.set_is_recv(pair.right.recv);
+        }
+        {
+            let right_member = self.members.get_mut(&pair.right.id).unwrap();
+            right_member.set_is_send(pair.right.is_send());
+            right_member.set_is_recv(pair.right.recv);
+        }
+    }
+}
+
+pub struct MembersPair {
+    pub left: PairedMember,
+    pub right: PairedMember,
+}
+
+pub struct PairedMember {
+    pub id: String,
+    pub send_audio: Option<proto::AudioSettings>,
+    pub send_video: Option<proto::VideoSettings>,
+    pub recv: bool,
+}
+
+impl PairedMember {
+    fn is_send(&self) -> bool {
+        self.send_audio.is_some() || self.send_video.is_some()
     }
 }

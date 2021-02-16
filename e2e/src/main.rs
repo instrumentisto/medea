@@ -17,6 +17,7 @@ use self::{
     object::room::{FailedParsing, MediaKind, MediaSourceKind},
     world::{MemberBuilder, World},
 };
+use crate::world::{MembersPair, PairedMember};
 
 #[tokio::main]
 async fn main() {
@@ -477,4 +478,156 @@ async fn then_control_api_sends_on_join(world: &mut World, id: String) {
     timeout(Duration::from_secs(10), world.wait_for_on_join(id))
         .await
         .unwrap();
+}
+
+#[when(regex = "^Control API interconnects `(.*)` and `(.*)`$")]
+async fn when_control_api_interconnects_members(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    world
+        .interconnect_members(MembersPair {
+            left: PairedMember {
+                id,
+                recv: true,
+                send_video: Some(Default::default()),
+                send_audio: Some(Default::default()),
+            },
+            right: PairedMember {
+                id: partner_id,
+                recv: true,
+                send_video: Some(Default::default()),
+                send_audio: Some(Default::default()),
+            },
+        })
+        .await;
+}
+
+#[then(
+    regex = "^`(.*)` has (audio|video|audio and video) remote Track(?:s)? \
+             with `(.*)`"
+)]
+async fn then_member_has_remote_track(
+    world: &mut World,
+    id: String,
+    kind: String,
+    remote_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let connection = member
+        .connections()
+        .wait_for_connection(remote_id)
+        .await
+        .unwrap();
+    let tracks_store = connection.tracks_store().await.unwrap();
+
+    if kind.contains("audio") {
+        tracks_store
+            .get_track(MediaKind::Audio, MediaSourceKind::Device)
+            .await
+            .unwrap();
+    }
+    if kind.contains("video") {
+        tracks_store
+            .get_track(MediaKind::Video, MediaSourceKind::Device)
+            .await
+            .unwrap();
+    }
+}
+
+#[when(
+    regex = "^Control API interconnected (audio|video) of `(.*)` and `(.*)`$"
+)]
+async fn when_interconnects_kind(
+    world: &mut World,
+    kind: String,
+    left_member_id: String,
+    right_member_id: String,
+) {
+    let send_video = if kind.contains("video") {
+        Some(Default::default())
+    } else {
+        None
+    };
+    let send_audio = if kind.contains("audio") {
+        Some(Default::default())
+    } else {
+        None
+    };
+
+    world
+        .interconnect_members(MembersPair {
+            left: PairedMember {
+                id: left_member_id,
+                recv: true,
+                send_video: send_video.clone(),
+                send_audio: send_audio.clone(),
+            },
+            right: PairedMember {
+                id: right_member_id,
+                recv: true,
+                send_video,
+                send_audio,
+            },
+        })
+        .await;
+}
+
+#[when(regex = "^Control API starts `(.*)`'s (audio|video|media) publishing \
+                to `(.*)`$")]
+async fn when_control_api_starts_publishing(
+    world: &mut World,
+    publisher_id: String,
+    kind: String,
+    receiver_id: String,
+) {
+    let all_kinds = kind.contains("media");
+    let send_audio = if all_kinds || kind.contains("audio") {
+        Some(Default::default())
+    } else {
+        None
+    };
+    let send_video = if all_kinds || kind.contains("video") {
+        Some(Default::default())
+    } else {
+        None
+    };
+    world
+        .interconnect_members(MembersPair {
+            left: PairedMember {
+                id: publisher_id,
+                recv: false,
+                send_audio,
+                send_video,
+            },
+            right: PairedMember {
+                id: receiver_id,
+                recv: true,
+                send_video: None,
+                send_audio: None,
+            },
+        })
+        .await;
+}
+
+#[then(regex = "^`(.*)` doesn't has remote Tracks from `(.*)`$")]
+async fn then_member_doesnt_has_remote_tracks_with(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let tracks_count = member
+        .connections()
+        .wait_for_connection(partner_id)
+        .await
+        .unwrap()
+        .tracks_store()
+        .await
+        .unwrap()
+        .count()
+        .await
+        .unwrap();
+    assert_eq!(tracks_count, 0);
 }
