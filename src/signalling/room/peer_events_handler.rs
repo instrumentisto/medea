@@ -38,13 +38,12 @@ impl Room {
             };
 
         let member_id = peer.member_id();
-        let ice_servers = match peer.ice_servers_list() {
-            Some(ice_servers) => ice_servers,
-            None => {
-                self.peers.add_peer(peer);
-                self.peers.add_peer(partner_peer);
-                return Err(RoomError::NoTurnCredentials(member_id.clone()));
-            }
+        let ice_servers = if let Some(ice_servers) = peer.ice_servers_list() {
+            ice_servers
+        } else {
+            self.peers.add_peer(peer);
+            self.peers.add_peer(partner_peer);
+            return Err(RoomError::NoTurnCredentials(member_id));
         };
 
         let peer = peer.start_as_offerer();

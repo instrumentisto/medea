@@ -12,12 +12,14 @@ use std::time::Duration;
 use cucumber_rust::{given, then, when, WorldInit as _};
 use tokio::time::timeout;
 
+use crate::world::{MembersPair, PairedMember};
+
 use self::{
     file_server::FileServer,
     object::room::{FailedParsing, MediaKind, MediaSourceKind},
     world::{MemberBuilder, World},
 };
-use crate::world::{MembersPair, PairedMember};
+use medea_control_api_mock::proto::{AudioSettings, VideoSettings};
 
 #[tokio::main]
 async fn main() {
@@ -463,7 +465,10 @@ async fn then_control_api_sends_on_leave(
         .unwrap();
 }
 
-#[then(regex = "^Control API doesn't sends OnLeave callback for Member `(.*)`$")]
+#[rustfmt::skip]
+#[then(
+    regex = "^Control API doesn't sends OnLeave callback for Member `(.*)`$"
+)]
 async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
     timeout(
         Duration::from_millis(300),
@@ -491,17 +496,18 @@ async fn when_control_api_interconnects_members(
             left: PairedMember {
                 id,
                 recv: true,
-                send_video: Some(Default::default()),
-                send_audio: Some(Default::default()),
+                send_video: Some(VideoSettings::default()),
+                send_audio: Some(AudioSettings::default()),
             },
             right: PairedMember {
                 id: partner_id,
                 recv: true,
-                send_video: Some(Default::default()),
-                send_audio: Some(Default::default()),
+                send_video: Some(VideoSettings::default()),
+                send_audio: Some(AudioSettings::default()),
             },
         })
-        .await;
+        .await
+        .unwrap();
 }
 
 #[then(
@@ -546,12 +552,12 @@ async fn when_interconnects_kind(
     right_member_id: String,
 ) {
     let send_video = if kind.contains("video") {
-        Some(Default::default())
+        Some(VideoSettings::default())
     } else {
         None
     };
     let send_audio = if kind.contains("audio") {
-        Some(Default::default())
+        Some(AudioSettings::default())
     } else {
         None
     };
@@ -571,7 +577,8 @@ async fn when_interconnects_kind(
                 send_audio,
             },
         })
-        .await;
+        .await
+        .unwrap();
 }
 
 #[when(regex = "^Control API starts `(.*)`'s (audio|video|media) publishing \
@@ -584,12 +591,12 @@ async fn when_control_api_starts_publishing(
 ) {
     let all_kinds = kind.contains("media");
     let send_audio = if all_kinds || kind.contains("audio") {
-        Some(Default::default())
+        Some(AudioSettings::default())
     } else {
         None
     };
     let send_video = if all_kinds || kind.contains("video") {
-        Some(Default::default())
+        Some(VideoSettings::default())
     } else {
         None
     };
@@ -608,7 +615,8 @@ async fn when_control_api_starts_publishing(
                 send_audio: None,
             },
         })
-        .await;
+        .await
+        .unwrap();
 }
 
 #[then(regex = "^`(.*)` doesn't has remote Tracks from `(.*)`$")]

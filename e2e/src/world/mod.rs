@@ -9,7 +9,10 @@ use std::{collections::HashMap, time::Duration};
 use async_trait::async_trait;
 use cucumber_rust::WorldInit;
 use derive_more::{Display, Error, From};
-use medea_control_api_mock::proto;
+use medea_control_api_mock::{
+    callback::{CallbackEvent, CallbackItem},
+    proto,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -22,9 +25,10 @@ use self::member::Member;
 
 #[doc(inline)]
 pub use self::member::MemberBuilder;
-use medea_control_api_mock::callback::{CallbackEvent, CallbackItem};
 
-macro_rules! control_url {
+/// Returns Control API path for the provided `room_id`, `member_id` and
+/// `endpoint_id`.
+macro_rules! control_api_path {
     ($room_id:expr) => {
         format!("{}", $room_id)
     };
@@ -312,6 +316,10 @@ impl World {
         assert!(resp.error.is_none());
     }
 
+    /// Returns [`Future`] which will be resolved when `OnLeave` Control API
+    /// callback will be received for the provided [`Member`] ID.
+    ///
+    /// Panics if `OnLeave` reason is not equal to the provided one.
     pub async fn wait_for_on_leave(
         &mut self,
         member_id: String,
@@ -338,6 +346,8 @@ impl World {
         }
     }
 
+    /// Returns [`Future`] which will be resolved when `OnJoin` Control API
+    /// callback will be received for the provided [`Member`] ID.
     pub async fn wait_for_on_join(&mut self, member_id: String) {
         let mut interval = tokio::time::interval(Duration::from_millis(50));
         loop {
@@ -353,6 +363,8 @@ impl World {
         }
     }
 
+    /// Returns all [`CallbackItem`]s sent by Control API for this [`World`]'s
+    /// `Room`.
     pub async fn get_callbacks(&mut self) -> Vec<CallbackItem> {
         self.control_client
             .callbacks()
@@ -363,88 +375,58 @@ impl World {
             .collect()
     }
 
-    pub async fn interconnect_members(&mut self, pair: MembersPair) {
-        if pair.left.is_send() {
+    /// Creates `WebRtcPublishEndpoint`s and `WebRtcPlayEndpoint`s for the
+    /// provided [`MembersPair`].
+    pub async fn interconnect_members(
+        &mut self,
+        pair: MembersPair,
+    ) -> Result<()> {
+        if let Some(publish_endpoint) = pair.left.publish_endpoint() {
             self.control_client
                 .create(
-                    &control_url!(self.room_id, pair.left.id, "publish"),
-                    proto::WebRtcPublishEndpoint {
-                        id: "publish".to_string(),
-                        p2p: proto::P2pMode::Always,
-                        force_relay: false,
-                        audio_settings: pair
-                            .left
-                            .send_audio
-                            .clone()
-                            .unwrap_or_default(),
-                        video_settings: pair
-                            .left
-                            .send_video
-                            .clone()
-                            .unwrap_or_default(),
-                    }
-                    .into(),
+                    &control_api_path!(self.room_id, pair.left.id, "publish"),
+                    publish_endpoint.into(),
                 )
-                .await;
+                .await?;
         }
-        if pair.right.is_send() {
+        if let Some(publish_endpoint) = pair.right.publish_endpoint() {
             self.control_client
                 .create(
-                    &control_url!(self.room_id, pair.right.id, "publish"),
-                    proto::WebRtcPublishEndpoint {
-                        id: "publish".to_string(),
-                        p2p: proto::P2pMode::Always,
-                        force_relay: false,
-                        audio_settings: pair
-                            .right
-                            .send_audio
-                            .clone()
-                            .unwrap_or_default(),
-                        video_settings: pair
-                            .right
-                            .send_video
-                            .clone()
-                            .unwrap_or_default(),
-                    }
-                    .into(),
+                    &control_api_path!(self.room_id, pair.right.id, "publish"),
+                    publish_endpoint.into(),
                 )
-                .await;
+                .await?;
         }
 
-        if pair.left.recv {
-            let id = format!("play-{}", pair.right.id);
+        if let Some(play_endpoint) =
+            pair.left.play_endpoint_for(&self.room_id, &pair.right)
+        {
             self.control_client
                 .create(
-                    &control_url!(self.room_id, pair.left.id, id),
-                    proto::WebRtcPlayEndpoint {
-                        id,
-                        src: format!(
-                            "local://{}/{}/{}",
-                            self.room_id, pair.right.id, "publish"
-                        ),
-                        force_relay: false,
-                    }
-                    .into(),
+                    &control_api_path!(
+                        self.room_id,
+                        pair.left.id,
+                        play_endpoint.id
+                    ),
+                    play_endpoint.into(),
                 )
-                .await;
+                .await?;
         }
-        if pair.right.recv {
-            let id = format!("play-{}", pair.left.id);
+        if let Some(play_endpoint) =
+            pair.right.play_endpoint_for(&self.room_id, &pair.left)
+        {
             self.control_client
                 .create(
-                    &control_url!(self.room_id, pair.right.id, id),
-                    proto::WebRtcPlayEndpoint {
-                        id,
-                        src: format!(
-                            "local://{}/{}/{}",
-                            self.room_id, pair.left.id, "publish"
-                        ),
-                        force_relay: false,
-                    }
-                    .into(),
+                    &control_api_path!(
+                        self.room_id,
+                        pair.right.id,
+                        play_endpoint.id
+                    ),
+                    play_endpoint.into(),
                 )
-                .await;
+                .await?;
         }
+
         {
             let left_member = self.members.get_mut(&pair.left.id).unwrap();
             left_member.set_is_send(pair.left.is_send());
@@ -455,14 +437,21 @@ impl World {
             right_member.set_is_send(pair.right.is_send());
             right_member.set_is_recv(pair.right.recv);
         }
+
+        Ok(())
     }
 }
 
+/// `Member`s pairing configuration.
+///
+/// Based on this configuration [`World`] can dynamically create `Endpoint`s for
+/// this `Member`s.
 pub struct MembersPair {
     pub left: PairedMember,
     pub right: PairedMember,
 }
 
+/// `Endpoint`s configuration of `Member`.
 pub struct PairedMember {
     pub id: String,
     pub send_audio: Option<proto::AudioSettings>,
@@ -471,7 +460,46 @@ pub struct PairedMember {
 }
 
 impl PairedMember {
+    /// Returns `true` if this [`PairedMember`] should publish media.
     fn is_send(&self) -> bool {
         self.send_audio.is_some() || self.send_video.is_some()
+    }
+
+    /// Returns [`proto::WebRtcPublishEndpoint`] for this [`PairedMember`] if
+    /// publishing is enabled.
+    fn publish_endpoint(&self) -> Option<proto::WebRtcPublishEndpoint> {
+        if self.is_send() {
+            Some(proto::WebRtcPublishEndpoint {
+                id: "publish".to_string(),
+                p2p: proto::P2pMode::Always,
+                force_relay: false,
+                audio_settings: self.send_audio.clone().unwrap_or_default(),
+                video_settings: self.send_video.clone().unwrap_or_default(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Returns [`proto::WebRtcPlayEndpoint`] for this [`PairedMember`] which
+    /// will receive media from the provided [`PairedMember`] if receiving is
+    /// enabled.
+    fn play_endpoint_for(
+        &self,
+        room_id: &str,
+        publisher: &PairedMember,
+    ) -> Option<proto::WebRtcPlayEndpoint> {
+        if self.recv {
+            Some(proto::WebRtcPlayEndpoint {
+                id: format!("play-{}", publisher.id),
+                src: format!(
+                    "local://{}/{}/{}",
+                    room_id, publisher.id, "publish"
+                ),
+                force_relay: false,
+            })
+        } else {
+            None
+        }
     }
 }

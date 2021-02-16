@@ -3,11 +3,11 @@
 use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
     api::{Response, SingleGetResponse},
+    callback::CallbackItem,
     proto::{CreateResponse, Element},
 };
 
 use crate::conf;
-use medea_control_api_mock::callback::CallbackItem;
 
 /// All errors which can happen while working with Control API.
 #[derive(Debug, Display, Error, From)]
