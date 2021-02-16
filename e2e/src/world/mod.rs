@@ -79,6 +79,7 @@ impl cucumber_rust::World for World {
 
     async fn new() -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
+        println!("Room ID: {}", room_id);
         let control_client = control::Client::new();
         control_client
             .create(
