@@ -340,17 +340,22 @@ impl PeersService {
         if let Some((first_peer_id, second_peer_id)) = self
             .get_peers_between_members(&src.owner().id(), &sink.owner().id())
         {
+            println!("FOOBAR: Found already created Peers between Members: {:?} - {:?}", first_peer_id, second_peer_id);
             Ok(GetOrCreatePeersResult::AlreadyExisted(
                 first_peer_id,
                 second_peer_id,
             ))
         } else {
+            println!("FOOBAR: Creating Peers");
             let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
+            println!("FOOBAR: Created Peers: {:?} - {:?}", src_peer_id, sink_peer_id);
 
             self.peer_post_construct(src_peer_id, &src.clone().into())
-                .await?;
+                .await
+                .unwrap();
             self.peer_post_construct(sink_peer_id, &sink.clone().into())
-                .await?;
+                .await
+                .unwrap();
 
             Ok(GetOrCreatePeersResult::Created(src_peer_id, sink_peer_id))
         }
@@ -472,13 +477,16 @@ impl PeersService {
         peer_id: PeerId,
         endpoint: &Endpoint,
     ) -> Result<(), RoomError> {
+        println!("FOOBAR [{:?}]: Constructing Peer", peer_id);
         let ice_user = self
             .turn_service
             .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
             .await?;
+        println!("FOOBAR [{:?}]: Created IceUser", peer_id);
 
         self.peers
             .map_peer_by_id_mut(peer_id, move |p| p.set_ice_user(ice_user))?;
+        println!("FOOBAR [{:?}]: Added IceUser", peer_id);
 
         if endpoint.has_traffic_callback() {
             self.peers_traffic_watcher
