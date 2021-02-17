@@ -152,7 +152,7 @@ impl<T> Object<TracksStore<T>> {
                             let sourceKind = track.track.media_source_kind();
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
-                                return resolve(track);
+                                resolve(track);
                             }
                         }
 

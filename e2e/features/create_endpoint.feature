@@ -18,7 +18,9 @@ Feature: Create Endpoint
     Given joined empty Member `Alice`
     And joined empty Member `Bob`
     When Control API interconnected audio of `Alice` and `Bob`
-    Then `Alice` has audio remote Tracks with `Bob`
+    Then `Bob` has local audio
+    And `Alice` has local audio
+    And `Alice` has audio remote Tracks with `Bob`
     And `Bob` has audio remote Tracks with `Alice`
 
   Scenario: New Endpoint creates new video Tracks
