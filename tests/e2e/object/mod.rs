@@ -55,12 +55,12 @@ impl<T> Drop for Object<T> {
         tokio::spawn(async move {
             window
                 .execute(Statement::new(
-                    r#"
-                    async () => {
-                        const [id] = args;
-                        window.registry.delete(id);
-                    }
-                "#,
+                    js! {
+                        async () => {
+                            const [id] = args;
+                            window.registry.delete(id);
+                        }
+                    },
                     vec![ptr.to_string().into()],
                 ))
                 .await
@@ -107,11 +107,11 @@ impl<T> Object<T> {
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         Ok(self
             .execute(Statement::new(
-                r#"
-                async (o) => {
-                    return o === undefined;
-                }
-            "#,
+                js! {
+                    async (o) => {
+                        return o === undefined;
+                    }
+                },
                 vec![],
             ))
             .await?
@@ -130,12 +130,12 @@ impl<T> Object<T> {
     /// Returns [`Statement`] which will obtain JS object of this [`Object`].
     fn get_obj(&self) -> Statement {
         Statement::new(
-            r#"
+            js! {
                 async () => {
                     const [id] = args;
                     return window.registry.get(id);
                 }
-            "#,
+            },
             vec![self.ptr.to_string().into()],
         )
     }
@@ -150,12 +150,12 @@ impl<T: Builder> Object<T> {
         let id = Uuid::new_v4().to_string();
         window
             .execute(obj.build().and_then(Statement::new(
-                r#"
+                js! {
                     async (obj) => {
                         const [id] = args;
                         window.registry.set(id, obj);
                     }
-                "#,
+                },
                 vec![id.clone().into()],
             )))
             .await?;

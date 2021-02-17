@@ -96,11 +96,11 @@ impl Statement {
     /// Returns JS code which should be executed in the browser and [`Json`]
     /// arguments for this code.
     pub(super) fn prepare(self) -> (String, Vec<Json>) {
-        let mut final_js = r#"
+        let mut final_js = js! {
             let lastResult;
             let objs;
             let args;
-        "#
+        }
         .to_string();
         let mut args = Vec::new();
 

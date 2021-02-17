@@ -2225,7 +2225,7 @@ dependencies = [
  "medea-control-api-mock",
  "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-macro 0.2.0",
  "mockall",
  "once_cell",
  "rand 0.8.3",

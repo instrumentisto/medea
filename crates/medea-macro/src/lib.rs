@@ -12,6 +12,7 @@ mod js_caused;
 mod watchers;
 
 use proc_macro::TokenStream;
+use quote::ToTokens as _;
 use synstructure::decl_derive;
 
 /// Delegates function calls to enum variants field.
@@ -284,6 +285,11 @@ pub fn dispatchable(args: TokenStream, input: TokenStream) -> TokenStream {
     let enum_item = syn::parse_macro_input!(input as dispatchable::Item);
     let args = syn::parse_macro_input!(args as dispatchable::Args);
     dispatchable::expand(enum_item, &args)
+}
+
+#[proc_macro]
+pub fn js(input: TokenStream) -> TokenStream {
+    input.to_string().to_token_stream().into()
 }
 
 /// Generates `ComponentState` implementation on provided `impl`.
