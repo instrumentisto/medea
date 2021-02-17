@@ -146,15 +146,16 @@ impl<T> Object<TracksStore<T>> {
             .execute_and_fetch(kind_js.and_then(Statement::new(
                 r#"
                 async (meta) => {
-                    for (track of meta.store.tracks) {
-                        let kind = track.track.kind();
-                        let sourceKind = track.track.media_source_kind();
-                        if (kind === meta.kind
-                            && sourceKind === meta.sourceKind) {
-                            return track;
-                        }
-                    }
                     let waiter = new Promise((resolve, reject) => {
+                        for (track of meta.store.tracks) {
+                            let kind = track.track.kind();
+                            let sourceKind = track.track.media_source_kind();
+                            if (kind === meta.kind
+                                && sourceKind === meta.sourceKind) {
+                                return resolve(track);
+                            }
+                        }
+
                         meta.store.subs.push((track) => {
                             let kind = track.track.kind();
                             let sourceKind = track.track.media_source_kind();
@@ -168,7 +169,7 @@ impl<T> Object<TracksStore<T>> {
                         });
                     });
                     let res = await waiter;
-                    return waiter;
+                    return res;
                 }
             "#,
                 vec![],

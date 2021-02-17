@@ -477,7 +477,7 @@ test.e2e:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
 	env $(test-integration-env) \
-	MEDEA_LOG__LEVEL=debug make docker.up.medea debug=$(debug) background=yes log=$(log) \
+	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     tag=$(tag) \
 	                     log-to-file=$(log-to-file)
