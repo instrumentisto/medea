@@ -303,9 +303,9 @@ async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let room = member.room();
     let tracks = room.local_tracks().await.unwrap();
     let media_kind = kind.parse().unwrap();
-    let source_kind = kind.parse().ok();
+    // let source_kind = kind.parse().ok();
 
-    assert!(tracks.has_track(media_kind, source_kind).await.unwrap())
+    tracks.get_track(media_kind, MediaSourceKind::Device).await.unwrap();
 }
 
 #[when(
@@ -552,12 +552,17 @@ async fn when_interconnects_kind(
     right_member_id: String,
 ) {
     let send_video = if kind.contains("video") {
-        Some(VideoSettings::default())
+        Some(VideoSettings {
+            publish_policy: proto::PublishPolicy::Required
+        })
     } else {
         None
     };
+    use medea_control_api_mock::proto;
     let send_audio = if kind.contains("audio") {
-        Some(AudioSettings::default())
+        Some(AudioSettings {
+            publish_policy: proto::PublishPolicy::Required
+        })
     } else {
         None
     };

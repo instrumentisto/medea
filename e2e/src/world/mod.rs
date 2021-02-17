@@ -25,6 +25,7 @@ use self::member::Member;
 
 #[doc(inline)]
 pub use self::member::MemberBuilder;
+use medea_control_api_mock::proto::PublishPolicy;
 
 /// Returns Control API path for the provided `room_id`, `member_id` and
 /// `endpoint_id`.
@@ -439,6 +440,9 @@ impl World {
             right_member.set_is_recv(pair.right.recv);
         }
 
+        let room = self.control_client.get(&control_api_path!(self.room_id)).await.unwrap();
+        // panic!("\n\n\n{:#?}\n\n\n", room);
+
         Ok(())
     }
 }
@@ -474,8 +478,12 @@ impl PairedMember {
                 id: "publish".to_string(),
                 p2p: proto::P2pMode::Always,
                 force_relay: false,
-                audio_settings: self.send_audio.clone().unwrap_or_default(),
-                video_settings: self.send_video.clone().unwrap_or_default(),
+                audio_settings: self.send_audio.clone().unwrap_or_else(|| proto::AudioSettings {
+                    publish_policy: PublishPolicy::Disabled
+                }),
+                video_settings: self.send_video.clone().unwrap_or_else(|| proto::VideoSettings {
+                    publish_policy: PublishPolicy::Disabled
+                }),
             })
         } else {
             None

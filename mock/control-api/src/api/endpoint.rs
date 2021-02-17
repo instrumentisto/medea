@@ -83,7 +83,7 @@ pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
-    publish_policy: PublishPolicy,
+    pub publish_policy: PublishPolicy,
 }
 
 impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
@@ -114,7 +114,7 @@ pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
-    publish_policy: PublishPolicy,
+    pub publish_policy: PublishPolicy,
 }
 
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
