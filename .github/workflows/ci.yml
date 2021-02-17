@@ -159,8 +159,13 @@ jobs:
           toolchain: stable
           target: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
-        if: ${{ matrix.if
-          && !contains(github.event.head_commit.message, '[fresh ci]') }}
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        with:
+          key: test-e2e-{hash}
+          restore-keys: test-e2e-
+        continue-on-error: true
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
       - uses: actions-rs/install@v0.1
         with:
           crate: wasm-pack

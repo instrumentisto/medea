@@ -7,23 +7,23 @@ use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
 
-/// Entity that represents [Control API] `Member`.
+/// Entity that represents a [Control API] [`Member`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
-    /// ID of `Member`.
+    /// ID of this [`Member`].
     #[serde(skip_deserializing)]
     pub id: String,
 
-    /// Pipeline of [Control API] `Member`.
+    /// [Control API] pipeline of this [`Member`].
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
     pub pipeline: HashMap<String, Endpoint>,
 
-    /// Optional `Member` credentials.
+    /// Optional credentials of this [`Member`].
     ///
-    /// If `None` then random credentials will be generated on Medea side.
+    /// If [`None`] then random credentials will be generated on Medea side.
     pub credentials: Option<Credentials>,
 
     /// URL to which `OnJoin` Control API callback will be sent.
@@ -34,17 +34,17 @@ pub struct Member {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_leave: Option<String>,
 
-    /// Timeout of receiving heartbeat messages from the `Member` via Client
-    /// API. Once reached, the `Member` is considered being idle.
+    /// Timeout of receiving heartbeat messages from this [`Member`] via Client
+    /// API. Once reached, the [`Member`] is considered being idle.
     #[serde(default, with = "humantime_serde")]
     pub idle_timeout: Option<Duration>,
 
-    /// Timeout of the `Member` reconnecting via Client API.
-    /// Once reached, the `Member` is considered disconnected.
+    /// Timeout of this [`Member`] reconnecting via Client API.
+    /// Once reached, the [`Member`] is considered disconnected.
     #[serde(default, with = "humantime_serde")]
     pub reconnect_timeout: Option<Duration>,
 
-    /// Interval of sending pings from Medea to the `Member` via Client API.
+    /// Interval of sending pings from Medea to this [`Member`] via Client API.
     #[serde(default, with = "humantime_serde")]
     pub ping_interval: Option<Duration>,
 }

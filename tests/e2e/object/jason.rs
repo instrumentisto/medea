@@ -24,7 +24,7 @@ impl Builder for Jason {
 }
 
 impl Object<Jason> {
-    /// Returns new [`Room`] initiated in this [`Jason`].
+    /// Returns a new [`Room`] initiated in this [`Jason`].
     pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
         self.execute_and_fetch(Statement::new(
             r#"

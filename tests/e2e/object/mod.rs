@@ -90,12 +90,12 @@ impl<T> Object<T> {
     ) -> Result<Object<O>, Error> {
         let id = Uuid::new_v4().to_string();
         self.execute(statement.and_then(Statement::new(
-            r#"
+            js! {
                 async (obj) => {
                     const [id] = args;
                     window.registry.set(id, obj);
                 }
-            "#,
+            },
             vec![id.clone().into()],
         )))
         .await?;

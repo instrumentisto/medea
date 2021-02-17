@@ -207,7 +207,7 @@ impl From<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPlayEndpoint {
-    /// ID of `WebRtcPlayEndpoint`.
+    /// ID of this [`WebRtcPlayEndpoint`].
     #[serde(skip_deserializing)]
     pub id: String,
 

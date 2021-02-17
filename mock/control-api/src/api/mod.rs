@@ -243,7 +243,7 @@ mod create {
 /// Error object. Returns when some error happened on [Control API]'s side.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ErrorResponse {
     /// Medea's Control API error code.
     pub code: u32,
@@ -268,7 +268,7 @@ impl Into<ErrorResponse> for proto::Error {
 /// Response which returns sids.
 ///
 /// Used for create methods.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CreateResponse {
     /// URIs with which [Jason] can connect `Member`s.
     ///

@@ -433,17 +433,18 @@ endif
 # Run Rust integration tests of project.
 #
 # Usage:
-#	make test.integration [( [up=no]
-#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
-#	                         | dockerized=yes [tag=(dev|<docker-tag>)]
-#	                                          [log=(no|yes)]
-#                                             [log-to-file=(no|yes)] )]
-#	                        [wait=(5|<seconds>)] )]
+#	make test.integration
+#		[( [up=no]
+#	     | up=yes [( [dockerized=no] [debug=(yes|no)]
+#	               | dockerized=yes [tag=(dev|<docker-tag>)]
+#	                                [log=(no|yes)]
+#	                                [log-to-file=(no|yes)] )]
+#	              [wait=(5|<seconds>)] )]
 
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/integration/specs/ \
-	MEDEA_CONF=tests/integration/medea.config.toml
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml
 
 test.integration:
 ifeq ($(up),yes)
@@ -468,15 +469,19 @@ endif
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [tag=(dev|<docker-tag>)]
 #	                                          [log=(no|yes)]
-#                                             [log-to-file=(no|yes)] )]
-#	                        )]
-#                 [wait=(5|<seconds>)]
-#                 [browser=(chrome|firefox)]
+#	                                          [log-to-file=(no|yes)] )] )]
+#	              [wait=(5|<seconds>)]
+#	              [browser=(chrome|firefox)]
+
+test-e2e-env = RUST_BACKTRACE=1 \
+	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml
 
 test.e2e:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
-	env $(test-integration-env) \
+	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     tag=$(tag) \
@@ -488,8 +493,8 @@ endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 	RUST_BACKTRACE=1 cargo test --test e2e
 ifeq ($(up),yes)
-	-make down
 	-make docker.down.webdriver browser=$(browser)
+	-make down
 endif
 
 

@@ -1,7 +1,6 @@
-//! Implementation of the object and methods for interacting with browser
-//! through [WebDriver] protocol.
+//! Interaction with browser through a [WebDriver] protocol.
 //!
-//! [WebDriver]: https://www.w3.org/TR/webdriver/
+//! [WebDriver]: https://w3.org/TR/webdriver
 
 mod client;
 mod js;
