@@ -12,12 +12,13 @@ mod world;
 use cucumber_rust::{given, WorldInit as _};
 use tokio_1 as tokio;
 
+use crate::world::MemberBuilder;
+
 use self::{
     file_server::FileServer,
     object::room::{FailedParsing, MediaKind, MediaSourceKind},
     world::World,
 };
-use crate::world::MemberBuilder;
 
 #[tokio::main]
 async fn main() {
