@@ -179,10 +179,20 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j3 up.jason docker.up.medea up.control
+	$(MAKE) -j3 up.jason up.medea up.control
 
+# Run Medea in development mode.
+#
+# Usage:
+#   make up.medea [debug=(no|yes)]
+#                 [log-to-file=(no|yes)]
+#                 [background=(no|yes)]
 
-up.medea: docker.up.medea
+up.medea:
+	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
+	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
+		$(if $(call eq,$(log-to-file),yes),> /tmp/medea.log,) \
+		$(if $(call eq,$(background),yes),&,)
 
 
 # Run Jason E2E demo in development mode.
@@ -497,7 +507,8 @@ ifeq ($(dockerized),yes)
 	               background=yes
 else
 	@make docker.up.coturn background=yes
-	env $(test-e2e-env) cargo run &
+	env $(test-e2e-env) \
+	make up.medea background=yes
 	cargo build -p medea-control-api-mock
 	cargo run -p medea-control-api-mock &
 endif
@@ -519,6 +530,7 @@ else
 endif
 ifeq ($(up),yes)
 	-make docker.down.webdriver browser=$(browser)
+	-make docker.down.e2e-files
 	-make down
 endif
 
@@ -672,6 +684,9 @@ docker.down.medea:
 docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
+docker.down.e2e-files:
+	-docker-compose -f docker-compose.e2e-files.yml down
+
 
 # Pull project Docker images from Container Registry.
 #
@@ -806,7 +821,8 @@ docker.up.control:
 #	make docker.up.coturn [background=(yes|no)]
 
 docker.up.coturn: docker.down.coturn
-	@make docker.up args='-f docker-compose.coturn.yml'
+	docker-compose -f docker-compose.coturn.yml up \
+		$(if $(call eq,$(background),no),--abort-on-container-exit,-d)
 
 
 # Run demo application in Docker Compose environment.

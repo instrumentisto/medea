@@ -55,6 +55,7 @@ impl<T> Drop for Object<T> {
         tokio::spawn(async move {
             window
                 .execute(Statement::new(
+                    // language=JavaScript
                     r#"
                     async () => {
                         const [id] = args;
@@ -90,6 +91,7 @@ impl<T> Object<T> {
     ) -> Result<Object<O>, Error> {
         let id = Uuid::new_v4().to_string();
         self.execute(statement.and_then(Statement::new(
+            // language=JavaScript
             r#"
                 async (obj) => {
                     const [id] = args;
@@ -107,6 +109,7 @@ impl<T> Object<T> {
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         Ok(self
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
                 async (o) => {
                     return o === undefined;
@@ -130,6 +133,7 @@ impl<T> Object<T> {
     /// Returns [`Statement`] which will obtain JS object of this [`Object`].
     fn get_obj(&self) -> Statement {
         Statement::new(
+            // language=JavaScript
             r#"
                 async () => {
                     const [id] = args;
@@ -150,6 +154,7 @@ impl<T: Builder> Object<T> {
         let id = Uuid::new_v4().to_string();
         window
             .execute(obj.build().and_then(Statement::new(
+                // language=JavaScript
                 r#"
                     async (obj) => {
                         const [id] = args;

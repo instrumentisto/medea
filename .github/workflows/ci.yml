@@ -171,9 +171,9 @@ jobs:
           crate: wasm-pack
           use-tool-cache: true
       - name: Chrome
-        run: make test.e2e up=yes browser=chrome dockerized=no
+        run: make test.e2e up=yes browser=chrome dockerized=yes
       - name: Firefox
-        run: make test.e2e up=yes browser=firefox dockerized=no
+        run: make test.e2e up=yes browser=firefox dockerized=yes
 
   test-integration:
     name: Integration tests

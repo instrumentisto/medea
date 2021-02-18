@@ -4,8 +4,7 @@ services:
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn
     image: instrumentisto/coturn:4.5
-    depends_on:
-      - coturn-db
+    depends_on: ["coturn-db"]
     command:
       - --log-file=stdout
       #- --Verbose

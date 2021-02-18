@@ -40,6 +40,7 @@ impl Object<Room> {
     /// Joins [`Room`] with a provided URI.
     pub async fn join(&self, uri: String) -> Result<(), super::Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (room) => {
                     const [uri] = args;
@@ -93,6 +94,7 @@ impl Object<Room> {
         &self,
     ) -> Result<Object<ConnectionStore>, super::Error> {
         self.execute_and_fetch(Statement::new(
+            // language=JavaScript
             r#"
                 async (room) => {
                     let store = {

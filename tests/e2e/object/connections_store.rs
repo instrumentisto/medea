@@ -20,6 +20,7 @@ impl Object<ConnectionStore> {
     ) -> Result<Option<Object<Connection>>, super::Error> {
         let connection = self
             .execute_and_fetch(Statement::new(
+                // language=JavaScript
                 r#"
                 async (store) => {
                     const [id] = args;
@@ -46,6 +47,7 @@ impl Object<ConnectionStore> {
         remote_id: String,
     ) -> Result<Object<Connection>, super::Error> {
         self.execute_and_fetch(Statement::new(
+            // language=JavaScript
             r#"
                 async (store) => {
                     const [remoteId] = args;
