@@ -448,15 +448,23 @@ test-integration-env = RUST_BACKTRACE=1 \
 
 test.integration:
 ifeq ($(up),yes)
-	make docker.up.coturn background=yes
+ifeq ($(dockerized),yes)
 	env $(test-integration-env) \
-	make docker.up.medea debug=$(debug) background=yes log=$(log) \
-	                     dockerized=$(dockerized) \
-	                     tag=$(tag) \
-	                     log-to-file=$(log-to-file)
+	make docker.up.medea background=yes
+else
+	env $(test-integration-env) \
+	cargo run &
+endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
+ifeq ($(dockerized),yes)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+		ghcr.io/instrumentisto/rust:$(RUST_VER) \
+			make test.integration up=no dockerized=no
+else
 	RUST_BACKTRACE=1 cargo test --test integration
+endif
 ifeq ($(up),yes)
 	-make down
 endif
@@ -818,7 +826,7 @@ docker.up.demo: docker.down.demo
 #                         | background=yes [log=(no|yes)] )])]
 
 docker.up.medea: docker.down.medea
-	@make docker.up args='-f docker-compose.medea.yml -f docker.compose.coturn.yml'
+	@make docker.up args='-f docker-compose.medea.yml -f docker-compose.coturn.yml'
 
 docker.up.e2e-files:
 	@make docker.up args='-f docker-compose.e2e-files.yml'
