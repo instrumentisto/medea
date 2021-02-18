@@ -4,11 +4,12 @@ mod browser;
 mod conf;
 mod control;
 mod object;
+mod steps;
 mod world;
 
 use std::str::FromStr;
 
-use cucumber_rust::{given, then, when, WorldInit as _};
+use cucumber_rust::{given, when, WorldInit as _};
 use tokio_1 as tokio;
 
 use self::{
@@ -199,62 +200,7 @@ async fn new_given_member(
     }
 }
 
-#[when(regex = "^Member (\\S*) (disables|mutes) (audio|video|all)$")]
-async fn when_disables_mutes(
-    world: &mut World,
-    id: String,
-    disable_or_mutes: String,
-    audio_or_video: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    if disable_or_mutes == "disables" {
-        if let Some(kind) = parse_media_kind(&audio_or_video) {
-            member.disable_media_send(kind, None).await.unwrap();
-        } else {
-            member
-                .disable_media_send(MediaKind::Audio, None)
-                .await
-                .unwrap();
-            member
-                .disable_media_send(MediaKind::Video, None)
-                .await
-                .unwrap();
-        }
-    } else {
-        todo!("Muting is unimplemented atm.")
-    }
-}
-
 #[when(regex = "^(\\S*) joins room")]
 async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
-}
-
-#[then(regex = "^(\\S*) receives connection with (\\S*)$")]
-async fn then_member_receives_connection(
-    world: &mut World,
-    id: String,
-    partner_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    member
-        .connections()
-        .wait_for_connection(partner_id.clone())
-        .await
-        .unwrap();
-}
-
-#[then(regex = "^(\\S*) doesn't receives connection with (\\S*)")]
-async fn then_member_doesnt_receives_connection(
-    world: &mut World,
-    id: String,
-    partner_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    assert!(member
-        .connections()
-        .get(partner_id)
-        .await
-        .unwrap()
-        .is_none())
 }
