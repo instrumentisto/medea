@@ -480,18 +480,35 @@ test-e2e-env = RUST_BACKTRACE=1 \
 
 test.e2e:
 ifeq ($(up),yes)
-	make docker.up.coturn background=yes
+ifeq ($(dockerized),yes)
 	env $(test-e2e-env) \
-	make docker.up.medea debug=$(debug) background=yes log=$(log) \
-	                     dockerized=$(dockerized) \
-	                     tag=$(tag) \
-	                     log-to-file=$(log-to-file)
-	make up.control background=yes log-to-file=$(log-to-file)
+	make docker.up args='-f docker-compose.medea.yml \
+	                     -f docker-compose.coturn.yml \
+	                     -f docker-compose.e2e-files.yml \
+	                     -f docker-compose.control.yml' \
+	               background=yes
+else
+	@make docker.up.coturn background=yes
+	env $(test-e2e-env) cargo run &
+	cargo build -p medea-control-api-mock
+	cargo run -p medea-control-api-mock &
 endif
-	make build.jason
-	@make docker.up.webdriver browser=$(browser)
+endif
+ifeq ($(up-test),no)
+else
+	@make build.jason
+	@make docker.up.e2e-files background=yes
+	@make docker.up.webdriver
 	sleep $(if $(call eq,$(wait),),5,$(wait))
-	RUST_BACKTRACE=1 cargo test --test e2e
+endif
+ifeq ($(dockerized),yes)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+		ghcr.io/instrumentisto/rust:$(RUST_VER) \
+			make test.e2e up=no dockerized=no up-test=no
+else
+	cargo test --test e2e
+endif
 ifeq ($(up),yes)
 	-make docker.down.webdriver browser=$(browser)
 	-make down
@@ -631,14 +648,12 @@ docker.down.demo:
 # and remove all related containers.
 #
 # Usage:
-# 	make docker.down.medea [dockerized=(no|yes)]
+# 	make docker.down.medea
 
 docker.down.medea:
-ifeq ($(dockerized),yes)
-	docker-compose -f docker-compose.medea.yml down --rmi=local -v
-else
-	-kill $(shell pidof medea)
-endif
+	docker-compose -f docker-compose.medea.yml \
+	               -f docker-compose.coturn.yml \
+	               down
 
 
 # Stop dockerized WebDriver and remove all related containers.
@@ -764,10 +779,17 @@ docker.untar:
 # Usage:
 #   make docker.up.control [tag=(dev|<docker-tag>)]
 
+docker.up:
+	docker-compose $(args) up \
+	               $(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
+ifeq ($(background),yes)
+ifeq ($(log),yes)
+	docker-compose $(args) logs -f &
+endif
+endif
+
 docker.up.control:
-	docker run --rm -d --network=host \
-		--name medea-control-api-mock \
-		$(IMAGE_REPO)/medea-control-api-mock:$(if $(call eq,$(tag),),dev,$(tag))
+	@make docker.up args='-f docker-compose.medea.yml -f docker-compose.coturn.yml -f docker-compose.control.yml'
 
 
 # Run Coturn STUN/TURN server in Docker Compose environment.
@@ -776,8 +798,7 @@ docker.up.control:
 #	make docker.up.coturn [background=(yes|no)]
 
 docker.up.coturn: docker.down.coturn
-	docker-compose -f docker-compose.coturn.yml up \
-		$(if $(call eq,$(background),no),--abort-on-container-exit,-d)
+	@make docker.up args='-f docker-compose.coturn.yml'
 
 
 # Run demo application in Docker Compose environment.
@@ -786,42 +807,21 @@ docker.up.coturn: docker.down.coturn
 #	make docker.up.demo
 
 docker.up.demo: docker.down.demo
-	docker-compose -f jason/demo/docker-compose.yml up
+	@make docker.up args='-f jason/demo/docker-compose.yml'
 
 
 # Run Medea media server in Docker Compose environment.
 #
 # Usage:
-#	make docker.up.medea [( [dockerized=no] [debug=(yes|no)]
-#	                                        [background=(no|yes)]
-#	                      | dockerized=yes [tag=(dev|<docker-tag>)]
-#	                                       [( [background=no]
-#	                                        | background=yes [log=(no|yes)] )])]
-#	                     [log-to-file=(no|yes)]
-
-docker-up-medea-image = $(IMAGE_REPO)/medea
-docker-up-medea-tag = $(if $(call eq,$(tag),),dev,$(tag))
+#   make docker.up.medea [tag=(dev|<docker-tag>)]
+#                        [( [background=no]
+#                         | background=yes [log=(no|yes)] )])]
 
 docker.up.medea: docker.down.medea
-ifeq ($(dockerized),yes)
-	COMPOSE_IMAGE_NAME=$(docker-up-medea-image) \
-	COMPOSE_IMAGE_VER=$(docker-up-medea-tag) \
-	docker-compose -f docker-compose.medea.yml up \
-		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
-ifeq ($(background),yes)
-ifeq ($(log),yes)
-	docker-compose -f docker-compose.medea.yml logs -f &
-endif
-endif
-else
-ifeq ($(log-to-file),yes)
-	@rm -f /tmp/medea.log
-endif
-	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
-	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
-		$(if $(call eq,$(log-to-file),yes),> /tmp/medea.log,) \
-		$(if $(call eq,$(background),yes),&,)
-endif
+	@make docker.up args='-f docker-compose.medea.yml -f docker.compose.coturn.yml'
+
+docker.up.e2e-files:
+	@make docker.up args='-f docker-compose.e2e-files.yml'
 
 
 # Run dockerized WebDriver.

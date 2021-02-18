@@ -1,0 +1,10 @@
+version: "2"
+
+services:
+  control-api-mock:
+    container_name: medea-control-api-mock
+    build: mock
+    depends_on:
+      - medea
+    image: ${MEDEA_CONTROL_MOCK_IMAGE_NAME}:${MEDEA_CONTROL_MOCK_IMAGE_VER}
+    network_mode: host
