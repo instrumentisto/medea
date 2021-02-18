@@ -3,7 +3,6 @@
 mod browser;
 mod conf;
 mod control;
-mod file_server;
 mod object;
 mod world;
 
@@ -13,14 +12,12 @@ use cucumber_rust::{given, then, when, WorldInit as _};
 use tokio_1 as tokio;
 
 use self::{
-    file_server::FileServer,
     object::MediaKind,
     world::{MemberBuilder, World},
 };
 
 #[tokio::main]
 async fn main() {
-    // let _server = FileServer::run();
     let runner = World::init(&[conf::FEATURES_PATH.as_str()]);
     runner.run_and_exit().await;
 }
