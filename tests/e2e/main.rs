@@ -20,7 +20,7 @@ use self::{
 
 #[tokio::main]
 async fn main() {
-    let _server = FileServer::run();
+    // let _server = FileServer::run();
     let runner = World::init(&[conf::FEATURES_PATH.as_str()]);
     runner.run_and_exit().await;
 }
