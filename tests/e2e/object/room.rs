@@ -40,12 +40,12 @@ impl Object<Room> {
     /// Joins [`Room`] with a provided URI.
     pub async fn join(&self, uri: String) -> Result<(), super::Error> {
         self.execute(Statement::new(
-            js! {
+            r#"
                 async (room) => {
                     const [uri] = args;
                     await room.join(uri);
                 }
-            },
+            "#,
             vec![uri.into()],
         ))
         .await?;
@@ -74,11 +74,11 @@ impl Object<Room> {
         };
         self.execute(Statement::new(
             &format!(
-                js! {
-                    async (room) => {{
-                        await {};
-                    }}
-                },
+                r#"
+                async (room) => {{
+                    await {};
+                }}
+            "#,
                 disable
             ),
             vec![],
@@ -93,7 +93,7 @@ impl Object<Room> {
         &self,
     ) -> Result<Object<ConnectionStore>, super::Error> {
         self.execute_and_fetch(Statement::new(
-            js! {
+            r#"
                 async (room) => {
                     let store = {
                         connections: new Map(),
@@ -110,7 +110,7 @@ impl Object<Room> {
 
                     return store;
                 }
-            },
+            "#,
             vec![],
         ))
         .await

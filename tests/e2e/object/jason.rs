@@ -12,12 +12,12 @@ pub struct Jason;
 impl Builder for Jason {
     fn build(self) -> Statement {
         Statement::new(
-            js! {
+            r#"
                 async () => {
                     let jason = new window.rust.Jason();
                     return jason;
                 }
-            },
+            "#,
             vec![],
         )
     }
@@ -27,7 +27,7 @@ impl Object<Jason> {
     /// Returns a new [`Room`] initiated in this [`Jason`].
     pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
         self.execute_and_fetch(Statement::new(
-            js! {
+            r#"
                 async (jason) => {
                     let room = await jason.init_room();
                     room.on_failed_local_media(() => {});
@@ -35,7 +35,7 @@ impl Object<Jason> {
 
                     return room;
                 }
-            },
+            "#,
             vec![],
         ))
         .await

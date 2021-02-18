@@ -2203,6 +2203,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "actix-web-actors",
+ "async-recursion",
  "async-trait",
  "awc",
  "bytes 0.5.6",

@@ -83,6 +83,7 @@ url = "2.1"
 [dev-dependencies]
 actix-codec = "0.3"
 actix-rt = "1.1"
+async-recursion = "0.3"
 awc = "2.0"
 cucumber_rust = { version = "0.8", features = ["macros"] }
 derive_builder = "0.9"

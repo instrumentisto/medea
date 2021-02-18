@@ -132,30 +132,30 @@ impl Inner {
         let (inner_js, args) = statement.prepare();
 
         let js = format!(
-            js! {
-                (
-                    async () => {{
-                        let callback = arguments[arguments.length - 1];
-                        try {{
-                            {executable_js}
-                            callback({{ ok: lastResult }});
-                        }} catch (e) {{
-                            if (e.ptr != undefined) {{
-                                callback({{
-                                    err: {{
-                                        name: e.name(),
-                                        message: e.message(),
-                                        trace: e.trace(),
-                                        source: e.source()
-                                    }}
-                                }});
-                            }} else {{
-                                callback({{ err: e.toString() }});
-                            }}
+            r#"
+            (
+                async () => {{
+                    let callback = arguments[arguments.length - 1];
+                    try {{
+                        {executable_js}
+                        callback({{ ok: lastResult }});
+                    }} catch (e) {{
+                        if (e.ptr != undefined) {{
+                            callback({{
+                                err: {{
+                                    name: e.name(),
+                                    message: e.message(),
+                                    trace: e.trace(),
+                                    source: e.source()
+                                }}
+                            }});
+                        }} else {{
+                            callback({{ err: e.toString() }});
                         }}
                     }}
-                )();
-            },
+                }}
+            )();
+        "#,
             executable_js = inner_js
         );
         let res = self.0.execute_async(&js, args).await?;
@@ -175,11 +175,11 @@ impl Inner {
         self.0.wait_for_find(Locator::Id("loaded")).await?;
 
         self.execute(Statement::new(
-            js! {
+            r#"
                 async () => {
                     window.registry = new Map();
                 }
-            },
+            "#,
             vec![],
         ))
         .await?;
