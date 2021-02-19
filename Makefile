@@ -462,8 +462,9 @@ ifeq ($(dockerized),yes)
 	env $(test-integration-env) \
 	make docker.up.medea background=yes
 else
+	@make up.coturn
 	env $(test-integration-env) \
-	cargo run &
+	make up.medea background=yes
 endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif

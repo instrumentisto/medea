@@ -195,7 +195,7 @@ jobs:
           restore-keys: test-integration-
         continue-on-error: true
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - run: make test.integration up=yes dockerized=no
+      - run: make test.integration up=yes dockerized=yes
 
 
 
