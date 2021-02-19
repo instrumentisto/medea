@@ -503,14 +503,23 @@ test-e2e-env = RUST_BACKTRACE=1 \
 	MEDEA_CONF=tests/medea.config.toml
 
 test.e2e:
+ifeq ($(up-test),no)
+else
+	@make build.jason
+ifeq ($(dockerized),yes)
+else
+	docker-compose -f 'docker-compose.e2e.yml' up -d jason-files-server
+endif
+	@make docker.up.webdriver
+	make wait.port port=4444
+endif
 ifeq ($(up),yes)
 ifeq ($(dockerized),yes)
-	env $(test-e2e-env) \
-	make docker.up args='-f docker-compose.medea.yml \
-	                     -f docker-compose.coturn.yml \
-	                     -f docker-compose.e2e-files.yml \
-	                     -f docker-compose.control.yml' \
-	               background=yes
+	env $(test-e2e-env) docker-compose -f 'docker-compose.e2e.yml' up -d
+	docker-compose -f 'docker-compose.e2e.yml' logs &
+	make wait.port port=8080
+	make wait.port port=30000
+	make wait.port port=8000
 else
 	@make docker.up.coturn background=yes
 	env $(test-e2e-env) \
@@ -518,13 +527,6 @@ else
 	cargo build -p medea-control-api-mock
 	cargo run -p medea-control-api-mock &
 endif
-endif
-ifeq ($(up-test),no)
-else
-	@make build.jason
-	@make docker.up.e2e-files background=yes
-	@make docker.up.webdriver
-	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 ifeq ($(dockerized),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
@@ -536,7 +538,7 @@ else
 endif
 ifeq ($(up),yes)
 	-make docker.down.webdriver browser=$(browser)
-	-make docker.down.e2e-files
+	docker-compose -f 'docker-compose.e2e.yml' down
 	-make down
 endif
 
