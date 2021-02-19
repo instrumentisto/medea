@@ -51,11 +51,14 @@ impl Object<Jason> {
                         }
                     });
                     room.on_local_track((t) => {
+                        console.log("foo");
+                        console.log(localTracksStore);
+                        console.log("bar");
                         let track = { track: t };
                         localTracksStore.tracks.push(track);
-                        for (sub of room.localTracksStore.subs) {
-                            sub(track);
-                        }
+                        let newSubs = localTracksStore.subs
+                            .filter((sub) => sub(track));
+                        localTracksStore.subs = newSubs;
                     });
 
                     let constraints = new rust.MediaStreamSettings();
