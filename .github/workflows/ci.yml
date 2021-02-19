@@ -171,9 +171,9 @@ jobs:
           crate: wasm-pack
           use-tool-cache: true
       - name: Chrome
-        run: make test.e2e up=yes browser=chrome dockerized=yes
+        run: make test.e2e up=yes browser=chrome dockerized=no
       - name: Firefox
-        run: make test.e2e up=yes browser=firefox dockerized=yes
+        run: make test.e2e up=yes browser=firefox dockerized=no
 
   test-integration:
     name: Integration tests
@@ -195,7 +195,7 @@ jobs:
           restore-keys: test-integration-
         continue-on-error: true
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - run: make test.integration up=yes dockerized=yes
+      - run: make test.integration up=yes dockerized=no
 
 
 
