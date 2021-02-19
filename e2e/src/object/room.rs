@@ -355,11 +355,9 @@ impl Object<Room> {
                                 track.onDisabledSubs = [];
                             });
                             tracksStore.tracks.push(track);
-                            let newStoreSubs = tracksStore.subs
-                                .filter((sub) => {
-                                    return sub(track);
-                                });
-                            tracksStore.subs = newStoreSubs;
+                            let newSubs = tracksStore.subs
+                                .filter((sub) => sub(track));
+                            tracksStore.subs = newSubs;
                         });
                         conn.on_close(() => {
                             closeListener.isClosed = true;

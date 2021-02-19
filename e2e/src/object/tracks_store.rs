@@ -157,10 +157,8 @@ impl<T> Object<TracksStore<T>> {
                         }
 
                         meta.store.subs.push((track) => {
-                            console.log("aqwe");
                             let kind = track.track.kind();
                             let sourceKind = track.track.media_source_kind();
-                            console.log(kind + ' ' + sourceKind);
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
                                 resolve(track);
