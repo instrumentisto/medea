@@ -57,11 +57,11 @@ impl<T> Drop for Object<T> {
                 .execute(Statement::new(
                     // language=JavaScript
                     r#"
-                    async () => {
-                        const [id] = args;
-                        window.registry.delete(id);
-                    }
-                "#,
+                        async () => {
+                            const [id] = args;
+                            window.registry.delete(id);
+                        }
+                    "#,
                     vec![ptr.to_string().into()],
                 ))
                 .await
@@ -111,10 +111,10 @@ impl<T> Object<T> {
             .execute(Statement::new(
                 // language=JavaScript
                 r#"
-                async (o) => {
-                    return o === undefined;
-                }
-            "#,
+                    async (o) => {
+                        return o === undefined;
+                    }
+                "#,
                 vec![],
             ))
             .await?

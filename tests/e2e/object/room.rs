@@ -74,12 +74,13 @@ impl Object<Room> {
             }
         };
         self.execute(Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
-                async (room) => {{
-                    await {};
-                }}
-            "#,
+                    async (room) => {{
+                        await {};
+                    }}
+                "#,
                 disable
             ),
             vec![],

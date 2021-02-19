@@ -96,6 +96,7 @@ impl Statement {
     /// Returns JS code which should be executed in the browser and [`Json`]
     /// arguments for this code.
     pub(super) fn prepare(self) -> (String, Vec<Json>) {
+        // language=JavaScript
         let mut final_js = r#"
             let lastResult;
             let objs;
@@ -133,10 +134,10 @@ impl Statement {
     fn step_js(&self, i: usize) -> String {
         format!(
             r#"
-            args = arguments[{i}];
-            {objs_js}
-            lastResult = await ({expr})(lastResult);
-        "#,
+                args = arguments[{i}];
+                {objs_js}
+                lastResult = await ({expr})(lastResult);
+            "#,
             i = i,
             objs_js = self.objects_injection_js(),
             expr = self.expression
