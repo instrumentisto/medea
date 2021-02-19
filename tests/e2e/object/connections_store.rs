@@ -22,11 +22,11 @@ impl Object<ConnectionStore> {
             .execute_and_fetch(Statement::new(
                 // language=JavaScript
                 r#"
-                async (store) => {
-                    const [id] = args;
-                    return store.connections.get(id);
-                }
-            "#,
+                    async (store) => {
+                        const [id] = args;
+                        return store.connections.get(id);
+                    }
+                "#,
                 vec![remote_id.into()],
             ))
             .await?;
