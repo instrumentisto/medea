@@ -110,7 +110,7 @@ release: release.crates release.npm
 test:
 	@make test.unit
 	@make test.integration up=yes dockerized=no
-	@make test.e2e up=yes dockerized=no # medea won't close
+	@make test.e2e up=yes dockerized=no
 
 
 up: up.dev
@@ -128,7 +128,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	kill $(shell pidof medea-control-api-mock)
+	-kill $(shell pidof medea-control-api-mock)
 
 
 down.coturn: docker.down.coturn
@@ -143,13 +143,19 @@ down.demo: docker.down.demo
 #	make down.dev
 
 down.dev:
-	@make docker.down.medea dockerized=no
-	@make docker.down.medea dockerized=yes
+	@make docker.down.medea
+	@make down.medea
 	@make docker.down.coturn
+	@make docker.down.control
 	@make down.control
 
+# Stop non-dockerized Medea media server.
+#
+# Usage:
+#   make down.medea
 
-down.medea: docker.down.medea
+down.medea:
+	-killall medea
 
 
 # Run Control API mock server.
@@ -684,7 +690,11 @@ docker.down.medea:
 docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
-# TODO: comment?
+# Stop dockerized Nginx server which server files needed for the E2E tests.
+#
+# Usage:
+#   make docker.down.e2e-files
+
 docker.down.e2e-files:
 	-docker-compose -f docker-compose.e2e-files.yml down
 
@@ -844,6 +854,13 @@ docker.up.demo: docker.down.demo
 
 docker.up.medea: docker.down.medea
 	@make docker.up args='-f docker-compose.medea.yml -f docker-compose.coturn.yml'
+
+# Starts dockerized Nginx server which server files needed for the E2E tests.
+#
+# Usage:
+#   make docker.up.e2e-files [tag=(dev|<docker-tag>)]
+#                        [( [background=no]
+#                         | background=yes [log=(no|yes)] )])]
 
 docker.up.e2e-files:
 	@make docker.up args='-f docker-compose.e2e-files.yml'
@@ -1068,11 +1085,11 @@ endef
         	cargo.version \
         docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
-        	docker.down.medea docker.down.webdriver  \
+        	docker.down.medea docker.down.webdriver docker.down.e2e-files \
         	docker.pull docker.push docker.tag docker.tar docker.untar \
         	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver \
-        docs docs.rust \
+        	docker.up.webdriver docker.up.e2e-files \
+        docs docs.rust down.medea \
         down down.control down.coturn down.demo down.dev down.medea \
         helm helm.dir helm.down helm.lint helm.list \
         	helm.package helm.package.release helm.up \
