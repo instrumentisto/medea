@@ -332,7 +332,7 @@ impl Object<Room> {
                             tracksStore: tracksStore,
                             closeListener: closeListener,
                         };
-                        conn.on_remote_track_added((t) => {
+                        conn.on_remote_track_added(async (t) => {
                             let track = {
                                 track: t,
                                 on_enabled_fire_count: 0,
@@ -356,7 +356,7 @@ impl Object<Room> {
                             });
                             tracksStore.tracks.push(track);
                             let newSubs = tracksStore.subs
-                                .filter((sub) => sub(track));
+                                .filter((sub) => { return sub(track); });
                             tracksStore.subs = newSubs;
                         });
                         conn.on_close(() => {
