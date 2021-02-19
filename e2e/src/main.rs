@@ -553,7 +553,7 @@ async fn when_interconnects_kind(
 ) {
     let send_video = if kind.contains("video") {
         Some(VideoSettings {
-            publish_policy: proto::PublishPolicy::Required
+            publish_policy: proto::PublishPolicy::Optional
         })
     } else {
         None
@@ -561,7 +561,7 @@ async fn when_interconnects_kind(
     use medea_control_api_mock::proto;
     let send_audio = if kind.contains("audio") {
         Some(AudioSettings {
-            publish_policy: proto::PublishPolicy::Required
+            publish_policy: proto::PublishPolicy::Optional
         })
     } else {
         None
