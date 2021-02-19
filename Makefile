@@ -110,7 +110,7 @@ release: release.crates release.npm
 test:
 	@make test.unit
 	@make test.integration up=yes dockerized=no
-	@make test.e2e up=yes dockerized=no
+	@make test.e2e up=yes dockerized=no # medea won't close
 
 
 up: up.dev
@@ -181,7 +181,7 @@ up.demo: docker.up.demo
 up.dev: up.coturn
 	$(MAKE) -j3 up.jason up.medea up.control
 
-# Run Medea in development mode.
+# Run Medea media server locally.
 #
 # Usage:
 #   make up.medea [debug=(no|yes)]
@@ -443,13 +443,12 @@ endif
 # Run Rust integration tests of project.
 #
 # Usage:
-#	make test.integration
-#		[( [up=no]
-#	     | up=yes [( [dockerized=no] [debug=(yes|no)]
-#	               | dockerized=yes [tag=(dev|<docker-tag>)]
-#	                                [log=(no|yes)]
-#	                                [log-to-file=(no|yes)] )]
-#	              [wait=(5|<seconds>)] )]
+#	make test.integration [( [up=no]
+#	     				   | up=yes [( [dockerized=no] [debug=(yes|no)]
+#			                         | dockerized=yes [tag=(dev|<docker-tag>)]
+#			                                          [log=(no|yes)]
+#		                                              [log-to-file=(no|yes)] )]
+#			                        [wait=(5|<seconds>)] )]
 
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
@@ -685,6 +684,7 @@ docker.down.medea:
 docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
+# TODO: comment?
 docker.down.e2e-files:
 	-docker-compose -f docker-compose.e2e-files.yml down
 
