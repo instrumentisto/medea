@@ -486,6 +486,7 @@ endif
 	make build.jason
 	@make docker.up.webdriver browser=$(browser)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
+	docker-compose -f docker-compose.coturn.yml logs
 	RUST_BACKTRACE=1 FEATURES_PATH=e2e/features/test cargo run -p medea-e2e-tests
 ifeq ($(up),yes)
 	-make down
