@@ -178,9 +178,9 @@ jobs:
       - name: Untar Medea image
         run: make docker.untar from-file=image.tar
       - name: Chrome
-        run: make test.e2e up=yes browser=chrome dockerized=yes tag=build-${{ github.run-id }}
+        run: make test.e2e up=yes browser=chrome dockerized=yes tag=build-${{ github.run_id }}
       - name: Firefox
-        run: make test.e2e up=yes browser=firefox dockerized=yes tag=build-${{ github.run-id }}
+        run: make test.e2e up=yes browser=firefox dockerized=yes tag=build-${{ github.run_id }}
 #
 #  test-integration:
 #    name: Integration tests
