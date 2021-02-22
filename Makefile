@@ -496,11 +496,13 @@ endif
 #	                                          [log-to-file=(no|yes)] )] )]
 #	              [wait=(5|<seconds>)]
 #	              [browser=(chrome|firefox)]
+#		          [tag=(dev|<tag>)]
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(tag)
 
 test.e2e:
 ifeq ($(up-test),no)
