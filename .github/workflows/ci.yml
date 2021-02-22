@@ -310,8 +310,7 @@ jobs:
             cache: ${{ github.ref != 'refs/heads/master'
                        && !startsWith(github.ref, 'refs/tags/medea-')
                        && !contains(github.event.head_commit.message, '[fresh ci]') }}
-            export: ${{ github.ref == 'refs/heads/master'
-                        || startsWith(github.ref, 'refs/tags/medea-') }}
+            export: true
             if: true
 
           - image: medea-control-api-mock
