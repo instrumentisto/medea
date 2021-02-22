@@ -342,7 +342,7 @@ jobs:
         if: ${{ matrix.if }}
 
       - run: make docker.build debug=no no-cache=yes
-                  image=${{ matrix.image }} tag=build-${{ github.run_number }}
+                  image=${{ matrix.image }} tag=build-${{ github.run_id }}
         if: ${{ matrix.if && !matrix.cache }}
 
 #      - uses: satackey/action-docker-layer-caching@v0.0.11
@@ -353,11 +353,11 @@ jobs:
 #        continue-on-error: true
 #        if: ${{ matrix.if && matrix.cache }}
       - run: make docker.build debug=yes no-cache=no
-                  image=${{ matrix.image }} tag=build-${{ github.run_number }}
+                  image=${{ matrix.image }} tag=build-${{ github.run_id }}
         if: ${{ matrix.if && matrix.cache }}
 
       - run: make docker.tar to-file=image.tar
-                  image=${{ matrix.image }} tags=build-${{ github.run_number }}
+                  image=${{ matrix.image }} tags=build-${{ github.run_id }}
         if: ${{ matrix.if && matrix.export }}
       - uses: actions/upload-artifact@v2
         with:
