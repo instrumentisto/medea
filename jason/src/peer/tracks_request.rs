@@ -225,9 +225,8 @@ impl SimpleTracksRequest {
                     return Err(tracerr::new!(
                         TracksRequestError::ExpectedAudioTracks
                     ));
-                } else {
-                    self.audio.take();
                 }
+                self.audio.take();
             }
         }
         if let Some((_, device_video_caps)) = &self.device_video {
@@ -236,9 +235,8 @@ impl SimpleTracksRequest {
                     return Err(tracerr::new!(
                         TracksRequestError::ExpectedDeviceVideoTracks
                     ));
-                } else {
-                    self.device_video.take();
                 }
+                self.device_video.take();
             }
         }
         if let Some((_, display_video_caps)) = &self.display_video {
@@ -247,9 +245,8 @@ impl SimpleTracksRequest {
                     return Err(tracerr::new!(
                         TracksRequestError::ExpectedDisplayVideoTracks
                     ));
-                } else {
-                    self.display_video.take();
                 }
+                self.display_video.take();
             }
         }
 
