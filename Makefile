@@ -512,8 +512,6 @@ ifeq ($(dockerized),yes)
 else
 	docker-compose -f 'docker-compose.e2e.yml' up -d jason-files-server
 endif
-	@make docker.up.webdriver
-	make wait.port port=4444
 endif
 ifeq ($(up),yes)
 ifeq ($(dockerized),yes)
@@ -529,6 +527,11 @@ else
 	cargo build -p medea-control-api-mock
 	cargo run -p medea-control-api-mock &
 endif
+endif
+ifeq ($(up-test),no)
+else
+	@make docker.up.webdriver
+	make wait.port port=4444
 endif
 ifeq ($(dockerized),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
