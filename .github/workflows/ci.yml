@@ -165,8 +165,8 @@ jobs:
         with:
           crate: wasm-pack
           use-tool-cache: true
-      - name: Chrome
-        run: make test.e2e up=yes browser=chrome
+#      - name: Chrome
+#        run: make test.e2e up=yes browser=chrome
       - name: Firefox
         run: make test.e2e up=yes browser=firefox
 #
