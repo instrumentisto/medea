@@ -8,6 +8,7 @@ mod transitable_state;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
+use web_sys as sys;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;
@@ -307,6 +308,8 @@ struct InnerMediaConnections {
 
     /// [`TrackId`] to its [`receiver::Component`].
     receivers: HashMap<TrackId, receiver::Component>,
+
+    unknown_remote_tracks: HashMap<String, (Transceiver, sys::MediaStreamTrack)>,
 }
 
 impl InnerMediaConnections {
@@ -393,6 +396,7 @@ impl MediaConnections {
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
+            unknown_remote_tracks: HashMap::new(),
         }))
     }
 
@@ -673,9 +677,9 @@ impl MediaConnections {
                 }
             }
         }
-        Err(tracerr::new!(
-            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
-        ))
+        self.0.borrow_mut().unknown_remote_tracks.insert(mid, (transceiver, track));
+
+        Ok(())
     }
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without
@@ -685,15 +689,20 @@ impl MediaConnections {
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     /// [`Receiver`]: self::receiver::Receiver
     pub fn sync_receivers(&self) {
-        let inner = self.0.borrow();
+        let mut inner = self.0.borrow_mut();
         for receiver in inner
             .receivers
             .values()
             .filter(|rcvr| rcvr.transceiver().is_none())
+            .map(|rcvr| rcvr.obj())
+            .collect::<Vec<_>>()
         {
             if let Some(mid) = receiver.mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
                     receiver.replace_transceiver(trnscvr.into())
+                }
+                if let Some((transceiver, track)) = inner.unknown_remote_tracks.remove(&mid) {
+                    receiver.set_remote_track(transceiver, track);
                 }
             }
         }
