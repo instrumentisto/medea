@@ -143,34 +143,22 @@ down.demo: docker.down.demo
 #	make down.dev
 
 down.dev:
-	@make docker.down.medea
-	@make down.medea
+	@make docker.down.medea dockerized=no
+	@make docker.down.medea dockerized=yes
 	@make docker.down.coturn
-	@make docker.down.control
-	@make down.control
 
-# Stop non-dockerized Medea media server.
-#
-# Usage:
-#   make down.medea
 
-down.medea:
-	-killall medea
+down.medea: docker.down.medea
 
 
 # Run Control API mock server.
 #
 # Usage:
-#  make up.control [log-to-file=(no|yes)] [background=(yes|no)]
+#  make up.control
 
 up.control:
 	make wait.port port=6565
-ifeq ($(log-to-file),yes)
-	@rm -f /tmp/medea-control-api-mock.log
-endif
-	cargo run -p medea-control-api-mock \
-		$(if $(call eq,$(log-to-file),yes),> /tmp/medea-control-api-mock.log,) \
-		$(if $(call eq,$(background),yes),&,)
+	cargo run -p medea-control-api-mock
 
 
 up.coturn: docker.up.coturn
@@ -185,20 +173,10 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j3 up.jason up.medea up.control
+	$(MAKE) -j3 up.jason docker.up.medea up.control
 
-# Run Medea media server locally.
-#
-# Usage:
-#   make up.medea [debug=(no|yes)]
-#                 [log-to-file=(no|yes)]
-#                 [background=(no|yes)]
 
-up.medea:
-	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
-	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
-		$(if $(call eq,$(log-to-file),yes),> /tmp/medea.log,) \
-		$(if $(call eq,$(background),yes),&,)
+up.medea: docker.up.medea
 
 
 # Run Jason E2E demo in development mode.
@@ -681,12 +659,14 @@ docker.down.demo:
 # and remove all related containers.
 #
 # Usage:
-# 	make docker.down.medea
+# 	make docker.down.medea [dockerized=(no|yes)]
 
 docker.down.medea:
-	docker-compose -f docker-compose.medea.yml \
-	               -f docker-compose.coturn.yml \
-	               down
+ifeq ($(dockerized),yes)
+	docker-compose -f docker-compose.medea.yml down --rmi=local -v
+else
+	-killall medea
+endif
 
 
 # Stop dockerized WebDriver and remove all related containers.
@@ -696,14 +676,6 @@ docker.down.medea:
 
 docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
-
-# Stop dockerized Nginx server which server files needed for the E2E tests.
-#
-# Usage:
-#   make docker.down.e2e-files
-
-docker.down.e2e-files:
-	-docker-compose -f docker-compose.e2e-files.yml down
 
 
 # Pull project Docker images from Container Registry.
@@ -820,17 +792,10 @@ docker.untar:
 # Usage:
 #   make docker.up.control [tag=(dev|<docker-tag>)]
 
-docker.up:
-	docker-compose $(args) up \
-	               $(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
-ifeq ($(background),yes)
-ifeq ($(log),yes)
-	docker-compose $(args) logs -f &
-endif
-endif
-
 docker.up.control:
-	@make docker.up args='-f docker-compose.medea.yml -f docker-compose.coturn.yml -f docker-compose.control.yml'
+	docker run --rm -d --network=host \
+		--name medea-control-api-mock \
+		$(IMAGE_REPO)/medea-control-api-mock:$(if $(call eq,$(tag),),dev,$(tag))
 
 
 # Run Coturn STUN/TURN server in Docker Compose environment.
@@ -849,28 +814,42 @@ docker.up.coturn: docker.down.coturn
 #	make docker.up.demo
 
 docker.up.demo: docker.down.demo
-	@make docker.up args='-f jason/demo/docker-compose.yml'
+	docker-compose -f jason/demo/docker-compose.yml up
 
 
 # Run Medea media server in Docker Compose environment.
 #
 # Usage:
-#   make docker.up.medea [tag=(dev|<docker-tag>)]
-#                        [( [background=no]
-#                         | background=yes [log=(no|yes)] )])]
+#	make docker.up.medea [( [dockerized=no] [debug=(yes|no)]
+#	                                        [background=(no|yes)]
+#	                      | dockerized=yes [tag=(dev|<docker-tag>)]
+#	                                       [( [background=no]
+#	                                        | background=yes [log=(no|yes)] )])]
+#	                     [log-to-file=(no|yes)]
+
+docker-up-medea-image = $(IMAGE_REPO)/medea
+docker-up-medea-tag = $(if $(call eq,$(tag),),dev,$(tag))
 
 docker.up.medea: docker.down.medea
-	@make docker.up args='-f docker-compose.medea.yml -f docker-compose.coturn.yml'
-
-# Starts dockerized Nginx server which server files needed for the E2E tests.
-#
-# Usage:
-#   make docker.up.e2e-files [tag=(dev|<docker-tag>)]
-#                        [( [background=no]
-#                         | background=yes [log=(no|yes)] )])]
-
-docker.up.e2e-files:
-	@make docker.up args='-f docker-compose.e2e-files.yml'
+ifeq ($(dockerized),yes)
+	COMPOSE_IMAGE_NAME=$(docker-up-medea-image) \
+	COMPOSE_IMAGE_VER=$(docker-up-medea-tag) \
+	docker-compose -f docker-compose.medea.yml up \
+		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
+ifeq ($(background),yes)
+ifeq ($(log),yes)
+	docker-compose -f docker-compose.medea.yml logs -f &
+endif
+endif
+else
+ifeq ($(log-to-file),yes)
+	@rm -f /tmp/medea.log
+endif
+	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
+	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
+		$(if $(call eq,$(log-to-file),yes),> /tmp/medea.log,) \
+		$(if $(call eq,$(background),yes),&,)
+endif
 
 
 # Run dockerized WebDriver.
@@ -1092,11 +1071,11 @@ endef
         	cargo.version \
         docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
-        	docker.down.medea docker.down.webdriver docker.down.e2e-files \
+        	docker.down.medea docker.down.webdriver  \
         	docker.pull docker.push docker.tag docker.tar docker.untar \
         	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver docker.up.e2e-files \
-        docs docs.rust down.medea \
+        	docker.up.webdriver \
+        docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
         helm helm.dir helm.down helm.lint helm.list \
         	helm.package helm.package.release helm.up \
