@@ -488,7 +488,11 @@ else
 	@make build.jason
 ifeq ($(dockerized),yes)
 else
-	docker-compose -f 'docker-compose.e2e.yml' up -d jason-files-server
+	docker run --rm -d --network=host --name e2e-files \
+		-v $(PWD)/tests/e2e/index.html:/usr/share/nginx/html/index.html \
+		-v $(PWD)/jason/pkg:/usr/share/nginx/html/pkg \
+		-v $(PWD)/tests/e2e/nginx.conf:/etc/nginx/nginx.conf \
+		nginx:1.19.7-alpine
 endif
 endif
 ifeq ($(up),yes)
@@ -504,6 +508,7 @@ else
 	make up.medea background=yes
 	cargo build -p medea-control-api-mock
 	cargo run -p medea-control-api-mock &
+	make wait.port port=8000
 endif
 endif
 ifeq ($(up-test),no)
@@ -521,7 +526,8 @@ else
 endif
 ifeq ($(up),yes)
 	-make docker.down.webdriver browser=$(browser)
-	docker-compose -f 'docker-compose.e2e.yml' down
+	-docker-compose -f 'docker-compose.e2e.yml' down
+	-docker rm -f e2e-files
 	-make down
 endif
 

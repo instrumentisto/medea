@@ -12,20 +12,13 @@ services:
     volumes:
       - ./${MEDEA_CONF}:/${MEDEA_CONF}:ro
       - ./${MEDEA_CONTROL__STATIC_SPECS_DIR}:/${MEDEA_CONTROL__STATIC_SPECS_DIR}:ro
-    ports:
-      - "8000:8000" # Medea's Client API
-      - "6565:6565" # Medea's Control API
-      - "3478:3478" # Coturn stun/turn
-      - "8080:8080" # Medea's Control API mock
-      - "30000:30000" # Tests files server
-    expose:
-      - 6379 # Coturn's Redis server
+    network_mode: host
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn
     image: instrumentisto/coturn:4.5
     command:
       - --log-file=stdout
-    network_mode: service:medea
+    network_mode: host
     volumes:
       - ./_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./.cache/coturn/data:/var/lib/coturn
@@ -33,7 +26,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
-    network_mode: service:medea
+    network_mode: host
     volumes:
       - ./_dev/coturn/redis.conf:/etc/redis.conf:ro
   control-api-mock:
@@ -41,13 +34,12 @@ services:
     build:
       context: .
       dockerfile: ./mock/control-api/Dockerfile
-    depends_on: ["medea"]
     image: ${MEDEA_CONTROL_MOCK_IMAGE_NAME}:${MEDEA_CONTROL_MOCK_IMAGE_VER}
-    network_mode: service:medea
+    network_mode: host
   jason-files-server:
     container_name: jason-files-server
-    image: nginx
-    network_mode: service:medea
+    image: nginx:1.19.7-alpine
+    network_mode: host
     volumes:
       - ./tests/e2e/index.html:/usr/share/nginx/html/index.html:ro
       - ./jason/pkg:/usr/share/nginx/html/pkg:ro
