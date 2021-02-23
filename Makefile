@@ -155,11 +155,13 @@ down.medea: docker.down.medea
 # Run Control API mock server.
 #
 # Usage:
-#  make up.control
+#  make up.control [background=(no|yes)]
 
 up.control:
+	cargo build -p medea-control-api-mock
 	make wait.port port=6565
-	cargo run -p medea-control-api-mock
+	cargo run -p medea-control-api-mock $(if $(call eq,$(background),yes),&,)
+	make wait.port port=8080
 
 
 up.coturn: docker.up.coturn
@@ -484,36 +486,26 @@ test-e2e-env = RUST_BACKTRACE=1 \
 	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag))
 
 test.e2e:
-ifeq ($(up-test),no)
-else
+ifeq ($(up),yes)
 	@make build.jason
 ifeq ($(dockerized),yes)
-else
-	docker run --rm -d --network=host --name e2e-files \
-		-v $(PWD)/tests/e2e/index.html:/usr/share/nginx/html/index.html \
-		-v $(PWD)/jason/pkg:/usr/share/nginx/html/pkg \
-		-v $(PWD)/tests/e2e/nginx.conf:/etc/nginx/nginx.conf \
-		nginx:1.19.7-alpine
+ifeq ($(rebuild),yes)
+	make docker.build image=medea
+	make docker.build image=medea-control-api-mock
 endif
-endif
-ifeq ($(up),yes)
-ifeq ($(dockerized),yes)
 	env $(test-e2e-env) docker-compose -f 'docker-compose.e2e.yml' up -d
 	docker-compose -f 'docker-compose.e2e.yml' logs &
 	make wait.port port=8080
 	make wait.port port=30000
 	make wait.port port=8000
 else
-	@make docker.up.coturn background=yes
-	env $(test-e2e-env) \
-	make up.medea background=yes
-	cargo build -p medea-control-api-mock
-	cargo run -p medea-control-api-mock &
-	make wait.port port=8000
+	docker run --rm -d --network=host --name e2e-files \
+		-v $(PWD)/tests/e2e/index.html:/usr/share/nginx/html/index.html \
+		-v $(PWD)/jason/pkg:/usr/share/nginx/html/pkg \
+		-v $(PWD)/tests/e2e/nginx.conf:/etc/nginx/nginx.conf \
+		nginx:1.19.7-alpine
+	make docker.up.medea up.control up.coturn background=yes dockerized=no
 endif
-endif
-ifeq ($(up-test),no)
-else
 	@make docker.up.webdriver
 	make wait.port port=4444
 endif

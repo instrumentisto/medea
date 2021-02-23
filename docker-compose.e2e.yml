@@ -4,7 +4,6 @@ services:
   medea:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
-    build: .
     depends_on: ["coturn"]
     environment:
       RUST_LOG: ${RUST_LOG}
@@ -32,15 +31,12 @@ services:
     volumes:
       - ./_dev/coturn/redis.conf:/etc/redis.conf:ro
   control-api-mock:
-    container_name: medea-control-api-mock
-    build:
-      context: .
-      dockerfile: ./mock/control-api/Dockerfile
+    container_name: ${COMPOSE_PROJECT_NAME}-control-api-mock
     image: ${MEDEA_CONTROL_MOCK_IMAGE_NAME}:${MEDEA_CONTROL_MOCK_IMAGE_VER}
     depends_on: ["medea"]
     network_mode: host
   jason-files-server:
-    container_name: jason-files-server
+    container_name: ${COMPOSE_PROJECT_NAME}-jason-files-server
     image: nginx:1.19.7-alpine
     network_mode: host
     volumes:
