@@ -70,7 +70,7 @@ pub async fn run(
     HttpServer::new(move || {
         debug!("Running HTTP server...");
         App::new()
-            .wrap(Cors::new().finish())
+            .wrap(Cors::permissive())
             .data(AppContext {
                 client: client.clone(),
                 subscribers: Arc::clone(&subscribers),
