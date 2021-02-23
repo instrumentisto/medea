@@ -166,7 +166,7 @@ jobs:
           crate: wasm-pack
           use-tool-cache: true
       - name: Chrome
-        run: env RUST_LOG=debug FEATURES_PATH=e2e/features/test make test.e2e up=yes browser=chrome
+        run: env MEDEA_LOG__LEVEL=DEBUG FEATURES_PATH=e2e/features/test make test.e2e up=yes browser=chrome
 #      - name: Firefox
 #        run: make test.e2e up=yes browser=firefox
 #
