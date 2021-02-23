@@ -350,7 +350,7 @@ jobs:
           key: docker-${{ matrix.image }}-build-{hash}
           restore-keys: docker-${{ matrix.image }}-build-
         continue-on-error: true
-        timeout-minutes: 5
+        timeout-minutes: 10
         if: ${{ matrix.if && matrix.cache }}
       - run: make docker.build debug=yes no-cache=no
                   image=${{ matrix.image }} tag=build-${{ github.run_number }}
