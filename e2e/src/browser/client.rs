@@ -102,10 +102,6 @@ impl WebDriverClient {
         let client = self.0.clone();
         tokio::spawn(async move {
             let mut client = client.lock().await;
-            let logs = client.0.execute(r#"
-                return console.everything;
-            "#, vec![]).await.unwrap();
-            println!("CONSOLE LOGS HERE:\n{:?}\n", logs);
             client.close_window(window).await;
             tx.send(()).unwrap();
         });
@@ -206,6 +202,11 @@ impl Inner {
     /// Closes provided [`WebWindow`].
     pub async fn close_window(&mut self, window: WebWindow) {
         if self.0.switch_to_window(window).await.is_ok() {
+            let logs = self.0.execute(r#"
+                return console.everything;
+            "#, vec![]).await.unwrap();
+            println!("CONSOLE LOGS HERE:\n{:?}\n", logs);
+
             let _ = self.0.close_window().await;
         }
     }
