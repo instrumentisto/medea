@@ -102,6 +102,10 @@ impl WebDriverClient {
         let client = self.0.clone();
         tokio::spawn(async move {
             let mut client = client.lock().await;
+            let logs = client.0.execute(r#"
+                return console.everything;
+            "#, vec![]).await.unwrap();
+            println!("CONSOLE LOGS HERE:\n{:?}\n", logs);
             client.close_window(window).await;
             tx.send(()).unwrap();
         });
