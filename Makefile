@@ -145,6 +145,7 @@ down.demo: docker.down.demo
 down.dev:
 	@make docker.down.medea dockerized=no
 	@make docker.down.medea dockerized=yes
+	@make down.control
 	@make docker.down.coturn
 
 
