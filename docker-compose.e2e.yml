@@ -5,6 +5,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
     build: .
+    depends_on: ["coturn"]
     environment:
       RUST_LOG: ${RUST_LOG}
       MEDEA_CONF: ${MEDEA_CONF}
@@ -18,6 +19,7 @@ services:
     image: instrumentisto/coturn:4.5
     command:
       - --log-file=stdout
+    depends_on: ["coturn-db"]
     network_mode: host
     volumes:
       - ./_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
@@ -35,6 +37,7 @@ services:
       context: .
       dockerfile: ./mock/control-api/Dockerfile
     image: ${MEDEA_CONTROL_MOCK_IMAGE_NAME}:${MEDEA_CONTROL_MOCK_IMAGE_VER}
+    depends_on: ["medea"]
     network_mode: host
   jason-files-server:
     container_name: jason-files-server
