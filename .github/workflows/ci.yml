@@ -165,12 +165,12 @@ jobs:
         with:
           crate: wasm-pack
           use-tool-cache: true
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-        with:
-          key: test-e2e-{hash}
-          restore-keys: test-e2e-
-        timeout-minutes: 5
-        continue-on-error: true
+#      - uses: satackey/action-docker-layer-caching@v0.0.11
+#        with:
+#          key: test-e2e-{hash}
+#          restore-keys: test-e2e-
+#        timeout-minutes: 5
+#        continue-on-error: true
       - name: Chrome
         run: env MEDEA_LOG__LEVEL=DEBUG FEATURES_PATH=e2e/features/test make test.e2e up=yes browser=chrome
 #      - name: Firefox

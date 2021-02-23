@@ -658,27 +658,24 @@ impl MediaConnections {
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
     pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
-        loop {
-            let inner = self.0.borrow();
-            let transceiver = Transceiver::from(track_event.transceiver());
-            let track = track_event.track();
-            // Cannot fail, since transceiver is guaranteed to be negotiated at this
-            // point.
-            let mid = transceiver.mid().unwrap();
+        let inner = self.0.borrow();
+        let transceiver = Transceiver::from(track_event.transceiver());
+        let track = track_event.track();
+        // Cannot fail, since transceiver is guaranteed to be negotiated at this
+        // point.
+        let mid = transceiver.mid().unwrap();
 
-            for receiver in inner.receivers.values() {
-                if let Some(recv_mid) = &receiver.mid() {
-                    if recv_mid == &mid {
-                        receiver.set_remote_track(transceiver, track);
-                        return Ok(());
-                    }
+        for receiver in inner.receivers.values() {
+            if let Some(recv_mid) = &receiver.mid() {
+                if recv_mid == &mid {
+                    receiver.set_remote_track(transceiver, track);
+                    return Ok(());
                 }
             }
         }
-        panic!()
-        // Err(tracerr::new!(
-        //     MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
-        // ))
+        Err(tracerr::new!(
+            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
+        ))
     }
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without
