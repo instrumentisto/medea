@@ -677,9 +677,9 @@ impl MediaConnections {
                 }
             }
         }
-        self.0.borrow_mut().unknown_remote_tracks.insert(mid, (transceiver, track));
-
-        Ok(())
+        Err(tracerr::new!(
+            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
+        ))
     }
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without

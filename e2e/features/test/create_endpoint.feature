@@ -18,6 +18,8 @@ Feature: Create Endpoint
     Given joined empty Member `Alice`
     And joined empty Member `Bob`
     When Control API interconnected audio of `Alice` and `Bob`
+    Then `Alice` has local audio
+    And `Bob` has local audio
     Then `Alice` has audio remote Tracks with `Bob`
     And `Bob` has audio remote Tracks with `Alice`
 
@@ -25,6 +27,8 @@ Feature: Create Endpoint
     Given joined empty Member `Alice`
     And joined empty Member `Bob`
     When Control API interconnected video of `Alice` and `Bob`
+    Then `Alice` has local video
+    And `Bob` has local video
     Then `Alice` has video remote Tracks with `Bob`
     And `Bob` has video remote Tracks with `Alice`
 

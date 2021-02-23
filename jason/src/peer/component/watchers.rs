@@ -38,9 +38,7 @@ impl Component {
             candidate.sdp_mid,
         )
         .await
-        .map_err(tracerr::map_from_and_wrap!())?;
-        peer.media_connections.sync_receivers();
-        Ok(())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Watcher for the [`State::remote_sdp`] update.
