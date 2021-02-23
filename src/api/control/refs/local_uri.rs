@@ -206,9 +206,8 @@ impl TryFrom<String> for StatefulLocalUri {
                 let host = host.to_string();
                 if host.is_empty() {
                     return Err(LocalUriParseError::MissingPaths(value));
-                } else {
-                    LocalUri::<ToRoom>::new(host.into())
                 }
+                LocalUri::<ToRoom>::new(host.into())
             }
             None => return Err(LocalUriParseError::MissingPaths(value)),
         };
