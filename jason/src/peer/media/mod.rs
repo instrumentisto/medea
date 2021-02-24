@@ -673,10 +673,12 @@ impl MediaConnections {
             if let Some(recv_mid) = &receiver.mid() {
                 if recv_mid == &mid {
                     receiver.set_remote_track(transceiver, track);
+                    log::debug!("Found Receiver for this Track");
                     return Ok(());
                 }
             }
         }
+        log::debug!("Receiver for this Track currently not found");
         self.0.borrow_mut().unknown_remote_tracks.insert(mid, (transceiver, track));
 
         Ok(())

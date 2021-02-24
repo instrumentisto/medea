@@ -269,7 +269,7 @@ impl Component {
     /// [`WaitRemoteSdp`]: NegotiationState::WaitRemoteSdp
     #[watch(self.local_sdp.on_approve().skip(1))]
     async fn local_sdp_approved(
-        _: Rc<PeerConnection>,
+        peer: Rc<PeerConnection>,
         state: Rc<State>,
         _: (),
     ) -> Result<(), Traced<PeerError>> {
@@ -282,6 +282,7 @@ impl Component {
                         .set(NegotiationState::WaitRemoteSdp);
                 }
                 NegotiationRole::Answerer(_) => {
+                    peer.media_connections.sync_receivers();
                     state.negotiation_state.set(NegotiationState::Stable);
                     state.negotiation_role.set(None);
                 }
@@ -315,7 +316,7 @@ impl Component {
         match negotiation_state {
             NegotiationState::Stable => {
                 state.negotiation_role.set(None);
-                peer.media_connections.sync_receivers();
+                // peer.media_connections.sync_receivers();
             }
             NegotiationState::WaitLocalSdp => {
                 if let Some(negotiation_role) = state.negotiation_role.get() {
