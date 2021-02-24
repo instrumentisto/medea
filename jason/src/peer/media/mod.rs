@@ -682,6 +682,10 @@ impl MediaConnections {
         Ok(())
     }
 
+    pub fn assert_negotiate(&self) {
+        assert!(!self.0.borrow().receivers.values().any(|r| r.mid().is_none()));
+    }
+
     /// Iterates over all [`Receiver`]s with [`mid`] and without
     /// [`Transceiver`], trying to find the corresponding [`Transceiver`] in
     /// [`RtcPeerConnection`] and to insert it into the [`Receiver`].

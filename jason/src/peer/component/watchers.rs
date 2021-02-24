@@ -213,6 +213,7 @@ impl Component {
                             .set_offer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        peer.media_connections.assert_negotiate();
                         peer.media_connections.sync_receivers();
                         let mids = peer
                             .get_mids()
@@ -235,6 +236,7 @@ impl Component {
                             .set_answer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
+                        peer.media_connections.assert_negotiate();
                         peer.media_connections.sync_receivers();
                         peer.peer_events_sender
                             .unbounded_send(PeerEvent::NewSdpAnswer {
