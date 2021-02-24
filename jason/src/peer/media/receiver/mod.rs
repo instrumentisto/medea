@@ -89,6 +89,11 @@ impl Receiver {
         } else {
             None
         };
+        if let Some(mid) = state.mid() {
+            log::debug!("{:?}: mid on create '{}'", kind, mid);
+        } else {
+            log::debug!("{:?}: doesn't has mid on create", kind);
+        }
 
         let this = Self {
             track_id: state.track_id(),
@@ -228,12 +233,12 @@ impl Receiver {
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
     /// and has not notified yet.
     fn maybe_notify_track(&self) {
-        // if self.is_track_notified.get() {
-        //     return;
-        // }
-        // if !self.is_receiving() {
-        //     return;
-        // }
+        if self.is_track_notified.get() {
+            return;
+        }
+        if !self.is_receiving() {
+            return;
+        }
         if let Some(track) = self.track.borrow().as_ref() {
             let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::NewRemoteTrack {

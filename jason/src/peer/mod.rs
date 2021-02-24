@@ -401,6 +401,9 @@ impl PeerConnection {
                             media_connections.add_remote_track(&track_event)
                         {
                             JasonError::from(err).print();
+                        } else {
+                            log::debug!("Track inserted!");
+                            break;
                         };
                     }
                 })
