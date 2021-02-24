@@ -455,8 +455,10 @@ endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 ifeq ($(dockerized),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+	docker run --rm --network=host \
+				-u $(shell id -u):$(shell id -g) \
+				-v "$(PWD)":/app -w /app \
+				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		ghcr.io/instrumentisto/rust:$(RUST_VER) \
 			make test.integration up=no dockerized=no
 else
@@ -473,6 +475,7 @@ endif
 #	make test.e2e [( [up=no]
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [tag=(dev|<docker-tag>)]
+# 											  [rebuild=(no|yes)]
 #	                                          [log=(no|yes)]
 #	                                          [log-to-file=(no|yes)] )] )]
 #	              [wait=(5|<seconds>)]
@@ -490,30 +493,30 @@ ifeq ($(up),yes)
 	@make build.jason
 ifeq ($(dockerized),yes)
 ifeq ($(rebuild),yes)
-	make docker.build image=medea
-	make docker.build image=medea-control-api-mock
+	make docker.build image=medea debug=$(debug) tag=$(tag)
+	make docker.build image=medea-control-api-mock debug=$(debug) tag=$(tag)
 endif
 	env $(test-e2e-env) docker-compose -f 'docker-compose.e2e.yml' up -d
 	docker-compose -f 'docker-compose.e2e.yml' logs &
-	make wait.port port=8080
-	make wait.port port=30000
 	make wait.port port=8000
 else
 	docker run --rm -d --network=host --name e2e-files \
 		-v $(PWD)/tests/e2e/index.html:/usr/share/nginx/html/index.html \
 		-v $(PWD)/jason/pkg:/usr/share/nginx/html/pkg \
 		-v $(PWD)/tests/e2e/nginx.conf:/etc/nginx/nginx.conf \
-		nginx:1.19.7-alpine
+		nginx:stable-alpine
 	make docker.up.medea up.control up.coturn background=yes dockerized=no
 endif
 	@make docker.up.webdriver
 	make wait.port port=4444
 endif
 ifeq ($(dockerized),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+	docker run --rm --network=host \
+				-u $(shell id -u):$(shell id -g) \
+				-v "$(PWD)":/app -w /app \
+				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		ghcr.io/instrumentisto/rust:$(RUST_VER) \
-			make test.e2e up=no dockerized=no up-test=no
+			make test.e2e up=no dockerized=no
 else
 	cargo test --test e2e
 endif
