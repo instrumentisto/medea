@@ -14,6 +14,7 @@ pub struct Jason;
 impl Builder for Jason {
     fn build(self) -> Statement {
         Statement::new(
+            // language=JavaScript
             r#"
                 async () => {
                     let jason = new window.rust.Jason();
@@ -26,9 +27,10 @@ impl Builder for Jason {
 }
 
 impl Object<Jason> {
-    /// Returns new [`Room`] initiated in this [`Jason`].
-    pub async fn init_room(&self) -> Result<Object<Room>, Error> {
+    /// Returns a new [`Room`] initiated in this [`Jason`].
+    pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
         self.execute_and_fetch(Statement::new(
+            // language=JavaScript
             r#"
                 async (jason) => {
                     let room = await jason.init_room();

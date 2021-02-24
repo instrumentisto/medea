@@ -175,6 +175,7 @@ impl Inner {
         self.0.wait_for_find(Locator::Id("loaded")).await?;
 
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async () => {
                     window.registry = new Map();

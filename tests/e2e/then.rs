@@ -1,6 +1,8 @@
 use cucumber_rust::then;
 
-use crate::{parse_media_kinds, world::World};
+use crate::{world::World};
+use crate::object::{MediaKind, MediaSourceKind};
+use crate::object::room::FailedParsing;
 
 #[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
 async fn then_member_receives_connection(
@@ -29,6 +31,17 @@ async fn then_member_doesnt_receives_connection(
         .await
         .unwrap()
         .is_none())
+}
+/// Parses [`MediaKind`] and [`MediaSourceKind`] from the provided [`str`].
+fn parse_media_kinds(
+    s: &str,
+) -> Result<(MediaKind, MediaSourceKind), FailedParsing> {
+    let media_kind = s.parse()?;
+    let source_kind = match media_kind {
+        MediaKind::Audio => MediaSourceKind::Device,
+        MediaKind::Video => s.parse()?,
+    };
+    Ok((media_kind, source_kind))
 }
 
 #[then(regex = "^`(.*)`'s (audio|(?:display|device) video) RemoteMediaTrack \

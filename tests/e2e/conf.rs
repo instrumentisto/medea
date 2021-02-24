@@ -56,20 +56,6 @@ env_var!(
 );
 
 env_var!(
-    /// Path to the directory where compiled `jason` is stored.
-    ///
-    /// Default: `jason/pkg`.
-    JASON_DIR_PATH
-        || "jason/pkg"
-);
-
-env_var!(
-    /// Path to the `index.html` for all tests.
-    INDEX_PATH
-        || "tests/e2e/index.html"
-);
-
-env_var!(
     /// Path to the Cucumber Features which are should be ran.
     FEATURES_PATH
         || "tests/e2e/features"

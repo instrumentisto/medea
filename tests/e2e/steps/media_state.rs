@@ -1,0 +1,19 @@
+use cucumber_rust::when;
+
+use crate::{object::MediaKind, parse_media_kind, world::World};
+
+// #[when(regex = "^Member (\\S*) (disables|mutes) (audio|video|all)$")]
+// async fn when_disables_mutes(
+//     world: &mut World,
+//     id: String,
+//     disable_or_mutes: String,
+//     audio_or_video: String,
+// ) {
+//     let member = world.get_member(&id).unwrap();
+//     if disable_or_mutes == "disables" {
+//         let kind = parse_media_kind(&audio_or_video);
+//         member.toggle_media(kind, None, false).await.unwrap();
+//     } else {
+//         todo!("Muting is unimplemented atm.")
+//     }
+// }

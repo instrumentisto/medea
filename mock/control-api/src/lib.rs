@@ -25,7 +25,7 @@ pub mod proto {
     };
 }
 
-/// Initializes [`slog`] logger which will output logs with [`slog_term`]'s
+/// Initializes [`slog`] logger outputting logs with a [`slog_term`]'s
 /// decorator.
 pub fn init_logger() -> GlobalLoggerGuard {
     let decorator = slog_term::TermDecorator::new().build();

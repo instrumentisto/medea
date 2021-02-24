@@ -128,7 +128,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	kill $(shell pidof medea-control-api-mock)
+	-kill $(shell pidof medea-control-api-mock)
 
 
 down.coturn: docker.down.coturn
@@ -145,8 +145,8 @@ down.demo: docker.down.demo
 down.dev:
 	@make docker.down.medea dockerized=no
 	@make docker.down.medea dockerized=yes
-	@make docker.down.coturn
 	@make down.control
+	@make docker.down.coturn
 
 
 down.medea: docker.down.medea
@@ -155,16 +155,13 @@ down.medea: docker.down.medea
 # Run Control API mock server.
 #
 # Usage:
-#  make up.control [log-to-file=(no|yes)] [background=(yes|no)]
+#  make up.control [background=(no|yes)]
 
 up.control:
+	cargo build -p medea-control-api-mock
 	make wait.port port=6565
-ifeq ($(log-to-file),yes)
-	@rm -f /tmp/medea-control-api-mock.log
-endif
-	cargo run -p medea-control-api-mock \
-		$(if $(call eq,$(log-to-file),yes),> /tmp/medea-control-api-mock.log,) \
-		$(if $(call eq,$(background),yes),&,)
+	cargo run -p medea-control-api-mock $(if $(call eq,$(background),yes),&,)
+	make wait.port port=8080
 
 
 up.coturn: docker.up.coturn
@@ -434,28 +431,39 @@ endif
 #
 # Usage:
 #	make test.integration [( [up=no]
-#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
-#	                         | dockerized=yes [tag=(dev|<docker-tag>)]
-#	                                          [log=(no|yes)]
-#                                             [log-to-file=(no|yes)] )]
-#	                        [wait=(5|<seconds>)] )]
+#	     				   | up=yes [( [dockerized=no] [debug=(yes|no)]
+#			                         | dockerized=yes [tag=(dev|<docker-tag>)]
+#			                                          [log=(no|yes)]
+#		                                              [log-to-file=(no|yes)] )]
+#			                        [wait=(5|<seconds>)] )]
 
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/integration/specs/ \
-	MEDEA_CONF=tests/integration/medea.config.toml
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml
 
 test.integration:
 ifeq ($(up),yes)
-	make docker.up.coturn background=yes
+ifeq ($(dockerized),yes)
 	env $(test-integration-env) \
-	make docker.up.medea debug=$(debug) background=yes log=$(log) \
-	                     dockerized=$(dockerized) \
-	                     tag=$(tag) \
-	                     log-to-file=$(log-to-file)
+	make docker.up.medea background=yes
+else
+	@make up.coturn
+	env $(test-integration-env) \
+	make up.medea background=yes
+endif
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
+ifeq ($(dockerized),yes)
+	docker run --rm --network=host \
+				-u $(shell id -u):$(shell id -g) \
+				-v "$(PWD)":/app -w /app \
+				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		ghcr.io/instrumentisto/rust:$(RUST_VER) \
+			make test.integration up=no dockerized=no
+else
 	RUST_BACKTRACE=1 cargo test --test integration
+endif
 ifeq ($(up),yes)
 	-make down
 endif
@@ -467,29 +475,56 @@ endif
 #	make test.e2e [( [up=no]
 #	               | up=yes [( [dockerized=no] [debug=(yes|no)]
 #	                         | dockerized=yes [tag=(dev|<docker-tag>)]
+# 											  [rebuild=(no|yes)]
 #	                                          [log=(no|yes)]
-#                                             [log-to-file=(no|yes)] )]
-#	                        )]
-#                 [wait=(5|<seconds>)]
-#                 [browser=(chrome|firefox)]
+#	                                          [log-to-file=(no|yes)] )] )]
+#	              [wait=(5|<seconds>)]
+#	              [browser=(chrome|firefox)]
+#		          [tag=(dev|<tag>)]
+
+test-e2e-env = RUST_BACKTRACE=1 \
+	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag))
 
 test.e2e:
 ifeq ($(up),yes)
-	make docker.up.coturn background=yes
-	env $(test-integration-env) \
-	make docker.up.medea debug=$(debug) background=yes log=$(log) \
-	                     dockerized=$(dockerized) \
-	                     tag=$(tag) \
-	                     log-to-file=$(log-to-file)
-	make up.control background=yes log-to-file=$(log-to-file)
+	@make build.jason
+ifeq ($(dockerized),yes)
+ifeq ($(rebuild),yes)
+	make docker.build image=medea debug=$(debug) tag=$(tag)
+	make docker.build image=medea-control-api-mock debug=$(debug) tag=$(tag)
 endif
-	make build.jason
-	@make docker.up.webdriver browser=$(browser)
-	sleep $(if $(call eq,$(wait),),5,$(wait))
-	RUST_BACKTRACE=1 cargo test --test e2e
+	env $(test-e2e-env) docker-compose -f 'docker-compose.e2e.yml' up -d
+	docker-compose -f 'docker-compose.e2e.yml' logs &
+	make wait.port port=8000
+else
+	docker run --rm -d --network=host --name e2e-files \
+		-v $(PWD)/tests/e2e/index.html:/usr/share/nginx/html/index.html \
+		-v $(PWD)/jason/pkg:/usr/share/nginx/html/pkg \
+		-v $(PWD)/tests/e2e/nginx.conf:/etc/nginx/nginx.conf \
+		nginx:stable-alpine
+	make docker.up.medea up.control up.coturn background=yes dockerized=no
+endif
+	@make docker.up.webdriver
+	make wait.port port=4444
+endif
+ifeq ($(dockerized),yes)
+	docker run --rm --network=host \
+				-u $(shell id -u):$(shell id -g) \
+				-v "$(PWD)":/app -w /app \
+				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		ghcr.io/instrumentisto/rust:$(RUST_VER) \
+			make test.e2e up=no dockerized=no
+else
+	cargo test --test e2e
+endif
 ifeq ($(up),yes)
-	-make down
 	-make docker.down.webdriver browser=$(browser)
+	-docker-compose -f 'docker-compose.e2e.yml' down
+	-docker rm -f e2e-files
+	-make down
 endif
 
 
@@ -632,7 +667,7 @@ docker.down.medea:
 ifeq ($(dockerized),yes)
 	docker-compose -f docker-compose.medea.yml down --rmi=local -v
 else
-	-kill $(shell pidof medea)
+	-killall medea
 endif
 
 
