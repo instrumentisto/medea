@@ -395,6 +395,7 @@ impl PeerConnection {
             .on_track(Some(move |track_event| {
                 let media_connections = media_connections.clone();
                 spawn_local(async move {
+                    log::debug!("New remote track");
                     // loop {
                     //     crate::utils::delay_for(std::time::Duration::from_millis(500).into()).await;
                         if let Err(err) =
