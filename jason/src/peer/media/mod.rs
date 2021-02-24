@@ -708,9 +708,9 @@ impl MediaConnections {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
                     receiver.replace_transceiver(trnscvr.into())
                 }
-                if let Some((transceiver, track)) = inner.unknown_remote_tracks.remove(&mid) {
-                    receiver.set_remote_track(transceiver, track);
-                }
+                // if let Some((transceiver, track)) = inner.unknown_remote_tracks.remove(&mid) {
+                //     receiver.set_remote_track(transceiver, track);
+                // }
             }
         }
     }
