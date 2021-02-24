@@ -393,21 +393,11 @@ impl PeerConnection {
         let media_connections = Rc::clone(&peer.media_connections);
         peer.peer
             .on_track(Some(move |track_event| {
-                let media_connections = media_connections.clone();
-                spawn_local(async move {
-                    log::debug!("New remote track");
-                    // loop {
-                    //     crate::utils::delay_for(std::time::Duration::from_millis(500).into()).await;
-                        if let Err(err) =
-                            media_connections.add_remote_track(&track_event)
-                        {
-                            JasonError::from(err).print();
-                        } else {
-                            // log::debug!("Track inserted!");
-                            // break;
-                        };
-                    // }
-                })
+                if let Err(err) =
+                    media_connections.add_remote_track(&track_event)
+                {
+                    JasonError::from(err).print();
+                };
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 

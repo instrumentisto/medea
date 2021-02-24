@@ -157,7 +157,6 @@ impl<T> Object<TracksStore<T>> {
                             }
                         }
 
-                        console.log(meta.store);
                         meta.store.subs.push((track) => {
                             let kind = track.track.kind();
                             let sourceKind = track.track.media_source_kind();
@@ -169,7 +168,6 @@ impl<T> Object<TracksStore<T>> {
                                 return true;
                             }
                         });
-                        console.log(meta.store);
                     });
                     let res = await waiter;
                     return res;

@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use cucumber_rust::{given, then, when, WorldInit as _};
 use tokio::time::timeout;
+use medea_control_api_mock::proto::{AudioSettings, VideoSettings};
 
 use crate::world::{MembersPair, PairedMember};
 
@@ -19,7 +20,6 @@ use self::{
     object::room::{FailedParsing, MediaKind, MediaSourceKind},
     world::{MemberBuilder, World},
 };
-use medea_control_api_mock::proto::{AudioSettings, VideoSettings};
 
 #[tokio::main]
 async fn main() {
@@ -303,6 +303,7 @@ async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let room = member.room();
     let tracks = room.local_tracks().await.unwrap();
     let media_kind = kind.parse().unwrap();
+    // FIXME
     // let source_kind = kind.parse().ok();
 
     tracks.get_track(media_kind, MediaSourceKind::Device).await.unwrap();

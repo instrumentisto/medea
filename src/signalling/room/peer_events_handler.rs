@@ -27,28 +27,20 @@ impl Room {
     ///
     /// [`WaitLocalSdp`]: crate::media::peer::WaitLocalSdp
     fn send_peer_created(&self, peer_id: PeerId) -> Result<(), RoomError> {
-        println!("FOOBAR [{:?}]: Sending PeerCreated", peer_id);
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
-        println!("FOOBAR [{:?}]: Stable Peer taken", peer_id);
         let partner_peer: Peer<Stable> =
             match self.peers.take_inner_peer(peer.partner_peer_id()) {
                 Ok(peer) => peer,
                 Err(e) => {
-                    println!("FOOBAR [{:?}]: Partner Stable Peer NOT taken", peer_id);
-                    self.peers.map_peer_by_id(peer.partner_peer_id(), |_| {
-                        println!("FOOBAR [{:?}]: Partner Stable Peer NOT taken but exists", peer_id);
-                    });
                     self.peers.add_peer(peer);
                     return Err(e);
                 }
             };
-        println!("FOOBAR [{:?}]: Partner Stable Peer taken", peer_id);
 
         let member_id = peer.member_id();
         let ice_servers = if let Some(ice_servers) = peer.ice_servers_list() {
             ice_servers
         } else {
-            println!("FOOBAR [{:?}]: ICE Servers are None", peer_id);
             self.peers.add_peer(peer);
             self.peers.add_peer(partner_peer);
             return Err(RoomError::NoTurnCredentials(member_id));
@@ -279,10 +271,8 @@ impl Handler<NegotiationNeeded> for Room {
         msg: NegotiationNeeded,
         _: &mut Self::Context,
     ) -> Self::Result {
-        println!("FOOBAR [{:?}]: NegotiationNeeded", msg.0);
         let peer_id = msg.0;
         self.peers.update_peer_tracks(peer_id)?;
-        println!("FOOBAR [{:?}]: update_peer_tracks success", msg.0);
 
         // Make sure that both peers are in stable state, if that is not the
         // case then we just skip this iteration, and wait for next
@@ -291,10 +281,6 @@ impl Handler<NegotiationNeeded> for Room {
             if let Ok(peer) = self.peers.take_inner_peer(msg.0) {
                 peer
             } else {
-                println!("FOOBAR [{:?}]: Stable Peer not taken.", msg.0);
-                self.peers.map_peer_by_id(msg.0, |peer| {
-                    println!("FOOBAR [{:?}]: ...but it's exists", msg.0);
-                });
                 return Ok(());
             };
         let is_partner_stable = match self
@@ -303,27 +289,21 @@ impl Handler<NegotiationNeeded> for Room {
         {
             Ok(r) => r,
             Err(e) => {
-                println!("FOOBAR [{:?}]: Partner Peer not exists", msg.0);
                 self.peers.add_peer(peer);
 
                 return Err(e);
             }
         };
-        println!("FOOBAR [{:?}]: Partner Peer is exists and is_stable: {}", msg.0, is_partner_stable);
         let is_known_to_remote = peer.is_known_to_remote();
-        println!("FOOBAR [{:?}]: Peer is_known_to_remote: {}", msg.0, is_known_to_remote);
         self.peers.add_peer(peer);
 
         if is_partner_stable {
             if is_known_to_remote {
-                println!("FOOBAR [{:?}]: Sending TracksApplied", msg.0);
                 self.send_tracks_applied(peer_id)
             } else {
-                println!("FOOBAR [{:?}]: Sending PeerCreated", msg.0);
                 self.send_peer_created(peer_id)
             }
         } else {
-            println!("FOOBAR [{:?}]: Partner isn't stable, so do nothing", msg.0);
             Ok(())
         }
     }

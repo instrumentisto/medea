@@ -89,11 +89,6 @@ impl Receiver {
         } else {
             None
         };
-        if let Some(mid) = state.mid() {
-            log::debug!("{:?}: mid on create '{}'", kind, mid);
-        } else {
-            log::debug!("{:?}: doesn't has mid on create", kind);
-        }
 
         let this = Self {
             track_id: state.track_id(),

@@ -80,7 +80,6 @@ impl cucumber_rust::World for World {
 
     async fn new() -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
-        println!("Room ID: {}", room_id);
         let control_client = control::Client::new();
         control_client
             .create(
@@ -440,8 +439,7 @@ impl World {
             right_member.set_is_recv(pair.right.recv);
         }
 
-        let room = self.control_client.get(&control_api_path!(self.room_id)).await.unwrap();
-        // panic!("\n\n\n{:#?}\n\n\n", room);
+        self.control_client.get(&control_api_path!(self.room_id)).await.unwrap();
 
         Ok(())
     }

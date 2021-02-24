@@ -308,8 +308,6 @@ struct InnerMediaConnections {
 
     /// [`TrackId`] to its [`receiver::Component`].
     receivers: HashMap<TrackId, receiver::Component>,
-
-    unknown_remote_tracks: HashMap<String, (Transceiver, sys::MediaStreamTrack)>,
 }
 
 impl InnerMediaConnections {
@@ -396,7 +394,6 @@ impl MediaConnections {
             peer_events_sender,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-            unknown_remote_tracks: HashMap::new(),
         }))
     }
 
@@ -674,19 +671,13 @@ impl MediaConnections {
             if let Some(recv_mid) = &receiver.mid() {
                 if recv_mid == &mid {
                     receiver.set_remote_track(transceiver, track);
-                    log::debug!("Found Receiver for this Track");
                     return Ok(());
                 }
             }
         }
-        log::debug!("Receiver for this Track currently not found");
-        self.0.borrow_mut().unknown_remote_tracks.insert(mid, (transceiver, track));
-
-        Ok(())
-    }
-
-    pub fn assert_negotiate(&self) {
-        assert!(!self.0.borrow().receivers.values().any(|r| r.mid().is_none()));
+        Err(tracerr::new!(
+            MediaConnectionsError::CouldNotInsertRemoteTrack(mid)
+        ))
     }
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without
@@ -696,21 +687,16 @@ impl MediaConnections {
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     /// [`Receiver`]: self::receiver::Receiver
     pub fn sync_receivers(&self) {
-        let mut inner = self.0.borrow_mut();
+        let inner = self.0.borrow();
         for receiver in inner
             .receivers
             .values()
             .filter(|rcvr| rcvr.transceiver().is_none())
-            .map(|rcvr| rcvr.obj())
-            .collect::<Vec<_>>()
         {
             if let Some(mid) = receiver.mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
                     receiver.replace_transceiver(trnscvr.into())
                 }
-                // if let Some((transceiver, track)) = inner.unknown_remote_tracks.remove(&mid) {
-                //     receiver.set_remote_track(transceiver, track);
-                // }
             }
         }
     }

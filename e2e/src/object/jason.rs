@@ -51,9 +51,6 @@ impl Object<Jason> {
                         }
                     });
                     room.on_local_track((t) => {
-                        console.log("foo");
-                        console.log(localTracksStore);
-                        console.log("bar");
                         let track = { track: t };
                         localTracksStore.tracks.push(track);
                         let newSubs = localTracksStore.subs

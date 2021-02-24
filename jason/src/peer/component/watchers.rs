@@ -32,7 +32,6 @@ impl Component {
         _: Rc<State>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("ice_candidate_added");
         peer.add_ice_candidate(
             candidate.candidate,
             candidate.sdp_m_line_index,
@@ -58,7 +57,6 @@ impl Component {
         state: Rc<State>,
         description: Guarded<String>,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("ice_candidate_added");
         let (description, _guard) = description.into_parts();
         if let Some(role) = state.negotiation_role.get() {
             match role {
@@ -99,7 +97,6 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("sender_added");
         let mut wait_futs = vec![state.when_all_receivers_processed().into()];
         if matches!(
             state.negotiation_role.get(),
@@ -148,7 +145,6 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<receiver::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("receiver_added");
         if matches!(
             state.negotiation_role.get(),
             Some(NegotiationRole::Answerer(_))
@@ -192,7 +188,6 @@ impl Component {
         state: Rc<State>,
         sdp: String,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("local_sdp_changed");
         let _ = state.sync_state.when_eq(SyncState::Synced).await;
         if let Some(role) = state.negotiation_role.get() {
             if state.local_sdp.is_rollback() {
@@ -213,7 +208,6 @@ impl Component {
                             .set_offer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
-                        peer.media_connections.assert_negotiate();
                         peer.media_connections.sync_receivers();
                         let mids = peer
                             .get_mids()
@@ -236,7 +230,6 @@ impl Component {
                             .set_answer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
-                        peer.media_connections.assert_negotiate();
                         peer.media_connections.sync_receivers();
                         peer.peer_events_sender
                             .unbounded_send(PeerEvent::NewSdpAnswer {
@@ -269,11 +262,10 @@ impl Component {
     /// [`WaitRemoteSdp`]: NegotiationState::WaitRemoteSdp
     #[watch(self.local_sdp.on_approve().skip(1))]
     async fn local_sdp_approved(
-        peer: Rc<PeerConnection>,
+        _: Rc<PeerConnection>,
         state: Rc<State>,
         _: (),
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("local_sdp_approved");
         if let Some(negotiation_role) = state.negotiation_role.get() {
             match negotiation_role {
                 NegotiationRole::Offerer => {
@@ -282,7 +274,6 @@ impl Component {
                         .set(NegotiationState::WaitRemoteSdp);
                 }
                 NegotiationRole::Answerer(_) => {
-                    peer.media_connections.sync_receivers();
                     state.negotiation_state.set(NegotiationState::Stable);
                     state.negotiation_role.set(None);
                 }
@@ -304,7 +295,6 @@ impl Component {
         state: Rc<State>,
         negotiation_state: NegotiationState,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("negotiation_state_changed");
         medea_reactive::when_all_processed(vec![
             state.when_all_updated().into(),
             state.when_all_senders_processed().into(),
@@ -316,7 +306,6 @@ impl Component {
         match negotiation_state {
             NegotiationState::Stable => {
                 state.negotiation_role.set(None);
-                // peer.media_connections.sync_receivers();
             }
             NegotiationState::WaitLocalSdp => {
                 if let Some(negotiation_role) = state.negotiation_role.get() {
@@ -359,7 +348,6 @@ impl Component {
         state: Rc<State>,
         role: NegotiationRole,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("negotiation_role_changed");
         match role {
             NegotiationRole::Offerer => {
                 medea_reactive::when_all_processed(vec![
@@ -414,7 +402,6 @@ impl Component {
         _: Rc<State>,
         sync_state: SyncState,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("sync_state_changed");
         if let SyncState::Synced = sync_state {
             peer.send_current_connection_states();
         }
@@ -433,7 +420,6 @@ impl Component {
         state: Rc<State>,
         _: bool,
     ) -> Result<(), Traced<PeerError>> {
-        log::debug!("maybe_local_stream_update_needed");
         state.senders.when_updated().await;
         let _ = state.update_local_stream(&peer).await;
 

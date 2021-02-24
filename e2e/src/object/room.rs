@@ -332,8 +332,7 @@ impl Object<Room> {
                             tracksStore: tracksStore,
                             closeListener: closeListener,
                         };
-                        conn.on_remote_track_added(async (t) => {
-                            console.log("remote track added");
+                        conn.on_remote_track_added((t) => {
                             let track = {
                                 track: t,
                                 on_enabled_fire_count: 0,

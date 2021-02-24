@@ -505,13 +505,11 @@ impl RtcPeerConnection {
         let mut desc = RtcSessionDescriptionInit::new(sdp_type);
         desc.sdp(offer);
 
-        log::debug!("Local description set start");
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
             .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
             .map_err(tracerr::wrap!())?;
-        log::debug!("Local description set end");
 
         Ok(())
     }
@@ -648,13 +646,11 @@ impl RtcPeerConnection {
             }
         };
 
-        log::debug!("Remote Description set start");
         JsFuture::from(self.peer.set_remote_description(&description))
             .await
             .map_err(Into::into)
             .map_err(RTCPeerConnectionError::SetRemoteDescriptionFailed)
             .map_err(tracerr::wrap!())?;
-        log::debug!("Remote Description set end");
 
         Ok(())
     }
@@ -669,7 +665,6 @@ impl RtcPeerConnection {
         kind: MediaKind,
         direction: TransceiverDirection,
     ) -> RtcRtpTransceiver {
-        log::debug!("Add transceiver ({:?}", kind);
         let mut init = RtcRtpTransceiverInit::new();
         init.direction(direction.into());
         self.peer
