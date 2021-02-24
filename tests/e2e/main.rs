@@ -5,9 +5,9 @@ mod conf;
 mod control;
 mod object;
 mod steps;
-mod world;
-mod when;
 mod then;
+mod when;
+mod world;
 
 use std::str::FromStr;
 
@@ -161,12 +161,16 @@ async fn new_given_member(
     }
 
     let member = world.get_member(&first_member_id).unwrap();
-    let is_audio = disabled_media_type == DisabledMediaType::Audio || disabled_media_type == DisabledMediaType::All;
-    let is_video = disabled_media_type == DisabledMediaType::Video || disabled_media_type == DisabledMediaType::All;
+    let is_audio = disabled_media_type == DisabledMediaType::Audio
+        || disabled_media_type == DisabledMediaType::All;
+    let is_video = disabled_media_type == DisabledMediaType::Video
+        || disabled_media_type == DisabledMediaType::All;
     match media_settings {
         MediaSettings::DisabledMedia => {
-            let is_publish = disabled_direction == Direction::Publish || disabled_direction == Direction::None;
-            let is_play = disabled_direction == Direction::Play || disabled_direction == Direction::None;
+            let is_publish = disabled_direction == Direction::Publish
+                || disabled_direction == Direction::None;
+            let is_play = disabled_direction == Direction::Play
+                || disabled_direction == Direction::None;
 
             if is_publish {
                 if is_audio {
@@ -184,12 +188,24 @@ async fn new_given_member(
             }
             if is_play {
                 if is_audio {
-                    member.toggle_remote_media(Some(MediaKind::Audio), None, false)
+                    member
+                        .toggle_remote_media(
+                            Some(MediaKind::Audio),
+                            None,
+                            false,
+                        )
                         .await
                         .unwrap();
                 }
                 if is_video {
-                    member.toggle_remote_media(Some(MediaKind::Video), None, false).await.unwrap();
+                    member
+                        .toggle_remote_media(
+                            Some(MediaKind::Video),
+                            None,
+                            false,
+                        )
+                        .await
+                        .unwrap();
                 }
             }
         }

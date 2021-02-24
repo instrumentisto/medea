@@ -1,8 +1,9 @@
 use cucumber_rust::then;
 
-use crate::{world::World};
-use crate::object::{MediaKind, MediaSourceKind};
-use crate::object::room::FailedParsing;
+use crate::{
+    object::{room::FailedParsing, MediaKind, MediaSourceKind},
+    world::World,
+};
 
 #[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
 async fn then_member_receives_connection(
