@@ -313,6 +313,7 @@ impl Component {
         match negotiation_state {
             NegotiationState::Stable => {
                 state.negotiation_role.set(None);
+                peer.media_connections.sync_receivers();
             }
             NegotiationState::WaitLocalSdp => {
                 if let Some(negotiation_role) = state.negotiation_role.get() {
