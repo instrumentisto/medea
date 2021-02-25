@@ -57,6 +57,7 @@ impl Component {
         state: Rc<State>,
         description: Guarded<String>,
     ) -> Result<(), Traced<PeerError>> {
+        state.receivers.when_all_processed().await;
         let (description, _guard) = description.into_parts();
         if let Some(role) = state.negotiation_role.get() {
             match role {
