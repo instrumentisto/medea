@@ -202,6 +202,7 @@ impl Component {
                     state.negotiation_role.set(None);
                 }
             } else {
+                state.receivers.when_all_processed().await;
                 match role {
                     NegotiationRole::Offerer => {
                         peer.peer

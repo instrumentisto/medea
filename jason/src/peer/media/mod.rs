@@ -658,7 +658,7 @@ impl MediaConnections {
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
     pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
-        self.sync_receivers();
+        // self.sync_receivers();
         let inner = self.0.borrow();
         let transceiver = Transceiver::from(track_event.transceiver());
         let track = track_event.track();
