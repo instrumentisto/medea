@@ -3,8 +3,8 @@ Feature: Create Endpoint
   Scenario: New Endpoint creates new Connections
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Control API interconnects Alice and Bob
-    Then Alice receives connection with member Bob
-    And Bob receives connection with member Alice
+    Then Alice receives connection with Bob
+    And Bob receives connection with Alice
 
   Scenario: New Endpoint creates new Tracks
     Given room with joined member Alice and Bob with no WebRTC endpoints
