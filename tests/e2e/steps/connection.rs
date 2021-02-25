@@ -30,3 +30,15 @@ async fn then_member_doesnt_receives_connection(
         .unwrap()
         .is_none())
 }
+
+#[then(regex = "^(\\S*)'s connection with (\\S*) closes$")]
+async fn then_connection_closes(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let connection =
+        member.connections().get(partner_id).await.unwrap().unwrap();
+    connection.wait_for_close().await.unwrap();
+}

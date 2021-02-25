@@ -5,8 +5,6 @@ mod conf;
 mod control;
 mod object;
 mod steps;
-mod then;
-mod when;
 mod world;
 
 use std::str::FromStr;
@@ -18,6 +16,7 @@ use self::{
     object::MediaKind,
     world::{MemberBuilder, World},
 };
+use crate::object::{room::FailedParsing, MediaSourceKind};
 
 #[tokio::main]
 async fn main() {
@@ -38,6 +37,18 @@ fn parse_media_kind(text: &str) -> Option<MediaKind> {
     } else {
         unreachable!()
     }
+}
+
+/// Parses [`MediaKind`] and [`MediaSourceKind`] from the provided [`str`].
+fn parse_media_kinds(
+    s: &str,
+) -> Result<(MediaKind, MediaSourceKind), FailedParsing> {
+    let media_kind = s.parse()?;
+    let source_kind = match media_kind {
+        MediaKind::Audio => MediaSourceKind::Device,
+        MediaKind::Video => s.parse()?,
+    };
+    Ok((media_kind, source_kind))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -240,9 +251,4 @@ async fn new_given_member(
         )
         .await;
     }
-}
-
-#[when(regex = "^(\\S*) joins room")]
-async fn when_member_joins_room(world: &mut World, id: String) {
-    world.join_room(&id).await.unwrap();
 }

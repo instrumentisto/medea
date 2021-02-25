@@ -32,6 +32,6 @@ Feature: `on_new_connection` callback
     Given room with joined member Alice
     And joined member Bob
     And member Carol
-    When `Carol` joins Room
-    Then `Alice` receives Connection with Member `Carol`
-    And `Bob` receives Connection with Member `Carol`
+    When Carol joins room
+    Then Alice receives connection with Carol
+    And Bob receives connection with Carol
