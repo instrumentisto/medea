@@ -147,7 +147,7 @@ jobs:
 
   test-e2e:
     name: E2E tests
-    needs: ['docker']
+#    needs: ['docker']
     if: ${{ github.ref == 'refs/heads/master'
             || startsWith(github.ref, 'refs/tags/medea-')
             || !contains(github.event.head_commit.message, '[skip ci]') }}
@@ -171,14 +171,14 @@ jobs:
         with:
           crate: wasm-pack
           use-tool-cache: true
-      - uses: actions/download-artifact@v2
-        with:
-          name: docker-medea-${{ github.run_number }}
+#      - uses: actions/download-artifact@v2
+#        with:
+#          name: docker-medea-${{ github.run_number }}
 
-      - name: Untar Medea image
-        run: make docker.untar from-file=image.tar
+#      - name: Untar Medea image
+#        run: make docker.untar from-file=image.tar
       - name: Chrome
-        run: FEATURES_PATH=tests/e2e/features/test make test.e2e up=yes browser=chrome dockerized=yes tag=build-${{ github.run_number }}
+        run: FEATURES_PATH=tests/e2e/features/test make test.e2e up=yes browser=chrome dockerized=no
 #      - name: Firefox
 #        run: make test.e2e up=yes browser=firefox dockerized=yes tag=build-${{ github.run_number }}
 #
