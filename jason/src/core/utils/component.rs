@@ -11,7 +11,7 @@ use crate::{
         media::LocalTracksConstraints,
         utils::{JasonError, TaskHandle},
     },
-    platform::spawn,
+    platform,
 };
 
 /// Abstraction over a state which can be transformed to the states from the
@@ -139,7 +139,7 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
                 }
             }
         });
-        spawn(fut.map(|_| ()));
+        platform::spawn(fut.map(|_| ()));
 
         self.spawned_watchers.push(handle.into());
     }

@@ -24,7 +24,7 @@ use crate::{
         },
         utils::JsCaused,
     },
-    platform::{self, spawn},
+    platform,
 };
 
 /// Errors which are can be returned from the [`WebSocketRpcSession`].
@@ -252,7 +252,7 @@ impl WebSocketRpcSession {
 
         let mut state_updates = self.state.subscribe();
         let weak_this = Rc::downgrade(self);
-        spawn(async move {
+        platform::spawn(async move {
             while let Some(state) = state_updates.next().await {
                 let this = upgrade_or_break!(weak_this);
                 match state {
@@ -293,7 +293,7 @@ impl WebSocketRpcSession {
 
         let mut client_on_connection_loss = self.client.on_connection_loss();
         let weak_this = Rc::downgrade(self);
-        spawn(async move {
+        platform::spawn(async move {
             while client_on_connection_loss.next().await.is_some() {
                 let this = upgrade_or_break!(weak_this);
 
@@ -325,7 +325,7 @@ impl WebSocketRpcSession {
     fn spawn_close_watcher(self: &Rc<Self>) {
         let on_normal_close = self.client.on_normal_close();
         let weak_this = Rc::downgrade(self);
-        spawn(async move {
+        platform::spawn(async move {
             let reason = on_normal_close.await.unwrap_or_else(|_| {
                 ClientDisconnect::RpcClientUnexpectedlyDropped.into()
             });
@@ -339,7 +339,7 @@ impl WebSocketRpcSession {
     fn spawn_server_msg_listener(self: &Rc<Self>) {
         let mut server_msg_rx = self.client.subscribe();
         let weak_this = Rc::downgrade(self);
-        spawn(async move {
+        platform::spawn(async move {
             while let Some(msg) = server_msg_rx.next().await {
                 let this = upgrade_or_break!(weak_this);
                 msg.dispatch_with(this.as_ref());

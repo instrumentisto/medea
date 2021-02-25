@@ -4,7 +4,6 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use derive_more::{Display, From};
 use js_sys::{
     Array as JsArray, Function as JsFunction, Iterator as JsIterator, JsString,
 };
@@ -12,41 +11,7 @@ use medea_client_api_proto::stats::{RtcStat, RtcStatsType};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
-use crate::{
-    core::utils::JsCaused,
-    platform::{self, *},
-};
-
-/// Entry of the JS RTC stats dictionary.
-struct RtcStatsReportEntry(JsString, JsValue);
-
-impl TryFrom<JsArray> for RtcStatsReportEntry {
-    type Error = Traced<RtcStatsError>;
-
-    fn try_from(value: JsArray) -> Result<Self, Self::Error> {
-        use RtcStatsError::{Js, UndefinedId, UndefinedStats};
-
-        let id = value.get(0);
-        let stats = value.get(1);
-
-        if id.is_undefined() {
-            return Err(tracerr::new!(UndefinedId));
-        }
-
-        if stats.is_undefined() {
-            return Err(tracerr::new!(UndefinedStats));
-        }
-
-        let id = id
-            .dyn_into::<JsString>()
-            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
-        let stats = stats
-            .dyn_into::<JsValue>()
-            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
-
-        Ok(RtcStatsReportEntry(id, stats))
-    }
-}
+use crate::platform::{self, get_property_by_name, RtcStatsError};
 
 /// All available [`RtcStatsType`] of [`PeerConnection`].
 ///
@@ -94,32 +59,33 @@ impl TryFrom<&JsValue> for RtcStats {
         Ok(RtcStats(stats))
     }
 }
+/// Entry of the JS RTC stats dictionary.
+struct RtcStatsReportEntry(JsString, JsValue);
 
-/// Errors which can occur during deserialization of the [`RtcStatsType`].
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
-pub enum RtcStatsError {
-    /// [RTCStats.id][1] is undefined.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcstats-id
-    #[display(fmt = "RTCStats.id is undefined")]
-    UndefinedId,
+impl TryFrom<JsArray> for RtcStatsReportEntry {
+    type Error = Traced<RtcStatsError>;
 
-    /// [RTCStats.stats] is undefined.
-    ///
-    /// [1]: https://w3.org/TR/webrtc-stats/#dfn-stats-object
-    #[display(fmt = "RTCStats.stats is undefined")]
-    UndefinedStats,
+    fn try_from(value: JsArray) -> Result<Self, Self::Error> {
+        use RtcStatsError::{Js, UndefinedId, UndefinedStats};
 
-    /// Some JS error occurred.
-    #[display(fmt = "Unexpected JS side error: {}", _0)]
-    Js(platform::Error),
+        let id = value.get(0);
+        let stats = value.get(1);
 
-    /// `RTCStats.entries` is undefined.
-    #[display(fmt = "RTCStats.entries is undefined")]
-    UndefinedEntries,
+        if id.is_undefined() {
+            return Err(tracerr::new!(UndefinedId));
+        }
 
-    /// Error of [`RtcStats`] deserialization.
-    #[display(fmt = "Failed to deserialize into RtcStats: {}", _0)]
-    ParseError(Rc<serde_json::Error>),
+        if stats.is_undefined() {
+            return Err(tracerr::new!(UndefinedStats));
+        }
+
+        let id = id
+            .dyn_into::<JsString>()
+            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
+        let stats = stats
+            .dyn_into::<JsValue>()
+            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
+
+        Ok(RtcStatsReportEntry(id, stats))
+    }
 }

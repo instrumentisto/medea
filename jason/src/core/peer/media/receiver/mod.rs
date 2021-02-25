@@ -13,11 +13,11 @@ use crate::{
     core::{
         media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
         peer::{
-            media::{media_exchange_state, TrackEvent},
-            MediaConnections, MediaStateControllable, PeerEvent,
+            media::media_exchange_state, MediaConnections,
+            MediaStateControllable, PeerEvent, TrackEvent,
         },
     },
-    platform::{MediaStreamTrack, Transceiver, TransceiverDirection},
+    platform,
 };
 
 use super::TransceiverSide;
@@ -33,7 +33,7 @@ pub struct Receiver {
     track_id: TrackId,
     caps: TrackConstraints,
     sender_id: MemberId,
-    transceiver: RefCell<Option<Transceiver>>,
+    transceiver: RefCell<Option<platform::Transceiver>>,
     mid: RefCell<Option<String>>,
     track: RefCell<Option<remote::Track>>,
     is_track_notified: Cell<bool>,
@@ -64,9 +64,9 @@ impl Receiver {
         let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
         let transceiver_direction = if state.enabled_individual() {
-            TransceiverDirection::RECV
+            platform::TransceiverDirection::RECV
         } else {
-            TransceiverDirection::INACTIVE
+            platform::TransceiverDirection::INACTIVE
         };
 
         let transceiver = if state.mid().is_none() {
@@ -144,7 +144,7 @@ impl Receiver {
     pub fn is_receiving(&self) -> bool {
         let is_recv_direction =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
-                trnsvr.has_direction(TransceiverDirection::RECV)
+                trnsvr.has_direction(platform::TransceiverDirection::RECV)
             });
 
         self.enabled_individual.get() && is_recv_direction
@@ -174,8 +174,8 @@ impl Receiver {
     /// [`Receiver::enabled`] of this [`Receiver`].
     pub fn set_remote_track(
         &self,
-        transceiver: Transceiver,
-        new_track: MediaStreamTrack,
+        transceiver: platform::Transceiver,
+        new_track: platform::MediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
             if old_track.id() == new_track.id() {
@@ -187,9 +187,9 @@ impl Receiver {
             remote::Track::new(new_track, self.caps.media_source_kind());
 
         if self.enabled() {
-            transceiver.add_direction(TransceiverDirection::RECV);
+            transceiver.add_direction(platform::TransceiverDirection::RECV);
         } else {
-            transceiver.sub_direction(TransceiverDirection::RECV);
+            transceiver.sub_direction(platform::TransceiverDirection::RECV);
         }
         new_track.set_enabled(self.enabled());
 
@@ -204,7 +204,7 @@ impl Receiver {
     ///
     /// No-op if provided with the same [`Transceiver`] as already exists in
     /// this [`Receiver`].
-    pub fn replace_transceiver(&self, transceiver: Transceiver) {
+    pub fn replace_transceiver(&self, transceiver: platform::Transceiver) {
         if self.mid.borrow().as_ref() == transceiver.mid().as_ref() {
             self.transceiver.replace(Some(transceiver));
         }
@@ -214,7 +214,7 @@ impl Receiver {
     ///
     /// Returns [`None`] if this [`Receiver`] doesn't have [`Transceiver`].
     #[inline]
-    pub fn transceiver(&self) -> Option<Transceiver> {
+    pub fn transceiver(&self) -> Option<platform::Transceiver> {
         self.transceiver.borrow().clone()
     }
 

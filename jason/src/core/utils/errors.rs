@@ -5,7 +5,6 @@ use std::{
 
 use derive_more::{Display, From};
 use tracerr::{Trace, Traced};
-use wasm_bindgen::prelude::*;
 
 use crate::platform;
 
@@ -27,7 +26,6 @@ pub trait JsCaused {
 /// Representation of app error exported to JS side.
 ///
 /// Contains JS side error if it the cause and trace information.
-#[wasm_bindgen]
 #[derive(Clone, Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
@@ -37,14 +35,6 @@ pub struct JasonError {
     source: Option<js_sys::Error>,
 }
 
-impl JasonError {
-    /// Prints error information to `console.error()`.
-    pub fn print(&self) {
-        log::error!("{}", self);
-    }
-}
-
-#[wasm_bindgen]
 impl JasonError {
     /// Returns name of error.
     pub fn name(&self) -> String {
@@ -64,6 +54,11 @@ impl JasonError {
     /// Returns JS side error if it the cause.
     pub fn source(&self) -> Option<js_sys::Error> {
         Clone::clone(&self.source)
+    }
+
+    /// Prints error information to `console.error()`.
+    pub fn print(&self) {
+        log::error!("{}", self);
     }
 }
 

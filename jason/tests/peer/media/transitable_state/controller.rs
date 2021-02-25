@@ -1,7 +1,9 @@
 //! Tests for the [`TransitableStateController`].
 
 use futures::StreamExt;
-use medea_jason::peer::{media_exchange_state, MediaExchangeStateController};
+use medea_jason::core::peer::{
+    media_exchange_state, MediaExchangeStateController,
+};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use crate::timeout;

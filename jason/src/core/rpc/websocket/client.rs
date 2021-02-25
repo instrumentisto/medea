@@ -23,10 +23,7 @@ use crate::{
         },
         utils::JasonError,
     },
-    platform::{
-        spawn,
-        transport::{RpcTransport, TransportError, TransportState},
-    },
+    platform,
 };
 
 /// Reasons of closing WebSocket RPC connection by a client side.
@@ -100,7 +97,7 @@ pub enum ClientState {
 /// Inner state of [`WebSocketRpcClient`].
 struct Inner {
     /// Transport connection with remote media server.
-    sock: Option<Rc<dyn RpcTransport>>,
+    sock: Option<Rc<dyn platform::RpcTransport>>,
 
     /// Connection loss detector via ping/pong mechanism.
     heartbeat: Option<Heartbeat>,
@@ -143,7 +140,10 @@ pub type RpcTransportFactory = Box<
         ApiUrl,
     ) -> LocalBoxFuture<
         'static,
-        Result<Rc<dyn RpcTransport>, Traced<TransportError>>,
+        Result<
+            Rc<dyn platform::RpcTransport>,
+            Traced<platform::TransportError>,
+        >,
     >,
 >;
 
@@ -342,7 +342,7 @@ impl WebSocketRpcClient {
     /// [`RpcTransport`].
     async fn start_heartbeat(
         self: Rc<Self>,
-        transport: Rc<dyn RpcTransport>,
+        transport: Rc<dyn platform::RpcTransport>,
         rpc_settings: RpcSettings,
     ) -> Result<(), Traced<RpcClientError>> {
         let idle_timeout = IdleTimeout(
@@ -357,7 +357,7 @@ impl WebSocketRpcClient {
 
         let mut on_idle = heartbeat.on_idle();
         let weak_this = Rc::downgrade(&self);
-        spawn(async move {
+        platform::spawn(async move {
             while on_idle.next().await.is_some() {
                 if let Some(this) = weak_this.upgrade() {
                     this.handle_connection_loss(ClosedStateReason::Idle);
@@ -416,10 +416,10 @@ impl WebSocketRpcClient {
         // subscribe to transport close
         let mut transport_state_changes = transport.on_state_change();
         let weak_this = Rc::downgrade(&self);
-        spawn(async move {
+        platform::spawn(async move {
             while let Some(state) = transport_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    if let TransportState::Closed(msg) = state {
+                    if let platform::TransportState::Closed(msg) = state {
                         this.handle_close_message(msg);
                     }
                 }
@@ -429,7 +429,7 @@ impl WebSocketRpcClient {
         // subscribe to transport message received
         let weak_this = Rc::downgrade(&self);
         let mut on_socket_message = transport.on_message();
-        spawn(async move {
+        platform::spawn(async move {
             while let Some(msg) = on_socket_message.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     this.on_transport_message(msg)

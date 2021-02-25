@@ -1,7 +1,7 @@
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::core;
+use crate::{api::JasonError, core};
 
 /// Connection with a specific remote `Member`, that is used on JS side.
 ///
@@ -14,12 +14,18 @@ pub struct ConnectionHandle(core::ConnectionHandle);
 impl ConnectionHandle {
     /// Sets callback, which will be invoked when this `Connection` will close.
     pub fn on_close(&self, cb: js_sys::Function) -> Result<(), JsValue> {
-        self.0.on_close(cb).map_err(JsValue::from)
+        self.0
+            .on_close(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Returns remote `Member` ID.
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
-        self.0.get_remote_member_id().map_err(JsValue::from)
+        self.0
+            .get_remote_member_id()
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Sets callback, which will be invoked when new [`remote::Track`] will be
@@ -28,7 +34,10 @@ impl ConnectionHandle {
         &self,
         cb: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0.on_remote_track_added(cb).map_err(JsValue::from)
+        self.0
+            .on_remote_track_added(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Sets callback, which will be invoked when connection quality score will
@@ -37,6 +46,9 @@ impl ConnectionHandle {
         &self,
         cb: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0.on_quality_score_update(cb).map_err(JsValue::from)
+        self.0
+            .on_quality_score_update(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 }

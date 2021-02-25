@@ -8,7 +8,7 @@ use futures::{
     future::{AbortHandle, FutureExt},
 };
 
-use crate::platform::{delay_for, spawn};
+use crate::platform;
 
 type FutureResolver = Rc<RefCell<Option<oneshot::Sender<()>>>>;
 
@@ -83,12 +83,12 @@ impl ResettableDelayHandle {
         let future_resolver = self.future_resolver.clone();
         let timeout = self.timeout;
         let (fut, abort) = future::abortable(async move {
-            delay_for(timeout.into()).await;
+            platform::delay_for(timeout.into()).await;
             if let Some(rsvr) = future_resolver.borrow_mut().take() {
                 let _ = rsvr.send(());
             }
         });
-        spawn(fut.map(|_| ()));
+        platform::spawn(fut.map(|_| ()));
 
         self.abort_handle.replace(abort);
     }

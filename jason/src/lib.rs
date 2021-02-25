@@ -11,6 +11,6 @@
 
 pub use self::core::utils;
 
-mod api;
-mod core;
-mod platform;
+pub mod api;
+pub mod core;
+pub mod platform;

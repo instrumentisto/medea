@@ -18,17 +18,14 @@ use proto::{MediaSourceKind, TrackId};
 use tracerr::Traced;
 
 #[cfg(feature = "mockable")]
-use crate::media::{LocalTracksConstraints, RecvConstraints};
+use crate::core::media::{LocalTracksConstraints, RecvConstraints};
 use crate::{
     core::{
         media::{track::local, MediaKind},
-        peer::{LocalStreamUpdateCriteria, PeerEvent, TrackEvent},
+        peer::{LocalStreamUpdateCriteria, PeerEvent},
         utils::JsCaused,
     },
-    platform::{
-        self, MediaStreamTrack, RtcPeerConnection, Transceiver,
-        TransceiverDirection,
-    },
+    platform,
 };
 
 use super::tracks_request::TracksRequest;
@@ -298,7 +295,7 @@ struct InnerMediaConnections {
     ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
-    peer: Rc<RtcPeerConnection>,
+    peer: Rc<platform::RtcPeerConnection>,
 
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -364,16 +361,21 @@ impl InnerMediaConnections {
     fn add_transceiver(
         &self,
         kind: MediaKind,
-        direction: TransceiverDirection,
-    ) -> Transceiver {
-        Transceiver::from(self.peer.add_transceiver(kind, direction))
+        direction: platform::TransceiverDirection,
+    ) -> platform::Transceiver {
+        platform::Transceiver::from(self.peer.add_transceiver(kind, direction))
     }
 
     /// Lookups [`Transceiver`] by the provided [`mid`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
-    fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
-        self.peer.get_transceiver_by_mid(mid).map(Transceiver::from)
+    fn get_transceiver_by_mid(
+        &self,
+        mid: &str,
+    ) -> Option<platform::Transceiver> {
+        self.peer
+            .get_transceiver_by_mid(mid)
+            .map(platform::Transceiver::from)
     }
 }
 
@@ -386,7 +388,7 @@ impl MediaConnections {
     /// [`RtcPeerConnection`].
     #[inline]
     pub fn new(
-        peer: Rc<RtcPeerConnection>,
+        peer: Rc<platform::RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
@@ -658,8 +660,8 @@ impl MediaConnections {
     /// [`Receiver`]: self::receiver::Receiver
     pub fn add_remote_track(
         &self,
-        track: MediaStreamTrack,
-        transceiver: Transceiver,
+        track: platform::MediaStreamTrack,
+        transceiver: platform::Transceiver,
     ) -> Result<()> {
         let inner = self.0.borrow();
         // Cannot fail, since transceiver is guaranteed to be negotiated at this

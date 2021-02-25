@@ -12,8 +12,9 @@ use crate::{
     api,
     core::{
         media::track::remote,
-        utils::{Callback0, Callback1, HandlerDetachedError, JasonError},
+        utils::{HandlerDetachedError, JasonError},
     },
+    platform,
 };
 
 /// Service which manages [`Connection`]s with the remote `Member`s.
@@ -27,13 +28,16 @@ pub struct Connections {
 
     /// Callback from JS side which will be invoked on remote `Member` media
     /// stream arrival.
-    on_new_connection: Callback1<api::ConnectionHandle>,
+    on_new_connection: platform::Callback<api::ConnectionHandle>,
 }
 
 impl Connections {
     /// Sets callback, which will be invoked when new [`Connection`] is
     /// established.
-    pub fn on_new_connection(&self, f: js_sys::Function) {
+    pub fn on_new_connection(
+        &self,
+        f: platform::Function<api::ConnectionHandle>,
+    ) {
         self.on_new_connection.set_func(f);
     }
 
@@ -48,7 +52,7 @@ impl Connections {
         let is_new = !self.connections.borrow().contains_key(remote_member_id);
         if is_new {
             let con = Connection::new(remote_member_id.clone());
-            self.on_new_connection.call(con.new_handle());
+            self.on_new_connection.call1(con.new_handle());
             self.connections
                 .borrow_mut()
                 .insert(remote_member_id.clone(), con);
@@ -79,7 +83,7 @@ impl Connections {
                     // `on_close` callback is invoked here and not in `Drop`
                     // implementation so `ConnectionHandle` is available during
                     // callback invocation.
-                    connection.0.on_close.call();
+                    connection.0.on_close.call0();
                 }
             }
         }
@@ -104,19 +108,22 @@ struct InnerConnection {
 
     /// JS callback, that will be invoked when [`remote::Track`] is
     /// received.
-    on_remote_track_added: Callback1<api::RemoteMediaTrack>,
+    on_remote_track_added: platform::Callback<api::RemoteMediaTrack>,
 
     /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
     /// be updated.
-    on_quality_score_update: Callback1<u8>,
+    on_quality_score_update: platform::Callback<u8>,
 
     /// JS callback, that will be invoked when this connection is closed.
-    on_close: Callback0,
+    on_close: platform::Callback<()>,
 }
 
 impl ConnectionHandle {
     /// Sets callback, which will be invoked when this `Connection` will close.
-    pub fn on_close(&self, f: js_sys::Function) -> Result<(), JasonError> {
+    pub fn on_close(
+        &self,
+        f: platform::Function<()>,
+    ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
@@ -129,7 +136,7 @@ impl ConnectionHandle {
     /// added to this [`Connection`].
     pub fn on_remote_track_added(
         &self,
-        f: js_sys::Function,
+        f: platform::Function<api::RemoteMediaTrack>,
     ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_remote_track_added.set_func(f))
@@ -139,7 +146,7 @@ impl ConnectionHandle {
     /// be updated by server.
     pub fn on_quality_score_update(
         &self,
-        f: js_sys::Function,
+        f: platform::Function<u8>,
     ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_quality_score_update.set_func(f))
@@ -157,16 +164,16 @@ impl Connection {
         Self(Rc::new(InnerConnection {
             remote_id,
             quality_score: Cell::default(),
-            on_quality_score_update: Callback1::default(),
-            on_close: Callback0::default(),
-            on_remote_track_added: Callback1::default(),
+            on_quality_score_update: platform::Callback::default(),
+            on_close: platform::Callback::default(),
+            on_remote_track_added: platform::Callback::default(),
         }))
     }
 
     /// Invokes `on_remote_track_added` JS callback with the provided
     /// [`remote::Track`].
     pub fn add_remote_track(&self, track: remote::Track) {
-        self.0.on_remote_track_added.call(track);
+        self.0.on_remote_track_added.call1(track);
     }
 
     /// Creates new [`ConnectionHandle`] for using [`Connection`] on JS side.
@@ -178,7 +185,7 @@ impl Connection {
     /// Updates [`ConnectionQualityScore`] of this [`Connection`].
     pub fn update_quality_score(&self, score: ConnectionQualityScore) {
         if self.0.quality_score.replace(Some(score)) != Some(score) {
-            self.0.on_quality_score_update.call(score as u8);
+            self.0.on_quality_score_update.call1(score as u8);
         }
     }
 }

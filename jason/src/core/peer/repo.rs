@@ -18,7 +18,7 @@ use crate::{
         },
         Connections, RoomError,
     },
-    platform::{delay_for, spawn},
+    platform,
 };
 
 use super::{PeerConnection, PeerEvent};
@@ -170,7 +170,7 @@ impl Repository {
     ) -> TaskHandle {
         let (fut, abort) = future::abortable(async move {
             loop {
-                delay_for(Duration::from_secs(1).into()).await;
+                platform::delay_for(Duration::from_secs(1).into()).await;
 
                 let peers = peers
                     .borrow()
@@ -184,7 +184,7 @@ impl Repository {
             }
         });
 
-        spawn(async move {
+        platform::spawn(async move {
             fut.await.ok();
         });
 

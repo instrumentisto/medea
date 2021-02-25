@@ -14,7 +14,7 @@ use crate::{
         },
         peer::TrackEvent,
     },
-    platform::{Transceiver, TransceiverDirection},
+    platform,
 };
 
 use super::{
@@ -28,7 +28,7 @@ pub use self::component::{Component, State};
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
-    transceiver: Transceiver,
+    transceiver: platform::Transceiver,
     muted: Cell<bool>,
     enabled_individual: Cell<bool>,
     enabled_general: Cell<bool>,
@@ -82,8 +82,10 @@ impl Sender {
                 })
                 .and_then(|rcvr| rcvr.transceiver())
                 .unwrap_or_else(|| {
-                    connections
-                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                    connections.add_transceiver(
+                        kind,
+                        platform::TransceiverDirection::INACTIVE,
+                    )
                 }),
             Some(mid) => connections
                 .get_transceiver_by_mid(mid)
@@ -128,7 +130,8 @@ impl Sender {
     #[inline]
     #[must_use]
     pub fn is_publishing(&self) -> bool {
-        self.transceiver.has_direction(TransceiverDirection::SEND)
+        self.transceiver
+            .has_direction(platform::TransceiverDirection::SEND)
     }
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
@@ -177,7 +180,7 @@ impl Sender {
     /// Returns [`Transceiver`] of this [`Sender`].
     #[inline]
     #[must_use]
-    pub fn transceiver(&self) -> Transceiver {
+    pub fn transceiver(&self) -> platform::Transceiver {
         self.transceiver.clone()
     }
 

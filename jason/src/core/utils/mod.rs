@@ -3,7 +3,6 @@
 #[macro_use]
 mod errors;
 
-mod callback;
 pub mod component;
 mod resettable_delay;
 
@@ -15,7 +14,6 @@ use medea_reactive::Guarded;
 
 #[doc(inline)]
 pub use self::{
-    callback::{Callback0, Callback1},
     component::{AsProtoState, Component, SynchronizableState, Updatable},
     errors::{HandlerDetachedError, JasonError, JsCaused, JsonParseError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},

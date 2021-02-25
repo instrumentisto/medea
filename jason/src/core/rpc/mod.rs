@@ -15,10 +15,7 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 use url::Url;
 
-use crate::{
-    core::utils::JsCaused,
-    platform::{self, transport::TransportError},
-};
+use crate::{core::utils::JsCaused, platform};
 
 #[cfg(feature = "mockable")]
 pub use self::rpc_session::MockRpcSession;
@@ -30,7 +27,7 @@ pub use self::{
     rpc_session::{
         RpcSession, SessionError, SessionState, WebSocketRpcSession,
     },
-    websocket::{ClientDisconnect, WebSocketRpcClient},
+    websocket::{ClientDisconnect, RpcEvent, WebSocketRpcClient},
 };
 
 /// [`Url`] to which transport layer will connect.
@@ -167,7 +164,7 @@ pub enum ClosedStateReason {
     ConnectionLost(CloseMsg),
 
     /// Error while creating connection between client and server.
-    ConnectionFailed(TransportError),
+    ConnectionFailed(platform::TransportError),
 
     /// Indicates that connection with server has never been established.
     NeverConnected,
@@ -190,7 +187,7 @@ pub enum ClosedStateReason {
 pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
-    RpcTransportError(#[js(cause)] TransportError),
+    RpcTransportError(#[js(cause)] platform::TransportError),
 
     /// Occurs if the heartbeat cannot be started.
     #[display(fmt = "Start heartbeat failed: {}", _0)]

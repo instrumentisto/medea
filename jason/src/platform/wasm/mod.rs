@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+pub mod constraints;
 pub mod ice_server;
 pub mod input_device_info;
 pub mod media_track;
@@ -119,7 +120,7 @@ pub async fn get_user_media(
 
     let stream = JsFuture::from(
         media_devices
-            .get_user_media_with_constraints(&caps)
+            .get_user_media_with_constraints(&caps.into())
             .map_err(Error::from)
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?,
@@ -153,7 +154,7 @@ pub async fn get_display_media(
 
     let stream = JsFuture::from(
         media_devices
-            .get_display_media_with_constraints(&caps)
+            .get_display_media_with_constraints(&caps.into())
             .map_err(Error::from)
             .map_err(GetDisplayMediaFailed)
             .map_err(tracerr::from_and_wrap!())?,

@@ -35,7 +35,7 @@ use crate::{
         utils::{JasonError, JsCaused},
         Connections,
     },
-    platform::{self, spawn, MediaStreamTrack, Transceiver},
+    platform,
 };
 
 #[doc(inline)]
@@ -322,7 +322,7 @@ impl PeerConnection {
             peer_events_sender.clone(),
         ));
 
-        spawn({
+        platform::spawn({
             let peer_events_sender = peer_events_sender.clone();
             let peer_id = state.id();
 
@@ -940,7 +940,7 @@ impl PeerConnection {
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
     /// [`RtcStats`].
-    pub async fn get_stats(&self) -> Result<RtcStats> {
+    pub async fn get_stats(&self) -> Result<platform::RtcStats> {
         self.peer
             .get_stats()
             .await
@@ -1049,9 +1049,9 @@ impl Drop for PeerConnection {
     /// Drops `on_track` and `on_ice_candidate` callbacks to prevent possible
     /// leaks.
     fn drop(&mut self) {
-        let _ = self
-            .peer
-            .on_track::<Box<dyn FnMut(MediaStreamTrack, Transceiver)>>(None);
+        let _ = self.peer.on_track::<Box<
+            dyn FnMut(platform::MediaStreamTrack, platform::Transceiver),
+        >>(None);
         let _ = self
             .peer
             .on_ice_candidate::<Box<dyn FnMut(platform::IceCandidate)>>(None);

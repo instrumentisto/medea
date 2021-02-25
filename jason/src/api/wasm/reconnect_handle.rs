@@ -3,7 +3,7 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::core;
+use crate::{api::JasonError, core};
 
 /// Handle that JS side can reconnect to the Medea media server on
 /// a connection loss with.
@@ -23,7 +23,9 @@ impl ReconnectHandle {
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
         let this = self.0.clone();
         future_to_promise(async move {
-            this.reconnect_with_delay(delay_ms).await?;
+            this.reconnect_with_delay(delay_ms)
+                .await
+                .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -59,7 +61,8 @@ impl ReconnectHandle {
                 multiplier,
                 max_delay,
             )
-            .await?;
+            .await
+            .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }

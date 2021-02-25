@@ -7,11 +7,8 @@ use medea_client_api_proto as proto;
 use medea_reactive::ObservableCell;
 
 use crate::{
-    core::{
-        media::{MediaKind, MediaSourceKind},
-        utils::Callback0,
-    },
-    platform::{self, spawn},
+    core::media::{MediaKind, MediaSourceKind},
+    platform,
 };
 
 /// Inner reference-counted data of [`Track`].
@@ -23,10 +20,10 @@ struct Inner {
     media_source_kind: proto::MediaSourceKind,
 
     /// Callback to be invoked when this [`Track`] is enabled.
-    on_enabled: Callback0,
+    on_enabled: platform::Callback<()>,
 
     /// Callback to be invoked when this [`Track`] is disabled.
-    on_disabled: Callback0,
+    on_disabled: platform::Callback<()>,
 
     /// [`enabled`][1] property of [MediaStreamTrack][2].
     ///
@@ -54,15 +51,15 @@ impl Track {
         let track = platform::MediaStreamTrack::from(track);
         let track = Track(Rc::new(Inner {
             enabled: ObservableCell::new(track.enabled()),
-            on_enabled: Callback0::default(),
-            on_disabled: Callback0::default(),
+            on_enabled: platform::Callback::default(),
+            on_disabled: platform::Callback::default(),
             media_source_kind,
             track,
         }));
 
         let mut track_enabled_state_changes =
             track.enabled_observable().subscribe().skip(1);
-        spawn({
+        platform::spawn({
             let weak_inner = Rc::downgrade(&track.0);
             async move {
                 while let Some(enabled) =
@@ -70,9 +67,9 @@ impl Track {
                 {
                     if let Some(track) = weak_inner.upgrade() {
                         if enabled {
-                            track.on_enabled.call();
+                            track.on_enabled.call0();
                         } else {
-                            track.on_disabled.call();
+                            track.on_disabled.call0();
                         }
                     } else {
                         break;
@@ -138,12 +135,12 @@ impl Track {
     }
 
     /// Sets callback to invoke when this [`Track`] is enabled.
-    pub fn on_enabled(&self, callback: js_sys::Function) {
+    pub fn on_enabled(&self, callback: platform::Function<()>) {
         self.0.on_enabled.set_func(callback);
     }
 
     /// Sets callback to invoke when this [`Track`] is disabled.
-    pub fn on_disabled(&self, callback: js_sys::Function) {
+    pub fn on_disabled(&self, callback: platform::Function<()>) {
         self.0.on_disabled.set_func(callback);
     }
 }

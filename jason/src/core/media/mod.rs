@@ -2,7 +2,7 @@
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams
 
-mod constraints;
+pub mod constraints;
 mod manager;
 pub mod track;
 

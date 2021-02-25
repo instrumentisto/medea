@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::platform::delay_for;
+use crate::platform;
 
 /// Delayer that increases delay time by provided multiplier on each call.
 ///
@@ -35,7 +35,7 @@ impl BackoffDelayer {
         Self {
             current_interval: starting_interval,
             max_interval,
-            interval_multiplier,
+            interval_multiplier: interval_multiplier.max(0_f32),
         }
     }
 
@@ -46,7 +46,7 @@ impl BackoffDelayer {
     /// [`BackoffDelayer::interval_multiplier`] milliseconds,
     /// until [`BackoffDelayer::max_interval`] is reached.
     pub async fn delay(&mut self) {
-        delay_for(self.get_delay()).await;
+        platform::delay_for(self.get_delay()).await;
     }
 
     /// Returns current interval and increases it for next call.

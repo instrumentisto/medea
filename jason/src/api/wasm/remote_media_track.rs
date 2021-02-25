@@ -1,4 +1,4 @@
-use derive_more::From;
+use derive_more::{From, Into};
 use wasm_bindgen::prelude::*;
 
 use crate::core;
@@ -7,7 +7,7 @@ use crate::core;
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[wasm_bindgen]
-#[derive(Clone, From)]
+#[derive(Clone, From, Into)]
 pub struct RemoteMediaTrack(core::remote::Track);
 
 #[wasm_bindgen]
@@ -24,12 +24,12 @@ impl RemoteMediaTrack {
 
     /// Sets callback to invoke when this [`Track`] is enabled.
     pub fn on_enabled(&self, cb: js_sys::Function) {
-        self.0.on_enabled(cb)
+        self.0.on_enabled(cb.into())
     }
 
     /// Sets callback to invoke when this [`Track`] is disabled.
     pub fn on_disabled(&self, cb: js_sys::Function) {
-        self.0.on_disabled(cb)
+        self.0.on_disabled(cb.into())
     }
 
     /// Returns [`MediaKind::Audio`] if this [`Track`] represents an audio

@@ -13,7 +13,11 @@ mod wasm;
 pub use wasm::{
     connection_handle::ConnectionHandle,
     constraints_update_exception::ConstraintsUpdateException,
+    input_device_info::InputDeviceInfo,
+    jason::Jason,
+    jason_error::JasonError,
     local_media_track::LocalMediaTrack,
+    media_manager_handle::MediaManagerHandle,
     media_stream_settings::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, MediaStreamSettings,
@@ -21,5 +25,6 @@ pub use wasm::{
     reconnect_handle::ReconnectHandle,
     remote_media_track::RemoteMediaTrack,
     room_close_reason::RoomCloseReason,
+    room_handle::RoomHandle,
     FacingMode, MediaKind, MediaSourceKind,
 };

@@ -7,9 +7,9 @@ use futures::{
     stream, StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
-use medea_jason::rpc::{
-    websocket::MockRpcTransport, Heartbeat, IdleTimeout, PingInterval,
-    RpcTransport,
+use medea_jason::{
+    core::rpc::{Heartbeat, IdleTimeout, PingInterval},
+    platform::{MockRpcTransport, RpcTransport},
 };
 use wasm_bindgen_test::*;
 

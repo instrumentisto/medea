@@ -12,15 +12,16 @@ use tracerr::Traced;
 
 use crate::{
     core::{
-        media::{MediaKind, MediaStreamSettings, MultiSourceTracksConstraints},
+        media::{
+            track::MediaStreamTrackState, MediaKind, MediaStreamSettings,
+            MultiSourceTracksConstraints,
+        },
         utils::{HandlerDetachedError, JasonError, JsCaused},
     },
     platform,
 };
 
 use super::track::local;
-
-use crate::platform::Error;
 
 /// Errors that may occur in a [`MediaManager`].
 #[derive(Clone, Debug, Display, JsCaused)]
@@ -30,25 +31,25 @@ pub enum MediaManagerError {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
-    CouldNotGetMediaDevices(Error),
+    CouldNotGetMediaDevices(platform::Error),
 
     /// Occurs if the [getUserMedia][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
-    GetUserMediaFailed(Error),
+    GetUserMediaFailed(platform::Error),
 
     /// Occurs if the [getDisplayMedia()][1] request failed.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[display(fmt = "MediaDevices.getDisplayMedia() failed: {}", _0)]
-    GetDisplayMediaFailed(Error),
+    GetDisplayMediaFailed(platform::Error),
 
     /// Occurs when cannot get info about connected [MediaDevices][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
-    EnumerateDevicesFailed(Error),
+    EnumerateDevicesFailed(platform::Error),
 
     /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
     /// or [getDisplayMedia()][3] request.
@@ -255,7 +256,7 @@ impl InnerMediaManager {
         // `live`. Otherwise, we should err without caching tracks in
         // `MediaManager`. Tracks will be stopped on `Drop`.
         for track in &tracks {
-            if track.ready_state() != platform::MediaStreamTrackState::Live {
+            if track.ready_state() != MediaStreamTrackState::Live {
                 return Err(tracerr::new!(LocalTrackIsEnded(track.kind())));
             }
         }

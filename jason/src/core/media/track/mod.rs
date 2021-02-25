@@ -7,6 +7,12 @@ pub mod remote;
 
 use medea_client_api_proto as proto;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MediaStreamTrackState {
+    Live,
+    Ended,
+}
+
 /// Media source type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MediaSourceKind {

@@ -16,7 +16,7 @@ use medea_reactive::ObservableCell;
 
 use crate::{
     core::utils::{resettable_delay_for, ResettableDelayHandle},
-    platform::spawn,
+    platform,
 };
 
 const DESCRIPTION_APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -152,7 +152,7 @@ impl LocalSdp {
             DESCRIPTION_APPROVE_TIMEOUT,
             self.0.is_rollback_timeout_stopped.get(),
         );
-        spawn({
+        platform::spawn({
             let this = self.clone();
             async move {
                 if let Either::Right(_) =

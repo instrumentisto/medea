@@ -39,12 +39,10 @@ use crate::{
             ConnectionInfoParseError, ReconnectHandle, RpcSession,
             SessionError,
         },
-        utils::{
-            AsProtoState, Callback1, HandlerDetachedError, JasonError, JsCaused,
-        },
+        utils::{AsProtoState, HandlerDetachedError, JasonError, JsCaused},
         Connections,
     },
-    platform::{self, spawn},
+    platform,
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -306,15 +304,18 @@ impl RoomHandle {
     /// [`Connection`]: crate::api::Connection
     pub fn on_new_connection(
         &self,
-        f: js_sys::Function,
-    ) -> Result<(), JsValue> {
+        f: platform::Function<api::ConnectionHandle>,
+    ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.connections.on_new_connection(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
-    pub fn on_close(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_close(
+        &self,
+        f: platform::Function<api::RoomCloseReason>,
+    ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
@@ -324,7 +325,10 @@ impl RoomHandle {
     /// 1. Media server initiates media request.
     /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
-    pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_local_track(
+        &self,
+        f: platform::Function<api::LocalMediaTrack>,
+    ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_local_track.set_func(f))
     }
@@ -333,8 +337,8 @@ impl RoomHandle {
     /// media acquisition failures.
     pub fn on_failed_local_media(
         &self,
-        f: js_sys::Function,
-    ) -> Result<(), JsValue> {
+        f: platform::Function<api::JasonError>,
+    ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_failed_local_media.set_func(f))
     }
@@ -343,8 +347,8 @@ impl RoomHandle {
     /// with server loss.
     pub fn on_connection_loss(
         &self,
-        f: js_sys::Function,
-    ) -> Result<(), JsValue> {
+        f: platform::Function<api::ReconnectHandle>,
+    ) -> Result<(), JasonError> {
         upgrade_or_detached!(self.0)
             .map(|inner| inner.on_connection_loss.set_func(f))
     }
@@ -617,7 +621,7 @@ impl Room {
         let room = Rc::new(InnerRoom::new(rpc, media_manager, tx));
         let inner = Rc::downgrade(&room);
 
-        spawn(async move {
+        platform::spawn(async move {
             loop {
                 let event: RoomEvent = futures::select! {
                     event = rpc_events_stream.select_next_some() => event,
@@ -732,19 +736,19 @@ struct InnerRoom {
 
     /// Callback to be invoked when new local [`local::JsTrack`] will be added
     /// to this [`Room`].
-    on_local_track: Callback1<api::LocalMediaTrack>,
+    on_local_track: platform::Callback<api::LocalMediaTrack>,
 
     /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
     ///
     /// [`MediaManager`]: crate::media::MediaManager
-    on_failed_local_media: Rc<Callback1<JasonError>>,
+    on_failed_local_media: Rc<platform::Callback<api::JasonError>>,
 
     /// Callback to be invoked when [`RpcSession`] loses connection.
-    on_connection_loss: Callback1<api::ReconnectHandle>,
+    on_connection_loss: platform::Callback<api::ReconnectHandle>,
 
     /// JS callback which will be called when this [`Room`] will be closed.
-    on_close: Rc<Callback1<api::RoomCloseReason>>,
+    on_close: Rc<platform::Callback<api::RoomCloseReason>>,
 
     /// Reason of [`Room`] closing.
     ///
@@ -770,12 +774,14 @@ impl ConstraintsUpdateException {
     /// `RecoveredException` or `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn recover_reason(&self) -> JsValue {
+    pub fn recover_reason(&self) -> Option<JasonError> {
         use JsConstraintsUpdateError as E;
         match &self.0 {
             E::RecoverFailed { recover_reason, .. }
-            | E::Recovered { recover_reason, .. } => recover_reason.clone(),
-            _ => JsValue::UNDEFINED,
+            | E::Recovered { recover_reason, .. } => {
+                Some(recover_reason.clone())
+            }
+            _ => None,
         }
     }
 
@@ -783,13 +789,13 @@ impl ConstraintsUpdateException {
     /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn recover_fail_reasons(&self) -> JsValue {
+    pub fn recover_fail_reasons(&self) -> Vec<JasonError> {
         match &self.0 {
             JsConstraintsUpdateError::RecoverFailed {
                 recover_fail_reasons,
                 ..
             } => recover_fail_reasons.clone(),
-            _ => JsValue::UNDEFINED,
+            _ => Vec::new(),
         }
     }
 
@@ -797,10 +803,12 @@ impl ConstraintsUpdateException {
     /// `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
-    pub fn error(&self) -> JsValue {
+    pub fn error(&self) -> Option<JasonError> {
         match &self.0 {
-            JsConstraintsUpdateError::Errored { reason } => reason.clone(),
-            _ => JsValue::UNDEFINED,
+            JsConstraintsUpdateError::Errored { reason } => {
+                Some(reason.clone())
+            }
+            _ => None,
         }
     }
 }
@@ -817,7 +825,7 @@ pub enum JsConstraintsUpdateError {
     #[display(fmt = "RecoveredException")]
     Recovered {
         /// [`JasonError`] due to which recovery happened.
-        recover_reason: JsValue,
+        recover_reason: JasonError,
     },
 
     /// New [`MediaStreamSettings`] set failed and state recovering also
@@ -825,16 +833,16 @@ pub enum JsConstraintsUpdateError {
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
         /// [`JasonError`] due to which recovery happened.
-        recover_reason: JsValue,
+        recover_reason: JasonError,
 
         /// [`js_sys::Array`] with a [`JasonError`]s due to which recovery
         /// failed.
-        recover_fail_reasons: JsValue,
+        recover_fail_reasons: Vec<JasonError>,
     },
 
     /// Some another error occurred.
     #[display(fmt = "ErroredException")]
-    Errored { reason: JsValue },
+    Errored { reason: JasonError },
 }
 
 /// Constraints errors which are can occur while updating
@@ -914,12 +922,10 @@ impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
             } => Self::RecoverFailed {
                 recover_reason: JasonError::from(recover_reason).into(),
                 recover_fail_reasons: {
-                    let arr = js_sys::Array::new();
-                    for e in recover_fail_reasons {
-                        arr.push(&JasonError::from(e).into());
-                    }
-
-                    arr.into()
+                    recover_fail_reasons
+                        .into_iter()
+                        .map(JasonError::from)
+                        .collect()
                 },
             },
             E::Errored { error: reason } => Self::Errored {
@@ -956,10 +962,10 @@ impl InnerRoom {
             send_constraints,
             recv_constraints,
             connections,
-            on_connection_loss: Callback1::default(),
-            on_failed_local_media: Rc::new(Callback1::default()),
-            on_local_track: Callback1::default(),
-            on_close: Rc::new(Callback1::default()),
+            on_connection_loss: platform::Callback::default(),
+            on_failed_local_media: Rc::new(platform::Callback::default()),
+            on_local_track: platform::Callback::default(),
+            on_close: Rc::new(platform::Callback::default()),
             close_reason: RefCell::new(CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
@@ -1156,14 +1162,14 @@ impl InnerRoom {
                 .map_err(tracerr::map_from_and_wrap!())
                 .map_err(|e| {
                     self.on_failed_local_media
-                        .call(JasonError::from(e.clone()));
+                        .call1(JasonError::from(e.clone()));
 
                     e
                 })?;
             for (track, is_new) in tracks {
                 if is_new {
                     self.on_local_track
-                        .call(local::LocalMediaTrack::new(Rc::clone(&track)));
+                        .call1(local::LocalMediaTrack::new(Rc::clone(&track)));
                 }
                 result.push(track);
             }
@@ -1347,7 +1353,7 @@ impl InnerRoom {
     fn handle_rpc_connection_lost(&self) {
         self.peers.connection_lost();
         self.on_connection_loss
-            .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
+            .call1(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
 
     /// Sends [`Command::SynchronizeMe`] with a current Client state to the
@@ -1394,7 +1400,7 @@ impl EventHandler for InnerRoom {
                 .insert_track(track, self.send_constraints.clone())
                 .map_err(|e| {
                     self.on_failed_local_media
-                        .call(JasonError::from(e.clone()));
+                        .call1(JasonError::from(e.clone()));
                     tracerr::map_from_and_new!(e)
                 })?;
         }
@@ -1486,7 +1492,7 @@ impl EventHandler for InnerRoom {
                     .insert_track(&track, self.send_constraints.clone())
                     .map_err(|e| {
                         self.on_failed_local_media
-                            .call(JasonError::from(e.clone()));
+                            .call1(JasonError::from(e.clone()));
                         tracerr::map_from_and_new!(e)
                     })?,
                 TrackUpdate::Updated(track_patch) => {
@@ -1593,7 +1599,8 @@ impl PeerEventHandler for InnerRoom {
         &self,
         track: Rc<local::Track>,
     ) -> Self::Output {
-        self.on_local_track.call(local::LocalMediaTrack::new(track));
+        self.on_local_track
+            .call1(local::LocalMediaTrack::new(track));
         Ok(())
     }
 
@@ -1648,7 +1655,7 @@ impl PeerEventHandler for InnerRoom {
     /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
     /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
-        self.on_failed_local_media.call(error);
+        self.on_failed_local_media.call1(error);
         Ok(())
     }
 
@@ -1706,12 +1713,8 @@ impl Drop for InnerRoom {
             self.rpc.close_with_reason(reason);
         };
 
-        if let Some(Err(e)) = self
-            .on_close
-            .call(RoomCloseReason::new(*self.close_reason.borrow()))
-        {
-            log::error!("Failed to call Room::on_close callback: {:?}", e);
-        }
+        self.on_close
+            .call1(RoomCloseReason::new(*self.close_reason.borrow()));
     }
 }
 

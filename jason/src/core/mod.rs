@@ -3,6 +3,8 @@
 use futures::FutureExt as _;
 use std::{cell::RefCell, rc::Rc};
 
+use crate::platform;
+
 use self::{
     media::MediaManager,
     rpc::{
@@ -12,20 +14,18 @@ use self::{
 
 #[doc(inline)]
 pub use self::{
-    connection::{Connection, ConnectionHandle, Connections},
+    connection::{ConnectionHandle, Connections},
     media::{
-        track::{local::LocalMediaTrack, remote},
-        MediaKind, MediaManagerHandle, MediaSourceKind,
+        track::{local::LocalMediaTrack, remote, MediaStreamTrackState},
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaKind, MediaManagerHandle,
+        MediaSourceKind, MediaStreamSettings,
     },
     room::{
         ConstraintsUpdateException, Room, RoomCloseReason, RoomError,
-        RoomHandle, WeakRoom,
+        RoomHandle,
     },
     rpc::ReconnectHandle,
-};
-use crate::platform::{
-    spawn,
-    transport::{RpcTransport, WebSocketRpcTransport},
 };
 
 #[macro_use]
@@ -62,10 +62,10 @@ impl Jason {
         Self::with_rpc_client(Rc::new(WebSocketRpcClient::new(Box::new(
             |url| {
                 Box::pin(async move {
-                    let ws = WebSocketRpcTransport::new(url)
+                    let ws = platform::WebSocketRpcTransport::new(url)
                         .await
                         .map_err(|e| tracerr::new!(e))?;
-                    Ok(Rc::new(ws) as Rc<dyn RpcTransport>)
+                    Ok(Rc::new(ws) as Rc<dyn platform::RpcTransport>)
                 })
             },
         ))))
@@ -121,7 +121,7 @@ impl Jason {
 
         let weak_room = room.downgrade();
         let weak_inner = Rc::downgrade(&self.0);
-        spawn(on_normal_close.map(move |reason| {
+        platform::spawn(on_normal_close.map(move |reason| {
             (|| {
                 let room = weak_room.upgrade()?;
                 let inner = weak_inner.upgrade()?;

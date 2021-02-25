@@ -1,21 +1,21 @@
 use derive_more::{From, Into};
 use wasm_bindgen::prelude::*;
 
-use crate::{api::FacingMode, core::media};
+use crate::{api::FacingMode, core};
 
 /// [MediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[wasm_bindgen]
 #[derive(Clone, From, Into)]
-pub struct MediaStreamSettings(media::MediaStreamSettings);
+pub struct MediaStreamSettings(core::MediaStreamSettings);
 
 #[wasm_bindgen]
 impl MediaStreamSettings {
     /// Creates new [`MediaStreamSettings`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        media::MediaStreamSettings::new().into()
+        core::MediaStreamSettings::new().into()
     }
 
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
@@ -41,14 +41,14 @@ impl MediaStreamSettings {
 /// Constraints applicable to audio tracks.
 #[wasm_bindgen]
 #[derive(From, Into)]
-pub struct AudioTrackConstraints(media::AudioTrackConstraints);
+pub struct AudioTrackConstraints(core::AudioTrackConstraints);
 
 #[wasm_bindgen]
 impl AudioTrackConstraints {
     /// Creates new [`AudioTrackConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        media::AudioTrackConstraints::new().into()
+        core::AudioTrackConstraints::new().into()
     }
 
     /// Sets exact [deviceId][1] constraint.
@@ -63,7 +63,7 @@ impl AudioTrackConstraints {
 /// device.
 #[wasm_bindgen]
 #[derive(From, Into)]
-pub struct DeviceVideoTrackConstraints(media::DeviceVideoTrackConstraints);
+pub struct DeviceVideoTrackConstraints(core::DeviceVideoTrackConstraints);
 
 /// Constraints applicable to video tracks that are sourced from screen-capture.
 #[wasm_bindgen]
@@ -72,7 +72,7 @@ impl DeviceVideoTrackConstraints {
     /// configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        media::DeviceVideoTrackConstraints::new().into()
+        core::DeviceVideoTrackConstraints::new().into()
     }
 
     /// Sets exact [deviceId][1] constraint.
@@ -142,7 +142,7 @@ impl DeviceVideoTrackConstraints {
 /// Constraints applicable to video tracks sourced from screen capture.
 #[wasm_bindgen]
 #[derive(From, Into)]
-pub struct DisplayVideoTrackConstraints(media::DisplayVideoTrackConstraints);
+pub struct DisplayVideoTrackConstraints(core::DisplayVideoTrackConstraints);
 
 #[wasm_bindgen]
 impl DisplayVideoTrackConstraints {
@@ -150,6 +150,6 @@ impl DisplayVideoTrackConstraints {
     /// configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        media::DisplayVideoTrackConstraints::new().into()
+        core::DisplayVideoTrackConstraints::new().into()
     }
 }

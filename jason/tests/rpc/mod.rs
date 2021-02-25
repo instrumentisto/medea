@@ -17,9 +17,9 @@ use futures::{
 use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, RpcSettings, ServerMsg,
 };
-use medea_jason::rpc::{
-    websocket::{MockRpcTransport, RpcEvent, TransportState},
-    ClientDisconnect, CloseMsg, RpcTransport, WebSocketRpcClient,
+use medea_jason::{
+    core::rpc::{ClientDisconnect, CloseMsg, RpcEvent, WebSocketRpcClient},
+    platform::{MockRpcTransport, RpcTransport, TransportState},
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -260,7 +260,9 @@ mod on_close {
 
         assert_eq!(
             ws.on_normal_close().await.unwrap(),
-            medea_jason::rpc::CloseReason::ByServer(CloseReason::Finished)
+            medea_jason::core::rpc::CloseReason::ByServer(
+                CloseReason::Finished
+            )
         );
     }
 

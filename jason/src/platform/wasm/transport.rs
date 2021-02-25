@@ -32,7 +32,7 @@ impl From<EventListenerBindError> for TransportError {
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
 #[derive(Clone, From, Into)]
-pub struct ServerMessage(ServerMsg);
+struct ServerMessage(ServerMsg);
 
 impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = TransportError;

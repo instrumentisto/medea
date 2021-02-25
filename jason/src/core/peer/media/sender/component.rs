@@ -29,7 +29,7 @@ use crate::{
         },
         utils::{component, AsProtoState, SynchronizableState, Updatable},
     },
-    platform::TransceiverDirection,
+    platform,
 };
 
 use super::Sender;
@@ -445,11 +445,13 @@ impl Component {
                 if sender.enabled_in_cons() {
                     sender
                         .transceiver
-                        .add_direction(TransceiverDirection::SEND);
+                        .add_direction(platform::TransceiverDirection::SEND);
                 }
             }
             media_exchange_state::Stable::Disabled => {
-                sender.transceiver.sub_direction(TransceiverDirection::SEND);
+                sender
+                    .transceiver
+                    .sub_direction(platform::TransceiverDirection::SEND);
             }
         }
 

@@ -3,7 +3,10 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{api, core};
+use crate::{
+    api::{self, JasonError},
+    core,
+};
 
 use super::input_device_info::InputDeviceInfo;
 
@@ -46,6 +49,7 @@ impl MediaManagerHandle {
                         })
                         .into()
                 })
+                .map_err(JasonError::from)
                 .map_err(JsValue::from)
         })
     }
@@ -73,6 +77,7 @@ impl MediaManagerHandle {
                         })
                         .into()
                 })
+                .map_err(JasonError::from)
                 .map_err(JsValue::from)
         })
     }

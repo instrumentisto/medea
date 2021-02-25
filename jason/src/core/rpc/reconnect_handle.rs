@@ -9,7 +9,7 @@ use crate::{
         rpc::{BackoffDelayer, RpcSession},
         utils::{HandlerDetachedError, JasonError, JsCaused},
     },
-    platform::{self, delay_for},
+    platform,
 };
 
 /// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]
@@ -41,7 +41,8 @@ impl ReconnectHandle {
         &self,
         delay_ms: u32,
     ) -> Result<(), JasonError> {
-        delay_for(Duration::from_millis(u64::from(delay_ms)).into()).await;
+        platform::delay_for(Duration::from_millis(u64::from(delay_ms)).into())
+            .await;
 
         let rpc = upgrade_or_detached!(self.0, JasonError)?;
         rpc.reconnect().await.map_err(|e| JasonError::from(e))?;

@@ -5,8 +5,9 @@
 use std::convert::TryFrom;
 
 use derive_more::Display;
+use web_sys as sys;
 
-use crate::{core::media::MediaKind, platform};
+use crate::core;
 
 /// Errors that may occur when parsing [MediaDeviceInfo][1].
 ///
@@ -22,21 +23,21 @@ pub enum Error {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 pub struct InputDeviceInfo {
-    media_kind: MediaKind,
+    media_kind: core::MediaKind,
 
     /// Actual underlying [MediaDeviceInfo][1] object.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
-    info: platform::MediaDeviceInfo,
+    info: sys::MediaDeviceInfo,
 }
 
-impl TryFrom<platform::MediaDeviceKind> for MediaKind {
+impl TryFrom<sys::MediaDeviceKind> for core::MediaKind {
     type Error = Error;
 
-    fn try_from(value: platform::MediaDeviceKind) -> Result<Self, Self::Error> {
+    fn try_from(value: sys::MediaDeviceKind) -> Result<Self, Self::Error> {
         match value {
-            platform::MediaDeviceKind::Audioinput => Ok(Self::Audio),
-            platform::MediaDeviceKind::Videoinput => Ok(Self::Video),
+            sys::MediaDeviceKind::Audioinput => Ok(Self::Audio),
+            sys::MediaDeviceKind::Videoinput => Ok(Self::Video),
             _ => Err(Error::NotInputDevice),
         }
     }
@@ -53,7 +54,7 @@ impl InputDeviceInfo {
     /// This representation of [MediaDeviceInfo][1] ONLY for input device.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
-    pub fn kind(&self) -> MediaKind {
+    pub fn kind(&self) -> core::MediaKind {
         self.media_kind
     }
 
@@ -77,12 +78,12 @@ impl InputDeviceInfo {
     }
 }
 
-impl TryFrom<platform::MediaDeviceInfo> for InputDeviceInfo {
+impl TryFrom<sys::MediaDeviceInfo> for InputDeviceInfo {
     type Error = Error;
 
-    fn try_from(info: platform::MediaDeviceInfo) -> Result<Self, Self::Error> {
+    fn try_from(info: sys::MediaDeviceInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            media_kind: MediaKind::try_from(info.kind())?,
+            media_kind: core::MediaKind::try_from(info.kind())?,
             info,
         })
     }

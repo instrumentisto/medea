@@ -11,15 +11,15 @@ use medea_client_api_proto::{
 };
 
 use crate::{
-    api::FacingMode,
+    api,
     core::{
-        media::MediaKind,
+        media::{track::MediaStreamTrackState, MediaKind},
         peer::{
             media_exchange_state, mute_state, LocalStreamUpdateCriteria,
             MediaState,
         },
     },
-    platform::*,
+    platform,
 };
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
@@ -192,7 +192,10 @@ impl Default for AudioMediaTracksSettings {
 /// Returns `true` if provided [`MediaStreamTrack`] basically
 /// satisfies any constraints with a provided [`MediaKind`].
 #[inline]
-fn satisfies_track(track: &MediaStreamTrack, kind: MediaKind) -> bool {
+fn satisfies_track(
+    track: &platform::MediaStreamTrack,
+    kind: MediaKind,
+) -> bool {
     track.kind() == kind && track.ready_state() == MediaStreamTrackState::Live
 }
 
@@ -274,7 +277,10 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
     /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         self.constraints
             .as_ref()
             .filter(|_| self.enabled())
@@ -287,7 +293,10 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
     /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         self.constraints
             .as_ref()
             .filter(|_| self.enabled())
@@ -368,7 +377,7 @@ impl MediaStreamSettings {
     /// [`VideoTrackConstraints::unconstrain`].
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
-        T: AsRef<MediaStreamTrack>,
+        T: AsRef<platform::MediaStreamTrack>,
     {
         if self.device_video.satisfies(&track) {
             self.device_video.unconstrain();
@@ -634,18 +643,21 @@ pub enum MultiSourceTracksConstraints {
     /// Only [getUserMedia()][1] request is required.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
-    Device(MediaStreamConstraints),
+    Device(platform::MediaStreamConstraints),
 
     /// Only [getDisplayMedia()][1] request is required.
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    Display(DisplayMediaStreamConstraints),
+    Display(platform::DisplayMediaStreamConstraints),
 
     /// Both [getUserMedia()][1] and [getDisplayMedia()][2] are required.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    DeviceAndDisplay(MediaStreamConstraints, DisplayMediaStreamConstraints),
+    DeviceAndDisplay(
+        platform::MediaStreamConstraints,
+        platform::DisplayMediaStreamConstraints,
+    ),
 }
 
 impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
@@ -662,10 +674,8 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
                 constraints.device_video.constraints
             {
                 device_cons
-                    .get_or_insert_with(MediaStreamConstraints::new)
-                    .video(
-                        &MediaTrackConstraints::from(device_video_cons).into(),
-                    );
+                    .get_or_insert_with(platform::MediaStreamConstraints::new)
+                    .video(device_video_cons);
             }
         }
         if is_display_video_enabled {
@@ -673,19 +683,16 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
                 constraints.display_video.constraints
             {
                 display_cons
-                    .get_or_insert_with(DisplayMediaStreamConstraints::new)
-                    .video(
-                        &MediaTrackConstraints::from(display_video_cons).into(),
-                    );
+                    .get_or_insert_with(
+                        platform::DisplayMediaStreamConstraints::new,
+                    )
+                    .video(display_video_cons);
             }
         }
         if is_device_audio_enabled {
             device_cons
-                .get_or_insert_with(MediaStreamConstraints::new)
-                .audio(
-                    &MediaTrackConstraints::from(constraints.audio.constraints)
-                        .into(),
-                );
+                .get_or_insert_with(platform::MediaStreamConstraints::new)
+                .audio(constraints.audio.constraints);
         }
 
         match (device_cons, display_cons) {
@@ -739,7 +746,10 @@ impl VideoSource {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         match self {
             VideoSource::Display(display) => display.satisfies(&track),
             VideoSource::Device(device) => device.satisfies(track),
@@ -784,7 +794,10 @@ impl TrackConstraints {
     /// [`TrackConstraints`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         match self {
             Self::Audio(audio) => audio.satisfies(&track),
             Self::Video(video) => video.satisfies(&track),
@@ -833,19 +846,12 @@ impl From<ProtoTrackConstraints> for TrackConstraints {
     }
 }
 
-// TODO: Its gonna be a nightmare if we will add all possible constraints,
-//       especially if we will support all that `exact`/`min`/`max`/`ideal`
-//       stuff, will need major refactoring then.
-// TODO: Using reflection to get fields values is pure evil, but there are no
-//       getters for WebIDL's dictionaries, should be wrapped or improved in
-//       wasm-bindgen.
-
 /// Constraints applicable to audio tracks.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct AudioTrackConstraints {
     /// The identifier of the device generating the content for the media
     /// track.
-    device_id: Option<ConstrainString<String>>,
+    pub device_id: Option<ConstrainString<String>>,
 
     /// Importance of this [`AudioTrackConstraints`].
     ///
@@ -871,7 +877,10 @@ impl AudioTrackConstraints {
     /// contained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         let track = track.as_ref();
         satisfies_track(track, MediaKind::Audio)
             && ConstrainString::satisfies(&self.device_id, &track.device_id())
@@ -909,26 +918,13 @@ impl From<ProtoAudioConstraints> for AudioTrackConstraints {
     }
 }
 
-impl From<AudioTrackConstraints> for MediaTrackConstraints {
-    fn from(track_constraints: AudioTrackConstraints) -> Self {
-        let mut constraints = Self::new();
-
-        if let Some(device_id) = track_constraints.device_id {
-            constraints
-                .device_id(&ConstrainDomStringParameters::from(&device_id));
-        }
-
-        constraints
-    }
-}
-
-impl AsRef<str> for FacingMode {
+impl AsRef<str> for api::FacingMode {
     fn as_ref(&self) -> &str {
         match self {
-            FacingMode::User => "user",
-            FacingMode::Environment => "environment",
-            FacingMode::Left => "left",
-            FacingMode::Right => "right",
+            api::FacingMode::User => "user",
+            api::FacingMode::Environment => "environment",
+            api::FacingMode::Left => "left",
+            api::FacingMode::Right => "right",
         }
     }
 }
@@ -938,7 +934,7 @@ impl AsRef<str> for FacingMode {
 ///
 /// [1]: https://tinyurl.com/w3-streams#dom-constrainulong
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ConstrainU32 {
+pub enum ConstrainU32 {
     /// Must be the parameter's value.
     Exact(u32),
 
@@ -966,25 +962,6 @@ impl ConstrainU32 {
     }
 }
 
-impl From<ConstrainU32> for ConstrainDoubleRange {
-    fn from(from: ConstrainU32) -> Self {
-        let mut constraint = ConstrainDoubleRange::new();
-        match from {
-            ConstrainU32::Exact(val) => {
-                constraint.exact(f64::from(val));
-            }
-            ConstrainU32::Ideal(val) => {
-                constraint.ideal(f64::from(val));
-            }
-            ConstrainU32::Range(min, max) => {
-                constraint.min(f64::from(min)).max(f64::from(max));
-            }
-        }
-
-        constraint
-    }
-}
-
 /// Representation of the [ConstrainDOMString][1].
 ///
 /// Can set exact (must be the parameter's value) and ideal (should be used if
@@ -992,7 +969,7 @@ impl From<ConstrainU32> for ConstrainDoubleRange {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ConstrainString<T> {
+pub enum ConstrainString<T> {
     Exact(T),
     Ideal(T),
 }
@@ -1008,22 +985,6 @@ impl<T: AsRef<str>> ConstrainString<T> {
     }
 }
 
-impl<T: AsRef<str>> From<&ConstrainString<T>> for ConstrainDomStringParameters {
-    fn from(from: &ConstrainString<T>) -> Self {
-        let mut constraint = ConstrainDomStringParameters::new();
-        match from {
-            ConstrainString::Exact(val) => {
-                constraint.exact(&JsValue::from_str(val.as_ref()))
-            }
-            ConstrainString::Ideal(val) => {
-                constraint.ideal(&JsValue::from_str(val.as_ref()))
-            }
-        };
-
-        constraint
-    }
-}
-
 /// Constraints applicable to video tracks that are sourced from some media
 /// device.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1036,17 +997,17 @@ pub struct DeviceVideoTrackConstraints {
 
     /// The identifier of the device generating the content for the media
     /// track.
-    device_id: Option<ConstrainString<String>>,
+    pub device_id: Option<ConstrainString<String>>,
 
     /// Describes the directions that the camera can face, as seen from the
     /// user's perspective.
-    facing_mode: Option<ConstrainString<FacingMode>>,
+    pub facing_mode: Option<ConstrainString<api::FacingMode>>,
 
     /// Height of the video in pixels.
-    height: Option<ConstrainU32>,
+    pub height: Option<ConstrainU32>,
 
     /// Width of the video in pixels.
-    width: Option<ConstrainU32>,
+    pub width: Option<ConstrainU32>,
 }
 
 /// Constraints applicable to video tracks that are sourced from screen-capture.
@@ -1067,14 +1028,14 @@ impl DeviceVideoTrackConstraints {
     /// Sets exact [facingMode][1] constraint.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
-    pub fn exact_facing_mode(&mut self, facing_mode: FacingMode) {
+    pub fn exact_facing_mode(&mut self, facing_mode: api::FacingMode) {
         self.facing_mode = Some(ConstrainString::Exact(facing_mode));
     }
 
     /// Sets ideal [facingMode][1] constraint.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
-    pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
+    pub fn ideal_facing_mode(&mut self, facing_mode: api::FacingMode) {
         self.facing_mode = Some(ConstrainString::Ideal(facing_mode));
     }
 
@@ -1124,8 +1085,10 @@ impl DeviceVideoTrackConstraints {
     /// [`DeviceVideoTrackConstraints`] contained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    // pub fn satisfies(&self, track: &MediaStreamTrack) -> bool {
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         let track = track.as_ref();
         satisfies_track(track, MediaKind::Video)
             && ConstrainString::satisfies(&self.device_id, &track.device_id())
@@ -1191,7 +1154,10 @@ impl DisplayVideoTrackConstraints {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[allow(clippy::unused_self)]
     #[inline]
-    pub fn satisfies<T: AsRef<MediaStreamTrack>>(&self, track: T) -> bool {
+    pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
+        &self,
+        track: T,
+    ) -> bool {
         let track = track.as_ref();
         satisfies_track(track, MediaKind::Video)
             && track.guess_is_from_display()
@@ -1214,34 +1180,5 @@ impl DisplayVideoTrackConstraints {
     #[inline]
     pub fn required(&self) -> bool {
         self.required
-    }
-}
-
-impl From<DeviceVideoTrackConstraints> for MediaTrackConstraints {
-    fn from(track_constraints: DeviceVideoTrackConstraints) -> Self {
-        let mut constraints = Self::new();
-
-        if let Some(device_id) = track_constraints.device_id {
-            constraints
-                .device_id(&ConstrainDomStringParameters::from(&device_id));
-        }
-        if let Some(facing_mode) = track_constraints.facing_mode {
-            constraints
-                .facing_mode(&ConstrainDomStringParameters::from(&facing_mode));
-        }
-        if let Some(width) = track_constraints.width {
-            constraints.width(&ConstrainDoubleRange::from(width));
-        }
-        if let Some(height) = track_constraints.height {
-            constraints.height(&ConstrainDoubleRange::from(height));
-        }
-
-        constraints
-    }
-}
-
-impl From<DisplayVideoTrackConstraints> for MediaTrackConstraints {
-    fn from(_: DisplayVideoTrackConstraints) -> Self {
-        Self::new()
     }
 }

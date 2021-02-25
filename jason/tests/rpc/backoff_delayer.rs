@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use medea_jason::rpc::BackoffDelayer;
+use medea_jason::core::rpc::BackoffDelayer;
 use wasm_bindgen_test::*;
 
 use crate::timeout;

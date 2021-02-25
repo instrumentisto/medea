@@ -1,9 +1,11 @@
+use derive_more::Display;
 use wasm_bindgen::prelude::*;
 
 pub mod connection_handle;
 pub mod constraints_update_exception;
 pub mod input_device_info;
 pub mod jason;
+pub mod jason_error;
 pub mod local_media_track;
 pub mod media_manager_handle;
 pub mod media_stream_settings;
@@ -18,6 +20,7 @@ use crate::core;
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
 #[wasm_bindgen]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaKind {
     /// Audio track.
     Audio,
@@ -36,6 +39,7 @@ impl From<core::MediaKind> for MediaKind {
 }
 
 #[wasm_bindgen]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaSourceKind {
     /// Media is sourced from some media device (webcam or microphone).
     Device,
@@ -67,7 +71,7 @@ impl Into<core::MediaSourceKind> for MediaSourceKind {
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum FacingMode {
     /// Facing toward the user (a self-view camera).
     User,

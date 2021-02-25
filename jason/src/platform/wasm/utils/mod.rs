@@ -1,3 +1,9 @@
+mod callback;
 mod event_listener;
+mod function;
 
-pub use event_listener::{EventListener, EventListenerBindError};
+pub use self::{
+    callback::Callback,
+    event_listener::{EventListener, EventListenerBindError},
+    function::Function,
+};

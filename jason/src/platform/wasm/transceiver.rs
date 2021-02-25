@@ -221,7 +221,7 @@ mod tests {
             (D::all(), S::Sendrecv),
             (D::INACTIVE, S::Inactive),
         ] {
-            assert_eq!(S::from(*trnsv_dir), *sys_dir);
+            assert_eq!(S::from(*trnscvr_dir), *sys_dir);
         }
     }
 
@@ -236,7 +236,7 @@ mod tests {
             (S::Sendrecv, D::all()),
             (S::Inactive, D::INACTIVE),
         ] {
-            assert_eq!(D::from(*sys_dir), *trnsv_dir);
+            assert_eq!(D::from(*sys_dir), *trnscvr_dir);
         }
     }
 }

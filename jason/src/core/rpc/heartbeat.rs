@@ -8,16 +8,13 @@ use medea_client_api_proto::{ClientMsg, ServerMsg};
 
 use crate::{
     core::utils::{JsCaused, TaskHandle},
-    platform::{
-        self, delay_for, spawn,
-        transport::{RpcTransport, TransportError},
-    },
+    platform,
 };
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
-pub struct HeartbeatError(TransportError);
+pub struct HeartbeatError(platform::TransportError);
 
 /// Idle timeout of [`WebSocketRpcClient`].
 ///
@@ -34,7 +31,7 @@ pub struct PingInterval(pub Duration);
 /// Inner data of [`Heartbeat`].
 struct Inner {
     /// [`RpcTransport`] which heartbeats.
-    transport: Rc<dyn RpcTransport>,
+    transport: Rc<dyn platform::RpcTransport>,
 
     /// Idle timeout of [`RpcTransport`].
     idle_timeout: IdleTimeout,
@@ -65,7 +62,7 @@ impl Inner {
     fn send_pong(&self, n: u32) {
         self.transport
             .send(&ClientMsg::Pong(n))
-            .map_err(tracerr::wrap!(=> TransportError))
+            .map_err(tracerr::wrap!(=> platform::TransportError))
             .map_err(|e| log::error!("Failed to send pong: {}", e))
             .ok();
     }
@@ -78,7 +75,7 @@ impl Heartbeat {
     /// Start this [`Heartbeat`] for the provided [`RpcTransport`] with
     /// the provided `idle_timeout` and `ping_interval`.
     pub fn start(
-        transport: Rc<dyn RpcTransport>,
+        transport: Rc<dyn platform::RpcTransport>,
         ping_interval: PingInterval,
         idle_timeout: IdleTimeout,
     ) -> Self {
@@ -132,19 +129,19 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
     let (idle_watchdog_fut, idle_watchdog_handle) =
         future::abortable(async move {
             let wait_for_ping = this.borrow().ping_interval * 2;
-            delay_for(wait_for_ping.0).await;
+            platform::delay_for(wait_for_ping.0).await;
 
             let last_ping_num = this.borrow().last_ping_num;
             this.borrow().send_pong(last_ping_num + 1);
 
             let idle_timeout = this.borrow().idle_timeout;
-            delay_for(idle_timeout.0 - wait_for_ping.0).await;
+            platform::delay_for(idle_timeout.0 - wait_for_ping.0).await;
             this.borrow_mut()
                 .on_idle_subs
                 .retain(|sub| sub.unbounded_send(()).is_ok());
         });
 
-    spawn(async move {
+    platform::spawn(async move {
         idle_watchdog_fut.await.ok();
     });
 
@@ -169,7 +166,7 @@ fn spawn_ping_handle_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
             }
         }
     });
-    spawn(async move {
+    platform::spawn(async move {
         handle_ping_fut.await.ok();
     });
     handle_ping_task.into()

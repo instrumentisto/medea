@@ -26,7 +26,7 @@ use crate::{
         },
         utils::{component, AsProtoState, SynchronizableState, Updatable},
     },
-    platform::TransceiverDirection,
+    platform,
 };
 
 use super::Receiver;
@@ -270,7 +270,7 @@ impl Component {
                     track.set_enabled(false);
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
-                    trnscvr.sub_direction(TransceiverDirection::RECV);
+                    trnscvr.sub_direction(platform::TransceiverDirection::RECV);
                 }
             }
             media_exchange_state::Stable::Enabled => {
@@ -278,7 +278,7 @@ impl Component {
                     track.set_enabled(true);
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
-                    trnscvr.add_direction(TransceiverDirection::RECV);
+                    trnscvr.add_direction(platform::TransceiverDirection::RECV);
                 }
             }
         }
@@ -403,9 +403,9 @@ impl TransceiverSide for State {
 impl State {
     /// Stabilizes [`MediaExchangeState`] of this [`State`].
     pub fn stabilize(&self) {
-        use crate::peer::media::InTransition as _;
+        // use crate::core::peer::media::InTransition as _;
 
-        if let crate::peer::MediaExchangeState::Transition(transition) =
+        if let crate::core::peer::MediaExchangeState::Transition(transition) =
             self.enabled_individual.state()
         {
             self.enabled_individual.update(transition.intended());

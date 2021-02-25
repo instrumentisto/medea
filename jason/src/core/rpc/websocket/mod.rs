@@ -9,5 +9,3 @@ pub use self::client::{
     ClientDisconnect, ClientState, RpcEvent, RpcEventHandler,
     RpcTransportFactory, WebSocketRpcClient,
 };
-#[cfg(feature = "mockable")]
-pub use self::transport::MockRpcTransport;

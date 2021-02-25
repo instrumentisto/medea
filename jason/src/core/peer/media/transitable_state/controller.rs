@@ -22,7 +22,7 @@ use crate::{
         },
         utils::{resettable_delay_for, ResettableDelayHandle},
     },
-    platform::spawn,
+    platform,
 };
 
 use super::TransitableState;
@@ -83,13 +83,13 @@ where
         // at that moment.
         let mut state_changes = self.state.subscribe().skip(1);
         let weak_this = Rc::downgrade(&self);
-        spawn(async move {
+        platform::spawn(async move {
             while let Some(state) = state_changes.next().await {
                 let (state, _guard) = state.into_parts();
                 if let Some(this) = weak_this.upgrade() {
                     if let TransitableState::Transition(_) = state {
                         let weak_this = Rc::downgrade(&this);
-                        spawn(async move {
+                        platform::spawn(async move {
                             let mut states = this.state.subscribe().skip(1);
                             let (timeout, timeout_handle) =
                                 resettable_delay_for(

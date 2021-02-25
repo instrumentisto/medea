@@ -3,7 +3,11 @@ use js_sys::Promise;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{api, api::MediaSourceKind, core, core::utils::JasonError};
+use crate::{
+    api,
+    api::{JasonError, MediaSourceKind},
+    core,
+};
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -32,8 +36,9 @@ impl RoomHandle {
     /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
         let this = self.0.clone();
+
         future_to_promise(async move {
-            this.join(token).await?;
+            this.join(token).await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -46,13 +51,19 @@ impl RoomHandle {
         &self,
         cb: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0.on_new_connection(cb)
+        self.0
+            .on_new_connection(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     pub fn on_close(&self, cb: js_sys::Function) -> Result<(), JsValue> {
-        self.0.on_close(cb)
+        self.0
+            .on_close(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Sets callback, which will be invoked when new [`local::Track`] will be
@@ -62,7 +73,10 @@ impl RoomHandle {
     /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     pub fn on_local_track(&self, cb: js_sys::Function) -> Result<(), JsValue> {
-        self.0.on_local_track(cb)
+        self.0
+            .on_local_track(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Sets `on_failed_local_media` callback, which will be invoked on local
@@ -71,7 +85,10 @@ impl RoomHandle {
         &self,
         cb: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0.on_failed_local_media(cb)
+        self.0
+            .on_failed_local_media(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on connection
@@ -80,7 +97,10 @@ impl RoomHandle {
         &self,
         cb: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0.on_connection_loss(cb)
+        self.0
+            .on_connection_loss(cb.into())
+            .map_err(JasonError::from)
+            .map_err(JsValue::from)
     }
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
@@ -133,7 +153,7 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.mute_audio().await?;
+            this.mute_audio().await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -143,7 +163,7 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.unmute_audio().await?;
+            this.unmute_audio().await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -153,7 +173,9 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.mute_video(source_kind.map(Into::into)).await?;
+            this.mute_video(source_kind.map(Into::into))
+                .await
+                .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -178,7 +200,7 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.disable_audio().await?;
+            this.disable_audio().await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -188,7 +210,7 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.enable_audio().await?;
+            this.enable_audio().await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -205,6 +227,7 @@ impl RoomHandle {
         future_to_promise(async move {
             this.disable_video(source_kind.map(Into::into))
                 .await
+                .map_err(JasonError::from)
                 .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
@@ -232,7 +255,9 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.disable_remote_audio().await?;
+            this.disable_remote_audio()
+                .await
+                .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -242,7 +267,9 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.disable_remote_video().await?;
+            this.disable_remote_video()
+                .await
+                .map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -252,7 +279,7 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.enable_audio().await?;
+            this.enable_remote_audio().await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -262,7 +289,7 @@ impl RoomHandle {
         let this = self.0.clone();
 
         future_to_promise(async move {
-            this.enable_remote_video().await?;
+            this.enable_remote_video().await.map_err(JasonError::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }

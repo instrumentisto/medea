@@ -1,6 +1,6 @@
 use derive_more::AsRef;
 
-use crate::{api::FacingMode, core, platform::get_property_by_name};
+use crate::{api, core, platform::get_property_by_name};
 
 #[derive(AsRef, Clone, Debug)]
 pub struct MediaStreamTrack {
@@ -35,27 +35,38 @@ impl MediaStreamTrack {
         self.kind
     }
 
-    pub fn ready_state(&self) -> web_sys::MediaStreamTrackState {
-        self.sys_track.ready_state()
+    pub fn ready_state(&self) -> core::MediaStreamTrackState {
+        let state = self.sys_track.ready_state();
+        match state {
+            web_sys::MediaStreamTrackState::Live => {
+                core::MediaStreamTrackState::Live
+            }
+            web_sys::MediaStreamTrackState::Ended => {
+                core::MediaStreamTrackState::Ended
+            }
+            web_sys::MediaStreamTrackState::__Nonexhaustive => {
+                unreachable!("Unknown MediaStreamTrackState::{:?}", state)
+            }
+        }
     }
 
     pub fn device_id(&self) -> Option<String> {
-        get_property_by_name(&self.sys_track.get_settings(), "device_id", |v| {
+        get_property_by_name(&self.sys_track.get_settings(), "deviceId", |v| {
             v.as_string()
         })
     }
 
-    pub fn facing_mode(&self) -> Option<FacingMode> {
+    pub fn facing_mode(&self) -> Option<api::FacingMode> {
         let facing_mode = get_property_by_name(
             &self.sys_track.get_settings(),
             "facingMode",
             |v| v.as_string(),
         );
         facing_mode.and_then(|facing_mode| match facing_mode.as_ref() {
-            "user" => Some(FacingMode::User),
-            "environment" => Some(FacingMode::Environment),
-            "left" => Some(FacingMode::Left),
-            "right" => Some(FacingMode::Right),
+            "user" => Some(api::FacingMode::User),
+            "environment" => Some(api::FacingMode::Environment),
+            "left" => Some(api::FacingMode::Left),
+            "right" => Some(api::FacingMode::Right),
             _ => {
                 // TODO: log err
                 None
