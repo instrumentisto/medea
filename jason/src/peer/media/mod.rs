@@ -665,13 +665,10 @@ impl MediaConnections {
         // Cannot fail, since transceiver is guaranteed to be negotiated at this
         // point.
         let mid = transceiver.mid().unwrap();
-        log::debug!("RemoteTrack's transceiver mid: {}", mid);
 
         for receiver in inner.receivers.values() {
             if let Some(recv_mid) = &receiver.mid() {
-                log::debug!("Receiver mid: {}", recv_mid);
                 if recv_mid == &mid {
-                    log::debug!("Settings his remote track");
                     receiver.set_remote_track(transceiver, track);
                     return Ok(());
                 }
@@ -696,9 +693,7 @@ impl MediaConnections {
             .filter(|rcvr| rcvr.transceiver().is_none())
         {
             if let Some(mid) = receiver.mid() {
-                log::debug!("Receiver with mid and without transceiver: {}", mid);
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
-                    log::debug!("Found transceiver for this receiver");
                     receiver.replace_transceiver(trnscvr.into())
                 }
             }

@@ -523,12 +523,9 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn set_offer(&self, offer: &str) -> Result<()> {
-        log::debug!("Set offer start");
         self.set_local_description(RtcSdpType::Offer, offer)
             .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        log::debug!("Set offer end");
-        Ok(())
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Sets provided [SDP answer][`SdpType::Answer`] as local description.
@@ -540,12 +537,9 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
     pub async fn set_answer(&self, answer: &str) -> Result<()> {
-        log::debug!("Set answer start");
         self.set_local_description(RtcSdpType::Answer, answer)
             .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        log::debug!("Set answer end");
-        Ok(())
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
@@ -639,14 +633,12 @@ impl RtcPeerConnection {
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         let description = match sdp {
             SdpType::Offer(offer) => {
-                log::debug!("Set remote offer start");
                 let mut desc =
                     RtcSessionDescriptionInit::new(RtcSdpType::Offer);
                 desc.sdp(&offer);
                 desc
             }
             SdpType::Answer(answer) => {
-                log::debug!("Set remote answer start");
                 let mut desc =
                     RtcSessionDescriptionInit::new(RtcSdpType::Answer);
                 desc.sdp(&answer);
@@ -659,7 +651,6 @@ impl RtcPeerConnection {
             .map_err(Into::into)
             .map_err(RTCPeerConnectionError::SetRemoteDescriptionFailed)
             .map_err(tracerr::wrap!())?;
-        log::debug!("Set remote offer end");
 
         Ok(())
     }
@@ -674,7 +665,6 @@ impl RtcPeerConnection {
         kind: MediaKind,
         direction: TransceiverDirection,
     ) -> RtcRtpTransceiver {
-        log::debug!("Add transceiver");
         let mut init = RtcRtpTransceiverInit::new();
         init.direction(direction.into());
         self.peer

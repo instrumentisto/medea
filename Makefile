@@ -513,7 +513,6 @@ endif
 ifeq ($(dockerized),yes)
 	docker run --rm --network=host \
 				-u $(shell id -u):$(shell id -g) \
-				-e FEATURES_PATH=tests/e2e/features/test \
 				-v "$(PWD)":/app -w /app \
 				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		ghcr.io/instrumentisto/rust:$(RUST_VER) \
