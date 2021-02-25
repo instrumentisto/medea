@@ -9,7 +9,6 @@
 !crates/
 !mock/
 !proto/
-!e2e/
 
 # Jason sources, assets and manifest.
 !jason/Cargo.toml

@@ -340,7 +340,11 @@ impl PeersService {
         if let Some((first_peer_id, second_peer_id)) = self
             .get_peers_between_members(&src.owner().id(), &sink.owner().id())
         {
-            println!("FOOBAR: Found already created Peers between Members: {:?} - {:?}", first_peer_id, second_peer_id);
+            println!(
+                "FOOBAR: Found already created Peers between Members: {:?} - \
+                 {:?}",
+                first_peer_id, second_peer_id
+            );
             Ok(GetOrCreatePeersResult::AlreadyExisted(
                 first_peer_id,
                 second_peer_id,
@@ -348,7 +352,10 @@ impl PeersService {
         } else {
             println!("FOOBAR: Creating Peers");
             let (src_peer_id, sink_peer_id) = self.create_peers(&src, &sink);
-            println!("FOOBAR: Created Peers: {:?} - {:?}", src_peer_id, sink_peer_id);
+            println!(
+                "FOOBAR: Created Peers: {:?} - {:?}",
+                src_peer_id, sink_peer_id
+            );
 
             self.peer_post_construct(src_peer_id, &src.clone().into())
                 .await

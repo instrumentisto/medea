@@ -8,7 +8,6 @@ mod transitable_state;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
-use web_sys as sys;
 use derive_more::Display;
 use futures::{channel::mpsc, future, future::LocalBoxFuture};
 use medea_client_api_proto as proto;

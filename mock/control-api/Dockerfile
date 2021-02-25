@@ -25,7 +25,6 @@ RUN apt-get update \
             cmake
 
 # Prepare Cargo workspace for building dependencies only.
-COPY e2e/Cargo.toml /app/e2e/
 COPY crates/medea-macro/Cargo.toml /app/crates/medea-macro/
 COPY crates/medea-reactive/Cargo.toml /app/crates/medea-reactive/
 COPY crates/medea-coturn-telnet-client/Cargo.toml \
@@ -41,8 +40,7 @@ COPY proto/control-api/src/grpc/api.proto \
 COPY jason/Cargo.toml /app/jason/
 COPY Cargo.toml Cargo.lock /app/
 WORKDIR /app/
-RUN mkdir -p e2e/src/ && touch e2e/src/lib.rs \
- && mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
+RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
  && mkdir -p crates/medea-reactive/src/ \
  && touch crates/medea-reactive/src/lib.rs \
  && mkdir -p crates/medea-coturn-telnet-client/src/ \

@@ -543,49 +543,7 @@ async fn then_member_has_remote_track(
     }
 }
 
-#[when(
-    regex = "^Control API interconnected (audio|video) of `(.*)` and `(.*)`$"
-)]
-async fn when_interconnects_kind(
-    world: &mut World,
-    kind: String,
-    left_member_id: String,
-    right_member_id: String,
-) {
-    let send_video = if kind.contains("video") {
-        Some(VideoSettings {
-            publish_policy: proto::PublishPolicy::Optional
-        })
-    } else {
-        None
-    };
-    use medea_control_api_mock::proto;
-    let send_audio = if kind.contains("audio") {
-        Some(AudioSettings {
-            publish_policy: proto::PublishPolicy::Optional
-        })
-    } else {
-        None
-    };
 
-    world
-        .interconnect_members(MembersPair {
-            left: PairedMember {
-                id: left_member_id,
-                recv: true,
-                send_video: send_video.clone(),
-                send_audio: send_audio.clone(),
-            },
-            right: PairedMember {
-                id: right_member_id,
-                recv: true,
-                send_video,
-                send_audio,
-            },
-        })
-        .await
-        .unwrap();
-}
 
 #[when(regex = "^Control API starts `(.*)`'s (audio|video|media) publishing \
                 to `(.*)`$")]
