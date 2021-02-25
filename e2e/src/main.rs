@@ -161,34 +161,6 @@ async fn when_member_joins_room(world: &mut World, id: String) {
     world.wait_for_interconnection(&id).await.unwrap();
 }
 
-#[then(regex = "^`(.*)` receives Connection with Member `(.*)`$")]
-async fn then_member_receives_connection(
-    world: &mut World,
-    id: String,
-    partner_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    member
-        .connections()
-        .wait_for_connection(partner_id.clone())
-        .await
-        .unwrap();
-}
-
-#[then(regex = "^`(.*)` doesn't receives Connection with Member `(.*)`")]
-async fn then_member_doesnt_receives_connection(
-    world: &mut World,
-    id: String,
-    partner_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    assert!(member
-        .connections()
-        .get(partner_id)
-        .await
-        .unwrap()
-        .is_none())
-}
 
 #[then(regex = "^`(.*)`'s (audio|(?:display|device) video) RemoteMediaTrack \
                 with `(.*)` is (enabled|disabled)$")]
@@ -486,30 +458,7 @@ async fn then_control_api_sends_on_join(world: &mut World, id: String) {
         .unwrap();
 }
 
-#[when(regex = "^Control API interconnects `(.*)` and `(.*)`$")]
-async fn when_control_api_interconnects_members(
-    world: &mut World,
-    id: String,
-    partner_id: String,
-) {
-    world
-        .interconnect_members(MembersPair {
-            left: PairedMember {
-                id,
-                recv: true,
-                send_video: Some(VideoSettings::default()),
-                send_audio: Some(AudioSettings::default()),
-            },
-            right: PairedMember {
-                id: partner_id,
-                recv: true,
-                send_video: Some(VideoSettings::default()),
-                send_audio: Some(AudioSettings::default()),
-            },
-        })
-        .await
-        .unwrap();
-}
+
 
 #[then(
     regex = "^`(.*)` has (audio|video|audio and video) remote Track(?:s)? \
@@ -545,61 +494,4 @@ async fn then_member_has_remote_track(
 
 
 
-#[when(regex = "^Control API starts `(.*)`'s (audio|video|media) publishing \
-                to `(.*)`$")]
-async fn when_control_api_starts_publishing(
-    world: &mut World,
-    publisher_id: String,
-    kind: String,
-    receiver_id: String,
-) {
-    let all_kinds = kind.contains("media");
-    let send_audio = if all_kinds || kind.contains("audio") {
-        Some(AudioSettings::default())
-    } else {
-        None
-    };
-    let send_video = if all_kinds || kind.contains("video") {
-        Some(VideoSettings::default())
-    } else {
-        None
-    };
-    world
-        .interconnect_members(MembersPair {
-            left: PairedMember {
-                id: publisher_id,
-                recv: false,
-                send_audio,
-                send_video,
-            },
-            right: PairedMember {
-                id: receiver_id,
-                recv: true,
-                send_video: None,
-                send_audio: None,
-            },
-        })
-        .await
-        .unwrap();
-}
 
-#[then(regex = "^`(.*)` doesn't has remote Tracks from `(.*)`$")]
-async fn then_member_doesnt_has_remote_tracks_with(
-    world: &mut World,
-    id: String,
-    partner_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    let tracks_count = member
-        .connections()
-        .wait_for_connection(partner_id)
-        .await
-        .unwrap()
-        .tracks_store()
-        .await
-        .unwrap()
-        .count()
-        .await
-        .unwrap();
-    assert_eq!(tracks_count, 0);
-}

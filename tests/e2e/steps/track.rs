@@ -200,3 +200,24 @@ async fn then_doesnt_have_remote_track(
         .await
         .unwrap());
 }
+
+#[then(regex = "^(\\S*) doesn't has remote tracks from (\\S*)$")]
+async fn then_member_doesnt_has_remote_tracks_with(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let tracks_count = member
+        .connections()
+        .wait_for_connection(partner_id)
+        .await
+        .unwrap()
+        .tracks_store()
+        .await
+        .unwrap()
+        .count()
+        .await
+        .unwrap();
+    assert_eq!(tracks_count, 0);
+}
