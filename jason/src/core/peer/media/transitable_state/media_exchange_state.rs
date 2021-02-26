@@ -7,12 +7,12 @@ use super::{InStable, InTransition};
 pub enum Stable {
     /// [`MediaStateControllable`] is enabled.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Enabled,
 
     /// [`MediaStateControllable`] is disabled.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Disabled,
 }
 
@@ -72,13 +72,13 @@ pub enum Transition {
     /// [`MediaStateControllable`] should be enabled, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Enabling(Stable),
 
     /// [`MediaStateControllable`] should be disabled, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Disabling(Stable),
 }
 

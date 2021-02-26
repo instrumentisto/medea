@@ -5,7 +5,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::{api::JasonError, core};
 
-/// JS exception for the [`RoomHandle::set_local_media_settings`].
+/// Exception returned from for the [`RoomHandle::set_local_media_settings`][1].
+///
+/// [1]: crate::core::RoomHandle::set_local_media_settings
 #[wasm_bindgen]
 #[derive(Debug, From)]
 #[from(forward)]

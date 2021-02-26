@@ -1,4 +1,4 @@
-// TODO: Split to multiple modules.
+//! Media tracks and streams constraints functionality.
 
 use std::{
     cell::{Cell, RefCell},
@@ -24,7 +24,7 @@ use crate::{
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 ///
-/// [`PeerConnection`]: crate::peer::PeerConnection
+/// [`PeerConnection`]: crate::core::peer::PeerConnection
 #[derive(Clone, Debug, Default)]
 pub struct LocalTracksConstraints(Rc<RefCell<MediaStreamSettings>>);
 
@@ -217,7 +217,7 @@ pub struct VideoTrackConstraints<C> {
     /// actions by [`Room`]. This flag can't be changed by
     /// [`MediaStreamSettings`] updating.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     enabled: bool,
 
     /// Indicator whether video should be muted.
@@ -238,7 +238,7 @@ impl<C> VideoTrackConstraints<C> {
     /// Returns `true` if this [`VideoTrackConstraints`] are enabled by the
     /// [`Room`] and constrained with [`VideoTrackConstraints::constraints`].
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     #[inline]
     fn enabled(&self) -> bool {
         self.enabled && self.is_constrained()
@@ -277,6 +277,8 @@ impl VideoTrackConstraints<DeviceVideoTrackConstraints> {
     /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
+    ///
+    /// [`MediaStreamTrack`]: platform::MediaStreamTrack
     pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
         &self,
         track: T,
@@ -293,6 +295,8 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
     /// device [`VideoTrackConstraints::constraints`].
     ///
     /// Returns `false` if [`VideoTrackConstraints::constraints`] is not set.
+    ///
+    /// [`MediaStreamTrack`]: platform::MediaStreamTrack
     pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
         &self,
         track: T,
@@ -375,6 +379,8 @@ impl MediaStreamSettings {
     /// Unconstrains [`VideoTrackConstraints`] which this
     /// [`MediaStreamTrack`] satisfies by calling
     /// [`VideoTrackConstraints::unconstrain`].
+    ///
+    /// [`MediaStreamTrack`]: platform::MediaStreamTrack
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
         T: AsRef<platform::MediaStreamTrack>,
@@ -715,17 +721,17 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
 
 /// Constraints for the [`MediaKind::Video`] [`local::Track`].
 ///
-/// [`local::Track`]: crate::media::track::local::Track
+/// [`local::Track`]: crate::core::media::track::local::Track
 #[derive(Clone, Debug)]
 pub enum VideoSource {
     /// [`local::Track`] should be received from the `getUserMedia` request.
     ///
-    /// [`local::Track`]: crate::media::track::local::Track
+    /// [`local::Track`]: crate::core::media::track::local::Track
     Device(DeviceVideoTrackConstraints),
 
     /// [`local::Track`] should be received from the `getDisplayMedia` request.
     ///
-    /// [`local::Track`]: crate::media::track::local::Track
+    /// [`local::Track`]: crate::core::media::track::local::Track
     Display(DisplayVideoTrackConstraints),
 }
 
@@ -948,7 +954,6 @@ pub enum ConstrainU32 {
 impl ConstrainU32 {
     // It's up to `<T as Constraint>::TRACK_SETTINGS_FIELD_NAME` to guarantee
     // that such casts are safe.
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn satisfies(this: Option<Self>, setting: Option<u32>) -> bool {
         match this {
             None | Some(ConstrainU32::Ideal(_)) => true,
@@ -970,7 +975,9 @@ impl ConstrainU32 {
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConstrainString<T> {
+    /// The exact required value for this property.
     Exact(T),
+    /// The ideal (target) value for this property.
     Ideal(T),
 }
 

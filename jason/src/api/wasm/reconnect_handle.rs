@@ -20,6 +20,8 @@ impl ReconnectHandle {
     /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
+    ///
+    /// [`RpcSession`]: core::rpc::RpcSession
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
         let this = self.0.clone();
         future_to_promise(async move {
@@ -48,6 +50,8 @@ impl ReconnectHandle {
     ///
     /// If `multiplier` is negative number than `multiplier` will be considered
     /// as `0.0`.
+    ///
+    /// [`RpcSession`]: core::rpc::RpcSession
     pub fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,

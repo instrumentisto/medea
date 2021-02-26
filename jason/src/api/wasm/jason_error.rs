@@ -4,6 +4,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::core;
 
+/// Representation of app error exported to JS side.
+///
+/// Contains JS side error if it the cause and trace information.
 #[wasm_bindgen]
 #[derive(From)]
 pub struct JasonError(core::utils::JasonError);
@@ -27,6 +30,6 @@ impl JasonError {
 
     /// Returns JS side error if it the cause.
     pub fn source(&self) -> Option<js_sys::Error> {
-        self.0.source()
+        self.0.source().and_then(|a| a.sys_cause)
     }
 }

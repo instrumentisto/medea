@@ -120,7 +120,7 @@ impl Drop for Track {
 pub struct LocalMediaTrack(Rc<Track>);
 
 impl LocalMediaTrack {
-    /// Creates new [`JsTrack`] from the provided [`Track`].
+    /// Creates new [`LocalMediaTrack`] from the provided [`Track`].
     #[inline]
     #[must_use]
     pub fn new(track: Rc<Track>) -> Self {
@@ -128,20 +128,21 @@ impl LocalMediaTrack {
     }
 
     /// Returns the underlying [`platform::MediaStreamTrack`] of this
-    /// [`JsTrack`].
+    /// [`LocalMediaTrack`].
     pub fn get_track(&self) -> &platform::MediaStreamTrack {
         &self.0.track
     }
 
-    /// Returns [`MediaKind::Audio`] if this [`JsTrack`] represents an audio
-    /// track, or [`MediaKind::Video`] if it represents a video track.
+    /// Returns [`MediaKind::Audio`] if this [`LocalMediaTrack`] represents an
+    /// audio track, or [`MediaKind::Video`] if it represents a video track.
     pub fn kind(&self) -> MediaKind {
         self.0.kind()
     }
 
-    /// Returns [`MediaSourceKind::Device`] if this [`JsTrack`] is sourced
-    /// from some device (webcam/microphone), or [`MediaSourceKind::Display`]
-    /// if ot is captured via [MediaDevices.getDisplayMedia()][1].
+    /// Returns [`MediaSourceKind::Device`] if this [`LocalMediaTrack`] is
+    /// sourced from some device (webcam/microphone), or
+    /// [`MediaSourceKind::Display`] if ot is captured via
+    /// [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub fn media_source_kind(&self) -> MediaSourceKind {

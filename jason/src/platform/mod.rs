@@ -1,8 +1,6 @@
-// #[cfg(all(
-//     target_arch = "wasm32",
-//     target_vendor = "unknown",
-//     target_os = "unknown"
-// ))]
+//! Platform specific functionality.
+
+#[doc(inline)]
 pub use self::{
     rtc_stats::RtcStatsError,
     transport::{
@@ -10,9 +8,11 @@ pub use self::{
     },
     wasm::{
         constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
-        delay_for, enumerate_devices, get_display_media, get_property_by_name,
-        get_user_media, init_logger,
+        delay_for,
+        error::Error,
+        get_property_by_name, init_logger,
         input_device_info::InputDeviceInfo,
+        media_devices::{enumerate_devices, get_display_media, get_user_media},
         media_track::MediaStreamTrack,
         peer_connection::{
             IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
@@ -20,8 +20,7 @@ pub use self::{
         rtc_stats::RtcStats,
         set_panic_hook, spawn,
         transceiver::{Transceiver, TransceiverDirection},
-        utils::{Callback, EventListener, EventListenerBindError, Function},
-        Error,
+        utils::{Callback, Function},
     },
 };
 

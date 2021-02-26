@@ -31,27 +31,25 @@ use crate::{
 pub enum ClientDisconnect {
     /// [`Room`] was dropped without any [`CloseReason`].
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     RoomUnexpectedlyDropped,
 
     /// [`Room`] was normally closed by JS side.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     RoomClosed,
 
     /// [`WebSocketRpcClient`] was unexpectedly dropped.
-    ///
-    /// [`WebSocketRpcClient`]: crate::rpc::WebSocketRpcClient
     RpcClientUnexpectedlyDropped,
 
     /// [`RpcTransport`] was unexpectedly dropped.
     ///
-    /// [`RpcTransport`]: crate::rpc::RpcTransport
+    /// [`RpcTransport`]: platform::RpcTransport
     RpcTransportUnexpectedlyDropped,
 
     /// [`WebSocketRpcSession`] was unexpectedly dropped.
     ///
-    /// [`WebSocketRpcSession`]: crate::rpc::WebSocketRpcSession
+    /// [`WebSocketRpcSession`]: crate::core::rpc::WebSocketRpcSession
     SessionUnexpectedlyDropped,
 }
 
@@ -81,6 +79,8 @@ impl From<ClientDisconnect> for CloseReason {
 }
 
 /// State of [`WebSocketRpcClient`] and [`RpcTransport`].
+///
+/// [`RpcTransport`]: platform::RpcTransport
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClientState {
     /// [`WebSocketRpcClient`] is currently establishing a connection to RPC
@@ -112,6 +112,8 @@ struct Inner {
     /// Reason of [`WebSocketRpcClient`] closing.
     ///
     /// This reason will be provided to the underlying [`RpcTransport`].
+    ///
+    /// [`RpcTransport`]: platform::RpcTransport
     close_reason: ClientDisconnect,
 
     /// Subscribers that will be notified when underlying transport connection
@@ -121,12 +123,16 @@ struct Inner {
     /// Closure which will create new [`RpcTransport`]s for this
     /// [`WebSocketRpcClient`] on each
     /// [`WebSocketRpcClient:: establish_connection`] call.
+    ///
+    /// [`RpcTransport`]: platform::RpcTransport
     rpc_transport_factory: RpcTransportFactory,
 
     /// URL that [`RpcTransport`] will connect to.
     ///
     /// [`None`] if this [`WebSocketRpcClient`] has never been connected to
     /// a sever.
+    ///
+    /// [`RpcTransport`]: platform::RpcTransport
     url: Option<ApiUrl>,
 
     /// Current [`ClientState`] of this [`WebSocketRpcClient`].
@@ -135,6 +141,8 @@ struct Inner {
 
 /// Factory closure which creates [`RpcTransport`] for
 /// [`WebSocketRpcClient::establish_connection`] function.
+///
+/// [`RpcTransport`]: platform::RpcTransport
 pub type RpcTransportFactory = Box<
     dyn Fn(
         ApiUrl,
@@ -173,11 +181,11 @@ pub enum RpcEvent {
     /// Notification of the subscribers that [`WebSocketRpcClient`] is joined
     /// [`Room`] on Media Server.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     JoinedRoom {
         /// ID of the joined [`Room`].
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::core::Room
         room_id: RoomId,
 
         /// ID of the joined `Member`.
@@ -187,16 +195,16 @@ pub enum RpcEvent {
     /// Notification of the subscribers that [`WebSocketRpcClient`] left
     /// [`Room`] on Media Server.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     LeftRoom {
         /// ID of the [`Room`] being left.
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::core::Room
         room_id: RoomId,
 
         /// Reason of why the [`Room`] has been left.
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::core::Room
         close_reason: CloseReason,
     },
 
@@ -204,7 +212,7 @@ pub enum RpcEvent {
     Event {
         /// ID of the [`Room`] for that this [`Event`] has been received for.
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::core::Room
         room_id: RoomId,
 
         /// Received [`Event`].
@@ -312,14 +320,12 @@ impl WebSocketRpcClient {
             },
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
-                    IdleTimeout(
-                        Duration::from_millis(settings.idle_timeout_ms.into())
-                            .into(),
-                    ),
-                    PingInterval(
-                        Duration::from_millis(settings.ping_interval_ms.into())
-                            .into(),
-                    ),
+                    IdleTimeout(Duration::from_millis(
+                        settings.idle_timeout_ms.into(),
+                    )),
+                    PingInterval(Duration::from_millis(
+                        settings.ping_interval_ms.into(),
+                    )),
                 )
                 .map_err(tracerr::wrap!(=> RpcClientError))
                 .map_err(|e| {
@@ -340,17 +346,19 @@ impl WebSocketRpcClient {
 
     /// Starts [`Heartbeat`] with provided [`RpcSettings`] for provided
     /// [`RpcTransport`].
+    ///
+    /// [`RpcTransport`]: platform::RpcTransport
     async fn start_heartbeat(
         self: Rc<Self>,
         transport: Rc<dyn platform::RpcTransport>,
         rpc_settings: RpcSettings,
     ) -> Result<(), Traced<RpcClientError>> {
-        let idle_timeout = IdleTimeout(
-            Duration::from_millis(rpc_settings.idle_timeout_ms.into()).into(),
-        );
-        let ping_interval = PingInterval(
-            Duration::from_millis(rpc_settings.ping_interval_ms.into()).into(),
-        );
+        let idle_timeout = IdleTimeout(Duration::from_millis(
+            rpc_settings.idle_timeout_ms.into(),
+        ));
+        let ping_interval = PingInterval(Duration::from_millis(
+            rpc_settings.ping_interval_ms.into(),
+        ));
 
         let heartbeat =
             Heartbeat::start(transport, ping_interval, idle_timeout);
@@ -561,8 +569,9 @@ impl WebSocketRpcClient {
     /// connection loss, JS side user should select reconnection strategy with
     /// [`ReconnectHandle`] (or simply close [`Room`]).
     ///
-    /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
-    /// [`Room`]: crate::api::Room
+    /// [`RpcTransport`]: platform::RpcTransport
+    /// [`ReconnectHandle`]: crate::core::rpc::ReconnectHandle
+    /// [`Room`]: crate::core::Room
     /// [`Stream`]: futures::Stream
     pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();

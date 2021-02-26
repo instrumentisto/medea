@@ -1,7 +1,7 @@
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::platform;
+use crate::{api::MediaKind, platform};
 
 /// Representation of [MediaDeviceInfo][1].
 ///
@@ -22,7 +22,7 @@ impl InputDeviceInfo {
     /// This representation of [MediaDeviceInfo][1] ONLY for input device.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
-    pub fn kind(&self) -> super::MediaKind {
+    pub fn kind(&self) -> MediaKind {
         self.0.kind().into()
     }
 

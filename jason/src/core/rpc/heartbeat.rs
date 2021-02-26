@@ -74,6 +74,8 @@ pub struct Heartbeat(Rc<RefCell<Inner>>);
 impl Heartbeat {
     /// Start this [`Heartbeat`] for the provided [`RpcTransport`] with
     /// the provided `idle_timeout` and `ping_interval`.
+    ///
+    /// [`RpcTransport`]: platform::RpcTransport
     pub fn start(
         transport: Rc<dyn platform::RpcTransport>,
         ping_interval: PingInterval,
@@ -110,6 +112,8 @@ impl Heartbeat {
 
     /// Returns [`LocalBoxStream`] to which will sent `()` when [`Heartbeat`]
     /// considers that [`RpcTransport`] is idle.
+    ///
+    /// [`RpcTransport`]: platform::RpcTransport
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().on_idle_subs.push(on_idle_tx);

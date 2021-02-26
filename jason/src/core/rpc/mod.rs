@@ -158,6 +158,8 @@ pub enum CloseReason {
 
 /// The reason of why [`WebSocketRpcClient`]/[`RpcTransport`] went into
 /// closed state.
+///
+/// [`RpcTransport`]: platform::RpcTransport
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClosedStateReason {
     /// Connection with server was lost.

@@ -327,12 +327,11 @@ impl MediaManagerHandle {
     ) -> std::result::Result<Vec<platform::InputDeviceInfo>, JasonError> {
         InnerMediaManager::enumerate_devices()
             .await
-            .map(|tracks| tracks)
             .map_err(tracerr::wrap!(=> MediaManagerError))
-            .map_err(|e| JasonError::from(e).into())
+            .map_err(JasonError::from)
     }
 
-    /// Returns [`local::JsTrack`]s objects, built from provided
+    /// Returns [`local::LocalMediaTrack`]s objects, built from provided
     /// [`MediaStreamSettings`].
     pub async fn init_local_tracks(
         &self,
@@ -348,6 +347,6 @@ impl MediaManagerHandle {
                     .collect::<Vec<_>>()
             })
             .map_err(tracerr::wrap!(=> MediaManagerError))
-            .map_err(|e| JasonError::from(e).into())
+            .map_err(JasonError::from)
     }
 }

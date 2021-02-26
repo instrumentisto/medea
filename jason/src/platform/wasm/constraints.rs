@@ -8,20 +8,36 @@ use web_sys::{
     ConstrainDomStringParameters, ConstrainDoubleRange, MediaTrackConstraints,
 };
 
+/// [MediaStreamConstraints][1] wrapper.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 #[derive(AsRef, Debug, Into)]
 pub struct MediaStreamConstraints(web_sys::MediaStreamConstraints);
 
 impl MediaStreamConstraints {
+    /// Creates new [`MediaStreamConstraints`] with none constraints configured.
     pub fn new() -> Self {
         Self(web_sys::MediaStreamConstraints::new())
     }
 
+    /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn audio(&mut self, audio: AudioTrackConstraints) {
         self.0.audio(&MediaTrackConstraints::from(audio).into());
     }
 
+    /// Specifies the nature and settings of the video [MediaStreamTrack][1].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn video(&mut self, video: DeviceVideoTrackConstraints) {
         self.0.video(&MediaTrackConstraints::from(video).into());
+    }
+}
+
+impl Default for MediaStreamConstraints {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -96,16 +112,30 @@ impl<T: AsRef<str>> From<&ConstrainString<T>> for ConstrainDomStringParameters {
     }
 }
 
+/// [`DisplayMediaStreamConstraints`][1] wrapper.
+///
+/// [1]: https://www.w3.org/TR/screen-capture/#dom-displaymediastreamconstraints
 #[derive(AsRef, Debug, Into)]
 pub struct DisplayMediaStreamConstraints(
     web_sys::DisplayMediaStreamConstraints,
 );
 
+impl Default for DisplayMediaStreamConstraints {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DisplayMediaStreamConstraints {
+    /// Creates new [`DisplayMediaStreamConstraints`] with none constraints
+    /// configured.
     pub fn new() -> Self {
         Self(web_sys::DisplayMediaStreamConstraints::new())
     }
 
+    /// Specifies the nature and settings of the video [MediaStreamTrack][1].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn video(&mut self, video: DisplayVideoTrackConstraints) {
         self.0.video(&MediaTrackConstraints::from(video).into());
     }

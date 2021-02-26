@@ -85,14 +85,17 @@ impl RoomCloseReason {
         }
     }
 
+    /// [`Room`] close reason.
     pub fn reason(&self) -> String {
         self.reason.clone()
     }
 
+    /// Whether [`Room`] was closed by server.
     pub fn is_closed_by_server(&self) -> bool {
         self.is_closed_by_server
     }
 
+    /// Whether [`Room`] close reason is considered as error
     pub fn is_err(&self) -> bool {
         self.is_err
     }
@@ -115,8 +118,6 @@ pub enum RoomError {
 
     /// Returned if [`PeerConnection`] cannot receive the local tracks from
     /// [`MediaManager`].
-    ///
-    /// [`MediaManager`]: crate::media::MediaManager
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     #[from(ignore)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
@@ -139,7 +140,7 @@ pub enum RoomError {
 
     /// Returned if [`track`] update failed.
     ///
-    /// [`track`]: crate::media::track
+    /// [`track`]: crate::core::media::track
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
     #[from(ignore)]
     FailedTrackPatch(TrackId),
@@ -301,7 +302,7 @@ impl RoomHandle {
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::core::Connection
     pub fn on_new_connection(
         &self,
         f: platform::Function<api::ConnectionHandle>,
@@ -383,7 +384,11 @@ impl RoomHandle {
         stop_first: bool,
         rollback_on_fail: bool,
     ) -> Result<(), ConstraintsUpdateException> {
-        let inner = upgrade_or_detached!(self.0, JasonError).unwrap(); // TODO: remove unwrap
+        let inner = (self.0).upgrade().ok_or_else(|| {
+            ConstraintsUpdateException::Errored(new_js_error!(
+                HandlerDetachedError
+            ))
+        })?;
 
         inner
             .set_local_media_settings(settings, stop_first, rollback_on_fail)
@@ -394,7 +399,7 @@ impl RoomHandle {
     }
 
     /// Returns [`Promise`] which will switch [`MediaState`] of the provided
-    /// [`MediaKind`], [`TrackDirection`] and [`JsMediaSourceKind`] to the
+    /// [`MediaKind`], [`TrackDirection`] and [`MediaSourceKind`] to the
     /// provided [`MediaState`].
     ///
     /// Helper function for all the exported mute/unmute/enable/disable
@@ -494,7 +499,7 @@ impl RoomHandle {
 
     /// Disables outbound video.
     ///
-    /// Affects only video with specific [`JsMediaSourceKind`] if specified.
+    /// Affects only video with specific [`MediaSourceKind`] if specified.
     pub async fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -510,7 +515,7 @@ impl RoomHandle {
 
     /// Enables outbound video.
     ///
-    /// Affects only video with specific [`JsMediaSourceKind`] if specified.
+    /// Affects only video with specific [`MediaSourceKind`] if specified.
     pub async fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -701,7 +706,7 @@ impl Room {
             .map_or(false, |handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
     }
 
-    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
+    /// Downgrades this [`Room`] to a weak reference.
     #[inline]
     pub fn downgrade(&self) -> WeakRoom {
         WeakRoom(Rc::downgrade(&self.0))
@@ -731,7 +736,7 @@ struct InnerRoom {
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::core::Connection
     connections: Rc<Connections>,
 
     /// Callback to be invoked when new local [`local::JsTrack`] will be added
@@ -740,8 +745,6 @@ struct InnerRoom {
 
     /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    ///
-    /// [`MediaManager`]: crate::media::MediaManager
     on_failed_local_media: Rc<platform::Callback<api::JasonError>>,
 
     /// Callback to be invoked when [`RpcSession`] loses connection.
@@ -760,65 +763,8 @@ struct InnerRoom {
 }
 
 /// JS exception for the [`RoomHandle::set_local_media_settings`].
-#[derive(Debug, From)]
-#[from(forward)]
-pub struct ConstraintsUpdateException(JsConstraintsUpdateError);
-
-impl ConstraintsUpdateException {
-    /// Returns name of this [`ConstraintsUpdateException`].
-    pub fn name(&self) -> String {
-        self.0.to_string()
-    }
-
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `RecoveredException` or `RecoverFailedException`.
-    ///
-    /// Returns `undefined` otherwise.
-    pub fn recover_reason(&self) -> Option<JasonError> {
-        use JsConstraintsUpdateError as E;
-        match &self.0 {
-            E::RecoverFailed { recover_reason, .. }
-            | E::Recovered { recover_reason, .. } => {
-                Some(recover_reason.clone())
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
-    /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
-    ///
-    /// Returns `undefined` otherwise.
-    pub fn recover_fail_reasons(&self) -> Vec<JasonError> {
-        match &self.0 {
-            JsConstraintsUpdateError::RecoverFailed {
-                recover_fail_reasons,
-                ..
-            } => recover_fail_reasons.clone(),
-            _ => Vec::new(),
-        }
-    }
-
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `ErroredException`.
-    ///
-    /// Returns `undefined` otherwise.
-    pub fn error(&self) -> Option<JasonError> {
-        match &self.0 {
-            JsConstraintsUpdateError::Errored { reason } => {
-                Some(reason.clone())
-            }
-            _ => None,
-        }
-    }
-}
-
-/// [`ConstraintsUpdateError`] for JS side.
-///
-/// Should be wrapped to [`ConstraintsUpdateException`] before returning to the
-/// JS side.
 #[derive(Debug, Display)]
-pub enum JsConstraintsUpdateError {
+pub enum ConstraintsUpdateException {
     /// New [`MediaStreamSettings`] set failed and state was recovered
     /// accordingly to the provided recover policy
     /// (`rollback_on_fail`/`stop_first` arguments).
@@ -835,14 +781,56 @@ pub enum JsConstraintsUpdateError {
         /// [`JasonError`] due to which recovery happened.
         recover_reason: JasonError,
 
-        /// [`js_sys::Array`] with a [`JasonError`]s due to which recovery
-        /// failed.
+        /// Vector of [`JasonError`]s due to which recovery failed.
         recover_fail_reasons: Vec<JasonError>,
     },
 
-    /// Some another error occurred.
+    /// Some other error occurred.
     #[display(fmt = "ErroredException")]
-    Errored { reason: JasonError },
+    Errored(JasonError),
+}
+
+impl ConstraintsUpdateException {
+    /// Returns name of this [`ConstraintsUpdateException`].
+    pub fn name(&self) -> String {
+        self.to_string()
+    }
+
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `RecoveredException` or `RecoverFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
+    pub fn recover_reason(&self) -> Option<JasonError> {
+        match &self {
+            Self::RecoverFailed { recover_reason, .. }
+            | Self::Recovered { recover_reason, .. } => {
+                Some(recover_reason.clone())
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns vector of [`JasonError`]s if this due to which recovery failed.
+    pub fn recover_fail_reasons(&self) -> Vec<JasonError> {
+        match &self {
+            Self::RecoverFailed {
+                recover_fail_reasons,
+                ..
+            } => recover_fail_reasons.clone(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `ErroredException`.
+    ///
+    /// Returns `undefined` otherwise.
+    pub fn error(&self) -> Option<JasonError> {
+        match &self {
+            Self::Errored(reason) => Some(reason.clone()),
+            _ => None,
+        }
+    }
 }
 
 /// Constraints errors which are can occur while updating
@@ -909,18 +897,18 @@ impl ConstraintsUpdateError {
     }
 }
 
-impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
+impl From<ConstraintsUpdateError> for ConstraintsUpdateException {
     fn from(from: ConstraintsUpdateError) -> Self {
         use ConstraintsUpdateError as E;
         match from {
             E::Recovered { recover_reason } => Self::Recovered {
-                recover_reason: JasonError::from(recover_reason).into(),
+                recover_reason: JasonError::from(recover_reason),
             },
             E::RecoverFailed {
                 recover_reason,
                 recover_fail_reasons,
             } => Self::RecoverFailed {
-                recover_reason: JasonError::from(recover_reason).into(),
+                recover_reason: JasonError::from(recover_reason),
                 recover_fail_reasons: {
                     recover_fail_reasons
                         .into_iter()
@@ -928,9 +916,9 @@ impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
                         .collect()
                 },
             },
-            E::Errored { error: reason } => Self::Errored {
-                reason: JasonError::from(reason).into(),
-            },
+            E::Errored { error: reason } => {
+                Self::Errored(JasonError::from(reason))
+            }
         }
     }
 }
@@ -1380,7 +1368,7 @@ impl EventHandler for InnerRoom {
     /// If provided `sdp_offer` is `Some`, then offer is applied to a created
     /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::core::Connection
     async fn on_peer_created(
         &self,
         peer_id: PeerId,
@@ -1513,8 +1501,8 @@ impl EventHandler for InnerRoom {
     /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
     /// [`Connection::update_quality_score()`][1].
     ///
-    /// [`Connection`]: crate::api::Connection
-    /// [1]: crate::api::Connection::update_quality_score
+    /// [`Connection`]: crate::core::Connection
+    /// [1]: crate::core::Connection::update_quality_score
     async fn on_connection_quality_updated(
         &self,
         partner_member_id: MemberId,
@@ -1578,7 +1566,7 @@ impl PeerEventHandler for InnerRoom {
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
     /// [`remote::Track`] to the related [`Connection`].
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::core::Connection
     /// [`Stream`]: futures::Stream
     async fn on_new_remote_track(
         &self,

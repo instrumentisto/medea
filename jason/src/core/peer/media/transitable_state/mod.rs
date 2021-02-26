@@ -1,6 +1,6 @@
 //! [`MediaStateControllable`]s media exchange state.
 //!
-//! [`MediaStateControllable`]: crate::peer::MediaStateControllable
+//! [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
 
 mod controller;
 pub mod media_exchange_state;
@@ -25,7 +25,7 @@ pub type MuteState =
 
 /// All media states which can be toggled in the [`MediaStateControllable`].
 ///
-/// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+/// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
 #[derive(Clone, Copy, Debug, From)]
 pub enum MediaState {
     /// Responsible for changing [`enabled`][1] property of
@@ -116,7 +116,7 @@ pub trait InTransition: Clone + Copy + PartialEq {
 
 /// All media exchange states in which [`MediaStateControllable`] can be.
 ///
-/// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+/// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TransitableState<S, T> {
     /// State of transition.

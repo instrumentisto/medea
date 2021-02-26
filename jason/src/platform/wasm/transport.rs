@@ -18,15 +18,9 @@ use crate::{
     },
     platform::{
         transport::{RpcTransport, TransportError, TransportState},
-        wasm::utils::{EventListener, EventListenerBindError},
+        wasm::utils::EventListener,
     },
 };
-
-impl From<EventListenerBindError> for TransportError {
-    fn from(err: EventListenerBindError) -> Self {
-        Self::WebSocketEventBindError(err)
-    }
-}
 
 /// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
 ///
@@ -158,7 +152,7 @@ impl WebSocketRpcTransport {
                             .set(TransportState::Closed(CloseMsg::from(&msg)));
                     },
                 )
-                .map_err(tracerr::map_from_and_wrap!())?,
+                .unwrap(),
             );
 
             let inner = Rc::clone(&socket);
@@ -170,7 +164,7 @@ impl WebSocketRpcTransport {
                         inner.borrow().socket_state.set(TransportState::Open);
                     },
                 )
-                .map_err(tracerr::map_from_and_wrap!(=> TransportError))?,
+                .unwrap(),
             );
         }
 
@@ -179,8 +173,8 @@ impl WebSocketRpcTransport {
 
         if let Some(TransportState::Open) = state {
             let this = Self(socket);
-            this.set_on_close_listener()?;
-            this.set_on_message_listener()?;
+            this.set_on_close_listener();
+            this.set_on_message_listener();
 
             Ok(this)
         } else {
@@ -190,7 +184,7 @@ impl WebSocketRpcTransport {
 
     /// Sets [`InnerSocket::on_close_listener`] which will update
     /// [`RpcTransport`]'s [`TransportState`] to [`TransportState::Closed`].
-    fn set_on_close_listener(&self) -> Result<()> {
+    fn set_on_close_listener(&self) {
         let this = Rc::clone(&self.0);
         let on_close = EventListener::new_once(
             Rc::clone(&self.0.borrow().socket),
@@ -201,15 +195,13 @@ impl WebSocketRpcTransport {
                     .set(TransportState::Closed(CloseMsg::from(&msg)));
             },
         )
-        .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;
+        .unwrap();
         self.0.borrow_mut().on_close_listener = Some(on_close);
-
-        Ok(())
     }
 
     /// Sets [`InnerSocket::on_message_listener`] which will send
     /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`] subscribers.
-    fn set_on_message_listener(&self) -> Result<()> {
+    fn set_on_message_listener(&self) {
         let this = Rc::clone(&self.0);
         let on_message = EventListener::new_mut(
             Rc::clone(&self.0.borrow().socket),
@@ -232,11 +224,9 @@ impl WebSocketRpcTransport {
                 });
             },
         )
-        .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;
+        .unwrap();
 
         self.0.borrow_mut().on_message_listener = Some(on_message);
-
-        Ok(())
     }
 }
 

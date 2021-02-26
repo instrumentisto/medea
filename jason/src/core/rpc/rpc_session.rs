@@ -119,9 +119,9 @@ pub trait RpcSession {
     /// connection loss, JS side user should select reconnection strategy with
     /// [`ReconnectHandle`] (or simply close [`Room`]).
     ///
-    /// [`ReconnectHandle`]: crate::rpc::RpcTransport
-    /// [`Room`]: crate::api::Room
-    /// [`RpcTransport`]: crate::rpc::RpcTransport
+    /// [`ReconnectHandle`]: platform::RpcTransport
+    /// [`Room`]: crate::core::Room
+    /// [`RpcTransport`]: platform::RpcTransport
     /// [`Stream`]: futures::Stream
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
@@ -136,7 +136,7 @@ pub trait RpcSession {
 ///
 /// Responsible for [`Room`] authorization and closing.
 ///
-/// [`Room`]: crate::api::Room
+/// [`Room`]: crate::core::Room
 pub struct WebSocketRpcSession {
     /// [WebSocket] based Rpc Client used to .
     ///

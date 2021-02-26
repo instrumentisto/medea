@@ -48,6 +48,7 @@ impl Sender {
     /// has [`Some`] [`mid`], but this [`mid`] isn't found in the
     /// [`MediaConnections`].
     ///
+    /// [`Transceiver`]: platform::Transceiver
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn new(
         state: &State,
@@ -178,6 +179,8 @@ impl Sender {
     }
 
     /// Returns [`Transceiver`] of this [`Sender`].
+    ///
+    /// [`Transceiver`]: platform::Transceiver
     #[inline]
     #[must_use]
     pub fn transceiver(&self) -> platform::Transceiver {

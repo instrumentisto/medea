@@ -1,4 +1,7 @@
-//! External Jason API accessible from JS.
+//! Platform agnostic functionality.
+
+// TODO: Remove when moving JasonError to api::wasm.
+#![allow(clippy::missing_errors_doc)]
 
 use futures::FutureExt as _;
 use std::{cell::RefCell, rc::Rc};
@@ -14,7 +17,7 @@ use self::{
 
 #[doc(inline)]
 pub use self::{
-    connection::{ConnectionHandle, Connections},
+    connection::{Connection, ConnectionHandle, Connections},
     media::{
         track::{local::LocalMediaTrack, remote, MediaStreamTrackState},
         AudioTrackConstraints, DeviceVideoTrackConstraints,
@@ -42,7 +45,7 @@ pub mod rpc;
 /// and room initialization.
 pub struct Jason(Rc<RefCell<Inner>>);
 
-pub struct Inner {
+struct Inner {
     /// [`Jason`]s [`MediaManager`]. It's shared across [`Room`]s since
     /// [`MediaManager`] contains media tracks that can be used by multiple
     /// [`Room`]s.

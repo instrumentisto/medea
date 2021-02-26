@@ -13,9 +13,9 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::platform::{self, get_property_by_name, RtcStatsError};
 
-/// All available [`RtcStatsType`] of [`PeerConnection`].
+/// All available [`RtcStatsType`] of [`RtcPeerConnection`].
 ///
-/// [`PeerConnection`]: crate::peer::PeerConnection
+/// [`RtcPeerConnection`]: platform::RtcPeerConnection
 #[derive(Clone, Debug)]
 pub struct RtcStats(pub Vec<RtcStat>);
 
@@ -23,7 +23,7 @@ impl TryFrom<&JsValue> for RtcStats {
     type Error = Traced<RtcStatsError>;
 
     fn try_from(stats: &JsValue) -> Result<Self, Self::Error> {
-        use RtcStatsError::{Js, UndefinedEntries};
+        use RtcStatsError::{Platform, UndefinedEntries};
 
         let entries_fn =
             get_property_by_name(&stats, "entries", |func: JsValue| {
@@ -33,14 +33,15 @@ impl TryFrom<&JsValue> for RtcStats {
 
         let iterator = entries_fn
             .call0(stats.as_ref())
-            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?
+            .map_err(|e| tracerr::new!(Platform(platform::Error::from(e))))?
             .unchecked_into::<JsIterator>();
 
         let mut stats = Vec::new();
 
         for stat in iterator {
-            let stat =
-                stat.map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
+            let stat = stat.map_err(|e| {
+                tracerr::new!(Platform(platform::Error::from(e)))
+            })?;
             let stat = stat.unchecked_into::<JsArray>();
             let stat = RtcStatsReportEntry::try_from(stat)
                 .map_err(tracerr::map_from_and_wrap!())?;
@@ -66,7 +67,7 @@ impl TryFrom<JsArray> for RtcStatsReportEntry {
     type Error = Traced<RtcStatsError>;
 
     fn try_from(value: JsArray) -> Result<Self, Self::Error> {
-        use RtcStatsError::{Js, UndefinedId, UndefinedStats};
+        use RtcStatsError::{Platform, UndefinedId, UndefinedStats};
 
         let id = value.get(0);
         let stats = value.get(1);
@@ -81,10 +82,10 @@ impl TryFrom<JsArray> for RtcStatsReportEntry {
 
         let id = id
             .dyn_into::<JsString>()
-            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
+            .map_err(|e| tracerr::new!(Platform(platform::Error::from(e))))?;
         let stats = stats
             .dyn_into::<JsValue>()
-            .map_err(|e| tracerr::new!(Js(platform::Error::from(e))))?;
+            .map_err(|e| tracerr::new!(Platform(platform::Error::from(e))))?;
 
         Ok(RtcStatsReportEntry(id, stats))
     }

@@ -23,16 +23,15 @@ pub trait JsCaused {
     fn js_cause(self) -> Option<Self::Error>;
 }
 
-/// Representation of app error exported to JS side.
-///
-/// Contains JS side error if it the cause and trace information.
+// TODO: Consider moving to api::wasm.
+/// Abstract application error.
 #[derive(Clone, Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
     name: &'static str,
     message: String,
     trace: Trace,
-    source: Option<js_sys::Error>,
+    source: Option<platform::Error>,
 }
 
 impl JasonError {
@@ -52,11 +51,11 @@ impl JasonError {
     }
 
     /// Returns JS side error if it the cause.
-    pub fn source(&self) -> Option<js_sys::Error> {
+    pub fn source(&self) -> Option<platform::Error> {
         Clone::clone(&self.source)
     }
 
-    /// Prints error information to `console.error()`.
+    /// Prints error information to default logger with `ERROR` level.
     pub fn print(&self) {
         log::error!("{}", self);
     }
@@ -64,7 +63,7 @@ impl JasonError {
 
 impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
 where
-    E::Error: Into<js_sys::Error>,
+    E::Error: Into<platform::Error>,
 {
     fn from((err, trace): (E, Trace)) -> Self {
         Self {
@@ -78,7 +77,7 @@ where
 
 impl<E: JsCaused + Display> From<Traced<E>> for JasonError
 where
-    E::Error: Into<js_sys::Error>,
+    E::Error: Into<platform::Error>,
 {
     fn from(traced: Traced<E>) -> Self {
         Self::from(traced.into_parts())

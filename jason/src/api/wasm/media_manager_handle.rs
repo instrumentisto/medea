@@ -4,22 +4,24 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    api::{self, JasonError},
+    api::{InputDeviceInfo, JasonError, LocalMediaTrack, MediaStreamSettings},
     core,
 };
 
-use super::input_device_info::InputDeviceInfo;
-
-/// JS side handle to [`MediaManager`].
+/// [`MediaManagerHandle`] is a weak ref to [`MediaManager`].
 ///
 /// [`MediaManager`] performs all media acquisition requests
 /// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
 /// for further reusage.
 ///
-/// [`MediaManager`] stores weak references to [`local::Track`]s, so if there
+/// [`MediaManager`] stores weak references to [`LocalMediaTrack`]s, so if there
 /// are no strong references to some track, then this track is stopped and
 /// deleted from [`MediaManager`].
 ///
+/// Like all handlers it contains weak reference to object that is managed by
+/// Rust, so its methods will fail if weak reference could not be upgraded.
+///
+/// [`MediaManager`]: core::media::MediaManager
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[wasm_bindgen]
@@ -54,12 +56,9 @@ impl MediaManagerHandle {
         })
     }
 
-    /// Returns [`local::JsTrack`]s objects, built from provided
+    /// Returns [`LocalMediaTrack`]s objects, built from provided
     /// [`MediaStreamSettings`].
-    pub fn init_local_tracks(
-        &self,
-        caps: &api::MediaStreamSettings,
-    ) -> Promise {
+    pub fn init_local_tracks(&self, caps: &MediaStreamSettings) -> Promise {
         let this = self.0.clone();
         let caps = caps.clone();
 
@@ -70,9 +69,9 @@ impl MediaManagerHandle {
                     tracks
                         .into_iter()
                         .fold(js_sys::Array::new(), |tracks, track| {
-                            tracks.push(&JsValue::from(
-                                api::LocalMediaTrack::from(track),
-                            ));
+                            tracks.push(&JsValue::from(LocalMediaTrack::from(
+                                track,
+                            )));
                             tracks
                         })
                         .into()

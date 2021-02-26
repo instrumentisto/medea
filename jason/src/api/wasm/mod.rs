@@ -1,3 +1,5 @@
+#![allow(clippy::new_without_default)]
+
 use derive_more::Display;
 use wasm_bindgen::prelude::*;
 
@@ -38,6 +40,7 @@ impl From<core::MediaKind> for MediaKind {
     }
 }
 
+/// Media source type.
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaSourceKind {

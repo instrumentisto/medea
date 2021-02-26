@@ -1,18 +1,10 @@
 //! Somewhat convenient wrappers around JS functions used as callbacks.
 
-use std::cell::RefCell;
-
-use crate::platform::Function;
+use std::{cell::RefCell, marker::PhantomData};
+use wasm_bindgen::JsValue;
 
 /// Wrapper for a single argument JS function.
 pub struct Callback<A>(RefCell<Option<Function<A>>>);
-
-impl<A> Default for Callback<A> {
-    #[inline]
-    fn default() -> Self {
-        Self(RefCell::new(None))
-    }
-}
 
 impl<A> Callback<A> {
     /// Sets inner JS function.
@@ -29,17 +21,55 @@ impl<A> Callback<A> {
 }
 
 impl Callback<()> {
+    /// Invokes JS function (if any).
     pub fn call0(&self) {
-        self.0.borrow().as_ref().map(|f| f.call0());
+        if let Some(f) = self.0.borrow().as_ref() {
+            f.call0()
+        };
+    }
+}
+
+impl<A> Default for Callback<A> {
+    #[inline]
+    fn default() -> Self {
+        Self(RefCell::new(None))
     }
 }
 
 impl<A: Into<wasm_bindgen::JsValue>> Callback<A> {
-    /// Invokes JS function if any.
-    ///
-    /// Returns `None` if no callback is set, otherwise returns its invocation
-    /// result.
+    /// Invokes JS function (if any) with provided argument.
     pub fn call1<T: Into<A>>(&self, arg: T) {
-        self.0.borrow().as_ref().map(|f| f.call1(arg.into()));
+        if let Some(f) = self.0.borrow().as_ref() {
+            f.call1(arg.into())
+        };
+    }
+}
+
+/// Typed wrapper for [`js_sys::Function`] with single argument and no result.
+pub struct Function<T> {
+    inner: js_sys::Function,
+    _arg: PhantomData<T>,
+}
+
+impl Function<()> {
+    /// Invokes JS function.
+    pub fn call0(&self) {
+        std::mem::drop(self.inner.call0(&JsValue::NULL));
+    }
+}
+
+impl<T: Into<JsValue>> Function<T> {
+    /// Invokes JS function with provided argument.
+    pub fn call1(&self, arg: T) {
+        std::mem::drop(self.inner.call1(&JsValue::NULL, &arg.into()));
+    }
+}
+
+impl<T> From<js_sys::Function> for Function<T> {
+    fn from(func: js_sys::Function) -> Self {
+        Self {
+            inner: func,
+            _arg: PhantomData::default(),
+        }
     }
 }

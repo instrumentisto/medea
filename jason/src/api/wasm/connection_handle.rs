@@ -5,14 +5,18 @@ use crate::{api::JasonError, core};
 
 /// Connection with a specific remote `Member`, that is used on JS side.
 ///
-/// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
+/// Like all handlers it contains weak reference to object that is managed by
+/// Rust, so its methods will fail if weak reference could not be upgraded.
 #[wasm_bindgen]
 #[derive(From)]
 pub struct ConnectionHandle(core::ConnectionHandle);
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked when this `Connection` will close.
+    /// Sets callback, which will be invoked when this [`Connection`] will
+    /// close.
+    ///
+    /// [`Connection`]: core::Connection
     pub fn on_close(&self, cb: js_sys::Function) -> Result<(), JsValue> {
         self.0
             .on_close(cb.into())
@@ -28,8 +32,11 @@ impl ConnectionHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets callback, which will be invoked when new [`remote::Track`] will be
-    /// added to this [`Connection`].
+    /// Sets callback, which will be invoked when new [`RemoteMediaTrack`] will
+    /// be added to this [`Connection`].
+    ///
+    /// [`RemoteMediaTrack`]: crate::api::RemoteMediaTrack
+    /// [`Connection`]: core::Connection
     pub fn on_remote_track_added(
         &self,
         cb: js_sys::Function,

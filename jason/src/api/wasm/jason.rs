@@ -2,12 +2,9 @@ use derive_more::From;
 use wasm_bindgen::prelude::*;
 
 use crate::{
+    api::{MediaManagerHandle, RoomHandle},
     core,
     platform::{init_logger, set_panic_hook},
-};
-
-use super::{
-    media_manager_handle::MediaManagerHandle, room_handle::RoomHandle,
 };
 
 /// General library interface.
@@ -29,7 +26,7 @@ impl Jason {
         Self(core::Jason::new())
     }
 
-    /// Creates new [`Room`] and returns its [`RoomHandle`].
+    /// Creates new `Room` and returns its [`RoomHandle`].
     pub fn init_room(&self) -> RoomHandle {
         self.0.init_room().into()
     }

@@ -5,8 +5,7 @@ mod component;
 use std::cell::{Cell, RefCell};
 
 use futures::channel::mpsc;
-use medea_client_api_proto as proto;
-use medea_client_api_proto::{MediaType, MemberId};
+use medea_client_api_proto::{self as proto, MediaType, MemberId};
 use proto::TrackId;
 
 use crate::{
@@ -27,8 +26,10 @@ pub use self::component::{Component, State};
 /// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
 ///
-/// We can save related [`Transceiver`] and the actual
-/// [`remote::Track`] only when [`remote::Track`] data arrives.
+/// We can save related [`Transceiver`] and the actual [`remote::Track`] only
+/// when [`remote::Track`] data arrives.
+///
+/// [`Transceiver`]: platform::Transceiver
 pub struct Receiver {
     track_id: TrackId,
     caps: TrackConstraints,
@@ -49,11 +50,15 @@ impl Receiver {
     /// when [`remote::Track`] arrives.
     ///
     /// Created [`Transceiver`] direction is set to
-    /// [`TransceiverDirection::INACTIVE`] if `enabled_individual` is `false`.
+    /// [`TransceiverDirection::INACTIVE`][1] if `enabled_individual` is
+    /// `false`.
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
+    ///
+    /// [`Transceiver`]: platform::Transceiver
+    /// [1]: platform::TransceiverDirection::INACTIVE
     pub fn new(
         state: &State,
         media_connections: &MediaConnections,
@@ -172,6 +177,8 @@ impl Receiver {
     ///
     /// Sets [`platform::MediaStreamTrack::enabled`] same as
     /// [`Receiver::enabled`] of this [`Receiver`].
+    ///
+    /// [`Transceiver`]: platform::Transceiver
     pub fn set_remote_track(
         &self,
         transceiver: platform::Transceiver,
@@ -204,6 +211,9 @@ impl Receiver {
     ///
     /// No-op if provided with the same [`Transceiver`] as already exists in
     /// this [`Receiver`].
+    ///
+    /// [`Transceiver`]: platform::Transceiver
+    /// [`TransceiverDirection`]: platform::TransceiverDirection
     pub fn replace_transceiver(&self, transceiver: platform::Transceiver) {
         if self.mid.borrow().as_ref() == transceiver.mid().as_ref() {
             self.transceiver.replace(Some(transceiver));
@@ -213,6 +223,8 @@ impl Receiver {
     /// Returns [`Transceiver`] of this [`Receiver`].
     ///
     /// Returns [`None`] if this [`Receiver`] doesn't have [`Transceiver`].
+    ///
+    /// [`Transceiver`]: platform::Transceiver
     #[inline]
     pub fn transceiver(&self) -> Option<platform::Transceiver> {
         self.transceiver.borrow().clone()

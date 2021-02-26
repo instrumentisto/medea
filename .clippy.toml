@@ -12,7 +12,7 @@ doc-valid-idents = [
     "ConstrainDOMString", "ConstrainULong",
     "DOMHighResTimeStamp",
     "getDisplayMedia", "getUserMedia", "gRPC",
-    "MediaDeviceKind", "MediaDeviceInfo",
+    "MediaDevices", "MediaDeviceKind", "MediaDeviceInfo",
     "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
     "MediaTrackConstraints",
     "MessageEvent",

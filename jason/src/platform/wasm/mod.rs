@@ -1,12 +1,10 @@
-use std::{
-    borrow::Cow,
-    convert::{TryFrom as _, TryInto as _},
-    time::Duration,
-};
+use std::{convert::TryInto as _, time::Duration};
 
 pub mod constraints;
+pub mod error;
 pub mod ice_server;
 pub mod input_device_info;
+pub mod media_devices;
 pub mod media_track;
 pub mod peer_connection;
 pub mod rtc_stats;
@@ -14,22 +12,11 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
-use derive_more::Display;
 use futures::Future;
 use js_sys::{Promise, Reflect};
-use tracerr::Traced;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Window;
-
-use input_device_info::InputDeviceInfo;
-
-use crate::{
-    core::media::MediaManagerError,
-    platform::{
-        DisplayMediaStreamConstraints, MediaStreamConstraints, MediaStreamTrack,
-    },
-};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -46,10 +33,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
+/// Initialize [`wasm_logger`] with default [`wasm_logger::Config`].
 pub fn init_logger() {
     wasm_logger::init(wasm_logger::Config::default());
 }
 
+/// Runs a Rust [`Future`] on the current thread.
 #[inline]
 pub fn spawn<F>(task: F)
 where
@@ -58,7 +47,7 @@ where
     wasm_bindgen_futures::spawn_local(task);
 }
 
-/// [`Future`] which resolves after the provided [`JsDuration`].
+/// [`Future`] which resolves after the provided [`Duration`].
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
@@ -72,144 +61,6 @@ pub async fn delay_for(delay: Duration) {
     }))
     .await
     .unwrap();
-}
-
-pub async fn enumerate_devices(
-) -> Result<Vec<InputDeviceInfo>, Traced<MediaManagerError>> {
-    use MediaManagerError::{CouldNotGetMediaDevices, EnumerateDevicesFailed};
-
-    let devices = window()
-        .navigator()
-        .media_devices()
-        .map_err(Error::from)
-        .map_err(CouldNotGetMediaDevices)
-        .map_err(tracerr::from_and_wrap!())?;
-    let devices = JsFuture::from(
-        devices
-            .enumerate_devices()
-            .map_err(Error::from)
-            .map_err(EnumerateDevicesFailed)
-            .map_err(tracerr::from_and_wrap!())?,
-    )
-    .await
-    .map_err(Error::from)
-    .map_err(EnumerateDevicesFailed)
-    .map_err(tracerr::from_and_wrap!())?;
-
-    Ok(js_sys::Array::from(&devices)
-        .values()
-        .into_iter()
-        .filter_map(|info| {
-            let info = web_sys::MediaDeviceInfo::from(info.unwrap());
-            InputDeviceInfo::try_from(info).ok()
-        })
-        .collect())
-}
-
-pub async fn get_user_media(
-    caps: MediaStreamConstraints,
-) -> Result<Vec<MediaStreamTrack>, Traced<MediaManagerError>> {
-    use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
-
-    let media_devices = window()
-        .navigator()
-        .media_devices()
-        .map_err(Error::from)
-        .map_err(CouldNotGetMediaDevices)
-        .map_err(tracerr::from_and_wrap!())?;
-
-    let stream = JsFuture::from(
-        media_devices
-            .get_user_media_with_constraints(&caps.into())
-            .map_err(Error::from)
-            .map_err(GetUserMediaFailed)
-            .map_err(tracerr::from_and_wrap!())?,
-    )
-    .await
-    .map(web_sys::MediaStream::from)
-    .map_err(Error::from)
-    .map_err(GetUserMediaFailed)
-    .map_err(tracerr::from_and_wrap!())?;
-
-    Ok(js_sys::try_iter(&stream.get_tracks())
-        .unwrap()
-        .unwrap()
-        .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-        .collect())
-}
-
-pub async fn get_display_media(
-    caps: DisplayMediaStreamConstraints,
-) -> Result<Vec<MediaStreamTrack>, Traced<MediaManagerError>> {
-    use MediaManagerError::{
-        CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
-    };
-
-    let media_devices = window()
-        .navigator()
-        .media_devices()
-        .map_err(Error::from)
-        .map_err(CouldNotGetMediaDevices)
-        .map_err(tracerr::from_and_wrap!())?;
-
-    let stream = JsFuture::from(
-        media_devices
-            .get_display_media_with_constraints(&caps.into())
-            .map_err(Error::from)
-            .map_err(GetDisplayMediaFailed)
-            .map_err(tracerr::from_and_wrap!())?,
-    )
-    .await
-    .map(web_sys::MediaStream::from)
-    .map_err(Error::from)
-    .map_err(GetUserMediaFailed)
-    .map_err(tracerr::from_and_wrap!())?;
-
-    Ok(js_sys::try_iter(&stream.get_tracks())
-        .unwrap()
-        .unwrap()
-        .map(|tr| MediaStreamTrack::from(tr.unwrap()))
-        .collect())
-}
-
-/// Wrapper for JS value which returned from JS side as error.
-#[derive(Clone, Debug, Display, PartialEq)]
-#[display(fmt = "{}: {}", name, message)]
-pub struct Error {
-    /// Name of JS error.
-    pub name: Cow<'static, str>,
-
-    /// Message of JS error.
-    pub message: Cow<'static, str>,
-}
-
-impl From<JsValue> for Error {
-    fn from(val: JsValue) -> Self {
-        match val.dyn_into::<js_sys::Error>() {
-            Ok(err) => Self {
-                name: Cow::Owned(err.name().into()),
-                message: Cow::Owned(err.message().into()),
-            },
-            Err(val) => match val.as_string() {
-                Some(reason) => Self {
-                    name: "Unknown JS error".into(),
-                    message: reason.into(),
-                },
-                None => Self {
-                    name: "Unknown JS error".into(),
-                    message: format!("{:?}", val).into(),
-                },
-            },
-        }
-    }
-}
-
-impl From<Error> for js_sys::Error {
-    fn from(err: Error) -> Self {
-        let error = Self::new(&err.message);
-        error.set_name(&err.name);
-        error
-    }
 }
 
 /// Returns property of JS object by name if its defined.

@@ -1,6 +1,6 @@
 //! [`PeerConnection`] media management.
 //!
-//! [`PeerConnection`]: crate::peer::PeerConnection
+//! [`PeerConnection`]: crate::core::peer::PeerConnection
 
 pub mod receiver;
 pub mod sender;
@@ -111,7 +111,7 @@ pub trait MediaStateControllable {
     /// Indicates whether [`Room`] should subscribe to the [`MediaState`] update
     /// when updating [`MediaStateControllable`] to the provided [`MediaState`].
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     #[must_use]
     fn is_subscription_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
@@ -139,7 +139,7 @@ pub trait MediaStateControllable {
     /// [`MediaState`].
     ///
     /// [`TrackPatchCommand`]: medea_client_api_proto::TrackPatchCommand
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::core::Room
     #[must_use]
     fn is_track_patch_needed(&self, desired_state: MediaState) -> bool {
         match desired_state {
@@ -217,7 +217,8 @@ pub enum MediaConnectionsError {
     /// Occurs when [`remote::Track`] discovered by [`RtcPeerConnection`] could
     /// not be inserted into [`Receiver`].
     ///
-    /// [`remote::Track`]: crate::media::track::remote::Track
+    /// [`remote::Track`]: crate::core::media::track::remote::Track
+    /// [`RtcPeerConnection`]: platform::RtcPeerConnection
     /// [`Receiver`]: self::receiver::Receiver
     #[display(
         fmt = "Could not insert remote track with mid: {:?} into media \
@@ -227,6 +228,8 @@ pub enum MediaConnectionsError {
     CouldNotInsertRemoteTrack(String),
 
     /// Could not find [`Transceiver`] by `mid`.
+    ///
+    /// [`Transceiver`]: platform::Transceiver
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
     TransceiverNotFound(String),
 
@@ -293,6 +296,7 @@ struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
     ///
+    /// [`RtcPeerConnection`]: platform::RtcPeerConnection
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
     peer: Rc<platform::RtcPeerConnection>,
@@ -358,6 +362,9 @@ impl InnerMediaConnections {
     }
 
     /// Creates [`Transceiver`] and adds it to the [`RtcPeerConnection`].
+    ///
+    /// [`Transceiver`]: platform::Transceiver
+    /// [`RtcPeerConnection`]: platform::RtcPeerConnection
     fn add_transceiver(
         &self,
         kind: MediaKind,
@@ -368,6 +375,7 @@ impl InnerMediaConnections {
 
     /// Lookups [`Transceiver`] by the provided [`mid`].
     ///
+    /// [`Transceiver`]: platform::Transceiver
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn get_transceiver_by_mid(
         &self,
@@ -381,11 +389,15 @@ impl InnerMediaConnections {
 
 /// Storage of [`RtcPeerConnection`]'s [`sender::Component`] and
 /// [`receiver::Component`].
+///
+/// [`RtcPeerConnection`]: platform::RtcPeerConnection
 pub struct MediaConnections(RefCell<InnerMediaConnections>);
 
 impl MediaConnections {
     /// Instantiates new [`MediaConnections`] storage for a given
     /// [`RtcPeerConnection`].
+    ///
+    /// [`RtcPeerConnection`]: platform::RtcPeerConnection
     #[inline]
     pub fn new(
         peer: Rc<platform::RtcPeerConnection>,
@@ -467,6 +479,7 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::ReceiversWithoutMid`] if some
     /// [`Receiver`] doesn't have [mid].
     ///
+    /// [`Transceiver`]: platform::Transceiver
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
     /// [mid]:
@@ -599,6 +612,7 @@ impl MediaConnections {
     /// [`local::Track`] cannot be inserted into provided [`Sender`]s
     /// transceiver.
     ///
+    /// [`Transceiver`]: platform::Transceiver
     /// [`Sender`]: self::sender::Sender
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
@@ -645,11 +659,7 @@ impl MediaConnections {
         Ok(media_exchange_state_updates)
     }
 
-    /// Handles [`RtcTrackEvent`] by adding new track to the corresponding
-    /// [`Receiver`].
-    ///
-    /// Returns ID of associated [`Sender`] and provided track [`TrackId`], if
-    /// any.
+    /// Ads new track to the corresponding [`Receiver`].
     ///
     /// # Errors
     ///
@@ -671,7 +681,7 @@ impl MediaConnections {
         for receiver in inner.receivers.values() {
             if let Some(recv_mid) = &receiver.mid() {
                 if recv_mid == &mid {
-                    receiver.set_remote_track(transceiver, track.into());
+                    receiver.set_remote_track(transceiver, track);
                     return Ok(());
                 }
             }
@@ -685,8 +695,10 @@ impl MediaConnections {
     /// [`Transceiver`], trying to find the corresponding [`Transceiver`] in
     /// [`RtcPeerConnection`] and to insert it into the [`Receiver`].
     ///
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     /// [`Receiver`]: self::receiver::Receiver
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`Transceiver`]: platform::Transceiver
+    /// [`RtcPeerConnection`]: platform::RtcPeerConnection
     pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
         for receiver in inner

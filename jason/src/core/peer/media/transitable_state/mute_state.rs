@@ -7,12 +7,12 @@ use super::{InStable, InTransition};
 pub enum Stable {
     /// [`MediaStateControllable`] is muted.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Muted,
 
     /// [`MediaStateControllable`] is unmuted.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Unmuted,
 }
 
@@ -64,13 +64,13 @@ pub enum Transition {
     /// [`MediaStateControllable`] should be muted, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Muting(Stable),
 
     /// [`MediaStateControllable`] should be unmuted, but awaits server
     /// permission.
     ///
-    /// [`MediaStateControllable`]: crate::peer::MediaStateControllable
+    /// [`MediaStateControllable`]: crate::core::peer::MediaStateControllable
     Unmuting(Stable),
 }
 

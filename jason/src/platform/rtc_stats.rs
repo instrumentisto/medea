@@ -5,6 +5,8 @@ use derive_more::{Display, From};
 use crate::{platform, utils::JsCaused};
 
 /// Errors which can occur during deserialization of the [`RtcStatsType`].
+///
+/// [`RtcStatsType`]: medea_client_api_proto::stats::RtcStatsType
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum RtcStatsError {
@@ -20,15 +22,17 @@ pub enum RtcStatsError {
     #[display(fmt = "RTCStats.stats is undefined")]
     UndefinedStats,
 
-    /// Some JS error occurred.
-    #[display(fmt = "Unexpected JS side error: {}", _0)]
-    Js(platform::Error),
+    /// Some platform error occurred.
+    #[display(fmt = "Unexpected platform error: {}", _0)]
+    Platform(platform::Error),
 
     /// `RTCStats.entries` is undefined.
     #[display(fmt = "RTCStats.entries is undefined")]
     UndefinedEntries,
 
-    /// Error of [`RtcStats`] deserialization.
+    /// [`RtcStats`] deserialization error.
+    ///
+    /// [`RtcStats`]: platform::RtcStats
     #[display(fmt = "Failed to deserialize into RtcStats: {}", _0)]
     ParseError(Rc<serde_json::Error>),
 }

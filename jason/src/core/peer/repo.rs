@@ -104,21 +104,21 @@ pub struct Repository {
 
     /// Channel for sending events produced by [`PeerConnection`] to [`Room`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [`Room`]: crate::api::Room
+    /// [`PeerConnection`]: crate::core::peer::PeerConnection
+    /// [`Room`]: crate::core::Room
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s from this [`Repository`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [`Room`]: crate::api::Room
-    /// [`local::Track`]: crate::media::track::local::Track
+    /// [`PeerConnection`]: crate::core::peer::PeerConnection
+    /// [`Room`]: crate::core::Room
+    /// [`local::Track`]: crate::core::media::track::local::Track
     send_constraints: LocalTracksConstraints,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::core::Connection
     connections: Rc<Connections>,
 
     /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
@@ -126,7 +126,7 @@ pub struct Repository {
     ///
     /// Used to disable or enable media receiving.
     ///
-    /// [`remote::Track`]: crate::media::track::remote::Track
+    /// [`remote::Track`]: crate::core::media::track::remote::Track
     recv_constraints: Rc<RecvConstraints>,
 }
 
@@ -135,7 +135,7 @@ impl Repository {
     ///
     /// Spawns [`RtcStats`] scrape task.
     ///
-    /// [`RtcStats`]: crate::peer::RtcStats
+    /// [`RtcStats`]: platform::RtcStats
     #[must_use]
     pub fn new(
         media_manager: Rc<MediaManager>,
@@ -170,7 +170,7 @@ impl Repository {
     ) -> TaskHandle {
         let (fut, abort) = future::abortable(async move {
             loop {
-                platform::delay_for(Duration::from_secs(1).into()).await;
+                platform::delay_for(Duration::from_secs(1)).await;
 
                 let peers = peers
                     .borrow()

@@ -1,3 +1,5 @@
+//! External Jason API.
+
 // #[cfg(all(
 //     target_arch = "wasm32",
 //     target_vendor = "unknown",

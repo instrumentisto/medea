@@ -41,11 +41,10 @@ impl ReconnectHandle {
         &self,
         delay_ms: u32,
     ) -> Result<(), JasonError> {
-        platform::delay_for(Duration::from_millis(u64::from(delay_ms)).into())
-            .await;
+        platform::delay_for(Duration::from_millis(u64::from(delay_ms))).await;
 
         let rpc = upgrade_or_detached!(self.0, JasonError)?;
-        rpc.reconnect().await.map_err(|e| JasonError::from(e))?;
+        rpc.reconnect().await.map_err(JasonError::from)?;
 
         Ok(())
     }
@@ -75,9 +74,9 @@ impl ReconnectHandle {
         max_delay: u32,
     ) -> Result<(), JasonError> {
         let mut backoff_delayer = BackoffDelayer::new(
-            Duration::from_millis(u64::from(starting_delay_ms)).into(),
+            Duration::from_millis(u64::from(starting_delay_ms)),
             multiplier,
-            Duration::from_millis(u64::from(max_delay)).into(),
+            Duration::from_millis(u64::from(max_delay)),
         );
         backoff_delayer.delay().await;
         while upgrade_or_detached!(self.0, JasonError)?

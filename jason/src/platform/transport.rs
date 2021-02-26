@@ -8,7 +8,7 @@ use crate::{
         rpc::{ClientDisconnect, CloseMsg},
         utils::JsonParseError,
     },
-    platform::{self, wasm::utils::EventListenerBindError},
+    platform,
     utils::JsCaused,
 };
 
@@ -18,35 +18,18 @@ pub use super::wasm::transport::WebSocketRpcTransport;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TransportState {
     /// Socket has been created. The connection is not open yet.
-    ///
-    /// Reflects `CONNECTING` state from JS side
-    /// [`WebSocket.readyState`][1].
-    ///
-    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Connecting,
 
     /// The connection is open and ready to communicate.
-    ///
-    /// Reflects `OPEN` state from JS side [`WebSocket.readyState`][1].
-    ///
-    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Open,
 
     /// The connection is in the process of closing.
-    ///
-    /// Reflects `CLOSING` state from JS side [`WebSocket.readyState`][1].
-    ///
-    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
     Closing,
 
     /// The connection is closed or couldn't be opened.
     ///
-    /// Reflects `CLOSED` state from JS side [`WebSocket.readyState`][1].
-    ///
-    /// [`CloseMsg`] is the reason of why [`RpcTransport`] went into
-    /// this [`TransportState`].
-    ///
-    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/readyState
+    /// [`CloseMsg`] is the reason of why [`RpcTransport`] went into this
+    /// [`TransportState`].
     Closed(CloseMsg),
 }
 
@@ -60,12 +43,11 @@ impl TransportState {
 /// RPC transport between a client and a server.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
-    /// Returns [`LocalBoxStream`] of all messages received by this
-    /// transport.
+    /// Returns [`LocalBoxStream`] of all messages received by this transport.
     fn on_message(&self) -> LocalBoxStream<'static, ServerMsg>;
 
-    /// Sets reason, that will be sent to remote server when this transport
-    /// will be dropped.
+    /// Sets reason, that will be sent to remote server when this transport will
+    /// be dropped.
     fn set_close_reason(&self, reason: ClientDisconnect);
 
     /// Sends given [`ClientMsg`] to a server.
@@ -79,18 +61,15 @@ pub trait RpcTransport {
     fn on_state_change(&self) -> LocalBoxStream<'static, TransportState>;
 }
 
-/// Errors that may occur when working with [`WebSocketRpcClient`].
-///
-/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
+/// Errors that may occur when working with [`RpcTransport`].
 #[derive(Clone, Debug, Display, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
 pub enum TransportError {
-    /// Occurs when the port to which the connection is being attempted
-    /// is being blocked.
+    /// Error encountered when trying to establish connection.
     #[display(fmt = "Failed to create WebSocket: {}", _0)]
     CreateSocket(platform::Error),
 
-    /// Occurs when the connection close before becomes state active.
+    /// Connection was closed before becoming active.
     #[display(fmt = "Failed to init WebSocket")]
     InitSocket,
 
@@ -109,13 +88,6 @@ pub enum TransportError {
     /// Occurs when a message cannot be send to server.
     #[display(fmt = "Failed to send message: {}", _0)]
     SendMessage(platform::Error),
-
-    /// Occurs when handler failed to bind to some [WebSocket] event. Not
-    /// really supposed to ever happen.
-    ///
-    /// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
-    #[display(fmt = "Failed to bind to WebSocket event: {}", _0)]
-    WebSocketEventBindError(EventListenerBindError), // TODO: remove
 
     /// Occurs when message is sent to a closed socket.
     #[display(fmt = "Underlying socket is closed")]
