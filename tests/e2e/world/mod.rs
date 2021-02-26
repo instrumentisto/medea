@@ -198,11 +198,12 @@ impl World {
                 self.control_client.create(&path, element).await?;
             }
         }
+        let window = self.window_factory.new_window().await;
         let jason =
-            Object::spawn(Jason, self.window_factory.new_window().await)
+            Object::spawn(Jason, window.clone())
                 .await?;
         let room = jason.init_room().await?;
-        let member = builder.build(room).await?;
+        let member = builder.build(room, window).await?;
 
         self.jasons.insert(member.id().to_string(), jason);
         self.members.insert(member.id().to_string(), member);

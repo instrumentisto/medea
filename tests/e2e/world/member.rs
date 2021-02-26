@@ -11,6 +11,8 @@ use crate::{
         Object, Room,
     },
 };
+use crate::browser::mock;
+use crate::browser::Window;
 
 /// All errors which can happen while working with [`Member`].
 #[derive(Debug, Display, Error, From)]
@@ -35,7 +37,7 @@ pub struct MemberBuilder {
 
 impl MemberBuilder {
     /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
-    pub async fn build(self, room: Object<Room>) -> Result<Member> {
+    pub async fn build(self, room: Object<Room>, window: Window) -> Result<Member> {
         let connection_store = room.connections_store().await?;
         let mut media_state = HashMap::new();
         media_state.insert((MediaKind::Audio, MediaSourceKind::Device), true);
@@ -49,6 +51,7 @@ impl MemberBuilder {
             send_state: RefCell::new(media_state.clone()),
             recv_state: RefCell::new(media_state),
             room,
+            window,
             connection_store,
         })
     }
@@ -82,6 +85,8 @@ pub struct Member {
 
     /// Representation of the `Room` JS object.
     room: Object<Room>,
+
+    window: Window,
 
     /// Storage for the [`Connection`]s throws by this [`Member`]'s `Room`.
     ///
@@ -341,5 +346,9 @@ impl Member {
     /// Returns reference to the [`Room`] of this [`Member`].
     pub fn room(&self) -> &Object<Room> {
         &self.room
+    }
+
+    pub fn ws_mock(&self) -> mock::WebSocket {
+        self.window.websocket_mock()
     }
 }
