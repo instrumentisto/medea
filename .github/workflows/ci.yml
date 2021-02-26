@@ -159,6 +159,7 @@ jobs:
           profile: minimal
           toolchain: stable
           target: wasm32-unknown-unknown
+
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
       - uses: satackey/action-docker-layer-caching@v0.0.11
@@ -167,16 +168,18 @@ jobs:
           restore-keys: test-e2e-
         continue-on-error: true
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+
       - uses: actions-rs/install@v0.1
         with:
           crate: wasm-pack
           use-tool-cache: true
+
       - uses: actions/download-artifact@v2
         with:
           name: docker-medea-${{ github.run_number }}
-
-      - name: Untar Medea image
+      - name: Unpack Medea Docker image
         run: make docker.untar from-file=image.tar
+
       - name: Chrome
         run: make test.e2e up=yes browser=chrome dockerized=yes tag=build-${{ github.run_number }}
       - name: Firefox
@@ -194,6 +197,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
       - uses: satackey/action-docker-layer-caching@v0.0.11
@@ -202,6 +206,7 @@ jobs:
           restore-keys: test-integration-
         continue-on-error: true
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+
       - run: make test.integration up=yes dockerized=no
 
 

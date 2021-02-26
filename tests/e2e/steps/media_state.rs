@@ -1,8 +1,10 @@
 use cucumber_rust::when;
 
-use crate::{object::MediaKind, parse_media_kind, world::World};
+use crate::{object::MediaKind, world::World};
 
-#[when(regex = "^Member (\\S*) (disables|mutes) (audio|video|all)$")]
+use super::parse_media_kind;
+
+#[when(regex = r"^Member (\S+) (disables|mutes) (audio|video|all)$")]
 async fn when_disables_mutes(
     world: &mut World,
     id: String,

@@ -1,4 +1,4 @@
-//! Representation of Media Server Member used in tests.
+//! Medea media server member representation.
 
 use derive_more::{Display, Error, From};
 
@@ -10,29 +10,32 @@ use crate::{
     },
 };
 
-/// All errors which can happen while working with [`Member`].
+/// All errors which can happen while working with a [`Member`].
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
-    /// [`Room`] or [`ConnectionStore`] object errored.
+    /// [`Room`] or a [`ConnectionStore`] object errored.
     Object(object::Error),
 }
 
+/// Shortcut for a [`Result`] containing an [`Error`](enum@Error).
+///
+/// [`Result`]: std::result::Result
 type Result<T> = std::result::Result<T, Error>;
 
-/// Builder for the [`Member`].
-pub struct MemberBuilder {
-    /// ID with which [`Member`] will be created.
+/// Builder of a [`Member`].
+pub struct Builder {
+    /// ID with which a [`Member`] will be created.
     pub id: String,
 
-    /// Flag which indicates that [`Member`] will publish media.
+    /// Indicator whether a [`Member`] will publish media.
     pub is_send: bool,
 
-    /// Flag which indicates that [`Member`] will receive media.
+    /// Indicator whether a [`Member`] will receive media.
     pub is_recv: bool,
 }
 
-impl MemberBuilder {
-    /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
+impl Builder {
+    /// Creates a new [`Member`] out of this [`Builder`] configuration.
     pub async fn build(self, room: Object<Room>) -> Result<Member> {
         let connection_store = room.connections_store().await?;
         Ok(Member {
@@ -46,69 +49,80 @@ impl MemberBuilder {
     }
 }
 
-/// Object which represents some connected to the Media Server `Member`.
+/// [`Object`] representing a `Member` connected to a media server.
 pub struct Member {
-    /// ID of [`Member`] on the Media Server.
+    /// ID of this [`Member`] on a media server.
     id: String,
 
-    /// Flag which indicates that [`Member`] should publish media.
+    /// Indicator whether this [`Member`] should publish media.
     is_send: bool,
 
-    /// Flag which indicates that [`Member`] should receive media.
+    /// Indicator whether this [`Member`] should receive media.
     is_recv: bool,
 
-    /// Flag which indicates that [`Member`] is joined to the `Room`.
+    /// Indicator whether this [`Member`] is joined a [`Room`] on a media
+    /// server.
     is_joined: bool,
 
-    /// Representation of the `Room` JS object.
+    /// [`Room`]'s [`Object`] that this [`Member`] is intended to join.
     room: Object<Room>,
 
-    /// Storage for the [`Connection`]s throws by this [`Member`]'s `Room`.
+    /// Storage of [`Connection`]s thrown by this [`Member`]'s [`Room`].
     ///
-    /// [`Connection`]: crate::object::connection::Connection
+    /// [`Connection`]: object::connection::Connection
     connection_store: Object<ConnectionStore>,
 }
 
 impl Member {
-    /// Returns ID of [`Member`] on the Media Server.
+    /// Returns ID of this [`Member`] on a media server.
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
-    /// Returns flag which indicates that [`Member`] should publish media.
+    /// Indicates whether this [`Member`] should publish media.
+    #[inline]
+    #[must_use]
     pub fn is_send(&self) -> bool {
         self.is_send
     }
 
-    /// Returns flag which indicates that [`Member`] should receive media.
+    /// Indicator whether this [`Member`] should receive media.
+    #[inline]
+    #[must_use]
     pub fn is_recv(&self) -> bool {
         self.is_recv
     }
 
-    /// Returns flag which indicates that [`Member`] is joined to the `Room`.
+    /// Indicates whether this [`Member`] is joined a [`Room`] on a media
+    /// server.
+    #[inline]
+    #[must_use]
     pub fn is_joined(&self) -> bool {
         self.is_joined
     }
 
-    /// Joins into `Room` with a provided ID.
+    /// Joins a [`Room`] with the provided ID.
     pub async fn join_room(&mut self, room_id: &str) -> Result<()> {
         self.room
             .join(format!(
                 "{}/{}/{}?token=test",
                 *conf::CLIENT_API_ADDR,
                 room_id,
-                self.id
+                self.id,
             ))
             .await?;
         self.is_joined = true;
         Ok(())
     }
 
-    /// Disabled media publishing for the provided [`MediaKind`] and
+    /// Disables media publishing for the provided [`MediaKind`] and
     /// [`MediaSourceKind`].
     ///
-    /// If provided [`None`] `source_kind` then media publishing will be
+    /// If the provided `source_kind` is [`None`], then media publishing will be
     /// disabled for all [`MediaSourceKind`]s.
+    #[inline]
     pub async fn disable_media_send(
         &self,
         kind: MediaKind,
@@ -118,10 +132,12 @@ impl Member {
         Ok(())
     }
 
-    /// Returns reference to the storage for the [`Connection`]s throws by this
-    /// [`Member`]'s `Room`.
+    /// Returns reference to the Storage of [`Connection`]s thrown by this
+    /// [`Member`]'s [`Room`].
     ///
-    /// [`Connection`]: crate::object::connection::Connection
+    /// [`Connection`]: object::connection::Connection
+    #[inline]
+    #[must_use]
     pub fn connections(&self) -> &Object<ConnectionStore> {
         &self.connection_store
     }

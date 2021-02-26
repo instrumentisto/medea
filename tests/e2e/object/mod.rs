@@ -1,4 +1,4 @@
-//! Implementation of the all browser-side objects.
+//! Browser-side objects.
 
 pub mod connection;
 pub mod connections_store;
@@ -19,35 +19,36 @@ pub use self::{
     room::{MediaKind, MediaSourceKind, Room},
 };
 
-/// All errors which can happen while working with objects.
+/// All errors which can happen while working with [`Object`]s.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
-    /// Error while interacting with browser.
+    /// Error while interacting with a browser.
     Browser(browser::Error),
 
     /// Failed JS object type casting.
     TypeCast,
 }
 
-/// Pointer to the JS object on browser-side.
+/// Pointer to a JS object on a browser's side.
 #[derive(Clone, Debug, Display)]
 pub struct ObjectPtr(String);
 
-/// Representation of some object from the browser-side.
+/// Representation of some JS object on a browser's side.
 ///
-/// JS object on browser-side will be removed on this [`Object`] [`Drop::drop`].
+/// JS object on browser's side will be removed on this [`Object`]'s [`Drop`].
 pub struct Object<T> {
-    /// Pointer to the JS object on browser-side.
+    /// Pointer to the JS object on a browser's side.
     ptr: ObjectPtr,
 
-    /// [`Window`] where this [`Object`] is exists.
+    /// [`browser::Window`] where this [`Object`] exists.
     window: browser::Window,
 
-    /// Type of [`Object`].
-    _kind: PhantomData<T>,
+    /// Type of this [`Object`].
+    _type: PhantomData<T>,
 }
 
 impl<T> Drop for Object<T> {
+    /// Removes this [`Object`] on a browser's side.
     fn drop(&mut self) {
         let ptr = self.ptr.clone();
         let window = self.window.clone();
@@ -62,7 +63,7 @@ impl<T> Drop for Object<T> {
                             window.registry.delete(id);
                         }
                     "#,
-                    vec![ptr.to_string().into()],
+                    [ptr.to_string().into()],
                 ))
                 .await
                 .unwrap();
@@ -75,16 +76,19 @@ impl<T> Drop for Object<T> {
 }
 
 impl<T> Object<T> {
-    /// Returns [`Object`] with a provided ID and [`Window`].
+    /// Returns a new [`Object`] with the provided ID and [`browser::Window`].
+    #[inline]
+    #[must_use]
     pub fn new(id: String, window: browser::Window) -> Self {
         Self {
             ptr: ObjectPtr(id),
             window,
-            _kind: PhantomData::default(),
+            _type: PhantomData,
         }
     }
 
-    /// Executes provided statement that returns [`Object`].
+    /// Executes the provided [`Statement`] and returns the resulting
+    /// [`Object`].
     pub async fn execute_and_fetch<O>(
         &self,
         statement: Statement,
@@ -98,39 +102,42 @@ impl<T> Object<T> {
                     window.registry.set(id, obj);
                 }
             "#,
-            vec![id.clone().into()],
+            [id.clone().into()],
         )))
         .await?;
 
         Ok(Object::new(id, self.window.clone()))
     }
 
-    /// Returns `true` if this [`Object`] is `undefined`.
+    /// Indicates whether this [`Object`] is `undefined`.
     pub async fn is_undefined(&self) -> Result<bool, Error> {
-        Ok(self
-            .execute(Statement::new(
-                // language=JavaScript
-                r#"
-                    async (o) => {
-                        return o === undefined;
-                    }
-                "#,
-                vec![],
-            ))
-            .await?
-            .as_bool()
-            .ok_or(Error::TypeCast)?)
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (o) => {
+                    return o === undefined;
+                }
+            "#,
+            [],
+        ))
+        .await?
+        .as_bool()
+        .ok_or(Error::TypeCast)
     }
 
-    /// Executes provided [`Statement`] in the browser.
+    /// Executes the provided [`Statement`] in a browser.
     ///
-    /// JS object which this [`Object`] represents will be passed to the
-    /// provided [`Statement`] as lambda argument.
+    /// JS object representing this [`Object`] will be passed to the provided
+    /// [`Statement`] as a lambda argument.
+    #[inline]
     async fn execute(&self, js: Statement) -> Result<Json, Error> {
-        Ok(self.window.execute(self.get_obj().and_then(js)).await?)
+        self.window
+            .execute(self.get_obj().and_then(js))
+            .await
+            .map_err(Error::Browser)
     }
 
-    /// Returns [`Statement`] which will obtain JS object of this [`Object`].
+    /// Returns a [`Statement`] obtaining JS object of this [`Object`].
     fn get_obj(&self) -> Statement {
         Statement::new(
             // language=JavaScript
@@ -140,13 +147,13 @@ impl<T> Object<T> {
                     return window.registry.get(id);
                 }
             "#,
-            vec![self.ptr.to_string().into()],
+            [self.ptr.to_string().into()],
         )
     }
 }
 
 impl<T: Builder> Object<T> {
-    /// Spawns provided `obj` [`Object`] in the provided [`Window`].
+    /// Spawns the provided [`Object`] in the provided [`browser::Window`].
     pub async fn spawn(
         obj: T,
         window: browser::Window,
@@ -161,7 +168,7 @@ impl<T: Builder> Object<T> {
                         window.registry.set(id, obj);
                     }
                 "#,
-                vec![id.clone().into()],
+                [id.clone().into()],
             )))
             .await?;
 
@@ -169,9 +176,9 @@ impl<T: Builder> Object<T> {
     }
 }
 
-/// Abstraction which will be used for JS object creating for the [`Object`].
+/// JS object builder for an [`Object`].
 pub trait Builder {
-    /// Returns [`Statement`] with which JS object for this object will be
-    /// created.
+    /// Returns a [`Statement`] creating a desired JS object.
+    #[must_use]
     fn build(self) -> Statement;
 }
