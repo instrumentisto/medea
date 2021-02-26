@@ -177,6 +177,8 @@ jobs:
 
       - name: Untar Medea image
         run: make docker.untar from-file=image.tar
+      - name: Build Medea Control API mock
+        run: make docker.build image=medea-control-api-mock
       - name: Chrome
         run: make test.e2e up=yes browser=chrome dockerized=yes tag=build-${{ github.run_number }}
       - name: Firefox
