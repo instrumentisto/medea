@@ -157,7 +157,7 @@ impl World {
                     )),
                     on_join: Some("grpc://127.0.0.1:9099".to_string()),
                     on_leave: Some("grpc://127.0.0.1:9099".to_string()),
-                    idle_timeout: None,
+                    idle_timeout: Some(Duration::from_millis(500)),
                     reconnect_timeout: None,
                     ping_interval: None,
                 }),

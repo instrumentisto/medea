@@ -59,6 +59,14 @@ impl Object<Jason> {
                             .filter((sub) => sub(track));
                         localTracksStore.subs = newSubs;
                     });
+                    room.on_connection_loss(async (recon) => {
+                        while (true) {
+                            try {
+                                await recon.reconnect_with_delay(10);
+                                break;
+                            } catch(e) {}
+                        }
+                    });
 
                     let constraints = new rust.MediaStreamSettings();
                     let audio = new window.rust.AudioTrackConstraints();
