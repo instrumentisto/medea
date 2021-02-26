@@ -351,4 +351,8 @@ impl Member {
     pub fn ws_mock(&self) -> mock::WebSocket {
         self.window.websocket_mock()
     }
+
+    pub fn gum_mock(&self) -> mock::Gum {
+        self.window.gum_mock()
+    }
 }

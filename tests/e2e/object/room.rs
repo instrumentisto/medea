@@ -430,4 +430,66 @@ impl Object<Room> {
             .ok_or(Error::TypeCast)?
             .to_string())
     }
+
+    pub async fn set_local_media_settings(&self, video: bool, audio: bool) -> Result<(), Error> {
+        self.clean_all_local_tracks().await;
+        self.execute(Statement::new(
+            r#"
+                async (room) => {
+                    const [video, audio] = args;
+
+                    let constraints = new rust.MediaStreamSettings();
+                    if (video) {
+                        let video = new window.rust.DeviceVideoTrackConstraints();
+                        constraints.device_video(video);
+                    }
+                    if (audio) {
+                        let audio = new window.rust.AudioTrackConstraints();
+                        constraints.audio(audio);
+                    }
+
+                    await room.room.set_local_media_settings(constraints, true, false);
+                }
+            "#,
+            vec![video.into(), audio.into()]
+        )).await?;
+
+        Ok(())
+    }
+
+    pub async fn when_failed_local_stream_count(&self, count: u64) {
+        self.execute(Statement::new(
+            r#"
+                async (room) => {
+                    const [count] = args;
+                    return await new Promise((resolve, reject) => {
+                        if (room.onFailedLocalStreamListener.count === count) {
+                            resolve();
+                        } else {
+                            room.onFailedLocalStreamListener.subs.push(() => {
+                                if (room.onFailedLocalStreamListener.count === count) {
+                                    resolve();
+                                    return false;
+                                } else {
+                                    return true;
+                                }
+                            });
+                        }
+                    });
+                }
+            "#,
+            vec![count.into()],
+        )).await.unwrap();
+    }
+
+    pub async fn clean_all_local_tracks(&self) {
+        self.execute(Statement::new(
+            r#"
+                async (room) => {
+                    room.localTracksStore.tracks = [];
+                }
+            "#,
+            vec![]
+        )).await.unwrap();
+    }
 }

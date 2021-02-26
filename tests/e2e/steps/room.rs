@@ -1,4 +1,4 @@
-use cucumber_rust::{then, when};
+use cucumber_rust::{then, when, given};
 
 use crate::world::World;
 
@@ -26,4 +26,30 @@ async fn when_room_closed_by_client(world: &mut World, id: String) {
 #[when(regex = "^(\\S*)'s Jason object disposes$")]
 async fn when_jason_object_disposes(world: &mut World, id: String) {
     world.dispose_jason(&id).await.unwrap();
+}
+
+#[given(regex = "^(\\S*)'s gUM (audio |video )?broken$")]
+async fn given_member_gum_broken(world: &mut World, id: String, kind: String) {
+    let member = world.get_member(&id).unwrap();
+    let gum = member.gum_mock();
+    let (video, audio) = if kind.is_empty() {
+        (true, true)
+    } else {
+        (kind.contains("video"), kind.contains("audio"))
+    };
+    gum.broke_gum(video, audio).await;
+}
+
+#[when(regex = "^(\\S*) enables (video|audio|video and audio) constraints$")]
+async fn when_member_switches_to_kind(world: &mut World, id: String, kind: String) {
+    let member = world.get_member(&id).unwrap();
+    let video = kind.contains("video");
+    let audio = kind.contains("audio");
+    let _ = member.room().set_local_media_settings(video, audio).await.unwrap();
+}
+
+#[then(regex = "^(\\S*)'s Room.on_failed_local_stream fires (\\d*) time(:?s)?$")]
+async fn then_room_failed_local_stream_fires(world: &mut World, id: String, times: u64) {
+    let member = world.get_member(&id).unwrap();
+    member.room().when_failed_local_stream_count(times).await;
 }

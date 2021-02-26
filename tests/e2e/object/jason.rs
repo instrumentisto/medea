@@ -34,7 +34,15 @@ impl Object<Jason> {
             r#"
                 async (jason) => {
                     let room = await jason.init_room();
-                    room.on_failed_local_media(() => {});
+                    let onFailedLocalStreamListener = {
+                        subs: [],
+                        count: 0
+                    };
+                    room.on_failed_local_media(() => {
+                        onFailedLocalStreamListener.count++;
+                        onFailedLocalStreamListener.subs = onFailedLocalStreamListener.subs
+                            .filter((sub) => sub());
+                    });
                     room.on_connection_loss(() => {});
                     let closeListener = {
                         closeReason: null,
@@ -78,7 +86,8 @@ impl Object<Jason> {
                     return {
                         room: room,
                         closeListener: closeListener,
-                        localTracksStore: localTracksStore
+                        localTracksStore: localTracksStore,
+                        onFailedLocalStreamListener: onFailedLocalStreamListener
                     };
                 }
             "#,

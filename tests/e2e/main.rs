@@ -9,7 +9,7 @@ mod world;
 
 use std::str::FromStr;
 
-use cucumber_rust::{given, when, WorldInit as _};
+use cucumber_rust::{given, WorldInit as _};
 use tokio_1 as tokio;
 
 use self::{
