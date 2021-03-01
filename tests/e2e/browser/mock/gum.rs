@@ -20,8 +20,9 @@ impl<'a> Gum<'a> {
     }
 
     pub async fn broke_gum(&self, video: bool, audio: bool) {
-        self.0.execute(Statement::new(
-            r#"
+        self.0
+            .execute(Statement::new(
+                r#"
                 async () => {
                     const [isVideoBroken, isAudioBroken] = args;
                     navigator.mediaDevices.getUserMedia = async (cons) => {
@@ -35,8 +36,10 @@ impl<'a> Gum<'a> {
                     }
                 }
             "#,
-            vec![video.into(), audio.into()]
-        )).await.unwrap();
+                vec![video.into(), audio.into()],
+            ))
+            .await
+            .unwrap();
     }
 
     pub async fn unbroke_gum(&self) {

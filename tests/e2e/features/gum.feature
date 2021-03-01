@@ -13,10 +13,8 @@ Feature: Get user media requests
     When Alice tries to enable media publishing
     Then Alice's Room.on_failed_local_stream fires 1 time
 
-#  Scenario: bar
-#    Given room with joined member Alice and Bob
-#    And Alice's gUM broken
-#    When Alice disables media in constraints
-#    And Alice enables all
-#    And Alice enables video and audio constraints
-#    Then Alice's Room.on_failed_local_stream fires 1 time
+  Scenario: asd
+    Given room with joined member Alice and Bob
+    And Alice's gUM broken
+    When Alice enables video and audio constraints
+    Then Alice doesn't have live tracks

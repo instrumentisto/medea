@@ -177,4 +177,25 @@ impl<T> Object<TracksStore<T>> {
             )))
             .await?)
     }
+
+    /// Returns `true` if all local `Track`s from this store are in `ended`
+    /// `readyState`.
+    pub async fn is_all_tracks_ended(&self) -> Result<bool, Error> {
+        self.execute(Statement::new(
+            r#"
+                async (store) => {
+                    for (track of store.tracks) {
+                        if (track.track.get_track().readyState != 'ended') {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            "#,
+            vec![],
+        ))
+        .await?
+        .as_bool()
+        .ok_or(Error::TypeCast)
+    }
 }
