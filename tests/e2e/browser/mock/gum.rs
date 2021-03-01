@@ -25,10 +25,10 @@ impl<'a> Gum<'a> {
                 async () => {
                     const [isVideoBroken, isAudioBroken] = args;
                     navigator.mediaDevices.getUserMedia = async (cons) => {
-                        if (isAudioBroken && cons.audio != undefined) {
+                        if (isAudioBroken && cons.audio != null) {
                             throw new NotFoundError();
                         }
-                        if (isVideoBroken && cons.video != undefined) {
+                        if (isVideoBroken && cons.video != null) {
                             throw new NotFoundError();
                         }
                         return await window.gumMock.original(cons);

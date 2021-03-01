@@ -48,6 +48,13 @@ async fn when_member_switches_to_kind(world: &mut World, id: String, kind: Strin
     let _ = member.room().set_local_media_settings(video, audio).await.unwrap();
 }
 
+#[when(regex = "^(\\S*) disables media in constraints$")]
+async fn when_member_disabled_media_in_cons(world: &mut World, id: String) {
+    let member = world.get_member(&id).unwrap();
+    member.room().set_local_media_settings(false, false).await.unwrap();
+}
+
+
 #[then(regex = "^(\\S*)'s Room.on_failed_local_stream fires (\\d*) time(:?s)?$")]
 async fn then_room_failed_local_stream_fires(world: &mut World, id: String, times: u64) {
     let member = world.get_member(&id).unwrap();

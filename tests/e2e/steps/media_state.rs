@@ -116,3 +116,11 @@ async fn when_member_disables_remote_track(
         .await
         .unwrap();
 }
+
+#[when(regex = "^(\\S*) tries to enable media publishing")]
+async fn when_member_tries_to_enable_publishing(
+    world: &mut World,
+    id: String,
+) {
+    world.get_member(&id).unwrap().toggle_media(None, None, true).await.unwrap_err();
+}
