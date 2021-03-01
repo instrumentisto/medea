@@ -1,7 +1,8 @@
-//! Platform specific functionality.
+//! Platform-specific functionality.
 
 #[doc(inline)]
 pub use self::{
+    peer_connection::{IceCandidate, RTCPeerConnectionError, SdpType},
     rtc_stats::RtcStatsError,
     transport::{
         RpcTransport, TransportError, TransportState, WebSocketRpcTransport,
@@ -14,9 +15,7 @@ pub use self::{
         input_device_info::InputDeviceInfo,
         media_devices::{enumerate_devices, get_display_media, get_user_media},
         media_track::MediaStreamTrack,
-        peer_connection::{
-            IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
-        },
+        peer_connection::RtcPeerConnection,
         rtc_stats::RtcStats,
         set_panic_hook, spawn,
         transceiver::{Transceiver, TransceiverDirection},
@@ -27,6 +26,7 @@ pub use self::{
 #[cfg(feature = "mockable")]
 pub use self::transport::MockRpcTransport;
 
+mod peer_connection;
 mod rtc_stats;
 mod transport;
 mod wasm;

@@ -5,7 +5,7 @@ use futures::{
     StreamExt,
 };
 use medea_client_api_proto::PeerId;
-use medea_jason::{api, core::Connections, platform};
+use medea_jason::{api, connection::Connections, platform};
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
 

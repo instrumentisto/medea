@@ -1,3 +1,5 @@
+//! Platform-agnostic functionality of [`platform::RtcStats`].
+
 use std::rc::Rc;
 
 use derive_more::{Display, From};
@@ -30,9 +32,7 @@ pub enum RtcStatsError {
     #[display(fmt = "RTCStats.entries is undefined")]
     UndefinedEntries,
 
-    /// [`RtcStats`] deserialization error.
-    ///
-    /// [`RtcStats`]: platform::RtcStats
+    /// [`platform::RtcStats`] deserialization error.
     #[display(fmt = "Failed to deserialize into RtcStats: {}", _0)]
     ParseError(Rc<serde_json::Error>),
 }

@@ -1,10 +1,14 @@
+//! [MediaDevices][1] functionality.
+//!
+//! [1]: https://tinyurl.com/w3-streams/#mediadevices
+
 use std::convert::TryFrom as _;
 use wasm_bindgen_futures::JsFuture;
 
 use tracerr::Traced;
 
 use crate::{
-    core::media::MediaManagerError,
+    media::MediaManagerError,
     platform::{
         DisplayMediaStreamConstraints, Error, InputDeviceInfo,
         MediaStreamConstraints, MediaStreamTrack,
@@ -120,7 +124,7 @@ pub async fn get_user_media(
 /// With [`MediaManagerError::GetUserMediaFailed`] if
 /// [MediaDevices.getDisplayMedia()][1] returns error.
 ///
-/// [1]: https://www.w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+/// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 /// [2]: https://tinyurl.com/w3-streams/#mediadevices
 pub async fn get_display_media(
     caps: DisplayMediaStreamConstraints,

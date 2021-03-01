@@ -4,7 +4,7 @@ use derive_more::{Display, From};
 use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 
-use crate::{core::utils::JsCaused, platform};
+use crate::{platform, utils::JsCaused};
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///
@@ -14,6 +14,8 @@ use crate::{core::utils::JsCaused, platform};
 pub struct EventListenerBindError(platform::Error);
 
 /// Wrapper for closure that handles some [`EventTarget`] event.
+///
+/// [`EventTarget`]: web_sys::EventTarget
 pub struct EventListener<T, A>
 where
     T: Deref<Target = web_sys::EventTarget>,

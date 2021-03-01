@@ -20,18 +20,14 @@ use medea_client_api_proto::{
     VideoSettings,
 };
 use medea_jason::{
-    core::{
-        media::{
-            LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints,
-        },
-        peer::{
-            self, media_exchange_state, MediaStateControllable, PeerEvent,
-            TrackDirection,
-        },
-        utils::Updatable,
-        Connections,
+    connection::Connections,
+    media::{LocalTracksConstraints, MediaKind, MediaManager, RecvConstraints},
+    peer::{
+        self, media_exchange_state, MediaStateControllable, PeerEvent,
+        TrackDirection,
     },
     platform::RtcStats,
+    utils::Updatable,
 };
 use wasm_bindgen_test::*;
 

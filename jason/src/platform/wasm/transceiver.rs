@@ -8,7 +8,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::{core::media::track::local, platform::MediaStreamTrack};
+use crate::{media::track::local, platform::MediaStreamTrack};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -20,11 +20,13 @@ pub struct Transceiver {
 
 impl Transceiver {
     /// Returns current [`TransceiverDirection`] of this [`Transceiver`].
+    #[inline]
     fn current_direction(&self) -> TransceiverDirection {
         TransceiverDirection::from(self.transceiver.direction())
     }
 
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
+    #[inline]
     pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
         self.transceiver.set_direction(
             (self.current_direction() - disabled_direction).into(),
@@ -32,6 +34,7 @@ impl Transceiver {
     }
 
     /// Enables provided [`TransceiverDirection`] of this [`Transceiver`].
+    #[inline]
     pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
         self.transceiver.set_direction(
             (self.current_direction() | enabled_direction).into(),
@@ -40,6 +43,7 @@ impl Transceiver {
 
     /// Indicates whether the provided [`TransceiverDirection`] is enabled for
     /// this [`Transceiver`].
+    #[inline]
     pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
         self.current_direction().contains(direction)
     }
@@ -75,11 +79,13 @@ impl Transceiver {
     /// Returns [`mid`] of this [`Transceiver`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    #[inline]
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }
 
     /// Returns [`local::Track`] that is being send to remote, if any.
+    #[inline]
     pub fn send_track(&self) -> Option<Rc<local::Track>> {
         self.send_track.borrow().clone()
     }
@@ -93,6 +99,7 @@ impl Transceiver {
 
     /// Sets the underlying [`local::Track`]'s `enabled` field to the provided
     /// value, if any.
+    #[inline]
     pub fn set_send_track_enabled(&self, enabled: bool) {
         if let Some(track) = self.send_track.borrow().as_ref() {
             track.set_enabled(enabled);

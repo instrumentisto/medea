@@ -13,9 +13,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::platform::{self, get_property_by_name, RtcStatsError};
 
-/// All available [`RtcStatsType`] of [`RtcPeerConnection`].
-///
-/// [`RtcPeerConnection`]: platform::RtcPeerConnection
+/// All available [`RtcStatsType`] of [`platform::RtcPeerConnection`].
 #[derive(Clone, Debug)]
 pub struct RtcStats(pub Vec<RtcStat>);
 

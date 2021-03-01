@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     api::{MediaKind, MediaSourceKind},
-    core,
+    media::track::local,
 };
 
 /// Wrapper around local [MediaStreamTrack][1].
@@ -15,7 +15,7 @@ use crate::{
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[wasm_bindgen]
 #[derive(From)]
-pub struct LocalMediaTrack(core::LocalMediaTrack);
+pub struct LocalMediaTrack(local::LocalMediaTrack);
 
 #[wasm_bindgen]
 impl LocalMediaTrack {

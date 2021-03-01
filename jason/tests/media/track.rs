@@ -3,9 +3,9 @@
 use std::rc::{Rc, Weak};
 
 use futures::channel::oneshot;
-use medea_jason::core::{
-    media::{track::remote, MediaManager},
-    DeviceVideoTrackConstraints, MediaStreamSettings,
+use medea_jason::media::{
+    track::remote, DeviceVideoTrackConstraints, MediaManager,
+    MediaStreamSettings,
 };
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen_test::*;
@@ -70,7 +70,7 @@ async fn on_track_disabled_works() {
         .into(),
     );
 
-    let track: remote::Track = track.into();
+    let track = remote::Track::from(track);
     track.set_enabled(false);
 
     timeout(100, test_rx).await.unwrap().unwrap();

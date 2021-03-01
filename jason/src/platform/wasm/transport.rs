@@ -12,14 +12,12 @@ use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    core::{
-        rpc::{websocket::ClientDisconnect, ApiUrl, CloseMsg},
-        utils::JasonError,
-    },
     platform::{
         transport::{RpcTransport, TransportError, TransportState},
         wasm::utils::EventListener,
     },
+    rpc::{websocket::ClientDisconnect, ApiUrl, CloseMsg},
+    utils::JasonError,
 };
 
 /// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
@@ -231,6 +229,7 @@ impl WebSocketRpcTransport {
 }
 
 impl RpcTransport for WebSocketRpcTransport {
+    #[inline]
     fn on_message(&self) -> LocalBoxStream<'static, ServerMsg> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_message_subs.push(tx);
@@ -238,6 +237,7 @@ impl RpcTransport for WebSocketRpcTransport {
         Box::pin(rx)
     }
 
+    #[inline]
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason;
     }
@@ -260,6 +260,7 @@ impl RpcTransport for WebSocketRpcTransport {
         }
     }
 
+    #[inline]
     fn on_state_change(&self) -> LocalBoxStream<'static, TransportState> {
         self.0.borrow().socket_state.subscribe()
     }

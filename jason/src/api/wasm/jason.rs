@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     api::{MediaManagerHandle, RoomHandle},
-    core,
+    jason,
     platform::{init_logger, set_panic_hook},
 };
 
@@ -13,7 +13,7 @@ use crate::{
 /// and room initialization.
 #[wasm_bindgen]
 #[derive(From)]
-pub struct Jason(core::Jason);
+pub struct Jason(jason::Jason);
 
 #[wasm_bindgen]
 impl Jason {
@@ -23,7 +23,7 @@ impl Jason {
         set_panic_hook();
         init_logger();
 
-        Self(core::Jason::new())
+        Self(jason::Jason::new())
     }
 
     /// Creates new `Room` and returns its [`RoomHandle`].

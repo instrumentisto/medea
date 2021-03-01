@@ -2,7 +2,7 @@
 
 use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
-    core::media::{
+    media::{
         AudioTrackConstraints, DeviceVideoTrackConstraints,
         DisplayVideoTrackConstraints, MediaKind, MediaManager,
         MediaStreamSettings, MultiSourceTracksConstraints, VideoSource,

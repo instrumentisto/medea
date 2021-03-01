@@ -3,15 +3,15 @@ use std::iter::FromIterator as _;
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::{api::JasonError, core};
+use crate::{api::JasonError, room};
 
 /// Exception returned from for the [`RoomHandle::set_local_media_settings`][1].
 ///
-/// [1]: crate::core::RoomHandle::set_local_media_settings
+/// [1]: crate::api::RoomHandle::set_local_media_settings
 #[wasm_bindgen]
 #[derive(Debug, From)]
 #[from(forward)]
-pub struct ConstraintsUpdateException(core::ConstraintsUpdateException);
+pub struct ConstraintsUpdateException(room::ConstraintsUpdateException);
 
 #[wasm_bindgen]
 impl ConstraintsUpdateException {

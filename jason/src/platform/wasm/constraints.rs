@@ -1,4 +1,6 @@
-use crate::core::media::{
+//! Media tracks and streams constraints functionality.
+
+use crate::media::{
     constraints::{ConstrainString, ConstrainU32},
     AudioTrackConstraints, DeviceVideoTrackConstraints,
     DisplayVideoTrackConstraints,
@@ -16,6 +18,7 @@ pub struct MediaStreamConstraints(web_sys::MediaStreamConstraints);
 
 impl MediaStreamConstraints {
     /// Creates new [`MediaStreamConstraints`] with none constraints configured.
+    #[inline]
     pub fn new() -> Self {
         Self(web_sys::MediaStreamConstraints::new())
     }
@@ -23,6 +26,7 @@ impl MediaStreamConstraints {
     /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[inline]
     pub fn audio(&mut self, audio: AudioTrackConstraints) {
         self.0.audio(&MediaTrackConstraints::from(audio).into());
     }
@@ -30,6 +34,7 @@ impl MediaStreamConstraints {
     /// Specifies the nature and settings of the video [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[inline]
     pub fn video(&mut self, video: DeviceVideoTrackConstraints) {
         self.0.video(&MediaTrackConstraints::from(video).into());
     }
@@ -114,7 +119,7 @@ impl<T: AsRef<str>> From<&ConstrainString<T>> for ConstrainDomStringParameters {
 
 /// [`DisplayMediaStreamConstraints`][1] wrapper.
 ///
-/// [1]: https://www.w3.org/TR/screen-capture/#dom-displaymediastreamconstraints
+/// [1]: https://w3.org/TR/screen-capture/#dom-displaymediastreamconstraints
 #[derive(AsRef, Debug, Into)]
 pub struct DisplayMediaStreamConstraints(
     web_sys::DisplayMediaStreamConstraints,
@@ -129,6 +134,7 @@ impl Default for DisplayMediaStreamConstraints {
 impl DisplayMediaStreamConstraints {
     /// Creates new [`DisplayMediaStreamConstraints`] with none constraints
     /// configured.
+    #[inline]
     pub fn new() -> Self {
         Self(web_sys::DisplayMediaStreamConstraints::new())
     }
@@ -136,6 +142,7 @@ impl DisplayMediaStreamConstraints {
     /// Specifies the nature and settings of the video [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[inline]
     pub fn video(&mut self, video: DisplayVideoTrackConstraints) {
         self.0.video(&MediaTrackConstraints::from(video).into());
     }

@@ -5,7 +5,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     api::{InputDeviceInfo, JasonError, LocalMediaTrack, MediaStreamSettings},
-    core,
+    media,
 };
 
 /// [`MediaManagerHandle`] is a weak ref to [`MediaManager`].
@@ -21,12 +21,12 @@ use crate::{
 /// Like all handlers it contains weak reference to object that is managed by
 /// Rust, so its methods will fail if weak reference could not be upgraded.
 ///
-/// [`MediaManager`]: core::media::MediaManager
+/// [`MediaManager`]: media::MediaManager
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[wasm_bindgen]
 #[derive(From)]
-pub struct MediaManagerHandle(core::MediaManagerHandle);
+pub struct MediaManagerHandle(media::MediaManagerHandle);
 
 #[wasm_bindgen]
 #[allow(clippy::unused_self)]

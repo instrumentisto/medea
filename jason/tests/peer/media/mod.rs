@@ -7,15 +7,13 @@ use std::{convert::TryFrom, mem, rc::Rc};
 use futures::channel::mpsc;
 use medea_client_api_proto::{TrackId, TrackPatchEvent};
 use medea_jason::{
-    core::{
-        media::{LocalTracksConstraints, MediaManager, RecvConstraints},
-        peer::{
-            media_exchange_state, LocalStreamUpdateCriteria, MediaConnections,
-            MediaStateControllable, SimpleTracksRequest,
-        },
-        utils::Updatable as _,
+    media::{LocalTracksConstraints, MediaManager, RecvConstraints},
+    peer::{
+        media_exchange_state, LocalStreamUpdateCriteria, MediaConnections,
+        MediaStateControllable, SimpleTracksRequest,
     },
     platform::RtcPeerConnection,
+    utils::Updatable as _,
 };
 use wasm_bindgen_test::*;
 
@@ -157,7 +155,7 @@ async fn new_media_connections_with_disabled_video_tracks() {
 /// This tests checks that [`TrackPatch`] works as expected.
 mod sender_patch {
     use medea_client_api_proto::{AudioSettings, MediaType};
-    use medea_jason::core::{
+    use medea_jason::{
         peer::{sender, MediaExchangeState},
         utils::{AsProtoState, SynchronizableState},
     };
@@ -289,7 +287,7 @@ mod sender_patch {
 
 mod receiver_patch {
     use medea_client_api_proto::{AudioSettings, MediaType, MemberId};
-    use medea_jason::core::{
+    use medea_jason::{
         media::RecvConstraints,
         peer::{receiver, MediaExchangeState, PeerEvent},
         utils::{AsProtoState, SynchronizableState},

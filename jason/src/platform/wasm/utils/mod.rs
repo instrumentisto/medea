@@ -1,3 +1,5 @@
+//! `wasm32`-specific utility structs and functions.
+
 mod callback;
 mod event_listener;
 

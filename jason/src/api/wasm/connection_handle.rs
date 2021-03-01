@@ -1,7 +1,7 @@
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::{api::JasonError, core};
+use crate::{api::JasonError, connection};
 
 /// Connection with a specific remote `Member`, that is used on JS side.
 ///
@@ -9,14 +9,14 @@ use crate::{api::JasonError, core};
 /// Rust, so its methods will fail if weak reference could not be upgraded.
 #[wasm_bindgen]
 #[derive(From)]
-pub struct ConnectionHandle(core::ConnectionHandle);
+pub struct ConnectionHandle(connection::ConnectionHandle);
 
 #[wasm_bindgen]
 impl ConnectionHandle {
     /// Sets callback, which will be invoked when this [`Connection`] will
     /// close.
     ///
-    /// [`Connection`]: core::Connection
+    /// [`Connection`]: connection::Connection
     pub fn on_close(&self, cb: js_sys::Function) -> Result<(), JsValue> {
         self.0
             .on_close(cb.into())
@@ -36,7 +36,7 @@ impl ConnectionHandle {
     /// be added to this [`Connection`].
     ///
     /// [`RemoteMediaTrack`]: crate::api::RemoteMediaTrack
-    /// [`Connection`]: core::Connection
+    /// [`Connection`]: connection::Connection
     pub fn on_remote_track_added(
         &self,
         cb: js_sys::Function,

@@ -88,15 +88,12 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     api,
-    core::{
-        media::{
-            track::remote, LocalTracksConstraints, MediaKind, MediaManager,
-        },
-        peer::media_exchange_state,
-        rpc::ApiUrl,
-        AudioTrackConstraints, DeviceVideoTrackConstraints,
-        MediaStreamSettings,
+    media::{
+        track::remote, AudioTrackConstraints, DeviceVideoTrackConstraints,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
     },
+    peer::media_exchange_state,
+    rpc::ApiUrl,
 };
 use url::Url;
 use wasm_bindgen::prelude::*;

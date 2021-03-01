@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     api::{MediaKind, MediaSourceKind},
-    core,
+    media::track::remote,
 };
 
 /// Wrapper around [MediaStreamTrack][1] received from the remote.
@@ -11,7 +11,7 @@ use crate::{
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[wasm_bindgen]
 #[derive(Clone, From, Into)]
-pub struct RemoteMediaTrack(core::remote::Track);
+pub struct RemoteMediaTrack(remote::Track);
 
 #[wasm_bindgen]
 impl RemoteMediaTrack {

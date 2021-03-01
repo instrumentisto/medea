@@ -17,11 +17,8 @@ use medea_client_api_proto::{
     VideoSettings,
 };
 use medea_jason::{
-    api,
-    core::{
-        media::MediaKind, peer::PeerConnection, rpc::MockRpcSession,
-        utils::Updatable, Room,
-    },
+    api, media::MediaKind, peer::PeerConnection, room::Room,
+    rpc::MockRpcSession, utils::Updatable,
 };
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use wasm_bindgen_test::*;
@@ -327,7 +324,7 @@ mod disable_send_tracks {
         AudioSettings, Direction, MediaType, MemberId, TrackPatchCommand,
         VideoSettings,
     };
-    use medea_jason::core::{
+    use medea_jason::{
         media::MediaKind,
         peer::{media_exchange_state, TrackDirection},
     };
@@ -952,7 +949,7 @@ mod disable_send_tracks {
 /// Tests for `RoomHandle.on_close` JS side callback.
 mod on_close_callback {
     use medea_client_api_proto::CloseReason as CloseByServerReason;
-    use medea_jason::core::rpc::{ClientDisconnect, CloseReason};
+    use medea_jason::rpc::{ClientDisconnect, CloseReason};
     use wasm_bindgen::{prelude::*, JsValue};
     use wasm_bindgen_test::*;
 
@@ -1062,7 +1059,7 @@ mod rpc_close_reason_on_room_drop {
     //! is provided to [`RpcClient`].
 
     use futures::channel::oneshot;
-    use medea_jason::core::rpc::{ClientDisconnect, CloseReason};
+    use medea_jason::rpc::{ClientDisconnect, CloseReason};
 
     use super::*;
 
@@ -1150,9 +1147,7 @@ mod patches_generation {
         AudioSettings, Direction, MediaType, Track, TrackId, TrackPatchCommand,
         VideoSettings,
     };
-    use medea_jason::core::peer::{
-        media_exchange_state, mute_state, MediaState,
-    };
+    use medea_jason::peer::{media_exchange_state, mute_state, MediaState};
     use wasm_bindgen_futures::spawn_local;
 
     use crate::{is_firefox, timeout};
@@ -2565,7 +2560,7 @@ mod state_synchronization {
         PeerId, TrackId,
     };
     use medea_jason::{
-        core::{media::MediaManager, rpc::MockRpcSession, Room},
+        media::MediaManager, room::Room, rpc::MockRpcSession,
         utils::AsProtoState,
     };
     use wasm_bindgen_test::*;

@@ -1,3 +1,5 @@
+//! More convenient wrapper for [`js_sys::Error`].
+
 use std::borrow::Cow;
 
 use derive_more::Display;

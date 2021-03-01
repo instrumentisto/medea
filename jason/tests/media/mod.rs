@@ -9,12 +9,8 @@ use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, MemberId, Track, TrackId,
 };
 use medea_jason::{
-    core::{
-        media::{MediaManager, RecvConstraints},
-        peer::{
-            LocalStreamUpdateCriteria, MediaConnections, SimpleTracksRequest,
-        },
-    },
+    media::{MediaManager, RecvConstraints},
+    peer::{LocalStreamUpdateCriteria, MediaConnections, SimpleTracksRequest},
     platform::{RtcPeerConnection, TransceiverDirection},
 };
 use wasm_bindgen_test::*;

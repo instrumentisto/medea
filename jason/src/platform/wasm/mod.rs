@@ -1,3 +1,5 @@
+//! `wasm32`-platform-specific functionality.
+
 use std::{convert::TryInto as _, time::Duration};
 
 pub mod constraints;
@@ -33,7 +35,9 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
-/// Initialize [`wasm_logger`] with default [`wasm_logger::Config`].
+/// Initialize [`wasm_logger`] as default application logger.
+///
+/// [`wasm_logger`]: https://docs.rs/wasm-logger
 pub fn init_logger() {
     wasm_logger::init(wasm_logger::Config::default());
 }

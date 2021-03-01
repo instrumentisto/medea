@@ -1,17 +1,17 @@
+//! Platform-agnostic functionality of RPC Transport.
+
 use derive_more::Display;
 use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 
 use crate::{
-    core::{
-        rpc::{ClientDisconnect, CloseMsg},
-        utils::JsonParseError,
-    },
     platform,
-    utils::JsCaused,
+    rpc::{ClientDisconnect, CloseMsg},
+    utils::{JsCaused, JsonParseError},
 };
 
+#[doc(inline)]
 pub use super::wasm::transport::WebSocketRpcTransport;
 
 /// [`RpcTransport`] states.

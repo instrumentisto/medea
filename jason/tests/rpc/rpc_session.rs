@@ -12,12 +12,12 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, ServerMsg,
 };
 use medea_jason::{
-    core::rpc::{
-        CloseMsg, ConnectionInfo, RpcSession, SessionError, WebSocketRpcClient,
-        WebSocketRpcSession,
-    },
     platform::{
         MockRpcTransport, RpcTransport, TransportState, WebSocketRpcTransport,
+    },
+    rpc::{
+        CloseMsg, ConnectionInfo, RpcSession, SessionError, WebSocketRpcClient,
+        WebSocketRpcSession,
     },
 };
 use wasm_bindgen_test::*;

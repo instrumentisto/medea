@@ -12,11 +12,9 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     api,
-    core::{
-        self,
-        rpc::{CloseMsg, WebSocketRpcClient},
-    },
+    jason::Jason,
     platform::{MockRpcTransport, RpcTransport, TransportState},
+    rpc::{CloseMsg, WebSocketRpcClient},
 };
 use medea_reactive::ObservableCell;
 use wasm_bindgen::closure::Closure;
@@ -55,7 +53,7 @@ async fn only_one_strong_rpc_rc_exists() {
             Ok(transport as Rc<dyn RpcTransport>)
         })
     })));
-    let jason = api::Jason::from(core::Jason::with_rpc_client(ws.clone()));
+    let jason = api::Jason::from(Jason::with_rpc_client(ws.clone()));
 
     let room = jason.init_room();
     room.on_failed_local_media(Closure::once_into_js(|| {}).into())
@@ -105,7 +103,7 @@ async fn rpc_dropped_on_jason_dispose() {
             Ok(transport as Rc<dyn RpcTransport>)
         })
     })));
-    let jason = api::Jason::from(core::Jason::with_rpc_client(ws));
+    let jason = api::Jason::from(Jason::with_rpc_client(ws));
 
     let room = jason.init_room();
     room.on_failed_local_media(Closure::once_into_js(|| {}).into())
@@ -160,7 +158,7 @@ async fn room_dispose_works() {
             })
         })
     }));
-    let jason = api::Jason::from(core::Jason::with_rpc_client(ws));
+    let jason = api::Jason::from(Jason::with_rpc_client(ws));
 
     let room = jason.init_room();
     room.on_failed_local_media(Closure::once_into_js(|| {}).into())
@@ -293,7 +291,7 @@ async fn room_closes_on_rpc_transport_close() {
             })
         }
     })));
-    let jason = api::Jason::from(core::Jason::with_rpc_client(ws));
+    let jason = api::Jason::from(Jason::with_rpc_client(ws));
 
     let room = jason.init_room();
     room.on_failed_local_media(Closure::once_into_js(|| {}).into())

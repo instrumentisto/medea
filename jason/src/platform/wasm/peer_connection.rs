@@ -1,10 +1,13 @@
+//! Wrapper around [RTCPeerConnection][1].
+//!
+//! [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+
 use std::{
     cell::{Cell, RefCell},
     convert::TryFrom as _,
     rc::Rc,
 };
 
-use derive_more::{Display, From};
 use medea_client_api_proto::{
     IceConnectionState, IceServer, PeerConnectionState,
 };
@@ -19,41 +22,15 @@ use web_sys::{
 };
 
 use crate::{
-    core::{
-        media::{MediaKind, TrackConstraints},
-        utils::JsCaused,
-    },
+    media::{MediaKind, TrackConstraints},
     platform::{
-        self, get_property_by_name, wasm::utils::EventListener,
-        MediaStreamTrack, RtcStats, RtcStatsError, Transceiver,
-        TransceiverDirection,
+        self, get_property_by_name, wasm::utils::EventListener, IceCandidate,
+        MediaStreamTrack, RTCPeerConnectionError, RtcStats, SdpType,
+        Transceiver, TransceiverDirection,
     },
 };
 
 use super::ice_server::RtcIceServers;
-
-/// [RTCIceCandidate][1] representation.
-///
-/// [1]: https://w3.org/TR/webrtc/#rtcicecandidate-interface
-pub struct IceCandidate {
-    /// [`candidate` field][2] of the discovered [RTCIceCandidate][1].
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-candidate
-    pub candidate: String,
-
-    /// [`sdpMLineIndex` field][2] of the discovered [RTCIceCandidate][1].
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmlineindex
-    pub sdp_m_line_index: Option<u16>,
-
-    /// [`sdpMid` field][2] of the discovered [RTCIceCandidate][1].
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
-    pub sdp_mid: Option<String>,
-}
 
 impl From<&TrackConstraints> for MediaKind {
     fn from(media_type: &TrackConstraints) -> Self {
@@ -62,77 +39,6 @@ impl From<&TrackConstraints> for MediaKind {
             TrackConstraints::Video(_) => Self::Video,
         }
     }
-}
-
-/// Representation of [RTCSdpType].
-///
-/// [RTCSdpType]: https://w3.org/TR/webrtc/#dom-rtcsdptype
-pub enum SdpType {
-    /// [`offer` type][1] of SDP.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcsdptype-offer
-    Offer(String),
-
-    /// [`answer` type][1] of SDP.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcsdptype-answer
-    Answer(String),
-}
-
-/// Errors that may occur during signaling between this and remote
-/// [RTCPeerConnection][1] and event handlers setting errors.
-///
-/// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-#[derive(Clone, Debug, Display, From, JsCaused)]
-#[js(error = "platform::Error")]
-pub enum RTCPeerConnectionError {
-    /// Occurs when cannot adds new remote candidate to the
-    /// [RTCPeerConnection][1]'s remote description.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    #[display(fmt = "Failed to add ICE candidate: {}", _0)]
-    #[from(ignore)]
-    AddIceCandidateFailed(platform::Error),
-
-    /// Occurs when cannot obtains [SDP answer][`SdpType::Answer`] from
-    /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`].
-    #[display(fmt = "Failed to create SDP answer: {}", _0)]
-    #[from(ignore)]
-    CreateAnswerFailed(platform::Error),
-
-    /// Occurs when a new [`RtcPeerConnection`] cannot be created.
-    #[display(fmt = "Failed to create PeerConnection: {}", _0)]
-    #[from(ignore)]
-    PeerCreationError(platform::Error),
-
-    /// Occurs when cannot obtains [SDP offer][`SdpType::Offer`] from
-    /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
-    #[display(fmt = "Failed to create SDP offer: {}", _0)]
-    #[from(ignore)]
-    CreateOfferFailed(platform::Error),
-
-    /// Occurs while getting and parsing [`RtcStats`] of [`RtcPeerConnection`].
-    #[display(fmt = "Failed to get RTCStats: {}", _0)]
-    RtcStatsError(#[js(cause)] RtcStatsError),
-
-    /// [PeerConnection.getStats][1] promise thrown exception.
-    ///
-    /// [1]: https://tinyurl.com/w6hmt5f
-    #[display(fmt = "PeerConnection.getStats() failed with error: {}", _0)]
-    #[from(ignore)]
-    GetStatsException(platform::Error),
-
-    /// Occurs if the local description associated with the
-    /// [`RtcPeerConnection`] cannot be changed.
-    #[display(fmt = "Failed to set local SDP description: {}", _0)]
-    #[from(ignore)]
-    SetLocalDescriptionFailed(platform::Error),
-
-    /// Occurs if the description of the remote end of the
-    /// [`RtcPeerConnection`] cannot be changed.
-    #[display(fmt = "Failed to set remote SDP description: {}", _0)]
-    #[from(ignore)]
-    SetRemoteDescriptionFailed(platform::Error),
 }
 
 type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
@@ -461,6 +367,7 @@ impl RtcPeerConnection {
     /// After this function returns, the offer returned by the next call to
     /// [`RtcPeerConnection::create_offer`] is automatically configured
     /// to trigger ICE restart.
+    #[inline]
     pub fn restart_ice(&self) {
         self.ice_restart.set(true);
     }

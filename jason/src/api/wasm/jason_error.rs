@@ -2,14 +2,14 @@ use derive_more::From;
 
 use wasm_bindgen::prelude::*;
 
-use crate::core;
+use crate::utils;
 
 /// Representation of app error exported to JS side.
 ///
 /// Contains JS side error if it the cause and trace information.
 #[wasm_bindgen]
 #[derive(From)]
-pub struct JasonError(core::utils::JasonError);
+pub struct JasonError(utils::JasonError);
 
 #[wasm_bindgen]
 impl JasonError {

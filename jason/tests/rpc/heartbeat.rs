@@ -8,8 +8,8 @@ use futures::{
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use medea_jason::{
-    core::rpc::{Heartbeat, IdleTimeout, PingInterval},
     platform::{MockRpcTransport, RpcTransport},
+    rpc::{Heartbeat, IdleTimeout, PingInterval},
 };
 use wasm_bindgen_test::*;
 

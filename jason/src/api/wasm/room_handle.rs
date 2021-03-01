@@ -8,15 +8,15 @@ use crate::{
         ConstraintsUpdateException, JasonError, MediaSourceKind,
         MediaStreamSettings,
     },
-    core,
+    room,
 };
 
 /// JS side handle to [`Room`] where all the media happens.
 ///
-/// [`Room`]: core::Room
+/// [`Room`]: room::Room
 #[wasm_bindgen]
 #[derive(From, Into)]
-pub struct RoomHandle(core::RoomHandle);
+pub struct RoomHandle(room::RoomHandle);
 
 #[wasm_bindgen]
 impl RoomHandle {
@@ -35,7 +35,7 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), JasonError>`.
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn join(&self, token: String) -> Promise {
         let this = self.0.clone();
 
@@ -48,7 +48,7 @@ impl RoomHandle {
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Member` is established.
     ///
-    /// [`Connection`]: core::Connection
+    /// [`Connection`]: crate::connection::Connection
     pub fn on_new_connection(
         &self,
         cb: js_sys::Function,
@@ -62,8 +62,8 @@ impl RoomHandle {
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
     ///
-    /// [`Room`]: core::Room
-    /// [`RoomCloseReason`]: crate::core::RoomCloseReason
+    /// [`Room`]: room::Room
+    /// [`RoomCloseReason`]: room::RoomCloseReason
     pub fn on_close(&self, cb: js_sys::Function) -> Result<(), JsValue> {
         self.0
             .on_close(cb.into())
@@ -78,7 +78,7 @@ impl RoomHandle {
     /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     /// [`LocalMediaTrack`]: crate::api::LocalMediaTrack
     pub fn on_local_track(&self, cb: js_sys::Function) -> Result<(), JsValue> {
         self.0
@@ -134,8 +134,8 @@ impl RoomHandle {
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
     ///
-    /// [`Room`]: core::Room
-    /// [`PeerConnection`]: core::peer::PeerConnection
+    /// [`Room`]: room::Room
+    /// [`PeerConnection`]: crate::peer::PeerConnection
     /// [`LocalMediaTrack`]: crate::api::LocalMediaTrack
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
@@ -161,7 +161,7 @@ impl RoomHandle {
 
     /// Mutes outbound audio in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn mute_audio(&self) -> Promise {
         let this = self.0.clone();
 
@@ -173,7 +173,7 @@ impl RoomHandle {
 
     /// Unmutes outbound audio in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn unmute_audio(&self) -> Promise {
         let this = self.0.clone();
 
@@ -185,7 +185,7 @@ impl RoomHandle {
 
     /// Mutes outbound video in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn mute_video(&self, source_kind: Option<MediaSourceKind>) -> Promise {
         let this = self.0.clone();
 
@@ -199,7 +199,7 @@ impl RoomHandle {
 
     /// Unmutes outbound video in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn unmute_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -216,7 +216,7 @@ impl RoomHandle {
 
     /// Disables outbound audio in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn disable_audio(&self) -> Promise {
         let this = self.0.clone();
 
@@ -228,7 +228,7 @@ impl RoomHandle {
 
     /// Enables outbound audio in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn enable_audio(&self) -> Promise {
         let this = self.0.clone();
 
@@ -275,7 +275,7 @@ impl RoomHandle {
 
     /// Disables inbound audio in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn disable_remote_audio(&self) -> Promise {
         let this = self.0.clone();
 
@@ -289,7 +289,7 @@ impl RoomHandle {
 
     /// Disables inbound video in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn disable_remote_video(&self) -> Promise {
         let this = self.0.clone();
 
@@ -303,7 +303,7 @@ impl RoomHandle {
 
     /// Enables inbound audio in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn enable_remote_audio(&self) -> Promise {
         let this = self.0.clone();
 
@@ -315,7 +315,7 @@ impl RoomHandle {
 
     /// Enables inbound video in this [`Room`].
     ///
-    /// [`Room`]: core::Room
+    /// [`Room`]: room::Room
     pub fn enable_remote_video(&self) -> Promise {
         let this = self.0.clone();
 

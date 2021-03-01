@@ -3,7 +3,7 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{api::JasonError, core};
+use crate::{api::JasonError, rpc};
 
 /// Handle that JS side can reconnect to the Medea media server on
 /// a connection loss with.
@@ -11,7 +11,7 @@ use crate::{api::JasonError, core};
 /// This handle will be provided into `Room.on_connection_loss` callback.
 #[wasm_bindgen]
 #[derive(Clone, From)]
-pub struct ReconnectHandle(core::ReconnectHandle);
+pub struct ReconnectHandle(rpc::ReconnectHandle);
 
 #[wasm_bindgen]
 impl ReconnectHandle {
@@ -21,7 +21,7 @@ impl ReconnectHandle {
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     ///
-    /// [`RpcSession`]: core::rpc::RpcSession
+    /// [`RpcSession`]: rpc::RpcSession
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
         let this = self.0.clone();
         future_to_promise(async move {
@@ -51,7 +51,7 @@ impl ReconnectHandle {
     /// If `multiplier` is negative number than `multiplier` will be considered
     /// as `0.0`.
     ///
-    /// [`RpcSession`]: core::rpc::RpcSession
+    /// [`RpcSession`]: rpc::RpcSession
     pub fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
