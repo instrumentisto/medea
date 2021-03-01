@@ -250,10 +250,9 @@ impl Component {
     /// Watcher for the [`State::enabled_general`] updates.
     ///
     /// Updates [`Receiver`]'s general media exchange state. Adds or removes
-    /// [`TransceiverDirection::RECV`] from the [`Transceiver`] of the
+    /// [`TransceiverDirection::RECV`] from the [`platform::Transceiver`] of the
     /// [`Receiver`].
     ///
-    /// [`Transceiver`]: platform::Transceiver
     /// [`TransceiverDirection::RECV`]: platform::TransceiverDirection::RECV
     #[watch(self.enabled_general.subscribe())]
     async fn general_media_exchange_state_changed(

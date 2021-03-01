@@ -1,4 +1,4 @@
-//! Client library for Medea media server.
+//! Client library for [Medea] media server.
 //!
 //! [Medea]: https://github.com/instrumentisto/medea
 

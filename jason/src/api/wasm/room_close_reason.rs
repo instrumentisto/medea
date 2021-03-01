@@ -5,9 +5,10 @@ use crate::room;
 
 /// Reason of why [`Room`] has been closed.
 ///
-/// This struct is passed into `on_close_by_server` JS side callback.
+/// This struct is passed into [`RoomHandle::on_close`] JS side callback.
 ///
 /// [`Room`]: room::Room
+/// [`RoomHandle::on_close`]: crate::api::RoomHandle::on_close
 #[wasm_bindgen]
 #[derive(From)]
 pub struct RoomCloseReason(room::RoomCloseReason);

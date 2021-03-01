@@ -13,6 +13,9 @@ use crate::{
 
 /// JS side handle to [`Room`] where all the media happens.
 ///
+/// Like all handlers it contains weak reference to object that is managed by
+/// Rust, so its methods will fail if weak reference could not be upgraded.
+///
 /// [`Room`]: room::Room
 #[wasm_bindgen]
 #[derive(From, Into)]

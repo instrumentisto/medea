@@ -7,7 +7,7 @@ use crate::{
     platform::{init_logger, set_panic_hook},
 };
 
-/// General library interface.
+/// General JS side library interface.
 ///
 /// Responsible for managing shared transports, local media
 /// and room initialization.

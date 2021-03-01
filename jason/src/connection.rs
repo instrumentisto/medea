@@ -27,8 +27,7 @@ pub struct Connections {
     /// Remote [`MemberId`] to [`Connection`] with that `Member`.
     connections: RefCell<HashMap<MemberId, Connection>>,
 
-    /// Callback from JS side which will be invoked on remote `Member` media
-    /// stream arrival.
+    /// Callback that will be invoked on remote `Member` media arrival.
     on_new_connection: platform::Callback<api::ConnectionHandle>,
 }
 
@@ -91,15 +90,14 @@ impl Connections {
     }
 }
 
-/// Connection with a specific remote `Member`, that is used on JS side.
+/// External handler to [`Connection`] with remote `Member`.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
 pub struct ConnectionHandle(Weak<InnerConnection>);
 
 /// Actual data of a connection with a specific remote `Member`.
 ///
-/// Shared between JS side ([`ConnectionHandle`]) and Rust side
-/// ([`Connection`]).
+/// Shared between external [`ConnectionHandle`] and Rust side [`Connection`].
 struct InnerConnection {
     /// Remote `Member` ID.
     remote_id: MemberId,
@@ -107,15 +105,14 @@ struct InnerConnection {
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
     quality_score: Cell<Option<ConnectionQualityScore>>,
 
-    /// JS callback, that will be invoked when [`remote::Track`] is
-    /// received.
+    /// Callback, that will be invoked when [`remote::Track`] is received.
     on_remote_track_added: platform::Callback<api::RemoteMediaTrack>,
 
-    /// JS callback, that will be invoked when [`ConnectionQualityScore`] will
-    /// be updated.
+    /// Callback, that will be invoked when [`ConnectionQualityScore`] is
+    /// updated.
     on_quality_score_update: platform::Callback<u8>,
 
-    /// JS callback, that will be invoked when this connection is closed.
+    /// Callback, that will be invoked when current [`Connection`] is closed.
     on_close: platform::Callback<()>,
 }
 
@@ -171,13 +168,13 @@ impl Connection {
         }))
     }
 
-    /// Invokes `on_remote_track_added` JS callback with the provided
+    /// Invokes `on_remote_track_added` callback with the provided
     /// [`remote::Track`].
     pub fn add_remote_track(&self, track: remote::Track) {
         self.0.on_remote_track_added.call1(track);
     }
 
-    /// Creates new [`ConnectionHandle`] for using [`Connection`] on JS side.
+    /// Creates new external handle to current [`Connection`].
     #[inline]
     pub fn new_handle(&self) -> ConnectionHandle {
         ConnectionHandle(Rc::downgrade(&self.0))

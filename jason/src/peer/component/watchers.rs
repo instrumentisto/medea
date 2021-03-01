@@ -169,11 +169,11 @@ impl Component {
     /// Watcher for the [`State::local_sdp`] updates.
     ///
     /// Sets [`PeerConnection`]'s SDP offer to the provided one and sends
-    /// a [`PeerEvent::NewSdpOffer`] if [`NegotiationRole`] is an
+    /// a [`PeerEvent::NewSdpOffer`] if [`NegotiationRole`] is
     /// [`NegotiationRole::Offerer`].
     ///
     /// Sets [`PeerConnection`]'s SDP answer to the provided one and sends
-    /// a [`PeerEvent::NewSdpAnswer`] if [`NegotiationRole`] is an
+    /// a [`PeerEvent::NewSdpAnswer`] if [`NegotiationRole`] is
     /// [`NegotiationRole::Answerer`].
     ///
     /// Rollbacks [`PeerConnection`] to a stable state if [`PeerConnection`] is

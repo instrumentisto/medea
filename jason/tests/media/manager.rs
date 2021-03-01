@@ -335,7 +335,6 @@ async fn new_tracks_should_be_live() {
             .as_ref()
             .as_ref(),
     );
-
     let ended_track = track.clone();
     ended_track.stop();
 

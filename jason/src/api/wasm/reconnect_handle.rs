@@ -8,7 +8,13 @@ use crate::{api::JasonError, rpc};
 /// Handle that JS side can reconnect to the Medea media server on
 /// a connection loss with.
 ///
-/// This handle will be provided into `Room.on_connection_loss` callback.
+/// This handle will be provided into [`RoomHandle.on_connection_loss`]
+/// callback.
+///
+/// Like all handlers it contains weak reference to object that is managed by
+/// Rust, so its methods will fail if weak reference could not be upgraded.
+///
+/// [`RoomHandle.on_connection_loss`]: crate::api::RoomHandle.on_connection_loss
 #[wasm_bindgen]
 #[derive(Clone, From)]
 pub struct ReconnectHandle(rpc::ReconnectHandle);

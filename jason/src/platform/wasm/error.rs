@@ -44,11 +44,3 @@ impl From<JsValue> for platform::Error {
         }
     }
 }
-
-impl From<platform::Error> for js_sys::Error {
-    fn from(err: platform::Error) -> Self {
-        let error = Self::new(&err.message);
-        error.set_name(&err.name);
-        error
-    }
-}

@@ -1,4 +1,4 @@
-//! Platform agnostic functionality.
+//! General library interface.
 
 use futures::FutureExt as _;
 use std::{cell::RefCell, rc::Rc};
@@ -15,8 +15,8 @@ use crate::{
 
 /// General library interface.
 ///
-/// Responsible for managing shared transports, local media
-/// and room initialization.
+/// Responsible for managing shared transports, local media and room
+/// initialization.
 pub struct Jason(Rc<RefCell<Inner>>);
 
 struct Inner {

@@ -47,7 +47,7 @@ use crate::{
 
 /// Reason of why [`Room`] has been closed.
 ///
-/// This struct is passed into `on_close_by_server` JS side callback.
+/// This struct is passed into [`RoomHandle::on_close`] callback.
 pub struct RoomCloseReason {
     /// Indicator if [`Room`] is closed by server.
     ///
@@ -64,8 +64,7 @@ pub struct RoomCloseReason {
 }
 
 impl RoomCloseReason {
-    /// Creates new [`RoomCloseReason`] with provided [`CloseReason`]
-    /// converted into [`String`].
+    /// Creates new [`RoomCloseReason`] with provided [`CloseReason`].
     ///
     /// `is_err` may be `true` only on closing by client.
     ///
@@ -179,11 +178,7 @@ impl From<PeerError> for RoomError {
     }
 }
 
-/// JS side handle to `Room` where all the media happens.
-///
-/// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
-///
-/// For using [`RoomHandle`] on Rust side, consider the `Room`.
+/// External handle to [`Room`].
 #[derive(Clone)]
 pub struct RoomHandle(Weak<InnerRoom>);
 
@@ -251,7 +246,7 @@ impl RoomHandle {
         );
 
         // Perform `getUserMedia()`/`getDisplayMedia()` right away, so we can
-        // fail fast without touching senders' states and starting all required
+        // fail fast without touching senders states and starting all required
         // messaging.
         // Hold tracks through all process, to ensure that they will be reused
         // without additional requests.
@@ -587,8 +582,6 @@ impl WeakRoom {
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
 /// handles media server events, etc).
-///
-/// For using [`Room`] on JS side, consider the [`RoomHandle`].
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
@@ -680,8 +673,8 @@ impl Room {
         self.0.set_close_reason(reason);
     }
 
-    /// Creates new [`RoomHandle`] used by JS side. You can create them as many
-    /// as you need.
+    /// Creates new external handle to [`Room`]. You can create them as many as
+    /// you need.
     #[inline]
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
@@ -712,7 +705,7 @@ impl Room {
 
 /// Actual data of a [`Room`].
 ///
-/// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
+/// Shared between external [`RoomHandle`] and Rust side ([`Room`]).
 struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
     rpc: Rc<dyn RpcSession>,
@@ -752,10 +745,11 @@ struct InnerRoom {
 
     /// Reason of [`Room`] closing.
     ///
-    /// This [`CloseReason`] will be provided into `on_close` JS callback.
+    /// This [`CloseReason`] will be provided into [`RoomHandle::on_close`]
+    /// callback.
     ///
     /// Note that `None` will be considered as error and `is_err` will be
-    /// `true` in [`CloseReason`] provided to JS callback.
+    /// `true` in [`CloseReason`] provided to callback.
     close_reason: RefCell<CloseReason>,
 }
 

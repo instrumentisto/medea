@@ -43,10 +43,10 @@ pub struct Receiver {
 
 impl Receiver {
     /// Creates new [`platform::Transceiver`] if provided `mid` is `None`,
-    /// otherwise creates [`Receiver`] without [`Transceiver`]. It will be
-    /// injected when [`remote::Track`] arrives.
+    /// otherwise creates [`Receiver`] without [`platform::Transceiver`]. It
+    /// will be injected when [`remote::Track`] arrives.
     ///
-    /// Created [`Transceiver`] direction is set to
+    /// Created [`platform::Transceiver`] direction is set to
     /// [`TransceiverDirection::INACTIVE`][1] if `enabled_individual` is
     /// `false`.
     ///
@@ -54,7 +54,6 @@ impl Receiver {
     /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
     ///
-    /// [`Transceiver`]: platform::Transceiver
     /// [1]: platform::TransceiverDirection::INACTIVE
     pub fn new(
         state: &State,

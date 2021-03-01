@@ -133,7 +133,7 @@ impl WebSocketRpcTransport {
     /// fired before [WebSocket.onopen][2] callback.
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
-    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopens
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
     pub async fn new(url: ApiUrl) -> Result<Self> {
         let socket = Rc::new(RefCell::new(InnerSocket::new(url.as_ref())?));
         {

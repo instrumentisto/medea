@@ -1,4 +1,4 @@
-//! External Jason API.
+//! External `Jason` API.
 
 mod wasm;
 

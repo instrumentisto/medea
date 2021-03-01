@@ -435,11 +435,10 @@ impl Component {
     /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Updates [`Sender`]'s general media exchange state. Adds or removes
-    /// [`TransceiverDirection::SEND`] from the [`Transceiver`] of this
-    /// [`Sender`].
+    /// [`TransceiverDirection::SEND`] from the [`platform::Transceiver`] of
+    /// this [`Sender`].
     ///
     /// [`TransceiverDirection::SEND`]: platform::TransceiverDirection::SEND
-    /// [`Transceiver`]: platform::Transceiver
     #[watch(self.enabled_general.subscribe())]
     async fn enabled_general_state_changed(
         sender: Rc<Sender>,
@@ -473,13 +472,11 @@ impl Component {
     ///
     /// Updates [`Sender::enabled_individual`] to the `new_state`.
     ///
-    /// Removes `MediaTrack` from [`Transceiver`] if `new_state` is
+    /// Removes `MediaTrack` from [`platform::Transceiver`] if `new_state` is
     /// [`media_exchange_state::Stable::Disabled`].
     ///
     /// Marks [`State::local_track_state`] as [`LocalTrackState::NeedUpdate`] if
     /// `new_state` is [`media_exchange_state::Stable::Enabled`].
-    ///
-    /// [`Transceiver`]: platform::Transceiver
     #[watch(self.enabled_individual.subscribe_stable())]
     async fn enabled_individual_stable_state_changed(
         sender: Rc<Sender>,
@@ -504,9 +501,8 @@ impl Component {
     ///
     /// Updates [`Sender`]'s mute state.
     ///
-    /// Updates [`Sender`]'s [`Transceiver`] `MediaTrack.enabled` property.
-    ///
-    /// [`Transceiver`]: platform::Transceiver
+    /// Updates [`Sender`]'s [`platform::Transceiver`] `MediaTrack.enabled`
+    /// property.
     #[watch(self.mute_state.subscribe_stable())]
     async fn mute_state_stable_watcher(
         sender: Rc<Sender>,

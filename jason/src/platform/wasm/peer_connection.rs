@@ -358,7 +358,6 @@ impl RtcPeerConnection {
         .map_err(Into::into)
         .map_err(RTCPeerConnectionError::AddIceCandidateFailed)
         .map_err(tracerr::wrap!())?;
-
         Ok(())
     }
 
