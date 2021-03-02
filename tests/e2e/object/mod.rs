@@ -1,6 +1,5 @@
 //! Browser-side objects.
 
-// TODO(evdokimovs): private/public modules
 pub mod connection;
 pub mod connections_store;
 pub mod jason;
