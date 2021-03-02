@@ -93,6 +93,11 @@ $ make test.unit crate=medea
 $ make test.unit crate=medea-jason
 ```
 
+To run integration tests use docker-wrapped commands from [`Makefile`]:
+```bash
+$ make test.integration
+```
+
 To run E2E tests use docker-wrapped commands from [`Makefile`]:
 ```bash
 $ make test.e2e

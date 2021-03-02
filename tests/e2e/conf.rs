@@ -40,9 +40,9 @@ env_var!(
 env_var!(
     /// Address a Client API WebSocket endpoint.
     ///
-    /// Default: `ws://127.0.0.1:8080/ws`
+    /// Default: `ws://127.0.0.1:8001/ws`
     CLIENT_API_ADDR
-        || "ws://127.0.0.1:8080/ws"
+        || "ws://127.0.0.1:8001/ws"
 );
 
 env_var!(
