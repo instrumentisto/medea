@@ -61,7 +61,7 @@ mod grpc {
                              then just remove this line of code.",
                         );
                     break;
-                };
+                }
                 panic!("{}", e);
             }
         }

@@ -102,7 +102,7 @@ impl TryFrom<String> for StatefulFid {
         let room_id = if let Some(room_id) = splitted.next() {
             if room_id.is_empty() {
                 return Err(ParseFidError::MissingPath(value));
-            };
+            }
             room_id
         } else {
             return Err(ParseFidError::Empty);
