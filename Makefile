@@ -814,7 +814,8 @@ docker-up-e2e-env = RUST_BACKTRACE=1 \
 			$(FIREFOX_VERSION) ,\
 			$(CHROME_VERSION) ))
 
-docker.up.e2e: docker.down.e2e
+docker.up.e2e:
+	@env $(docker-up-e2e-env) make docker.down.e2e
 	@make build.jason debug=$(debug) dockerized=no
 	env $(docker-up-e2e-env) \
 	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
