@@ -46,7 +46,7 @@ async fn new_given_member(
     };
     world.create_member(member_builder).await.unwrap();
     if joined.0 {
-        world.join_room(&first_member_id).await;
+        world.join_room(&first_member_id).await.unwrap();
         world
             .wait_for_interconnection(&first_member_id)
             .await
@@ -138,17 +138,6 @@ async fn new_given_member(
 #[when(regex = r"^(\S+) joins the room$")]
 async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
-}
-
-/// Parses [`MediaKind`] from the given `step` description match.
-#[must_use]
-fn parse_media_kind(step: &str) -> Option<MediaKind> {
-    match step {
-        "audio" => Some(MediaKind::Audio),
-        "video" => Some(MediaKind::Video),
-        "all" => None,
-        _ => unreachable!(),
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

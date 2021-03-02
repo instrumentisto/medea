@@ -43,7 +43,7 @@ async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
     assert!(is_stopped);
 }
 
-#[when(regex = r"^Member (\S+) (disables|mutes) (audio|video|all)$")]
+#[when(regex = r"^(\S+) (disables|mutes) (audio|video|all)$")]
 async fn when_disables_mutes(
     world: &mut World,
     id: String,

@@ -17,8 +17,8 @@ Feature: Room joining
     Given room with member Alice with no WebRTC endpoints
     And joined member Bob with no WebRTC endpoints
     When Alice joins room
-    Then Alice doesn't receives connection with Bob
-    And Bob doesn't receives connection with Alice
+    Then Alice doesn't receive connection with Bob
+    And Bob doesn't receive connection with Alice
 
   Scenario: Third Member joined
     Given room with joined member Alice and Bob
