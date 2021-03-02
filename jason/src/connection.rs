@@ -1,8 +1,5 @@
 //! Connection with specific remote `Member`.
 
-// TODO: Remove when moving JasonError to api::wasm.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
@@ -15,7 +12,7 @@ use crate::{
     api,
     media::track::remote,
     platform,
-    utils::{HandlerDetachedError, JasonError},
+    api::JasonError,
 };
 
 /// Service which manages [`Connection`]s with the remote `Member`s.

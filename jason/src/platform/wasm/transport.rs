@@ -16,8 +16,8 @@ use crate::{
         transport::{RpcTransport, TransportError, TransportState},
         wasm::utils::EventListener,
     },
+    api::JasonError,
     rpc::{websocket::ClientDisconnect, ApiUrl, CloseMsg},
-    utils::JasonError,
 };
 
 /// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].

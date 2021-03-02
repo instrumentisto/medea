@@ -1,8 +1,5 @@
 //! Medea `Room`.
 
-// TODO: Remove when moving JasonError to api::wasm.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -38,11 +35,12 @@ use crate::{
         PeerEvent, PeerEventHandler, TrackDirection,
     },
     platform,
+    api::JasonError,
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
-    utils::{AsProtoState, HandlerDetachedError, JasonError, JsCaused},
+    utils::{AsProtoState, JsCaused, HandlerDetachedError},
 };
 
 /// Reason of why [`Room`] has been closed.

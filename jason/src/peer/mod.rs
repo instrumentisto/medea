@@ -33,7 +33,8 @@ use crate::{
         MediaStreamSettings, RecvConstraints,
     },
     platform,
-    utils::{JasonError, JsCaused},
+    utils::{JsCaused},
+    api::JasonError,
 };
 
 #[doc(inline)]
@@ -69,7 +70,7 @@ pub enum PeerError {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js(cause)] platform::RTCPeerConnectionError),
+    RtcPeerConnection(#[js(cause)] platform::RtcPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or parsing
     /// [`local::Track`]s.

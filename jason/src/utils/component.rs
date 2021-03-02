@@ -9,7 +9,8 @@ use medea_reactive::AllProcessed;
 use crate::{
     media::LocalTracksConstraints,
     platform,
-    utils::{JasonError, TaskHandle},
+    api::JasonError,
+    utils::{TaskHandle},
 };
 
 /// Abstraction over a state which can be transformed to the states from the

@@ -21,7 +21,7 @@ use crate::{
         ApiUrl, CloseMsg, CloseReason, ClosedStateReason, Heartbeat,
         IdleTimeout, PingInterval, RpcClientError,
     },
-    utils::JasonError,
+    api::JasonError,
 };
 
 /// Reasons of closing WebSocket RPC connection by a client side.

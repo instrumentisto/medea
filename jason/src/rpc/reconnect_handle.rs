@@ -1,8 +1,5 @@
 //! Reconnection for [`RpcSession`].
 
-// TODO: Remove when moving JasonError to api::wasm.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{rc::Weak, time::Duration};
 
 use derive_more::Display;
@@ -10,7 +7,8 @@ use derive_more::Display;
 use crate::{
     platform,
     rpc::{BackoffDelayer, RpcSession},
-    utils::{HandlerDetachedError, JasonError, JsCaused},
+    api::JasonError,
+    utils::{JsCaused},
 };
 
 /// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]

@@ -1,8 +1,5 @@
 //! Acquiring and storing [`local::Track`]s.
 
-// TODO: Remove when moving JasonError to api::wasm.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -19,7 +16,8 @@ use crate::{
         MultiSourceTracksConstraints,
     },
     platform,
-    utils::{HandlerDetachedError, JasonError, JsCaused},
+    api::JasonError,
+    utils::{JsCaused},
 };
 
 use super::track::local;

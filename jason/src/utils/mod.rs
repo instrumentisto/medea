@@ -15,7 +15,7 @@ use medea_reactive::Guarded;
 #[doc(inline)]
 pub use self::{
     component::{AsProtoState, Component, SynchronizableState, Updatable},
-    errors::{HandlerDetachedError, JasonError, JsCaused, JsonParseError},
+    errors::{HandlerDetachedError, JsCaused, JsonParseError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
 
@@ -28,11 +28,11 @@ pub use self::{
 macro_rules! upgrade_or_detached {
     ($v:expr) => {{
         $v.upgrade()
-            .ok_or_else(|| new_js_error!(HandlerDetachedError))
+            .ok_or_else(|| new_js_error!($crate::utils::HandlerDetachedError))
     }};
     ($v:expr, $err:ty) => {{
         $v.upgrade()
-            .ok_or_else(|| new_js_error!(HandlerDetachedError => $err))
+            .ok_or_else(|| new_js_error!($crate::utils::HandlerDetachedError => $err))
     }};
 }
 
@@ -46,10 +46,10 @@ macro_rules! upgrade_or_detached {
 ///   explicitly which type conversion is required.
 macro_rules! new_js_error {
     ($e:expr) => {
-        $crate::utils::JasonError::from(tracerr::new!($e)).into()
+        $crate::api::JasonError::from(tracerr::new!($e)).into()
     };
     ($e:expr => $o:ty) => {
-        <$o>::from($crate::utils::JasonError::from(tracerr::new!($e)))
+        <$o>::from($crate::api::JasonError::from(tracerr::new!($e)))
     };
 }
 
