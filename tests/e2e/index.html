@@ -1,0 +1,18 @@
+<html>
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+  <title>Medea's E2E test</title>
+  <script type="module">
+    import init, {Jason} from "/pkg/medea_jason.js";
+
+    window.onload = async () => {
+      await init();
+      window.rust = await import("/pkg/medea_jason.js");
+      let loadedDiv = document.createElement('div');
+      loadedDiv.id = 'loaded';
+      document.body.appendChild(loadedDiv);
+    }
+  </script>
+</head>
+<body></body>
+</html>
