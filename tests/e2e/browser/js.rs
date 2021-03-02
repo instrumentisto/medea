@@ -1,16 +1,14 @@
-//! Implementation and definition of the object which represents some JS code
-//! which can be executed in the browser.
+//! JS code executable in a browser.
 
-use std::iter;
+use std::{iter, mem};
 
 use serde_json::Value as Json;
 
 use crate::object::ObjectPtr;
 
-/// Representation of the JS code which can be executed in the browser.
+/// Representation of a JS code executable in a browser.
 ///
-/// Example of JS expression:
-///
+/// Example of a JS expression:
 /// ```js
 /// async (lastResult) => {
 ///     const [room] = objs;
@@ -21,7 +19,7 @@ use crate::object::ObjectPtr;
 /// }
 /// ```
 pub struct Statement {
-    /// Actual JS code to execute.
+    /// Actual JS code to be executed.
     expression: String,
 
     /// Arguments for the [`Statement::expression`] which will be provided
@@ -40,10 +38,9 @@ pub struct Statement {
 }
 
 impl Statement {
-    /// Returns new [`Statement`] with a provided JS code and arguments.
+    /// Returns a new [`Statement`] with the provided JS code and arguments.
     ///
-    /// Example of JS expression:
-    ///
+    /// Example of a JS expression:
     /// ```js
     /// async (lastResult) => {
     ///     const [room] = objs;
@@ -53,47 +50,50 @@ impl Statement {
     ///     return "foobar";
     /// }
     /// ```
-    pub fn new(expression: &str, args: Vec<Json>) -> Self {
+    #[inline]
+    #[must_use]
+    pub fn new<A: Into<Vec<Json>>>(expression: &str, args: A) -> Self {
         Self {
-            expression: expression.to_string(),
-            args,
+            expression: expression.to_owned(),
+            args: args.into(),
             objs: Vec::new(),
             and_then: None,
         }
     }
 
-    /// Returns new [`Statement`] with a provided JS code, arguments and
+    /// Returns a new [`Statement`] with the provided JS code, arguments and
     /// objects.
-    #[allow(dead_code)]
+    #[inline]
+    #[must_use]
     pub fn with_objs(
         expression: &str,
         args: Vec<Json>,
         objs: Vec<ObjectPtr>,
     ) -> Self {
         Self {
-            expression: expression.to_string(),
+            expression: expression.to_owned(),
             args,
             objs,
             and_then: None,
         }
     }
 
-    /// Executes another [`Statement`] after this one executed successfully.
+    /// Executes the `another` [`Statement`] after this one being executed
+    /// successfully.
     ///
-    /// The success value is passed to a next [`Statement`] as JS lambda
+    /// The success value is passed to the next [`Statement`] as a JS lambda
     /// argument.
-    #[allow(clippy::option_if_let_else)]
+    #[inline]
     pub fn and_then(mut self, another: Self) -> Self {
-        if let Some(e) = self.and_then {
-            self.and_then = Some(Box::new(e.and_then(another)));
-            self
+        self.and_then = Some(Box::new(if let Some(e) = self.and_then {
+            e.and_then(another)
         } else {
-            self.and_then = Some(Box::new(another));
-            self
-        }
+            another
+        }));
+        self
     }
 
-    /// Returns JS code which should be executed in the browser and [`Json`]
+    /// Returns a JS code which should be executed in a browser and [`Json`]
     /// arguments for this code.
     pub(super) fn prepare(self) -> (String, Vec<Json>) {
         // language=JavaScript
@@ -102,36 +102,37 @@ impl Statement {
             let objs;
             let args;
         "#
-        .to_string();
-        let mut args = Vec::new();
+        .to_owned();
 
         let mut statement = Some(Box::new(self));
-        let mut i = 0;
+        let (mut i, mut args) = (0, Vec::new());
         while let Some(mut e) = statement.take() {
             final_js.push_str(&e.step_js(i));
             i += 1;
-            args.push(std::mem::take(&mut e.args).into());
+            args.push(mem::take(&mut e.args).into());
             statement = e.and_then;
         }
 
         (final_js, args)
     }
 
-    /// Returns JS code which obtains [`Statement::objs`] JS objects.
+    /// Returns a JS code which obtains [`Statement::objs`] JS objects.
     ///
     /// Should be injected to the [`Statement::step_js`] code.
     fn objects_injection_js(&self) -> String {
-        iter::once("objs = [];\n".to_string())
+        // language=JavaScript
+        iter::once("objs = [];\n".to_owned())
             .chain(self.objs.iter().map(|id| {
                 format!("objs.push(window.registry.get('{}'));\n", id)
             }))
             .collect()
     }
 
-    /// Returns JS code for this [`Statement`].
+    /// Returns a JS code for this [`Statement`].
     ///
     /// Doesn't generates code for the [`Statement::and_then`].
     fn step_js(&self, i: usize) -> String {
+        // language=JavaScript
         format!(
             r#"
                 args = arguments[{i}];
@@ -140,7 +141,7 @@ impl Statement {
             "#,
             i = i,
             objs_js = self.objects_injection_js(),
-            expr = self.expression
+            expr = self.expression,
         )
     }
 }

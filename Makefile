@@ -128,7 +128,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	-kill $(shell pidof medea-control-api-mock)
+	-killall medea-control-api-mock
 
 
 down.coturn: docker.down.coturn
@@ -159,9 +159,7 @@ down.medea: docker.down.medea
 
 up.control:
 	cargo build -p medea-control-api-mock
-	make wait.port port=6565
 	cargo run -p medea-control-api-mock $(if $(call eq,$(background),yes),&,)
-	make wait.port port=8080
 
 
 up.coturn: docker.up.coturn
@@ -430,41 +428,34 @@ endif
 # Run Rust integration tests of project.
 #
 # Usage:
-#	make test.integration [( [up=no]
-#	     				   | up=yes [( [dockerized=no] [debug=(yes|no)]
-#			                         | dockerized=yes [tag=(dev|<docker-tag>)]
-#			                                          [log=(no|yes)]
-#		                                              [log-to-file=(no|yes)] )]
-#			                        [wait=(5|<seconds>)] )]
+#	make test.integration
+#		[( [up=no]
+#		 | up=yes [( [dockerized=no] [debug=(yes|no)]
+#		           | dockerized=yes [tag=(dev|<docker-tag>)]
+#		                            [log=(no|yes)] [log-to-file=(no|yes)] )]
+#		          [wait=(5|<seconds>)] )]
 
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag))
 
 test.integration:
 ifeq ($(up),yes)
-ifeq ($(dockerized),yes)
+	make docker.up.coturn background=yes
 	env $(test-integration-env) \
-	make docker.up.medea background=yes
-else
-	@make up.coturn
-	env $(test-integration-env) \
-	make up.medea background=yes
-endif
+	make docker.up.medea debug=$(debug) background=yes log=$(log) \
+	                     dockerized=$(dockerized) \
+	                     tag=$(tag) \
+	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
-ifeq ($(dockerized),yes)
-	docker run --rm --network=host \
-				-u $(shell id -u):$(shell id -g) \
-				-v "$(PWD)":/app -w /app \
-				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		ghcr.io/instrumentisto/rust:$(RUST_VER) \
-			make test.integration up=no dockerized=no
-else
 	RUST_BACKTRACE=1 cargo test --test integration
-endif
 ifeq ($(up),yes)
+	-make docker.down.webdriver browser=$(browser)
+	-docker-compose -f 'docker-compose.e2e.yml' down
+	-docker rm -f e2e-files
 	-make down
 endif
 
@@ -472,60 +463,32 @@ endif
 # Run E2E tests of project.
 #
 # Usage:
-#	make test.e2e [( [up=no]
-#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
-#	                         | dockerized=yes [tag=(dev|<docker-tag>)]
-# 											  [rebuild=(no|yes)]
-#	                                          [log=(no|yes)]
-#	                                          [log-to-file=(no|yes)] )] )]
-#	              [wait=(5|<seconds>)]
-#	              [browser=(chrome|firefox)]
-#		          [tag=(dev|<tag>)]
-
-test-e2e-env = RUST_BACKTRACE=1 \
-	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml \
-	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag))
+#	make test.e2e
+#		[( [up=no]
+#		 | up=yes [browser=(chrome|firefox)]
+#		          [( [dockerized=no]
+#		           | dockerized=yes [tag=(dev|<tag>)] [rebuild=(no|yes)] )]
+#		          [debug=(yes|no)]
+#		          [( [background=no]
+#		           | background=yes [log=(no|yes)] )]
 
 test.e2e:
 ifeq ($(up),yes)
-	@make build.jason
 ifeq ($(dockerized),yes)
 ifeq ($(rebuild),yes)
-	make docker.build image=medea debug=$(debug) tag=$(tag)
-	make docker.build image=medea-control-api-mock debug=$(debug) tag=$(tag)
+	@make docker.build image=medea debug=$(debug) tag=$(tag)
+	@make docker.build image=medea-control-api-mock debug=$(debug) tag=$(tag)
 endif
-	env $(test-e2e-env) docker-compose -f 'docker-compose.e2e.yml' up -d
-	docker-compose -f 'docker-compose.e2e.yml' logs &
-	make wait.port port=8000
-else
-	docker run --rm -d --network=host --name e2e-files \
-		-v $(PWD)/tests/e2e/index.html:/usr/share/nginx/html/index.html \
-		-v $(PWD)/jason/pkg:/usr/share/nginx/html/pkg \
-		-v $(PWD)/tests/e2e/nginx.conf:/etc/nginx/nginx.conf \
-		nginx:stable-alpine
-	make docker.up.medea up.control up.coturn background=yes dockerized=no
 endif
-	@make docker.up.webdriver
-	make wait.port port=4444
+	@make docker.up.e2e browser=$(browser) background=yes log=$(log) \
+	                    dockerized=$(dockerized) tag=$(tag) debug=$(debug)
+	@make wait.port port=4444
 endif
-ifeq ($(dockerized),yes)
-	docker run --rm --network=host \
-				-u $(shell id -u):$(shell id -g) \
-				-v "$(PWD)":/app -w /app \
-				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		ghcr.io/instrumentisto/rust:$(RUST_VER) \
-			make test.e2e up=no dockerized=no
-else
 	cargo test --test e2e
-endif
 ifeq ($(up),yes)
-	-make docker.down.webdriver browser=$(browser)
-	-docker-compose -f 'docker-compose.e2e.yml' down
-	-docker rm -f e2e-files
-	-make down
+	@make docker.down.e2e
 endif
+
 
 
 
@@ -655,6 +618,17 @@ docker.down.coturn:
 
 docker.down.demo:
 	docker-compose -f jason/demo/docker-compose.yml down --rmi=local -v
+
+
+# Stop E2E tests environment in Docker Compose and remove all related
+# containers.
+#
+# Usage:
+#	make docker.down.e2e
+
+docker.down.e2e: down.control
+	@make docker.down.medea dockerized=no
+	docker-compose -f tests/e2e/docker-compose.yml down --rmi=local -v
 
 
 # Stop Medea media server in Docker Compose environment
@@ -817,6 +791,53 @@ docker.up.coturn: docker.down.coturn
 
 docker.up.demo: docker.down.demo
 	docker-compose -f jason/demo/docker-compose.yml up
+
+
+# Run E2E tests environment in Docker Compose.
+#
+# Usage:
+#	make docker.up.e2e [browser=(chrome|firefox)]
+#	                   [( [dockerized=no]
+#	                    | dockerized=yes [tag=(dev|<tag>)] )]
+#	                   [debug=(yes|no)]
+#	                   [( [background=no]
+#	                    | background=yes [log=(no|yes)] )]
+
+docker-up-e2e-env = RUST_BACKTRACE=1 \
+	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
+	COMPOSE_CONTROL_MOCK_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
+	COMPOSE_WEBDRIVER_IMAGE_NAME=$(strip \
+		$(if $(call eq,$(browser),firefox),\
+			ghcr.io/instrumentisto/geckodriver ,\
+			selenoid/chrome )) \
+	COMPOSE_WEBDRIVER_IMAGE_VER=$(strip \
+		$(if $(call eq,$(browser),firefox),\
+			$(FIREFOX_VERSION) ,\
+			$(CHROME_VERSION) ))
+
+docker.up.e2e: docker.down.e2e
+	@make build.jason debug=$(debug) dockerized=no
+	env $(docker-up-e2e-env) \
+	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+		up $(if $(call eq,$(dockerized),yes),\
+		   $(if $(call eq,$(background),yes),-d,--abort-on-container-exit),-d)
+ifeq ($(background),yes)
+ifeq ($(log),yes)
+	env $(docker-up-e2e-env) \
+	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+		logs -f &
+endif
+endif
+ifneq ($(dockerized),yes)
+	@MEDEA_SERVER__CLIENT__HTTP__BIND_PORT=8001 \
+	make docker.up.medea dockerized=no debug=$(debug) \
+	                     background=$(background) log-to-file=$(log)
+	@make wait.port port=6565
+	@make up.control background=$(background)
+endif
 
 
 # Run Medea media server in Docker Compose environment.
@@ -1073,10 +1094,10 @@ endef
         	cargo.version \
         docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
-        	docker.down.medea docker.down.webdriver  \
+        	docker.down.e2e docker.down.medea docker.down.webdriver  \
         	docker.pull docker.push docker.tag docker.tar docker.untar \
-        	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver \
+        	docker.up.control docker.up.coturn docker.up.demo docker.up.e2e \
+        	docker.up.medea docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
         helm helm.dir helm.down helm.lint helm.list \

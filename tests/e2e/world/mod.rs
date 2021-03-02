@@ -1,8 +1,8 @@
-//! Implementation of [`World`][1] for the tests.
+//! E2E tests [`World`][1].
 //!
 //! [1]: cucumber_rust::World
 
-mod member;
+pub mod member;
 
 use std::collections::HashMap;
 
@@ -18,10 +18,7 @@ use crate::{
     object::{self, Jason, Object},
 };
 
-use self::member::Member;
-
-#[doc(inline)]
-pub use self::member::MemberBuilder;
+pub use self::member::{Member, MemberBuilder};
 
 /// All errors which can happen while working with [`World`].
 #[derive(Debug, Display, Error, From)]
@@ -35,33 +32,37 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-/// World which will be used by all E2E tests.
+/// [`World`][1] used by all E2E tests.
+///
+/// [1]: cucumber_rust::World
 #[derive(WorldInit)]
 pub struct World {
-    /// ID of `Room` created for this [`World`].
+    /// ID of the `Room` created for this [`World`].
     room_id: String,
 
-    /// Client for the Control API.
+    /// Client of a Medea Control API.
     control_client: control::Client,
 
     /// All [`Member`]s created in this [`World`].
     members: HashMap<String, Member>,
 
-    /// All [`Jason`]s created in this [`World`].
+    /// All [`Jason`] [`Object`]s created in this [`World`].
     jasons: HashMap<String, Object<Jason>>,
 
-    /// [WebDriver] client where all objects from this world will be created.
+    /// [WebDriver] client that all [`Object`]s of this [`World`] will be
+    /// created with.
     ///
-    /// [WebDriver]: https://www.w3.org/TR/webdriver/
+    /// [WebDriver]: https://w3.org/TR/webdriver
     window_factory: WindowFactory,
 }
 
-#[async_trait(? Send)]
+#[async_trait(?Send)]
 impl cucumber_rust::World for World {
     type Error = Error;
 
     async fn new() -> Result<Self> {
         let room_id = Uuid::new_v4().to_string();
+
         let control_client = control::Client::new();
         control_client
             .create(
@@ -84,10 +85,9 @@ impl cucumber_rust::World for World {
 }
 
 impl World {
-    /// Creates new [`Member`] from the provided [`MemberBuilder`].
+    /// Creates a new [`Member`] from the provided [`MemberBuilder`].
     ///
-    /// `Room` for this [`Member`] will be created, but joining will not be
-    /// performed.
+    /// `Room` for this [`Member`] will be created, but joining won't be done.
     pub async fn create_member(
         &mut self,
         builder: MemberBuilder,
@@ -118,7 +118,7 @@ impl World {
                             src: format!(
                                 "local://{}/{}/publish",
                                 self.room_id,
-                                m.id()
+                                m.id(),
                             ),
                             force_relay: false,
                         },
@@ -150,29 +150,26 @@ impl World {
                 .members
                 .values()
                 .filter_map(|m| {
-                    if m.is_recv() {
+                    m.is_recv().then(|| {
                         let endpoint_id = format!("play-{}", builder.id);
-                        Some((
-                            format!(
-                                "{}/{}/{}",
-                                self.room_id,
-                                m.id(),
-                                endpoint_id
-                            ),
-                            proto::Element::WebRtcPlayEndpoint(
-                                proto::WebRtcPlayEndpoint {
-                                    id: endpoint_id,
-                                    src: format!(
-                                        "local://{}/{}/publish",
-                                        self.room_id, builder.id
-                                    ),
-                                    force_relay: false,
-                                },
-                            ),
-                        ))
-                    } else {
-                        None
-                    }
+                        let id = format!(
+                            "{}/{}/{}",
+                            self.room_id,
+                            m.id(),
+                            endpoint_id,
+                        );
+                        let elem = proto::Element::WebRtcPlayEndpoint(
+                            proto::WebRtcPlayEndpoint {
+                                id: endpoint_id,
+                                src: format!(
+                                    "local://{}/{}/publish",
+                                    self.room_id, builder.id,
+                                ),
+                                force_relay: false,
+                            },
+                        );
+                        (id, elem)
+                    })
                 })
                 .collect();
             for (path, element) in recv_endpoints {
@@ -191,15 +188,17 @@ impl World {
         Ok(())
     }
 
-    /// Returns reference to the [`Member`] with a provided ID.
+    /// Returns reference to a [`Member`] with the provided ID.
     ///
-    /// Returns [`None`] if [`Member`] with a provided ID is not exists.
+    /// Returns [`None`] if a [`Member`] with the provided ID doesn't exist.
+    #[inline]
+    #[must_use]
     pub fn get_member(&self, member_id: &str) -> Option<&Member> {
         self.members.get(member_id)
     }
 
-    /// [`Member`] with a provided ID will be joined to the `Room` created for
-    /// this [`World`].
+    /// Joins a [`Member`] with the provided ID to the `Room` created for this
+    /// [`World`].
     pub async fn join_room(&mut self, member_id: &str) -> Result<()> {
         let member = self
             .members
@@ -209,10 +208,8 @@ impl World {
         Ok(())
     }
 
-    /// [`Future`] which will be resolved when [`Member`] with a provided ID
-    /// will connect with his partners.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Waits until a [`Member`] with the provided ID will connect with his
+    /// responders.
     pub async fn wait_for_interconnection(
         &mut self,
         member_id: &str,

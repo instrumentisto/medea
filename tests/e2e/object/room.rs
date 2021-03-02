@@ -1,5 +1,4 @@
-//! Implementation and definition for the object which represents `Room` JS
-//! object.
+//! [`Object`] representing a `Room` JS object.
 
 use std::str::FromStr;
 
@@ -11,13 +10,11 @@ use crate::{
     },
 };
 
-use super::Error;
-
-/// Representation of the `Room` JS object.
+/// Representation of a `Room` JS object.
 pub struct Room;
 
-/// Representation of the `MediaKind` JS enum.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+/// Representation of a `MediaKind` JS enum.
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MediaKind {
     Audio,
     Video,
@@ -51,7 +48,7 @@ impl MediaKind {
     }
 }
 
-/// Representation of the `MediaSourceKind` JS enum.
+/// Representation of a `MediaSourceKind` JS enum.
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub enum MediaSourceKind {
     Device,
@@ -73,22 +70,19 @@ impl FromStr for MediaSourceKind {
 }
 
 impl MediaSourceKind {
-    /// Converts this [`MediaSourceKind`] to the JS code for this enum variant.
+    /// Converts this [`MediaSourceKind`] to a JS code for this enum variant.
     pub fn as_js(self) -> String {
         match self {
-            MediaSourceKind::Device => {
-                "window.rust.MediaSourceKind.Device".to_string()
-            }
-            MediaSourceKind::Display => {
-                "window.rust.MediaSourceKind.Display".to_string()
-            }
+            MediaSourceKind::Device => "window.rust.MediaSourceKind.Device",
+            MediaSourceKind::Display => "window.rust.MediaSourceKind.Display",
         }
+        .to_owned()
     }
 }
 
 impl Object<Room> {
-    /// Joins [`Room`] with a provided URI.
-    pub async fn join(&self, uri: String) -> Result<(), Error> {
+    /// Joins a [`Room`] with the provided URI.
+    pub async fn join(&self, uri: String) -> Result<(), super::Error> {
         self.execute(Statement::new(
             // language=JavaScript
             r#"
@@ -97,23 +91,22 @@ impl Object<Room> {
                     await room.room.join(uri);
                 }
             "#,
-            vec![uri.into()],
+            [uri.into()],
         ))
         .await?;
-
         Ok(())
     }
 
-    /// Disabled media publishing for the provided [`MediaKind`] and
+    /// Disables media publishing for the provided [`MediaKind`] and
     /// [`MediaSourceKind`].
     ///
-    /// If provided [`None`] `source_kind` then media publishing will be
+    /// If the provided `source_kind` is [`None`], then media publishing will be
     /// disabled for all [`MediaSourceKind`]s.
     pub async fn disable_media_send(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), super::Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -147,7 +140,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), super::Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -181,7 +174,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), super::Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -215,7 +208,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), super::Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -249,7 +242,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), super::Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -283,7 +276,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), super::Error> {
         let media_source_kind =
             source_kind.map_or_else(String::new, MediaSourceKind::as_js);
         let disable = match kind {
@@ -309,10 +302,10 @@ impl Object<Room> {
         Ok(())
     }
 
-    /// Returns [`ConnectionStore`] for this [`Room`].
+    /// Returns a [`ConnectionStore`] of this [`Room`].
     pub async fn connections_store(
         &self,
-    ) -> Result<Object<ConnectionStore>, Error> {
+    ) -> Result<Object<ConnectionStore>, super::Error> {
         self.execute_and_fetch(Statement::new(
             // language=JavaScript
             r#"
@@ -391,7 +384,7 @@ impl Object<Room> {
     /// [`LocalTrack`]: crate::object::local_track::LocalTrack
     pub async fn local_tracks(
         &self,
-    ) -> Result<Object<LocalTracksStore>, Error> {
+    ) -> Result<Object<LocalTracksStore>, super::Error> {
         Ok(self
             .execute_and_fetch(Statement::new(
                 r#"
@@ -408,7 +401,7 @@ impl Object<Room> {
     /// will fire.
     ///
     /// [`Future`]: std::future::Future
-    pub async fn wait_for_close(&self) -> Result<String, Error> {
+    pub async fn wait_for_close(&self) -> Result<String, super::Error> {
         Ok(self
             .execute(Statement::new(
                 r#"
@@ -429,7 +422,7 @@ impl Object<Room> {
             ))
             .await?
             .as_str()
-            .ok_or(Error::TypeCast)?
+            .ok_or(super::Error::TypeCast)?
             .to_string())
     }
 }
