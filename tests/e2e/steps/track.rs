@@ -2,7 +2,7 @@ use cucumber_rust::then;
 
 use crate::{parse_media_kinds, world::World};
 
-#[then(regex = "^Member (\\S*) has (\\d*) local tracks$")]
+#[then(regex = r"^Member (\S+) has (\d+) local tracks$")]
 async fn then_member_has_local_tracks(
     world: &mut World,
     id: String,
@@ -14,7 +14,7 @@ async fn then_member_has_local_tracks(
     assert_eq!(count, tracks.count().await.unwrap());
 }
 
-#[then(regex = "^(\\S*) has local (audio|(?:device |display )?video)$")]
+#[then(regex = r"^(\S+) has local (audio|(?:device |display )?video)$")]
 async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let member = world.get_member(&id).unwrap();
     let room = member.room();

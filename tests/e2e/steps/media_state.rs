@@ -64,7 +64,7 @@ async fn when_disables_mutes(
     }
 }
 
-#[when(regex = "^(\\S*) (enables|unmutes) (audio|video|all)$")]
+#[when(regex = r"^(\S+) (enables|unmutes) (audio|video|all)$")]
 async fn when_enables_mutes(
     world: &mut World,
     id: String,
@@ -85,7 +85,7 @@ async fn when_enables_mutes(
     }
 }
 
-#[when(regex = "(\\S*) enables remote (audio|(?:device |display )?video)")]
+#[when(regex = r"(\S*) enables remote (audio|(?:device |display )?video)")]
 async fn when_member_enables_remote_track(
     world: &mut World,
     id: String,
@@ -101,7 +101,7 @@ async fn when_member_enables_remote_track(
         .unwrap();
 }
 
-#[when(regex = "^(\\S*) disables remote (audio|(?:device |display )?video)$")]
+#[when(regex = r"^(\S*) disables remote (audio|(?:device |display )?video)$")]
 async fn when_member_disables_remote_track(
     world: &mut World,
     id: String,
