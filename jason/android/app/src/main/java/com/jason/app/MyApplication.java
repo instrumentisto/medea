@@ -1,19 +1,21 @@
-package com.jason.api;
+package com.jason.app;
 
 import android.app.Application;
 
+import com.jason.api.Jason;
+
 public final class MyApplication extends Application {
     private static final String TAG = "exm MyApplication";
-    private static MyApplication sSelf;
+    private static MyApplication app;
     private Jason jason;
 
     public MyApplication() {
         super();
-        sSelf = this;
+        app = this;
     }
 
     public static MyApplication get() {
-        return sSelf;
+        return app;
     }
 
     @Override

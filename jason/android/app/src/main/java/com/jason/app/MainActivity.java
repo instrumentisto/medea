@@ -1,4 +1,4 @@
-package com.jason.api;
+package com.jason.app;
 
 import android.os.Bundle;
 import android.view.Menu;
@@ -11,6 +11,7 @@ import androidx.appcompat.widget.Toolbar;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
+import com.jason.api.Jason;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -24,18 +25,13 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         FloatingActionButton fab = findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
+        fab.setOnClickListener(view -> Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show());
 
         final TextView tv_greet = findViewById(R.id.greetingLabel);
         tv_greet.setText("Hello");
 
-        final TextView tv_number = (TextView) findViewById(R.id.numberLabel);
+        final TextView tv_number = findViewById(R.id.numberLabel);
         tv_number.setText(jason.toString());
     }
 

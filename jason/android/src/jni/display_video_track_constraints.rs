@@ -1,27 +1,14 @@
 use super::*;
 
-impl ForeignClass for DisplayVideoTrackConstraints {
-    type PointedType = DisplayVideoTrackConstraints;
+use crate::DisplayVideoTrackConstraints;
 
+impl ForeignClass for DisplayVideoTrackConstraints {
     fn jni_class() -> jclass {
         unsafe { FOREIGN_CLASS_DISPLAYVIDEOTRACKCONSTRAINTS }
     }
 
     fn jni_class_pointer_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_DISPLAYVIDEOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
-    }
-
-    fn box_object(self) -> jlong {
-        Box::into_raw(Box::new(self)) as i64
-    }
-
-    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
-        let x: *mut DisplayVideoTrackConstraints = unsafe {
-            jlong_to_pointer::<DisplayVideoTrackConstraints>(x)
-                .as_mut()
-                .unwrap()
-        };
-        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
     }
 }
 
@@ -31,5 +18,7 @@ pub extern "C" fn Java_com_jason_api_DisplayVideoTrackConstraints_nativeFree(
     _: jclass,
     ptr: jlong,
 ) {
-    DisplayVideoTrackConstraints::get_boxed(ptr);
+    rust_exec_context().blocking_exec(move || {
+        DisplayVideoTrackConstraints::get_boxed(ptr);
+    })
 }

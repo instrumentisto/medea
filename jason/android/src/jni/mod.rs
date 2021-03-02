@@ -2,10 +2,12 @@
 
 mod audio_track_constraints;
 mod connection_handle;
+mod constraints_update_exception;
 mod device_video_track_constraints;
 mod display_video_track_constraints;
 mod input_device_info;
 mod jason;
+mod jason_error;
 mod local_media_track;
 mod media_manager_handle;
 mod media_stream_settings;
@@ -13,75 +15,34 @@ mod reconnect_handle;
 mod remote_media_track;
 mod room_close_reason;
 mod room_handle;
+pub mod util;
 
 use std::{
     convert::TryFrom,
-    ffi::{CStr, CString},
+    ffi::CStr,
     marker::PhantomData,
     os::raw,
     ptr,
+    sync::{Arc, Mutex},
 };
 
-use jni_sys::*;
+use jni_sys::{
+    jboolean, jclass, jfieldID, jfloat, jint, jlong, jmethodID, jobject,
+    jshort, jstring, jvalue, JNI_OK, JNI_VERSION_1_6,
+};
+use once_cell::sync::Lazy;
 
-use crate::*;
-
-#[repr(transparent)]
-pub struct JForeignObjectsArray<T: ForeignClass> {
-    _inner: jobjectArray,
-    _marker: PhantomData<T>,
-}
-
-impl<T: ForeignClass> JForeignObjectsArray<T> {
-    fn jni_invalid_value() -> Self {
-        Self {
-            _inner: ptr::null_mut(),
-            _marker: PhantomData,
-        }
-    }
-
-    fn from_jobjects(env: *mut JNIEnv, mut arr: Vec<T>) -> Self {
-        let jcls: jclass = <T>::jni_class();
-        assert!(!jcls.is_null());
-        let arr_len = jsize::try_from(arr.len())
-            .expect("invalid usize, in usize => to jsize conversation");
-        let obj_arr: jobjectArray = unsafe {
-            (**env).NewObjectArray.unwrap()(env, arr_len, jcls, ptr::null_mut())
-        };
-        assert!(!obj_arr.is_null());
-        let field_id = <T>::jni_class_pointer_field();
-        assert!(!field_id.is_null());
-        for (i, r_obj) in arr.drain(..).enumerate() {
-            let jobj: jobject =
-                unsafe { (**env).AllocObject.unwrap()(env, jcls) };
-            assert!(!jobj.is_null());
-            let r_obj: jlong = <T>::box_object(r_obj);
-            unsafe {
-                (**env).SetLongField.unwrap()(env, jobj, field_id, r_obj);
-                if (**env).ExceptionCheck.unwrap()(env) != 0 {
-                    panic!("Can not nativePtr field: catch exception");
-                }
-                (**env).SetObjectArrayElement.unwrap()(
-                    env, obj_arr, i as jsize, jobj,
-                );
-                if (**env).ExceptionCheck.unwrap()(env) != 0 {
-                    panic!("SetObjectArrayElement({}) failed", i);
-                }
-                (**env).DeleteLocalRef.unwrap()(env, jobj);
-            }
-        }
-        JForeignObjectsArray {
-            _inner: obj_arr,
-            _marker: PhantomData,
-        }
-    }
-}
+use crate::{
+    context::{JavaExecutor, RustExecutor},
+    jni::util::{JNIEnv, JavaVM},
+    AudioTrackConstraints, FacingMode, Jason, MediaKind, MediaSourceKind,
+};
 
 #[doc = " Default JNI_VERSION"]
 const JNI_VERSION: jint = JNI_VERSION_1_6 as jint;
 
 trait SwigFrom<T> {
-    fn swig_from(_: T, env: *mut JNIEnv) -> Self;
+    fn swig_from(_: T, env: *mut jni_sys::JNIEnv) -> Self;
 }
 macro_rules! swig_c_str {
     ($lit:expr) => {
@@ -104,35 +65,44 @@ pub unsafe fn jlong_to_pointer<T>(val: jlong) -> *mut T {
 }
 
 pub trait ForeignClass {
-    type PointedType;
     fn jni_class() -> jclass;
     fn jni_class_pointer_field() -> jfieldID;
-    fn box_object(self) -> jlong;
+    fn box_object(self) -> jlong
+    where
+        Self: Sized,
+    {
+        Box::into_raw(Box::new(self)) as i64
+    }
     fn get_boxed(ptr: jlong) -> Box<Self>
     where
         Self: Sized,
     {
-        let this = unsafe { jlong_to_pointer::<Self>(ptr).as_mut().unwrap() };
+        let this = Self::get_ptr(ptr).as_ptr();
         unsafe { Box::from_raw(this) }
     }
-    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType>;
+
+    fn get_ptr(ptr: jlong) -> ptr::NonNull<Self>
+    where
+        Self: Sized,
+    {
+        let this = unsafe { jlong_to_pointer::<Self>(ptr).as_mut().unwrap() };
+        ptr::NonNull::new(this).unwrap()
+    }
 }
 
 pub trait ForeignEnum {
     fn as_jint(&self) -> jint;
-    #[doc = " # Panics"]
-    #[doc = " Panics on error"]
     fn from_jint(_: jint) -> Self;
 }
 
 pub struct JavaString {
     string: jstring,
     chars: *const raw::c_char,
-    env: *mut JNIEnv,
+    env: *mut jni_sys::JNIEnv,
 }
 
 impl JavaString {
-    pub fn new(env: *mut JNIEnv, js: jstring) -> JavaString {
+    pub fn new(env: *mut jni_sys::JNIEnv, js: jstring) -> JavaString {
         let chars = if js.is_null() {
             ptr::null_mut()
         } else {
@@ -175,175 +145,85 @@ impl Drop for JavaString {
     }
 }
 
-struct JavaCallback {
-    java_vm: *mut JavaVM,
-    this: jobject,
-    methods: Vec<jmethodID>,
+pub struct JavaCallback<T> {
+    object: jobject,
+    method: jmethodID,
+    _type: PhantomData<T>,
 }
 
-impl JavaCallback {
-    fn new(obj: jobject, env: *mut JNIEnv) -> JavaCallback {
-        let mut java_vm: *mut JavaVM = ptr::null_mut();
-        let ret = unsafe { (**env).GetJavaVM.unwrap()(env, &mut java_vm) };
-        assert_eq!(0, ret, "GetJavaVm failed");
-        let global_obj = unsafe { (**env).NewGlobalRef.unwrap()(env, obj) };
-        assert!(!global_obj.is_null());
+impl<T> JavaCallback<T> {
+    pub fn new(env: JNIEnv, obj: jobject) -> JavaCallback<T> {
+        let class = env.get_object_class(obj);
+        assert!(!class.is_null(), "GetObjectClass return null class");
+        let method =
+            env.get_method_id(class, "accept", "(Ljava/lang/Object;)V");
+        assert!(!method.is_null(), "Can not find accept id");
+
+        let object = env.new_global_ref(obj);
+        assert!(!object.is_null());
         JavaCallback {
-            java_vm,
-            this: global_obj,
-            methods: Vec::new(),
+            object,
+            method,
+            _type: PhantomData::default(),
         }
     }
+}
 
-    fn get_jni_(&self) -> JniEnvHolder {
-        assert!(!self.java_vm.is_null());
-        let mut env: *mut JNIEnv = ptr::null_mut();
-        let res = unsafe {
-            (**self.java_vm).GetEnv.unwrap()(
-                self.java_vm,
-                (&mut env) as *mut *mut JNIEnv as *mut *mut raw::c_void,
-                JNI_VERSION,
-            )
-        };
-        if res == (JNI_OK as jint) {
-            return JniEnvHolder {
-                env: Some(env),
-                callback: self,
-                need_detach: false,
-            };
-        }
-        if res != (JNI_EDETACHED as jint) {
-            panic!("get_jni_: GetEnv return error `{}`", res);
-        }
-        trait ConvertPtr<T> {
-            fn convert_ptr(self) -> T;
-        }
-        impl ConvertPtr<*mut *mut raw::c_void> for *mut *mut JNIEnv {
-            fn convert_ptr(self) -> *mut *mut raw::c_void {
-                self as *mut *mut raw::c_void
-            }
-        }
-        impl ConvertPtr<*mut *mut JNIEnv> for *mut *mut JNIEnv {
-            fn convert_ptr(self) -> *mut *mut JNIEnv {
-                self
-            }
-        }
-        let res = unsafe {
-            (**self.java_vm).AttachCurrentThread.unwrap()(
-                self.java_vm,
-                (&mut env as *mut *mut JNIEnv).convert_ptr(),
-                ptr::null_mut(),
-            )
-        };
-        if res == 0 {
-            assert!(!env.is_null());
-            JniEnvHolder {
-                env: Some(env),
-                callback: self,
-                need_detach: true,
-            }
-        } else {
-            log::error!(
-                "JavaCallback::get_jnienv: AttachCurrentThread failed: {}",
-                res
+impl JavaCallback<()> {
+    pub fn accept(self: Arc<Self>, _: ()) {
+        swig_assert_eq_size!(raw::c_uint, u32);
+        swig_assert_eq_size!(raw::c_int, i32);
+
+        exec_foreign(move |env| {
+            env.call_void_method(self.object, self.method, &[]);
+        });
+    }
+}
+
+impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
+    pub fn accept(self: Arc<Self>, arg: T) {
+        swig_assert_eq_size!(raw::c_uint, u32);
+        swig_assert_eq_size!(raw::c_int, i32);
+
+        exec_foreign(move |env| {
+            let arg = env.object_to_jobject(arg);
+            env.call_void_method(
+                self.object,
+                self.method,
+                &[jvalue { l: arg }],
             );
-            JniEnvHolder {
-                env: None,
-                callback: self,
-                need_detach: false,
-            }
-        }
+        });
     }
 }
 
-impl Drop for JavaCallback {
-    fn drop(&mut self) {
-        let env = self.get_jni_();
-        if let Some(env) = env.env {
-            assert!(!env.is_null());
-            unsafe { (**env).DeleteGlobalRef.unwrap()(env, self.this) };
-        } else {
-            log::error!("JavaCallback::drop failed, can not get JNIEnv");
-        }
-    }
-}
+impl JavaCallback<u8> {
+    pub fn accept(self: Arc<Self>, arg: u8) {
+        swig_assert_eq_size!(raw::c_uint, u32);
+        swig_assert_eq_size!(raw::c_int, i32);
 
-#[doc = " According to JNI spec it should be safe to"]
-#[doc = " pass pointer to JavaVm and jobject (global) across threads"]
-unsafe impl Send for JavaCallback {}
-
-struct JniEnvHolder<'a> {
-    env: Option<*mut JNIEnv>,
-    callback: &'a JavaCallback,
-    need_detach: bool,
-}
-
-impl<'a> Drop for JniEnvHolder<'a> {
-    fn drop(&mut self) {
-        if self.need_detach {
-            let res = unsafe {
-                (**self.callback.java_vm).DetachCurrentThread.unwrap()(
-                    self.callback.java_vm,
-                )
-            };
-            if res != 0 {
-                log::error!(
-                    "JniEnvHolder: DetachCurrentThread failed: {}",
-                    res
-                );
-            }
-        }
-    }
-}
-
-fn jni_throw(env: *mut JNIEnv, ex_class: jclass, message: &str) {
-    let c_message = CString::new(message).unwrap();
-    let res =
-        unsafe { (**env).ThrowNew.unwrap()(env, ex_class, c_message.as_ptr()) };
-    if res != 0 {
-        log::error!(
-            "JNI ThrowNew({}) failed for class {:?} failed",
-            message,
-            ex_class
-        );
-    }
-}
-
-fn jni_throw_exception(env: *mut JNIEnv, message: &str) {
-    let exception_class = unsafe { JAVA_LANG_EXCEPTION };
-    jni_throw(env, exception_class, message)
-}
-
-fn object_to_jobject<T: ForeignClass>(
-    env: *mut JNIEnv,
-    rust_obj: T,
-) -> jobject {
-    let jcls = <T>::jni_class();
-    assert!(!jcls.is_null());
-    let field_id = <T>::jni_class_pointer_field();
-    assert!(!field_id.is_null());
-    let jobj: jobject = unsafe { (**env).AllocObject.unwrap()(env, jcls) };
-    assert!(!jobj.is_null(), "object_to_jobject: AllocObject failed");
-    let ret: jlong = <T>::box_object(rust_obj);
-    unsafe {
-        (**env).SetLongField.unwrap()(env, jobj, field_id, ret);
-        if (**env).ExceptionCheck.unwrap()(env) != 0 {
-            panic!(
-                "object_to_jobject: Can not set nativePtr field: catch \
-                 exception"
+        exec_foreign(move |env| {
+            let arg = i32::from(jshort::from(arg));
+            env.call_void_method(
+                self.object,
+                self.method,
+                &[jvalue { i: arg }],
             );
-        }
+        });
     }
-    jobj
 }
 
-fn from_std_string_jstring(x: String, env: *mut JNIEnv) -> jstring {
-    let x = x.into_bytes();
-    unsafe {
-        let x = CString::from_vec_unchecked(x);
-        (**env).NewStringUTF.unwrap()(env, x.as_ptr())
+impl<T> Drop for JavaCallback<T> {
+    fn drop(&mut self) {
+        // TODO: DeleteGlobalRef(self.cb_jobj);
+        // getting JNIEnv might be tricky here
     }
 }
+
+/// Raw pointers are thread safe.
+unsafe impl<T> Send for JavaCallback<T> {}
+
+/// Raw pointers are thread safe.
+unsafe impl<T> Sync for JavaCallback<T> {}
 
 impl ForeignEnum for FacingMode {
     fn as_jint(&self) -> jint {
@@ -370,7 +250,7 @@ impl ForeignEnum for FacingMode {
 }
 
 impl SwigFrom<FacingMode> for jobject {
-    fn swig_from(x: FacingMode, env: *mut JNIEnv) -> jobject {
+    fn swig_from(x: FacingMode, env: *mut jni_sys::JNIEnv) -> jobject {
         let cls = unsafe { FOREIGN_ENUM_FACINGMODE };
         assert!(!cls.is_null());
         let static_field_id: jfieldID = match x {
@@ -428,7 +308,7 @@ impl ForeignEnum for MediaKind {
 }
 
 impl SwigFrom<MediaKind> for jobject {
-    fn swig_from(x: MediaKind, env: *mut JNIEnv) -> jobject {
+    fn swig_from(x: MediaKind, env: *mut jni_sys::JNIEnv) -> jobject {
         let cls = unsafe { FOREIGN_ENUM_MEDIAKIND };
         assert!(!cls.is_null());
         let static_field_id: jfieldID = match x {
@@ -476,7 +356,7 @@ impl ForeignEnum for MediaSourceKind {
 }
 
 impl SwigFrom<MediaSourceKind> for jobject {
-    fn swig_from(x: MediaSourceKind, env: *mut JNIEnv) -> jobject {
+    fn swig_from(x: MediaSourceKind, env: *mut jni_sys::JNIEnv) -> jobject {
         let cls = unsafe { FOREIGN_ENUM_MEDIASOURCEKIND };
         assert!(!cls.is_null());
         let static_field_id: jfieldID = match x {
@@ -504,457 +384,6 @@ impl SwigFrom<MediaSourceKind> for jobject {
         );
         ret
     }
-}
-
-impl<T: ForeignClass> Consumer<T> for JavaCallback {
-    fn accept(&self, arg: T) {
-        swig_assert_eq_size!(raw::c_uint, u32);
-        swig_assert_eq_size!(raw::c_int, i32);
-        if let Some(env) = self.get_jni_().env {
-            unsafe {
-                (**env).CallVoidMethod.unwrap()(
-                    env,
-                    self.this,
-                    self.methods[0],
-                    object_to_jobject(env, arg),
-                );
-                if (**env).ExceptionCheck.unwrap()(env) != 0 {
-                    log::error!(concat!(
-                        stringify!(accept),
-                        ": java throw exception"
-                    ));
-                    (**env).ExceptionDescribe.unwrap()(env);
-                    (**env).ExceptionClear.unwrap()(env);
-                }
-            };
-        }
-    }
-}
-
-impl Consumer<()> for JavaCallback {
-    fn accept(&self, _: ()) {
-        swig_assert_eq_size!(raw::c_uint, u32);
-        swig_assert_eq_size!(raw::c_int, i32);
-        if let Some(env) = self.get_jni_().env {
-            unsafe {
-                (**env).CallVoidMethod.unwrap()(
-                    env,
-                    self.this,
-                    self.methods[0],
-                    ptr::null::<jobject>(),
-                );
-                if (**env).ExceptionCheck.unwrap()(env) != 0 {
-                    log::error!(concat!(
-                        stringify!(accept),
-                        ": java throw exception"
-                    ));
-                    (**env).ExceptionDescribe.unwrap()(env);
-                    (**env).ExceptionClear.unwrap()(env);
-                }
-            };
-        }
-    }
-}
-
-impl Consumer<u8> for JavaCallback {
-    fn accept(&self, arg: u8) {
-        swig_assert_eq_size!(raw::c_uint, u32);
-        swig_assert_eq_size!(raw::c_int, i32);
-        if let Some(env) = self.get_jni_().env {
-            unsafe {
-                (**env).CallVoidMethod.unwrap()(
-                    env,
-                    self.this,
-                    self.methods[0],
-                    i32::from(jshort::from(arg)),
-                );
-                if (**env).ExceptionCheck.unwrap()(env) != 0 {
-                    log::error!(concat!(
-                        stringify!(accept),
-                        ": java throw exception"
-                    ));
-                    (**env).ExceptionDescribe.unwrap()(env);
-                    (**env).ExceptionClear.unwrap()(env);
-                }
-            };
-        }
-    }
-}
-
-impl SwigFrom<jobject> for Box<dyn Consumer<()>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerRemoteMediaTrack"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-#[doc = ""]
-impl SwigFrom<jobject> for Box<dyn Consumer<RemoteMediaTrack>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerRemoteMediaTrack"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-#[doc = ""]
-impl SwigFrom<jobject> for Box<dyn Consumer<u8>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerShort"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-impl ForeignClass for JasonError {
-    type PointedType = JasonError;
-
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_JASONERROR }
-    }
-
-    fn jni_class_pointer_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_JASONERROR_NATIVEPTR_FIELD }
-    }
-
-    fn box_object(self) -> jlong {
-        Box::into_raw(Box::new(self)) as i64
-    }
-
-    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
-        let this = unsafe { jlong_to_pointer::<Self>(x).as_mut().unwrap() };
-        ptr::NonNull::<Self::PointedType>::new(this).unwrap()
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeName(
-    env: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jstring {
-    let this: &JasonError =
-        unsafe { jlong_to_pointer::<JasonError>(this).as_mut().unwrap() };
-    let ret: String = JasonError::name(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeMessage(
-    env: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jstring {
-    let this: &JasonError =
-        unsafe { jlong_to_pointer::<JasonError>(this).as_mut().unwrap() };
-    let ret: String = JasonError::message(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeTrace(
-    env: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jstring {
-    let this: &JasonError =
-        unsafe { jlong_to_pointer::<JasonError>(this).as_mut().unwrap() };
-    let ret: String = JasonError::trace(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeFree(
-    _: *mut JNIEnv,
-    _: jclass,
-    ptr: jlong,
-) {
-    JasonError::get_boxed(ptr);
-}
-
-impl SwigFrom<jobject> for Box<dyn Consumer<ConnectionHandle>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerConnectionHandle"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-#[doc = ""]
-impl SwigFrom<jobject> for Box<dyn Consumer<RoomCloseReason>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerRoomCloseReason"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-#[doc = ""]
-impl SwigFrom<jobject> for Box<dyn Consumer<LocalMediaTrack>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerLocalMediaTrack"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-#[doc = ""]
-impl SwigFrom<jobject> for Box<dyn Consumer<JasonError>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerJasonError"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-#[doc = ""]
-impl SwigFrom<jobject> for Box<dyn Consumer<ReconnectHandle>> {
-    fn swig_from(this: jobject, env: *mut JNIEnv) -> Self {
-        let mut cb = JavaCallback::new(this, env);
-        cb.methods.reserve(1);
-        let class = unsafe { (**env).GetObjectClass.unwrap()(env, cb.this) };
-        assert!(
-            !class.is_null(),
-            "GetObjectClass return null class for ConsumerReconnectHandle"
-        );
-        let method_id: jmethodID = unsafe {
-            (**env).GetMethodID.unwrap()(
-                env,
-                class,
-                swig_c_str!("accept"),
-                swig_c_str!("(Ljava/lang/Object;)V"),
-            )
-        };
-        assert!(!method_id.is_null(), "Can not find accept id");
-        cb.methods.push(method_id);
-        Box::new(cb)
-    }
-}
-
-impl ForeignClass for ConstraintsUpdateException {
-    type PointedType = ConstraintsUpdateException;
-
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION }
-    }
-
-    fn jni_class_pointer_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION_NATIVEPTR_FIELD }
-    }
-
-    fn box_object(self) -> jlong {
-        Box::into_raw(Box::new(self)) as i64
-    }
-
-    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
-        let x = unsafe { jlong_to_pointer::<Self>(x).as_mut().unwrap() };
-        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeName(
-    env: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jstring {
-    let this: &ConstraintsUpdateException = unsafe {
-        jlong_to_pointer::<ConstraintsUpdateException>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let ret: String = ConstraintsUpdateException::name(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeRecoverReason(
-    _: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jlong {
-    let this: &ConstraintsUpdateException = unsafe {
-        jlong_to_pointer::<ConstraintsUpdateException>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let ret: Option<JasonError> =
-        ConstraintsUpdateException::recover_reason(this);
-    let ret: jlong = match ret {
-        Some(x) => {
-            let ptr = <JasonError>::box_object(x);
-            debug_assert_ne!(0, ptr);
-            ptr
-        }
-        None => 0,
-    };
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeRecoverFailReason(
-    _: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jlong {
-    let this: &ConstraintsUpdateException = unsafe {
-        jlong_to_pointer::<ConstraintsUpdateException>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let ret: Option<JasonError> =
-        ConstraintsUpdateException::recover_fail_reasons(this);
-    let ret: jlong = match ret {
-        Some(x) => {
-            let ptr = <JasonError>::box_object(x);
-            debug_assert_ne!(0, ptr);
-            ptr
-        }
-        None => 0,
-    };
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeError(
-    _: *mut JNIEnv,
-    _: jclass,
-    this: jlong,
-) -> jlong {
-    let this: &ConstraintsUpdateException = unsafe {
-        jlong_to_pointer::<ConstraintsUpdateException>(this)
-            .as_mut()
-            .unwrap()
-    };
-    let ret: Option<JasonError> = ConstraintsUpdateException::error(this);
-    let ret: jlong = match ret {
-        Some(x) => {
-            let ptr = <JasonError>::box_object(x);
-            debug_assert_ne!(0, ptr);
-            ptr
-        }
-        None => 0,
-    };
-    ret
-}
-
-#[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeFree(
-    _: *mut JNIEnv,
-    _: jclass,
-    ptr: jlong,
-) {
-    ConstraintsUpdateException::get_boxed(ptr);
 }
 
 macro_rules! cache_foreign_class {
@@ -992,6 +421,35 @@ macro_rules! cache_foreign_class {
                 $field = field_id;
             )*
     };
+}
+
+struct Context {
+    java: JavaExecutor,
+    rust: RustExecutor,
+}
+
+impl Context {
+    fn new(java_vm: JavaVM) -> Context {
+        Self {
+            java: JavaExecutor::new(java_vm),
+            rust: RustExecutor::new(),
+        }
+    }
+}
+
+static CONTEXT: Lazy<Mutex<Option<Context>>> = Lazy::new(|| Mutex::new(None));
+
+pub fn rust_exec_context() -> RustExecutor {
+    CONTEXT.lock().unwrap().as_ref().unwrap().rust.clone()
+}
+
+pub fn exec_foreign<T>(task: T)
+where
+    T: FnOnce(JNIEnv) + Send + 'static,
+{
+    let executor = CONTEXT.lock().unwrap().as_ref().unwrap().java.clone();
+
+    executor.execute(task);
 }
 
 static mut JAVA_LANG_LONG: jclass = ptr::null_mut();
@@ -1073,15 +531,23 @@ static mut FOREIGN_ENUM_MEDIASOURCEKIND_DISPLAY: jfieldID = ptr::null_mut();
 
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnLoad(
-    java_vm: *mut JavaVM,
+    java_vm: *mut jni_sys::JavaVM,
     _reserved: *mut raw::c_void,
 ) -> jint {
-    // TODO: dont panic, return log and return JNI_ERR.
+    // TODO: dont panic, log and return JNI_ERR.
 
-    let mut env: *mut JNIEnv = ptr::null_mut();
+    // It's ok to cache JavaVM, it is guaranteed to be valid until
+    // `JNI_OnUnload`. In theory there may be multiple JavaVMs per process,
+    // but Android only allows one.
+    CONTEXT
+        .lock()
+        .unwrap()
+        .replace(Context::new(JavaVM::from_raw(java_vm)));
+
+    let mut env: *mut jni_sys::JNIEnv = ptr::null_mut();
     let res = (**java_vm).GetEnv.unwrap()(
         java_vm,
-        (&mut env) as *mut *mut JNIEnv as *mut *mut raw::c_void,
+        (&mut env) as *mut *mut jni_sys::JNIEnv as *mut *mut raw::c_void,
         JNI_VERSION,
     );
     if res != (JNI_OK as jint) {
@@ -1594,16 +1060,22 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JNI_VERSION
 }
 
+/// TODO: doesnt seem to fire on android for some reason
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnUnload(
-    java_vm: *mut JavaVM,
+    java_vm: *mut jni_sys::JavaVM,
     _reserved: *mut raw::c_void,
 ) {
+    println!("JNI_OnUnloadJNI_OnUnloadJNI_OnUnloadJNI_OnUnload");
+    log::error!("JNI_OnUnloadJNI_OnUnloadJNI_OnUnloadJNI_OnUnloadJNI_OnUnload");
+
+    CONTEXT.lock().unwrap().take();
+
     assert!(!java_vm.is_null());
-    let mut env: *mut JNIEnv = ptr::null_mut();
+    let mut env: *mut jni_sys::JNIEnv = ptr::null_mut();
     let res = (**java_vm).GetEnv.unwrap()(
         java_vm,
-        (&mut env) as *mut *mut JNIEnv as *mut *mut raw::c_void,
+        (&mut env) as *mut *mut jni_sys::JNIEnv as *mut *mut raw::c_void,
         JNI_VERSION,
     );
     if res != (JNI_OK as jint) {

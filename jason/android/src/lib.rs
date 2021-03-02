@@ -14,10 +14,13 @@
 use android_logger::Config;
 use log::{info, Level};
 
-// mod context;
+mod context;
 mod jni;
 
-pub use crate::jni::*;
+use crate::jni::*;
+
+pub use crate::jni::exec_foreign;
+use std::sync::Arc;
 
 pub enum FacingMode {
     User,
@@ -72,7 +75,7 @@ impl Drop for Jason {
 pub struct ConnectionHandle;
 
 impl ConnectionHandle {
-    pub fn on_close(&self, _f: Box<dyn Consumer<()>>) -> Result<(), String> {
+    pub fn on_close(&self, _f: Arc<JavaCallback<()>>) -> Result<(), String> {
         Ok(())
     }
 
@@ -82,16 +85,21 @@ impl ConnectionHandle {
 
     pub fn on_remote_track_added(
         &self,
-        cb: Box<dyn Consumer<RemoteMediaTrack>>,
+        cb: Arc<JavaCallback<RemoteMediaTrack>>,
     ) -> Result<(), String> {
+        info!(
+            "ConnectionHandle::on_remote_track_added() {:?}",
+            std::thread::current()
+        );
         cb.accept(RemoteMediaTrack);
         Ok(())
     }
 
     pub fn on_quality_score_update(
         &self,
-        _f: Box<dyn Consumer<u8>>,
+        cb: Arc<JavaCallback<u8>>,
     ) -> Result<(), String> {
+        cb.accept(1);
         Ok(())
     }
 }
@@ -101,7 +109,7 @@ pub struct RoomHandle;
 impl RoomHandle {
     pub fn on_new_connection(
         &mut self,
-        cb: Box<dyn Consumer<ConnectionHandle>>,
+        cb: Arc<JavaCallback<ConnectionHandle>>,
     ) -> Result<(), String> {
         cb.accept(ConnectionHandle);
         Ok(())
@@ -109,38 +117,38 @@ impl RoomHandle {
 
     pub fn on_close(
         &mut self,
-        _f: Box<dyn Consumer<RoomCloseReason>>,
+        _f: Arc<JavaCallback<RoomCloseReason>>,
     ) -> Result<(), String> {
         Ok(())
     }
 
     pub fn on_local_track(
         &self,
-        _f: Box<dyn Consumer<LocalMediaTrack>>,
+        _f: Arc<JavaCallback<LocalMediaTrack>>,
     ) -> Result<(), String> {
         Ok(())
     }
 
     pub fn on_failed_local_media(
         &self,
-        _f: Box<dyn Consumer<JasonError>>,
+        _f: Arc<JavaCallback<JasonError>>,
     ) -> Result<(), String> {
         Ok(())
     }
 
     pub fn on_connection_loss(
         &self,
-        _f: Box<dyn Consumer<ReconnectHandle>>,
+        _f: Arc<JavaCallback<ReconnectHandle>>,
     ) -> Result<(), String> {
         Ok(())
     }
 
-    pub fn join(&self, _token: String) -> Result<(), String> {
+    pub async fn join(&self, _token: String) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn set_local_media_settings(
+    pub async fn set_local_media_settings(
         &self,
         _settings: &MediaStreamSettings,
         _stop_first: bool,
@@ -150,17 +158,17 @@ impl RoomHandle {
         Ok(())
     }
 
-    pub fn mute_audio(&self) -> Result<(), String> {
+    pub async fn mute_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn unmute_audio(&self) -> Result<(), String> {
+    pub async fn unmute_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn mute_video(
+    pub async fn mute_video(
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
@@ -168,7 +176,7 @@ impl RoomHandle {
         Ok(())
     }
 
-    pub fn unmute_video(
+    pub async fn unmute_video(
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
@@ -176,17 +184,17 @@ impl RoomHandle {
         Ok(())
     }
 
-    pub fn disable_audio(&self) -> Result<(), String> {
+    pub async fn disable_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn enable_audio(&self) -> Result<(), String> {
+    pub async fn enable_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn disable_video(
+    pub async fn disable_video(
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
@@ -194,7 +202,7 @@ impl RoomHandle {
         Ok(())
     }
 
-    pub fn enable_video(
+    pub async fn enable_video(
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
@@ -202,42 +210,42 @@ impl RoomHandle {
         Ok(())
     }
 
-    pub fn disable_remote_audio(&self) -> Result<(), String> {
+    pub async fn disable_remote_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn disable_remote_video(&self) -> Result<(), String> {
+    pub async fn disable_remote_video(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn enable_remote_audio(&self) -> Result<(), String> {
+    pub async fn enable_remote_audio(&self) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn enable_remote_video(&self) -> Result<(), String> {
+    pub async fn enable_remote_video(&self) -> Result<(), String> {
         // async
         Ok(())
     }
-}
-
-pub trait Consumer<T> {
-    fn accept(&self, val: T);
 }
 
 pub struct MediaManagerHandle;
 
 impl MediaManagerHandle {
-    pub fn enumerate_devices(&self) -> Result<Vec<InputDeviceInfo>, String> {
+    pub async fn enumerate_devices(
+        &self,
+    ) -> Result<Vec<InputDeviceInfo>, String> {
+        // async
         Ok(Vec::new())
     }
 
-    pub fn init_local_tracks(
+    pub async fn init_local_tracks(
         &self,
         _caps: &MediaStreamSettings,
     ) -> Result<Vec<LocalMediaTrack>, String> {
+        // async
         Ok(Vec::new())
     }
 }
@@ -345,11 +353,11 @@ impl RemoteMediaTrack {
         true
     }
 
-    pub fn on_enabled(&self, cb: Box<dyn Consumer<()>>) {
+    pub fn on_enabled(&self, cb: Arc<JavaCallback<()>>) {
         cb.accept(());
     }
 
-    pub fn on_disabled(&self, _cb: Box<dyn Consumer<()>>) {}
+    pub fn on_disabled(&self, _cb: Arc<JavaCallback<()>>) {}
 
     pub fn kind(&self) -> MediaKind {
         MediaKind::Video
@@ -387,8 +395,8 @@ impl ConstraintsUpdateException {
         None
     }
 
-    pub fn recover_fail_reasons(&self) -> Option<JasonError> {
-        None
+    pub fn recover_fail_reasons(&self) -> Vec<JasonError> {
+        vec![JasonError {}]
     }
 
     pub fn error(&self) -> Option<JasonError> {
@@ -399,12 +407,15 @@ impl ConstraintsUpdateException {
 pub struct ReconnectHandle;
 
 impl ReconnectHandle {
-    pub fn reconnect_with_delay(&self, _delay_ms: u32) -> Result<(), String> {
+    pub async fn reconnect_with_delay(
+        &self,
+        _delay_ms: u32,
+    ) -> Result<(), String> {
         // async
         Ok(())
     }
 
-    pub fn reconnect_with_backoff(
+    pub async fn reconnect_with_backoff(
         &self,
         _starting_delay_ms: u32,
         _multiplier: f32,

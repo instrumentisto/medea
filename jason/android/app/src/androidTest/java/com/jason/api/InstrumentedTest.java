@@ -27,18 +27,18 @@ public class InstrumentedTest {
 
         new Thread(() -> {
             try {
-                Log.e(TAG, "newJason");
-                Log.e(TAG, "1: " + Thread.currentThread().getId() + " " + Thread.currentThread().getName());
+                Log.e(TAG, "1 " + Thread.currentThread().getName());
                 RoomHandle room = jason.initRoom();
                 room.onNewConnection(handle -> {
-                    Log.e(TAG, "2:" + Thread.currentThread().getId() + " " + Thread.currentThread().getName());
+                    Log.e(TAG, "2 " + Thread.currentThread().getName());
 
                     try {
                         handle.onRemoteTrackAdded(remoteMediaTrack -> {
+                            Log.e(TAG, "3 " + Thread.currentThread().getName());
                             assertTrue(remoteMediaTrack.enabled());
 
                             remoteMediaTrack.onEnabled(aVoid -> {
-                                Log.e(TAG, "remoteMediaTrack onEnabled fired");
+                                Log.e(TAG, "4 " + Thread.currentThread().getName());
                                 done.countDown();
                             });
                         });

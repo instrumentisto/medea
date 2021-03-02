@@ -1,8 +1,8 @@
 use super::*;
 
-impl ForeignClass for RoomCloseReason {
-    type PointedType = RoomCloseReason;
+use crate::{util::JNIEnv, RoomCloseReason};
 
+impl ForeignClass for RoomCloseReason {
     fn jni_class() -> jclass {
         unsafe { FOREIGN_CLASS_ROOMCLOSEREASON }
     }
@@ -10,58 +10,61 @@ impl ForeignClass for RoomCloseReason {
     fn jni_class_pointer_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_ROOMCLOSEREASON_NATIVEPTR_FIELD }
     }
-
-    fn box_object(self) -> jlong {
-        Box::into_raw(Box::new(self)) as i64
-    }
-
-    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
-        let x: *mut RoomCloseReason =
-            unsafe { jlong_to_pointer::<RoomCloseReason>(x).as_mut().unwrap() };
-        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
-    }
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeReason(
-    env: *mut JNIEnv,
+    env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jstring {
-    let this =
-        unsafe { jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap() };
-    from_std_string_jstring(this.reason(), env)
+    let env = unsafe { JNIEnv::from_raw(env) };
+    let reason = rust_exec_context().blocking_exec(move || {
+        let this = unsafe {
+            jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap()
+        };
+        this.reason()
+    });
+
+    env.string_to_jstring(reason)
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeIsClosedByServer(
-    _: *mut JNIEnv,
+    _: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jboolean {
-    let this: &RoomCloseReason =
-        unsafe { jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap() };
-    let ret: bool = RoomCloseReason::is_closed_by_server(this);
-    ret as jboolean
+    rust_exec_context().blocking_exec(move || {
+        let this = unsafe {
+            jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap()
+        };
+        this.is_closed_by_server()
+    }) as jboolean
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeRoomCloseReason(
-    _: *mut JNIEnv,
+    _: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jboolean {
-    let this: &RoomCloseReason =
-        unsafe { jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap() };
-    let ret: bool = RoomCloseReason::is_err(this);
-    ret as jboolean
+    rust_exec_context().blocking_exec(move || {
+        let this: &RoomCloseReason = unsafe {
+            jlong_to_pointer::<RoomCloseReason>(this).as_mut().unwrap()
+        };
+        let ret: bool = RoomCloseReason::is_err(this);
+        ret as jboolean
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_RoomCloseReason_nativeFree(
-    _: *mut JNIEnv,
+    _: *mut jni_sys::JNIEnv,
     _: jclass,
     ptr: jlong,
 ) {
-    RoomCloseReason::get_boxed(ptr);
+    rust_exec_context().blocking_exec(move || {
+        RoomCloseReason::get_boxed(ptr);
+    });
 }

@@ -1,8 +1,8 @@
 use super::*;
 
-impl ForeignClass for InputDeviceInfo {
-    type PointedType = InputDeviceInfo;
+use crate::{util::JNIEnv, InputDeviceInfo};
 
+impl ForeignClass for InputDeviceInfo {
     fn jni_class() -> jclass {
         unsafe { FOREIGN_CLASS_INPUTDEVICEINFO }
     }
@@ -10,75 +10,80 @@ impl ForeignClass for InputDeviceInfo {
     fn jni_class_pointer_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_INPUTDEVICEINFO_NATIVEPTR_FIELD }
     }
-
-    fn box_object(self) -> jlong {
-        Box::into_raw(Box::new(self)) as i64
-    }
-
-    fn get_ptr(x: jlong) -> ptr::NonNull<Self::PointedType> {
-        let x: *mut InputDeviceInfo =
-            unsafe { jlong_to_pointer::<InputDeviceInfo>(x).as_mut().unwrap() };
-        ptr::NonNull::<Self::PointedType>::new(x).unwrap()
-    }
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeDeviceId(
-    env: *mut JNIEnv,
+    env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jstring {
-    let this: &InputDeviceInfo =
-        unsafe { jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap() };
-    let ret: String = InputDeviceInfo::device_id(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
+    let env = unsafe { JNIEnv::from_raw(env) };
+    let device_id = rust_exec_context().blocking_exec(move || {
+        let this: &InputDeviceInfo = unsafe {
+            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+        };
+        this.device_id()
+    });
+
+    env.string_to_jstring(device_id)
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeKind(
-    _: *mut JNIEnv,
+    _: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jint {
-    let this: &InputDeviceInfo =
-        unsafe { jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap() };
-    let ret: MediaKind = InputDeviceInfo::kind(this);
-    let ret: jint = ret.as_jint();
-    ret
+    rust_exec_context().blocking_exec(move || {
+        let this = unsafe {
+            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+        };
+        this.kind().as_jint()
+    })
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeLabel(
-    env: *mut JNIEnv,
+    env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jstring {
-    let this: &InputDeviceInfo =
-        unsafe { jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap() };
-    let ret: String = InputDeviceInfo::label(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
+    let env = unsafe { JNIEnv::from_raw(env) };
+    let label = rust_exec_context().blocking_exec(move || {
+        let this = unsafe {
+            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+        };
+        this.label()
+    });
+
+    env.string_to_jstring(label)
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId(
-    env: *mut JNIEnv,
+    env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
 ) -> jstring {
-    let this: &InputDeviceInfo =
-        unsafe { jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap() };
-    let ret: String = InputDeviceInfo::group_id(this);
-    let ret: jstring = from_std_string_jstring(ret, env);
-    ret
+    let env = unsafe { JNIEnv::from_raw(env) };
+    let group_id = rust_exec_context().blocking_exec(move || {
+        let this = unsafe {
+            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+        };
+        this.group_id()
+    });
+
+    env.string_to_jstring(group_id)
 }
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeFree(
-    _: *mut JNIEnv,
+    _: *mut jni_sys::JNIEnv,
     _: jclass,
     ptr: jlong,
 ) {
-    InputDeviceInfo::get_boxed(ptr);
+    rust_exec_context().blocking_exec(move || {
+        InputDeviceInfo::get_boxed(ptr);
+    })
 }
