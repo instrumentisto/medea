@@ -109,6 +109,7 @@ release: release.crates release.npm
 
 test:
 	@make test.unit
+	@make test.integration up=yes dockerized=no
 	@make test.e2e up=yes dockerized=no
 
 
@@ -127,7 +128,7 @@ up: up.dev
 #   make down.control
 
 down.control:
-	kill -9 $(pidof medea-control-api-mock)
+	-killall medea-control-api-mock
 
 
 down.coturn: docker.down.coturn
@@ -144,6 +145,7 @@ down.demo: docker.down.demo
 down.dev:
 	@make docker.down.medea dockerized=no
 	@make docker.down.medea dockerized=yes
+	@make down.control
 	@make docker.down.coturn
 
 
@@ -153,11 +155,11 @@ down.medea: docker.down.medea
 # Run Control API mock server.
 #
 # Usage:
-#  make up.control
+#  make up.control [background=(no|yes)]
 
 up.control:
-	make wait.port port=6565
-	cargo run -p medea-control-api-mock
+	cargo build -p medea-control-api-mock
+	cargo run -p medea-control-api-mock $(if $(call eq,$(background),yes),&,)
 
 
 up.coturn: docker.up.coturn
@@ -423,35 +425,66 @@ endif
 endif
 
 
-# Run Rust E2E tests of project.
+# Run Rust integration tests of project.
 #
 # Usage:
-#	make test.e2e [( [up=no]
-#	               | up=yes [( [dockerized=no] [debug=(yes|no)]
-#	                         | dockerized=yes [tag=(dev|<docker-tag>)]
-#	                                          [log=(no|yes)]
-#                                             [log-to-file=(no|yes)] )]
-#	                        [wait=(5|<seconds>)] )]
+#	make test.integration
+#		[( [up=no]
+#		 | up=yes [( [dockerized=no] [debug=(yes|no)]
+#		           | dockerized=yes [tag=(dev|<docker-tag>)]
+#		                            [log=(no|yes)] [log-to-file=(no|yes)] )]
+#		          [wait=(5|<seconds>)] )]
 
-test-e2e-env = RUST_BACKTRACE=1 \
+test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
 	MEDEA_CONF=tests/medea.config.toml
 
-test.e2e:
+test.integration:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
-	env $(test-e2e-env) \
+	env $(test-integration-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     tag=$(tag) \
 	                     log-to-file=$(log-to-file)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
-	RUST_BACKTRACE=1 cargo test --test e2e
+	RUST_BACKTRACE=1 cargo test --test integration
 ifeq ($(up),yes)
 	-make down
 endif
+
+
+# Run E2E tests of project.
+#
+# Usage:
+#	make test.e2e
+#		[( [up=no]
+#		 | up=yes [browser=(chrome|firefox)]
+#		          [( [dockerized=no]
+#		           | dockerized=yes [tag=(dev|<tag>)] [rebuild=(no|yes)] )]
+#		          [debug=(yes|no)]
+#		          [( [background=no]
+#		           | background=yes [log=(no|yes)] )]
+
+test.e2e:
+ifeq ($(up),yes)
+ifeq ($(dockerized),yes)
+ifeq ($(rebuild),yes)
+	@make docker.build image=medea debug=$(debug) tag=$(tag)
+	@make docker.build image=medea-control-api-mock debug=$(debug) tag=$(tag)
+endif
+endif
+	@make docker.up.e2e browser=$(browser) background=yes log=$(log) \
+	                    dockerized=$(dockerized) tag=$(tag) debug=$(debug)
+	@make wait.port port=4444
+endif
+	cargo test --test e2e
+ifeq ($(up),yes)
+	@make docker.down.e2e
+endif
+
 
 
 
@@ -581,6 +614,17 @@ docker.down.coturn:
 
 docker.down.demo:
 	docker-compose -f jason/demo/docker-compose.yml down --rmi=local -v
+
+
+# Stop E2E tests environment in Docker Compose and remove all related
+# containers.
+#
+# Usage:
+#	make docker.down.e2e
+
+docker.down.e2e: down.control
+	@make docker.down.medea dockerized=no
+	docker-compose -f tests/e2e/docker-compose.yml down --rmi=local -v
 
 
 # Stop Medea media server in Docker Compose environment
@@ -743,6 +787,53 @@ docker.up.coturn: docker.down.coturn
 
 docker.up.demo: docker.down.demo
 	docker-compose -f jason/demo/docker-compose.yml up
+
+
+# Run E2E tests environment in Docker Compose.
+#
+# Usage:
+#	make docker.up.e2e [browser=(chrome|firefox)]
+#	                   [( [dockerized=no]
+#	                    | dockerized=yes [tag=(dev|<tag>)] )]
+#	                   [debug=(yes|no)]
+#	                   [( [background=no]
+#	                    | background=yes [log=(no|yes)] )]
+
+docker-up-e2e-env = RUST_BACKTRACE=1 \
+	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
+	COMPOSE_CONTROL_MOCK_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
+	COMPOSE_WEBDRIVER_IMAGE_NAME=$(strip \
+		$(if $(call eq,$(browser),firefox),\
+			ghcr.io/instrumentisto/geckodriver ,\
+			selenoid/chrome )) \
+	COMPOSE_WEBDRIVER_IMAGE_VER=$(strip \
+		$(if $(call eq,$(browser),firefox),\
+			$(FIREFOX_VERSION) ,\
+			$(CHROME_VERSION) ))
+
+docker.up.e2e: docker.down.e2e
+	@make build.jason debug=$(debug) dockerized=no
+	env $(docker-up-e2e-env) \
+	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+		up $(if $(call eq,$(dockerized),yes),\
+		   $(if $(call eq,$(background),yes),-d,--abort-on-container-exit),-d)
+ifeq ($(background),yes)
+ifeq ($(log),yes)
+	env $(docker-up-e2e-env) \
+	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
+		logs -f &
+endif
+endif
+ifneq ($(dockerized),yes)
+	@MEDEA_SERVER__CLIENT__HTTP__BIND_PORT=8001 \
+	make docker.up.medea dockerized=no debug=$(debug) \
+	                     background=$(background) log-to-file=$(log)
+	@make wait.port port=6565
+	@make up.control background=$(background)
+endif
 
 
 # Run Medea media server in Docker Compose environment.
@@ -999,17 +1090,17 @@ endef
         	cargo.version \
         docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
-        	docker.down.medea docker.down.webdriver  \
+        	docker.down.e2e docker.down.medea docker.down.webdriver  \
         	docker.pull docker.push docker.tag docker.tar docker.untar \
-        	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver \
+        	docker.up.control docker.up.coturn docker.up.demo docker.up.e2e \
+        	docker.up.medea docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
         helm helm.dir helm.down helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
-        test test.e2e test.unit \
+        test test.e2e test.integration test.unit \
         up up.control up.coturn up.demo up.dev up.jason up.medea \
         wait.port \
         yarn yarn.version

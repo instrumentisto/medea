@@ -16,7 +16,6 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
-    ports:
-      - "6379:6379"    # coturn redis
     volumes:
       - ./_dev/coturn/redis.conf:/etc/redis.conf:ro
+    network_mode: host
