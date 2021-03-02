@@ -186,6 +186,8 @@ jobs:
       - name: Unpack `medea-control-api-mock` Docker image
         run: make docker.untar from-file=image.tar
 
+      - name: Wut?
+        run: cat .env
       - name: Prepare Docker Compose E2E environment
         run: source .env
 
