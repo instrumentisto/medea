@@ -188,12 +188,12 @@ jobs:
 
       - name: Chrome
         run: |
-          source .env
+          source .env && \
           make test.e2e browser=chrome up=yes dockerized=yes \
                         tag=build-${{ github.run_number }}
       - name: Firefox
         run: |
-          source .env
+          source .env && \
           make test.e2e browser=firefox up=yes dockerized=yes
                         tag=build-${{ github.run_number }}
 
