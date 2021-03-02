@@ -5,11 +5,11 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-frontend
     image: nginx:stable-alpine
     ports:
-#      - "4444:4444"      # browser webdriver
-#      - "6379:6379"      # coturn redis
-#      - "6565:6565"      # medea grpc
-#      - "8000:8000"      # control-api-mock http
-#      - "8001:8001"      # medea http (ws)
+      - "4444:4444"      # browser webdriver
+      - "6379:6379"      # coturn redis
+      - "6565:6565"      # medea grpc
+      - "8000:8000"      # control-api-mock http
+      - "8001:8001"      # medea http (ws)
       - "30000:30000"    # frontend http
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
@@ -21,12 +21,7 @@ services:
     depends_on: ["coturn"]
     environment:
       RUST_LOG: ${RUST_LOG}
-      MEDEA_CONF: ${MEDEA_CONF}
       MEDEA_SERVER__CLIENT__HTTP__BIND_PORT: 8001
-      MEDEA_CONTROL__STATIC_SPECS_DIR: ${MEDEA_CONTROL__STATIC_SPECS_DIR}
-    volumes:
-      - ../../${MEDEA_CONF}:/${MEDEA_CONF}:ro
-      - ../../${MEDEA_CONTROL__STATIC_SPECS_DIR}:/${MEDEA_CONTROL__STATIC_SPECS_DIR}:ro
     network_mode: service:frontend
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn

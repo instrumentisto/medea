@@ -116,6 +116,7 @@ impl Object<Room> {
             }
         };
         self.execute(Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (room) => {{
@@ -150,6 +151,7 @@ impl Object<Room> {
             }
         };
         self.execute(Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (room) => {{
@@ -184,6 +186,7 @@ impl Object<Room> {
             }
         };
         self.execute(Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (room) => {{
@@ -218,6 +221,7 @@ impl Object<Room> {
             }
         };
         self.execute(Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (room) => {{
@@ -252,6 +256,7 @@ impl Object<Room> {
             }
         };
         self.execute(Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (room) => {{
@@ -387,6 +392,7 @@ impl Object<Room> {
     ) -> Result<Object<LocalTracksStore>, super::Error> {
         Ok(self
             .execute_and_fetch(Statement::new(
+                // language=JavaScript
                 r#"
                 async (room) => {
                     return room.localTracksStore;
@@ -404,6 +410,7 @@ impl Object<Room> {
     pub async fn wait_for_close(&self) -> Result<String, super::Error> {
         Ok(self
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
                 async (room) => {
                     if (room.closeListener.isClosed) {

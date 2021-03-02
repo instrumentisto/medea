@@ -9,6 +9,7 @@ impl Object<RemoteTrack> {
     /// Returns `true` if this [`RemoteTrack`] is enabled.
     pub async fn wait_for_enabled(&self) -> Result<(), Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     if (!track.track.enabled()) {
@@ -32,6 +33,7 @@ impl Object<RemoteTrack> {
     /// [`Future`]: std::future::Future
     pub async fn wait_for_disabled(&self) -> Result<(), Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     if (track.track.enabled()) {
@@ -53,6 +55,7 @@ impl Object<RemoteTrack> {
     pub async fn muted(&self) -> Result<bool, Error> {
         Ok(self
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
                 async (track) => {
                     return !track.track.get_track().enabled;
@@ -74,6 +77,7 @@ impl Object<RemoteTrack> {
         count: u64,
     ) -> Result<(), Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     const [count] = args;
@@ -103,6 +107,7 @@ impl Object<RemoteTrack> {
         count: u64,
     ) -> Result<(), Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     const [count] = args;

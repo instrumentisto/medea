@@ -2,7 +2,7 @@
 
 use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
-    api::{Response, SingleGetResponse},
+    api::Response,
     proto::{CreateResponse, Element},
 };
 
@@ -47,11 +47,6 @@ impl Client {
     /// Deletes a media [`Element`] identified by the provided `path`.
     pub async fn delete(&self, path: &str) -> Result<Response> {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
-    }
-
-    /// Returns a media [`Element`] identified by the provided `path`.
-    pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
-        Ok(self.0.get(&get_url(path)).send().await?.json().await?)
     }
 }
 

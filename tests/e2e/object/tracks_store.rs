@@ -26,6 +26,7 @@ impl<T> Object<TracksStore<T>> {
     pub async fn count(&self) -> Result<u64, Error> {
         Ok(self
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
                 async (store) => {
                     return store.tracks.length;
@@ -44,6 +45,7 @@ impl<T> Object<TracksStore<T>> {
     /// [`Future`]: std::future::Future
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (store) => {
                     const [neededCount] = args;
@@ -81,6 +83,7 @@ impl<T> Object<TracksStore<T>> {
         let source_kind_js = source_kind
             .map_or_else(|| "undefined".to_string(), MediaSourceKind::as_js);
         let kind_js = Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (store) => {{
@@ -99,6 +102,7 @@ impl<T> Object<TracksStore<T>> {
 
         Ok(self
             .execute(kind_js.and_then(Statement::new(
+                // language=JavaScript
                 r#"
             async (meta) => {
                 for (track of meta.store.tracks) {
@@ -126,6 +130,7 @@ impl<T> Object<TracksStore<T>> {
         source_kind: MediaSourceKind,
     ) -> Result<Object<T>, Error> {
         let kind_js = Statement::new(
+            // language=JavaScript
             &format!(
                 r#"
                 async (store) => {{
@@ -144,6 +149,7 @@ impl<T> Object<TracksStore<T>> {
 
         Ok(self
             .execute_and_fetch(kind_js.and_then(Statement::new(
+                // language=JavaScript
                 r#"
                 async (meta) => {
                     for (track of meta.store.tracks) {
