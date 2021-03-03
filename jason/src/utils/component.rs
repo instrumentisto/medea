@@ -1,17 +1,12 @@
 //! Implementation of the [`Component`].
 
-use std::rc::Rc;
-use std::fmt::Display;
+use std::{fmt::Display, rc::Rc};
 
 use derive_more::Deref;
 use futures::{future, Future, FutureExt as _, Stream, StreamExt};
 use medea_reactive::AllProcessed;
 
-use crate::{
-    media::LocalTracksConstraints,
-    platform,
-    utils::{TaskHandle},
-};
+use crate::{media::LocalTracksConstraints, platform, utils::TaskHandle};
 
 /// Abstraction over a state which can be transformed to the states from the
 /// [`medea_client_api_proto::state`].

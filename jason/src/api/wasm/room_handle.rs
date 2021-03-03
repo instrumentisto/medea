@@ -4,10 +4,7 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    api::{
-        ConstraintsUpdateException, MediaSourceKind,
-        MediaStreamSettings,
-    },
+    api::{ConstraintsUpdateException, MediaSourceKind, MediaStreamSettings},
     room,
 };
 

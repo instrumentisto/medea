@@ -3,7 +3,7 @@ use std::iter::FromIterator as _;
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::{room};
+use crate::room;
 
 use super::jason_error::JasonError;
 

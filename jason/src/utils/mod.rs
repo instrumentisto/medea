@@ -23,8 +23,7 @@ macro_rules! gen_upgrade_macro {
     ($e:expr) => {
         macro_rules! upgrade {
             ($v:expr) => {
-                $v.upgrade()
-                    .ok_or_else(|| tracerr::new!($e))
+                $v.upgrade().ok_or_else(|| tracerr::new!($e))
             };
         }
     };

@@ -1,7 +1,7 @@
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::{connection};
+use crate::connection;
 
 use super::jason_error::JasonError;
 

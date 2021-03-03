@@ -3,7 +3,7 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{rpc};
+use crate::rpc;
 
 use super::jason_error::JasonError;
 

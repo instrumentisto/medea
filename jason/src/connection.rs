@@ -6,16 +6,11 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use derive_more::Display;
+use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
 use tracerr::Traced;
 
-use crate::{
-    api,
-    media::track::remote,
-    platform,
-    utils::JsCaused,
-};
+use crate::{api, media::track::remote, platform, utils::JsCaused};
 
 /// Service which manages [`Connection`]s with the remote `Member`s.
 #[derive(Default)]
@@ -136,7 +131,9 @@ impl ConnectionHandle {
     }
 
     /// Returns remote `Member` ID.
-    pub fn get_remote_member_id(&self) -> Result<String, Traced<ConnectionError>> {
+    pub fn get_remote_member_id(
+        &self,
+    ) -> Result<String, Traced<ConnectionError>> {
         upgrade!(self.0).map(|inner| inner.remote_id.0.clone())
     }
 
@@ -146,8 +143,7 @@ impl ConnectionHandle {
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
     ) -> Result<(), Traced<ConnectionError>> {
-        upgrade!(self.0)
-            .map(|inner| inner.on_remote_track_added.set_func(f))
+        upgrade!(self.0).map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
     /// Sets callback, which will be invoked when connection quality score will
@@ -156,8 +152,7 @@ impl ConnectionHandle {
         &self,
         f: platform::Function<u8>,
     ) -> Result<(), Traced<ConnectionError>> {
-        upgrade!(self.0)
-            .map(|inner| inner.on_quality_score_update.set_func(f))
+        upgrade!(self.0).map(|inner| inner.on_quality_score_update.set_func(f))
     }
 }
 

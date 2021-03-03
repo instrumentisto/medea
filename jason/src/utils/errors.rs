@@ -1,9 +1,6 @@
 //! Helpers for application errors.
 
-use std::{
-    fmt::{Debug},
-    rc::Rc,
-};
+use std::{fmt::Debug, rc::Rc};
 
 use derive_more::{Display, From};
 

@@ -23,6 +23,7 @@ use tracerr::Traced;
 
 use crate::{
     api,
+    api::JasonError,
     connection::Connections,
     media::{
         track::{local, remote},
@@ -35,7 +36,6 @@ use crate::{
         PeerEvent, PeerEventHandler, TrackDirection,
     },
     platform,
-    api::JasonError,
     rpc::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
@@ -206,20 +206,19 @@ impl RoomHandle {
     pub async fn join(&self, url: String) -> Result<(), Traced<RoomError>> {
         let inner = upgrade!(self.0)?;
 
-        let connection_info: ConnectionInfo = url.parse().map_err(
-            tracerr::map_from_and_wrap!(),
-        )?;
+        let connection_info: ConnectionInfo =
+            url.parse().map_err(tracerr::map_from_and_wrap!())?;
 
         if !inner.on_failed_local_media.is_set() {
-            return Err(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_failed_local_media()")
-            ));
+            return Err(tracerr::new!(RoomError::CallbackNotSet(
+                "Room.on_failed_local_media()"
+            )));
         }
 
         if !inner.on_connection_loss.is_set() {
-            return Err(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_connection_loss()")
-            ));
+            return Err(tracerr::new!(RoomError::CallbackNotSet(
+                "Room.on_connection_loss()"
+            )));
         }
 
         Rc::clone(&inner.rpc)
@@ -308,8 +307,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::ConnectionHandle>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0)
-            .map(|inner| inner.connections.on_new_connection(f))
+        upgrade!(self.0).map(|inner| inner.connections.on_new_connection(f))
     }
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
@@ -331,8 +329,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::LocalMediaTrack>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0)
-            .map(|inner| inner.on_local_track.set_func(f))
+        upgrade!(self.0).map(|inner| inner.on_local_track.set_func(f))
     }
 
     /// Sets `on_failed_local_media` callback, which will be invoked on local
@@ -341,8 +338,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::JasonError>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0)
-            .map(|inner| inner.on_failed_local_media.set_func(f))
+        upgrade!(self.0).map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, which will be invoked on connection
@@ -351,8 +347,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::ReconnectHandle>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0)
-            .map(|inner| inner.on_connection_loss.set_func(f))
+        upgrade!(self.0).map(|inner| inner.on_connection_loss.set_func(f))
     }
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
@@ -386,9 +381,9 @@ impl RoomHandle {
         rollback_on_fail: bool,
     ) -> Result<(), ConstraintsUpdateException> {
         let inner = (self.0).upgrade().ok_or_else(|| {
-            ConstraintsUpdateException::Errored(
-                tracerr::new!(RoomError::Detached)
-            )
+            ConstraintsUpdateException::Errored(tracerr::new!(
+                RoomError::Detached
+            ))
         })?;
 
         inner
@@ -434,7 +429,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Unmutes outbound audio in this [`Room`].
@@ -446,7 +441,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Mutes outbound video in this [`Room`].
@@ -461,7 +456,7 @@ impl RoomHandle {
             source_kind,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Unmutes outbound video in this [`Room`].
@@ -476,7 +471,7 @@ impl RoomHandle {
             source_kind,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables outbound audio in this [`Room`].
@@ -488,7 +483,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables outbound audio in this [`Room`].
@@ -500,7 +495,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables outbound video.
@@ -517,7 +512,7 @@ impl RoomHandle {
             source_kind,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables outbound video.
@@ -534,7 +529,7 @@ impl RoomHandle {
             source_kind,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables inbound audio in this [`Room`].
@@ -546,7 +541,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables inbound video in this [`Room`].
@@ -558,7 +553,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables inbound audio in this [`Room`].
@@ -570,7 +565,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables inbound video in this [`Room`].
@@ -582,7 +577,7 @@ impl RoomHandle {
             None,
         )
         .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
     }
 }
 
@@ -649,15 +644,23 @@ impl Room {
                 if let Some(inner) = inner.upgrade() {
                     match event {
                         RoomEvent::RpcEvent(event) => {
-                            if let Err(err) =
-                                event.dispatch_with(inner.deref()).await.map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                            if let Err(err) = event
+                                .dispatch_with(inner.deref())
+                                .await
+                                .map_err(
+                                    tracerr::map_from_and_wrap!(=> RoomError),
+                                )
                             {
                                 log::error!("{}", err);
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(err) =
-                                event.dispatch_with(inner.deref()).await.map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                            if let Err(err) = event
+                                .dispatch_with(inner.deref())
+                                .await
+                                .map_err(
+                                    tracerr::map_from_and_wrap!(=> RoomError),
+                                )
                             {
                                 log::error!("{}", err);
                             };

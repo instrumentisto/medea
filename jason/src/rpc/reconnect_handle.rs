@@ -2,16 +2,14 @@
 
 use std::{rc::Weak, time::Duration};
 
+use derive_more::{Display, From};
 use tracerr::Traced;
-use derive_more::Display;
-use derive_more::From;
 
 use crate::{
     platform,
-    rpc::{BackoffDelayer, RpcSession},
-    utils::{JsCaused},
+    rpc::{BackoffDelayer, RpcSession, SessionError},
+    utils::JsCaused,
 };
-use crate::rpc::SessionError;
 
 /// Errors that may occur in a [`ReconnectHandle`].
 #[derive(Clone, From, Display, JsCaused)]
@@ -54,7 +52,9 @@ impl ReconnectHandle {
         platform::delay_for(Duration::from_millis(u64::from(delay_ms))).await;
 
         let rpc = upgrade!(self.0)?;
-        rpc.reconnect().await.map_err(tracerr::map_from_and_wrap!())?;
+        rpc.reconnect()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(())
     }
@@ -89,11 +89,7 @@ impl ReconnectHandle {
             Duration::from_millis(u64::from(max_delay)),
         );
         backoff_delayer.delay().await;
-        while upgrade!(self.0)?
-            .reconnect()
-            .await
-            .is_err()
-        {
+        while upgrade!(self.0)?.reconnect().await.is_err() {
             backoff_delayer.delay().await;
         }
 

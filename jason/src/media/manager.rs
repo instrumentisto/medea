@@ -16,7 +16,7 @@ use crate::{
         MultiSourceTracksConstraints,
     },
     platform,
-    utils::{JsCaused},
+    utils::JsCaused,
 };
 
 use super::track::local;
