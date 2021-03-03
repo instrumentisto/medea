@@ -1,3 +1,4 @@
+/// Representation of the `Connection` JS object.
 use crate::{
     browser::Statement,
     object::{tracks_store::RemoteTracksStore, Object},
@@ -15,6 +16,7 @@ impl Object<Connection> {
     ) -> Result<Object<RemoteTracksStore>, Error> {
         Ok(self
             .execute_and_fetch(Statement::new(
+                // language=JavaScript
                 r#"
                 async (conn) => {
                     return conn.tracksStore;
@@ -30,10 +32,11 @@ impl Object<Connection> {
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
             r#"
                 async (conn) => {
-                    await new Promise((resolve, reject) => {
+                    await new Promise((resolve) => {
                         if (!conn.closeListener.isClosed) {
                             conn.closeListener.subs.push(resolve);
                         } else {
