@@ -23,7 +23,7 @@ pub use self::rpc_session::MockRpcSession;
 pub use self::{
     backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
-    reconnect_handle::ReconnectHandle,
+    reconnect_handle::{ReconnectError, ReconnectHandle},
     rpc_session::{
         RpcSession, SessionError, SessionState, WebSocketRpcSession,
     },

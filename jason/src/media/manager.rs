@@ -324,6 +324,12 @@ impl MediaManagerHandle {
     /// Returns array of [`platform::InputDeviceInfo`] objects, which represent
     /// available media input and output devices, such as microphones,
     /// cameras, and so forth.
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaManagerError::CouldNotGetMediaDevices`] or
+    /// [`MediaManagerError::EnumerateDevicesFailed`] if devices enumeration is
+    /// failed.
     pub async fn enumerate_devices(
         &self,
     ) -> Result<Vec<platform::InputDeviceInfo>> {
@@ -334,6 +340,11 @@ impl MediaManagerHandle {
 
     /// Returns [`local::LocalMediaTrack`]s objects, built from provided
     /// [`MediaStreamSettings`].
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade is
+    /// failed.
     pub async fn init_local_tracks(
         &self,
         caps: MediaStreamSettings,

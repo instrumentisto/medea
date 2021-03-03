@@ -123,6 +123,10 @@ struct InnerConnection {
 
 impl ConnectionHandle {
     /// Sets callback, which will be invoked when this `Connection` will close.
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
     pub fn on_close(
         &self,
         f: platform::Function<()>,
@@ -131,6 +135,10 @@ impl ConnectionHandle {
     }
 
     /// Returns remote `Member` ID.
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
     pub fn get_remote_member_id(
         &self,
     ) -> Result<String, Traced<ConnectionError>> {
@@ -139,6 +147,10 @@ impl ConnectionHandle {
 
     /// Sets callback, which will be invoked when new [`remote::Track`] will be
     /// added to this [`Connection`].
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
@@ -147,7 +159,11 @@ impl ConnectionHandle {
     }
 
     /// Sets callback, which will be invoked when connection quality score will
-    /// be updated by server.
+    /// be updated by a server.
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,

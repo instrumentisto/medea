@@ -110,8 +110,8 @@ pub struct WatchersSpawner<S, O> {
 impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
     /// Spawns watchers for the provided [`Stream`].
     ///
-    /// If watcher returns an error then this error will be converted into the
-    /// [`JasonError`] and printed with a [`JasonError::print()`].
+    /// If watcher returns an error then this error will be printed to the error
+    /// log.
     ///
     /// You can stop all listeners tasks spawned by this function by
     /// [`Drop`]ping [`Component`].

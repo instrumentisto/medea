@@ -203,6 +203,18 @@ impl RoomHandle {
     /// - `on_failed_local_media` callback is not set
     /// - `on_connection_loss` callback is not set
     /// - unable to connect to media server.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
+    /// `on_connection_loss` callbacks is not set.
+    ///
+    /// With [`RoomError::ConnectionInfoParse`] if provided URL parsing fails.
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::SessionError`] if connecting to the RPC server is
+    /// failed.
     pub async fn join(&self, url: String) -> Result<(), Traced<RoomError>> {
         let inner = upgrade!(self.0)?;
 
@@ -293,7 +305,7 @@ impl RoomHandle {
                         )
                         .await?;
                 }
-                return Err(e.into());
+                return Err(e);
             }
         }
         Ok(())
@@ -301,6 +313,10 @@ impl RoomHandle {
 
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
     /// [`Connection`]: crate::connection::Connection
     pub fn on_new_connection(
@@ -312,6 +328,10 @@ impl RoomHandle {
 
     /// Sets `on_close` callback, which will be invoked on [`Room`] close,
     /// providing [`RoomCloseReason`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_close(
         &self,
         f: platform::Function<api::RoomCloseReason>,
@@ -325,6 +345,10 @@ impl RoomHandle {
     /// 1. Media server initiates media request.
     /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_local_track(
         &self,
         f: platform::Function<api::LocalMediaTrack>,
@@ -334,6 +358,10 @@ impl RoomHandle {
 
     /// Sets `on_failed_local_media` callback, which will be invoked on local
     /// media acquisition failures.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_failed_local_media(
         &self,
         f: platform::Function<api::JasonError>,
@@ -343,6 +371,10 @@ impl RoomHandle {
 
     /// Sets `on_connection_loss` callback, which will be invoked on connection
     /// with server loss.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_connection_loss(
         &self,
         f: platform::Function<api::ReconnectHandle>,
@@ -372,6 +404,17 @@ impl RoomHandle {
     ///
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
+    ///
+    /// # Errors
+    ///
+    /// With [`ConstraintsUpdateException::Errored`] if error while provided
+    /// [`MediaStreamSettings`] applying occured.
+    ///
+    /// With [`ConstraintsUpdateException::Recovered`] if
+    /// [`MediaStreamSettings`] are rollbacked because error occured.
+    ///
+    /// With [`ConstraintsUpdateException::RecoverFailed`] if
+    /// [`MediaStreamSettings`] rollback failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub async fn set_local_media_settings(
@@ -421,6 +464,10 @@ impl RoomHandle {
     }
 
     /// Mutes outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if muting audio is failed.
     pub async fn mute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             mute_state::Stable::Muted,
@@ -433,6 +480,10 @@ impl RoomHandle {
     }
 
     /// Unmutes outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if unmuting audio is failed.
     pub async fn unmute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             mute_state::Stable::Unmuted,
@@ -445,6 +496,10 @@ impl RoomHandle {
     }
 
     /// Mutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if muting video is failed.
     pub async fn mute_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -460,6 +515,10 @@ impl RoomHandle {
     }
 
     /// Unmutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if unmuting video is failed.
     pub async fn unmute_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -475,6 +534,10 @@ impl RoomHandle {
     }
 
     /// Disables outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if disabling audio is failed.
     pub async fn disable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
@@ -487,6 +550,10 @@ impl RoomHandle {
     }
 
     /// Enables outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if enabling audio is failed.
     pub async fn enable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,
@@ -501,6 +568,10 @@ impl RoomHandle {
     /// Disables outbound video.
     ///
     /// Affects only video with specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// Errors if disabling video is failed.
     pub async fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -518,6 +589,10 @@ impl RoomHandle {
     /// Enables outbound video.
     ///
     /// Affects only video with specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// Errors if enabling video is failed.
     pub async fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -533,6 +608,10 @@ impl RoomHandle {
     }
 
     /// Disables inbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if disabling remote audio is failed.
     pub async fn disable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
@@ -545,6 +624,10 @@ impl RoomHandle {
     }
 
     /// Disables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if disabling remote video is failed.
     pub async fn disable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
@@ -557,6 +640,10 @@ impl RoomHandle {
     }
 
     /// Enables inbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if enabling remote audio is failed.
     pub async fn enable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,
@@ -569,6 +656,10 @@ impl RoomHandle {
     }
 
     /// Enables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// Errors if enabling remote video is failed.
     pub async fn enable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,

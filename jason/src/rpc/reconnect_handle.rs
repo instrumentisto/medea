@@ -45,6 +45,12 @@ impl ReconnectHandle {
     /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
+    ///
+    /// # Errors
+    ///
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade failed.
+    ///
+    /// With [`ReconnectError::Session`] if error while reconnecting occurred.
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
@@ -77,6 +83,10 @@ impl ReconnectHandle {
     ///
     /// If `multiplier` is negative number than `multiplier` will be considered
     /// as `0.0`.
+    ///
+    /// # Errors
+    ///
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade failed.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
