@@ -1,8 +1,10 @@
-use crate::world::{MembersPair, PairedMember, World};
+use std::time::Duration;
+
 use cucumber_rust::{then, when};
 use medea_control_api_mock::proto::{AudioSettings, VideoSettings};
-use std::time::Duration;
 use tokio_1::time::timeout;
+
+use crate::world::{MembersPair, PairedMember, World};
 
 #[when(regex = r"^Control API removes member (\S+)$")]
 async fn when_control_api_removes_member(world: &mut World, id: String) {

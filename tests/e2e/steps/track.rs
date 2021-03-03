@@ -56,13 +56,19 @@ async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let room = member.room();
     let tracks = room.local_tracks().await.unwrap();
     let media_kind = kind.parse().unwrap();
-    // FIXME
-    // let source_kind = kind.parse().ok();
 
-    tracks
-        .get_track(media_kind, MediaSourceKind::Device)
-        .await
-        .unwrap();
+    let mut source_kinds = Vec::new();
+    if let Some(kind) = kind.parse().ok() {
+        source_kinds.push(kind);
+    } else {
+        if media_kind == MediaKind::Video {
+            source_kinds.push(MediaSourceKind::Display);
+        }
+        source_kinds.push(MediaSourceKind::Device);
+    }
+    for source_kind in source_kinds {
+        tracks.get_track(media_kind, source_kind).await.unwrap();
+    }
 }
 
 #[then(regex = "^(\\S*) remote (audio|(?:device|display) video) track from \

@@ -23,8 +23,8 @@ Feature: Create Endpoint
   Scenario: New Endpoint creates new video Tracks
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Control API interconnected video of Alice and Bob
-    Then Alice has local video
-    And Bob has local video
+    Then Alice has local device video
+    And Bob has local device video
     Then Alice has video remote tracks with Bob
     And Bob has video remote tracks with Alice
 

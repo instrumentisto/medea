@@ -207,18 +207,6 @@ impl Inner {
     /// Closes the provided [`WebWindow`].
     pub async fn close_window(&mut self, window: WebWindow) {
         if self.0.switch_to_window(window).await.is_ok() {
-            let logs = self
-                .0
-                .execute(
-                    r#"
-                return console.everything;
-            "#,
-                    vec![],
-                )
-                .await
-                .unwrap();
-            println!("CONSOLE LOGS HERE:\n{:?}\n", logs);
-
             let _ = self.0.close_window().await;
         }
     }
