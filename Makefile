@@ -480,7 +480,6 @@ endif
 	                    dockerized=$(dockerized) tag=$(tag) debug=$(debug)
 	@make wait.port port=4444
 endif
-	sleep 5
 	cargo test --test e2e
 ifeq ($(up),yes)
 	@make docker.down.e2e
