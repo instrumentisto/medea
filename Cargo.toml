@@ -50,7 +50,7 @@ futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "1.0"
 medea-client-api-proto = { version = "0.2", features = ["medea"] }
 medea-control-api-proto = "0.1"
-medea-macro = "0.2"
+medea-macro = { path = "crates/medea-macro" }
 rand = "0.8"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
@@ -83,11 +83,34 @@ url = "2.1"
 [dev-dependencies]
 actix-codec = "0.3"
 actix-rt = "1.1"
+async-recursion = "0.3"
 awc = "2.0"
+cucumber_rust = { version = "0.8", features = ["macros"] }
 derive_builder = "0.9"
+fantoccini = "0.17"
 function_name = "0.2"
+hyper = { version = "0.14", features = ["server"] }
 lazy_static = "1.4"
+medea-control-api-mock = { path = "mock/control-api" }
 mockall = "0.9"
+once_cell = "1.5"
+reqwest = { version = "0.11", features = ["json"] }
 serial_test = "0.5"
 tempfile = "3.1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded"] }
+tokio-util = "0.6"
+uuid = { version = "0.8", features = ["v4"] }
+webdriver = "0.43"
+[dev-dependencies.tokio_1]
+    package = "tokio"
+    version = "1.1"
+    features = ["fs", "macros", "rt-multi-thread"]
+
+[[test]]
+name = "e2e"
+path = "tests/e2e/main.rs"
+harness = false  # allows Cucumber to print output instead of libtest
+
+[[test]]
+name = "integration"
+path = "tests/integration/main.rs"

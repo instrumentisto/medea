@@ -31,5 +31,5 @@ doc-valid-idents = [
     "RTCTrackEvent",
     "RTCVideoSenderStats",
     "VideoFacingModeEnum",
-    "WebRTC", "WebSocket",
+    "WebDriver", "WebRTC", "WebSocket",
 ]

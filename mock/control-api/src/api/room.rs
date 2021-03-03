@@ -12,12 +12,12 @@ use super::member::Member;
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Room {
-    /// ID of `Room`.
+    /// ID of this [`Room`].
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
 
-    /// Pipeline of `Room`.
-    pipeline: HashMap<String, RoomElement>,
+    /// Pipeline of this [`Room`].
+    pub pipeline: HashMap<String, RoomElement>,
 }
 
 impl Room {

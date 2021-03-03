@@ -8,8 +8,6 @@ services:
       RUST_LOG: ${RUST_LOG}
       MEDEA_CONF: ${MEDEA_CONF}
       MEDEA_CONTROL__STATIC_SPECS_DIR: ${MEDEA_CONTROL__STATIC_SPECS_DIR}
-    ports:
-      - "8080:8080"
     volumes:
       - ./${MEDEA_CONF}:/${MEDEA_CONF}:ro
       - ./${MEDEA_CONTROL__STATIC_SPECS_DIR}:/${MEDEA_CONTROL__STATIC_SPECS_DIR}:ro
