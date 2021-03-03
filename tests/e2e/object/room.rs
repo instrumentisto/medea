@@ -371,7 +371,7 @@ impl Object<Room> {
                         let id = conn.get_remote_member_id();
                         store.connections.set(id, connection);
                         let sub = store.subs.get(id);
-                        if (sub != undefined) {
+                        if (sub !== undefined) {
                             sub(connection);
                         }
                     });
@@ -416,7 +416,7 @@ impl Object<Room> {
                     if (room.closeListener.isClosed) {
                         return room.closeListener.closeReason.reason();
                     } else {
-                        let waiter = new Promise((resolve, reject) => {
+                        let waiter = new Promise((resolve) => {
                             room.closeListener.subs.push(resolve);
                         });
 

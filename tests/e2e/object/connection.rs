@@ -1,3 +1,4 @@
+/// Representation of the `Connection` JS object.
 use crate::{
     browser::Statement,
     object::{tracks_store::RemoteTracksStore, Object},
@@ -35,7 +36,7 @@ impl Object<Connection> {
         self.execute(Statement::new(
             r#"
                 async (conn) => {
-                    await new Promise((resolve, reject) => {
+                    await new Promise((resolve) => {
                         if (!conn.closeListener.isClosed) {
                             conn.closeListener.subs.push(resolve);
                         } else {

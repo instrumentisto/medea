@@ -1,5 +1,6 @@
-use crate::world::World;
 use cucumber_rust::when;
+
+use crate::world::World;
 
 #[when(regex = r"^Control API removes member (\S+)$")]
 async fn when_control_api_removes_member(world: &mut World, id: String) {

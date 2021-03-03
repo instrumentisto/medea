@@ -1,3 +1,5 @@
+//! Representation of the `RemoteMediaTrack` JS object.
+
 use crate::{browser::Statement, object::Object};
 
 use super::Error;
@@ -13,7 +15,7 @@ impl Object<RemoteTrack> {
             r#"
                 async (track) => {
                     if (!track.track.enabled()) {
-                        let waiter = new Promise((resolve, reject) => {
+                        let waiter = new Promise((resolve) => {
                             track.onEnabledSubs.push(resolve);
                         });
                         await waiter;
@@ -37,7 +39,7 @@ impl Object<RemoteTrack> {
             r#"
                 async (track) => {
                     if (track.track.enabled()) {
-                        let waiter = new Promise((resolve, reject) => {
+                        let waiter = new Promise((resolve) => {
                             track.onDisabledSubs.push(resolve);
                         });
                         await waiter;
@@ -82,7 +84,7 @@ impl Object<RemoteTrack> {
                 async (track) => {
                     const [count] = args;
                     while (track.on_disabled_fire_count != count) {
-                        await new Promise((resolve, reject) => {
+                        await new Promise((resolve) => {
                             if (track.on_disabled_fire_count != count) {
                                 track.onDisabledSubs.push(resolve);
                             } else {
@@ -112,7 +114,7 @@ impl Object<RemoteTrack> {
                 async (track) => {
                     const [count] = args;
                     while (track.on_enabled_fire_count != count) {
-                        await new Promise((resolve, reject) => {
+                        await new Promise((resolve) => {
                             if (track.on_enabled_fire_count != count) {
                                 track.onEnabledSubs.push(resolve);
                             } else {

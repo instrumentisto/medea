@@ -8,10 +8,10 @@ services:
     command:
       - --log-file=stdout
       #- --Verbose
-    network_mode: host
     volumes:
       - ./_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./.cache/coturn/data:/var/lib/coturn
+    network_mode: host
   coturn-db:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
     image: redis:alpine

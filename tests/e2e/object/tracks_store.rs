@@ -53,7 +53,7 @@ impl<T> Object<TracksStore<T>> {
                     if (currentCount === neededCount) {
                         return;
                     } else {
-                        let waiter = new Promise((resolve, reject) => {
+                        let waiter = new Promise((resolve) => {
                             store.subs.push((track) => {
                                 currentCount += 1;
                                 if (currentCount === neededCount) {
@@ -160,7 +160,7 @@ impl<T> Object<TracksStore<T>> {
                             return track;
                         }
                     }
-                    let waiter = new Promise((resolve, reject) => {
+                    let waiter = new Promise((resolve) => {
                         meta.store.subs.push((track) => {
                             let kind = track.track.kind();
                             let sourceKind = track.track.media_source_kind();
