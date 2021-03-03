@@ -832,12 +832,12 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`][3] if
+    /// With [`RtcPeerConnectionError::SetRemoteDescriptionFailed`][3] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
-    /// [3]: platform::RTCPeerConnectionError::SetRemoteDescriptionFailed
+    /// [3]: platform::RtcPeerConnectionError::SetRemoteDescriptionFailed
     async fn set_remote_answer(&self, answer: String) -> Result<()> {
         self.set_remote_description(platform::SdpType::Answer(answer))
             .await
@@ -848,7 +848,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`platform::RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`platform::RtcPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -864,10 +864,10 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`platform::RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`platform::RtcPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
-    /// With [`platform::RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// With [`platform::RtcPeerConnectionError::AddIceCandidateFailed`] if
     /// [RtcPeerConnection.addIceCandidate()][3] fails when adding buffered ICE
     /// candidates.
     ///
@@ -911,13 +911,13 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`][2] if
+    /// With [`RtcPeerConnectionError::AddIceCandidateFailed`][2] if
     /// [RtcPeerConnection.addIceCandidate()][3] fails to add buffered
     /// [ICE candidates][1].
     ///
     ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2
-    /// [2]: platform::RTCPeerConnectionError::AddIceCandidateFailed
+    /// [2]: platform::RtcPeerConnectionError::AddIceCandidateFailed
     /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     pub async fn add_ice_candidate(
         &self,

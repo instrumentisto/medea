@@ -108,7 +108,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`RTCPeerConnectionError::PeerCreationError`] if
+    /// Errors with [`RtcPeerConnectionError::PeerCreationError`] if
     /// [`SysRtcPeerConnection`] creation fails.
     pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
     where
@@ -142,10 +142,10 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`RTCPeerConnectionError::RtcStatsError`] if getting or
+    /// Errors with [`RtcPeerConnectionError::RtcStatsError`] if getting or
     /// parsing of [`RtcStats`] fails.
     ///
-    /// Errors with [`RTCPeerConnectionError::GetStatsException`] when
+    /// Errors with [`RtcPeerConnectionError::GetStatsException`] when
     /// [PeerConnection.getStats][1] promise throws exception.
     ///
     /// [1]: https://tinyurl.com/w6hmt5f
@@ -333,7 +333,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// With [`RtcPeerConnectionError::AddIceCandidateFailed`] if
     /// [RtcPeerConnection.addIceCandidate()][3] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -375,7 +375,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetLocalDescriptionFailed`] if
     /// [RtcPeerConnection.setLocalDescription()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -402,7 +402,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetLocalDescriptionFailed`] if
     /// [RtcPeerConnection.setLocalDescription()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -416,7 +416,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetLocalDescriptionFailed`] if
     /// [RtcPeerConnection.setLocalDescription()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -433,7 +433,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
+    /// With [`RtcPeerConnectionError::CreateAnswerFailed`] if
     /// [RtcPeerConnection.createAnswer()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
@@ -453,7 +453,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetLocalDescriptionFailed`] if
     /// [RtcPeerConnection.setLocalDescription()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
@@ -479,7 +479,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
+    /// With [`RtcPeerConnectionError::CreateOfferFailed`] if
     /// [RtcPeerConnection.createOffer()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
@@ -510,7 +510,7 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][1] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription

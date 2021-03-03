@@ -875,7 +875,7 @@ pub enum ConstraintsUpdateException {
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
     Recovered {
-        /// [`JasonError`] due to which recovery happened.
+        /// [`RoomError`] due to which recovery happened.
         recover_reason: Traced<RoomError>,
     },
 
@@ -883,10 +883,10 @@ pub enum ConstraintsUpdateException {
     /// failed.
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
-        /// [`JasonError`] due to which recovery happened.
+        /// [`RoomError`] due to which recovery happened.
         recover_reason: Traced<RoomError>,
 
-        /// Vector of [`JasonError`]s due to which recovery failed.
+        /// Vector of [`RoomError`]s due to which recovery failed.
         recover_fail_reasons: Vec<Traced<RoomError>>,
     },
 
@@ -901,7 +901,7 @@ impl ConstraintsUpdateException {
         self.to_string()
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// Returns [`RoomError`] if this [`ConstraintsUpdateException`] represents
     /// `RecoveredException` or `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
@@ -915,7 +915,7 @@ impl ConstraintsUpdateException {
         }
     }
 
-    /// Returns vector of [`JasonError`]s if this due to which recovery failed.
+    /// Returns vector of [`RoomError`]s if this due to which recovery failed.
     pub fn recover_fail_reasons(&self) -> Vec<Traced<RoomError>> {
         match &self {
             Self::RecoverFailed {
@@ -926,7 +926,7 @@ impl ConstraintsUpdateException {
         }
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// Returns [`RoomError`] if this [`ConstraintsUpdateException`] represents
     /// `ErroredException`.
     ///
     /// Returns `undefined` otherwise.

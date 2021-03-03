@@ -40,11 +40,6 @@ impl JasonError {
     pub fn source(&self) -> Option<js_sys::Error> {
         self.source.clone().and_then(|e| e.sys_cause)
     }
-
-    /// Prints error information to default logger with `ERROR` level.
-    pub fn print(&self) {
-        log::error!("{}", self);
-    }
 }
 
 impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
