@@ -43,7 +43,7 @@ async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
     assert!(is_stopped);
 }
 
-#[when(regex = "^(\\S*) (disables|mutes) (audio|video|all)$")]
+#[when(regex = r"^(\S+) (disables|mutes) (audio|video|all)$")]
 async fn when_disables_mutes(
     world: &mut World,
     id: String,
@@ -64,7 +64,7 @@ async fn when_disables_mutes(
     }
 }
 
-#[when(regex = "^(\\S*) (enables|unmutes) (audio|video|all)$")]
+#[when(regex = r"^(\S+) (enables|unmutes) (audio|video|all)$")]
 async fn when_enables_mutes(
     world: &mut World,
     id: String,
@@ -85,7 +85,7 @@ async fn when_enables_mutes(
     }
 }
 
-#[when(regex = "(\\S*) enables remote (audio|(?:device |display )?video)")]
+#[when(regex = r"(\S*) enables remote (audio|(?:device |display )?video)")]
 async fn when_member_enables_remote_track(
     world: &mut World,
     id: String,
@@ -101,7 +101,7 @@ async fn when_member_enables_remote_track(
         .unwrap();
 }
 
-#[when(regex = "^(\\S*) disables remote (audio|(?:device |display )?video)$")]
+#[when(regex = r"^(\S*) disables remote (audio|(?:device |display )?video)$")]
 async fn when_member_disables_remote_track(
     world: &mut World,
     id: String,
@@ -118,9 +118,11 @@ async fn when_member_disables_remote_track(
 }
 
 #[when(regex = "^(\\S*) tries to enable media publishing")]
-async fn when_member_tries_to_enable_publishing(
-    world: &mut World,
-    id: String,
-) {
-    world.get_member(&id).unwrap().toggle_media(None, None, true).await.unwrap_err();
+async fn when_member_tries_to_enable_publishing(world: &mut World, id: String) {
+    world
+        .get_member(&id)
+        .unwrap()
+        .toggle_media(None, None, true)
+        .await
+        .unwrap_err();
 }

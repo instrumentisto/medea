@@ -1,11 +1,11 @@
-//! All configurable properties of the E2E tests runner.
+//! All configurable properties of E2E tests runner.
 
 use std::env;
 
 use once_cell::sync::Lazy;
 
 /// Generates static config variable which will be lazily obtained from the
-/// environment variables and if failed, default one will be used.
+/// environment variables falling back to a default one.
 macro_rules! env_var {
     (
         $(#[$meta:meta])*
@@ -20,50 +20,50 @@ macro_rules! env_var {
 }
 
 env_var!(
-    /// Address of the [WebDriver] client.
+    /// Address of a [WebDriver] client.
     ///
-    /// Default: `http://127.0.0.1:4444`.
+    /// Default: `http://127.0.0.1:4444`
     ///
-    /// [WebDriver]: https://www.w3.org/TR/webdriver/
+    /// [WebDriver]: https://w3.org/TR/webdriver
     WEBDRIVER_ADDR
         || "http://127.0.0.1:4444"
 );
 
 env_var!(
-    /// Address of the Control API mock server.
+    /// Address of a Control API mock server.
     ///
-    /// Default: `http://127.0.0.1:8000`.
+    /// Default: `http://127.0.0.1:8000/control-api`
     CONTROL_API_ADDR
         || "http://127.0.0.1:8000"
 );
 
 env_var!(
-    /// Address for the Client API.
+    /// Address a Client API WebSocket endpoint.
     ///
-    /// Default: `ws://127.0.0.1:8080/ws`.
+    /// Default: `ws://127.0.0.1:8001/ws`
     CLIENT_API_ADDR
-        || "ws://127.0.0.1:8080/ws"
+        || "ws://127.0.0.1:8001/ws"
 );
 
 env_var!(
-    /// Address where [`FileServer`] will be hosted.
+    /// Host of a [`FileServer`].
     ///
-    /// Default: `ws://127.0.0.1:8080/ws`.
+    /// Default: `127.0.0.1:30000`
     ///
     /// [`FileServer`]: crate::file_server::FileServer
-    FILE_SERVER_ADDR
+    FILE_SERVER_HOST
         || "127.0.0.1:30000"
 );
 
 env_var!(
-    /// Path to the Cucumber Features which are should be ran.
+    /// Path to a Cucumber features which should be run.
     FEATURES_PATH
         || "tests/e2e/features"
 );
 
-/// Flag which indicates that tests should be ran in the headless browser.
+/// Indicator whether tests should run in a headless browser's mode.
 ///
-/// Default: `true`.
+/// Default: `true`
 pub static HEADLESS: Lazy<bool> = Lazy::new(|| {
     env::var("HEADLESS").map_or(true, |v| v.to_ascii_lowercase() == "true")
 });
