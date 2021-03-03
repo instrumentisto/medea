@@ -1,15 +1,15 @@
-//! HTTP client that interacts with Medea via Control API.
+//! HTTP client interacting with Medea via its Control API.
 
 use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
-    api::{Response, SingleGetResponse},
+    api::Response,
     callback::CallbackItem,
     proto::{CreateResponse, Element},
 };
 
 use crate::conf;
 
-/// All errors which can happen while working with Control API.
+/// All errors which can happen while working with a Control API.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
     Reqwest(reqwest::Error),
@@ -17,16 +17,19 @@ pub enum Error {
 
 type Result<T> = std::result::Result<T, Error>;
 
-/// Client for the Control API.
+/// Client of a Control API.
 pub struct Client(reqwest::Client);
 
 impl Client {
-    /// Returns new [`Client`] client.
+    /// Returns a new Control API [`Client`].
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self(reqwest::Client::new())
     }
 
-    /// Creates provided [`Element`] in the provided `path`.
+    /// Creates the provided media [`Element`] in the provided `path` on a Medea
+    /// media server.
     pub async fn create(
         &self,
         path: &str,
@@ -34,7 +37,7 @@ impl Client {
     ) -> Result<CreateResponse> {
         Ok(self
             .0
-            .post(&get_url_to_element(path))
+            .post(&get_url(path))
             .json(&element)
             .send()
             .await?
@@ -42,29 +45,12 @@ impl Client {
             .await?)
     }
 
-    /// Deletes [`Element`] in the provided `path`.
+    /// Deletes a media [`Element`] identified by the provided `path`.
     pub async fn delete(&self, path: &str) -> Result<Response> {
-        Ok(self
-            .0
-            .delete(&get_url_to_element(path))
-            .send()
-            .await?
-            .json()
-            .await?)
+        Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
     }
 
-    /// Returns [`Element`] from the provided `path`.
-    #[allow(dead_code)]
-    pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
-        Ok(self
-            .0
-            .get(&get_url_to_element(path))
-            .send()
-            .await?
-            .json()
-            .await?)
-    }
-
+    /// Returns all received by Control API mock server callbacks.
     pub async fn callbacks(&self) -> Result<Vec<CallbackItem>> {
         Ok(self
             .0
@@ -76,7 +62,8 @@ impl Client {
     }
 }
 
-/// Returns URL to the Control API for the provided [`Element`] path.
-fn get_url_to_element(path: &str) -> String {
+/// Returns URL of a media [`Element`] identified by the provided `path`.
+#[must_use]
+fn get_url(path: &str) -> String {
     format!("{}/control-api/{}", *conf::CONTROL_API_ADDR, path)
 }

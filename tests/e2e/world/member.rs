@@ -1,4 +1,4 @@
-//! Representation of Media Server Member used in tests.
+//! Medea media server member representation.
 
 use std::{cell::RefCell, collections::HashMap};
 
@@ -95,44 +95,55 @@ pub struct Member {
 }
 
 impl Member {
-    /// Returns ID of [`Member`] on the Media Server.
+    /// Returns ID of this [`Member`] on a media server.
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
 
-    /// Returns flag which indicates that [`Member`] should publish media.
+    /// Indicates whether this [`Member`] should publish media.
+    #[inline]
+    #[must_use]
     pub fn is_send(&self) -> bool {
         self.is_send
     }
 
-    /// Returns flag which indicates that [`Member`] should receive media.
+    /// Indicator whether this [`Member`] should receive media.
+    #[inline]
+    #[must_use]
     pub fn is_recv(&self) -> bool {
         self.is_recv
     }
 
     /// Updates flag which indicates that [`Member`] should publish media.
+    #[inline]
     pub fn set_is_send(&mut self, is_send: bool) {
         self.is_send = is_send;
     }
 
     /// Updates flag which indicates that [`Member`] should receive media.
+    #[inline]
     pub fn set_is_recv(&mut self, is_recv: bool) {
         self.is_recv = is_recv;
     }
 
-    /// Returns flag which indicates that [`Member`] is joined to the `Room`.
+    /// Indicates whether this [`Member`] is joined a [`Room`] on a media
+    /// server.
+    #[inline]
+    #[must_use]
     pub fn is_joined(&self) -> bool {
         self.is_joined
     }
 
-    /// Joins into `Room` with a provided ID.
+    /// Joins a [`Room`] with the provided ID.
     pub async fn join_room(&mut self, room_id: &str) -> Result<()> {
         self.room
             .join(format!(
                 "{}/{}/{}?token=test",
                 *conf::CLIENT_API_ADDR,
                 room_id,
-                self.id
+                self.id,
             ))
             .await?;
         self.is_joined = true;
@@ -335,10 +346,10 @@ impl Member {
         Ok(())
     }
 
-    /// Returns reference to the storage for the [`Connection`]s throws by this
-    /// [`Member`]'s `Room`.
+    /// Returns reference to the Storage of [`Connection`]s thrown by this
+    /// [`Member`]'s [`Room`].
     ///
-    /// [`Connection`]: crate::object::connection::Connection
+    /// [`Connection`]: object::connection::Connection
     pub fn connections(&self) -> &Object<ConnectionStore> {
         &self.connection_store
     }

@@ -20,53 +20,54 @@ use self::client::WebDriverClient;
 #[doc(inline)]
 pub use self::js::Statement;
 
-/// All errors which can happen while working with browser.
+/// All errors which can happen while working with a browser.
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
-    /// JS exception was thrown while executing JS code.
+    /// JS exception was thrown while executing a JS code.
     #[from(ignore)]
     Js(#[error(not(source))] Json),
 
-    /// An error occurred while executing some browser action by [WebDriver].
+    /// Error occurred while executing some browser action by a [WebDriver].
     ///
-    /// [WebDriver]: https://www.w3.org/TR/webdriver/
+    /// [WebDriver]: https://w3.org/TR/webdriver
     WebDriverCmd(fantoccini::error::CmdError),
 
-    /// An error occured while attempting to establish a [WebDriver] session.
+    /// Error occurred while attempting to establish a [WebDriver] session.
     ///
-    /// [WebDriver]: https://www.w3.org/TR/webdriver/
+    /// [WebDriver]: https://w3.org/TR/webdriver
     WebDriverSession(fantoccini::error::NewSessionError),
 
-    /// Failed to deserialize result from the executed JS code.
+    /// Failed to deserialize a result of the executed JS code.
     ///
     /// Should never happen.
     Deserialize(serde_json::Error),
 }
 
+/// Shortcut for a [`Result`] with an [`Error`](enum@Error) inside.
+///
+/// [`Result`]: std::result::Result
 type Result<T> = std::result::Result<T, Error>;
 
-/// [WebDriver] for some concrete browser window.
+/// [WebDriver] handle of a browser window.
 ///
-/// All JS executed by [`Window::execute`] will be ran in the right
-/// browser window.
+/// All JS code executed by [`Window::execute()`] will run in the right browser
+/// window.
 ///
-/// Window will be closed when all [`Window`] for this window will be
-/// [`Drop`]ped.
+/// Window is closed once all [`WebWindow`]s for this window are [`Drop`]ped.
 ///
-/// [WebDriver]: https://www.w3.org/TR/webdriver/
+/// [WebDriver]: https://w3.org/TR/webdriver
 pub struct Window {
-    /// Client for interacting with browser through [WebDriver].
+    /// Client for interacting with a browser through [WebDriver].
     ///
-    /// [WebDriver]: https://www.w3.org/TR/webdriver/
+    /// [WebDriver]: https://w3.org/TR/webdriver
     client: WebDriverClient,
 
-    /// ID of window in which this [`Window`] should execute
-    /// everything.
+    /// ID of the window in which this [`Window`] should execute everything.
     window: WebWindow,
 
-    /// Count of [`Window`] references.
+    /// Count of this [`Window`] references.
     ///
-    /// Used in the [`Drop`] implementation of the [`Window`].
+    /// Used in a [`Drop`] implementation of this [`Window`].
     rc: Arc<AtomicUsize>,
 }
 
@@ -90,8 +91,8 @@ impl Drop for Window {
 }
 
 impl Window {
-    /// Creates new window in the provided [`WebDriverClient`] and returns
-    /// [`Window`] for the created window.
+    /// Creates a new [`Window`] in the provided [`WebDriverClient`].
+    #[must_use]
     async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();
 
@@ -106,8 +107,8 @@ impl Window {
         this
     }
 
-    /// Executes provided [`Statement`] in window which this [`Window`]
-    /// represents.
+    /// Executes the provided [`Statement`] in this [`Window`].
+    #[inline]
     pub async fn execute(&self, exec: Statement) -> Result<Json> {
         self.client
             .switch_to_window_and_execute(self.window.clone(), exec)
@@ -119,24 +120,28 @@ impl Window {
 ///
 /// This client can create new [`Window`]s.
 ///
-/// [WebDriver] session will be closed on this object [`Drop::drop`].
+/// [WebDriver] session will be closed on this object's [`Drop`].
 ///
-/// [WebDriver]: https://www.w3.org/TR/webdriver/
+/// [WebDriver]: https://w3.org/TR/webdriver
 pub struct WindowFactory(WebDriverClient);
 
 impl WindowFactory {
-    /// Returns new [`WindowFactory`].
+    /// Returns a new [`WindowFactory`].
+    #[inline]
     pub async fn new() -> Result<Self> {
         Ok(Self(WebDriverClient::new().await?))
     }
 
-    /// Creates and returns new [`Window`].
+    /// Creates and returns a new [`Window`].
+    #[inline]
+    #[must_use]
     pub async fn new_window(&self) -> Window {
         Window::new(self.0.clone()).await
     }
 }
 
 impl Drop for WindowFactory {
+    #[inline]
     fn drop(&mut self) {
         self.0.blocking_close();
     }

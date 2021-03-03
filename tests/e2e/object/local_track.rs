@@ -1,3 +1,5 @@
+//! Representation of the `LocalMediaTrack` JS object.
+
 use crate::{browser::Statement, object::Object};
 
 use super::Error;

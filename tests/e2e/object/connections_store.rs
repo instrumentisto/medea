@@ -1,19 +1,19 @@
-//! Implementation and definition for the object which will store all
-//! [`Connection`]s thrown by `Room.on_new_connection` callback.
+//! [`Object`] storing all the [`Connection`]s thrown by
+//! `Room.on_new_connection` callback.
 
 use crate::{
     browser::Statement,
     object::{connection::Connection, Object},
 };
 
-/// Storage for the [`Connection`]s thrown by `Room.on_new_connection` callback.
+/// Storage for [`Connection`]s thrown by `Room.on_new_connection` callback.
 pub struct ConnectionStore;
 
 impl Object<ConnectionStore> {
-    /// Returns [`Connection`] for the provided remote Member ID.
+    /// Returns a [`Connection`] of the provided remote member.
     ///
-    /// Returns [`None`] if [`Connection`] with a provided remote Member ID is
-    /// not exist.
+    /// Returns [`None`] if a [`Connection`] with the provided remote member
+    /// doesn't exist.
     pub async fn get(
         &self,
         remote_id: String,
@@ -27,21 +27,15 @@ impl Object<ConnectionStore> {
                         return store.connections.get(id);
                     }
                 "#,
-                vec![remote_id.into()],
+                [remote_id.into()],
             ))
             .await?;
 
-        Ok(if connection.is_undefined().await? {
-            None
-        } else {
-            Some(connection)
-        })
+        Ok((!connection.is_undefined().await?).then(|| connection))
     }
 
-    /// Returns [`Connection`] for the provided remote Member ID.
-    ///
-    /// If this [`Connection`] currently not exists then this method will wait
-    /// for it.
+    /// Returns a [`Connection`] for the provided remote member, waiting it if
+    /// it doesn't exists at the moment.
     pub async fn wait_for_connection(
         &self,
         remote_id: String,
@@ -52,17 +46,17 @@ impl Object<ConnectionStore> {
                 async (store) => {
                     const [remoteId] = args;
                     let conn = store.connections.get(remoteId);
-                    if (conn != undefined) {
+                    if (conn !== undefined) {
                         return conn;
                     } else {
-                        let waiter = new Promise((resolve, reject) => {
+                        let waiter = new Promise((resolve) => {
                             store.subs.set(remoteId, resolve);
                         });
                         return await waiter;
                     }
                 }
             "#,
-            vec![remote_id.into()],
+            [remote_id.into()],
         ))
         .await
     }

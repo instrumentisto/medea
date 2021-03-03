@@ -18,6 +18,7 @@ use std::{
     convert::TryFrom as _,
     hash::{Hash, Hasher},
     rc::Rc,
+    time::Duration,
 };
 
 use derive_more::{Display, From};
@@ -38,7 +39,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
         RecvConstraints,
     },
-    utils::{JasonError, JsCaused, JsError},
+    utils::{delay_for, JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
 
@@ -58,8 +59,6 @@ pub use self::{
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
     transceiver::{Transceiver, TransceiverDirection},
 };
-use crate::utils::delay_for;
-use std::time::Duration;
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///

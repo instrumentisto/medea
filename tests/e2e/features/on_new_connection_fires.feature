@@ -1,32 +1,25 @@
 Feature: `on_new_connection` callback
 
-  Scenario: Member joined
+  Scenario: Member joined with enabled media
     Given room with joined member Alice
     And member Bob
-    When Bob joins room
-    Then Alice receives connection with Bob
-    And Bob receives connection with Alice
-
-  Scenario: Member joined
-    Given room with member Alice with disabled media publishing
-    And joined member Bob
-    When Alice joins room
+    When Bob joins the room
     Then Alice receives connection with Bob
     And Bob receives connection with Alice
 
   Scenario: Member joined with disabled media
     Given room with member Alice with disabled media publishing
     And joined member Bob
-    When Alice joins room
+    When Alice joins the room
     Then Alice receives connection with Bob
     And Bob receives connection with Alice
 
-  Scenario: Member without Endpoints joined
+  Scenario: Member joined without WebRTC endpoints
     Given room with member Alice with no WebRTC endpoints
     And joined member Bob with no WebRTC endpoints
-    When Alice joins room
-    Then Alice doesn't receives connection with Bob
-    And Bob doesn't receives connection with Alice
+    When Alice joins the room
+    Then Alice doesn't receive connection with Bob
+    And Bob doesn't receive connection with Alice
 
   Scenario: Third Member joined
     Given room with joined member Alice

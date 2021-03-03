@@ -1,5 +1,4 @@
-//! Implementation and definition for the object which represents `Jason` JS
-//! object.
+//! [`Object`] representing a `Jason` JS object.
 
 use crate::{
     browser::Statement,
@@ -8,26 +7,22 @@ use crate::{
 
 use super::Error;
 
-/// Representation of the `Jason` JS object.
+/// Representation of a `Jason` JS object.
 pub struct Jason;
 
 impl Builder for Jason {
+    #[inline]
     fn build(self) -> Statement {
         Statement::new(
             // language=JavaScript
-            r#"
-                async () => {
-                    let jason = new window.rust.Jason();
-                    return jason;
-                }
-            "#,
-            vec![],
+            r#"async () => new window.rust.Jason()"#,
+            [],
         )
     }
 }
 
 impl Object<Jason> {
-    /// Returns a new [`Room`] initiated in this [`Jason`].
+    /// Returns a new [`Room`] initiated in this [`Jason`] [`Object`].
     pub async fn init_room(&self) -> Result<Object<Room>, super::Error> {
         self.execute_and_fetch(Statement::new(
             // language=JavaScript
@@ -82,7 +77,7 @@ impl Object<Jason> {
                     };
                 }
             "#,
-            vec![],
+            [],
         ))
         .await
     }
