@@ -75,7 +75,7 @@ impl ConnectionInfo {
 }
 
 /// Errors which can occur while [`ConnectionInfo`] parsing from the [`str`].
-#[derive(Debug, JsCaused, Display)]
+#[derive(Clone, Debug, JsCaused, Display)]
 #[js(error = "platform::Error")]
 pub enum ConnectionInfoParseError {
     /// [`Url::parse`] returned error.

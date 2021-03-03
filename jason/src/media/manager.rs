@@ -16,7 +16,6 @@ use crate::{
         MultiSourceTracksConstraints,
     },
     platform,
-    api::JasonError,
     utils::{JsCaused},
 };
 
@@ -58,6 +57,10 @@ pub enum MediaManagerError {
     /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     #[display(fmt = "{} track is ended", _0)]
     LocalTrackIsEnded(MediaKind),
+
+    /// [`MediaManagerHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "MediaManager is in detached state")]
+    Detached,
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
@@ -299,6 +302,8 @@ impl MediaManager {
     }
 }
 
+gen_upgrade_macro!(MediaManagerError::Detached);
+
 /// External handle to [`MediaManager`].
 ///
 /// [`MediaManager`] performs all media acquisition requests
@@ -321,11 +326,10 @@ impl MediaManagerHandle {
     /// cameras, and so forth.
     pub async fn enumerate_devices(
         &self,
-    ) -> std::result::Result<Vec<platform::InputDeviceInfo>, JasonError> {
+    ) -> Result<Vec<platform::InputDeviceInfo>> {
         InnerMediaManager::enumerate_devices()
             .await
             .map_err(tracerr::wrap!(=> MediaManagerError))
-            .map_err(JasonError::from)
     }
 
     /// Returns [`local::LocalMediaTrack`]s objects, built from provided
@@ -333,8 +337,8 @@ impl MediaManagerHandle {
     pub async fn init_local_tracks(
         &self,
         caps: MediaStreamSettings,
-    ) -> std::result::Result<Vec<local::LocalMediaTrack>, JasonError> {
-        upgrade_or_detached!(self.0, JasonError)?
+    ) -> Result<Vec<local::LocalMediaTrack>> {
+        upgrade!(self.0)?
             .get_tracks(caps)
             .await
             .map(|tracks| {
@@ -344,6 +348,5 @@ impl MediaManagerHandle {
                     .collect::<Vec<_>>()
             })
             .map_err(tracerr::wrap!(=> MediaManagerError))
-            .map_err(JasonError::from)
     }
 }

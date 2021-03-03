@@ -21,7 +21,6 @@ use crate::{
         ApiUrl, CloseMsg, CloseReason, ClosedStateReason, Heartbeat,
         IdleTimeout, PingInterval, RpcClientError,
     },
-    api::JasonError,
 };
 
 /// Reasons of closing WebSocket RPC connection by a client side.
@@ -526,9 +525,9 @@ impl WebSocketRpcClient {
 
         if let Some(socket) = socket_borrow.as_ref() {
             if let Err(err) =
-                socket.send(&ClientMsg::Command { room_id, command })
+                socket.send(&ClientMsg::Command { room_id, command }).map_err(tracerr::map_from_and_wrap!(=> RpcClientError))
             {
-                JasonError::from(err).print()
+                log::error!("{}", err);
             }
         }
     }

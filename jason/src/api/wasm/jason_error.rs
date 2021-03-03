@@ -5,10 +5,10 @@ use std::{
 use derive_more::From;
 use derive_more::{Display};
 use tracerr::{Trace, Traced};
-use crate::utils::JsCaused;
 use wasm_bindgen::prelude::*;
 
 use crate::platform;
+use crate::utils::JsCaused;
 
 /// Representation of app error exported to JS side.
 ///

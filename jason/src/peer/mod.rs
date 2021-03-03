@@ -388,8 +388,9 @@ impl PeerConnection {
         peer.peer.on_track(Some(move |track, transceiver| {
             if let Err(err) =
                 media_connections.add_remote_track(track, transceiver)
+                    .map_err(tracerr::map_from_and_wrap!(=> PeerError))
             {
-                JasonError::from(err).print();
+                log::error!("{}", err);
             };
         }));
 
@@ -500,10 +501,10 @@ impl PeerConnection {
     /// Sends [`platform::RtcStats`] update of this [`PeerConnection`] to the
     /// server.
     pub async fn scrape_and_send_peer_stats(&self) {
-        match self.peer.get_stats().await {
+        match self.peer.get_stats().await.map_err(tracerr::map_from_and_wrap!(=> PeerError)) {
             Ok(stats) => self.send_peer_stats(stats),
             Err(e) => {
-                JasonError::from(e).print();
+                log::error!("{}", e);
             }
         };
     }

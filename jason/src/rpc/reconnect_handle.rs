@@ -2,20 +2,31 @@
 
 use std::{rc::Weak, time::Duration};
 
+use tracerr::Traced;
 use derive_more::Display;
+use derive_more::From;
 
 use crate::{
     platform,
     rpc::{BackoffDelayer, RpcSession},
-    api::JasonError,
     utils::{JsCaused},
 };
+use crate::rpc::SessionError;
 
-/// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]
-/// tries to reconnect) token is `None`.
-#[derive(Debug, Display, JsCaused)]
+/// Errors that may occur in a [`ReconnectHandle`].
+#[derive(Clone, From, Display, JsCaused)]
 #[js(error = "platform::Error")]
-struct NoTokenError;
+pub enum ReconnectError {
+    /// Some [`SessionError`] occurred while reconnecting.
+    #[display(fmt = "{}", _0)]
+    Session(#[js(cause)] SessionError),
+
+    /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "Reconnector is in detached state")]
+    Detached,
+}
+
+gen_upgrade_macro!(ReconnectError::Detached);
 
 /// External handle that is used to reconnect to the Medea media server on
 /// connection loss.
@@ -39,11 +50,11 @@ impl ReconnectHandle {
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<ReconnectError>> {
         platform::delay_for(Duration::from_millis(u64::from(delay_ms))).await;
 
-        let rpc = upgrade_or_detached!(self.0, JasonError)?;
-        rpc.reconnect().await.map_err(JasonError::from)?;
+        let rpc = upgrade!(self.0)?;
+        rpc.reconnect().await.map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(())
     }
@@ -71,14 +82,14 @@ impl ReconnectHandle {
         starting_delay_ms: u32,
         multiplier: f32,
         max_delay: u32,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<ReconnectError>> {
         let mut backoff_delayer = BackoffDelayer::new(
             Duration::from_millis(u64::from(starting_delay_ms)),
             multiplier,
             Duration::from_millis(u64::from(max_delay)),
         );
         backoff_delayer.delay().await;
-        while upgrade_or_detached!(self.0, JasonError)?
+        while upgrade!(self.0)?
             .reconnect()
             .await
             .is_err()

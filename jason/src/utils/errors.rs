@@ -7,8 +7,6 @@ use std::{
 
 use derive_more::{Display, From};
 
-use crate::platform;
-
 pub use medea_macro::JsCaused;
 
 /// Representation of an error which can caused by error returned from the
@@ -23,12 +21,6 @@ pub trait JsCaused {
     /// Returns JS error if it is the cause.
     fn js_cause(self) -> Option<Self::Error>;
 }
-
-/// Occurs if referenced value was dropped.
-#[derive(Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
-#[display(fmt = "Handler is in detached state.")]
-pub struct HandlerDetachedError;
 
 /// Wrapper for [`serde_json::error::Error`] that provides [`Clone`], [`Debug`],
 /// [`Display`] implementations.

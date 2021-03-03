@@ -1,7 +1,9 @@
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::{api::JasonError, connection};
+use crate::{connection};
+
+use super::jason_error::JasonError;
 
 /// Connection with a specific remote `Member`, that is used on JS side.
 ///

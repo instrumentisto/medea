@@ -5,11 +5,13 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     api::{
-        ConstraintsUpdateException, JasonError, MediaSourceKind,
+        ConstraintsUpdateException, MediaSourceKind,
         MediaStreamSettings,
     },
     room,
 };
+
+use super::jason_error::JasonError;
 
 /// JS side handle to [`Room`] where all the media happens.
 ///

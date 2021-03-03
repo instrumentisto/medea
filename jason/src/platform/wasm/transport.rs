@@ -16,7 +16,6 @@ use crate::{
         transport::{RpcTransport, TransportError, TransportState},
         wasm::utils::EventListener,
     },
-    api::JasonError,
     rpc::{websocket::ClientDisconnect, ApiUrl, CloseMsg},
 };
 
@@ -211,7 +210,7 @@ impl WebSocketRpcTransport {
                         Err(e) => {
                             // TODO: protocol versions mismatch? should drop
                             //       connection if so
-                            JasonError::from(tracerr::new!(e)).print();
+                            log::error!("{}", tracerr::new!(e));
                             return;
                         }
                     };

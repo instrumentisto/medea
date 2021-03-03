@@ -1,6 +1,7 @@
 //! Implementation of the [`Component`].
 
 use std::rc::Rc;
+use std::fmt::Display;
 
 use derive_more::Deref;
 use futures::{future, Future, FutureExt as _, Stream, StreamExt};
@@ -9,7 +10,6 @@ use medea_reactive::AllProcessed;
 use crate::{
     media::LocalTracksConstraints,
     platform,
-    api::JasonError,
     utils::{TaskHandle},
 };
 
@@ -125,7 +125,7 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
         F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
         R: Stream<Item = V> + Unpin + 'static,
         H: Future<Output = Result<(), E>> + 'static,
-        E: Into<JasonError>,
+        E: Display,
     {
         let obj = Rc::clone(&self.obj);
         let state = Rc::clone(&self.state);
@@ -134,7 +134,7 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
                 if let Err(e) =
                     (handle)(Rc::clone(&obj), Rc::clone(&state), value).await
                 {
-                    Into::<JasonError>::into(e).print();
+                    log::error!("{}", e);
                 }
             }
         });

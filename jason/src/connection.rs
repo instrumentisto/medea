@@ -7,12 +7,14 @@ use std::{
 };
 
 use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
+use derive_more::Display;
+use tracerr::Traced;
 
 use crate::{
     api,
     media::track::remote,
     platform,
-    api::JasonError,
+    utils::JsCaused,
 };
 
 /// Service which manages [`Connection`]s with the remote `Member`s.
@@ -87,6 +89,17 @@ impl Connections {
     }
 }
 
+/// Errors that may occur in a [`ConnectionHandle`].
+#[derive(Clone, Copy, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum ConnectionError {
+    /// [`ConnectionHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "Connection is in detached state")]
+    Detached,
+}
+
+gen_upgrade_macro!(ConnectionError::Detached);
+
 /// External handler to [`Connection`] with remote `Member`.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
@@ -118,13 +131,13 @@ impl ConnectionHandle {
     pub fn on_close(
         &self,
         f: platform::Function<()>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
+    ) -> Result<(), Traced<ConnectionError>> {
+        upgrade!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
     /// Returns remote `Member` ID.
-    pub fn get_remote_member_id(&self) -> Result<String, JasonError> {
-        upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
+    pub fn get_remote_member_id(&self) -> Result<String, Traced<ConnectionError>> {
+        upgrade!(self.0).map(|inner| inner.remote_id.0.clone())
     }
 
     /// Sets callback, which will be invoked when new [`remote::Track`] will be
@@ -132,8 +145,8 @@ impl ConnectionHandle {
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
+    ) -> Result<(), Traced<ConnectionError>> {
+        upgrade!(self.0)
             .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
@@ -142,8 +155,8 @@ impl ConnectionHandle {
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
+    ) -> Result<(), Traced<ConnectionError>> {
+        upgrade!(self.0)
             .map(|inner| inner.on_quality_score_update.set_func(f))
     }
 }
