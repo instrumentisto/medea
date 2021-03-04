@@ -1,6 +1,8 @@
 use cucumber_rust::then;
 
-use crate::{parse_media_kinds, world::World};
+use crate::world::World;
+
+use super::parse_media_kinds;
 
 #[then(regex = r"^Member (\S+) has (\d+) local tracks$")]
 async fn then_member_has_local_tracks(

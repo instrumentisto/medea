@@ -16,20 +16,20 @@ Feature: Media send muting
     Given room with joined member Alice
     And member Bob with muted audio publishing
     When Bob joins room
-    Then Bob's audio local track is unmuted
+    Then Bob's audio local track is not muted
 
   Scenario: Local Track doesn't mutes when Member mutes video before call
     Given room with joined member Alice
     And member Bob with muted video publishing
     When Bob joins room
-    Then Bob's device video local track is unmuted
+    Then Bob's device video local track is not muted
 
-  Scenario: Local Track doesn't mutes when Member mutes audio while call
+  Scenario: Local Track doesn't mutes when Member mutes audio during call
     Given room with joined member Alice and Bob
     When Bob mutes video
-    Then Bob's device video local track is unmuted
+    Then Bob's device video local track is not muted
 
-  Scenario: Local Track doesn't mutes when Member mutes audio while call
+  Scenario: Local Track doesn't mutes when Member mutes audio during call
     Given room with joined member Alice and Bob
     When Bob mutes audio
-    Then Bob's audio local track is unmuted
+    Then Bob's audio local track is not muted

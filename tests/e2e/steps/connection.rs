@@ -9,12 +9,11 @@ async fn then_member_receives_connection(
     responder_id: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    member
+    assert!(member
         .connections()
         .wait_for_connection(responder_id.clone())
         .await
-        .unwrap();
-    assert!(true);
+        .is_ok());
 }
 
 #[then(regex = r"^(\S+) doesn't receive connection with (\S+)$")]

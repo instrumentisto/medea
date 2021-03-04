@@ -23,7 +23,7 @@ async fn when_room_closed_by_client(world: &mut World, id: String) {
     world.close_room(&id).await.unwrap();
 }
 
-#[when(regex = r"^(\S+)'s Jason object disposes$")]
+#[when(regex = r"^(\S+) disposes Jason object$")]
 async fn when_jason_object_disposes(world: &mut World, id: String) {
     world.dispose_jason(&id).await.unwrap();
 }

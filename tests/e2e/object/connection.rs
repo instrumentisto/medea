@@ -14,14 +14,14 @@ impl Object<Connection> {
     pub async fn tracks_store(
         &self,
     ) -> Result<Object<RemoteTracksStore>, Error> {
+        // language=JavaScript
         Ok(self
             .execute_and_fetch(Statement::new(
-                // language=JavaScript
                 r#"
-                async (conn) => {
-                    return conn.tracksStore;
-                }
-            "#,
+                    async (conn) => {
+                        return conn.tracksStore;
+                    }
+                "#,
                 vec![],
             ))
             .await?)

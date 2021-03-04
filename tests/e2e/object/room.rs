@@ -115,14 +115,14 @@ impl Object<Room> {
                 format!("room.room.disable_video({})", media_source_kind)
             }
         };
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (room) => {{
-                    await {};
-                }}
-            "#,
+                    async (room) => {{
+                        await {};
+                    }}
+                "#,
                 disable
             ),
             vec![],
@@ -150,14 +150,14 @@ impl Object<Room> {
                 format!("room.room.enable_video({})", media_source_kind)
             }
         };
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (room) => {{
-                    await {};
-                }}
-            "#,
+                    async (room) => {{
+                        await {};
+                    }}
+                "#,
                 disable
             ),
             vec![],
@@ -185,14 +185,14 @@ impl Object<Room> {
                 format!("room.room.disable_remote_video({})", media_source_kind)
             }
         };
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (room) => {{
-                    await {};
-                }}
-            "#,
+                    async (room) => {{
+                        await {};
+                    }}
+                "#,
                 disable
             ),
             vec![],
@@ -220,14 +220,14 @@ impl Object<Room> {
                 format!("room.room.enable_remote_video({})", media_source_kind)
             }
         };
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (room) => {{
-                    await {};
-                }}
-            "#,
+                    async (room) => {{
+                        await {};
+                    }}
+                "#,
                 disable
             ),
             vec![],
@@ -255,14 +255,14 @@ impl Object<Room> {
                 format!("room.room.mute_video({})", media_source_kind)
             }
         };
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (room) => {{
-                    await {};
-                }}
-            "#,
+                    async (room) => {{
+                        await {};
+                    }}
+                "#,
                 disable
             ),
             vec![],
@@ -375,7 +375,6 @@ impl Object<Room> {
                             sub(connection);
                         }
                     });
-
                     return store;
                 }
             "#,
@@ -390,14 +389,14 @@ impl Object<Room> {
     pub async fn local_tracks(
         &self,
     ) -> Result<Object<LocalTracksStore>, super::Error> {
+        // language=JavaScript
         Ok(self
             .execute_and_fetch(Statement::new(
-                // language=JavaScript
                 r#"
-                async (room) => {
-                    return room.localTracksStore;
-                }
-            "#,
+                    async (room) => {
+                        return room.localTracksStore;
+                    }
+                "#,
                 vec![],
             ))
             .await?)
@@ -408,23 +407,23 @@ impl Object<Room> {
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<String, super::Error> {
+        // language=JavaScript
         Ok(self
             .execute(Statement::new(
-                // language=JavaScript
                 r#"
-                async (room) => {
-                    if (room.closeListener.isClosed) {
-                        return room.closeListener.closeReason.reason();
-                    } else {
-                        let waiter = new Promise((resolve) => {
-                            room.closeListener.subs.push(resolve);
-                        });
+                    async (room) => {
+                        if (room.closeListener.isClosed) {
+                            return room.closeListener.closeReason.reason();
+                        } else {
+                            let waiter = new Promise((resolve) => {
+                                room.closeListener.subs.push(resolve);
+                            });
 
-                        let closeReason = await waiter;
-                        return closeReason.reason();
+                            let closeReason = await waiter;
+                            return closeReason.reason();
+                        }
                     }
-                }
-            "#,
+                "#,
                 vec![],
             ))
             .await?

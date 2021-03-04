@@ -10,8 +10,8 @@ pub struct RemoteTrack;
 impl Object<RemoteTrack> {
     /// Returns `true` if this [`RemoteTrack`] is enabled.
     pub async fn wait_for_enabled(&self) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             r#"
                 async (track) => {
                     if (!track.track.enabled()) {
@@ -34,8 +34,8 @@ impl Object<RemoteTrack> {
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_disabled(&self) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             r#"
                 async (track) => {
                     if (track.track.enabled()) {
@@ -55,14 +55,14 @@ impl Object<RemoteTrack> {
     /// Returns `true` if this [`RemoteTrack`] underlying
     /// `MediaStreamTrack.enabled` is `false`.
     pub async fn muted(&self) -> Result<bool, Error> {
+        // language=JavaScript
         Ok(self
             .execute(Statement::new(
-                // language=JavaScript
                 r#"
-                async (track) => {
-                    return !track.track.get_track().enabled;
-                }
-            "#,
+                    async (track) => {
+                        return !track.track.get_track().enabled;
+                    }
+                "#,
                 vec![],
             ))
             .await?
@@ -78,8 +78,8 @@ impl Object<RemoteTrack> {
         &self,
         count: u64,
     ) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             r#"
                 async (track) => {
                     const [count] = args;
@@ -108,8 +108,8 @@ impl Object<RemoteTrack> {
         &self,
         count: u64,
     ) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             r#"
                 async (track) => {
                     const [count] = args;

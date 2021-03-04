@@ -11,15 +11,16 @@ impl Object<LocalTrack> {
     /// Drops this [`LocalTrack`] and returns `readyState` of the
     /// `MediaStreamTrack`.
     pub async fn free_and_check(self) -> Result<bool, Error> {
+        // language=JavaScript
         Ok(self
             .execute(Statement::new(
                 r#"
-                async (track) => {
-                    let sysTrack = track.track.get_track();
-                    track.track.free();
-                    return sysTrack.readyState == "ended";
-                }
-            "#,
+                    async (track) => {
+                        let sysTrack = track.track.get_track();
+                        track.track.free();
+                        return sysTrack.readyState == "ended";
+                    }
+                "#,
                 vec![],
             ))
             .await?
@@ -30,13 +31,14 @@ impl Object<LocalTrack> {
     /// Returns `MediaStreamTrack.enabled` status of underlying
     /// `MediaStreamTrack`.
     pub async fn muted(&self) -> Result<bool, Error> {
+        // language=JavaScript
         Ok(self
             .execute(Statement::new(
                 r#"
-                async (track) => {
-                    return !track.track.get_track().enabled;
-                }
-            "#,
+                    async (track) => {
+                        return !track.track.get_track().enabled;
+                    }
+                "#,
                 vec![],
             ))
             .await?

@@ -10,8 +10,8 @@ use async_recursion::async_recursion;
 use cucumber_rust::{given, when};
 
 use crate::{
-    object::MediaKind,
-    world::{member::MemberBuilder, World},
+    object::{room::FailedParsing, MediaKind, MediaSourceKind},
+    world::{member::Builder as MemberBuilder, World},
 };
 
 #[given(regex = "^(?:room with )?(joined )?member(?:s)? (\\S+)\
@@ -221,4 +221,30 @@ impl FromStr for Direction {
             Self::None
         })
     }
+}
+
+/// Tries to find `audio`, `video` or `all` in the provided text. If `audio` or
+/// `video` found, then [`Some`] [`MediaKind`] will be returned. If `all` found,
+/// the [`None`] will be returned. Otherwise this function will panic.
+fn parse_media_kind(text: &str) -> Option<MediaKind> {
+    match text {
+        "audio" => Some(MediaKind::Audio),
+        "video" => Some(MediaKind::Video),
+        "all" => None,
+        _ => {
+            panic!("Unknown media kind: {}", text)
+        }
+    }
+}
+
+/// Parses [`MediaKind`] and [`MediaSourceKind`] from the provided [`str`].
+fn parse_media_kinds(
+    s: &str,
+) -> Result<(MediaKind, MediaSourceKind), FailedParsing> {
+    let media_kind = s.parse()?;
+    let source_kind = match media_kind {
+        MediaKind::Audio => MediaSourceKind::Device,
+        MediaKind::Video => s.parse()?,
+    };
+    Ok((media_kind, source_kind))
 }

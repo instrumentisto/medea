@@ -76,6 +76,7 @@ impl Object<Jason> {
 
     /// Closes the provided [`Room`].
     pub async fn close_room(&self, room: &Object<Room>) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::with_objs(
             r#"
                 async (jason) => {
@@ -93,6 +94,7 @@ impl Object<Jason> {
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,
     /// streams etc.) respectively.
     pub async fn dispose(self) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
             r#"
                 async (jason) => {

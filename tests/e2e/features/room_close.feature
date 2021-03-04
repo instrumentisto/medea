@@ -6,7 +6,7 @@ Feature: Room closing
 
   Scenario: Room.on_close fires on Jason.dispose call
     Given room with joined member Alice
-    When Alice's Jason object disposes
+    When Alice disposes Jason object
     Then Alice's Room.on_close callback fires with `RoomClosed` reason
 
   Scenario: Room.on_close fires on Member delete by Control API

@@ -18,7 +18,7 @@ use crate::{
     object::{self, Jason, Object},
 };
 
-pub use self::member::{Member, MemberBuilder};
+pub use self::member::{Builder as MemberBuilder, Member};
 
 /// All errors which can happen while working with [`World`].
 #[derive(Debug, Display, Error, From)]

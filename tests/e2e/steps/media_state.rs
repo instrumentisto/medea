@@ -1,9 +1,11 @@
 use cucumber_rust::{then, when};
 
-use crate::{parse_media_kind, parse_media_kinds, world::World};
+use crate::world::World;
+
+use super::{parse_media_kind, parse_media_kinds};
 
 #[then(regex = "^(\\S*)'s (audio|(?:device|display) video) local track is \
-                (muted|unmuted)$")]
+                (muted|not muted)$")]
 async fn then_local_track_mute_state(
     world: &mut World,
     id: String,

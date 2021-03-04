@@ -1,18 +1,18 @@
 Feature: Enable remote media
 
-  Scenario: on_enabled fires on video enable
+  Scenario: RemoteMediaTrack.on_enabled fires on video enable
     Given room with joined member Bob
     Given joined member Alice with disabled video playing
     When Alice enables remote video
     Then on_enabled callback fires 1 time on Alice's remote device video track from Bob
 
-  Scenario: on_enabled fires on audio enable
+  Scenario: RemoteMediaTrack.on_enabled fires on audio enable
     Given room with joined member Bob
     Given joined member Alice with disabled audio playing
     When Alice enables remote audio
     Then on_enabled callback fires 1 time on Alice's remote audio track from Bob
 
-  Scenario: on_enabled doesn't fires on Track create
+  Scenario: RemoteMediaTrack.on_enabled doesn't fire on Track create
     Given room with joined member Alice
     And member Bob
     When Bob joins room

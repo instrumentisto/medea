@@ -1,12 +1,12 @@
 Feature: Send Media disabling
 
-  Scenario: Member disables video while call
+  Scenario: Member disables video during call
     Given room with joined member Alice and Bob
     When Bob disables video
     Then Alice's device video remote track with Bob is disabled
     And Alice's audio remote track with Bob is enabled
 
-  Scenario: Member disables audio while call
+  Scenario: Member disables audio during call
     Given room with joined member Alice and Bob
     When Bob disables audio
     Then Alice's audio remote track with Bob is disabled
@@ -26,14 +26,14 @@ Feature: Send Media disabling
     Then Alice doesn't have audio remote track with Bob
     And Alice's device video remote track with Bob is enabled
 
-  Scenario: Member enables audio while call
+  Scenario: Member enables audio during call
     Given room with joined member Alice
     And member Bob with disabled audio publishing
     When Bob joins room
     And Bob enables audio
     Then Alice's audio remote track with Bob is enabled
 
-  Scenario: Member enables video while call
+  Scenario: Member enables video during call
     Given room with joined member Alice
     And member Bob with disabled video publishing
     When Bob joins room

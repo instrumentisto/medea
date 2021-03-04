@@ -24,14 +24,14 @@ pub struct TracksStore<T>(PhantomData<T>);
 impl<T> Object<TracksStore<T>> {
     /// Returns count of Tracks stored in this [`TracksStore`].
     pub async fn count(&self) -> Result<u64, Error> {
+        // language=JavaScript
         Ok(self
             .execute(Statement::new(
-                // language=JavaScript
                 r#"
-                async (store) => {
-                    return store.tracks.length;
-                }
-            "#,
+                    async (store) => {
+                        return store.tracks.length;
+                    }
+                "#,
                 vec![],
             ))
             .await?
@@ -44,8 +44,8 @@ impl<T> Object<TracksStore<T>> {
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
+        // language=JavaScript
         self.execute(Statement::new(
-            // language=JavaScript
             r#"
                 async (store) => {
                     const [neededCount] = args;
@@ -82,39 +82,43 @@ impl<T> Object<TracksStore<T>> {
     ) -> Result<bool, Error> {
         let source_kind_js = source_kind
             .map_or_else(|| "undefined".to_string(), MediaSourceKind::as_js);
+        // language=JavaScript
         let kind_js = Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (store) => {{
-                    return {{
-                        store: store,
-                        kind: {kind},
-                        sourceKind: {source_kind}
-                    }};
-                }}
-            "#,
+                    async (store) => {{
+                        return {{
+                            store: store,
+                            kind: {kind},
+                            sourceKind: {source_kind}
+                        }};
+                    }}
+                "#,
                 source_kind = source_kind_js,
                 kind = kind.as_js()
             ),
             vec![],
         );
 
+        // language=JavaScript
         Ok(self
             .execute(kind_js.and_then(Statement::new(
-                // language=JavaScript
                 r#"
-            async (meta) => {
-                for (track of meta.store.tracks) {
-                    if (track.track.kind() === meta.kind
-                        && (track.track.media_source_kind() === meta.sourceKind
-                            || meta.sourceKind === undefined)) {
-                        return true;
+                    async (meta) => {
+                        for (track of meta.store.tracks) {
+                            if (track.track.kind() === meta.kind &&
+                                (
+                                    track.track.media_source_kind()  ===
+                                    meta.sourceKind ||
+                                    meta.sourceKind === undefined
+                                )
+                            ) {
+                                return true;
+                            }
+                        }
+                        return false;
                     }
-                }
-                return false;
-            }
-        "#,
+                "#,
                 vec![],
             )))
             .await?
@@ -129,54 +133,55 @@ impl<T> Object<TracksStore<T>> {
         kind: MediaKind,
         source_kind: MediaSourceKind,
     ) -> Result<Object<T>, Error> {
+        // language=JavaScript
         let kind_js = Statement::new(
-            // language=JavaScript
             &format!(
                 r#"
-                async (store) => {{
-                    return {{
-                        store: store,
-                        kind: {kind},
-                        sourceKind: {source_kind}
-                    }};
-                }}
-            "#,
+                    async (store) => {{
+                        return {{
+                            store: store,
+                            kind: {kind},
+                            sourceKind: {source_kind}
+                        }};
+                    }}
+                "#,
                 source_kind = source_kind.as_js(),
                 kind = kind.as_js()
             ),
             vec![],
         );
 
+        // language=JavaScript
         Ok(self
             .execute_and_fetch(kind_js.and_then(Statement::new(
-                // language=JavaScript
                 r#"
-                async (meta) => {
-                    for (track of meta.store.tracks) {
-                        let kind = track.track.kind();
-                        let sourceKind = track.track.media_source_kind();
-                        if (kind === meta.kind
-                            && sourceKind === meta.sourceKind) {
-                            return track;
-                        }
-                    }
-                    let waiter = new Promise((resolve) => {
-                        meta.store.subs.push((track) => {
+                    async (meta) => {
+                        for (track of meta.store.tracks) {
                             let kind = track.track.kind();
                             let sourceKind = track.track.media_source_kind();
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
-                                resolve(track);
-                                return true;
-                            } else {
-                                return false;
+                                return track;
                             }
+                        }
+                        let waiter = new Promise((resolve) => {
+                            meta.store.subs.push((track) => {
+                                let kind = track.track.kind();
+                                let sourceKind =
+                                    track.track.media_source_kind();
+                                if (kind === meta.kind
+                                    && sourceKind === meta.sourceKind) {
+                                    resolve(track);
+                                    return true;
+                                } else {
+                                    return false;
+                                }
+                            });
                         });
-                    });
-                    let res = await waiter;
-                    return waiter;
-                }
-            "#,
+                        let res = await waiter;
+                        return waiter;
+                    }
+                "#,
                 vec![],
             )))
             .await?)
