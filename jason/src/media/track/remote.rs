@@ -139,12 +139,14 @@ impl Track {
 #[wasm_bindgen(js_class = RemoteMediaTrack)]
 impl Track {
     /// Returns the underlying [`sys::MediaStreamTrack`] of this [`Track`].
+    #[must_use]
     pub fn get_track(&self) -> sys::MediaStreamTrack {
         Clone::clone(&self.0.track)
     }
 
     /// Indicate whether this [`Track`] is enabled.
     #[wasm_bindgen(js_name = enabled)]
+    #[must_use]
     pub fn js_enabled(&self) -> bool {
         self.0.enabled.get()
     }
@@ -162,6 +164,7 @@ impl Track {
     /// Returns [`MediaKind::Audio`] if this [`Track`] represents an audio
     /// track, or [`MediaKind::Video`] if it represents a video track.
     #[wasm_bindgen(js_name = kind)]
+    #[must_use]
     pub fn js_kind(&self) -> MediaKind {
         self.kind()
     }
@@ -172,6 +175,7 @@ impl Track {
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[wasm_bindgen(js_name = media_source_kind)]
+    #[must_use]
     pub fn js_media_source_kind(&self) -> JsMediaSourceKind {
         self.0.media_source_kind.into()
     }

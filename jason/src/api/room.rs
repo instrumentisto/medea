@@ -73,6 +73,7 @@ impl RoomCloseReason {
     /// `is_err` may be `true` only on closing by client.
     ///
     /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
+    #[must_use]
     pub fn new(reason: CloseReason) -> Self {
         match reason {
             CloseReason::ByServer(reason) => Self {
@@ -92,17 +93,20 @@ impl RoomCloseReason {
 #[wasm_bindgen]
 impl RoomCloseReason {
     /// `wasm_bindgen` getter for [`RoomCloseReason::reason`] field.
+    #[must_use]
     pub fn reason(&self) -> String {
         self.reason.clone()
     }
 
     /// `wasm_bindgen` getter for [`RoomCloseReason::is_closed_by_server`]
     /// field.
+    #[must_use]
     pub fn is_closed_by_server(&self) -> bool {
         self.is_closed_by_server
     }
 
     /// `wasm_bindgen` getter for [`RoomCloseReason::is_err`] field.
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.is_err
     }
@@ -698,6 +702,7 @@ impl Room {
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
+    #[must_use]
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
     }
@@ -705,12 +710,14 @@ impl Room {
     /// Indicates whether this [`Room`] reference is the same as the given
     /// [`Room`] reference. Compares pointers, not values.
     #[inline]
+    #[must_use]
     pub fn ptr_eq(&self, other: &Room) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
     /// Checks [`RoomHandle`] equality by comparing inner pointers.
     #[inline]
+    #[must_use]
     pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
         handle
             .0
@@ -720,6 +727,7 @@ impl Room {
 
     /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
     #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakRoom {
         WeakRoom(Rc::downgrade(&self.0))
     }
@@ -785,6 +793,7 @@ pub struct ConstraintsUpdateException(JsConstraintsUpdateError);
 #[wasm_bindgen]
 impl ConstraintsUpdateException {
     /// Returns name of this [`ConstraintsUpdateException`].
+    #[must_use]
     pub fn name(&self) -> String {
         self.0.to_string()
     }
@@ -793,6 +802,7 @@ impl ConstraintsUpdateException {
     /// `RecoveredException` or `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
+    #[must_use]
     pub fn recover_reason(&self) -> JsValue {
         use JsConstraintsUpdateError as E;
         match &self.0 {
@@ -806,6 +816,7 @@ impl ConstraintsUpdateException {
     /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
+    #[must_use]
     pub fn recover_fail_reasons(&self) -> JsValue {
         match &self.0 {
             JsConstraintsUpdateError::RecoverFailed {
@@ -820,6 +831,7 @@ impl ConstraintsUpdateException {
     /// `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
+    #[must_use]
     pub fn error(&self) -> JsValue {
         match &self.0 {
             JsConstraintsUpdateError::Errored { reason } => reason.clone(),

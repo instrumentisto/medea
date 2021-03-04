@@ -429,6 +429,8 @@ pub struct Unvalidated;
 // is fix for it. This allow not works on function.
 impl DeleteElements<Unvalidated> {
     /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fids: Vec::new(),
@@ -437,6 +439,7 @@ impl DeleteElements<Unvalidated> {
     }
 
     /// Adds [`StatefulFid`] to request.
+    #[inline]
     pub fn add_fid(&mut self, fid: StatefulFid) {
         self.fids.push(fid)
     }

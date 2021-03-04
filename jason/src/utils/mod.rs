@@ -36,6 +36,7 @@ pub use self::{
 /// # Panics
 ///
 /// When global [`Window`] object is inaccessible.
+#[must_use]
 pub fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.
     // Safe to unwrap.
@@ -58,6 +59,7 @@ impl JsDuration {
     /// will need a longer duration in the future, then we can implement this
     /// with a few `setTimeout`s.
     #[inline]
+    #[must_use]
     pub fn into_js_duration(self) -> i32 {
         self.0.as_millis().try_into().unwrap_or(i32::max_value())
     }

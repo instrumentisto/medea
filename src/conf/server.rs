@@ -53,6 +53,7 @@ pub struct ClientApiHttpServer {
 impl ClientApiHttpServer {
     /// Builds [`SocketAddr`] from `bind_ip` and `bind_port`.
     #[inline]
+    #[must_use]
     pub fn bind_addr(&self) -> SocketAddr {
         (self.bind_ip, self.bind_port)
             .to_socket_addrs()

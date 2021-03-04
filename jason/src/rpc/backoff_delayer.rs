@@ -25,6 +25,8 @@ pub struct BackoffDelayer {
 
 impl BackoffDelayer {
     /// Creates and returns new [`BackoffDelayer`].
+    #[inline]
+    #[must_use]
     pub fn new(
         starting_interval: JsDuration,
         interval_multiplier: f32,
@@ -43,6 +45,7 @@ impl BackoffDelayer {
     /// [`BackoffDelayer::current_interval`] *
     /// [`BackoffDelayer::interval_multiplier`] milliseconds,
     /// until [`BackoffDelayer::max_interval`] is reached.
+    #[inline]
     pub async fn delay(&mut self) {
         delay_for(self.get_delay()).await;
     }

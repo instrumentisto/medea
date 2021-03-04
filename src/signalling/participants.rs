@@ -137,6 +137,8 @@ impl ParticipantService {
     ///
     /// __Note__ this function don't check presence of [`Member`] in
     /// [`ParticipantService`].
+    #[inline]
+    #[must_use]
     pub fn get_fid_to_member(&self, member_id: MemberId) -> Fid<ToMember> {
         Fid::<ToMember>::new(self.room_id.clone(), member_id)
     }
@@ -159,6 +161,8 @@ impl ParticipantService {
     }
 
     /// Returns all [`Member`] from this [`ParticipantService`].
+    #[inline]
+    #[must_use]
     pub fn members(&self) -> HashMap<MemberId, Member> {
         self.members.clone()
     }
@@ -187,6 +191,8 @@ impl ParticipantService {
     }
 
     /// Checks if [`Member`] has __active__ [`RpcConnection`].
+    #[inline]
+    #[must_use]
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)

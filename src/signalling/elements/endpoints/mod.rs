@@ -26,6 +26,8 @@ pub enum Endpoint {
 
 impl Endpoint {
     /// Downgrades this [`Endpoint`] to [`WeakEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakEndpoint {
         match self {
             Self::WebRtcPublishEndpoint(publish) => publish.downgrade().into(),
@@ -58,6 +60,7 @@ pub enum WeakEndpoint {
 
 impl WeakEndpoint {
     /// Upgrades this weak pointer to a strong [`Endpoint`] pointer.
+    #[must_use]
     pub fn upgrade(&self) -> Option<Endpoint> {
         match self {
             WeakEndpoint::WebRtcPublishEndpoint(ep) => {

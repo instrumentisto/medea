@@ -17,6 +17,8 @@ pub struct Log {
 
 impl Log {
     /// Returns configured application logging level. `None` if disabled.
+    #[inline]
+    #[must_use]
     pub fn level(&self) -> Option<slog::Level> {
         slog::Level::from_str(&self.level).ok()
     }

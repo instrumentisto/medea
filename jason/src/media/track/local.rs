@@ -147,12 +147,14 @@ impl JsTrack {
 #[wasm_bindgen(js_class = LocalMediaTrack)]
 impl JsTrack {
     /// Returns the underlying [`sys::MediaStreamTrack`] of this [`JsTrack`].
+    #[must_use]
     pub fn get_track(&self) -> sys::MediaStreamTrack {
         Clone::clone(self.0.track.as_ref())
     }
 
     /// Returns [`MediaKind::Audio`] if this [`JsTrack`] represents an audio
     /// track, or [`MediaKind::Video`] if it represents a video track.
+    #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.0.kind()
     }
@@ -162,6 +164,7 @@ impl JsTrack {
     /// if ot is captured via [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[must_use]
     pub fn media_source_kind(&self) -> JsMediaSourceKind {
         self.0.media_source_kind().into()
     }

@@ -52,6 +52,7 @@ struct Inner {
 impl Jason {
     /// Instantiates new [`Jason`] interface to interact with this library.
     #[wasm_bindgen(constructor)]
+    #[must_use]
     pub fn new() -> Self {
         set_panic_hook();
         wasm_logger::init(wasm_logger::Config::default());
@@ -69,12 +70,14 @@ impl Jason {
     }
 
     /// Creates new [`Room`] and returns its [`RoomHandle`].
+    #[must_use]
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::clone(&self.0.borrow().rpc);
         self.inner_init_room(WebSocketRpcSession::new(rpc))
     }
 
     /// Returns [`MediaManagerHandle`].
+    #[must_use]
     pub fn media_manager(&self) -> MediaManagerHandle {
         self.0.borrow().media_manager.new_handle()
     }

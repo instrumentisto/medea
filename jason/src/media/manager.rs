@@ -370,6 +370,7 @@ impl MediaManager {
 
     /// Instantiates new [`MediaManagerHandle`] for use on JS side.
     #[inline]
+    #[must_use]
     pub fn new_handle(&self) -> MediaManagerHandle {
         MediaManagerHandle(Rc::downgrade(&self.0))
     }

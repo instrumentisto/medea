@@ -81,6 +81,7 @@ impl StatefulFid {
     /// Returns reference to [`RoomId`].
     ///
     /// This is possible in any [`StatefulFid`] state.
+    #[must_use]
     pub fn room_id(&self) -> &RoomId {
         match self {
             StatefulFid::Room(uri) => uri.room_id(),
