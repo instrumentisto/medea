@@ -126,6 +126,8 @@ impl IntoJValue for i32 {
 //     }
 // }
 
+// TODO: Remove. Dont alloc java object from rust, pass pointers that java will wrap in java object.
+//       Same for JForeignObjectsArray.
 trait IntoJObject {
     fn into_jobject(self, env: JNIEnv) -> jobject;
 }
