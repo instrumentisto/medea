@@ -19,7 +19,7 @@ impl ForeignClass for ConnectionHandle {
         unsafe { FOREIGN_CLASS_CONNECTIONHANDLE }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_CONNECTIONHANDLE_NATIVEPTR_FIELD }
     }
 }

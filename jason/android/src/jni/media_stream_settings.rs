@@ -10,7 +10,7 @@ impl ForeignClass for MediaStreamSettings {
         unsafe { FOREIGN_CLASS_MEDIASTREAMSETTINGS }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_MEDIASTREAMSETTINGS_NATIVEPTR_FIELD }
     }
 }

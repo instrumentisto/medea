@@ -14,7 +14,7 @@ impl ForeignClass for AudioTrackConstraints {
         unsafe { FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
     }
 }

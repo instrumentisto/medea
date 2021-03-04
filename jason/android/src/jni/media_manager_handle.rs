@@ -10,7 +10,7 @@ impl ForeignClass for MediaManagerHandle {
         unsafe { FOREIGN_CLASS_MEDIAMANAGERHANDLE }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_MEDIAMANAGERHANDLE_NATIVEPTR_FIELD }
     }
 }

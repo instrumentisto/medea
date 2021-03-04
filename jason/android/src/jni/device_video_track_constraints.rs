@@ -7,7 +7,7 @@ impl ForeignClass for DeviceVideoTrackConstraints {
         unsafe { FOREIGN_CLASS_DEVICEVIDEOTRACKCONSTRAINTS }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_DEVICEVIDEOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
     }
 }

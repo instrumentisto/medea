@@ -7,7 +7,7 @@ impl ForeignClass for ReconnectHandle {
         unsafe { FOREIGN_CLASS_RECONNECTHANDLE }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_RECONNECTHANDLE_NATIVEPTR_FIELD }
     }
 }

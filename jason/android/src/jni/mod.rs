@@ -134,7 +134,7 @@ impl<T: ForeignClass> IntoJObject for T {
     fn into_jobject(self, env: JNIEnv) -> jobject {
         let jclass = <T>::jni_class();
         assert!(!jclass.is_null());
-        let field_id = <T>::jni_class_pointer_field();
+        let field_id = <T>::native_ptr_field();
         assert!(!field_id.is_null());
         let jobj = env.alloc_object(jclass);
         assert!(!jobj.is_null(), "object_to_jobject: AllocObject failed");
@@ -155,7 +155,7 @@ impl<T: ForeignClass> IntoJObject for T {
 pub trait ForeignClass {
     fn jni_class() -> jclass;
 
-    fn jni_class_pointer_field() -> jfieldID;
+    fn native_ptr_field() -> jfieldID;
 
     fn box_object(self) -> jlong
     where
@@ -195,7 +195,7 @@ pub struct JavaCallback<T> {
 
 impl<T> JavaCallback<T> {
     pub fn new(env: JNIEnv, obj: jobject) -> Self {
-        let class = env.get_object_class(obj); // TODO: assert class
+        let class = env.get_object_class(obj); // TODO: assert Consumer class
         assert!(!class.is_null(), "GetObjectClass return null class");
         // TODO: cache method?
         let accept_method =
@@ -224,11 +224,10 @@ impl JavaCallback<()> {
     }
 }
 
-impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
-    pub fn accept(self: Arc<Self>, arg: T) {
+impl JavaCallback<u8> {
+    pub fn accept(self: Arc<Self>, arg: u8) {
         exec_foreign(move |env| {
-            let arg = arg.into_jobject(env).into_jvalue();
-
+            let arg = arg.into_jvalue();
             env.call_void_method(
                 self.consumer_object,
                 self.accept_method,
@@ -238,10 +237,10 @@ impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
     }
 }
 
-impl JavaCallback<u8> {
-    pub fn accept(self: Arc<Self>, arg: u8) {
+impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
+    pub fn accept(self: Arc<Self>, arg: T) {
         exec_foreign(move |env| {
-            let arg = arg.into_jvalue();
+            let arg = arg.into_jobject(env).into_jvalue();
             env.call_void_method(
                 self.consumer_object,
                 self.accept_method,
@@ -263,7 +262,7 @@ impl JavaCallback<u8> {
 //         });
 //     }
 // }
-
+//
 // impl<T: IntoJValue + Send + 'static> JavaCallback<T> {
 //     pub fn accept(self: Arc<Self>, arg: T) {
 //         exec_foreign(move |env| {
@@ -431,7 +430,6 @@ impl ForeignEnum for MediaKind {
     }
 }
 
-// TODO: impl IntoObject for ForeignEnum
 impl IntoJObject for MediaKind {
     fn into_jobject(self, env: JNIEnv) -> jobject {
         let class = unsafe { FOREIGN_ENUM_MEDIAKIND };

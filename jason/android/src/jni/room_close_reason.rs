@@ -7,7 +7,7 @@ impl ForeignClass for RoomCloseReason {
         unsafe { FOREIGN_CLASS_ROOMCLOSEREASON }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_ROOMCLOSEREASON_NATIVEPTR_FIELD }
     }
 }

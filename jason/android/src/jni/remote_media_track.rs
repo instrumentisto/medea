@@ -9,7 +9,7 @@ impl ForeignClass for RemoteMediaTrack {
         unsafe { FOREIGN_CLASS_REMOTEMEDIATRACK }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_REMOTEMEDIATRACK_NATIVEPTR_FIELD }
     }
 }

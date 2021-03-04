@@ -7,7 +7,7 @@ impl ForeignClass for InputDeviceInfo {
         unsafe { FOREIGN_CLASS_INPUTDEVICEINFO }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_INPUTDEVICEINFO_NATIVEPTR_FIELD }
     }
 }

@@ -16,7 +16,7 @@ impl ForeignClass for JasonError {
         unsafe { FOREIGN_CLASS_JASONERROR }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_JASONERROR_NATIVEPTR_FIELD }
     }
 }

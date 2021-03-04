@@ -24,6 +24,7 @@ impl RustExecutor {
                     .unwrap();
 
                 runtime.block_on(async move {
+                    // TODO: catch panics
                     while let Some(task) = rx.next().await {
                         tokio::spawn(async move {
                             match task {
@@ -95,7 +96,6 @@ enum Task {
 //     Panic(String),
 // }
 
-// Executors.newSingleThreadExecutor()
 #[derive(Clone)]
 pub struct JavaExecutor(std_mpsc::Sender<Box<dyn FnOnce(JNIEnv) + Send>>);
 

@@ -15,7 +15,7 @@ impl ForeignClass for ConstraintsUpdateException {
         unsafe { FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION_NATIVEPTR_FIELD }
     }
 }

@@ -7,7 +7,7 @@ impl ForeignClass for LocalMediaTrack {
         unsafe { FOREIGN_CLASS_LOCALMEDIATRACK }
     }
 
-    fn jni_class_pointer_field() -> jfieldID {
+    fn native_ptr_field() -> jfieldID {
         unsafe { FOREIGN_CLASS_LOCALMEDIATRACK_NATIVEPTR_FIELD }
     }
 }

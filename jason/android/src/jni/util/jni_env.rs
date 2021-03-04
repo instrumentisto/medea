@@ -66,7 +66,7 @@ impl<'a> JNIEnv<'a> {
             )
         };
         assert!(!obj_arr.is_null());
-        let field_id = <T>::jni_class_pointer_field();
+        let field_id = <T>::native_ptr_field();
         assert!(!field_id.is_null());
         for (i, r_obj) in arr.drain(..).enumerate() {
             let jobj: jobject =
