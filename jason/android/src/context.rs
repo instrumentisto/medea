@@ -1,6 +1,9 @@
 use std::sync::mpsc as std_mpsc;
 
-use crate::jni::util::{JNIEnv, JavaVM};
+use crate::jni::{
+    util::{JNIEnv, JavaVM},
+    AsyncTaskCallback,
+};
 
 use futures::{
     channel::mpsc as fut_mpsc, future::BoxFuture, stream::StreamExt, Future,
@@ -39,21 +42,17 @@ impl RustExecutor {
         Self(tx)
     }
 
-    // pub fn spawn_async<T>(&self, task: T) -> oneshot::Receiver<T::Output>
-    // where
-    //     T: Future + Send + 'static,
-    //     T::Output: Send,
-    // {
-    //     let (tx, rx) = oneshot::channel();
-    //     self.tx
-    //         .unbounded_send(Task::Async(Box::pin(async {
-    //             if !tx.is_canceled() {
-    //                 let _ = tx.send(task.await);
-    //             }
-    //         })))
-    //         .unwrap();
-    //     rx
-    // }
+    pub fn really_spawn_async<T>(&self, task: T, cb: AsyncTaskCallback<()>)
+    where
+        T: Future + Send + 'static,
+    {
+        self.0
+            .unbounded_send(Task::Async(Box::pin(async {
+                task.await; // TODO: pass result to callback
+                cb.resolve(());
+            })))
+            .unwrap();
+    }
 
     pub fn spawn_async<T>(&self, task: T) -> T::Output
     where
@@ -110,6 +109,7 @@ impl JavaExecutor {
                 // Detach is performed automatically when thread exits.
                 // Subsequent attach calls are no-op.
                 let env = java_vm.attach();
+
                 while let Ok(task) = rx.recv() {
                     task(env);
                     if env.exception_check() {

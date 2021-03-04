@@ -9,6 +9,7 @@ name = "jason_java"
 crate-type = ["cdylib"]
 
 [dependencies]
+derive_more = "0.99"
 android_logger = "0.9"
 futures = "0.3"
 log = "0.4"

@@ -7,7 +7,8 @@ use std::{
 };
 
 use jni_sys::{
-    jclass, jlong, jmethodID, jobject, jobjectArray, jsize, jstring, jvalue,
+    jclass, jfieldID, jlong, jmethodID, jobject, jobjectArray, jsize, jstring,
+    jvalue,
 };
 
 use crate::jni::{ForeignClass, JAVA_LANG_EXCEPTION};
@@ -26,6 +27,26 @@ impl<'a> JNIEnv<'a> {
             ptr,
             _lifetime: PhantomData,
         }
+    }
+
+    pub fn get_static_object_field(
+        &self,
+        class: jclass,
+        field: jfieldID,
+    ) -> jobject {
+        unsafe {
+            (**self.ptr).GetStaticObjectField.unwrap()(self.ptr, class, field)
+        }
+    }
+
+    pub fn set_long_field(&self, obj: jobject, field: jfieldID, value: jlong) {
+        unsafe {
+            (**self.ptr).SetLongField.unwrap()(self.ptr, obj, field, value);
+        }
+    }
+
+    pub fn alloc_object(&self, class: jclass) -> jobject {
+        unsafe { (**self.ptr).AllocObject.unwrap()(self.ptr, class) }
     }
 
     pub fn new_object_array<T: ForeignClass>(
@@ -74,7 +95,7 @@ impl<'a> JNIEnv<'a> {
         }
     }
 
-    // TODO: create wrapper with DeleteGlobalRef on drop
+    // TODO: create GlobalJObject wrapper with DeleteGlobalRef on drop
     pub fn new_global_ref(&self, obj: jobject) -> jobject {
         unsafe { (**self.ptr).NewGlobalRef.unwrap()(self.ptr, obj) }
     }
@@ -118,28 +139,6 @@ impl<'a> JNIEnv<'a> {
         unsafe { (**self.ptr).GetObjectClass.unwrap()(self.ptr, obj) }
     }
 
-    pub fn object_to_jobject<T: ForeignClass>(&self, rust_obj: T) -> jobject {
-        let jcls = <T>::jni_class();
-        assert!(!jcls.is_null());
-        let field_id = <T>::jni_class_pointer_field();
-        assert!(!field_id.is_null());
-        let jobj: jobject =
-            unsafe { (**self.ptr).AllocObject.unwrap()(self.ptr, jcls) };
-        assert!(!jobj.is_null(), "object_to_jobject: AllocObject failed");
-        let ret: jlong = <T>::box_object(rust_obj);
-        unsafe {
-            (**self.ptr).SetLongField.unwrap()(self.ptr, jobj, field_id, ret);
-            if (**self.ptr).ExceptionCheck.unwrap()(self.ptr) != 0 {
-                panic!(
-                    "object_to_jobject: Can not set nativePtr field: catch \
-                     exception"
-                );
-            }
-        }
-
-        jobj
-    }
-
     pub fn string_to_jstring(&self, string: String) -> jstring {
         let string = string.into_bytes();
         unsafe {
@@ -169,7 +168,7 @@ impl<'a> JNIEnv<'a> {
         args: &[jvalue],
     ) {
         unsafe {
-            (**self.ptr).CallVoidMethod.unwrap()(
+            (**self.ptr).CallVoidMethodA.unwrap()(
                 self.ptr,
                 object,
                 method,

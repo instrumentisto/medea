@@ -19,7 +19,8 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeDeviceId(
     this: jlong,
     device_id: jstring,
 ) {
-    let device_id = JavaString::new(env, device_id).to_str().to_owned();
+    let env = unsafe { JNIEnv::from_raw(env) };
+    let device_id = env.clone_jstring_to_string(device_id);
 
     rust_exec_context().blocking_exec(move || {
         let this: &mut DeviceVideoTrackConstraints = unsafe {

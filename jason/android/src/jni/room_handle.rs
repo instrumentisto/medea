@@ -14,25 +14,31 @@ impl ForeignClass for RoomHandle {
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_RoomHandle_nativeJoin(
+pub extern "C" fn Java_com_jason_api_RoomHandle_nativeAsyncJoin(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
     token: jstring,
+    cb: jobject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let token = env.clone_jstring_to_string(token);
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
 
-    let result = rust_exec_context().spawn_async(async move {
-        let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+    rust_exec_context().really_spawn_async(
+        async move {
+            let this = unsafe {
+                jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap()
+            };
 
-        this.join(token).await
-    });
+            this.join(token).await.unwrap();
+        },
+        async_cb,
+    );
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result { // TODO: handle errors
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]

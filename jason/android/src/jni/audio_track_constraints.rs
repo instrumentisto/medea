@@ -1,9 +1,9 @@
-use jni_sys::{jclass, jfieldID, jlong, jstring, JNIEnv};
+use jni_sys::{jclass, jfieldID, jlong, jstring};
 
 use crate::{
     jlong_to_pointer,
     jni::{
-        ForeignClass, JavaString, FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS,
+        util::JNIEnv, ForeignClass, FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS,
         FOREIGN_CLASS_AUDIOTRACKCONSTRAINTS_NATIVEPTR_FIELD,
     },
     rust_exec_context, AudioTrackConstraints,
@@ -21,12 +21,13 @@ impl ForeignClass for AudioTrackConstraints {
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_AudioTrackConstraints_nativeDeviceId(
-    env: *mut JNIEnv,
+    env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
     device_id: jstring,
 ) {
-    let device_id = JavaString::new(env, device_id).to_str().to_owned();
+    let env = unsafe { JNIEnv::from_raw(env) };
+    let device_id = env.clone_jstring_to_string(device_id);
 
     rust_exec_context().blocking_exec(move || {
         let this = unsafe {
@@ -40,7 +41,7 @@ pub extern "C" fn Java_com_jason_api_AudioTrackConstraints_nativeDeviceId(
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_AudioTrackConstraints_nativeFree(
-    _: *mut JNIEnv,
+    _: *mut jni_sys::JNIEnv,
     _: jclass,
     ptr: jlong,
 ) {

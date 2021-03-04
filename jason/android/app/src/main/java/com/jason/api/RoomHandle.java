@@ -14,8 +14,8 @@ public final class RoomHandle {
         this.nativePtr = ptr;
     }
 
-    public void join(@NonNull String token) throws Exception {
-        nativeJoin(nativePtr, token);
+    public void join(@NonNull String token, @NonNull AsyncTaskCallback<Void> asyncCb) throws Exception {
+        nativeAsyncJoin(nativePtr, token, asyncCb);
     }
 
     public void onNewConnection(@NonNull Consumer<ConnectionHandle> cb) throws Exception {
@@ -120,7 +120,7 @@ public final class RoomHandle {
         free();
     }
 
-    private static native void nativeJoin(long self, @NonNull String token) throws Exception;
+    private static native void nativeAsyncJoin(long self, String token, AsyncTaskCallback<Void> asyncCb) throws Exception;
 
     private static native void nativeOnNewConnection(long self, Consumer<ConnectionHandle> cb) throws Exception;
 

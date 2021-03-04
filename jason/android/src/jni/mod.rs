@@ -19,7 +19,6 @@ pub mod util;
 
 use std::{
     convert::TryFrom,
-    ffi::CStr,
     marker::PhantomData,
     os::raw,
     ptr,
@@ -28,7 +27,7 @@ use std::{
 
 use jni_sys::{
     jboolean, jclass, jfieldID, jfloat, jint, jlong, jmethodID, jobject,
-    jshort, jstring, jvalue, JNI_OK, JNI_VERSION_1_6,
+    jstring, jvalue, JNI_OK, JNI_VERSION_1_6,
 };
 use once_cell::sync::Lazy;
 
@@ -41,19 +40,12 @@ use crate::{
 #[doc = " Default JNI_VERSION"]
 const JNI_VERSION: jint = JNI_VERSION_1_6 as jint;
 
-trait SwigFrom<T> {
-    fn swig_from(_: T, env: *mut jni_sys::JNIEnv) -> Self;
-}
 macro_rules! swig_c_str {
     ($lit:expr) => {
         concat!($lit, "\0").as_ptr() as *const ::std::os::raw::c_char
     };
 }
-macro_rules! swig_assert_eq_size {
-    ($x:ty, $($xs:ty), +$(,)*) => {
-        $ (let _ = ::std::mem::transmute::<$x, $xs>;)+
-    };
-}
+
 #[cfg(target_pointer_width = "32")]
 pub unsafe fn jlong_to_pointer<T>(val: jlong) -> *mut T {
     (val as u32) as *mut T
@@ -64,15 +56,114 @@ pub unsafe fn jlong_to_pointer<T>(val: jlong) -> *mut T {
     val as *mut T
 }
 
+pub trait IntoJValue {
+    fn into_jvalue(self) -> jvalue;
+}
+
+impl IntoJValue for () {
+    fn into_jvalue(self) -> jvalue {
+        jvalue { l: ptr::null_mut() }
+    }
+}
+
+impl IntoJValue for jobject {
+    fn into_jvalue(self) -> jvalue {
+        jvalue {
+            l: unsafe { std::mem::transmute(self) },
+        }
+    }
+}
+
+// impl IntoJValue for i8 {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { b: self }
+//     }
+// }
+//
+impl IntoJValue for u8 {
+    fn into_jvalue(self) -> jvalue {
+        (self as i32).into_jvalue()
+    }
+}
+// impl IntoJValue for char {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { c: self as u16 }
+//     }
+// }
+//
+// impl IntoJValue for i16 {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { s: self }
+//     }
+// }
+//
+impl IntoJValue for i32 {
+    fn into_jvalue(self) -> jvalue {
+        jvalue { i: self }
+    }
+}
+// impl IntoJValue for i64 {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { j: self }
+//     }
+// }
+//
+// impl IntoJValue for bool {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { b: self as i8 }
+//     }
+// }
+//
+// impl IntoJValue for f32 {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { f: self }
+//     }
+// }
+//
+// impl IntoJValue for f64 {
+//     fn into_jvalue(self) -> jvalue {
+//         jvalue { d: self }
+//     }
+// }
+
+trait IntoJObject {
+    fn into_jobject(self, env: JNIEnv) -> jobject;
+}
+
+impl<T: ForeignClass> IntoJObject for T {
+    fn into_jobject(self, env: JNIEnv) -> jobject {
+        let jclass = <T>::jni_class();
+        assert!(!jclass.is_null());
+        let field_id = <T>::jni_class_pointer_field();
+        assert!(!field_id.is_null());
+        let jobj = env.alloc_object(jclass);
+        assert!(!jobj.is_null(), "object_to_jobject: AllocObject failed");
+        let native_ptr: jlong = <T>::box_object(self);
+        env.set_long_field(jobj, field_id, native_ptr);
+        if env.exception_check() {
+            env.exception_describe();
+            panic!(
+                "object_to_jobject: Can not set nativePtr field: catch \
+                 exception"
+            )
+        }
+
+        jobj
+    }
+}
+
 pub trait ForeignClass {
     fn jni_class() -> jclass;
+
     fn jni_class_pointer_field() -> jfieldID;
+
     fn box_object(self) -> jlong
     where
         Self: Sized,
     {
         Box::into_raw(Box::new(self)) as i64
     }
+
     fn get_boxed(ptr: jlong) -> Box<Self>
     where
         Self: Sized,
@@ -92,105 +183,56 @@ pub trait ForeignClass {
 
 pub trait ForeignEnum {
     fn as_jint(&self) -> jint;
+
     fn from_jint(_: jint) -> Self;
 }
 
-pub struct JavaString {
-    string: jstring,
-    chars: *const raw::c_char,
-    env: *mut jni_sys::JNIEnv,
-}
-
-impl JavaString {
-    pub fn new(env: *mut jni_sys::JNIEnv, js: jstring) -> JavaString {
-        let chars = if js.is_null() {
-            ptr::null_mut()
-        } else {
-            unsafe {
-                (**env).GetStringUTFChars.unwrap()(env, js, ptr::null_mut())
-            }
-        };
-        JavaString {
-            string: js,
-            chars,
-            env,
-        }
-    }
-
-    pub fn to_str(&self) -> &str {
-        if self.chars.is_null() {
-            ""
-        } else {
-            let s = unsafe { CStr::from_ptr(self.chars) };
-            s.to_str().unwrap()
-        }
-    }
-}
-
-impl Drop for JavaString {
-    fn drop(&mut self) {
-        assert!(!self.env.is_null());
-        if !self.string.is_null() {
-            assert!(!self.chars.is_null());
-            unsafe {
-                (**self.env).ReleaseStringUTFChars.unwrap()(
-                    self.env,
-                    self.string,
-                    self.chars,
-                )
-            };
-            self.env = ptr::null_mut();
-            self.chars = ptr::null_mut();
-        }
-    }
-}
-
 pub struct JavaCallback<T> {
-    object: jobject,
-    method: jmethodID,
+    consumer_object: jobject,
+    accept_method: jmethodID,
     _type: PhantomData<T>,
 }
 
 impl<T> JavaCallback<T> {
-    pub fn new(env: JNIEnv, obj: jobject) -> JavaCallback<T> {
-        let class = env.get_object_class(obj);
+    pub fn new(env: JNIEnv, obj: jobject) -> Self {
+        let class = env.get_object_class(obj); // TODO: assert class
         assert!(!class.is_null(), "GetObjectClass return null class");
-        let method =
+        // TODO: cache method?
+        let accept_method =
             env.get_method_id(class, "accept", "(Ljava/lang/Object;)V");
-        assert!(!method.is_null(), "Can not find accept id");
+        assert!(!accept_method.is_null(), "Can not find accept id");
 
-        let object = env.new_global_ref(obj);
-        assert!(!object.is_null());
+        let consumer_object = env.new_global_ref(obj);
+        assert!(!consumer_object.is_null());
         JavaCallback {
-            object,
-            method,
+            consumer_object,
+            accept_method,
             _type: PhantomData::default(),
         }
     }
 }
 
 impl JavaCallback<()> {
-    pub fn accept(self: Arc<Self>, _: ()) {
-        swig_assert_eq_size!(raw::c_uint, u32);
-        swig_assert_eq_size!(raw::c_int, i32);
-
+    pub fn accept(self: Arc<Self>, void: ()) {
         exec_foreign(move |env| {
-            env.call_void_method(self.object, self.method, &[]);
+            env.call_void_method(
+                self.consumer_object,
+                self.accept_method,
+                &[void.into_jvalue()],
+            );
         });
     }
 }
 
 impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
     pub fn accept(self: Arc<Self>, arg: T) {
-        swig_assert_eq_size!(raw::c_uint, u32);
-        swig_assert_eq_size!(raw::c_int, i32);
-
         exec_foreign(move |env| {
-            let arg = env.object_to_jobject(arg);
+            let arg = arg.into_jobject(env).into_jvalue();
+
             env.call_void_method(
-                self.object,
-                self.method,
-                &[jvalue { l: arg }],
+                self.consumer_object,
+                self.accept_method,
+                &[arg],
             );
         });
     }
@@ -198,23 +240,46 @@ impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
 
 impl JavaCallback<u8> {
     pub fn accept(self: Arc<Self>, arg: u8) {
-        swig_assert_eq_size!(raw::c_uint, u32);
-        swig_assert_eq_size!(raw::c_int, i32);
-
         exec_foreign(move |env| {
-            let arg = i32::from(jshort::from(arg));
+            let arg = arg.into_jvalue();
             env.call_void_method(
-                self.object,
-                self.method,
-                &[jvalue { i: arg }],
+                self.consumer_object,
+                self.accept_method,
+                &[arg],
             );
         });
     }
 }
 
+// impl<T: IntoJObject + Send + 'static> JavaCallback<T> {
+//     pub fn accept(self: Arc<Self>, arg: T) {
+//         exec_foreign(move |env| {
+//             let arg = arg.into_jobject(env).into_jvalue();
+//             env.call_void_method(
+//                 self.consumer_object,
+//                 self.accept_method,
+//                 &[arg],
+//             );
+//         });
+//     }
+// }
+
+// impl<T: IntoJValue + Send + 'static> JavaCallback<T> {
+//     pub fn accept(self: Arc<Self>, arg: T) {
+//         exec_foreign(move |env| {
+//             let arg = arg.into_jvalue();
+//             env.call_void_method(
+//                 self.consumer_object,
+//                 self.accept_method,
+//                 &[arg],
+//             );
+//         });
+//     }
+// }
+
 impl<T> Drop for JavaCallback<T> {
     fn drop(&mut self) {
-        // TODO: DeleteGlobalRef(self.cb_jobj);
+        // TODO: DeleteGlobalRef(self.consumer_object);
         // getting JNIEnv might be tricky here
     }
 }
@@ -224,6 +289,67 @@ unsafe impl<T> Send for JavaCallback<T> {}
 
 /// Raw pointers are thread safe.
 unsafe impl<T> Sync for JavaCallback<T> {}
+
+pub struct AsyncTaskCallback<T> {
+    cb_object: jobject,
+    done_method: jmethodID,
+    error_method: jmethodID,
+    _type: PhantomData<T>,
+}
+
+impl<T> AsyncTaskCallback<T> {
+    pub fn new(env: JNIEnv, obj: jobject) -> Self {
+        let class = env.get_object_class(obj);
+        assert!(!class.is_null(), "GetObjectClass return null class");
+
+        let done_method =
+            env.get_method_id(class, "onDone", "(Ljava/lang/Object;)V");
+        let error_method =
+            env.get_method_id(class, "onError", "(Ljava/lang/Throwable;)V");
+
+        assert!(!done_method.is_null(), "Can not find onDone id");
+        assert!(!error_method.is_null(), "Can not find onError id");
+
+        let cb_object = env.new_global_ref(obj);
+        assert!(!cb_object.is_null());
+
+        AsyncTaskCallback {
+            cb_object,
+            done_method,
+            error_method,
+            _type: PhantomData,
+        }
+    }
+
+    pub fn reject(self) {
+        unimplemented!()
+    }
+}
+
+impl AsyncTaskCallback<()> {
+    pub fn resolve(self, void: ()) {
+        exec_foreign(move |env| {
+            env.call_void_method(
+                self.cb_object,
+                self.done_method,
+                &[void.into_jvalue()],
+            );
+        });
+    }
+}
+
+impl<T> Drop for AsyncTaskCallback<T> {
+    fn drop(&mut self) {
+        // TODO: DeleteGlobalRef(self.cb_object);
+        // getting JNIEnv might be tricky here
+    }
+}
+
+/// Raw pointers are thread safe.
+unsafe impl<T> Send for AsyncTaskCallback<T> {}
+
+/// Raw pointers are thread safe.
+unsafe impl<T> Sync for AsyncTaskCallback<T> {}
 
 impl ForeignEnum for FacingMode {
     fn as_jint(&self) -> jint {
@@ -249,11 +375,11 @@ impl ForeignEnum for FacingMode {
     }
 }
 
-impl SwigFrom<FacingMode> for jobject {
-    fn swig_from(x: FacingMode, env: *mut jni_sys::JNIEnv) -> jobject {
-        let cls = unsafe { FOREIGN_ENUM_FACINGMODE };
-        assert!(!cls.is_null());
-        let static_field_id: jfieldID = match x {
+impl IntoJObject for FacingMode {
+    fn into_jobject(self, env: JNIEnv) -> jobject {
+        let class = unsafe { FOREIGN_ENUM_FACINGMODE };
+        assert!(!class.is_null());
+        let field_id: jfieldID = match self {
             FacingMode::User => {
                 let field = unsafe { FOREIGN_ENUM_FACINGMODE_USER };
                 assert!(!field.is_null());
@@ -275,15 +401,13 @@ impl SwigFrom<FacingMode> for jobject {
                 field
             }
         };
-        assert!(!static_field_id.is_null());
-        let ret: jobject = unsafe {
-            (**env).GetStaticObjectField.unwrap()(env, cls, static_field_id)
-        };
+        assert!(!field_id.is_null());
+        let obj = env.get_static_object_field(class, field_id);
         assert!(
-            !ret.is_null(),
+            !obj.is_null(),
             concat!("Can get value of item in ", "com/jason/api/FacingMode")
         );
-        ret
+        obj
     }
 }
 
@@ -307,11 +431,12 @@ impl ForeignEnum for MediaKind {
     }
 }
 
-impl SwigFrom<MediaKind> for jobject {
-    fn swig_from(x: MediaKind, env: *mut jni_sys::JNIEnv) -> jobject {
-        let cls = unsafe { FOREIGN_ENUM_MEDIAKIND };
-        assert!(!cls.is_null());
-        let static_field_id: jfieldID = match x {
+// TODO: impl IntoObject for ForeignEnum
+impl IntoJObject for MediaKind {
+    fn into_jobject(self, env: JNIEnv) -> jobject {
+        let class = unsafe { FOREIGN_ENUM_MEDIAKIND };
+        assert!(!class.is_null());
+        let field: jfieldID = match self {
             MediaKind::Audio => {
                 let field = unsafe { FOREIGN_ENUM_MEDIAKIND_AUDIO };
                 assert!(!field.is_null());
@@ -323,15 +448,13 @@ impl SwigFrom<MediaKind> for jobject {
                 field
             }
         };
-        assert!(!static_field_id.is_null());
-        let ret: jobject = unsafe {
-            (**env).GetStaticObjectField.unwrap()(env, cls, static_field_id)
-        };
+        assert!(!field.is_null());
+        let obj = env.get_static_object_field(class, field);
         assert!(
-            !ret.is_null(),
+            !obj.is_null(),
             concat!("Can get value of item in ", "com/jason/api/MediaKind")
         );
-        ret
+        obj
     }
 }
 
@@ -355,11 +478,11 @@ impl ForeignEnum for MediaSourceKind {
     }
 }
 
-impl SwigFrom<MediaSourceKind> for jobject {
-    fn swig_from(x: MediaSourceKind, env: *mut jni_sys::JNIEnv) -> jobject {
-        let cls = unsafe { FOREIGN_ENUM_MEDIASOURCEKIND };
-        assert!(!cls.is_null());
-        let static_field_id: jfieldID = match x {
+impl IntoJObject for MediaSourceKind {
+    fn into_jobject(self, env: JNIEnv) -> jobject {
+        let class = unsafe { FOREIGN_ENUM_MEDIASOURCEKIND };
+        assert!(!class.is_null());
+        let field_id = match self {
             MediaSourceKind::Device => {
                 let field = unsafe { FOREIGN_ENUM_MEDIASOURCEKIND_DEVICE };
                 assert!(!field.is_null());
@@ -371,18 +494,16 @@ impl SwigFrom<MediaSourceKind> for jobject {
                 field
             }
         };
-        assert!(!static_field_id.is_null());
-        let ret: jobject = unsafe {
-            (**env).GetStaticObjectField.unwrap()(env, cls, static_field_id)
-        };
+        assert!(!field_id.is_null());
+        let obj = env.get_static_object_field(class, field_id);
         assert!(
-            !ret.is_null(),
+            !obj.is_null(),
             concat!(
                 "Can get value of item in ",
                 "com/jason/api/MediaSourceKind"
             )
         );
-        ret
+        obj
     }
 }
 
@@ -930,7 +1051,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     );
     (**env).DeleteLocalRef.unwrap()(env, class_local_ref);
     FOREIGN_ENUM_FACINGMODE = class;
-    let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
+    let field_id = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
         swig_c_str!("User"),
@@ -942,7 +1063,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
          Lcom/jason/api/FacingMode; failed"
     );
     FOREIGN_ENUM_FACINGMODE_USER = field_id;
-    let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
+    let field_id = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
         swig_c_str!("Environment"),
@@ -1060,7 +1181,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JNI_VERSION
 }
 
-/// TODO: doesnt seem to fire on android for some reason
+/// TODO: doesnt seem to fire on android for some reason, how do we stop exec
+///       context (or maybe theres no need to)?
 #[no_mangle]
 pub unsafe extern "system" fn JNI_OnUnload(
     java_vm: *mut jni_sys::JavaVM,

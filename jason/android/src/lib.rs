@@ -144,7 +144,6 @@ impl RoomHandle {
     }
 
     pub async fn join(&self, _token: String) -> Result<(), String> {
-        // async
         Ok(())
     }
 
@@ -154,17 +153,14 @@ impl RoomHandle {
         _stop_first: bool,
         _rollback_on_fail: bool,
     ) -> Result<(), String> {
-        // async ConstraintsUpdateException
         Ok(())
     }
 
     pub async fn mute_audio(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn unmute_audio(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
@@ -172,7 +168,6 @@ impl RoomHandle {
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
-        // async
         Ok(())
     }
 
@@ -180,17 +175,14 @@ impl RoomHandle {
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn disable_audio(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn enable_audio(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
@@ -198,7 +190,6 @@ impl RoomHandle {
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
-        // async
         Ok(())
     }
 
@@ -206,27 +197,22 @@ impl RoomHandle {
         &self,
         _source_kind: Option<MediaSourceKind>,
     ) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn disable_remote_audio(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn disable_remote_video(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn enable_remote_audio(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 
     pub async fn enable_remote_video(&self) -> Result<(), String> {
-        // async
         Ok(())
     }
 }
@@ -237,7 +223,6 @@ impl MediaManagerHandle {
     pub async fn enumerate_devices(
         &self,
     ) -> Result<Vec<InputDeviceInfo>, String> {
-        // async
         Ok(Vec::new())
     }
 
@@ -245,7 +230,6 @@ impl MediaManagerHandle {
         &self,
         _caps: &MediaStreamSettings,
     ) -> Result<Vec<LocalMediaTrack>, String> {
-        // async
         Ok(Vec::new())
     }
 }
@@ -411,7 +395,6 @@ impl ReconnectHandle {
         &self,
         _delay_ms: u32,
     ) -> Result<(), String> {
-        // async
         Ok(())
     }
 
@@ -421,7 +404,6 @@ impl ReconnectHandle {
         _multiplier: f32,
         _max_delay: u32,
     ) -> Result<(), String> {
-        // async
         Ok(())
     }
 }
