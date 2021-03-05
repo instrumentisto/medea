@@ -6,7 +6,7 @@ Feature: OnLeave callback of Control API
 
   Scenario: Member's Jason object disposed
     Given room with joined member Alice
-    When Alice's Jason object disposes
+    When Alice disposes Jason object
     Then Control API sends OnLeave callback with `Disconnected` reason for member Alice
 
   Scenario: Member deleted by Control API
@@ -16,5 +16,5 @@ Feature: OnLeave callback of Control API
 
   Scenario: Member's Room deleted by Control API
     Given room with joined member Alice
-    When Control API removes room
+    When Control API removes the room
     Then Control API doesn't sends OnLeave callback for member `Alice`

@@ -1,4 +1,5 @@
-/// Representation of the `Connection` JS object.
+//! `Connection` JS object's representation.
+
 use crate::{
     browser::Statement,
     object::{tracks_store::RemoteTracksStore, Object},
@@ -6,34 +7,29 @@ use crate::{
 
 use super::Error;
 
-/// Representation of the `Connection` JS object.
+/// Representation of a `Connection` JS object.
 pub struct Connection;
 
 impl Object<Connection> {
-    /// Returns [`RemoteTracksStore`] of this [`Connection`].
+    /// Returns a [`RemoteTracksStore`] of this [`Connection`].
     pub async fn tracks_store(
         &self,
     ) -> Result<Object<RemoteTracksStore>, Error> {
-        Ok(self
-            .execute_and_fetch(Statement::new(
-                // language=JavaScript
-                r#"
-                async (conn) => {
-                    return conn.tracksStore;
-                }
-            "#,
-                vec![],
-            ))
-            .await?)
+        self.execute_and_fetch(Statement::new(
+            // language=JavaScript
+            r#"async (conn) => conn.tracksStore"#,
+            [],
+        ))
+        .await
     }
 
-    /// Returns [`Future`] which will be resolved when `Connection.on_close`
-    /// callback will fire.
+    /// Returns a [`Future`] resolving when `Connection.on_close()` callback is
+    /// fired.
     ///
     /// [`Future`]: std::future::Future
     pub async fn wait_for_close(&self) -> Result<(), Error> {
-        // language=JavaScript
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (conn) => {
                     await new Promise((resolve) => {
@@ -45,9 +41,9 @@ impl Object<Connection> {
                     });
                 }
             "#,
-            vec![],
+            [],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 }

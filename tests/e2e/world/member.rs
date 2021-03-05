@@ -68,19 +68,19 @@ pub struct Member {
     /// Flag which indicates that [`Member`] is joined to the `Room`.
     is_joined: bool,
 
-    /// Publishing media state of this [`Member`].
+    /// Media publishing state of this [`Member`].
     ///
     /// If value is `true` then this [`MediaKind`] and [`MediaSourceKind`] is
     /// enabled.
     send_state: RefCell<HashMap<(MediaKind, MediaSourceKind), bool>>,
 
-    /// Receiving media state of this [`Member`].
+    /// Media receiving state of this [`Member`].
     ///
     /// If value is `true` then this [`MediaKind`] and [`MediaSourceKind`] is
     /// enabled.
     recv_state: RefCell<HashMap<(MediaKind, MediaSourceKind), bool>>,
 
-    /// Representation of the `Room` JS object.
+    /// [`Room`]'s [`Object`] that this [`Member`] is intended to join.
     room: Object<Room>,
 
     /// Storage for the [`Connection`]s throws by this [`Member`]'s `Room`.
@@ -178,9 +178,7 @@ impl Member {
         source_kind: Option<MediaSourceKind>,
         enabled: bool,
     ) {
-        for (kind, source_kind) in
-            Self::kinds_and_source_kinds(kind, source_kind)
-        {
+        for (kind, source_kind) in kinds_combinations(kind, source_kind) {
             *self
                 .send_state
                 .borrow_mut()
@@ -196,9 +194,7 @@ impl Member {
         source_kind: Option<MediaSourceKind>,
         enabled: bool,
     ) {
-        for (kind, source_kind) in
-            Self::kinds_and_source_kinds(kind, source_kind)
-        {
+        for (kind, source_kind) in kinds_combinations(kind, source_kind) {
             *self
                 .recv_state
                 .borrow_mut()
@@ -212,6 +208,7 @@ impl Member {
     ///
     /// [`LocalTrack`]: crate::object::local_track::LocalTrack
     /// [`RemoteTrack`]: crate::object::remote_track::RemoteTrack
+    #[must_use]
     pub fn count_of_tracks_between_members(
         &self,
         another: &Self,
@@ -304,7 +301,6 @@ impl Member {
                 .unmute_media(MediaKind::Video, source_kind)
                 .await?;
         }
-
         Ok(())
     }
 
@@ -337,7 +333,6 @@ impl Member {
                 .disable_remote_media(MediaKind::Video, source_kind)
                 .await?;
         }
-
         Ok(())
     }
 
@@ -350,7 +345,33 @@ impl Member {
     }
 
     /// Returns reference to the [`Room`] of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn room(&self) -> &Object<Room> {
         &self.room
     }
+}
+
+/// Returns list of [`MediaKind`]s and [`MediaSourceKind`] based on the provided
+/// [`Option`]s.
+#[must_use]
+fn kinds_combinations(
+    kind: Option<MediaKind>,
+    source_kind: Option<MediaSourceKind>,
+) -> Vec<(MediaKind, MediaSourceKind)> {
+    let mut out = Vec::with_capacity(2);
+    if let Some(kind) = kind {
+        if let Some(source_kind) = source_kind {
+            out.push((kind, source_kind));
+        } else {
+            out.push((kind, MediaSourceKind::Device));
+        }
+    } else if let Some(source_kind) = source_kind {
+        out.push((MediaKind::Audio, source_kind));
+        out.push((MediaKind::Video, source_kind));
+    } else {
+        out.push((MediaKind::Video, MediaSourceKind::Device));
+        out.push((MediaKind::Audio, MediaSourceKind::Device));
+    }
+    out
 }

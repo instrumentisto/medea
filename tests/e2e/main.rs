@@ -10,7 +10,7 @@ use tokio_1 as tokio;
 
 use self::world::World;
 
-use crate::object::{room::FailedParsing, MediaKind, MediaSourceKind};
+use crate::object::{room::ParsingFailedError, MediaKind, MediaSourceKind};
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +36,7 @@ fn parse_media_kind(text: &str) -> Option<MediaKind> {
 /// Parses [`MediaKind`] and [`MediaSourceKind`] from the provided [`str`].
 fn parse_media_kinds(
     s: &str,
-) -> Result<(MediaKind, MediaSourceKind), FailedParsing> {
+) -> Result<(MediaKind, MediaSourceKind), ParsingFailedError> {
     let media_kind = s.parse()?;
     let source_kind = match media_kind {
         MediaKind::Audio => MediaSourceKind::Device,

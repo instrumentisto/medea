@@ -15,34 +15,29 @@ use crate::{
 
 use super::Error;
 
+/// Shortcut for a [`TracksStore`] of [`LocalTrack`]s.
 pub type LocalTracksStore = TracksStore<LocalTrack>;
+
+/// Shortcut for a [`TracksStore`] of [`RemoteTrack`]s.
 pub type RemoteTracksStore = TracksStore<RemoteTrack>;
 
-/// Store for the [`LocalTrack`]s or [`RemoteTrack`]s.
+/// Store for [`LocalTrack`]s or [`RemoteTrack`]s.
 pub struct TracksStore<T>(PhantomData<T>);
 
 impl<T> Object<TracksStore<T>> {
-    /// Returns count of Tracks stored in this [`TracksStore`].
+    /// Returns count of tracks stored in this [`TracksStore`].
     pub async fn count(&self) -> Result<u64, Error> {
-        Ok(self
-            .execute(Statement::new(
-                // language=JavaScript
-                r#"
-                async (store) => {
-                    return store.tracks.length;
-                }
-            "#,
-                vec![],
-            ))
-            .await?
-            .as_u64()
-            .ok_or(Error::TypeCast)?)
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"async (store) => store.tracks.length"#,
+            [],
+        ))
+        .await?
+        .as_u64()
+        .ok_or(Error::TypeCast)
     }
 
-    /// Returns [`Future`] which will be resolved when count of Tracks
-    /// will be same as provided one.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Waits this [`TracksStore`] to contain `count` tracks.
     pub async fn wait_for_count(&self, count: u64) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript
@@ -54,7 +49,7 @@ impl<T> Object<TracksStore<T>> {
                         return;
                     } else {
                         let waiter = new Promise((resolve) => {
-                            store.subs.push((track) => {
+                            store.subs.push(() => {
                                 currentCount += 1;
                                 if (currentCount === neededCount) {
                                     resolve();
@@ -67,63 +62,66 @@ impl<T> Object<TracksStore<T>> {
                     }
                 }
             "#,
-            vec![count.into()],
+            [count.into()],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 
-    /// Returns `true` if this [`TracksStore`] contains Track with
-    /// a provided [`MediaKind`] and [`MediaSourceKind`].
+    /// Indicates whether this [`TracksStore`] contains a track with the
+    /// provided [`MediaKind`] and [`MediaSourceKind`].
     pub async fn has_track(
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
     ) -> Result<bool, Error> {
-        let source_kind_js = source_kind
-            .map_or_else(|| "undefined".to_string(), MediaSourceKind::as_js);
+        let source_kind_js =
+            source_kind.map_or("undefined", MediaSourceKind::as_js);
         let kind_js = Statement::new(
             // language=JavaScript
             &format!(
                 r#"
-                async (store) => {{
-                    return {{
-                        store: store,
-                        kind: {kind},
-                        sourceKind: {source_kind}
-                    }};
-                }}
-            "#,
+                    async (store) => {{
+                        return {{
+                            store: store,
+                            kind: {kind},
+                            sourceKind: {source_kind}
+                        }};
+                    }}
+                "#,
                 source_kind = source_kind_js,
                 kind = kind.as_js()
             ),
-            vec![],
+            [],
         );
 
-        Ok(self
-            .execute(kind_js.and_then(Statement::new(
-                // language=JavaScript
-                r#"
-            async (meta) => {
-                for (track of meta.store.tracks) {
-                    if (track.track.kind() === meta.kind
-                        && (track.track.media_source_kind() === meta.sourceKind
-                            || meta.sourceKind === undefined)) {
-                        return true;
+        self.execute(kind_js.and_then(Statement::new(
+            // language=JavaScript
+            r#"
+                async (meta) => {
+                    for (track of meta.store.tracks) {
+                        if (track.track.kind() === meta.kind &&
+                            (
+                                track.track.media_source_kind()  ===
+                                meta.sourceKind ||
+                                meta.sourceKind === undefined
+                            )
+                        ) {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
-            }
-        "#,
-                vec![],
-            )))
-            .await?
-            .as_bool()
-            .ok_or(Error::TypeCast)?)
+            "#,
+            [],
+        )))
+        .await?
+        .as_bool()
+        .ok_or(Error::TypeCast)
     }
 
-    /// Returns Track from this [`TracksStore`] with a provided [`MediaKind`]
-    /// and [`MediaSourceKind`].
+    /// Returns a track from this [`TracksStore`] with the provided
+    /// [`MediaKind`] and [`MediaSourceKind`].
     pub async fn get_track(
         &self,
         kind: MediaKind,
@@ -133,45 +131,43 @@ impl<T> Object<TracksStore<T>> {
             // language=JavaScript
             &format!(
                 r#"
-                async (store) => {{
-                    return {{
-                        store: store,
-                        kind: {kind},
-                        sourceKind: {source_kind}
-                    }};
-                }}
-            "#,
+                    async (store) => {{
+                        return {{
+                            store: store,
+                            kind: {kind},
+                            sourceKind: {source_kind}
+                        }};
+                    }}
+                "#,
                 source_kind = source_kind.as_js(),
                 kind = kind.as_js()
             ),
-            vec![],
+            [],
         );
 
-        Ok(self
-            .execute_and_fetch(kind_js.and_then(Statement::new(
-                // language=JavaScript
-                r#"
+        self.execute_and_fetch(kind_js.and_then(Statement::new(
+            // language=JavaScript
+            r#"
                 async (meta) => {
-                    let waiter = new Promise((resolve, reject) => {
-                        for (track of meta.store.tracks) {
-                            let kind = track.track.kind();
-                            let sourceKind = track.track.media_source_kind();
-                            if (kind === meta.kind
-                                && sourceKind === meta.sourceKind) {
-                                resolve(track);
-                                return false;
-                            }
+                    for (track of meta.store.tracks) {
+                        let kind = track.track.kind();
+                        let sourceKind = track.track.media_source_kind();
+                        if (kind === meta.kind
+                            && sourceKind === meta.sourceKind) {
+                            return track;
                         }
-
+                    }
+                    let waiter = new Promise((resolve) => {
                         meta.store.subs.push((track) => {
                             let kind = track.track.kind();
-                            let sourceKind = track.track.media_source_kind();
+                            let sourceKind =
+                                track.track.media_source_kind();
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
                                 resolve(track);
-                                return false;
-                            } else {
                                 return true;
+                            } else {
+                                return false;
                             }
                         });
                     });
@@ -179,8 +175,8 @@ impl<T> Object<TracksStore<T>> {
                     return res;
                 }
             "#,
-                vec![],
-            )))
-            .await?)
+            [],
+        )))
+        .await
     }
 }
