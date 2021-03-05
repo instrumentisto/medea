@@ -159,6 +159,7 @@ down.medea: docker.down.medea
 
 up.control:
 	cargo build -p medea-control-api-mock
+	make wait.port port=6565
 	cargo run -p medea-control-api-mock $(if $(call eq,$(background),yes),&,)
 
 
@@ -438,7 +439,8 @@ endif
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag))
 
 test.integration:
 ifeq ($(up),yes)
@@ -459,7 +461,7 @@ endif
 # Run E2E tests of project.
 #
 # Usage:
-#	make test.e2e
+#	make test.e2e [only=<regex>]
 #		[( [up=no]
 #		 | up=yes [browser=(chrome|firefox)]
 #		          [( [dockerized=no]
@@ -480,7 +482,7 @@ endif
 	                    dockerized=$(dockerized) tag=$(tag) debug=$(debug)
 	@make wait.port port=4444
 endif
-	cargo test --test e2e
+	cargo test --test e2e $(if $(call eq,$(only),),,-- -e '$(only)')
 ifeq ($(up),yes)
 	@make docker.down.e2e
 endif
@@ -801,8 +803,6 @@ docker.up.demo: docker.down.demo
 
 docker-up-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml \
 	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
 	COMPOSE_CONTROL_MOCK_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
 	COMPOSE_WEBDRIVER_IMAGE_NAME=$(strip \

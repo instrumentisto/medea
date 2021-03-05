@@ -4,8 +4,8 @@ services:
   frontend:
     container_name: ${COMPOSE_PROJECT_NAME}-frontend
     image: nginx:stable-alpine
-    ports:
-      - "30000:30000"    # frontend http
+    #ports:
+    #  - "30000:30000"    # frontend http
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./index.html:/usr/share/nginx/html/index.html:ro
@@ -25,8 +25,8 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
-    ports:
-      - "6379:6379"      # coturn redis
+    #ports:
+    #  - "6379:6379"      # coturn redis
     volumes:
       - ../../_dev/coturn/redis.conf:/etc/redis.conf:ro
     network_mode: host
@@ -34,7 +34,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-webdriver
     image: ${COMPOSE_WEBDRIVER_IMAGE_NAME}:${COMPOSE_WEBDRIVER_IMAGE_VER}
     depends_on: ["coturn", "frontend"]
-    ports:
-      - "4444:4444"      # browser webdriver
+    #ports:
+    #  - "4444:4444"      # browser webdriver
     shm_size: 512m
     network_mode: host

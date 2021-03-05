@@ -47,7 +47,7 @@ pub struct World {
     members: HashMap<String, Member>,
 
     /// All [`Jason`] [`Object`]s created in this [`World`].
-    jasons: Vec<Object<Jason>>,
+    jasons: HashMap<String, Object<Jason>>,
 
     /// [WebDriver] client that all [`Object`]s of this [`World`] will be
     /// created with.
@@ -79,7 +79,7 @@ impl cucumber_rust::World for World {
             control_client,
             window_factory: WindowFactory::new().await?,
             members: HashMap::new(),
-            jasons: Vec::new(),
+            jasons: HashMap::new(),
         })
     }
 }
@@ -182,8 +182,9 @@ impl World {
         let room = jason.init_room().await?;
         let member = builder.build(room).await?;
 
+        self.jasons.insert(member.id().to_string(), jason);
         self.members.insert(member.id().to_string(), member);
-        self.jasons.push(jason);
+
         Ok(())
     }
 
@@ -213,24 +214,85 @@ impl World {
         &mut self,
         member_id: &str,
     ) -> Result<()> {
-        let interconnected_members: Vec<_> = self
-            .members
-            .values()
-            .filter_map(|m| {
-                (m.is_joined()
-                    && m.id() != member_id
-                    && (m.is_recv() || m.is_send()))
-                .then(|| m.id().to_string())
-            })
-            .collect();
+        let interconnected_members = self.members.values().filter(|m| {
+            m.is_joined() && m.id() != member_id && (m.is_recv() || m.is_send())
+        });
+        let member = self.members.get(member_id).unwrap();
+        for partner in interconnected_members {
+            let (send_count, recv_count) =
+                member.count_of_tracks_between_members(partner);
+            let conn = member
+                .connections()
+                .wait_for_connection(partner.id().to_string())
+                .await?;
+            conn.tracks_store()
+                .await?
+                .wait_for_count(recv_count)
+                .await?;
+
+            let partner_conn = partner
+                .connections()
+                .wait_for_connection(member_id.to_string())
+                .await?;
+            partner_conn
+                .tracks_store()
+                .await?
+                .wait_for_count(send_count)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Closes a [`Room`] of the provided [`Member`].
+    ///
+    /// [`Room`]: crate::object::room::Room
+    pub async fn close_room(&mut self, member_id: &str) -> Result<()> {
+        let jason = self.jasons.get(member_id).unwrap();
+        let member = self.members.get(member_id).unwrap();
+        let room = member.room();
+        jason.close_room(room).await?;
+        Ok(())
+    }
+
+    /// Waist for the [`Member`]'s [`Room`] being closed.
+    ///
+    /// [`Room`]: crate::object::room::Room
+    pub async fn wait_for_on_close(&self, member_id: &str) -> Result<String> {
         let member = self
             .members
-            .get_mut(member_id)
+            .get(member_id)
             .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
-        let connections = member.connections();
-        for id in interconnected_members {
-            connections.wait_for_connection(id).await?;
-        }
+
+        Ok(member.room().wait_for_close().await?)
+    }
+
+    /// Disposes a [`Jason`] object of the provided [`Member`] ID.
+    pub async fn dispose_jason(&mut self, member_id: &str) -> Result<()> {
+        let jason = self.jasons.remove(member_id).unwrap();
+        jason.dispose().await?;
         Ok(())
+    }
+
+    /// Deletes a Control API element of the [`Member`] with the provided ID.
+    pub async fn delete_member_element(&mut self, member_id: &str) {
+        let resposne = self
+            .control_client
+            .delete(&format!("{}/{}", self.room_id, member_id))
+            .await
+            .unwrap();
+        assert!(resposne.error.is_none());
+    }
+
+    /// Deletes a Control API element of the [`Room`] with the provided ID.
+    ///
+    /// [`Room`]: crate::object::room::Room
+    pub async fn delete_room_element(&mut self) {
+        let resp = self
+            .control_client
+            .delete(self.room_id.as_str())
+            .await
+            .unwrap();
+        assert!(resp.error.is_none());
     }
 }

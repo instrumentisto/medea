@@ -21,12 +21,7 @@ services:
     depends_on: ["coturn"]
     environment:
       RUST_LOG: ${RUST_LOG}
-      MEDEA_CONF: ${MEDEA_CONF}
       MEDEA_SERVER__CLIENT__HTTP__BIND_PORT: 8001
-      MEDEA_CONTROL__STATIC_SPECS_DIR: ${MEDEA_CONTROL__STATIC_SPECS_DIR}
-    volumes:
-      - ../../${MEDEA_CONF}:/${MEDEA_CONF}:ro
-      - ../../${MEDEA_CONTROL__STATIC_SPECS_DIR}:/${MEDEA_CONTROL__STATIC_SPECS_DIR}:ro
     network_mode: service:frontend
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn

@@ -186,8 +186,6 @@ jobs:
       - name: Unpack `medea-control-api-mock` Docker image
         run: make docker.untar from-file=image.tar
 
-      - uses: c-py/action-dotenv-to-setenv@v2
-
       - name: Chrome
         run: make test.e2e browser=chrome up=yes dockerized=yes
                            tag=build-${{ github.run_number }}
