@@ -244,7 +244,7 @@ impl World {
         Ok(())
     }
 
-    /// Closes [`Room`] of the provided [`Member`].
+    /// Closes a [`Room`] of the provided [`Member`].
     ///
     /// [`Room`]: crate::object::room::Room
     pub async fn close_room(&mut self, member_id: &str) -> Result<()> {
@@ -255,7 +255,7 @@ impl World {
         Ok(())
     }
 
-    /// Wait for [`Member`]'s [`Room`] close.
+    /// Waist for the [`Member`]'s [`Room`] being closed.
     ///
     /// [`Room`]: crate::object::room::Room
     pub async fn wait_for_on_close(&self, member_id: &str) -> Result<String> {
@@ -267,14 +267,14 @@ impl World {
         Ok(member.room().wait_for_close().await?)
     }
 
-    /// Disposes [`Jason`] object of the provided [`Member`] ID.
+    /// Disposes a [`Jason`] object of the provided [`Member`] ID.
     pub async fn dispose_jason(&mut self, member_id: &str) -> Result<()> {
         let jason = self.jasons.remove(member_id).unwrap();
         jason.dispose().await?;
         Ok(())
     }
 
-    /// Deletes Control API element of the [`Member`] with a provided ID.
+    /// Deletes a Control API element of the [`Member`] with the provided ID.
     pub async fn delete_member_element(&mut self, member_id: &str) {
         let resposne = self
             .control_client
@@ -284,7 +284,7 @@ impl World {
         assert!(resposne.error.is_none());
     }
 
-    /// Deletes Control API element of the [`Room`] with a provided ID.
+    /// Deletes a Control API element of the [`Room`] with the provided ID.
     ///
     /// [`Room`]: crate::object::room::Room
     pub async fn delete_room_element(&mut self) {

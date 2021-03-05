@@ -4,13 +4,13 @@ use crate::world::World;
 
 use super::{parse_media_kind, parse_media_kinds};
 
-#[then(regex = "^(\\S*)'s (audio|(?:device|display) video) local track is \
-                (muted|not muted)$")]
+#[then(regex = "^(\\S+)'s (audio|(?:device|display) video) local track is \
+                 (not )?muted$")]
 async fn then_local_track_mute_state(
     world: &mut World,
     id: String,
     kind: String,
-    muted: String,
+    not_muted: String,
 ) {
     let member = world.get_member(&id).unwrap();
     let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
@@ -22,12 +22,11 @@ async fn then_local_track_mute_state(
         .get_track(media_kind, source_kind)
         .await
         .unwrap();
-    let muted = muted.as_str() == "muted";
-    assert_eq!(muted, track.muted().await.unwrap());
+    assert_eq!(not_muted.is_empty(), track.muted().await.unwrap());
 }
 
-#[then(regex = "^(\\S*)'s (audio|(?:device|display) video) local track is \
-                stopped$")]
+#[then(regex = "^(\\S+)'s (audio|(?:device|display) video) local track is \
+                 stopped$")]
 async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
     let member = world.get_member(&id).unwrap();
     let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
@@ -87,7 +86,7 @@ async fn when_enables_mutes(
     }
 }
 
-#[when(regex = r"(\S*) enables remote (audio|(?:device |display )?video)")]
+#[when(regex = r"^(\S+) enables remote (audio|(?:device |display )?video)$")]
 async fn when_member_enables_remote_track(
     world: &mut World,
     id: String,
@@ -103,7 +102,7 @@ async fn when_member_enables_remote_track(
         .unwrap();
 }
 
-#[when(regex = r"^(\S*) disables remote (audio|(?:device |display )?video)$")]
+#[when(regex = r"^(\S+) disables remote (audio|(?:device |display )?video)$")]
 async fn when_member_disables_remote_track(
     world: &mut World,
     id: String,

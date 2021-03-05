@@ -10,7 +10,7 @@ use async_recursion::async_recursion;
 use cucumber_rust::{given, when};
 
 use crate::{
-    object::{room::FailedParsing, MediaKind, MediaSourceKind},
+    object::{room::ParsingFailedError, MediaKind, MediaSourceKind},
     world::{member::Builder as MemberBuilder, World},
 };
 
@@ -165,6 +165,7 @@ enum MediaSettings {
 impl FromStr for MediaSettings {
     type Err = Infallible;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(if s.contains("no WebRTC endpoints") {
             Self::NoWebRtcEndpoint
@@ -189,6 +190,7 @@ enum DisabledMediaType {
 impl FromStr for DisabledMediaType {
     type Err = Infallible;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(if s.contains("audio") {
             Self::Audio
@@ -212,6 +214,7 @@ enum Direction {
 impl FromStr for Direction {
     type Err = Infallible;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(if s.contains("publishing") {
             Self::Publish
@@ -223,9 +226,12 @@ impl FromStr for Direction {
     }
 }
 
-/// Tries to find `audio`, `video` or `all` in the provided text. If `audio` or
-/// `video` found, then [`Some`] [`MediaKind`] will be returned. If `all` found,
-/// the [`None`] will be returned. Otherwise this function will panic.
+/// Tries to find `audio`, `video` or `all` in the provided text.
+///
+/// If `audio` or `video` found, then [`Some`] [`MediaKind`] will be returned.
+/// If `all` found, then [`None`] will be returned.
+/// Otherwise, this function will panic.
+#[must_use]
 fn parse_media_kind(text: &str) -> Option<MediaKind> {
     match text {
         "audio" => Some(MediaKind::Audio),
@@ -237,10 +243,10 @@ fn parse_media_kind(text: &str) -> Option<MediaKind> {
     }
 }
 
-/// Parses [`MediaKind`] and [`MediaSourceKind`] from the provided [`str`].
+/// Parses a [`MediaKind`] and a [`MediaSourceKind`] from the provided [`str`].
 fn parse_media_kinds(
     s: &str,
-) -> Result<(MediaKind, MediaSourceKind), FailedParsing> {
+) -> Result<(MediaKind, MediaSourceKind), ParsingFailedError> {
     let media_kind = s.parse()?;
     let source_kind = match media_kind {
         MediaKind::Audio => MediaSourceKind::Device,

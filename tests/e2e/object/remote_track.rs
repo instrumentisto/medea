@@ -1,17 +1,17 @@
-//! Representation of the `RemoteMediaTrack` JS object.
+//! `RemoteMediaTrack` JS object's representation.
 
 use crate::{browser::Statement, object::Object};
 
 use super::Error;
 
-/// Representation of the `RemoteMediaTrack` object.
+/// Representation of a `RemoteMediaTrack` object.
 pub struct RemoteTrack;
 
 impl Object<RemoteTrack> {
-    /// Returns `true` if this [`RemoteTrack`] is enabled.
+    /// Waits for this [`RemoteTrack`] being enabled.
     pub async fn wait_for_enabled(&self) -> Result<(), Error> {
-        // language=JavaScript
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     if (!track.track.enabled()) {
@@ -22,20 +22,17 @@ impl Object<RemoteTrack> {
                     }
                 }
             "#,
-            vec![],
+            [],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 
-    /// Returns [`Future`] which will be resolved id `RemoteMediaTrack.enabled`
-    /// will be `false` or when `RemoteMediaTrack.on_disabled` callback will
-    /// fire.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Waits for this [`RemoteTrack`] being disabled, or the
+    /// `RemoteMediaTrack.on_disabled()` callback to fire.
     pub async fn wait_for_disabled(&self) -> Result<(), Error> {
-        // language=JavaScript
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     if (track.track.enabled()) {
@@ -46,46 +43,39 @@ impl Object<RemoteTrack> {
                     }
                 }
             "#,
-            vec![],
+            [],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 
-    /// Returns `true` if this [`RemoteTrack`] underlying
-    /// `MediaStreamTrack.enabled` is `false`.
-    pub async fn muted(&self) -> Result<bool, Error> {
-        // language=JavaScript
-        Ok(self
-            .execute(Statement::new(
-                r#"
-                    async (track) => {
-                        return !track.track.get_track().enabled;
-                    }
-                "#,
-                vec![],
-            ))
-            .await?
-            .as_bool()
-            .ok_or(Error::TypeCast)?)
+    /// Indicates whether this [`RemoteTrack`]'s underlying `MediaStreamTrack`
+    /// is disabled.
+    pub async fn disabled(&self) -> Result<bool, Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"async (t) => !t.track.get_track().enabled"#,
+            [],
+        ))
+        .await?
+        .as_bool()
+        .ok_or(Error::TypeCast)
     }
 
-    /// Returns [`Future`] which will be resolved when count of
-    /// `RemoteMediaTrack.on_disabled` fires will be same as provided one.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Waits for the `RemoteMediaTrack.on_disabled()` callback to fire `count`
+    /// times.
     pub async fn wait_for_on_disabled_fire_count(
         &self,
         count: u64,
     ) -> Result<(), Error> {
-        // language=JavaScript
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     const [count] = args;
-                    while (track.on_disabled_fire_count != count) {
+                    while (track.on_disabled_fire_count !== count) {
                         await new Promise((resolve) => {
-                            if (track.on_disabled_fire_count != count) {
+                            if (track.on_disabled_fire_count !== count) {
                                 track.onDisabledSubs.push(resolve);
                             } else {
                                 resolve();
@@ -94,28 +84,26 @@ impl Object<RemoteTrack> {
                     }
                 }
             "#,
-            vec![count.into()],
+            [count.into()],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 
-    /// Returns [`Future`] which will be resolved when count of
-    /// `RemoteMediaTrack.on_enabled` fires will be same as provided one.
-    ///
-    /// [`Future`]: std::future::Future
+    /// Waits for the `RemoteMediaTrack.on_enabled()` callback to fire `count`
+    /// times.
     pub async fn wait_for_on_enabled_fire_count(
         &self,
         count: u64,
     ) -> Result<(), Error> {
-        // language=JavaScript
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (track) => {
                     const [count] = args;
-                    while (track.on_enabled_fire_count != count) {
+                    while (track.on_enabled_fire_count !== count) {
                         await new Promise((resolve) => {
-                            if (track.on_enabled_fire_count != count) {
+                            if (track.on_enabled_fire_count !== count) {
                                 track.onEnabledSubs.push(resolve);
                             } else {
                                 resolve();
@@ -124,9 +112,9 @@ impl Object<RemoteTrack> {
                     }
                 }
             "#,
-            vec![count.into()],
+            [count.into()],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 }

@@ -174,6 +174,7 @@ impl Member {
     ///
     /// [`LocalTrack`]: crate::object::local_track::LocalTrack
     /// [`RemoteTrack`]: crate::object::remote_track::RemoteTrack
+    #[must_use]
     pub fn count_of_tracks_between_members(
         &self,
         another: &Self,
@@ -266,7 +267,6 @@ impl Member {
                 .unmute_media(MediaKind::Video, source_kind)
                 .await?;
         }
-
         Ok(())
     }
 
@@ -299,7 +299,6 @@ impl Member {
                 .disable_remote_media(MediaKind::Video, source_kind)
                 .await?;
         }
-
         Ok(())
     }
 
@@ -321,28 +320,26 @@ impl Member {
     }
 }
 
-/// Returns list of [`MediaKind`]s and [`MediaSourceKind`] based on the
-/// provided [`Option`]s.
+/// Returns list of [`MediaKind`]s and [`MediaSourceKind`] based on the provided
+/// [`Option`]s.
+#[must_use]
 fn kinds_combinations(
     kind: Option<MediaKind>,
     source_kind: Option<MediaSourceKind>,
 ) -> Vec<(MediaKind, MediaSourceKind)> {
-    let mut kinds_and_source_kinds = Vec::new();
+    let mut out = Vec::with_capacity(2);
     if let Some(kind) = kind {
         if let Some(source_kind) = source_kind {
-            kinds_and_source_kinds.push((kind, source_kind));
+            out.push((kind, source_kind));
         } else {
-            kinds_and_source_kinds.push((kind, MediaSourceKind::Device));
+            out.push((kind, MediaSourceKind::Device));
         }
     } else if let Some(source_kind) = source_kind {
-        kinds_and_source_kinds.push((MediaKind::Audio, source_kind));
-        kinds_and_source_kinds.push((MediaKind::Video, source_kind));
+        out.push((MediaKind::Audio, source_kind));
+        out.push((MediaKind::Video, source_kind));
     } else {
-        kinds_and_source_kinds
-            .push((MediaKind::Video, MediaSourceKind::Device));
-        kinds_and_source_kinds
-            .push((MediaKind::Audio, MediaSourceKind::Device));
+        out.push((MediaKind::Video, MediaSourceKind::Device));
+        out.push((MediaKind::Audio, MediaSourceKind::Device));
     }
-
-    kinds_and_source_kinds
+    out
 }
