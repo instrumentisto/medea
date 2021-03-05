@@ -135,6 +135,12 @@ impl<'a> JNIEnv<'a> {
         }
     }
 
+    pub fn call_object_method(&self, object: jobject, method: jmethodID) -> jobject {
+        unsafe {
+            (**self.ptr).CallObjectMethod.unwrap()(self.ptr, object, method)
+        }
+    }
+
     pub fn get_object_class(&self, obj: jobject) -> jclass {
         unsafe { (**self.ptr).GetObjectClass.unwrap()(self.ptr, obj) }
     }

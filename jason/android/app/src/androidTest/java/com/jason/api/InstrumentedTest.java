@@ -39,11 +39,14 @@ public class InstrumentedTest {
             callerThreadId.set(Thread.currentThread().getId());
             try {
                 RoomHandle room = jason.initRoom();
+                Log.d("a", "1");
                 room.onNewConnection(handle -> {
+                    Log.d("a", "2");
                     callback1ThreadId.set(Thread.currentThread().getId());
 
                     try {
                         handle.onRemoteTrackAdded(remoteMediaTrack -> {
+                            Log.d("a", "3");
                             callback2ThreadId.set(Thread.currentThread().getId());
                             assertTrue(remoteMediaTrack.enabled());
 

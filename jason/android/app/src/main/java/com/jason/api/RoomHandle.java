@@ -1,9 +1,12 @@
 package com.jason.api;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
 public final class RoomHandle {
 
@@ -19,7 +22,16 @@ public final class RoomHandle {
     }
 
     public void onNewConnection(@NonNull Consumer<ConnectionHandle> cb) throws Exception {
-        nativeOnNewConnection(nativePtr, cb);
+//        nativeOnNewConnection(nativePtr, new LongConsumer() {
+//            @Override
+//            public void accept(long value) {
+//                ConnectionHandle connectionHandle = new ConnectionHandle(value);
+//                cb.accept(connectionHandle);
+//            }
+//        });
+        nativeOnNewConnection(nativePtr, foobar -> {
+
+        });
     }
 
     public void onClose(@NonNull Consumer<RoomCloseReason> cb) throws Exception {
@@ -122,7 +134,7 @@ public final class RoomHandle {
 
     private static native void nativeAsyncJoin(long self, String token, AsyncTaskCallback<Void> asyncCb) throws Exception;
 
-    private static native void nativeOnNewConnection(long self, Consumer<ConnectionHandle> cb) throws Exception;
+    private static native void nativeOnNewConnection(long self, LongConsumer cb) throws Exception;
 
     private static native void nativeOnClose(long self, Consumer<RoomCloseReason> cb) throws Exception;
 

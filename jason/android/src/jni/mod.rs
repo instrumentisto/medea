@@ -102,11 +102,12 @@ impl IntoJValue for i32 {
         jvalue { i: self }
     }
 }
-// impl IntoJValue for i64 {
-//     fn into_jvalue(self) -> jvalue {
-//         jvalue { j: self }
-//     }
-// }
+
+impl IntoJValue for i64 {
+    fn into_jvalue(self) -> jvalue {
+        jvalue { j: self }
+    }
+}
 //
 // impl IntoJValue for bool {
 //     fn into_jvalue(self) -> jvalue {
@@ -198,11 +199,25 @@ pub struct JavaCallback<T> {
 impl<T> JavaCallback<T> {
     pub fn new(env: JNIEnv, obj: jobject) -> Self {
         let class = env.get_object_class(obj); // TODO: assert Consumer class
+
+        let mid = env.get_method_id(class, "getClass", "()Ljava/lang/Class;");
+        let cls_obj = env.call_object_method(obj, mid);
+        let cls = env.get_object_class(cls_obj);
+        let mid = env.get_method_id(cls, "getName", "()Ljava/lang/String;");
+        let str_obj = env.call_object_method(cls_obj, mid);
+        let string = env.clone_jstring_to_string(str_obj as jstring);
+        log::debug!("Class name: {}", string);
+
         assert!(!class.is_null(), "GetObjectClass return null class");
         // TODO: cache method?
         let accept_method =
-            env.get_method_id(class, "accept", "(Ljava/lang/Object;)V");
+            env.get_method_id(class, "accept", "(J)V");
+        log::debug!("Method found");
+        if accept_method.is_null() {
+            log::debug!("Accept method is null");
+        }
         assert!(!accept_method.is_null(), "Can not find accept id");
+        log::debug!("Method not null");
 
         let consumer_object = env.new_global_ref(obj);
         assert!(!consumer_object.is_null());
@@ -242,7 +257,7 @@ impl JavaCallback<u8> {
 impl<T: ForeignClass + Send + 'static> JavaCallback<T> {
     pub fn accept(self: Arc<Self>, arg: T) {
         exec_foreign(move |env| {
-            let arg = arg.into_jobject(env).into_jvalue();
+            let arg = arg.box_object().into_jvalue();
             env.call_void_method(
                 self.consumer_object,
                 self.accept_method,

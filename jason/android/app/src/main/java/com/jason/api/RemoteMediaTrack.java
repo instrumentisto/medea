@@ -3,6 +3,7 @@ package com.jason.api;
 import androidx.annotation.NonNull;
 
 import java.util.function.Consumer;
+import java.util.function.LongConsumer;
 
 public final class RemoteMediaTrack {
 
@@ -18,7 +19,9 @@ public final class RemoteMediaTrack {
     }
 
     public void onEnabled(@NonNull Consumer<Void> callback) {
-        nativeOnEnabled(nativePtr, callback);
+        nativeOnEnabled(nativePtr, ptr -> {
+            callback.accept(null);
+        });
     }
 
     public void onDisabled(@NonNull Consumer<Void> callback) {
@@ -47,7 +50,7 @@ public final class RemoteMediaTrack {
 
     private static native boolean nativeEnabled(long self);
 
-    private static native void nativeOnEnabled(long self, Consumer<Void> callback);
+    private static native void nativeOnEnabled(long self, LongConsumer callback);
 
     private static native void nativeOnDisabled(long self, Consumer<Void> callback);
 
