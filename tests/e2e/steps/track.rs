@@ -19,8 +19,8 @@ async fn then_member_has_local_tracks(
 }
 
 #[then(
-    regex = "^(\\S*) has (audio|video|audio and video) remote track(?:s)? \
-             with (\\S*)"
+    regex = "^(\\S+) has (audio|video|audio and video) remote track(?:s)? \
+             with (\\S+)"
 )]
 async fn then_member_has_remote_track(
     world: &mut World,
@@ -67,7 +67,7 @@ async fn then_has_local_track(world: &mut World, id: String, kind: String) {
         source_kinds.push(MediaSourceKind::Device);
     }
     for source_kind in source_kinds {
-        tracks.get_track(media_kind, source_kind).await.unwrap();
+        assert!(tracks.get_track(media_kind, source_kind).await.is_ok());
     }
 }
 
@@ -193,23 +193,19 @@ async fn then_doesnt_have_remote_track(
         .unwrap());
 }
 
-#[then(regex = "^(\\S*) doesn't has remote tracks from (\\S*)$")]
+#[then(regex = r"^(\S+) doesn't has remote tracks from (\S+)$")]
 async fn then_member_doesnt_has_remote_tracks_with(
     world: &mut World,
     id: String,
     partner_id: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let tracks_count = member
+    let connection = member
         .connections()
         .wait_for_connection(partner_id)
         .await
-        .unwrap()
-        .tracks_store()
-        .await
-        .unwrap()
-        .count()
-        .await
         .unwrap();
+    let tracks_store = connection.tracks_store().await.unwrap();
+    let tracks_count = tracks_store.count().await.unwrap();
     assert_eq!(tracks_count, 0);
 }

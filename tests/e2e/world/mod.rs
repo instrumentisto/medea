@@ -12,7 +12,9 @@ use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
     callback::{CallbackEvent, CallbackItem},
     proto,
+    proto::PublishPolicy,
 };
+use tokio::time::interval;
 use tokio_1 as tokio;
 use uuid::Uuid;
 
@@ -25,8 +27,7 @@ use crate::{
 use self::member::Member;
 
 #[doc(inline)]
-pub use self::member::MemberBuilder;
-use medea_control_api_mock::proto::PublishPolicy;
+pub use self::member::Builder as MemberBuilder;
 
 /// Returns Control API path for the provided `room_id`, `member_id` and
 /// `endpoint_id`.
@@ -298,7 +299,7 @@ impl World {
         member_id: String,
         reason: String,
     ) {
-        let mut interval = tokio::time::interval(Duration::from_millis(50));
+        let mut interval = interval(Duration::from_millis(50));
         loop {
             interval.tick().await;
             let callbacks = self.get_callbacks().await;

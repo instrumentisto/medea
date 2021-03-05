@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use cucumber_rust::{then, when};
-use medea_control_api_mock::proto::{AudioSettings, VideoSettings};
+use medea_control_api_mock::proto::{
+    self as proto, AudioSettings, VideoSettings,
+};
 use tokio_1::time::timeout;
 
 use crate::world::{MembersPair, PairedMember, World};
@@ -17,7 +19,7 @@ async fn when_control_api_removes_room(world: &mut World) {
 }
 
 #[when(
-    regex = "^Control API interconnected (audio|video) of (\\S*) and (\\S*)$"
+    regex = r"^Control API interconnected (audio|video) of (\S+) and (\S+)$"
 )]
 async fn when_interconnects_kind(
     world: &mut World,
@@ -32,7 +34,6 @@ async fn when_interconnects_kind(
     } else {
         None
     };
-    use medea_control_api_mock::proto;
     let send_audio = if kind.contains("audio") {
         Some(AudioSettings {
             publish_policy: proto::PublishPolicy::Optional,
@@ -60,8 +61,8 @@ async fn when_interconnects_kind(
         .unwrap();
 }
 
-#[then(regex = "^Control API sends OnLeave callback with `(.*)` reason for \
-                member (\\S*)$")]
+#[then(regex = "^Control API sends OnLeave callback with `(.+)` reason for \
+                member (\\S+)$")]
 async fn then_control_api_sends_on_leave(
     world: &mut World,
     reason: String,
@@ -74,7 +75,7 @@ async fn then_control_api_sends_on_leave(
 
 #[rustfmt::skip]
 #[then(
-    regex = "^Control API doesn't sends OnLeave callback for member (\\S*)$"
+    regex = r"^Control API doesn't sends OnLeave callback for member (\S+)$"
 )]
 async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
     timeout(
@@ -85,15 +86,15 @@ async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
         .unwrap_err();
 }
 
-#[then(regex = "^Control API sends OnJoin callback for member (\\S*)$")]
+#[then(regex = r"^Control API sends `OnJoin` callback for member (\S+)$")]
 async fn then_control_api_sends_on_join(world: &mut World, id: String) {
     timeout(Duration::from_secs(10), world.wait_for_on_join(id))
         .await
         .unwrap();
 }
 
-#[when(regex = "^Control API starts (\\S*)'s (audio|video|media) publishing \
-                to (\\S*)$")]
+#[when(regex = "^Control API starts (\\S+)'s (audio|video|media) publishing \
+                to (\\S+)$")]
 async fn when_control_api_starts_publishing(
     world: &mut World,
     publisher_id: String,
@@ -130,7 +131,7 @@ async fn when_control_api_starts_publishing(
         .unwrap();
 }
 
-#[when(regex = "^Control API interconnects (\\S*) and (\\S*)$")]
+#[when(regex = r"^Control API interconnects (\S+) and (\S+)$")]
 async fn when_control_api_interconnects_members(
     world: &mut World,
     id: String,

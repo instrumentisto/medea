@@ -38,7 +38,7 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 
 /// Publishing policy of the video or audio media type in the
 /// [`WebRtcPublishEndpoint`].
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, SmartDefault)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
 pub enum PublishPolicy {
     /// Publish this media type if it possible.
     #[default]
@@ -78,7 +78,7 @@ impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
 }
 
 /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].

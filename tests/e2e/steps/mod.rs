@@ -11,7 +11,7 @@ use cucumber_rust::{given, when};
 
 use crate::{
     object::{room::ParsingFailedError, MediaKind, MediaSourceKind},
-    world::{member::MemberBuilder, World},
+    world::{member::Builder as MemberBuilder, World},
 };
 
 #[given(regex = "^(?:room with )?(joined )?member(?:s)? (\\S+)\

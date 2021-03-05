@@ -143,7 +143,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
         let enable: Cow<_> = match kind {
@@ -195,9 +195,9 @@ impl Object<Room> {
                         await {};
                     }}
                 "#,
-                disable
+                disable,
             ),
-            vec![],
+            [],
         ))
         .await
         .map(|_| ())
@@ -374,11 +374,10 @@ impl Object<Room> {
                             sub(connection);
                         }
                     });
-
                     return store;
                 }
             "#,
-            vec![],
+            [],
         ))
         .await
     }

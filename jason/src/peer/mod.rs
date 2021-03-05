@@ -399,7 +399,7 @@ impl PeerConnection {
                     while let Err(err) =
                         media_connections.add_remote_track(&track_event)
                     {
-                        delay_for(Duration::from_millis(100).into()).await;
+                        delay_for(Duration::from_millis(50).into()).await;
                         JasonError::from(err).print();
                     }
                 })

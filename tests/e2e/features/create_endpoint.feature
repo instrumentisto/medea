@@ -33,11 +33,13 @@ Feature: Create Endpoint
     When Control API starts Alice's media publishing to Bob
     Then Alice doesn't has remote tracks from Bob
     And Bob has audio and video remote tracks with Alice
+
   Scenario: Only one Member publishes audio
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Control API starts Alice's audio publishing to Bob
     Then Alice doesn't has remote tracks from Bob
     And Bob has audio remote track with Alice
+
   Scenario: Only one Member publishes video
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Control API starts Alice's video publishing to Bob

@@ -454,9 +454,6 @@ ifeq ($(up),yes)
 endif
 	RUST_BACKTRACE=1 cargo test --test integration
 ifeq ($(up),yes)
-	-make docker.down.webdriver browser=$(browser)
-	-docker-compose -f 'docker-compose.e2e.yml' down
-	-docker rm -f e2e-files
 	-make down
 endif
 

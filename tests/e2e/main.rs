@@ -18,21 +18,6 @@ async fn main() {
     runner.run_and_exit().await;
 }
 
-/// Tries to find `audio`, `video` or `all` in the provided text. If `audio` or
-/// `video` found, then [`Some`] [`MediaKind`] will be returned. If `all` found,
-/// the [`None`] will be returned. Otherwise this function will panic.
-fn parse_media_kind(text: &str) -> Option<MediaKind> {
-    if text.contains("audio") {
-        Some(MediaKind::Audio)
-    } else if text.contains("video") {
-        Some(MediaKind::Video)
-    } else if text.contains("all") {
-        None
-    } else {
-        unreachable!()
-    }
-}
-
 /// Parses [`MediaKind`] and [`MediaSourceKind`] from the provided [`str`].
 fn parse_media_kinds(
     s: &str,

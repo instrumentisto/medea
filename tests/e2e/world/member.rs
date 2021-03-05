@@ -12,29 +12,32 @@ use crate::{
     },
 };
 
-/// All errors which can happen while working with [`Member`].
+/// All errors which can happen while working with a [`Member`].
 #[derive(Debug, Display, Error, From)]
 pub enum Error {
-    /// [`Room`] or [`ConnectionStore`] object errored.
+    /// [`Room`] or a [`ConnectionStore`] object errored.
     Object(object::Error),
 }
 
+/// Shortcut for a [`Result`] containing an [`Error`](enum@Error).
+///
+/// [`Result`]: std::result::Result
 type Result<T> = std::result::Result<T, Error>;
 
-/// Builder for the [`Member`].
-pub struct MemberBuilder {
-    /// ID with which [`Member`] will be created.
+/// Builder of a [`Member`].
+pub struct Builder {
+    /// ID with which a [`Member`] will be created.
     pub id: String,
 
-    /// Flag which indicates that [`Member`] will publish media.
+    /// Indicator whether a [`Member`] will publish media.
     pub is_send: bool,
 
-    /// Flag which indicates that [`Member`] will receive media.
+    /// Indicator whether a [`Member`] will receive media.
     pub is_recv: bool,
 }
 
-impl MemberBuilder {
-    /// Creates new [`Member`] with a [`MemberBuilder`] configuration.
+impl Builder {
+    /// Creates a new [`Member`] out of this [`Builder`] configuration.
     pub async fn build(self, room: Object<Room>) -> Result<Member> {
         let connection_store = room.connections_store().await?;
         let mut media_state = HashMap::new();
@@ -54,18 +57,19 @@ impl MemberBuilder {
     }
 }
 
-/// Object which represents some connected to the Media Server `Member`.
+/// [`Object`] representing a `Member` connected to a media server.
 pub struct Member {
-    /// ID of [`Member`] on the Media Server.
+    /// ID of this [`Member`] on a media server.
     id: String,
 
-    /// Flag which indicates that [`Member`] should publish media.
+    /// Indicator whether this [`Member`] should publish media.
     is_send: bool,
 
-    /// Flag which indicates that [`Member`] should receive media.
+    /// Indicator whether this [`Member`] should receive media.
     is_recv: bool,
 
-    /// Flag which indicates that [`Member`] is joined to the `Room`.
+    /// Indicator whether this [`Member`] is joined a [`Room`] on a media
+    /// server.
     is_joined: bool,
 
     /// Media publishing state of this [`Member`].
@@ -83,9 +87,9 @@ pub struct Member {
     /// [`Room`]'s [`Object`] that this [`Member`] is intended to join.
     room: Object<Room>,
 
-    /// Storage for the [`Connection`]s throws by this [`Member`]'s `Room`.
+    /// Storage of [`Connection`]s thrown by this [`Member`]'s [`Room`].
     ///
-    /// [`Connection`]: crate::object::connection::Connection
+    /// [`Connection`]: object::connection::Connection
     connection_store: Object<ConnectionStore>,
 }
 
@@ -143,32 +147,6 @@ impl Member {
             .await?;
         self.is_joined = true;
         Ok(())
-    }
-
-    /// Returns list of [`MediaKind`]s and [`MediaSourceKind`] based on the
-    /// provided [`Option`]s.
-    fn kinds_and_source_kinds(
-        kind: Option<MediaKind>,
-        source_kind: Option<MediaSourceKind>,
-    ) -> Vec<(MediaKind, MediaSourceKind)> {
-        let mut kinds_and_source_kinds = Vec::new();
-        if let Some(kind) = kind {
-            if let Some(source_kind) = source_kind {
-                kinds_and_source_kinds.push((kind, source_kind));
-            } else {
-                kinds_and_source_kinds.push((kind, MediaSourceKind::Device));
-            }
-        } else if let Some(source_kind) = source_kind {
-            kinds_and_source_kinds.push((MediaKind::Audio, source_kind));
-            kinds_and_source_kinds.push((MediaKind::Video, source_kind));
-        } else {
-            kinds_and_source_kinds
-                .push((MediaKind::Video, MediaSourceKind::Device));
-            kinds_and_source_kinds
-                .push((MediaKind::Audio, MediaSourceKind::Device));
-        }
-
-        kinds_and_source_kinds
     }
 
     /// Updates [`Member::send_state`].
@@ -340,6 +318,8 @@ impl Member {
     /// [`Member`]'s [`Room`].
     ///
     /// [`Connection`]: object::connection::Connection
+    #[inline]
+    #[must_use]
     pub fn connections(&self) -> &Object<ConnectionStore> {
         &self.connection_store
     }

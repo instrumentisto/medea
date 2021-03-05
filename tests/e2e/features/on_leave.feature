@@ -1,4 +1,5 @@
 Feature: OnLeave callback of Control API
+
   Scenario: Member closes Room
     Given room with joined member Alice
     When Alice's room closed by client
@@ -12,9 +13,9 @@ Feature: OnLeave callback of Control API
   Scenario: Member deleted by Control API
     Given room with joined member Alice
     When Control API removes member Alice
-    Then Control API doesn't sends OnLeave callback for member `Alice`
+    Then Control API doesn't sends `OnLeave` callback for member Alice
 
   Scenario: Member's Room deleted by Control API
     Given room with joined member Alice
     When Control API removes the room
-    Then Control API doesn't sends OnLeave callback for member `Alice`
+    Then Control API doesn't sends `OnLeave` callback for member Alice
