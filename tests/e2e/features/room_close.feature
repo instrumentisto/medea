@@ -17,5 +17,5 @@ Feature: Room closing
 
   Scenario: `Room.on_close()` fires when room is removed by Control API
     Given room with joined member Alice
-    When Control API removes room
+    When Control API removes the room
     Then Alice's `on_close` room's callback fires with `Evicted` reason
