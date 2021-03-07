@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 use super::*;
 
 use crate::{
@@ -35,7 +37,7 @@ pub extern "C" fn Java_com_jason_api_MediaManagerHandle_nativeEnumerateDevices(
     match result {
         Ok(devices) => env.new_object_array(devices),
         Err(msg) => {
-            env.throw_new(&msg);
+            env.throw_new(CString::new(msg).unwrap().as_ptr());
             JForeignObjectsArray::jni_invalid_value()
         }
     }
@@ -67,7 +69,7 @@ pub extern "C" fn Java_com_jason_api_MediaManagerHandle_nativeInitLocalTracks(
     match result {
         Ok(tracks) => env.new_object_array(tracks),
         Err(msg) => {
-            env.throw_new(&msg);
+            env.throw_new(CString::new(msg).unwrap().as_ptr());
             JForeignObjectsArray::jni_invalid_value()
         }
     }

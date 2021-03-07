@@ -12,7 +12,7 @@ use crate::{
     util::JNIEnv,
     ConnectionHandle,
 };
-use std::sync::Arc;
+use std::{ffi::CString, sync::Arc};
 
 impl ForeignClass for ConnectionHandle {
     fn jni_class() -> jclass {
@@ -42,7 +42,7 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnClose(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -63,7 +63,7 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeGetRemoteMemberId(
     match result {
         Ok(remote_member_id) => env.string_to_jstring(remote_member_id),
         Err(msg) => {
-            env.throw_new(&msg);
+            env.throw_new(CString::new(msg).unwrap().as_ptr());
             ptr::null_mut()
         }
     }
@@ -87,7 +87,7 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnRemoteTrackAdded(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -109,7 +109,7 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnQualityScoreUpdate
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 

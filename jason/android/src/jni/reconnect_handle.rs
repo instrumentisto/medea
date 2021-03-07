@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 use super::*;
 
 use crate::ReconnectHandle;
@@ -31,7 +33,7 @@ pub extern "C" fn Java_com_jason_api_ReconnectHandle_nativeReconnectWithDelay(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     };
 }
 
@@ -59,7 +61,7 @@ pub extern "C" fn Java_com_jason_api_ReconnectHandle_nativeReconnectWithBackoff(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     };
 }
 

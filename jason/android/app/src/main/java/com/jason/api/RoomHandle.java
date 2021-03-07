@@ -22,15 +22,12 @@ public final class RoomHandle {
     }
 
     public void onNewConnection(@NonNull Consumer<ConnectionHandle> cb) throws Exception {
-//        nativeOnNewConnection(nativePtr, new LongConsumer() {
-//            @Override
-//            public void accept(long value) {
-//                ConnectionHandle connectionHandle = new ConnectionHandle(value);
-//                cb.accept(connectionHandle);
-//            }
-//        });
-        nativeOnNewConnection(nativePtr, foobar -> {
-
+        nativeOnNewConnection(nativePtr, new LongConsumer() {
+            @Override
+            public void accept(long value) {
+                ConnectionHandle connectionHandle = new ConnectionHandle(value);
+                cb.accept(connectionHandle);
+            }
         });
     }
 

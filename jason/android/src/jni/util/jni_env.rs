@@ -100,20 +100,15 @@ impl<'a> JNIEnv<'a> {
         unsafe { (**self.ptr).NewGlobalRef.unwrap()(self.ptr, obj) }
     }
 
-    pub fn throw_new(&self, message: &str) {
+    pub fn throw_new(&self, message: *const c_char) {
         let exception_class = unsafe { JAVA_LANG_EXCEPTION };
 
         let res = unsafe {
-            (**self.ptr).ThrowNew.unwrap()(
-                self.ptr,
-                exception_class,
-                as_c_str_unchecked(message),
-            )
+            (**self.ptr).ThrowNew.unwrap()(self.ptr, exception_class, message)
         };
         if res != 0 {
             log::error!(
-                "JNI ThrowNew({}) failed for class {:?} failed",
-                message,
+                "JNI ThrowNew failed for class {:?} failed",
                 exception_class
             );
         }
@@ -122,20 +117,17 @@ impl<'a> JNIEnv<'a> {
     pub fn get_method_id(
         &self,
         class: jclass,
-        name: &str,
-        sig: &str,
+        name: *const c_char,
+        sig: *const c_char,
     ) -> jmethodID {
-        unsafe {
-            (**self.ptr).GetMethodID.unwrap()(
-                self.ptr,
-                class,
-                as_c_str_unchecked(name),
-                as_c_str_unchecked(sig),
-            )
-        }
+        unsafe { (**self.ptr).GetMethodID.unwrap()(self.ptr, class, name, sig) }
     }
 
-    pub fn call_object_method(&self, object: jobject, method: jmethodID) -> jobject {
+    pub fn call_object_method(
+        &self,
+        object: jobject,
+        method: jmethodID,
+    ) -> jobject {
         unsafe {
             (**self.ptr).CallObjectMethod.unwrap()(self.ptr, object, method)
         }
@@ -228,10 +220,4 @@ impl<T> JForeignObjectsArray<T> {
             _marker: PhantomData,
         }
     }
-}
-
-// Provided string MUST not contain null-bytes.
-fn as_c_str_unchecked(string: &str) -> *const c_char {
-    let null_terminated = &[string, "\0"].concat();
-    null_terminated.as_ptr() as *const c_char
 }

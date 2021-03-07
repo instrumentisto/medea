@@ -1,5 +1,26 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref, clippy::missing_safety_doc)]
 
+use std::{
+    convert::TryFrom,
+    marker::PhantomData,
+    os::raw,
+    ptr,
+    sync::{Arc, Mutex},
+};
+
+use once_cell::sync::Lazy;
+
+use jni_sys::{
+    jboolean, jclass, jfieldID, jfloat, jint, jlong, jmethodID, jobject,
+    jstring, jvalue, JNI_OK, JNI_VERSION_1_6,
+};
+
+use crate::{
+    context::{JavaExecutor, RustExecutor},
+    jni::util::{JNIEnv, JavaVM},
+    AudioTrackConstraints, FacingMode, Jason, MediaKind, MediaSourceKind,
+};
+
 mod audio_track_constraints;
 mod connection_handle;
 mod constraints_update_exception;
@@ -17,30 +38,10 @@ mod room_close_reason;
 mod room_handle;
 pub mod util;
 
-use std::{
-    convert::TryFrom,
-    marker::PhantomData,
-    os::raw,
-    ptr,
-    sync::{Arc, Mutex},
-};
-
-use jni_sys::{
-    jboolean, jclass, jfieldID, jfloat, jint, jlong, jmethodID, jobject,
-    jstring, jvalue, JNI_OK, JNI_VERSION_1_6,
-};
-use once_cell::sync::Lazy;
-
-use crate::{
-    context::{JavaExecutor, RustExecutor},
-    jni::util::{JNIEnv, JavaVM},
-    AudioTrackConstraints, FacingMode, Jason, MediaKind, MediaSourceKind,
-};
-
 #[doc = " Default JNI_VERSION"]
 const JNI_VERSION: jint = JNI_VERSION_1_6 as jint;
 
-macro_rules! swig_c_str {
+macro_rules! as_c_str {
     ($lit:expr) => {
         concat!($lit, "\0").as_ptr() as *const ::std::os::raw::c_char
     };
@@ -199,25 +200,11 @@ pub struct JavaCallback<T> {
 impl<T> JavaCallback<T> {
     pub fn new(env: JNIEnv, obj: jobject) -> Self {
         let class = env.get_object_class(obj); // TODO: assert Consumer class
-
-        let mid = env.get_method_id(class, "getClass", "()Ljava/lang/Class;");
-        let cls_obj = env.call_object_method(obj, mid);
-        let cls = env.get_object_class(cls_obj);
-        let mid = env.get_method_id(cls, "getName", "()Ljava/lang/String;");
-        let str_obj = env.call_object_method(cls_obj, mid);
-        let string = env.clone_jstring_to_string(str_obj as jstring);
-        log::debug!("Class name: {}", string);
-
         assert!(!class.is_null(), "GetObjectClass return null class");
         // TODO: cache method?
         let accept_method =
-            env.get_method_id(class, "accept", "(J)V");
-        log::debug!("Method found");
-        if accept_method.is_null() {
-            log::debug!("Accept method is null");
-        }
+            env.get_method_id(class, as_c_str!("accept"), as_c_str!("(J)V"));
         assert!(!accept_method.is_null(), "Can not find accept id");
-        log::debug!("Method not null");
 
         let consumer_object = env.new_global_ref(obj);
         assert!(!consumer_object.is_null());
@@ -318,10 +305,16 @@ impl<T> AsyncTaskCallback<T> {
         let class = env.get_object_class(obj);
         assert!(!class.is_null(), "GetObjectClass return null class");
 
-        let done_method =
-            env.get_method_id(class, "onDone", "(Ljava/lang/Object;)V");
-        let error_method =
-            env.get_method_id(class, "onError", "(Ljava/lang/Throwable;)V");
+        let done_method = env.get_method_id(
+            class,
+            as_c_str!("onDone"),
+            as_c_str!("(Ljava/lang/Object;)V"),
+        );
+        let error_method = env.get_method_id(
+            class,
+            as_c_str!("onError"),
+            as_c_str!("(Ljava/lang/Throwable;)V"),
+        );
 
         assert!(!done_method.is_null(), "Can not find onDone id");
         assert!(!error_method.is_null(), "Can not find onError id");
@@ -526,7 +519,7 @@ macro_rules! cache_foreign_class {
     ($env:ident; $class:expr => $path:expr) => {
             let class_local_ref = (**$env).FindClass.unwrap()(
                 $env,
-                swig_c_str!($path),
+                as_c_str!($path),
             );
             assert!(
                 !class_local_ref.is_null(),
@@ -546,8 +539,8 @@ macro_rules! cache_foreign_class {
                 let field_id: jfieldID = (**$env).GetFieldID.unwrap()(
                     $env,
                     $class,
-                    swig_c_str!($field_name),
-                    swig_c_str!($field_sig),
+                    as_c_str!($field_name),
+                    as_c_str!($field_sig),
                 );
                 assert!(
                     !field_id.is_null(),
@@ -692,7 +685,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     assert!(!env.is_null());
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Exception"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Exception"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Exception"
@@ -703,7 +696,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_EXCEPTION = class;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Long"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Long"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Long"
@@ -716,8 +709,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("longValue"),
-        swig_c_str!("()J"),
+        as_c_str!("longValue"),
+        as_c_str!("()J"),
     );
     assert!(
         !method_id.is_null(),
@@ -726,7 +719,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_LONG_LONG_VALUE = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Byte"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Byte"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Byte"
@@ -738,8 +731,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("byteValue"),
-        swig_c_str!("()B"),
+        as_c_str!("byteValue"),
+        as_c_str!("()B"),
     );
     assert!(
         !method_id.is_null(),
@@ -748,7 +741,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_BYTE_BYTE_VALUE = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Integer"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Integer"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Integer"
@@ -760,8 +753,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("intValue"),
-        swig_c_str!("()I"),
+        as_c_str!("intValue"),
+        as_c_str!("()I"),
     );
     assert!(
         !method_id.is_null(),
@@ -771,7 +764,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_INTEGER_INT_VALUE = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Short"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Short"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Short"
@@ -783,8 +776,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("shortValue"),
-        swig_c_str!("()S"),
+        as_c_str!("shortValue"),
+        as_c_str!("()S"),
     );
     assert!(
         !method_id.is_null(),
@@ -794,7 +787,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_SHORT_SHORT_VALUE = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Double"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Double"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Double"
@@ -806,8 +799,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("doubleValue"),
-        swig_c_str!("()D"),
+        as_c_str!("doubleValue"),
+        as_c_str!("()D"),
     );
     assert!(
         !method_id.is_null(),
@@ -817,7 +810,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_DOUBLE_DOUBLE_VALUE_METHOD = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/String"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/String"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/String"
@@ -828,7 +821,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_LANG_STRING = class;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/lang/Float"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/lang/Float"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/lang/Float"
@@ -840,8 +833,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("floatValue"),
-        swig_c_str!("()F"),
+        as_c_str!("floatValue"),
+        as_c_str!("()F"),
     );
     assert!(
         !method_id.is_null(),
@@ -850,10 +843,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     );
     JAVA_LANG_FLOAT_FLOAT_VALUE = method_id;
 
-    let class_local_ref = (**env).FindClass.unwrap()(
-        env,
-        swig_c_str!("java/util/OptionalDouble"),
-    );
+    let class_local_ref =
+        (**env).FindClass.unwrap()(env, as_c_str!("java/util/OptionalDouble"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/util/OptionalDouble"
@@ -868,8 +859,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetStaticMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("of"),
-        swig_c_str!("(D)Ljava/util/OptionalDouble;"),
+        as_c_str!("of"),
+        as_c_str!("(D)Ljava/util/OptionalDouble;"),
     );
     assert!(
         !method_id.is_null(),
@@ -880,8 +871,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetStaticMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("empty"),
-        swig_c_str!("()Ljava/util/OptionalDouble;"),
+        as_c_str!("empty"),
+        as_c_str!("()Ljava/util/OptionalDouble;"),
     );
     assert!(
         !method_id.is_null(),
@@ -891,7 +882,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_UTIL_OPTIONAL_DOUBLE_EMPTY = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/util/OptionalInt"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/util/OptionalInt"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/util/OptionalInt"
@@ -906,8 +897,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetStaticMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("of"),
-        swig_c_str!("(I)Ljava/util/OptionalInt;"),
+        as_c_str!("of"),
+        as_c_str!("(I)Ljava/util/OptionalInt;"),
     );
     assert!(
         !method_id.is_null(),
@@ -918,8 +909,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetStaticMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("empty"),
-        swig_c_str!("()Ljava/util/OptionalInt;"),
+        as_c_str!("empty"),
+        as_c_str!("()Ljava/util/OptionalInt;"),
     );
     assert!(
         !method_id.is_null(),
@@ -929,7 +920,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     JAVA_UTIL_OPTIONAL_INT_EMPTY = method_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("java/util/OptionalLong"));
+        (**env).FindClass.unwrap()(env, as_c_str!("java/util/OptionalLong"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for java/util/OptionalLong"
@@ -944,8 +935,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetStaticMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("of"),
-        swig_c_str!("(J)Ljava/util/OptionalLong;"),
+        as_c_str!("of"),
+        as_c_str!("(J)Ljava/util/OptionalLong;"),
     );
     assert!(
         !method_id.is_null(),
@@ -956,8 +947,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let method_id: jmethodID = (**env).GetStaticMethodID.unwrap()(
         env,
         class,
-        swig_c_str!("empty"),
-        swig_c_str!("()Ljava/util/OptionalLong;"),
+        as_c_str!("empty"),
+        as_c_str!("()Ljava/util/OptionalLong;"),
     );
     assert!(
         !method_id.is_null(),
@@ -1051,10 +1042,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
         }
     );
 
-    let class_local_ref = (**env).FindClass.unwrap()(
-        env,
-        swig_c_str!("com/jason/api/FacingMode"),
-    );
+    let class_local_ref =
+        (**env).FindClass.unwrap()(env, as_c_str!("com/jason/api/FacingMode"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for com/jason/api/FacingMode"
@@ -1069,8 +1058,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("User"),
-        swig_c_str!("Lcom/jason/api/FacingMode;"),
+        as_c_str!("User"),
+        as_c_str!("Lcom/jason/api/FacingMode;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1081,8 +1070,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Environment"),
-        swig_c_str!("Lcom/jason/api/FacingMode;"),
+        as_c_str!("Environment"),
+        as_c_str!("Lcom/jason/api/FacingMode;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1093,8 +1082,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Left"),
-        swig_c_str!("Lcom/jason/api/FacingMode;"),
+        as_c_str!("Left"),
+        as_c_str!("Lcom/jason/api/FacingMode;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1105,8 +1094,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Right"),
-        swig_c_str!("Lcom/jason/api/FacingMode;"),
+        as_c_str!("Right"),
+        as_c_str!("Lcom/jason/api/FacingMode;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1116,7 +1105,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
     FOREIGN_ENUM_FACINGMODE_RIGHT = field_id;
 
     let class_local_ref =
-        (**env).FindClass.unwrap()(env, swig_c_str!("com/jason/api/MediaKind"));
+        (**env).FindClass.unwrap()(env, as_c_str!("com/jason/api/MediaKind"));
     assert!(
         !class_local_ref.is_null(),
         "FindClass failed for com/jason/api/MediaKind"
@@ -1131,8 +1120,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Audio"),
-        swig_c_str!("Lcom/jason/api/MediaKind;"),
+        as_c_str!("Audio"),
+        as_c_str!("Lcom/jason/api/MediaKind;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1143,8 +1132,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Video"),
-        swig_c_str!("Lcom/jason/api/MediaKind;"),
+        as_c_str!("Video"),
+        as_c_str!("Lcom/jason/api/MediaKind;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1155,7 +1144,7 @@ pub unsafe extern "system" fn JNI_OnLoad(
 
     let class_local_ref = (**env).FindClass.unwrap()(
         env,
-        swig_c_str!("com/jason/api/MediaSourceKind"),
+        as_c_str!("com/jason/api/MediaSourceKind"),
     );
     assert!(
         !class_local_ref.is_null(),
@@ -1171,8 +1160,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Device"),
-        swig_c_str!("Lcom/jason/api/MediaSourceKind;"),
+        as_c_str!("Device"),
+        as_c_str!("Lcom/jason/api/MediaSourceKind;"),
     );
     assert!(
         !field_id.is_null(),
@@ -1183,8 +1172,8 @@ pub unsafe extern "system" fn JNI_OnLoad(
     let field_id: jfieldID = (**env).GetStaticFieldID.unwrap()(
         env,
         class,
-        swig_c_str!("Display"),
-        swig_c_str!("Lcom/jason/api/MediaSourceKind;"),
+        as_c_str!("Display"),
+        as_c_str!("Lcom/jason/api/MediaSourceKind;"),
     );
     assert!(
         !field_id.is_null(),

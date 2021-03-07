@@ -1,7 +1,8 @@
+use std::{ffi::CString, sync::Arc};
+
 use super::*;
 
 use crate::{MediaStreamSettings, RoomHandle};
-use std::sync::Arc;
 
 impl ForeignClass for RoomHandle {
     fn jni_class() -> jclass {
@@ -59,7 +60,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnNewConnection(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -80,7 +81,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnClose(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -102,7 +103,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnLocalTrack(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -124,7 +125,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnFailedLocalMedia(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -145,7 +146,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnConnectionLoss(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -176,7 +177,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeSetLocalMediaSettings(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -195,7 +196,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeMuteAudio(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -214,7 +215,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeUnmuteAudio(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -239,7 +240,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeMuteVideo(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -264,7 +265,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeUnmuteVideo(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -283,7 +284,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableAudio(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -302,7 +303,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableAudio(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -327,7 +328,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableVideo(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -352,7 +353,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableVideo(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -371,7 +372,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableRemoteAudio(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -390,7 +391,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableRemoteVideo(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -409,7 +410,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableRemoteAudio(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
@@ -428,7 +429,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableRemoteVideo(
     });
 
     if let Err(msg) = result {
-        env.throw_new(&msg);
+        env.throw_new(CString::new(msg).unwrap().as_ptr());
     }
 }
 
