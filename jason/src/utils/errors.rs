@@ -25,7 +25,7 @@ pub trait JsCaused {
     fn js_cause(self) -> Option<Self::Error>;
 }
 
-// TODO: Consider moving to api::wasm.
+// TODO: Consider moving to `api::wasm`.
 /// Abstract application error.
 #[derive(Clone, Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
@@ -37,27 +37,36 @@ pub struct JasonError {
 }
 
 impl JasonError {
-    /// Returns name of error.
+    /// Returns name of this error.
+    #[inline]
+    #[must_use]
     pub fn name(&self) -> String {
         String::from(self.name)
     }
 
-    /// Returns message of errors.
+    /// Returns message of this error.
+    #[inline]
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.clone()
     }
 
-    /// Returns trace information of error.
+    /// Returns trace information of this error.
+    #[inline]
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
 
-    /// Returns JS side error if it the cause.
+    /// Returns [`platform::Error`] if it's the cause.
+    #[inline]
+    #[must_use]
     pub fn source(&self) -> Option<platform::Error> {
         Clone::clone(&self.source)
     }
 
-    /// Prints error information to default logger with `ERROR` level.
+    /// Prints error information to default logger with an `ERROR` level.
+    #[inline]
     pub fn print(&self) {
         log::error!("{}", self);
     }
@@ -88,8 +97,8 @@ where
 
 /// Occurs if referenced value was dropped.
 #[derive(Debug, Display, JsCaused)]
-#[js(error = "platform::Error")]
 #[display(fmt = "Handler is in detached state.")]
+#[js(error = "platform::Error")]
 pub struct HandlerDetachedError;
 
 /// Wrapper for [`serde_json::error::Error`] that provides [`Clone`], [`Debug`],

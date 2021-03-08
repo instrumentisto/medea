@@ -1,6 +1,6 @@
 //! Acquiring and storing [`local::Track`]s.
 
-// TODO: Remove when moving JasonError to api::wasm.
+// TODO: Remove when moving `JasonError` to `api::wasm`.
 #![allow(clippy::missing_errors_doc)]
 
 use std::{
@@ -85,7 +85,8 @@ struct InnerMediaManager {
 }
 
 impl InnerMediaManager {
-    /// Returns the vector of [`platform::InputDeviceInfo`] objects.
+    /// Returns a list of [`platform::InputDeviceInfo`] objects.
+    #[inline]
     async fn enumerate_devices() -> Result<Vec<platform::InputDeviceInfo>> {
         platform::enumerate_devices().await
     }
@@ -294,14 +295,14 @@ impl MediaManager {
         self.0.get_tracks(caps.into()).await
     }
 
-    /// Instantiates new [`MediaManagerHandle`] for external use.
+    /// Instantiates a new [`MediaManagerHandle`] for external usage.
     #[inline]
     pub fn new_handle(&self) -> MediaManagerHandle {
         MediaManagerHandle(Rc::downgrade(&self.0))
     }
 }
 
-/// External handle to [`MediaManager`].
+/// External handle to a [`MediaManager`].
 ///
 /// [`MediaManager`] performs all media acquisition requests
 /// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
@@ -318,9 +319,9 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 
 #[allow(clippy::unused_self)]
 impl MediaManagerHandle {
-    /// Returns array of [`platform::InputDeviceInfo`] objects, which represent
-    /// available media input and output devices, such as microphones,
-    /// cameras, and so forth.
+    /// Returns a list of [`platform::InputDeviceInfo`] objects representing
+    /// available media input and output devices, such as microphones, cameras,
+    /// and so forth.
     pub async fn enumerate_devices(
         &self,
     ) -> std::result::Result<Vec<platform::InputDeviceInfo>, JasonError> {
@@ -330,7 +331,7 @@ impl MediaManagerHandle {
             .map_err(JasonError::from)
     }
 
-    /// Returns [`local::LocalMediaTrack`]s objects, built from provided
+    /// Returns [`local::LocalMediaTrack`]s objects, built from the provided
     /// [`MediaStreamSettings`].
     pub async fn init_local_tracks(
         &self,

@@ -19,11 +19,12 @@ pub struct MediaStreamConstraints(web_sys::MediaStreamConstraints);
 impl MediaStreamConstraints {
     /// Creates new [`MediaStreamConstraints`] with none constraints configured.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self(web_sys::MediaStreamConstraints::new())
     }
 
-    /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
+    /// Specifies the nature and settings of the `audio` [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
@@ -31,7 +32,7 @@ impl MediaStreamConstraints {
         self.0.audio(&MediaTrackConstraints::from(audio).into());
     }
 
-    /// Specifies the nature and settings of the video [MediaStreamTrack][1].
+    /// Specifies the nature and settings of the `video` [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
@@ -41,6 +42,7 @@ impl MediaStreamConstraints {
 }
 
 impl Default for MediaStreamConstraints {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -117,7 +119,7 @@ impl<T: AsRef<str>> From<&ConstrainString<T>> for ConstrainDomStringParameters {
     }
 }
 
-/// [`DisplayMediaStreamConstraints`][1] wrapper.
+/// [DisplayMediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-displaymediastreamconstraints
 #[derive(AsRef, Debug, Into)]
@@ -126,20 +128,22 @@ pub struct DisplayMediaStreamConstraints(
 );
 
 impl Default for DisplayMediaStreamConstraints {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl DisplayMediaStreamConstraints {
-    /// Creates new [`DisplayMediaStreamConstraints`] with none constraints
+    /// Creates a new [`DisplayMediaStreamConstraints`] with none constraints
     /// configured.
     #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self(web_sys::DisplayMediaStreamConstraints::new())
     }
 
-    /// Specifies the nature and settings of the video [MediaStreamTrack][1].
+    /// Specifies the nature and settings of the `video` [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[inline]
@@ -149,6 +153,7 @@ impl DisplayMediaStreamConstraints {
 }
 
 impl From<DisplayVideoTrackConstraints> for MediaTrackConstraints {
+    #[inline]
     fn from(_: DisplayVideoTrackConstraints) -> Self {
         Self::new()
     }

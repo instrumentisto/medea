@@ -218,8 +218,8 @@ pub enum MediaConnectionsError {
     #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
     CouldNotInsertLocalTrack(platform::Error),
 
-    /// Occurs when [`remote::Track`] discovered by
-    /// [`platform::RtcPeerConnection`] could not be inserted into
+    /// Occurs when [`remote::Track`] discovered by a
+    /// [`platform::RtcPeerConnection`] couldn't be inserted into a
     /// [`Receiver`].
     ///
     /// [`remote::Track`]: crate::media::track::remote::Track
@@ -231,7 +231,7 @@ pub enum MediaConnectionsError {
     )]
     CouldNotInsertRemoteTrack(String),
 
-    /// Could not find [`platform::Transceiver`] by `mid`.
+    /// Could not find a [`platform::Transceiver`] by `mid`.
     #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
     TransceiverNotFound(String),
 
@@ -295,8 +295,9 @@ type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
-    /// Ref to parent [`platform::RtcPeerConnection`]. Used to generate
-    /// transceivers for [`Sender`]s and [`Receiver`]s.
+    /// Reference to the parent [`platform::RtcPeerConnection`].
+    ///
+    /// Used to generate transceivers for [`Sender`]s and [`Receiver`]s.
     ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
@@ -362,7 +363,7 @@ impl InnerMediaConnections {
         }
     }
 
-    /// Creates [`platform::Transceiver`] and adds it to the
+    /// Creates a [`platform::Transceiver`] and adds it to the
     /// [`platform::RtcPeerConnection`].
     fn add_transceiver(
         &self,
@@ -372,7 +373,7 @@ impl InnerMediaConnections {
         platform::Transceiver::from(self.peer.add_transceiver(kind, direction))
     }
 
-    /// Lookups [`platform::Transceiver`] by the provided [`mid`].
+    /// Lookups a [`platform::Transceiver`] by the provided [`mid`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     fn get_transceiver_by_mid(
@@ -390,7 +391,7 @@ impl InnerMediaConnections {
 pub struct MediaConnections(RefCell<InnerMediaConnections>);
 
 impl MediaConnections {
-    /// Instantiates new [`MediaConnections`] storage for a given
+    /// Instantiates a new [`MediaConnections`] storage for the given
     /// [`platform::RtcPeerConnection`].
     #[inline]
     pub fn new(
@@ -502,8 +503,8 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    /// Returns app statuses of the all [`Sender`]s and [`Receiver`]s from
-    /// this [`MediaConnections`].
+    /// Returns activity statuses of the all the [`Sender`]s and [`Receiver`]s
+    /// from these [`MediaConnections`].
     ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
@@ -587,7 +588,7 @@ impl MediaConnections {
     /// Inserts provided tracks into [`Sender`]s based on track IDs.
     ///
     /// [`local::Track`]s are inserted into [`Sender`]'s
-    /// [`platform::Transceiver`]s via [`replaceTrack` method][1], changing
+    /// [`platform::Transceiver`]s via a [`replaceTrack` method][1], changing
     /// its direction to `sendonly`.
     ///
     /// Returns [`HashMap`] with [`media_exchange_state::Stable`]s updates for
@@ -652,7 +653,7 @@ impl MediaConnections {
         Ok(media_exchange_state_updates)
     }
 
-    /// Ads new track to the corresponding [`Receiver`].
+    /// Adds a new track to the corresponding [`Receiver`].
     ///
     /// # Errors
     ///
@@ -686,7 +687,7 @@ impl MediaConnections {
 
     /// Iterates over all [`Receiver`]s with [`mid`] and without
     /// [`platform::Transceiver`], trying to find the corresponding
-    /// [`platform::Transceiver`] in [`platform::RtcPeerConnection`] and to
+    /// [`platform::Transceiver`] in the [`platform::RtcPeerConnection`] and to
     /// insert it into the [`Receiver`].
     ///
     /// [`Receiver`]: self::receiver::Receiver

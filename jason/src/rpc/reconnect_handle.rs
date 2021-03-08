@@ -1,6 +1,6 @@
 //! Reconnection for [`RpcSession`].
 
-// TODO: Remove when moving JasonError to api::wasm.
+// TODO: Remove when moving `JasonError` to `api::wasm`.
 #![allow(clippy::missing_errors_doc)]
 
 use std::{rc::Weak, time::Duration};
@@ -19,16 +19,17 @@ use crate::{
 #[js(error = "platform::Error")]
 struct NoTokenError;
 
-/// External handle that is used to reconnect to the Medea media server on
-/// connection loss.
+/// External handle used to reconnect to a media server when connection is lost.
 ///
-/// This handle will be provided into `Room.on_connection_loss` callback.
+/// This handle will be passed to a `Room.on_connection_loss` callback.
 #[derive(Clone)]
 pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
 impl ReconnectHandle {
     /// Instantiates new [`ReconnectHandle`] from the given [`RpcSession`]
     /// reference.
+    #[inline]
+    #[must_use]
     pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
     }

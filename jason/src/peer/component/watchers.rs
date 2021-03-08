@@ -87,7 +87,7 @@ impl Component {
     /// an [`Answerer`].
     ///
     /// Creates a new [`sender::Component`], creates a new [`Connection`] with
-    /// all [`sender::State::receivers`] by calling
+    /// all [`sender::State::receivers`] by calling a
     /// [`Connections::create_connection()`][1].
     ///
     /// [`Answerer`]: NegotiationRole::Answerer
@@ -139,7 +139,7 @@ impl Component {
     /// Watcher for the [`State::receivers`] insert update.
     ///
     /// Creates a new [`receiver::Component`], creates a new [`Connection`] with
-    /// a [`receiver::State::sender_id`] by calling
+    /// a [`receiver::State::sender_id`] by calling a
     /// [`Connections::create_connection()`][1].
     ///
     /// [`Connection`]: crate::connection::Connections

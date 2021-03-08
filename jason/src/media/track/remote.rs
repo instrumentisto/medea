@@ -1,4 +1,4 @@
-//! Wrapper around [`platform::MediaStreamTrack`] received from the remote.
+//! Wrapper around a received remote [`platform::MediaStreamTrack`].
 
 use std::rc::Rc;
 
@@ -11,7 +11,7 @@ use crate::{
     platform,
 };
 
-/// Inner reference-counted data of [`Track`].
+/// Inner reference-counted data of a [`Track`].
 struct Inner {
     /// Underlying platform-specific [`platform::MediaStreamTrack`].
     track: platform::MediaStreamTrack,
@@ -19,27 +19,27 @@ struct Inner {
     /// Underlying [`platform::MediaStreamTrack`] source kind.
     media_source_kind: proto::MediaSourceKind,
 
-    /// Callback to be invoked when this [`Track`] is enabled.
+    /// Callback invoked when this [`Track`] is enabled.
     on_enabled: platform::Callback<()>,
 
-    /// Callback to be invoked when this [`Track`] is disabled.
+    /// Callback invoked when this [`Track`] is disabled.
     on_disabled: platform::Callback<()>,
 
-    /// [`enabled`][1] property of [MediaStreamTrack][2].
+    /// [`enabled`][1] property of this [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
     enabled: ObservableCell<bool>,
 }
 
-/// Wrapper around [MediaStreamTrack][1] received from the remote.
+/// Wrapper around a received remote [MediaStreamTrack][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[derive(Clone)]
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`] spawning a listener for its [`enabled`][1]
+    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1]
     /// property changes.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
@@ -93,8 +93,8 @@ impl Track {
         self.0.track.set_enabled(enabled);
     }
 
-    /// Returns [`id`][1] of underlying [`platform::MediaStreamTrack`] of this
-    /// [`Track`].
+    /// Returns [`id`][1] of the underlying [`platform::MediaStreamTrack`] of
+    /// this [`Track`].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
     #[inline]
@@ -118,21 +118,27 @@ impl Track {
     }
 
     /// Returns the underlying [`platform::MediaStreamTrack`] of this [`Track`].
+    #[inline]
+    #[must_use]
     pub fn get_track(&self) -> &platform::MediaStreamTrack {
         &self.0.track
     }
 
-    /// Indicate whether this [`Track`] is enabled.
+    /// Indicates whether this [`Track`] is enabled.
+    #[inline]
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.0.enabled.get()
     }
 
-    /// Sets callback to invoke when this [`Track`] is enabled.
+    /// Sets callback, invoked when this [`Track`] is enabled.
+    #[inline]
     pub fn on_enabled(&self, callback: platform::Function<()>) {
         self.0.on_enabled.set_func(callback);
     }
 
-    /// Sets callback to invoke when this [`Track`] is disabled.
+    /// Sets callback, invoked when this [`Track`] is disabled.
+    #[inline]
     pub fn on_disabled(&self, callback: platform::Function<()>) {
         self.0.on_disabled.set_func(callback);
     }

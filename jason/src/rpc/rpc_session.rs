@@ -1,4 +1,5 @@
-//! Wrapper for [WebSocket] based transport that implements `Room` management.
+//! Wrapper around [WebSocket] based transport that implements `Room`
+//! management.
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 

@@ -42,9 +42,9 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    /// Creates new [`platform::Transceiver`] if provided `mid` is `None`,
-    /// otherwise creates [`Receiver`] without [`platform::Transceiver`]. It
-    /// will be injected when [`remote::Track`] arrives.
+    /// Creates a new [`platform::Transceiver`] if provided `mid` is [`None`],
+    /// otherwise creates a [`Receiver`] without a [`platform::Transceiver`]. It
+    /// will be injected when a [`remote::Track`] will arrive.
     ///
     /// Created [`platform::Transceiver`] direction is set to
     /// [`TransceiverDirection::INACTIVE`][1] if `enabled_individual` is
@@ -168,7 +168,7 @@ impl Receiver {
         );
     }
 
-    /// Adds provided [`platform::MediaStreamTrack`] and
+    /// Adds the provided [`platform::MediaStreamTrack`] and
     /// [`platform::Transceiver`] to this [`Receiver`].
     ///
     /// Sets [`platform::MediaStreamTrack::enabled`] same as
@@ -199,7 +199,7 @@ impl Receiver {
         self.maybe_notify_track();
     }
 
-    /// Replaces [`Receiver`]'s [`platform::Transceiver`] with a provided
+    /// Replaces [`Receiver`]'s [`platform::Transceiver`] with the provided
     /// [`platform::Transceiver`].
     ///
     /// Doesn't update [`platform::TransceiverDirection`] of the
@@ -213,9 +213,9 @@ impl Receiver {
         }
     }
 
-    /// Returns [`platform::Transceiver`] of this [`Receiver`].
+    /// Returns a [`platform::Transceiver`] of this [`Receiver`].
     ///
-    /// Returns [`None`] if this [`Receiver`] doesn't have
+    /// Returns [`None`] if this [`Receiver`] doesn't have a
     /// [`platform::Transceiver`].
     #[inline]
     pub fn transceiver(&self) -> Option<platform::Transceiver> {

@@ -19,11 +19,11 @@ use super::window;
 
 /// Collects information about the User Agent's available media input devices.
 ///
-/// Adapter for [MediaDevices.enumerateDevices()][1].
+/// Adapter for a [MediaDevices.enumerateDevices()][1] function.
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if could not get
+/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
 /// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::EnumerateDevicesFailed`] if
@@ -63,14 +63,14 @@ pub async fn enumerate_devices(
         .collect())
 }
 
-/// Prompts the user for permission to use a media input which produces vector
+/// Prompts a user for a permission to use a media input which produces vector
 /// of [`MediaStreamTrack`]s containing the requested types of media.
 ///
-/// Adapter for [MediaDevices.getUserMedia()][1].
+/// Adapter for a [MediaDevices.getUserMedia()][1] function.
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if could not get
+/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
 /// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
@@ -110,15 +110,15 @@ pub async fn get_user_media(
         .collect())
 }
 
-/// Prompts the user to select and grant permission to capture the contents of a
-/// display or portion thereof (such as a window) as vector of
+/// Prompts a user to select and grant a permission to capture contents of a
+/// display or portion thereof (such as a single window) as vector of
 /// [`MediaStreamTrack`].
 ///
-/// Adapter for [MediaDevices.getDisplayMedia()][1].
+/// Adapter for a [MediaDevices.getDisplayMedia()][1] function.
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if could not get
+/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
 /// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if

@@ -34,6 +34,7 @@ pub struct InputDeviceInfo {
 impl TryFrom<sys::MediaDeviceKind> for MediaKind {
     type Error = Error;
 
+    #[inline]
     fn try_from(value: sys::MediaDeviceKind) -> Result<Self, Self::Error> {
         match value {
             sys::MediaDeviceKind::Audioinput => Ok(Self::Audio),
@@ -46,6 +47,7 @@ impl TryFrom<sys::MediaDeviceKind> for MediaKind {
 impl InputDeviceInfo {
     /// Returns unique identifier for the represented device.
     #[inline]
+    #[must_use]
     pub fn device_id(&self) -> String {
         self.info.device_id()
     }
@@ -56,6 +58,7 @@ impl InputDeviceInfo {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
     #[inline]
+    #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.media_kind
     }
@@ -64,6 +67,7 @@ impl InputDeviceInfo {
     /// "External USB Webcam").
     /// If the device has no associated label, then returns an empty string.
     #[inline]
+    #[must_use]
     pub fn label(&self) -> String {
         self.info.label()
     }
@@ -77,6 +81,7 @@ impl InputDeviceInfo {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadeviceinfo-groupid
     #[inline]
+    #[must_use]
     pub fn group_id(&self) -> String {
         self.info.group_id()
     }
@@ -85,6 +90,7 @@ impl InputDeviceInfo {
 impl TryFrom<sys::MediaDeviceInfo> for InputDeviceInfo {
     type Error = Error;
 
+    #[inline]
     fn try_from(info: sys::MediaDeviceInfo) -> Result<Self, Self::Error> {
         Ok(Self {
             media_kind: MediaKind::try_from(info.kind())?,

@@ -74,7 +74,7 @@ impl From<ClientDisconnect> for CloseReason {
     }
 }
 
-/// State of [`WebSocketRpcClient`] and [`platform::RpcTransport`].
+/// State of a [`WebSocketRpcClient`] and a [`platform::RpcTransport`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClientState {
     /// [`WebSocketRpcClient`] is currently establishing a connection to RPC
@@ -128,8 +128,8 @@ struct Inner {
     state: ObservableCell<ClientState>,
 }
 
-/// Factory closure which creates [`platform::RpcTransport`] for
-/// [`WebSocketRpcClient::establish_connection`] function.
+/// Factory closure which creates a [`platform::RpcTransport`] for a
+/// [`WebSocketRpcClient::establish_connection()`] function.
 pub type RpcTransportFactory = Box<
     dyn Fn(
         ApiUrl,

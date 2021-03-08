@@ -1,4 +1,4 @@
-//! Wrapper around a remote [MediaStreamTrack][1].
+//! Wrapper around a received remote [MediaStreamTrack][1].
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 
@@ -10,7 +10,7 @@ use crate::{
     media::track::remote,
 };
 
-/// Wrapper around a remote [MediaStreamTrack][1].
+/// Wrapper around a received remote [MediaStreamTrack][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
 #[wasm_bindgen]

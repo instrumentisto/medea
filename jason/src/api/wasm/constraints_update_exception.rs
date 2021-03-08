@@ -1,4 +1,6 @@
 //! Exception returned from [`RoomHandle::set_local_media_settings()`][1].
+//!
+//! [1]: crate::api::RoomHandle::set_local_media_settings
 
 use std::iter::FromIterator as _;
 

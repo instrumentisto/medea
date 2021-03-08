@@ -129,7 +129,7 @@ pub struct Repository {
 impl Repository {
     /// Returns new empty [`platform::RtcStats`].
     ///
-    /// Spawns [`platform::RtcStats`] scrape task.
+    /// Spawns a task for scraping [`platform::RtcStats`].
     #[must_use]
     pub fn new(
         media_manager: Rc<MediaManager>,
@@ -152,11 +152,11 @@ impl Repository {
         }
     }
 
-    /// Spawns task which will call [`PeerConnection::send_peer_stats`] of
+    /// Spawns a task which will call [`PeerConnection::send_peer_stats()`] of
     /// all [`PeerConnection`]s every second and send updated
-    /// [`platform::RtcStats`] to the server.
+    /// [`platform::RtcStats`] to a server.
     ///
-    /// Returns [`TaskHandle`] which will stop this task on [`Drop::drop()`].
+    /// Returns [`TaskHandle`] which will stop this task on its [`Drop`].
     fn spawn_peers_stats_scrape_task(
         peers: Rc<RefCell<HashMap<PeerId, peer::Component>>>,
     ) -> TaskHandle {
