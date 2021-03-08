@@ -1204,12 +1204,11 @@ impl Peer<Stable> {
     /// regardless of negotiation state will be immediately force-pushed to
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
-        if self.context.ice_user.is_some()
-            && (!self.context.track_changes_queue.is_empty()
-                || matches!(
-                    self.context.on_negotiation_finish,
-                    OnNegotiationFinish::Renegotiate
-                ))
+        if !self.context.track_changes_queue.is_empty()
+            || matches!(
+                self.context.on_negotiation_finish,
+                OnNegotiationFinish::Renegotiate
+            )
         {
             let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
