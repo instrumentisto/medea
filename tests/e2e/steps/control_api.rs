@@ -75,7 +75,7 @@ async fn then_control_api_sends_on_leave(
 
 #[rustfmt::skip]
 #[then(
-    regex = r"^Control API doesn't sends OnLeave callback for member (\S+)$"
+    regex = r"^Control API doesn't sends `OnLeave` callback for member (\S+)$"
 )]
 async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
     timeout(
