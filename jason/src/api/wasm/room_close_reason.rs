@@ -1,11 +1,15 @@
+//! Reason of a [`Room`] closing.
+//!
+//! [`Room`]: room::Room
+
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
 use crate::room;
 
-/// Reason of why [`Room`] has been closed.
+/// Reason of why a [`Room`] is closed.
 ///
-/// This struct is passed into [`RoomHandle::on_close`] JS side callback.
+/// This struct is passed to a [`RoomHandle::on_close`] JS side callback.
 ///
 /// [`Room`]: room::Room
 /// [`RoomHandle::on_close`]: crate::api::RoomHandle::on_close
@@ -15,21 +19,21 @@ pub struct RoomCloseReason(room::RoomCloseReason);
 
 #[wasm_bindgen]
 impl RoomCloseReason {
-    /// [`Room`] close reason.
+    /// Returns the [`Room`]'s close reason.
     ///
     /// [`Room`]: room::Room
     pub fn reason(&self) -> String {
         self.0.reason()
     }
 
-    /// Whether [`Room`] was closed by server.
+    /// Indicates whether the [`Room`] was closed by server.
     ///
     /// [`Room`]: room::Room
     pub fn is_closed_by_server(&self) -> bool {
         self.0.is_closed_by_server()
     }
 
-    /// Whether [`Room`] close reason is considered as error
+    /// Indicates whether the [`Room`] close reason is considered as an error.
     ///
     /// [`Room`]: room::Room
     pub fn is_err(&self) -> bool {

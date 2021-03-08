@@ -1,3 +1,5 @@
+//! Connection with a specific remote `Member` used on JS side.
+
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
@@ -5,16 +7,16 @@ use crate::{api::JasonError, connection};
 
 /// Connection with a specific remote `Member`, that is used on JS side.
 ///
-/// Like all handlers it contains weak reference to object that is managed by
-/// Rust, so its methods will fail if weak reference could not be upgraded.
+/// Like all the handles it contains a weak reference to the object that is
+/// managed by Rust, so its methods will fail if a weak reference could not be
+/// upgraded.
 #[wasm_bindgen]
 #[derive(From)]
 pub struct ConnectionHandle(connection::ConnectionHandle);
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked when this [`Connection`] will
-    /// close.
+    /// Sets callback, invoked when this [`Connection`] is closed.
     ///
     /// [`Connection`]: connection::Connection
     pub fn on_close(&self, cb: js_sys::Function) -> Result<(), JsValue> {
@@ -24,7 +26,7 @@ impl ConnectionHandle {
             .map_err(JsValue::from)
     }
 
-    /// Returns remote `Member` ID.
+    /// Returns ID of the remote `Member`.
     pub fn get_remote_member_id(&self) -> Result<String, JsValue> {
         self.0
             .get_remote_member_id()
@@ -32,11 +34,11 @@ impl ConnectionHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets callback, which will be invoked when new [`RemoteMediaTrack`] will
-    /// be added to this [`Connection`].
+    /// Sets callback, invoked when a new [`RemoteMediaTrack`] is added to this
+    /// [`Connection`].
     ///
-    /// [`RemoteMediaTrack`]: crate::api::RemoteMediaTrack
     /// [`Connection`]: connection::Connection
+    /// [`RemoteMediaTrack`]: crate::api::RemoteMediaTrack
     pub fn on_remote_track_added(
         &self,
         cb: js_sys::Function,
@@ -47,8 +49,8 @@ impl ConnectionHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets callback, which will be invoked when connection quality score will
-    /// be updated by server.
+    /// Sets callback, invoked when connection quality score is updated by a
+    /// server.
     pub fn on_quality_score_update(
         &self,
         cb: js_sys::Function,

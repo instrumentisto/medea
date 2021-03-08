@@ -1,6 +1,6 @@
-//! Connection with specific remote `Member`.
+//! [`Connection`] with a specific remote `Member`.
 
-// TODO: Remove when moving JasonError to api::wasm.
+// TODO: Remove when moving `JasonError` to `api::wasm`.
 #![allow(clippy::missing_errors_doc)]
 
 use std::{
@@ -18,7 +18,7 @@ use crate::{
     utils::{HandlerDetachedError, JasonError},
 };
 
-/// Service which manages [`Connection`]s with the remote `Member`s.
+/// Service which manages [`Connection`]s with remote `Member`s.
 #[derive(Default)]
 pub struct Connections {
     /// Local [`PeerId`] to remote [`MemberId`].
@@ -27,7 +27,7 @@ pub struct Connections {
     /// Remote [`MemberId`] to [`Connection`] with that `Member`.
     connections: RefCell<HashMap<MemberId, Connection>>,
 
-    /// Callback that will be invoked on remote `Member` media arrival.
+    /// Callback invoked on remote `Member` media arrival.
     on_new_connection: platform::Callback<api::ConnectionHandle>,
 }
 
@@ -90,7 +90,7 @@ impl Connections {
     }
 }
 
-/// External handler to [`Connection`] with remote `Member`.
+/// External handler to a [`Connection`] with a remote `Member`.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
 pub struct ConnectionHandle(Weak<InnerConnection>);
@@ -105,19 +105,18 @@ struct InnerConnection {
     /// Current [`ConnectionQualityScore`] of this [`Connection`].
     quality_score: Cell<Option<ConnectionQualityScore>>,
 
-    /// Callback, that will be invoked when [`remote::Track`] is received.
+    /// Callback invoked when a [`remote::Track`] is received.
     on_remote_track_added: platform::Callback<api::RemoteMediaTrack>,
 
-    /// Callback, that will be invoked when [`ConnectionQualityScore`] is
-    /// updated.
+    /// Callback invoked when a [`ConnectionQualityScore`] is updated.
     on_quality_score_update: platform::Callback<u8>,
 
-    /// Callback, that will be invoked when current [`Connection`] is closed.
+    /// Callback invoked when this [`Connection`] is closed.
     on_close: platform::Callback<()>,
 }
 
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked when this `Connection` will close.
+    /// Sets callback, invoked when this `Connection` will close.
     pub fn on_close(
         &self,
         f: platform::Function<()>,
@@ -130,8 +129,8 @@ impl ConnectionHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
     }
 
-    /// Sets callback, which will be invoked when new [`remote::Track`] will be
-    /// added to this [`Connection`].
+    /// Sets callback, invoked when a new [`remote::Track`] will is added to
+    /// this [`Connection`].
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
@@ -140,8 +139,8 @@ impl ConnectionHandle {
             .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
-    /// Sets callback, which will be invoked when connection quality score will
-    /// be updated by server.
+    /// Sets callback, invoked when a connection quality score is updated by
+    /// a server.
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,
@@ -174,7 +173,7 @@ impl Connection {
         self.0.on_remote_track_added.call1(track);
     }
 
-    /// Creates new external handle to current [`Connection`].
+    /// Creates a new external handle to this [`Connection`].
     #[inline]
     pub fn new_handle(&self) -> ConnectionHandle {
         ConnectionHandle(Rc::downgrade(&self.0))

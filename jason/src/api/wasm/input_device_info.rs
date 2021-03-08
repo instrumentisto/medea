@@ -1,9 +1,13 @@
+//! Representation of a [MediaDeviceInfo][1].
+//!
+//! [1]: https://w3.org/TR/mediacapture-streams/#device-info
+
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
 use crate::{api::MediaKind, platform};
 
-/// Representation of [MediaDeviceInfo][1].
+/// Representation of a [MediaDeviceInfo][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 #[wasm_bindgen]
@@ -12,28 +16,29 @@ pub struct InputDeviceInfo(platform::InputDeviceInfo);
 
 #[wasm_bindgen]
 impl InputDeviceInfo {
-    /// Returns unique identifier for the represented device.
+    /// Returns a unique identifier for the represented device.
     pub fn device_id(&self) -> String {
         self.0.device_id()
     }
 
-    /// Returns kind of the represented device.
+    /// Returns a kind of the represented device.
     ///
-    /// This representation of [MediaDeviceInfo][1] ONLY for input device.
+    /// This representation of [MediaDeviceInfo][1] is for input device ONLY.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
     pub fn kind(&self) -> MediaKind {
         self.0.kind().into()
     }
 
-    /// Returns label describing the represented device (for example
-    /// "External USB Webcam").
+    /// Returns label describing the represented device (for example "External
+    /// USB Webcam").
+    ///
     /// If the device has no associated label, then returns an empty string.
     pub fn label(&self) -> String {
         self.0.label()
     }
 
-    /// Returns group identifier of the represented device.
+    /// Returns a group identifier of the represented device.
     ///
     /// Two devices have the same group identifier if they belong to the same
     /// physical device. For example, the audio input and output devices
