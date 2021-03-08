@@ -227,6 +227,7 @@ impl World {
             .get_mut(member_id)
             .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
         member.join_room(&self.room_id).await?;
+        self.wait_for_interconnection(member_id).await?;
         Ok(())
     }
 
