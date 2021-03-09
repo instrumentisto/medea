@@ -2,8 +2,11 @@
 
 pub mod connection;
 pub mod connections_store;
-mod jason;
-mod room;
+pub mod jason;
+pub mod local_track;
+pub mod remote_track;
+pub mod room;
+pub mod tracks_store;
 
 use std::{marker::PhantomData, sync::mpsc};
 
@@ -87,6 +90,13 @@ impl<T> Object<T> {
         }
     }
 
+    /// Returns an [`ObjectPtr`] to this [`Object`].
+    #[inline]
+    #[must_use]
+    pub fn ptr(&self) -> ObjectPtr {
+        self.ptr.clone()
+    }
+
     /// Executes the provided [`Statement`] and returns the resulting
     /// [`Object`].
     pub async fn execute_and_fetch<O>(
@@ -113,11 +123,7 @@ impl<T> Object<T> {
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
-            r#"
-                async (o) => {
-                    return o === undefined;
-                }
-            "#,
+            r#"async (o) => o === undefined"#,
             [],
         ))
         .await?
