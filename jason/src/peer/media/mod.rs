@@ -225,9 +225,9 @@ pub enum MediaConnectionsError {
     /// [`remote::Track`]: crate::media::track::remote::Track
     /// [`Receiver`]: self::receiver::Receiver
     #[display(
-    fmt = "Could not insert remote track with mid: {:?} into media \
+        fmt = "Could not insert remote track with mid: {:?} into media \
                connections",
-    _0
+        _0
     )]
     CouldNotInsertRemoteTrack(String),
 
@@ -648,7 +648,7 @@ impl MediaConnections {
                 Ok::<(), Traced<MediaConnectionsError>>(())
             },
         ))
-            .await?;
+        .await?;
 
         Ok(media_exchange_state_updates)
     }

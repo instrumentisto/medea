@@ -7,7 +7,7 @@ use std::iter::FromIterator as _;
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::connection;
+use crate::room;
 
 use super::jason_error::JasonError;
 
@@ -44,7 +44,7 @@ impl ConstraintsUpdateException {
                 .map(JasonError::from)
                 .map(JsValue::from),
         )
-            .into()
+        .into()
     }
 
     /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents

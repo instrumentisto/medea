@@ -37,8 +37,8 @@ impl Component {
             candidate.sdp_m_line_index,
             candidate.sdp_mid,
         )
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+        .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Watcher for the [`State::remote_sdp`] update.
@@ -118,7 +118,7 @@ impl Component {
             peer.send_constraints.clone(),
             peer.track_events_sender.clone(),
         )
-            .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!())
         {
             Ok(sender) => sender,
             Err(e) => {
@@ -300,7 +300,7 @@ impl Component {
             state.when_all_receivers_processed().into(),
             state.remote_sdp.when_all_processed().into(),
         ])
-            .await;
+        .await;
 
         match negotiation_state {
             NegotiationState::Stable => {
@@ -353,14 +353,14 @@ impl Component {
                     state.when_all_senders_processed().into(),
                     state.when_all_receivers_processed().into(),
                 ])
-                    .await;
+                .await;
 
                 medea_reactive::when_all_processed(vec![
                     state.senders.when_stabilized().into(),
                     state.receivers.when_stabilized().into(),
                     state.when_all_updated().into(),
                 ])
-                    .await;
+                .await;
             }
             NegotiationRole::Answerer(remote_sdp) => {
                 state.when_all_receivers_processed().await;
@@ -372,13 +372,13 @@ impl Component {
                     state.remote_sdp.when_all_processed().into(),
                     state.senders.when_updated().into(),
                 ])
-                    .await;
+                .await;
 
                 medea_reactive::when_all_processed(vec![
                     state.senders.when_stabilized().into(),
                     state.receivers.when_stabilized().into(),
                 ])
-                    .await;
+                .await;
             }
         }
 
@@ -412,7 +412,7 @@ impl Component {
     /// Waits for [`State::senders`] update and calls
     /// [`State::update_local_stream()`].
     #[watch(
-    self.maybe_update_local_stream.subscribe().filter(|v| future::ready(*v))
+        self.maybe_update_local_stream.subscribe().filter(|v| future::ready(*v))
     )]
     async fn maybe_local_stream_update_needed(
         peer: Rc<PeerConnection>,

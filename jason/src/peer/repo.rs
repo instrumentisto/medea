@@ -172,7 +172,7 @@ impl Repository {
                 future::join_all(
                     peers.iter().map(|p| p.scrape_and_send_peer_stats()),
                 )
-                    .await;
+                .await;
             }
         });
 
@@ -241,7 +241,7 @@ impl Component {
                 Rc::clone(&peers.connections),
                 Rc::clone(&peers.recv_constraints),
             )
-                .map_err(tracerr::map_from_and_wrap!())?,
+            .map_err(tracerr::map_from_and_wrap!())?,
             new_peer,
         );
 

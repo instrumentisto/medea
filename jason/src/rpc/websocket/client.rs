@@ -313,11 +313,11 @@ impl WebSocketRpcClient {
                         settings.ping_interval_ms.into(),
                     )),
                 )
-                    .map_err(tracerr::wrap!(=> RpcClientError))
-                    .map_err(|e| {
-                        log::error!("Failed to update socket settings: {}", e)
-                    })
-                    .ok();
+                .map_err(tracerr::wrap!(=> RpcClientError))
+                .map_err(|e| {
+                    log::error!("Failed to update socket settings: {}", e)
+                })
+                .ok();
                 None
             }
             ServerMsg::Ping(_) => None,

@@ -24,8 +24,6 @@ pub enum ReconnectError {
     Detached,
 }
 
-gen_upgrade_macro!(ReconnectError::Detached);
-
 /// External handle used to reconnect to a media server when connection is lost.
 ///
 /// This handle will be passed to a `Room.on_connection_loss` callback.
@@ -49,7 +47,7 @@ impl ReconnectHandle {
     ///
     /// # Errors
     ///
-    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade failed.
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
     /// With [`ReconnectError::Session`] if error while reconnecting occurred.
     pub async fn reconnect_with_delay(
@@ -58,7 +56,10 @@ impl ReconnectHandle {
     ) -> Result<(), Traced<ReconnectError>> {
         platform::delay_for(Duration::from_millis(u64::from(delay_ms))).await;
 
-        let rpc = upgrade!(self.0)?;
+        let rpc = self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?;
         rpc.reconnect()
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
@@ -87,7 +88,7 @@ impl ReconnectHandle {
     ///
     /// # Errors
     ///
-    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade failed.
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
@@ -100,7 +101,14 @@ impl ReconnectHandle {
             Duration::from_millis(u64::from(max_delay)),
         );
         backoff_delayer.delay().await;
-        while upgrade!(self.0)?.reconnect().await.is_err() {
+        while self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?
+            .reconnect()
+            .await
+            .is_err()
+        {
             backoff_delayer.delay().await;
         }
 

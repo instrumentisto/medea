@@ -149,7 +149,7 @@ impl WebSocketRpcTransport {
                             .set(TransportState::Closed(CloseMsg::from(&msg)));
                     },
                 )
-                    .unwrap(),
+                .unwrap(),
             );
 
             let inner = Rc::clone(&socket);
@@ -161,7 +161,7 @@ impl WebSocketRpcTransport {
                         inner.borrow().socket_state.set(TransportState::Open);
                     },
                 )
-                    .unwrap(),
+                .unwrap(),
             );
         }
 
@@ -192,7 +192,7 @@ impl WebSocketRpcTransport {
                     .set(TransportState::Closed(CloseMsg::from(&msg)));
             },
         )
-            .unwrap();
+        .unwrap();
         self.0.borrow_mut().on_close_listener = Some(on_close);
     }
 

@@ -190,7 +190,12 @@ impl From<PeerError> for RoomError {
     }
 }
 
-gen_upgrade_macro!(RoomError::Detached);
+macro_rules! upgrade_inner {
+    ($v:expr) => {
+        $v.upgrade()
+            .ok_or_else(|| tracerr::new!(RoomError::Detached))
+    };
+}
 
 /// External handle to a [`Room`].
 #[derive(Clone)]
@@ -210,16 +215,16 @@ impl RoomHandle {
     /// # Errors
     ///
     /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
-    /// `on_connection_loss` callbacks is not set.
+    /// `on_connection_loss` callback is not set.
     ///
     /// With [`RoomError::ConnectionInfoParse`] if provided URL parsing fails.
     ///
     /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
-    /// With [`RoomError::SessionError`] if connecting to the RPC server is
-    /// failed.
+    /// With [`RoomError::SessionError`] when unable to connect to a media
+    /// server.
     pub async fn join(&self, url: String) -> Result<(), Traced<RoomError>> {
-        let inner = upgrade!(self.0)?;
+        let inner = upgrade_inner!(self.0)?;
 
         let connection_info: ConnectionInfo =
             url.parse().map_err(tracerr::map_from_and_wrap!())?;
@@ -253,7 +258,7 @@ impl RoomHandle {
         direction: TrackDirection,
         source_kind: Option<proto::MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
-        let inner = upgrade!(self.0)?;
+        let inner = upgrade_inner!(self.0)?;
         inner.set_constraints_media_state(
             new_state,
             kind,
@@ -326,7 +331,8 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::ConnectionHandle>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0).map(|inner| inner.connections.on_new_connection(f))
+        upgrade_inner!(self.0)
+            .map(|inner| inner.connections.on_new_connection(f))
     }
 
     /// Sets `on_close` callback, invoked on this [`Room`] close, providing a
@@ -339,7 +345,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::RoomCloseReason>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0).map(|inner| inner.on_close.set_func(f))
+        upgrade_inner!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
     /// Sets callback, invoked when a new [`local::Track`] is added to this
@@ -357,7 +363,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::LocalMediaTrack>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0).map(|inner| inner.on_local_track.set_func(f))
+        upgrade_inner!(self.0).map(|inner| inner.on_local_track.set_func(f))
     }
 
     /// Sets `on_failed_local_media` callback, invoked on a local media
@@ -370,7 +376,8 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::JasonError>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0).map(|inner| inner.on_failed_local_media.set_func(f))
+        upgrade_inner!(self.0)
+            .map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, invoked when a connection with
@@ -383,7 +390,7 @@ impl RoomHandle {
         &self,
         f: platform::Function<api::ReconnectHandle>,
     ) -> Result<(), Traced<RoomError>> {
-        upgrade!(self.0).map(|inner| inner.on_connection_loss.set_func(f))
+        upgrade_inner!(self.0).map(|inner| inner.on_connection_loss.set_func(f))
     }
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all

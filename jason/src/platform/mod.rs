@@ -6,7 +6,7 @@ pub mod transport;
 pub mod wasm;
 
 pub use self::{
-    peer_connection::{IceCandidate, RTCPeerConnectionError, SdpType},
+    peer_connection::{IceCandidate, RtcPeerConnectionError, SdpType},
     rtc_stats::RtcStatsError,
     transport::{
         RpcTransport, TransportError, TransportState, WebSocketRpcTransport,

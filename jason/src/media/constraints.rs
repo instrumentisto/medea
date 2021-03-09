@@ -403,8 +403,8 @@ impl MediaStreamSettings {
     /// [`VideoTrackConstraints::unconstrain()`].
     #[must_use]
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
-        where
-            T: AsRef<platform::MediaStreamTrack>,
+    where
+        T: AsRef<platform::MediaStreamTrack>,
     {
         if self.device_video.satisfies(&track) {
             self.device_video.unconstrain();
@@ -698,7 +698,7 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
 
         if is_device_video_enabled {
             if let Some(device_video_cons) =
-            constraints.device_video.constraints
+                constraints.device_video.constraints
             {
                 device_cons
                     .get_or_insert_with(platform::MediaStreamConstraints::new)
@@ -707,7 +707,7 @@ impl From<MediaStreamSettings> for Option<MultiSourceTracksConstraints> {
         }
         if is_display_video_enabled {
             if let Some(display_video_cons) =
-            constraints.display_video.constraints
+                constraints.display_video.constraints
             {
                 display_cons
                     .get_or_insert_with(
@@ -1147,9 +1147,9 @@ impl DeviceVideoTrackConstraints {
         satisfies_track(track, MediaKind::Video)
             && ConstrainString::satisfies(&self.device_id, &track.device_id())
             && ConstrainString::satisfies(
-            &self.facing_mode,
-            &track.facing_mode(),
-        )
+                &self.facing_mode,
+                &track.facing_mode(),
+            )
             && ConstrainU32::satisfies(self.height, track.height())
             && ConstrainU32::satisfies(self.width, track.width())
             && !track.guess_is_from_display()

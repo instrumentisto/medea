@@ -1,3 +1,5 @@
+//! App error exported to JS side.
+
 use std::fmt::{Debug, Display};
 
 use derive_more::{Display, From};
@@ -43,8 +45,8 @@ impl JasonError {
 }
 
 impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
-    where
-        E::Error: Into<platform::Error>,
+where
+    E::Error: Into<platform::Error>,
 {
     fn from((err, trace): (E, Trace)) -> Self {
         Self {
@@ -57,8 +59,8 @@ impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
 }
 
 impl<E: JsCaused + Display> From<Traced<E>> for JasonError
-    where
-        E::Error: Into<platform::Error>,
+where
+    E::Error: Into<platform::Error>,
 {
     fn from(traced: Traced<E>) -> Self {
         Self::from(traced.into_parts())

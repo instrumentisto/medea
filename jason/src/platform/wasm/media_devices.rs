@@ -48,10 +48,10 @@ pub async fn enumerate_devices(
             .map_err(EnumerateDevicesFailed)
             .map_err(tracerr::from_and_wrap!())?,
     )
-        .await
-        .map_err(Error::from)
-        .map_err(EnumerateDevicesFailed)
-        .map_err(tracerr::from_and_wrap!())?;
+    .await
+    .map_err(Error::from)
+    .map_err(EnumerateDevicesFailed)
+    .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::Array::from(&devices)
         .values()
@@ -97,11 +97,11 @@ pub async fn get_user_media(
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?,
     )
-        .await
-        .map(web_sys::MediaStream::from)
-        .map_err(Error::from)
-        .map_err(GetUserMediaFailed)
-        .map_err(tracerr::from_and_wrap!())?;
+    .await
+    .map(web_sys::MediaStream::from)
+    .map_err(Error::from)
+    .map_err(GetUserMediaFailed)
+    .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())
         .unwrap()
@@ -147,11 +147,11 @@ pub async fn get_display_media(
             .map_err(GetDisplayMediaFailed)
             .map_err(tracerr::from_and_wrap!())?,
     )
-        .await
-        .map(web_sys::MediaStream::from)
-        .map_err(Error::from)
-        .map_err(GetUserMediaFailed)
-        .map_err(tracerr::from_and_wrap!())?;
+    .await
+    .map(web_sys::MediaStream::from)
+    .map_err(Error::from)
+    .map_err(GetUserMediaFailed)
+    .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())
         .unwrap()

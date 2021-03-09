@@ -19,20 +19,6 @@ pub use self::{
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
 
-/// Generates `upgrade!` macro which can upgrade [`Weak`] pointer, mapping it to
-/// a [`Result`] with `$e` error.
-///
-/// [`Weak`]: std::rc::Weak
-macro_rules! gen_upgrade_macro {
-    ($e:expr) => {
-        macro_rules! upgrade {
-            ($v:expr) => {
-                $v.upgrade().ok_or_else(|| tracerr::new!($e))
-            };
-        }
-    };
-}
-
 /// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
 ///
 /// [`Future`]: std::future::Future

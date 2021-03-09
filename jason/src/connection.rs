@@ -96,8 +96,6 @@ pub enum ConnectionError {
     Detached,
 }
 
-gen_upgrade_macro!(ConnectionError::Detached);
-
 /// External handler to a [`Connection`] with a remote `Member`.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
@@ -128,23 +126,29 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_close(
         &self,
         f: platform::Function<()>,
     ) -> Result<(), Traced<ConnectionError>> {
-        upgrade!(self.0).map(|inner| inner.on_close.set_func(f))
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .map(|inner| inner.on_close.set_func(f))
     }
 
     /// Returns remote `Member` ID.
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn get_remote_member_id(
         &self,
     ) -> Result<String, Traced<ConnectionError>> {
-        upgrade!(self.0).map(|inner| inner.remote_id.0.clone())
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .map(|inner| inner.remote_id.0.clone())
     }
 
     /// Sets callback, invoked when a new [`remote::Track`] will is added to
@@ -152,12 +156,15 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
     ) -> Result<(), Traced<ConnectionError>> {
-        upgrade!(self.0).map(|inner| inner.on_remote_track_added.set_func(f))
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
     /// Sets callback, invoked when a connection quality score is updated by
@@ -165,12 +172,15 @@ impl ConnectionHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade failed.
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,
     ) -> Result<(), Traced<ConnectionError>> {
-        upgrade!(self.0).map(|inner| inner.on_quality_score_update.set_func(f))
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .map(|inner| inner.on_quality_score_update.set_func(f))
     }
 }
 

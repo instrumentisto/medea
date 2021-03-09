@@ -72,10 +72,10 @@ impl Transceiver {
                 .sender()
                 .replace_track(sys_track.map(AsRef::as_ref)),
         )
-            .await
-            .map(|_| {
-                self.send_track.replace(new_track);
-            })
+        .await
+        .map(|_| {
+            self.send_track.replace(new_track);
+        })
     }
 
     /// Returns [`mid`] of this [`Transceiver`].

@@ -162,8 +162,8 @@ impl RoomHandle {
                 stop_first,
                 rollback_on_fail,
             )
-                .await
-                .map_err(ConstraintsUpdateException::from)?;
+            .await
+            .map_err(ConstraintsUpdateException::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }

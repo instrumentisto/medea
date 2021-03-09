@@ -58,8 +58,8 @@ pub enum MediaManagerError {
     #[display(fmt = "{} track is ended", _0)]
     LocalTrackIsEnded(MediaKind),
 
-    /// [`MediaManagerHandle`]'s [`Weak`] pointer is detached.
-    #[display(fmt = "MediaManager is in detached state")]
+    /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be upgraded.
+    #[display(fmt = "MediaManagerHandle is in detached state")]
     Detached,
 }
 
@@ -303,8 +303,6 @@ impl MediaManager {
     }
 }
 
-gen_upgrade_macro!(MediaManagerError::Detached);
-
 /// External handle to a [`MediaManager`].
 ///
 /// [`MediaManager`] performs all media acquisition requests
@@ -329,7 +327,7 @@ impl MediaManagerHandle {
     /// # Errors
     ///
     /// With [`MediaManagerError::CouldNotGetMediaDevices`] or
-    /// [`MediaManagerError::EnumerateDevicesFailed`] if devices enumeration is
+    /// [`MediaManagerError::EnumerateDevicesFailed`] if devices enumeration
     /// failed.
     pub async fn enumerate_devices(
         &self,
@@ -344,14 +342,16 @@ impl MediaManagerHandle {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade is
-    /// failed.
+    /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade fails.
     pub async fn init_local_tracks(
         &self,
         caps: MediaStreamSettings,
     ) -> Result<Vec<local::LocalMediaTrack>> {
-        upgrade!(self.0)?
-            .get_tracks(caps)
+        let this = self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(MediaManagerError::Detached))?;
+        this.get_tracks(caps)
             .await
             .map(|tracks| {
                 tracks

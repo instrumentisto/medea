@@ -23,8 +23,8 @@ pub struct MediaStreamTrack {
 }
 
 impl<T> From<T> for MediaStreamTrack
-    where
-        web_sys::MediaStreamTrack: From<T>,
+where
+    web_sys::MediaStreamTrack: From<T>,
 {
     #[inline]
     fn from(from: T) -> MediaStreamTrack {
@@ -118,7 +118,7 @@ impl MediaStreamTrack {
     #[must_use]
     pub fn height(&self) -> Option<u32> {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            get_property_by_name(&self.sys_track.get_settings(), "height", |v| {
+        get_property_by_name(&self.sys_track.get_settings(), "height", |v| {
             v.as_f64().map(|v| v as u32)
         })
     }
@@ -131,7 +131,7 @@ impl MediaStreamTrack {
     #[must_use]
     pub fn width(&self) -> Option<u32> {
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-            get_property_by_name(&self.sys_track.get_settings(), "width", |v| {
+        get_property_by_name(&self.sys_track.get_settings(), "width", |v| {
             v.as_f64().map(|v| v as u32)
         })
     }

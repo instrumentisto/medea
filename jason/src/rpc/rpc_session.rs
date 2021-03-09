@@ -41,7 +41,7 @@ pub enum SessionError {
 
     /// [`WebSocketRpcSession`] doesn't have any credentials to authorize with.
     #[display(
-    fmt = "RPC Session doesn't have any credentials to authorize with"
+        fmt = "RPC Session doesn't have any credentials to authorize with"
     )]
     NoCredentials,
 

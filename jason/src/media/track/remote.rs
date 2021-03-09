@@ -45,8 +45,8 @@ impl Track {
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     #[must_use]
     pub fn new<T>(track: T, media_source_kind: proto::MediaSourceKind) -> Self
-        where
-            platform::MediaStreamTrack: From<T>,
+    where
+        platform::MediaStreamTrack: From<T>,
     {
         let track = platform::MediaStreamTrack::from(track);
         let track = Track(Rc::new(Inner {
@@ -63,7 +63,7 @@ impl Track {
             let weak_inner = Rc::downgrade(&track.0);
             async move {
                 while let Some(enabled) =
-                track_enabled_state_changes.next().await
+                    track_enabled_state_changes.next().await
                 {
                     if let Some(track) = weak_inner.upgrade() {
                         if enabled {
