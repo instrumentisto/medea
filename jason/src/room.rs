@@ -478,7 +478,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if muting audio is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::unmute_audio`]
+    /// was called while muting.
     #[inline]
     pub async fn mute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -495,7 +497,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if unmuting audio is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::mute_audio`] was
+    /// called while unmuting.
     #[inline]
     pub async fn unmute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -512,7 +516,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if muting video is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::unmute_video`]
+    /// was called while muting.
     #[inline]
     pub async fn mute_video(
         &self,
@@ -532,7 +538,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if unmuting video is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::mute_video`] was
+    /// called while unmuting.
     #[inline]
     pub async fn unmute_video(
         &self,
@@ -552,7 +560,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if disabling audio is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// CannotDisableRequiredSender)` if server forbids audio track disabling.
+    ///
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::enable_audio`]
+    /// was called while disabling.
     #[inline]
     pub async fn disable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -569,7 +582,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if enabling audio is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::disable_audio`]
+    /// was called while enabling.
     #[inline]
     pub async fn enable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -588,7 +603,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if disabling video is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// CannotDisableRequiredSender)` if server forbids some track disabling.
+    ///
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::enable_video`]
+    /// was called while disabling.
     #[inline]
     pub async fn disable_video(
         &self,
@@ -610,7 +630,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if enabling video is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if [`RoomHandle::disable_video`]
+    /// was called while enabling.
     #[inline]
     pub async fn enable_video(
         &self,
@@ -630,7 +652,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if disabling remote audio is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if
+    /// [`RoomHandle::enable_remote_audio`] was called while disabling.
     #[inline]
     pub async fn disable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -647,7 +671,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if disabling remote video is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if
+    /// [`RoomHandle::enable_remote_video`] was called while disabling.
     #[inline]
     pub async fn disable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -664,7 +690,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if enabling remote audio is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if
+    /// [`RoomHandle::disable_remote_audio`] was called while enabling.
     #[inline]
     pub async fn enable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -681,7 +709,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// Errors if enabling remote video is failed.
+    /// With `RoomError::MediaConnections(MediaConnectionsError::
+    /// MediaStateTransitsIntoOppositeState)` if
+    /// [`RoomHandle::disable_remote_video`] was called while enabling.
     #[inline]
     pub async fn enable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(

@@ -167,8 +167,14 @@ impl RoomHandle {
             Ok(JsValue::UNDEFINED)
         })
     }
-    // TODO: document mute/umute/enable/disable/local/remote errors section.
+
     /// Mutes outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::unmute_audio`] was called while muting.
     ///
     /// [`Room`]: room::Room
     pub fn mute_audio(&self) -> Promise {
@@ -182,6 +188,12 @@ impl RoomHandle {
 
     /// Unmutes outbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::mute_audio`] was called while unmuting.
+    ///
     /// [`Room`]: room::Room
     pub fn unmute_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -193,6 +205,12 @@ impl RoomHandle {
     }
 
     /// Mutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::unmute_video`] was called while muting.
     ///
     /// [`Room`]: room::Room
     pub fn mute_video(&self, source_kind: Option<MediaSourceKind>) -> Promise {
@@ -207,6 +225,12 @@ impl RoomHandle {
     }
 
     /// Unmutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::mute_video`] was called while unmuting.
     ///
     /// [`Room`]: room::Room
     pub fn unmute_video(
@@ -225,6 +249,16 @@ impl RoomHandle {
 
     /// Disables outbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and ` MediaExchangeState of Sender can't be
+    /// transited into disabled state, because this Sender is required.` message
+    /// if server forbids audio track disabling.
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::enable_audio`] was called while disabling.
+    ///
     /// [`Room`]: room::Room
     pub fn disable_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -236,6 +270,12 @@ impl RoomHandle {
     }
 
     /// Enables outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::disable_audio`] was called while enabling.
     ///
     /// [`Room`]: room::Room
     pub fn enable_audio(&self) -> Promise {
@@ -250,6 +290,16 @@ impl RoomHandle {
     /// Disables outbound video.
     ///
     /// Affects only video with a specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and ` MediaExchangeState of Sender can't be
+    /// transited into disabled state, because this Sender is required.` message
+    /// if server forbids a video track disabling.
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::enable_video`] was called while disabling.
     pub fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -268,6 +318,12 @@ impl RoomHandle {
     /// Enables outbound video.
     ///
     /// Affects only video with a specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::disable_video`] was called while enabling.
     pub fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -284,6 +340,12 @@ impl RoomHandle {
 
     /// Disables inbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::enable_remote_audio`] was called while disabling.
+    ///
     /// [`Room`]: room::Room
     pub fn disable_remote_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -297,6 +359,12 @@ impl RoomHandle {
     }
 
     /// Disables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::enable_remote_video`] was called while disabling.
     ///
     /// [`Room`]: room::Room
     pub fn disable_remote_video(&self) -> Promise {
@@ -312,6 +380,12 @@ impl RoomHandle {
 
     /// Enables inbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::disable_remote_audio`] was called while enabling.
+    ///
     /// [`Room`]: room::Room
     pub fn enable_remote_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -323,6 +397,12 @@ impl RoomHandle {
     }
 
     /// Enables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `MediaConnections` name and `MediaState of Sender transits into
+    /// opposite to expected MediaExchangeState` message if
+    /// [`RoomHandle::disable_remote_video`] was called while enabling.
     ///
     /// [`Room`]: room::Room
     pub fn enable_remote_video(&self) -> Promise {
