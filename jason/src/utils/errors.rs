@@ -101,21 +101,25 @@ impl JasonError {
 #[wasm_bindgen]
 impl JasonError {
     /// Returns name of error.
+    #[must_use]
     pub fn name(&self) -> String {
         String::from(self.name)
     }
 
     /// Returns message of errors.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.clone()
     }
 
     /// Returns trace information of error.
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
 
     /// Returns JS side error if it the cause.
+    #[must_use]
     pub fn source(&self) -> Option<js_sys::Error> {
         Clone::clone(&self.source)
     }

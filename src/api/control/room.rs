@@ -110,6 +110,8 @@ impl RoomSpec {
     }
 
     /// Returns ID of this [`RoomSpec`]
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> &Id {
         &self.id
     }

@@ -128,6 +128,8 @@ pub enum PeerError {
 }
 
 impl PeerError {
+    #[inline]
+    #[must_use]
     pub fn new_wrong_state(
         peer: &PeerStateMachine,
         expected: &'static str,
@@ -1000,6 +1002,7 @@ impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
     /// state.
     #[inline]
+    #[must_use]
     pub fn set_local_offer(self, local_sdp: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.local_sdp = Some(local_sdp);
@@ -1012,6 +1015,7 @@ impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`Stable`]
     /// state.
     #[inline]
+    #[must_use]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.local_sdp = Some(sdp_answer);
@@ -1069,6 +1073,7 @@ impl Peer<WaitLocalSdp> {
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
+    #[must_use]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
         self.context.remote_sdp = Some(sdp_answer);
 
@@ -1084,6 +1089,7 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`WaitLocalSdp`]
     /// state.
     #[inline]
+    #[must_use]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
         self.context.negotiation_role =
             Some(NegotiationRole::Answerer(sdp_offer.clone()));
@@ -1143,6 +1149,7 @@ impl Peer<Stable> {
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
+    #[must_use]
     pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
         context.local_sdp = None;
@@ -1163,6 +1170,7 @@ impl Peer<Stable> {
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
+    #[must_use]
     pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.local_sdp = None;
@@ -1604,7 +1612,7 @@ pub mod tests {
         ));
 
         let peer = peer.set_local_offer(String::new());
-        peer.set_remote_answer(String::new());
+        let _ = peer.set_remote_answer(String::new());
 
         let peer_id = negotiation_needed_rx.recv().unwrap();
         assert_eq!(peer_id, PeerId(0));

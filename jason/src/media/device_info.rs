@@ -48,6 +48,7 @@ impl TryFrom<MediaDeviceKind> for MediaKind {
 #[wasm_bindgen]
 impl InputDeviceInfo {
     /// Returns unique identifier for the represented device.
+    #[must_use]
     pub fn device_id(&self) -> String {
         self.info.device_id()
     }
@@ -57,6 +58,7 @@ impl InputDeviceInfo {
     /// This representation of [MediaDeviceInfo][1] ONLY for input device.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
+    #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.media_kind
     }
@@ -64,6 +66,7 @@ impl InputDeviceInfo {
     /// Returns label describing the represented device (for example
     /// "External USB Webcam").
     /// If the device has no associated label, then returns an empty string.
+    #[must_use]
     pub fn label(&self) -> String {
         self.info.label()
     }
@@ -76,6 +79,7 @@ impl InputDeviceInfo {
     /// same [groupId][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadeviceinfo-groupid
+    #[must_use]
     pub fn group_id(&self) -> String {
         self.info.group_id()
     }

@@ -112,6 +112,8 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
+    #[inline]
+    #[must_use]
     pub fn new(
         id: MemberId,
         credentials: Credential,
@@ -265,6 +267,8 @@ impl Member {
     }
 
     /// Returns [`Fid`] to this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn get_fid(&self) -> Fid<ToMember> {
         Fid::<ToMember>::new(self.room_id(), self.id())
     }
@@ -273,6 +277,8 @@ impl Member {
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
+    #[inline]
+    #[must_use]
     pub fn get_fid_to_endpoint(
         &self,
         endpoint_id: EndpointId,
@@ -298,11 +304,15 @@ impl Member {
     }
 
     /// Returns [`MemberId`] of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> MemberId {
         self.0.borrow().id.clone()
     }
 
     /// Returns credentials of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn credentials(&self) -> Credential {
         self.0.borrow().credentials.clone()
     }
@@ -318,16 +328,21 @@ impl Member {
     }
 
     /// Returns all srcs of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
     }
 
     /// Returns all sinks endpoints of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn sinks(&self) -> HashMap<WebRtcPlayId, WebRtcPlayEndpoint> {
         self.0.borrow().sinks.clone()
     }
 
     /// Returns partner [`Member`]s of this [`Member`].
+    #[must_use]
     pub fn partners(&self) -> Vec<Member> {
         let this = self.0.borrow();
         this.srcs
@@ -353,6 +368,8 @@ impl Member {
 
     /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
     /// [`WebRtcPublishId`].
+    #[inline]
+    #[must_use]
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -361,6 +378,8 @@ impl Member {
     }
 
     /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
+    #[inline]
+    #[must_use]
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
@@ -369,21 +388,27 @@ impl Member {
     }
 
     /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
+    #[inline]
     pub fn remove_sink(&self, id: &WebRtcPlayId) {
         self.0.borrow_mut().sinks.remove(id);
     }
 
     /// Removes source [`WebRtcPublishEndpoint`] from this [`Member`].
+    #[inline]
     pub fn remove_src(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().srcs.remove(id);
     }
 
     /// Takes sink from [`Member`]'s `sinks`.
+    #[inline]
+    #[must_use]
     pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
     /// Takes src from [`Member`]'s `srsc`.
+    #[inline]
+    #[must_use]
     pub fn take_src(
         &self,
         id: &WebRtcPublishId,
@@ -392,6 +417,8 @@ impl Member {
     }
 
     /// Returns [`RoomId`] of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
     }
@@ -447,6 +474,8 @@ impl Member {
     }
 
     /// Downgrades strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
+    #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
     }
@@ -454,16 +483,22 @@ impl Member {
     /// Compares pointers. If both pointers point to the same address, then
     /// returns `true`.
     #[cfg(test)]
+    #[inline]
+    #[must_use]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnJoin` callback.
+    #[inline]
+    #[must_use]
     pub fn get_on_join(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_join.clone()
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnLeave` callback.
+    #[inline]
+    #[must_use]
     pub fn get_on_leave(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_leave.clone()
     }
@@ -472,6 +507,8 @@ impl Member {
     /// Client API.
     ///
     /// Once reached, the [`Member`] is considered being idle.
+    #[inline]
+    #[must_use]
     pub fn get_idle_timeout(&self) -> Duration {
         self.0.borrow().idle_timeout
     }
@@ -479,12 +516,16 @@ impl Member {
     /// Returns timeout of the [`Member`] reconnecting via Client API.
     ///
     /// Once reached, the [`Member`] is considered disconnected.
+    #[inline]
+    #[must_use]
     pub fn get_reconnect_timeout(&self) -> Duration {
         self.0.borrow().reconnect_timeout
     }
 
     /// Returns interval of sending heartbeat `Ping`s to the [`Member`] via
     /// Client API.
+    #[inline]
+    #[must_use]
     pub fn get_ping_interval(&self) -> Duration {
         self.0.borrow().ping_interval
     }
@@ -504,11 +545,15 @@ impl WeakMember {
     /// Upgrades weak pointer to strong pointer.
     ///
     /// This function will __panic__ if weak pointer was dropped.
+    #[inline]
+    #[must_use]
     pub fn upgrade(&self) -> Member {
         Member(Weak::upgrade(&self.0).unwrap())
     }
 
     /// Safely upgrades to [`Member`].
+    #[inline]
+    #[must_use]
     pub fn safe_upgrade(&self) -> Option<Member> {
         Weak::upgrade(&self.0).map(Member)
     }
