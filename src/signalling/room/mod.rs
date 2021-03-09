@@ -178,11 +178,14 @@ impl Room {
     }
 
     /// Returns [`RoomId`] of this [`Room`].
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> &RoomId {
         &self.id
     }
 
     /// Sends [`Event::PeersRemoved`] to [`Member`].
+    #[inline]
     fn send_peers_removed(
         &self,
         member_id: MemberId,
