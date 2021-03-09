@@ -10,10 +10,8 @@ use medea_client_api_proto::{
 };
 use medea_jason::{
     media::{MediaManager, RecvConstraints},
-    peer::{
-        LocalStreamUpdateCriteria, MediaConnections, RtcPeerConnection,
-        SimpleTracksRequest, TransceiverDirection,
-    },
+    peer::{LocalStreamUpdateCriteria, MediaConnections, SimpleTracksRequest},
+    platform::{RtcPeerConnection, TransceiverDirection},
 };
 use wasm_bindgen_test::*;
 

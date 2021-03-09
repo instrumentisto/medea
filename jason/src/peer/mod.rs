@@ -3,14 +3,10 @@
 //! [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 mod component;
-mod conn;
-mod ice_server;
-mod media;
+pub mod media;
 pub mod repo;
-mod stats;
 mod stream_update_criteria;
 mod tracks_request;
-mod transceiver;
 
 use std::{
     cell::{Cell, RefCell},
@@ -28,24 +24,21 @@ use medea_client_api_proto::{
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
-use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    api::Connections,
+    connection::Connections,
     media::{
         track::{local, remote},
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
-        RecvConstraints,
+        MediaStreamSettings, RecvConstraints,
     },
-    utils::{JasonError, JsCaused, JsError},
-    MediaStreamSettings,
+    platform,
+    utils::{JasonError, JsCaused},
 };
 
 #[doc(inline)]
 pub use self::{
     component::{Component, State},
-    conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
     media::{
         media_exchange_state, mute_state, receiver, sender, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
@@ -53,16 +46,15 @@ pub use self::{
         MuteState, MuteStateController, TrackDirection, TransceiverSide,
         TransitableState, TransitableStateController,
     },
-    stats::RtcStats,
     stream_update_criteria::LocalStreamUpdateCriteria,
     tracks_request::{SimpleTracksRequest, TracksRequest, TracksRequestError},
-    transceiver::{Transceiver, TransceiverDirection},
 };
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
 #[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
@@ -77,7 +69,7 @@ pub enum PeerError {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
+    RtcPeerConnection(#[js(cause)] platform::RTCPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or parsing
     /// [`local::Track`]s.
@@ -112,11 +104,11 @@ pub enum TrackEvent {
     },
 }
 
+/// Events emitted from [`platform::RtcPeerConnection`].
 #[dispatchable(self: &Self, async_trait(?Send))]
 #[derive(Clone)]
-/// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
-    /// [`RtcPeerConnection`] discovered new ICE candidate.
+    /// [`platform::RtcPeerConnection`] discovered new ICE candidate.
     ///
     /// Wrapper around [RTCPeerConnectionIceEvent][1].
     ///
@@ -144,8 +136,8 @@ pub enum PeerEvent {
         sdp_mid: Option<String>,
     },
 
-    /// [`RtcPeerConnection`] received new [`remote::Track`] from remote
-    /// sender.
+    /// [`platform::RtcPeerConnection`] received a new [`remote::Track`] from
+    /// a remote sender.
     NewRemoteTrack {
         /// Remote `Member` ID.
         sender_id: MemberId,
@@ -154,13 +146,13 @@ pub enum PeerEvent {
         track: remote::Track,
     },
 
-    /// [`RtcPeerConnection`] sent new local track to remote members.
+    /// [`platform::RtcPeerConnection`] sent new local track to remote members.
     NewLocalTrack {
         /// Local [`local::Track`] that is sent to remote members.
         local_track: Rc<local::Track>,
     },
 
-    /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
+    /// [`platform::RtcPeerConnection`]'s [ICE connection][1] state changed.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
     IceConnectionStateChanged {
@@ -174,7 +166,7 @@ pub enum PeerEvent {
         ice_connection_state: IceConnectionState,
     },
 
-    /// [`RtcPeerConnection`]'s [connection][1] state changed.
+    /// [`platform::RtcPeerConnection`]'s [connection][1] state changed.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
     ConnectionStateChanged {
@@ -188,13 +180,14 @@ pub enum PeerEvent {
         peer_connection_state: PeerConnectionState,
     },
 
-    /// [`RtcPeerConnection`]'s [`RtcStats`] update.
+    /// [`platform::RtcPeerConnection`]'s [`platform::RtcStats`] update.
     StatsUpdate {
-        /// ID of the [`PeerConnection`] for which [`RtcStats`] was sent.
+        /// ID of the [`PeerConnection`] for which [` platform::RtcStats`] was
+        /// sent.
         peer_id: Id,
 
-        /// [`RtcStats`] of this [`PeerConnection`].
-        stats: RtcStats,
+        /// [` platform::RtcStats`] of this [`PeerConnection`].
+        stats: platform::RtcStats,
     },
 
     /// [`PeerConnection::update_local_stream`] was failed, so
@@ -243,16 +236,16 @@ pub enum PeerEvent {
     },
 }
 
-/// High-level wrapper around [`RtcPeerConnection`].
+/// High-level wrapper around a [`platform::RtcPeerConnection`].
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,
 
-    /// Underlying [`RtcPeerConnection`].
-    peer: Rc<RtcPeerConnection>,
+    /// Underlying [`platform::RtcPeerConnection`].
+    peer: Rc<platform::RtcPeerConnection>,
 
     /// [`sender::Component`]s and [`receiver::Component`]s of this
-    /// [`RtcPeerConnection`].
+    /// [`platform::RtcPeerConnection`].
     media_connections: Rc<MediaConnections>,
 
     /// [`MediaManager`] that will be used to acquire [`local::Track`]s.
@@ -261,15 +254,16 @@ pub struct PeerConnection {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Indicates if underlying [`RtcPeerConnection`] has remote description.
+    /// Indicator whether the underlying [`platform::RtcPeerConnection`] has a
+    /// remote description.
     has_remote_description: Cell<bool>,
 
-    /// Stores [`IceCandidate`]s received before remote description for
-    /// underlying [`RtcPeerConnection`].
-    ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
+    /// Buffer of [`platform::IceCandidate`]s received before a remote
+    /// description for the underlying [`platform::RtcPeerConnection`].
+    ice_candidates_buffer: RefCell<Vec<platform::IceCandidate>>,
 
-    /// Last hashes of the all [`RtcStats`] which was already sent to the
-    /// server, so we won't duplicate stats that were already sent.
+    /// Last hashes of all the [`platform::RtcStats`] which were already sent
+    /// to a server, so we won't duplicate stats that were already sent.
     ///
     /// Stores precomputed hashes, since we don't need access to actual stats
     /// values.
@@ -280,7 +274,7 @@ pub struct PeerConnection {
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::connection::Connection
     connections: Rc<Connections>,
 
     /// Sender for the [`TrackEvent`]s which should be processed by this
@@ -298,15 +292,16 @@ impl PeerConnection {
     /// Provided `peer_events_sender` will be used to emit [`PeerEvent`]s from
     /// this peer.
     ///
-    /// Provided `ice_servers` will be used by created [`RtcPeerConnection`].
+    /// Provided `ice_servers` will be used by the created
+    /// [`platform::RtcPeerConnection`].
     ///
     /// # Errors
     ///
-    /// Errors with [`PeerError::RtcPeerConnection`] if [`RtcPeerConnection`]
-    /// creating fails.
+    /// Errors with [`PeerError::RtcPeerConnection`] if
+    /// [`platform::RtcPeerConnection`] creating fails.
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
-    /// [`RtcPeerConnection`] can't be set.
+    /// [`platform::RtcPeerConnection`] can't be set.
     pub fn new(
         state: &State,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -316,7 +311,7 @@ impl PeerConnection {
         recv_constraints: Rc<RecvConstraints>,
     ) -> Result<Rc<Self>> {
         let peer = Rc::new(
-            RtcPeerConnection::new(
+            platform::RtcPeerConnection::new(
                 state.ice_servers().clone(),
                 state.force_relay(),
             )
@@ -328,7 +323,7 @@ impl PeerConnection {
             peer_events_sender.clone(),
         ));
 
-        spawn_local({
+        platform::spawn({
             let peer_events_sender = peer_events_sender.clone();
             let peer_id = state.id();
 
@@ -357,58 +352,57 @@ impl PeerConnection {
         // Bind to `icecandidate` event.
         let id = peer.id;
         let sender = peer.peer_events_sender.clone();
-        peer.peer
-            .on_ice_candidate(Some(move |candidate| {
-                Self::on_ice_candidate(id, &sender, candidate);
-            }))
-            .map_err(tracerr::map_from_and_wrap!())?;
+        peer.peer.on_ice_candidate(Some(move |candidate| {
+            Self::on_ice_candidate(id, &sender, candidate);
+        }));
 
         // Bind to `iceconnectionstatechange` event.
         let id = peer.id;
         let sender = peer.peer_events_sender.clone();
-        peer.peer
-            .on_ice_connection_state_change(Some(move |ice_connection_state| {
+        peer.peer.on_ice_connection_state_change(Some(
+            move |ice_connection_state| {
                 Self::on_ice_connection_state_changed(
                     id,
                     &sender,
                     ice_connection_state,
                 );
-            }))
-            .map_err(tracerr::map_from_and_wrap!())?;
+            },
+        ));
 
         // Bind to `connectionstatechange` event.
         let id = peer.id;
         let sender = peer.peer_events_sender.clone();
-        peer.peer
-            .on_connection_state_change(Some(move |peer_connection_state| {
+        peer.peer.on_connection_state_change(Some(
+            move |peer_connection_state| {
                 Self::on_connection_state_changed(
                     id,
                     &sender,
                     peer_connection_state,
                 )
-            }))
-            .map_err(tracerr::map_from_and_wrap!())?;
+            },
+        ));
 
         // Bind to `track` event.
         let media_connections = Rc::clone(&peer.media_connections);
-        peer.peer
-            .on_track(Some(move |track_event| {
-                if let Err(err) =
-                    media_connections.add_remote_track(&track_event)
-                {
-                    JasonError::from(err).print();
-                };
-            }))
-            .map_err(tracerr::map_from_and_wrap!())?;
+        peer.peer.on_track(Some(move |track, transceiver| {
+            if let Err(err) =
+                media_connections.add_remote_track(track, transceiver)
+            {
+                JasonError::from(err).print();
+            };
+        }));
 
         Ok(Rc::new(peer))
     }
 
-    /// Handler [`TrackEvent`]s emitted from [`Sender`] or [`Receiver`].
+    /// Handles [`TrackEvent`]s emitted from a [`Sender`] or a [`Receiver`].
     ///
-    /// Sends [`PeerEvent::SendIntention`] with a [`Command::UpdateTracks`] on
-    /// [`TrackEvent::MediaExchangeIntention`] and
-    /// [`TrackEvent::MuteStateIntention`].
+    /// Sends a [`PeerEvent::MediaUpdateCommand`] with a
+    /// [`Command::UpdateTracks`] on [`TrackEvent::MediaExchangeIntention`] and
+    /// [`TrackEvent::MuteUpdateIntention`].
+    ///
+    /// [`Sender`]: sender::Sender
+    /// [`Receiver`]: receiver::Receiver
     fn handle_track_event(
         peer_id: PeerId,
         peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
@@ -463,12 +457,12 @@ impl PeerConnection {
         self.media_connections.drop_send_tracks(kinds).await
     }
 
-    /// Filters out already sent stats, and send new statss from
-    /// provided [`RtcStats`].
+    /// Filters out already sent stats, and send new stats from the provided
+    /// [`platform::RtcStats`].
     #[allow(clippy::option_if_let_else)]
-    pub fn send_peer_stats(&self, stats: RtcStats) {
+    pub fn send_peer_stats(&self, stats: platform::RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
-        let stats = RtcStats(
+        let stats = platform::RtcStats(
             stats
                 .0
                 .into_iter()
@@ -502,7 +496,8 @@ impl PeerConnection {
         }
     }
 
-    /// Sends [`RtcStats`] update of this [`PeerConnection`] to the server.
+    /// Sends [`platform::RtcStats`] update of this [`PeerConnection`] to a
+    /// server.
     pub async fn scrape_and_send_peer_stats(&self) {
         match self.peer.get_stats().await {
             Ok(stats) => self.send_peer_stats(stats),
@@ -544,7 +539,7 @@ impl PeerConnection {
     fn on_ice_candidate(
         id: Id,
         sender: &mpsc::UnboundedSender<PeerEvent>,
-        candidate: IceCandidate,
+        candidate: platform::IceCandidate,
     ) {
         let _ = sender.unbounded_send(PeerEvent::IceCandidateDiscovered {
             peer_id: id,
@@ -560,24 +555,8 @@ impl PeerConnection {
     fn on_ice_connection_state_changed(
         peer_id: Id,
         sender: &mpsc::UnboundedSender<PeerEvent>,
-        ice_connection_state: RtcIceConnectionState,
+        ice_connection_state: IceConnectionState,
     ) {
-        use RtcIceConnectionState as S;
-
-        let ice_connection_state = match ice_connection_state {
-            S::New => IceConnectionState::New,
-            S::Checking => IceConnectionState::Checking,
-            S::Connected => IceConnectionState::Connected,
-            S::Completed => IceConnectionState::Completed,
-            S::Failed => IceConnectionState::Failed,
-            S::Disconnected => IceConnectionState::Disconnected,
-            S::Closed => IceConnectionState::Closed,
-            S::__Nonexhaustive => {
-                log::error!("Unknown ICE connection state");
-                return;
-            }
-        };
-
         let _ = sender.unbounded_send(PeerEvent::IceConnectionStateChanged {
             peer_id,
             ice_connection_state,
@@ -642,9 +621,9 @@ impl PeerConnection {
     }
 
     /// Track id to mid relations of all send tracks of this
-    /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
-    /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
-    /// allocated on sdp update.
+    /// [`platform::RtcPeerConnection`]. mid is id of [`m= section`][1]. mids
+    /// are received directly from registered [`RTCRtpTransceiver`][2]s, and
+    /// are being allocated on SDP update.
     ///
     /// # Errors
     ///
@@ -689,7 +668,7 @@ impl PeerConnection {
     /// Constraints being used when requesting stream from [`MediaManager`] are
     /// a result of merging constraints received from this [`PeerConnection`]
     /// [`Sender`]s, which are configured by server during signalling, and
-    /// [`LocalTracksConstraints`], that are optionally configured by JS-side.
+    /// [`LocalTracksConstraints`].
     ///
     /// Returns [`HashMap`] with [`media_exchange_state::Stable`]s updates for
     /// the [`Sender`]s.
@@ -767,7 +746,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`Media::TracksRequest`] if failed to create or merge
+    /// Errors with [`PeerError::TracksRequest`] if failed to create or merge
     /// [`SimpleTracksRequest`].
     fn get_simple_tracks_request(
         &self,
@@ -846,13 +825,14 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`][3] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
+    /// [3]: platform::RTCPeerConnectionError::SetRemoteDescriptionFailed
     async fn set_remote_answer(&self, answer: String) -> Result<()> {
-        self.set_remote_description(SdpType::Answer(answer))
+        self.set_remote_description(platform::SdpType::Answer(answer))
             .await
             .map_err(tracerr::wrap!())
     }
@@ -861,13 +841,13 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`platform::RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     async fn set_remote_offer(&self, offer: String) -> Result<()> {
-        self.set_remote_description(SdpType::Offer(offer))
+        self.set_remote_description(platform::SdpType::Offer(offer))
             .await
             .map_err(tracerr::wrap!())
     }
@@ -877,17 +857,20 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`platform::RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
-    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// With [`platform::RTCPeerConnectionError::AddIceCandidateFailed`] if
     /// [RtcPeerConnection.addIceCandidate()][3] fails when adding buffered ICE
     /// candidates.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setremotedescription
     /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
-    async fn set_remote_description(&self, desc: SdpType) -> Result<()> {
+    async fn set_remote_description(
+        &self,
+        desc: platform::SdpType,
+    ) -> Result<()> {
         self.peer
             .set_remote_description(desc)
             .await
@@ -921,12 +904,13 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
-    /// [RtcPeerConnection.addIceCandidate()][2] fails to add buffered
+    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`][2] if
+    /// [RtcPeerConnection.addIceCandidate()][3] fails to add buffered
     /// [ICE candidates][1].
     ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
+    /// [2]: platform::RTCPeerConnectionError::AddIceCandidateFailed
+    /// [3]: https://w3.org/TR/webrtc/#dom-peerconnection-addicecandidate
     pub async fn add_ice_candidate(
         &self,
         candidate: String,
@@ -939,11 +923,13 @@ impl PeerConnection {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
         } else {
-            self.ice_candidates_buffer.borrow_mut().push(IceCandidate {
-                candidate,
-                sdp_m_line_index,
-                sdp_mid,
-            });
+            self.ice_candidates_buffer.borrow_mut().push(
+                platform::IceCandidate {
+                    candidate,
+                    sdp_m_line_index,
+                    sdp_mid,
+                },
+            );
         }
         Ok(())
     }
@@ -957,7 +943,7 @@ impl PeerConnection {
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if failed to get
     /// [`RtcStats`].
-    pub async fn get_stats(&self) -> Result<RtcStats> {
+    pub async fn get_stats(&self) -> Result<platform::RtcStats> {
         self.peer
             .get_stats()
             .await
@@ -1066,9 +1052,10 @@ impl Drop for PeerConnection {
     /// Drops `on_track` and `on_ice_candidate` callbacks to prevent possible
     /// leaks.
     fn drop(&mut self) {
-        let _ = self.peer.on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);
-        let _ = self
-            .peer
-            .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
+        self.peer.on_track::<Box<
+            dyn FnMut(platform::MediaStreamTrack, platform::Transceiver),
+        >>(None);
+        self.peer
+            .on_ice_candidate::<Box<dyn FnMut(platform::IceCandidate)>>(None);
     }
 }

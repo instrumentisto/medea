@@ -5,10 +5,10 @@ use std::rc::Rc;
 use derive_more::Deref;
 use futures::{future, Future, FutureExt as _, Stream, StreamExt};
 use medea_reactive::AllProcessed;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::LocalTracksConstraints,
+    platform,
     utils::{JasonError, TaskHandle},
 };
 
@@ -137,7 +137,7 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
                 }
             }
         });
-        spawn_local(fut.map(|_| ()));
+        platform::spawn(fut.map(|_| ()));
 
         self.spawned_watchers.push(handle.into());
     }

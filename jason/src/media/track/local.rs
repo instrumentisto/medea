@@ -1,4 +1,4 @@
-//! Wrapper around [`sys::MediaStreamTrack`] received from
+//! Wrapper around a [`platform::MediaStreamTrack`] received from a
 //! [getUserMedia()][1]/[getDisplayMedia()][2] request.
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
@@ -6,30 +6,30 @@
 
 use std::rc::Rc;
 
-use medea_client_api_proto::MediaSourceKind;
-use wasm_bindgen::prelude::*;
-use web_sys as sys;
+use derive_more::AsRef;
+use medea_client_api_proto as proto;
 
-use crate::{media::MediaKind, JsMediaSourceKind};
+use crate::{
+    media::{MediaKind, MediaSourceKind},
+    platform,
+};
 
-/// Wrapper around [`sys::MediaStreamTrack`] received from from
+/// Wrapper around a [`platform::MediaStreamTrack`] received from a
 /// [getUserMedia()][1]/[getDisplayMedia()][2] request.
 ///
-/// Underlying [`sys::MediaStreamTrack`] is stopped on this [`Track`]'s
+/// Underlying [`platform::MediaStreamTrack`] is stopped on this [`Track`]'s
 /// [`Drop`].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-#[derive(Debug)]
+#[derive(AsRef, Debug)]
 pub struct Track {
-    /// Actual [`sys::MediaStreamTrack`].
-    track: sys::MediaStreamTrack,
+    /// Actual [`platform::MediaStreamTrack`].
+    #[as_ref]
+    track: platform::MediaStreamTrack,
 
-    /// Underlying [`sys::MediaStreamTrack`] source kind.
-    source_kind: MediaSourceKind,
-
-    /// Underlying [`sys::MediaStreamTrack`] kind.
-    kind: MediaKind,
+    /// Underlying [`platform::MediaStreamTrack`] source kind.
+    source_kind: proto::MediaSourceKind,
 
     /// Reference to the parent [`Track`].
     ///
@@ -41,22 +41,17 @@ pub struct Track {
 }
 
 impl Track {
-    /// Builds new [`Track`] from the provided [`sys::MediaStreamTrack`] and
-    /// [`MediaSourceKind`].
+    /// Builds a new [`Track`] from the provided [`platform::MediaStreamTrack`]
+    /// and [`proto::MediaSourceKind`].
+    #[inline]
     #[must_use]
     pub fn new(
-        track: sys::MediaStreamTrack,
-        source_kind: MediaSourceKind,
+        track: platform::MediaStreamTrack,
+        source_kind: proto::MediaSourceKind,
     ) -> Self {
-        let kind = match track.kind().as_ref() {
-            "audio" => MediaKind::Audio,
-            "video" => MediaKind::Video,
-            _ => unreachable!(),
-        };
         Self {
             track,
             source_kind,
-            kind,
             _parent: None,
         }
     }
@@ -84,7 +79,7 @@ impl Track {
     /// Returns this [`Track`]'s media source kind.
     #[inline]
     #[must_use]
-    pub fn media_source_kind(&self) -> MediaSourceKind {
+    pub fn media_source_kind(&self) -> proto::MediaSourceKind {
         self.source_kind
     }
 
@@ -92,13 +87,13 @@ impl Track {
     #[inline]
     #[must_use]
     pub fn kind(&self) -> MediaKind {
-        self.kind
+        self.track.kind()
     }
 
     /// Forks this [`Track`].
     ///
-    /// Creates new [`sys::MediaStreamTrack`] from this [`Track`]'s
-    /// [`sys::MediaStreamTrack`] using [`clone()`][1] method.
+    /// Creates new a [`platform::MediaStreamTrack`] from this [`Track`]'s
+    /// [`platform::MediaStreamTrack`] using a [`clone()`][1] method.
     ///
     /// Forked [`Track`] will hold a strong reference to this [`Track`].
     ///
@@ -106,21 +101,12 @@ impl Track {
     #[must_use]
     pub fn fork(self: &Rc<Self>) -> Self {
         let parent = Rc::clone(self);
-        let track = sys::MediaStreamTrack::clone(&self.track);
+        let track = platform::MediaStreamTrack::clone(&self.track);
         Self {
             track,
-            kind: self.kind,
             source_kind: self.source_kind,
             _parent: Some(parent),
         }
-    }
-
-    /// Returns reference to the underlying [`sys::MediaStreamTrack`] of this
-    /// [`Track`].
-    #[inline]
-    #[must_use]
-    pub fn sys_track(&self) -> &sys::MediaStreamTrack {
-        &self.track
     }
 }
 
@@ -131,38 +117,46 @@ impl Drop for Track {
     }
 }
 
-/// Wrapper around strongly referenced [`Track`] for JS side.
-#[wasm_bindgen(js_name = LocalMediaTrack)]
-pub struct JsTrack(Rc<Track>);
+/// Strongly referenced [`Track`] received from a
+/// [getUserMedia()][1]/[getDisplayMedia()][2] request.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+pub struct LocalMediaTrack(Rc<Track>);
 
-impl JsTrack {
-    /// Creates new [`JsTrack`] from the provided [`Track`].
+impl LocalMediaTrack {
+    /// Createsa  new [`LocalMediaTrack`] from the provided [`Track`].
     #[inline]
     #[must_use]
     pub fn new(track: Rc<Track>) -> Self {
-        JsTrack(track)
-    }
-}
-
-#[wasm_bindgen(js_class = LocalMediaTrack)]
-impl JsTrack {
-    /// Returns the underlying [`sys::MediaStreamTrack`] of this [`JsTrack`].
-    pub fn get_track(&self) -> sys::MediaStreamTrack {
-        Clone::clone(self.0.track.as_ref())
+        LocalMediaTrack(track)
     }
 
-    /// Returns [`MediaKind::Audio`] if this [`JsTrack`] represents an audio
-    /// track, or [`MediaKind::Video`] if it represents a video track.
+    /// Returns the underlying [`platform::MediaStreamTrack`] of this
+    /// [`LocalMediaTrack`].
+    #[inline]
+    #[must_use]
+    pub fn get_track(&self) -> &platform::MediaStreamTrack {
+        &self.0.track
+    }
+
+    /// Returns a [`MediaKind::Audio`] if this [`LocalMediaTrack`] represents an
+    /// audio track, or a [`MediaKind::Video`] if it represents a video track.
+    #[inline]
+    #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.0.kind()
     }
 
-    /// Returns [`JsMediaSourceKind::Device`] if this [`JsTrack`] is sourced
-    /// from some device (webcam/microphone), or [`JsMediaSourceKind::Display`]
-    /// if ot is captured via [MediaDevices.getDisplayMedia()][1].
+    /// Returns a [`MediaSourceKind::Device`] if this [`LocalMediaTrack`] is
+    /// sourced from some device (webcam/microphone), or
+    /// a [`MediaSourceKind::Display`] if it's captured via
+    /// [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    pub fn media_source_kind(&self) -> JsMediaSourceKind {
+    #[inline]
+    #[must_use]
+    pub fn media_source_kind(&self) -> MediaSourceKind {
         self.0.media_source_kind().into()
     }
 }

@@ -7,14 +7,14 @@ use medea_client_api_proto::{self as proto, PeerId};
 use medea_macro::watchers;
 use medea_reactive::ObservableHashMap;
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::{Connections, RoomError},
+    connection::Connections,
     media::{LocalTracksConstraints, MediaManager, RecvConstraints},
-    peer,
+    peer, platform,
+    room::RoomError,
     utils::{
-        component, delay_for, AsProtoState, SynchronizableState, TaskHandle,
+        component, AsProtoState, SynchronizableState, TaskHandle,
         Updatable as _,
     },
 };
@@ -102,21 +102,19 @@ pub struct Repository {
 
     /// Channel for sending events produced by [`PeerConnection`] to [`Room`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Constraints to local [`local::Track`]s that are being published by
     /// [`PeerConnection`]s from this [`Repository`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     /// [`local::Track`]: crate::media::track::local::Track
     send_constraints: LocalTracksConstraints,
 
     /// Collection of [`Connection`]s with a remote `Member`s.
     ///
-    /// [`Connection`]: crate::api::Connection
+    /// [`Connection`]: crate::connection::Connection
     connections: Rc<Connections>,
 
     /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
@@ -129,11 +127,9 @@ pub struct Repository {
 }
 
 impl Repository {
-    /// Returns new empty [`Repository`].
+    /// Returns new empty [`platform::RtcStats`].
     ///
-    /// Spawns [`RtcStats`] scrape task.
-    ///
-    /// [`RtcStats`]: crate::peer::RtcStats
+    /// Spawns a task for scraping [`platform::RtcStats`].
     #[must_use]
     pub fn new(
         media_manager: Rc<MediaManager>,
@@ -156,19 +152,17 @@ impl Repository {
         }
     }
 
-    /// Spawns task which will call [`PeerConnection::send_peer_stats`] of
-    /// all [`PeerConnection`]s every second and send updated [`RtcStats`]
-    /// to the server.
+    /// Spawns a task which will call [`PeerConnection::send_peer_stats()`] of
+    /// all [`PeerConnection`]s every second and send updated
+    /// [`platform::RtcStats`] to a server.
     ///
-    /// Returns [`TaskHandle`] which will stop this task on [`Drop::drop()`].
-    ///
-    /// [`RtcStats`]: crate::peer::RtcStats
+    /// Returns [`TaskHandle`] which will stop this task on its [`Drop`].
     fn spawn_peers_stats_scrape_task(
         peers: Rc<RefCell<HashMap<PeerId, peer::Component>>>,
     ) -> TaskHandle {
         let (fut, abort) = future::abortable(async move {
             loop {
-                delay_for(Duration::from_secs(1).into()).await;
+                platform::delay_for(Duration::from_secs(1)).await;
 
                 let peers = peers
                     .borrow()
@@ -182,7 +176,7 @@ impl Repository {
             }
         });
 
-        spawn_local(async move {
+        platform::spawn(async move {
             fut.await.ok();
         });
 
@@ -260,6 +254,8 @@ impl Component {
     ///
     /// Removes [`peer::Component`] and closes [`Connection`] by calling
     /// [`Connections::close_connection()`].
+    ///
+    /// [`Connection`]: crate::connection::Connection
     #[inline]
     #[watch(self.0.borrow().on_remove())]
     async fn peer_removed(

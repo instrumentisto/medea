@@ -8,7 +8,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::media::track::local;
+use crate::{media::track::local, platform::MediaStreamTrack};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -20,11 +20,14 @@ pub struct Transceiver {
 
 impl Transceiver {
     /// Returns current [`TransceiverDirection`] of this [`Transceiver`].
+    #[inline]
+    #[must_use]
     fn current_direction(&self) -> TransceiverDirection {
         TransceiverDirection::from(self.transceiver.direction())
     }
 
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
+    #[inline]
     pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
         self.transceiver.set_direction(
             (self.current_direction() - disabled_direction).into(),
@@ -32,6 +35,7 @@ impl Transceiver {
     }
 
     /// Enables provided [`TransceiverDirection`] of this [`Transceiver`].
+    #[inline]
     pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
         self.transceiver.set_direction(
             (self.current_direction() | enabled_direction).into(),
@@ -40,6 +44,8 @@ impl Transceiver {
 
     /// Indicates whether the provided [`TransceiverDirection`] is enabled for
     /// this [`Transceiver`].
+    #[inline]
+    #[must_use]
     pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
         self.current_direction().contains(direction)
     }
@@ -59,22 +65,31 @@ impl Transceiver {
         if new_track.is_none() {
             self.send_track.replace(None);
         }
-        let sys_track = new_track.as_ref().map(|t| t.sys_track());
-        JsFuture::from(self.transceiver.sender().replace_track(sys_track))
-            .await
-            .map(|_| {
-                self.send_track.replace(new_track);
-            })
+        let sys_track: Option<&MediaStreamTrack> =
+            new_track.as_ref().map(|t| (**t).as_ref());
+        JsFuture::from(
+            self.transceiver
+                .sender()
+                .replace_track(sys_track.map(AsRef::as_ref)),
+        )
+        .await
+        .map(|_| {
+            self.send_track.replace(new_track);
+        })
     }
 
     /// Returns [`mid`] of this [`Transceiver`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    #[inline]
+    #[must_use]
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }
 
     /// Returns [`local::Track`] that is being send to remote, if any.
+    #[inline]
+    #[must_use]
     pub fn send_track(&self) -> Option<Rc<local::Track>> {
         self.send_track.borrow().clone()
     }
@@ -88,6 +103,7 @@ impl Transceiver {
 
     /// Sets the underlying [`local::Track`]'s `enabled` field to the provided
     /// value, if any.
+    #[inline]
     pub fn set_send_track_enabled(&self, enabled: bool) {
         if let Some(track) = self.send_track.borrow().as_ref() {
             track.set_enabled(enabled);
@@ -96,6 +112,7 @@ impl Transceiver {
 }
 
 impl From<RtcRtpTransceiver> for Transceiver {
+    #[inline]
     fn from(transceiver: RtcRtpTransceiver) -> Self {
         Transceiver {
             send_track: RefCell::new(None),
@@ -206,32 +223,32 @@ mod tests {
     }
 
     #[test]
-    fn from_trnsvr_direction_to_sys() {
+    fn from_trnscvr_direction_to_sys() {
         use RtcRtpTransceiverDirection as S;
         use TransceiverDirection as D;
 
-        for (trnsv_dir, sys_dir) in &[
+        for (trnscvr_dir, sys_dir) in &[
             (D::SEND, S::Sendonly),
             (D::RECV, S::Recvonly),
             (D::all(), S::Sendrecv),
             (D::INACTIVE, S::Inactive),
         ] {
-            assert_eq!(S::from(*trnsv_dir), *sys_dir);
+            assert_eq!(S::from(*trnscvr_dir), *sys_dir);
         }
     }
 
     #[test]
-    fn from_sys_direction_to_trnsvr() {
+    fn from_sys_direction_to_trnscvr() {
         use RtcRtpTransceiverDirection as S;
         use TransceiverDirection as D;
 
-        for (sys_dir, trnsv_dir) in &[
+        for (sys_dir, trnscvr_dir) in &[
             (S::Sendonly, D::SEND),
             (S::Recvonly, D::RECV),
             (S::Sendrecv, D::all()),
             (S::Inactive, D::INACTIVE),
         ] {
-            assert_eq!(D::from(*sys_dir), *trnsv_dir);
+            assert_eq!(D::from(*sys_dir), *trnscvr_dir);
         }
     }
 }

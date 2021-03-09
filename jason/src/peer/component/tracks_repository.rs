@@ -29,6 +29,7 @@ use super::sender;
 /// [`Component`].
 ///
 /// [`Component`]: super::Component
+/// [`receiver::State`]: super::receiver::State
 #[derive(Debug, From)]
 pub struct TracksRepository<S: 'static>(
     RefCell<ProgressableHashMap<TrackId, Rc<S>>>,
@@ -43,6 +44,8 @@ impl<S> TracksRepository<S> {
     }
 
     /// Returns [`Future`] resolving once all inserts/removes are processed.
+    ///
+    /// [`Future`]: std::future::Future
     #[inline]
     pub fn when_all_processed(&self) -> AllProcessed<'static> {
         self.0.borrow().when_all_processed()
@@ -62,6 +65,8 @@ impl<S> TracksRepository<S> {
     }
 
     /// Returns a [`Stream`] streaming the all [`TracksRepository::insert`]ions.
+    ///
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_insert(
         &self,
@@ -157,6 +162,8 @@ where
     /// Returns [`Future`] resolving once all tracks from this
     /// [`TracksRepository`] will be stabilized meaning that all track's
     /// components won't contain any pending state change transitions.
+    ///
+    /// [`Future`]: std::future::Future
     fn when_stabilized(&self) -> AllProcessed<'static> {
         let when_futs: Vec<_> = self
             .0

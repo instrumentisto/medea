@@ -10,16 +10,18 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        track::local, AudioTrackConstraints, MediaKind, MediaStreamSettings,
+        track::local, AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaKind, MediaStreamSettings,
         TrackConstraints, VideoSource,
     },
-    utils::{JsCaused, JsError},
-    DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
+    platform,
+    utils::JsCaused,
 };
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`local::Track`]s.
 #[derive(Clone, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
 pub enum TracksRequestError {
     /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
     #[display(fmt = "only one audio track is allowed in SimpleTracksRequest")]
@@ -164,7 +166,7 @@ impl SimpleTracksRequest {
 
         if let Some((id, audio)) = &self.audio {
             if let Some(track) = audio_tracks.into_iter().next() {
-                if audio.satisfies(track.sys_track()) {
+                if audio.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
@@ -173,7 +175,7 @@ impl SimpleTracksRequest {
         }
         if let Some((id, device_video)) = &self.device_video {
             if let Some(track) = device_video_tracks.into_iter().next() {
-                if device_video.satisfies(track.sys_track()) {
+                if device_video.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
@@ -182,7 +184,7 @@ impl SimpleTracksRequest {
         }
         if let Some((id, display_video)) = &self.display_video {
             if let Some(track) = display_video_tracks.into_iter().next() {
-                if display_video.satisfies(track.sys_track()) {
+                if display_video.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));

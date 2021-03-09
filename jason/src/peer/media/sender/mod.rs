@@ -11,10 +11,8 @@ use crate::{
     media::{
         track::local, LocalTracksConstraints, MediaKind, TrackConstraints,
     },
-    peer::{
-        transceiver::{Transceiver, TransceiverDirection},
-        TrackEvent,
-    },
+    peer::TrackEvent,
+    platform,
 };
 
 use super::{
@@ -22,13 +20,14 @@ use super::{
     MediaStateControllable, Result,
 };
 
+#[doc(inline)]
 pub use self::component::{Component, State};
 
 /// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
-    transceiver: Transceiver,
+    transceiver: platform::Transceiver,
     muted: Cell<bool>,
     enabled_individual: Cell<bool>,
     enabled_general: Cell<bool>,
@@ -37,10 +36,9 @@ pub struct Sender {
 }
 
 impl Sender {
-    /// Creates new [`Transceiver`] if provided `mid` is [`None`], otherwise
-    /// retrieves existing [`Transceiver`] via provided `mid` from a
-    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
-    /// fails.
+    /// Creates a new [`platform::Transceiver`] if the provided `mid` is
+    /// [`None`], otherwise retrieves an existing [`platform::Transceiver`] via
+    /// the provided `mid` from the provided [`MediaConnections`].
     ///
     /// # Errors
     ///
@@ -82,8 +80,10 @@ impl Sender {
                 })
                 .and_then(|rcvr| rcvr.transceiver())
                 .unwrap_or_else(|| {
-                    connections
-                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                    connections.add_transceiver(
+                        kind,
+                        platform::TransceiverDirection::INACTIVE,
+                    )
                 }),
             Some(mid) => connections
                 .get_transceiver_by_mid(mid)
@@ -128,7 +128,8 @@ impl Sender {
     #[inline]
     #[must_use]
     pub fn is_publishing(&self) -> bool {
-        self.transceiver.has_direction(TransceiverDirection::SEND)
+        self.transceiver
+            .has_direction(platform::TransceiverDirection::SEND)
     }
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
@@ -174,10 +175,10 @@ impl Sender {
         Ok(())
     }
 
-    /// Returns [`Transceiver`] of this [`Sender`].
+    /// Returns [`platform::Transceiver`] of this [`Sender`].
     #[inline]
     #[must_use]
-    pub fn transceiver(&self) -> Transceiver {
+    pub fn transceiver(&self) -> platform::Transceiver {
         self.transceiver.clone()
     }
 

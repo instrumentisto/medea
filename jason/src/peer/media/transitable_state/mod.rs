@@ -9,6 +9,7 @@ pub mod mute_state;
 use derive_more::From;
 use medea_client_api_proto::{TrackId, TrackPatchCommand};
 
+#[doc(inline)]
 pub use self::controller::{
     MediaExchangeStateController, MuteStateController,
     TransitableStateController,
@@ -86,6 +87,7 @@ impl MediaState {
 
 /// [`TransitableState::Stable`] variant of the [`TransitableState`].
 pub trait InStable: Clone + Copy + PartialEq {
+    /// Transition invariants of this [`InStable`].
     type Transition: InTransition;
 
     /// Converts this [`InStable`] into [`InStable::Transition`].
@@ -95,6 +97,7 @@ pub trait InStable: Clone + Copy + PartialEq {
 
 /// [`TransitableState::Transition`] variant of the [`TransitableState`].
 pub trait InTransition: Clone + Copy + PartialEq {
+    /// Stable invariants of this [`InTransition`].
     type Stable: InStable;
 
     /// Returns intention which this state indicates.

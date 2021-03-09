@@ -3,19 +3,18 @@
 use medea_client_api_proto::{MediaSourceKind, VideoSettings};
 use medea_jason::{
     media::{
-        AudioTrackConstraints, DeviceVideoTrackConstraints, MediaKind,
-        MediaManager, MediaStreamSettings, MultiSourceTracksConstraints,
-        VideoSource,
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaKind, MediaManager,
+        MediaStreamSettings, MultiSourceTracksConstraints, VideoSource,
     },
-    utils::{get_property_by_name, window},
-    DisplayVideoTrackConstraints,
+    platform::get_property_by_name,
 };
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
-use crate::is_firefox;
+use crate::{is_firefox, window};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -41,7 +40,7 @@ async fn video_constraints_satisfies() {
     let track = tracks.pop().unwrap().0;
 
     assert_eq!(track.kind(), MediaKind::Video);
-    assert!(track_constraints.satisfies(track.sys_track()));
+    assert!(track_constraints.satisfies(track.as_ref()));
 }
 
 // 1. Get device id of non default audio device from enumerate_devices();
@@ -66,7 +65,7 @@ async fn audio_constraints_satisfies() {
     let track = tracks.pop().unwrap().0;
 
     assert_eq!(track.kind(), MediaKind::Audio);
-    assert!(track_constraints.satisfies(track.sys_track()));
+    assert!(track_constraints.satisfies(track.as_ref()));
 }
 
 // 1. Get device id of non default video device from enumerate_devices();
@@ -115,10 +114,10 @@ async fn both_constraints_satisfies() {
     let video_track = video.pop().unwrap().0;
 
     assert_eq!(audio_track.kind(), MediaKind::Audio);
-    assert!(audio_constraints.satisfies(audio_track.sys_track()));
+    assert!(audio_constraints.satisfies(audio_track.as_ref()));
 
     assert_eq!(video_track.kind(), MediaKind::Video);
-    assert!(video_constraints.satisfies(video_track.sys_track()));
+    assert!(video_constraints.satisfies(video_track.as_ref()));
 }
 
 // 1. Get device id of non default audio and video device from
@@ -224,12 +223,18 @@ async fn multi_source_media_stream_constraints_build2() {
 
     match constraints {
         Some(MultiSourceTracksConstraints::Device(constraints)) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+            let has_video = get_property_by_name(
+                constraints.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let has_audio = get_property_by_name(
+                constraints.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(!has_video);
             assert!(has_audio);
@@ -250,12 +255,18 @@ async fn multi_source_media_stream_constraints_build3() {
 
     match constraints {
         Some(MultiSourceTracksConstraints::Device(constraints)) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+            let has_video = get_property_by_name(
+                constraints.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let has_audio = get_property_by_name(
+                constraints.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(has_video);
             assert!(has_audio);
@@ -279,18 +290,30 @@ async fn multi_source_media_stream_constraints_build4() {
             device,
             display,
         )) => {
-            let device_has_video =
-                get_property_by_name(&device, "video", js_val_to_option)
-                    .is_some();
-            let device_has_audio =
-                get_property_by_name(&device, "audio", js_val_to_option)
-                    .is_some();
-            let display_has_video =
-                get_property_by_name(&display, "video", js_val_to_option)
-                    .is_some();
-            let display_has_audio =
-                get_property_by_name(&display, "audio", js_val_to_option)
-                    .is_some();
+            let device_has_video = get_property_by_name(
+                device.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let device_has_audio = get_property_by_name(
+                &device.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
+            let display_has_video = get_property_by_name(
+                display.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let display_has_audio = get_property_by_name(
+                display.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(!device_has_video);
             assert!(device_has_audio);
@@ -312,12 +335,18 @@ async fn multi_source_media_stream_constraints_build5() {
 
     match constraints {
         Some(MultiSourceTracksConstraints::Device(constraints)) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+            let has_video = get_property_by_name(
+                constraints.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let has_audio = get_property_by_name(
+                constraints.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(has_video);
             assert!(!has_audio);
@@ -337,12 +366,18 @@ async fn multi_source_media_stream_constraints_build6() {
 
     match constraints {
         Some(MultiSourceTracksConstraints::Display(constraints)) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+            let has_video = get_property_by_name(
+                constraints.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let has_audio = get_property_by_name(
+                constraints.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(has_video);
             assert!(!has_audio);
@@ -373,12 +408,18 @@ async fn multi_source_media_stream_constraints_build7() {
 
     match constraints {
         Some(MultiSourceTracksConstraints::Device(constraints)) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+            let has_video = get_property_by_name(
+                constraints.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let has_audio = get_property_by_name(
+                constraints.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(has_video);
             assert!(has_audio);
@@ -398,12 +439,18 @@ async fn multi_source_media_stream_constraints_build8() {
 
     match constraints {
         Some(MultiSourceTracksConstraints::Device(constraints)) => {
-            let has_video =
-                get_property_by_name(&constraints, "video", js_val_to_option)
-                    .is_some();
-            let has_audio =
-                get_property_by_name(&constraints, "audio", js_val_to_option)
-                    .is_some();
+            let has_video = get_property_by_name(
+                constraints.as_ref(),
+                "video",
+                js_val_to_option,
+            )
+            .is_some();
+            let has_audio = get_property_by_name(
+                constraints.as_ref(),
+                "audio",
+                js_val_to_option,
+            )
+            .is_some();
 
             assert!(has_video);
             assert!(!has_audio);
@@ -530,13 +577,11 @@ async fn simultaneous_device_and_display() {
 
     let audio_track = audio.pop().unwrap().0;
     assert_eq!(audio_track.kind(), MediaKind::Audio);
-    assert!(audio_constraints.satisfies(audio_track.sys_track()));
+    assert!(audio_constraints.satisfies(audio_track.as_ref()));
 
     let display_video_track = video.pop().unwrap().0;
     assert_eq!(display_video_track.kind(), MediaKind::Video);
-    assert!(
-        display_video_constraints.satisfies(display_video_track.sys_track())
-    );
+    assert!(display_video_constraints.satisfies(display_video_track.as_ref()));
     assert_eq!(
         display_video_track.media_source_kind(),
         MediaSourceKind::Display
@@ -544,7 +589,7 @@ async fn simultaneous_device_and_display() {
 
     let device_video_track = video.pop().unwrap().0;
     assert_eq!(device_video_track.kind(), MediaKind::Video);
-    assert!(device_video_constraints.satisfies(device_video_track.sys_track()));
+    assert!(device_video_constraints.satisfies(device_video_track.as_ref()));
     assert_eq!(
         device_video_track.media_source_kind(),
         MediaSourceKind::Device

@@ -11,7 +11,6 @@ use futures::{
     StreamExt as _,
 };
 use medea_reactive::{Processed, ProgressableCell};
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     peer::media::{
@@ -20,6 +19,7 @@ use crate::{
         },
         MediaConnectionsError, Result,
     },
+    platform,
     utils::{resettable_delay_for, ResettableDelayHandle},
 };
 
@@ -81,13 +81,13 @@ where
         // at that moment.
         let mut state_changes = self.state.subscribe().skip(1);
         let weak_this = Rc::downgrade(&self);
-        spawn_local(async move {
+        platform::spawn(async move {
             while let Some(state) = state_changes.next().await {
                 let (state, _guard) = state.into_parts();
                 if let Some(this) = weak_this.upgrade() {
                     if let TransitableState::Transition(_) = state {
                         let weak_this = Rc::downgrade(&this);
-                        spawn_local(async move {
+                        platform::spawn(async move {
                             let mut states = this.state.subscribe().skip(1);
                             let (timeout, timeout_handle) =
                                 resettable_delay_for(
@@ -126,7 +126,7 @@ where
     /// Returns [`Stream`] into which the [`TransitableState::Stable`] updates
     /// will be emitted.
     ///
-    /// [`Stream`]: futures::stream::Stream
+    /// [`Stream`]: futures::Stream
     pub fn subscribe_stable(&self) -> LocalBoxStream<'static, S> {
         self.state
             .subscribe()
@@ -144,7 +144,7 @@ where
     /// Returns [`Stream`] into which the [`TransitableState::Transition`]
     /// updates will be emitted.
     ///
-    /// [`Stream`]: futures::stream::Stream
+    /// [`Stream`]: futures::Stream
     pub fn subscribe_transition(&self) -> LocalBoxStream<'static, T> {
         self.state
             .subscribe()

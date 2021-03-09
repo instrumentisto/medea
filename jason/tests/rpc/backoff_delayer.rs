@@ -10,8 +10,6 @@ use crate::timeout;
 wasm_bindgen_test_configure!(run_in_browser);
 
 /// Tests that `delay` multiplies by provided `multiplier`.
-///
-/// Also this test checks that [`JsDuration`] correctly multiplies by [`f32`].
 #[wasm_bindgen_test]
 async fn multiplier_works() {
     let mut delayer = BackoffDelayer::new(
@@ -37,9 +35,8 @@ async fn max_delay_works() {
     timeout(103, delayer.delay()).await.unwrap();
 }
 
-/// Tests that multiplication of [`JsDuration`] by negative `multiplier`
-/// will be calculated as `0` (this is default JS behavior which is recreated in
-/// [`JsDuration`] implementation).
+/// Tests that multiplication by negative `multiplier` will be calculated as
+/// `0`.
 #[wasm_bindgen_test]
 async fn negative_multiplier() {
     let mut delayer = BackoffDelayer::new(

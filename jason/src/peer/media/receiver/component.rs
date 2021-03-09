@@ -14,18 +14,17 @@ use medea_reactive::{
 };
 
 use crate::{
-    media::LocalTracksConstraints,
+    media::{LocalTracksConstraints, MediaKind},
     peer::{
         component::SyncState,
         media::{
             transitable_state::media_exchange_state, InTransition, Result,
         },
         MediaExchangeState, MediaExchangeStateController,
-        MediaStateControllable, MuteStateController, TransceiverDirection,
-        TransceiverSide,
+        MediaStateControllable, MuteStateController, TransceiverSide,
     },
+    platform,
     utils::{component, AsProtoState, SynchronizableState, Updatable},
-    MediaKind,
 };
 
 use super::Receiver;
@@ -248,11 +247,13 @@ impl State {
 
 #[watchers]
 impl Component {
-    /// Watcher for the [`State::general_media_exchange_state`] update.
+    /// Watcher for the [`State::enabled_general`] updates.
     ///
     /// Updates [`Receiver`]'s general media exchange state. Adds or removes
-    /// [`TransceiverDirection::RECV`] from the [`Transceiver`] of the
+    /// [`TransceiverDirection::RECV`] from the [`platform::Transceiver`] of the
     /// [`Receiver`].
+    ///
+    /// [`TransceiverDirection::RECV`]: platform::TransceiverDirection::RECV
     #[watch(self.enabled_general.subscribe())]
     async fn general_media_exchange_state_changed(
         receiver: Rc<Receiver>,
@@ -269,7 +270,7 @@ impl Component {
                     track.set_enabled(false);
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
-                    trnscvr.sub_direction(TransceiverDirection::RECV);
+                    trnscvr.sub_direction(platform::TransceiverDirection::RECV);
                 }
             }
             media_exchange_state::Stable::Enabled => {
@@ -277,7 +278,7 @@ impl Component {
                     track.set_enabled(true);
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
-                    trnscvr.add_direction(TransceiverDirection::RECV);
+                    trnscvr.add_direction(platform::TransceiverDirection::RECV);
                 }
             }
         }
@@ -286,7 +287,8 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for [`MediaExchangeState::Stable`] update.
+    /// Watcher for [`media_exchange_state::Stable`] media exchange state
+    /// updates.
     ///
     /// Updates [`Receiver::enabled_individual`] to the new state.
     #[inline]
@@ -302,10 +304,13 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for [`MediaExchangeState::Transition`] update.
+    /// Watcher for media exchange state [`media_exchange_state::Transition`]
+    /// updates.
     ///
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
+    /// Sends [`TrackEvent::MediaExchangeIntention`][1] with the provided
     /// [`media_exchange_state`].
+    ///
+    /// [1]: crate::peer::TrackEvent::MediaExchangeIntention
     #[inline]
     #[watch(self.enabled_individual.subscribe_transition())]
     async fn enabled_individual_transition_started(
@@ -402,8 +407,6 @@ impl TransceiverSide for State {
 impl State {
     /// Stabilizes [`MediaExchangeState`] of this [`State`].
     pub fn stabilize(&self) {
-        use crate::peer::media::InTransition as _;
-
         if let crate::peer::MediaExchangeState::Transition(transition) =
             self.enabled_individual.state()
         {
