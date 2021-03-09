@@ -158,7 +158,6 @@ down.medea: docker.down.medea
 #  make up.control [background=(no|yes)]
 
 up.control:
-	make wait.port port=6565
 	cargo build -p medea-control-api-mock
 	make wait.port port=6565
 	cargo run -p medea-control-api-mock $(if $(call eq,$(background),yes),&,)
