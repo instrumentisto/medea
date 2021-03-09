@@ -1479,6 +1479,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
         peer.as_changes_scheduler().add_sender(media_track(1));
@@ -1503,7 +1508,7 @@ pub mod tests {
                 tx.send(peer_id).unwrap();
             });
 
-        let peer = Peer::new(
+        let mut peer = Peer::new(
             PeerId(0),
             MemberId::from("member-1"),
             PeerId(1),
@@ -1511,6 +1516,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
 
         let mut peer = peer.start_as_offerer();
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1555,6 +1565,11 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
@@ -1652,6 +1667,11 @@ pub mod tests {
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
         let mut peer = PeerStateMachine::from(peer);
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
             peer
@@ -1946,6 +1966,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
 
             peer.context.track_changes_queue = changes;
             peer.commit_scheduled_changes();
@@ -1986,6 +2011,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2025,6 +2055,11 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
