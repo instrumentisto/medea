@@ -14,7 +14,7 @@ use medea_control_api_mock::{
     proto,
     proto::PublishPolicy,
 };
-use tokio_1::{self as tokio, time::interval};
+use tokio_1::time::interval;
 use uuid::Uuid;
 
 use crate::{
@@ -278,7 +278,7 @@ impl World {
         Ok(())
     }
 
-    /// Waist for the [`Member`]'s [`Room`] being closed.
+    /// Waits for the [`Member`]'s [`Room`] being closed.
     ///
     /// [`Room`]: crate::object::room::Room
     pub async fn wait_for_on_close(&self, member_id: &str) -> Result<String> {
@@ -290,8 +290,7 @@ impl World {
         Ok(member.room().wait_for_close().await?)
     }
 
-    /// Returns [`Future`] which will be resolved when `OnLeave` Control API
-    /// callback will be received for the provided [`Member`] ID.
+    /// Waits for `OnLeave` Control API callback for the provided [`Member`] ID.
     ///
     /// Panics if `OnLeave` reason is not equal to the provided one.
     pub async fn wait_for_on_leave(
@@ -320,10 +319,9 @@ impl World {
         }
     }
 
-    /// Returns [`Future`] which will be resolved when `OnJoin` Control API
-    /// callback will be received for the provided [`Member`] ID.
+    /// Waits for `OnJoin` Control API callback for the provided [`Member`] ID.
     pub async fn wait_for_on_join(&mut self, member_id: String) {
-        let mut interval = tokio::time::interval(Duration::from_millis(50));
+        let mut interval = interval(Duration::from_millis(50));
         loop {
             interval.tick().await;
             let callbacks = self.get_callbacks().await;
@@ -476,16 +474,16 @@ impl PairedMember {
                 id: "publish".to_string(),
                 p2p: proto::P2pMode::Always,
                 force_relay: false,
-                audio_settings: self.send_audio.clone().unwrap_or_else(|| {
+                audio_settings: self.send_audio.clone().unwrap_or(
                     proto::AudioSettings {
                         publish_policy: PublishPolicy::Disabled,
-                    }
-                }),
-                video_settings: self.send_video.clone().unwrap_or_else(|| {
+                    },
+                ),
+                video_settings: self.send_video.clone().unwrap_or(
                     proto::VideoSettings {
                         publish_policy: PublishPolicy::Disabled,
-                    }
-                }),
+                    },
+                ),
             })
         } else {
             None

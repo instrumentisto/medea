@@ -73,7 +73,6 @@ async fn then_control_api_sends_on_leave(
         .unwrap();
 }
 
-#[rustfmt::skip]
 #[then(
     regex = r"^Control API doesn't sends `OnLeave` callback for member (\S+)$"
 )]
@@ -82,8 +81,8 @@ async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
         Duration::from_millis(300),
         world.wait_for_on_leave(id, "".to_string()),
     )
-        .await
-        .unwrap_err();
+    .await
+    .unwrap_err();
 }
 
 #[then(regex = r"^Control API sends `OnJoin` callback for member (\S+)$")]

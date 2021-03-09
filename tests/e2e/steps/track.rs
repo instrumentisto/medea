@@ -58,7 +58,7 @@ async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let media_kind = kind.parse().unwrap();
 
     let mut source_kinds = Vec::new();
-    if let Some(kind) = kind.parse().ok() {
+    if let Ok(kind) = kind.parse() {
         source_kinds.push(kind);
     } else {
         if media_kind == MediaKind::Video {

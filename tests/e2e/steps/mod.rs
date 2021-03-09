@@ -20,6 +20,7 @@ use crate::{
                           |(?:disabled|muted) (media|audio|video) \
                                               (publishing|playing)?))?$")]
 #[async_recursion(?Send)]
+#[allow(clippy::too_many_arguments)]
 async fn new_given_member(
     world: &mut World,
     joined: Matched,
