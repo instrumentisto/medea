@@ -167,7 +167,7 @@ impl RoomHandle {
             Ok(JsValue::UNDEFINED)
         })
     }
-
+    // TODO: document mute/umute/enable/disable/local/remote errors section.
     /// Mutes outbound audio in this [`Room`].
     ///
     /// [`Room`]: room::Room
