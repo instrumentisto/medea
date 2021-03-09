@@ -1,3 +1,7 @@
+//! JS side handle to a [`Room`].
+//!
+//! [`Room`]: room::Room
+
 use derive_more::{From, Into};
 use js_sys::Promise;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -10,10 +14,10 @@ use crate::{
 
 use super::jason_error::JasonError;
 
-/// JS side handle to [`Room`] where all the media happens.
+/// JS side handle to a [`Room`] where all the media happens.
 ///
-/// Like all handlers it contains weak reference to object that is managed by
-/// Rust, so its methods will fail if weak reference could not be upgraded.
+/// Like all handles it contains a weak reference to the object that is managed
+/// by Rust, so its methods will fail if a weak reference could not be upgraded.
 ///
 /// [`Room`]: room::Room
 #[wasm_bindgen]
@@ -22,20 +26,22 @@ pub struct RoomHandle(room::RoomHandle);
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// Connects media server and enters [`Room`] with provided authorization
-    /// `token`.
+    /// Connects to a media server and joins a [`Room`] with the provided
+    /// authorization `token`.
     ///
-    /// Authorization token has fixed format:
+    /// Authorization token has a fixed format:
     /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
     /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
     ///
-    /// Establishes connection with media server (if it doesn't already exist).
-    /// Fails if:
-    /// - `on_failed_local_media` callback is not set
-    /// - `on_connection_loss` callback is not set
-    /// - unable to connect to media server.
+    /// Establishes connection with media server (if it doesn't exist already).
     ///
     /// Effectively returns `Result<(), JasonError>`.
+    ///
+    /// # Errors
+    ///
+    /// - When `on_failed_local_media` callback is not set.
+    /// - When `on_connection_loss` callback is not set.
+    /// - When unable to connect to a media server.
     ///
     /// [`Room`]: room::Room
     pub fn join(&self, token: String) -> Promise {
@@ -47,8 +53,8 @@ impl RoomHandle {
         })
     }
 
-    /// Sets callback, which will be invoked when new [`Connection`] with some
-    /// remote `Member` is established.
+    /// Sets callback, invoked when a new [`Connection`] with some remote
+    /// `Member` is established.
     ///
     /// [`Connection`]: crate::connection::Connection
     pub fn on_new_connection(
@@ -61,8 +67,8 @@ impl RoomHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets `on_close` callback, which will be invoked on [`Room`] close,
-    /// providing [`RoomCloseReason`].
+    /// Sets `on_close` callback, invoked when this [`Room`] is closed,
+    /// providing a [`RoomCloseReason`].
     ///
     /// [`Room`]: room::Room
     /// [`RoomCloseReason`]: room::RoomCloseReason
@@ -73,12 +79,13 @@ impl RoomHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets callback, which will be invoked when new [`LocalMediaTrack`] will
-    /// be added to this [`Room`].
+    /// Sets callback, invoked when a new [`LocalMediaTrack`] is added to this
+    /// [`Room`].
+    ///
     /// This might happen in such cases:
-    /// 1. Media server initiates media request.
+    /// 1. Media server initiates a media request.
     /// 2. `disable_audio`/`enable_video` is called.
-    /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
+    /// 3. [`MediaStreamSettings`] is updated via `set_local_media_settings`.
     ///
     /// [`Room`]: room::Room
     /// [`LocalMediaTrack`]: crate::api::LocalMediaTrack
@@ -89,8 +96,8 @@ impl RoomHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets `on_failed_local_media` callback, which will be invoked on local
-    /// media acquisition failures.
+    /// Sets `on_failed_local_media` callback, invoked on local media
+    /// acquisition failures.
     pub fn on_failed_local_media(
         &self,
         cb: js_sys::Function,
@@ -101,8 +108,8 @@ impl RoomHandle {
             .map_err(JsValue::from)
     }
 
-    /// Sets `on_connection_loss` callback, which will be invoked on connection
-    /// with server loss.
+    /// Sets `on_connection_loss` callback, invoked when a connection with a
+    /// server is lost.
     pub fn on_connection_loss(
         &self,
         cb: js_sys::Function,
@@ -155,8 +162,8 @@ impl RoomHandle {
                 stop_first,
                 rollback_on_fail,
             )
-            .await
-            .map_err(ConstraintsUpdateException::from)?;
+                .await
+                .map_err(ConstraintsUpdateException::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -242,7 +249,7 @@ impl RoomHandle {
 
     /// Disables outbound video.
     ///
-    /// Affects only video with specific [`MediaSourceKind`] if specified.
+    /// Affects only video with a specific [`MediaSourceKind`] if specified.
     pub fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -260,7 +267,7 @@ impl RoomHandle {
 
     /// Enables outbound video.
     ///
-    /// Affects only video with specific [`MediaSourceKind`] if specified.
+    /// Affects only video with a specific [`MediaSourceKind`] if specified.
     pub fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,

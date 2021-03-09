@@ -21,6 +21,7 @@ pub struct Transceiver {
 impl Transceiver {
     /// Returns current [`TransceiverDirection`] of this [`Transceiver`].
     #[inline]
+    #[must_use]
     fn current_direction(&self) -> TransceiverDirection {
         TransceiverDirection::from(self.transceiver.direction())
     }
@@ -44,6 +45,7 @@ impl Transceiver {
     /// Indicates whether the provided [`TransceiverDirection`] is enabled for
     /// this [`Transceiver`].
     #[inline]
+    #[must_use]
     pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
         self.current_direction().contains(direction)
     }
@@ -70,22 +72,24 @@ impl Transceiver {
                 .sender()
                 .replace_track(sys_track.map(AsRef::as_ref)),
         )
-        .await
-        .map(|_| {
-            self.send_track.replace(new_track);
-        })
+            .await
+            .map(|_| {
+                self.send_track.replace(new_track);
+            })
     }
 
     /// Returns [`mid`] of this [`Transceiver`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     #[inline]
+    #[must_use]
     pub fn mid(&self) -> Option<String> {
         self.transceiver.mid()
     }
 
     /// Returns [`local::Track`] that is being send to remote, if any.
     #[inline]
+    #[must_use]
     pub fn send_track(&self) -> Option<Rc<local::Track>> {
         self.send_track.borrow().clone()
     }
@@ -108,6 +112,7 @@ impl Transceiver {
 }
 
 impl From<RtcRtpTransceiver> for Transceiver {
+    #[inline]
     fn from(transceiver: RtcRtpTransceiver) -> Self {
         Transceiver {
             send_track: RefCell::new(None),

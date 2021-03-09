@@ -36,10 +36,9 @@ pub struct Sender {
 }
 
 impl Sender {
-    /// Creates new [`platform::Transceiver`] if provided `mid` is [`None`],
-    /// otherwise retrieves existing [`platform::Transceiver`] via provided
-    /// `mid` from a provided [`MediaConnections`]. Errors if
-    /// [`platform::Transceiver`] lookup fails.
+    /// Creates a new [`platform::Transceiver`] if the provided `mid` is
+    /// [`None`], otherwise retrieves an existing [`platform::Transceiver`] via
+    /// the provided `mid` from the provided [`MediaConnections`].
     ///
     /// # Errors
     ///

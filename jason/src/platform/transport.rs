@@ -1,4 +1,4 @@
-//! Platform-agnostic functionality of RPC Transport.
+//! Platform-agnostic functionality of RPC transport.
 
 use derive_more::Display;
 use futures::stream::LocalBoxStream;
@@ -11,16 +11,15 @@ use crate::{
     utils::{JsCaused, JsonParseError},
 };
 
-#[doc(inline)]
 pub use super::wasm::transport::WebSocketRpcTransport;
 
-/// [`RpcTransport`] states.
+/// Possible states of a [`RpcTransport`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TransportState {
-    /// Socket has been created. The connection is not open yet.
+    /// Socket has been created. The connection is not opened yet.
     Connecting,
 
-    /// The connection is open and ready to communicate.
+    /// The connection is opened and ready to communicate.
     Open,
 
     /// The connection is in the process of closing.
@@ -34,7 +33,9 @@ pub enum TransportState {
 }
 
 impl TransportState {
-    /// Returns `true` if socket can be closed.
+    /// Indicates whether the socket can be closed.
+    #[inline]
+    #[must_use]
     pub fn can_close(self) -> bool {
         matches!(self, Self::Connecting | Self::Open)
     }
@@ -61,7 +62,7 @@ pub trait RpcTransport {
     fn on_state_change(&self) -> LocalBoxStream<'static, TransportState>;
 }
 
-/// Errors that may occur when working with [`RpcTransport`].
+/// Errors that may occur when working with a [`RpcTransport`].
 #[derive(Clone, Debug, Display, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
 pub enum TransportError {

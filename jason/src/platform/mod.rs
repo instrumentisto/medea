@@ -1,8 +1,12 @@
 //! Platform-specific functionality.
 
-#[doc(inline)]
+pub mod peer_connection;
+pub mod rtc_stats;
+pub mod transport;
+pub mod wasm;
+
 pub use self::{
-    peer_connection::{IceCandidate, RtcPeerConnectionError, SdpType},
+    peer_connection::{IceCandidate, RTCPeerConnectionError, SdpType},
     rtc_stats::RtcStatsError,
     transport::{
         RpcTransport, TransportError, TransportState, WebSocketRpcTransport,
@@ -25,8 +29,3 @@ pub use self::{
 
 #[cfg(feature = "mockable")]
 pub use self::transport::MockRpcTransport;
-
-mod peer_connection;
-mod rtc_stats;
-mod transport;
-mod wasm;

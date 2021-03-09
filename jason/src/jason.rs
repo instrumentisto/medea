@@ -19,22 +19,25 @@ use crate::{
 /// initialization.
 pub struct Jason(Rc<RefCell<Inner>>);
 
+/// Inner representation if a [`Jason`].
 struct Inner {
-    /// [`Jason`]s [`MediaManager`]. It's shared across [`Room`]s since
-    /// [`MediaManager`] contains media tracks that can be used by multiple
-    /// [`Room`]s.
+    /// [`Jason`]s [`MediaManager`].
+    ///
+    /// It's shared across [`Room`]s since [`MediaManager`] contains media
+    /// tracks that can be used by multiple [`Room`]s.
     media_manager: Rc<MediaManager>,
 
     /// [`Room`]s maintained by this [`Jason`] instance.
     rooms: Vec<Room>,
 
-    /// Connection with Media Server. Only one [`WebSocketRpcClient`] is
-    /// supported at the moment.
+    /// Connection with a media server.
+    ///
+    /// Only one [`WebSocketRpcClient`] is supported at the moment.
     rpc: Rc<WebSocketRpcClient>,
 }
 
 impl Jason {
-    /// Instantiates new [`Jason`] interface to interact with this library.
+    /// Instantiates a new [`Jason`] interface to interact with this library.
     pub fn new() -> Self {
         Self::with_rpc_client(Rc::new(WebSocketRpcClient::new(Box::new(
             |url| {
@@ -48,13 +51,17 @@ impl Jason {
         ))))
     }
 
-    /// Creates new [`Room`] and returns its [`RoomHandle`].
+    /// Creates a new [`Room`] and returns its [`RoomHandle`].
+    #[inline]
+    #[must_use]
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::clone(&self.0.borrow().rpc);
         self.inner_init_room(WebSocketRpcSession::new(rpc))
     }
 
-    /// Returns [`MediaManagerHandle`].
+    /// Returns a [`MediaManagerHandle`].
+    #[inline]
+    #[must_use]
     pub fn media_manager(&self) -> MediaManagerHandle {
         self.0.borrow().media_manager.new_handle()
     }
@@ -72,16 +79,17 @@ impl Jason {
         });
     }
 
-    /// Drops [`Jason`] API object, so all related objects (rooms, connections,
-    /// streams etc.) respectively. All objects related to this [`Jason`] API
-    /// object will be detached (you will still hold them, but unable to use).
+    /// Drops this [`Jason`] API object, so all the related objects (rooms,
+    /// connections, streams, etc.) respectively. All objects related to this
+    /// [`Jason`] API object will be detached (you will still hold them, but
+    /// unable to use).
     pub fn dispose(self) {
         self.0.borrow_mut().rooms.drain(..).for_each(|room| {
             room.close(ClientDisconnect::RoomClosed.into());
         });
     }
 
-    /// Returns new [`Jason`] with the provided [`WebSocketRpcClient`].
+    /// Returns a new [`Jason`] with the provided [`WebSocketRpcClient`].
     #[inline]
     pub fn with_rpc_client(rpc: Rc<WebSocketRpcClient>) -> Self {
         Self(Rc::new(RefCell::new(Inner {
@@ -91,7 +99,7 @@ impl Jason {
         })))
     }
 
-    /// Returns [`RoomHandle`] for [`Room`].
+    /// Returns a [`RoomHandle`] for an initialized  [`Room`].
     pub fn inner_init_room(&self, rpc: Rc<dyn RpcSession>) -> RoomHandle {
         let on_normal_close = rpc.on_normal_close();
         let room = Room::new(rpc, Rc::clone(&self.0.borrow().media_manager));

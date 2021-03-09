@@ -176,6 +176,8 @@ impl RtcPeerConnection {
             }
             Some(mut f) => {
                 on_track.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "track",
@@ -208,6 +210,8 @@ impl RtcPeerConnection {
             }
             Some(mut f) => {
                 on_ice_candidate.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "icecandidate",
@@ -263,6 +267,8 @@ impl RtcPeerConnection {
             Some(mut f) => {
                 let peer = Rc::clone(&self.peer);
                 on_ice_connection_state_changed.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "iceconnectionstatechange",
@@ -294,6 +300,8 @@ impl RtcPeerConnection {
             Some(mut f) => {
                 let peer = Rc::clone(&self.peer);
                 on_connection_state_changed.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "connectionstatechange",
@@ -621,6 +629,8 @@ fn get_peer_connection_state(
     }))
 }
 
+/// Parses a [`IceConnectionState`] out of the given [`RtcIceConnectionState`].
+#[must_use]
 fn parse_ice_connection_state(
     state: RtcIceConnectionState,
 ) -> IceConnectionState {

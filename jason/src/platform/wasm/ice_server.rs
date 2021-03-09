@@ -2,8 +2,7 @@
 //!
 //! [1]: https://w3.org/TR/webrtc/#rtciceserver-dictionary
 
-use std::ops::Deref;
-
+use derive_more::Deref;
 use js_sys::Array as JsArray;
 use medea_client_api_proto::IceServer;
 use wasm_bindgen::JsValue;
@@ -12,6 +11,7 @@ use web_sys::RtcIceServer;
 /// Collection of [`RtcIceServer`]s (see [RTCIceServer][1]).
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtciceserver-dictionary
+#[derive(Debug, Deref)]
 pub struct RtcIceServers(JsArray);
 
 impl<I> From<I> for RtcIceServers
@@ -42,13 +42,5 @@ where
         }
 
         Self(inner)
-    }
-}
-
-impl Deref for RtcIceServers {
-    type Target = JsArray;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }

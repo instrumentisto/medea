@@ -19,11 +19,11 @@ use super::window;
 
 /// Collects information about the User Agent's available media input devices.
 ///
-/// Adapter for [MediaDevices.enumerateDevices()][1].
+/// Adapter for a [MediaDevices.enumerateDevices()][1] function.
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if could not get
+/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
 /// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::EnumerateDevicesFailed`] if
@@ -48,10 +48,10 @@ pub async fn enumerate_devices(
             .map_err(EnumerateDevicesFailed)
             .map_err(tracerr::from_and_wrap!())?,
     )
-    .await
-    .map_err(Error::from)
-    .map_err(EnumerateDevicesFailed)
-    .map_err(tracerr::from_and_wrap!())?;
+        .await
+        .map_err(Error::from)
+        .map_err(EnumerateDevicesFailed)
+        .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::Array::from(&devices)
         .values()
@@ -63,14 +63,14 @@ pub async fn enumerate_devices(
         .collect())
 }
 
-/// Prompts the user for permission to use a media input which produces vector
+/// Prompts a user for a permission to use a media input which produces vector
 /// of [`MediaStreamTrack`]s containing the requested types of media.
 ///
-/// Adapter for [MediaDevices.getUserMedia()][1].
+/// Adapter for a [MediaDevices.getUserMedia()][1] function.
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if could not get
+/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
 /// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
@@ -97,11 +97,11 @@ pub async fn get_user_media(
             .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?,
     )
-    .await
-    .map(web_sys::MediaStream::from)
-    .map_err(Error::from)
-    .map_err(GetUserMediaFailed)
-    .map_err(tracerr::from_and_wrap!())?;
+        .await
+        .map(web_sys::MediaStream::from)
+        .map_err(Error::from)
+        .map_err(GetUserMediaFailed)
+        .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())
         .unwrap()
@@ -110,15 +110,15 @@ pub async fn get_user_media(
         .collect())
 }
 
-/// Prompts the user to select and grant permission to capture the contents of a
-/// display or portion thereof (such as a window) as vector of
+/// Prompts a user to select and grant a permission to capture contents of a
+/// display or portion thereof (such as a single window) as vector of
 /// [`MediaStreamTrack`].
 ///
-/// Adapter for [MediaDevices.getDisplayMedia()][1].
+/// Adapter for a [MediaDevices.getDisplayMedia()][1] function.
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if could not get
+/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
 /// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
@@ -147,11 +147,11 @@ pub async fn get_display_media(
             .map_err(GetDisplayMediaFailed)
             .map_err(tracerr::from_and_wrap!())?,
     )
-    .await
-    .map(web_sys::MediaStream::from)
-    .map_err(Error::from)
-    .map_err(GetUserMediaFailed)
-    .map_err(tracerr::from_and_wrap!())?;
+        .await
+        .map(web_sys::MediaStream::from)
+        .map_err(Error::from)
+        .map_err(GetUserMediaFailed)
+        .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())
         .unwrap()

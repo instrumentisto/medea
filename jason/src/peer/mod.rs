@@ -70,7 +70,7 @@ pub enum PeerError {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js(cause)] platform::RtcPeerConnectionError),
+    RtcPeerConnection(#[js(cause)] platform::RTCPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or parsing
     /// [`local::Track`]s.
@@ -137,8 +137,8 @@ pub enum PeerEvent {
         sdp_mid: Option<String>,
     },
 
-    /// [`platform::RtcPeerConnection`] received new [`remote::Track`] from
-    /// remote sender.
+    /// [`platform::RtcPeerConnection`] received a new [`remote::Track`] from
+    /// a remote sender.
     NewRemoteTrack {
         /// Remote `Member` ID.
         sender_id: MemberId,
@@ -237,7 +237,7 @@ pub enum PeerEvent {
     },
 }
 
-/// High-level wrapper around [`platform::RtcPeerConnection`].
+/// High-level wrapper around a [`platform::RtcPeerConnection`].
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,
@@ -255,16 +255,16 @@ pub struct PeerConnection {
     /// [`PeerEvent`]s tx.
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Indicates if underlying [`platform::RtcPeerConnection`] has remote
-    /// description.
+    /// Indicator whether the underlying [`platform::RtcPeerConnection`] has a
+    /// remote description.
     has_remote_description: Cell<bool>,
 
-    /// Stores [`platform::IceCandidate`]s received before remote description
-    /// for underlying [`platform::RtcPeerConnection`].
+    /// Buffer of [`platform::IceCandidate`]s received before a remote
+    /// description for the underlying [`platform::RtcPeerConnection`].
     ice_candidates_buffer: RefCell<Vec<platform::IceCandidate>>,
 
-    /// Last hashes of the all [`platform::RtcStats`] which was already sent to
-    /// the server, so we won't duplicate stats that were already sent.
+    /// Last hashes of all the [`platform::RtcStats`] which were already sent
+    /// to a server, so we won't duplicate stats that were already sent.
     ///
     /// Stores precomputed hashes, since we don't need access to actual stats
     /// values.
@@ -293,7 +293,7 @@ impl PeerConnection {
     /// Provided `peer_events_sender` will be used to emit [`PeerEvent`]s from
     /// this peer.
     ///
-    /// Provided `ice_servers` will be used by created
+    /// Provided `ice_servers` will be used by the created
     /// [`platform::RtcPeerConnection`].
     ///
     /// # Errors
@@ -397,10 +397,10 @@ impl PeerConnection {
         Ok(Rc::new(peer))
     }
 
-    /// Handler [`TrackEvent`]s emitted from [`Sender`] or [`Receiver`].
+    /// Handles [`TrackEvent`]s emitted from a [`Sender`] or a [`Receiver`].
     ///
-    /// Sends [`PeerEvent::MediaUpdateCommand`] with a [`Command::UpdateTracks`]
-    /// on [`TrackEvent::MediaExchangeIntention`] and
+    /// Sends a [`PeerEvent::MediaUpdateCommand`] with a
+    /// [`Command::UpdateTracks`] on [`TrackEvent::MediaExchangeIntention`] and
     /// [`TrackEvent::MuteUpdateIntention`].
     ///
     /// [`Sender`]: sender::Sender
@@ -459,8 +459,8 @@ impl PeerConnection {
         self.media_connections.drop_send_tracks(kinds).await
     }
 
-    /// Filters out already sent stats, and send new stats from
-    /// provided [`platform::RtcStats`].
+    /// Filters out already sent stats, and send new stats from the provided
+    /// [`platform::RtcStats`].
     #[allow(clippy::option_if_let_else)]
     pub fn send_peer_stats(&self, stats: platform::RtcStats) {
         let mut stats_cache = self.sent_stats_cache.borrow_mut();
@@ -498,7 +498,7 @@ impl PeerConnection {
         }
     }
 
-    /// Sends [`platform::RtcStats`] update of this [`PeerConnection`] to the
+    /// Sends [`platform::RtcStats`] update of this [`PeerConnection`] to a
     /// server.
     pub async fn scrape_and_send_peer_stats(&self) {
         match self
@@ -630,7 +630,7 @@ impl PeerConnection {
     /// Track id to mid relations of all send tracks of this
     /// [`platform::RtcPeerConnection`]. mid is id of [`m= section`][1]. mids
     /// are received directly from registered [`RTCRtpTransceiver`][2]s, and
-    /// are being allocated on sdp update.
+    /// are being allocated on SDP update.
     ///
     /// # Errors
     ///
@@ -914,7 +914,6 @@ impl PeerConnection {
     /// With [`RtcPeerConnectionError::AddIceCandidateFailed`][2] if
     /// [RtcPeerConnection.addIceCandidate()][3] fails to add buffered
     /// [ICE candidates][1].
-    ///
     ///
     /// [1]: https://tools.ietf.org/html/rfc5245#section-2
     /// [2]: platform::RtcPeerConnectionError::AddIceCandidateFailed

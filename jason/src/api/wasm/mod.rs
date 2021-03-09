@@ -1,7 +1,7 @@
-//! External Jason API for `wasm32-unknown-unknown` target, designed to be used
-//! in web environment with Javascript.
-
-#![allow(clippy::new_without_default)]
+//! External [`Jason`] API for `wasm32-unknown-unknown` target, designed to be
+//! used in a web environment with JavaScript.
+//!
+//! [`Jason`]: crate::api::Jason
 
 use derive_more::Display;
 use wasm_bindgen::prelude::*;
@@ -39,26 +39,26 @@ pub enum MediaSourceKind {
     /// Media is sourced from some media device (webcam or microphone).
     Device,
 
-    /// Media is obtained with screen-capture.
+    /// Media is obtained via screen capturing.
     Display,
 }
 
-/// Describes the directions that the camera can face, as seen from the user's
-/// perspective. Representation of [VideoFacingModeEnum][1].
+/// Describes directions that a camera can face, as seen from a user's
+/// perspective. Representation of a [VideoFacingModeEnum][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum FacingMode {
-    /// Facing toward the user (a self-view camera).
+    /// Facing towards a user (a self-view camera).
     User,
 
-    /// Facing away from the user (viewing the environment).
+    /// Facing away from a user (viewing the environment).
     Environment,
 
-    /// Facing to the left of the user.
+    /// Facing to the left of a user.
     Left,
 
-    /// Facing to the right of the user.
+    /// Facing to the right of a user.
     Right,
 }

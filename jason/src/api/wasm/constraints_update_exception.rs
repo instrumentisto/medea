@@ -1,13 +1,17 @@
+//! Exception returned from [`RoomHandle::set_local_media_settings()`][1].
+//!
+//! [1]: crate::api::RoomHandle::set_local_media_settings
+
 use std::iter::FromIterator as _;
 
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::room;
+use crate::connection;
 
 use super::jason_error::JasonError;
 
-/// Exception returned from for the [`RoomHandle::set_local_media_settings`][1].
+/// Exception returned from [`RoomHandle::set_local_media_settings()`][1].
 ///
 /// [1]: crate::api::RoomHandle::set_local_media_settings
 #[wasm_bindgen]
@@ -23,7 +27,7 @@ impl ConstraintsUpdateException {
     }
 
     /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `RecoveredException` or `RecoverFailedException`.
+    /// a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
     pub fn recover_reason(&self) -> Option<JasonError> {
@@ -31,7 +35,7 @@ impl ConstraintsUpdateException {
     }
 
     /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
-    /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
+    /// [`ConstraintsUpdateException`] represents a `RecoverFailedException`.
     pub fn recover_fail_reasons(&self) -> JsValue {
         js_sys::Array::from_iter(
             self.0
@@ -40,11 +44,11 @@ impl ConstraintsUpdateException {
                 .map(JasonError::from)
                 .map(JsValue::from),
         )
-        .into()
+            .into()
     }
 
     /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// `ErroredException`.
+    /// an `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
     pub fn error(&self) -> Option<JasonError> {

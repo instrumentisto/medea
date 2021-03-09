@@ -26,16 +26,17 @@ pub enum ReconnectError {
 
 gen_upgrade_macro!(ReconnectError::Detached);
 
-/// External handle that is used to reconnect to the Medea media server on
-/// connection loss.
+/// External handle used to reconnect to a media server when connection is lost.
 ///
-/// This handle will be provided into `Room.on_connection_loss` callback.
+/// This handle will be passed to a `Room.on_connection_loss` callback.
 #[derive(Clone)]
 pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
 impl ReconnectHandle {
     /// Instantiates new [`ReconnectHandle`] from the given [`RpcSession`]
     /// reference.
+    #[inline]
+    #[must_use]
     pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
     }

@@ -1,4 +1,4 @@
-//! Deserialization of the [`RtcStats`] from the [`SysRtcStats`].
+//! Deserialization of [`RtcStats`] from [`SysRtcStats`].
 //!
 //! [`SysRtcStats`]: web_sys::RtcStats
 
@@ -13,7 +13,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::platform::{self, get_property_by_name, RtcStatsError};
 
-/// All available [`RtcStatsType`] of [`platform::RtcPeerConnection`].
+/// All available [`RtcStatsType`]s of a [`platform::RtcPeerConnection`].
 #[derive(Clone, Debug)]
 pub struct RtcStats(pub Vec<RtcStat>);
 
@@ -58,7 +58,7 @@ impl TryFrom<&JsValue> for RtcStats {
         Ok(RtcStats(stats))
     }
 }
-/// Entry of the JS RTC stats dictionary.
+/// Entry of a JS RTC stats dictionary.
 struct RtcStatsReportEntry(JsString, JsValue);
 
 impl TryFrom<JsArray> for RtcStatsReportEntry {

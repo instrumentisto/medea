@@ -86,7 +86,8 @@ struct InnerMediaManager {
 }
 
 impl InnerMediaManager {
-    /// Returns the vector of [`platform::InputDeviceInfo`] objects.
+    /// Returns a list of [`platform::InputDeviceInfo`] objects.
+    #[inline]
     async fn enumerate_devices() -> Result<Vec<platform::InputDeviceInfo>> {
         platform::enumerate_devices().await
     }
@@ -295,7 +296,7 @@ impl MediaManager {
         self.0.get_tracks(caps.into()).await
     }
 
-    /// Instantiates new [`MediaManagerHandle`] for external use.
+    /// Instantiates a new [`MediaManagerHandle`] for external usage.
     #[inline]
     pub fn new_handle(&self) -> MediaManagerHandle {
         MediaManagerHandle(Rc::downgrade(&self.0))
@@ -304,7 +305,7 @@ impl MediaManager {
 
 gen_upgrade_macro!(MediaManagerError::Detached);
 
-/// External handle to [`MediaManager`].
+/// External handle to a [`MediaManager`].
 ///
 /// [`MediaManager`] performs all media acquisition requests
 /// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
@@ -321,9 +322,9 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 
 #[allow(clippy::unused_self)]
 impl MediaManagerHandle {
-    /// Returns array of [`platform::InputDeviceInfo`] objects, which represent
-    /// available media input and output devices, such as microphones,
-    /// cameras, and so forth.
+    /// Returns a list of [`platform::InputDeviceInfo`] objects representing
+    /// available media input and output devices, such as microphones, cameras,
+    /// and so forth.
     ///
     /// # Errors
     ///
@@ -338,7 +339,7 @@ impl MediaManagerHandle {
             .map_err(tracerr::wrap!(=> MediaManagerError))
     }
 
-    /// Returns [`local::LocalMediaTrack`]s objects, built from provided
+    /// Returns [`local::LocalMediaTrack`]s objects, built from the provided
     /// [`MediaStreamSettings`].
     ///
     /// # Errors

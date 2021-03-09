@@ -1,9 +1,10 @@
-//! External `Jason` API.
+//! External [`Jason`] API.
 
-mod wasm;
+pub mod wasm;
 
-#[doc(inline)]
-pub use wasm::{
+use crate::media;
+
+pub use self::wasm::{
     connection_handle::ConnectionHandle,
     constraints_update_exception::ConstraintsUpdateException,
     input_device_info::InputDeviceInfo,
@@ -22,9 +23,8 @@ pub use wasm::{
     FacingMode, MediaKind, MediaSourceKind,
 };
 
-use crate::media;
-
 impl From<media::MediaKind> for MediaKind {
+    #[inline]
     fn from(that: media::MediaKind) -> Self {
         match that {
             media::MediaKind::Audio => Self::Audio,
@@ -34,6 +34,7 @@ impl From<media::MediaKind> for MediaKind {
 }
 
 impl From<MediaKind> for media::MediaKind {
+    #[inline]
     fn from(that: MediaKind) -> Self {
         match that {
             MediaKind::Audio => Self::Audio,
@@ -43,6 +44,7 @@ impl From<MediaKind> for media::MediaKind {
 }
 
 impl From<media::MediaSourceKind> for MediaSourceKind {
+    #[inline]
     fn from(that: media::MediaSourceKind) -> Self {
         match that {
             media::MediaSourceKind::Device => Self::Device,
@@ -52,6 +54,7 @@ impl From<media::MediaSourceKind> for MediaSourceKind {
 }
 
 impl From<MediaSourceKind> for media::MediaSourceKind {
+    #[inline]
     fn from(that: MediaSourceKind) -> Self {
         match that {
             MediaSourceKind::Device => Self::Device,
@@ -61,6 +64,7 @@ impl From<MediaSourceKind> for media::MediaSourceKind {
 }
 
 impl From<media::FacingMode> for FacingMode {
+    #[inline]
     fn from(that: media::FacingMode) -> Self {
         match that {
             media::FacingMode::User => Self::User,
@@ -72,6 +76,7 @@ impl From<media::FacingMode> for FacingMode {
 }
 
 impl From<FacingMode> for media::FacingMode {
+    #[inline]
     fn from(val: FacingMode) -> Self {
         match val {
             FacingMode::User => Self::User,

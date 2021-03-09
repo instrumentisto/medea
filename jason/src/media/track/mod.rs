@@ -7,17 +7,19 @@ pub mod remote;
 
 use medea_client_api_proto as proto;
 
-/// [MediaStreamTrack][1] liveness state.
+/// Liveness state of a [MediaStreamTrack][1] .
 ///
 /// [1]: crate::platform::MediaStreamTrack
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MediaStreamTrackState {
-    /// The track is active (the track's underlying media source is making a
-    /// best-effort attempt to provide data in real time).
+    /// Active track (the track's underlying media source is making a
+    /// best-effort attempt to provide a data in real time).
     Live,
-    /// The track has ended (the track's underlying media source is no longer
-    /// providing data, and will never provide more data for this track). This
-    /// is a final state.
+
+    /// Ended track (the track's underlying media source is no longer providing
+    /// any data, and will never provide more data for this track).
+    ///
+    /// This is a final state.
     Ended,
 }
 

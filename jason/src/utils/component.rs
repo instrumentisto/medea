@@ -1,6 +1,6 @@
 //! Implementation of the [`Component`].
 
-use std::{fmt::Display, rc::Rc};
+use std::rc::Rc;
 
 use derive_more::Deref;
 use futures::{future, Future, FutureExt as _, Stream, StreamExt};
@@ -116,18 +116,18 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
     /// You can stop all listeners tasks spawned by this function by
     /// [`Drop`]ping [`Component`].
     pub fn spawn<R, V, F, H, E>(&mut self, mut rx: R, handle: F)
-    where
-        F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
-        R: Stream<Item = V> + Unpin + 'static,
-        H: Future<Output = Result<(), E>> + 'static,
-        E: Display,
+        where
+            F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
+            R: Stream<Item = V> + Unpin + 'static,
+            H: Future<Output = Result<(), E>> + 'static,
+            E: Display,
     {
         let obj = Rc::clone(&self.obj);
         let state = Rc::clone(&self.state);
         let (fut, handle) = future::abortable(async move {
             while let Some(value) = rx.next().await {
                 if let Err(e) =
-                    (handle)(Rc::clone(&obj), Rc::clone(&state), value).await
+                (handle)(Rc::clone(&obj), Rc::clone(&state), value).await
                 {
                     log::error!("{}", e);
                 }

@@ -1,3 +1,7 @@
+//! Weak reference to a [`MediaManager`].
+//!
+//! [`MediaManager`]: media::MediaManager
+
 use derive_more::From;
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
@@ -10,18 +14,19 @@ use crate::{
 
 use super::jason_error::JasonError;
 
-/// [`MediaManagerHandle`] is a weak ref to [`MediaManager`].
+/// [`MediaManagerHandle`] is a weak reference to a [`MediaManager`].
 ///
-/// [`MediaManager`] performs all media acquisition requests
-/// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
-/// for further reusage.
+/// [`MediaManager`] performs all the media acquisition requests
+/// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all the received
+/// tracks for further re-usage.
 ///
 /// [`MediaManager`] stores weak references to [`LocalMediaTrack`]s, so if there
 /// are no strong references to some track, then this track is stopped and
-/// deleted from [`MediaManager`].
+/// removed from [`MediaManager`].
 ///
-/// Like all handlers it contains weak reference to object that is managed by
-/// Rust, so its methods will fail if weak reference could not be upgraded.
+/// Like all the handles it contains a weak reference to the object that is
+/// managed by Rust, so its methods will fail if a weak reference could not be
+/// upgraded.
 ///
 /// [`MediaManager`]: media::MediaManager
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
@@ -33,7 +38,7 @@ pub struct MediaManagerHandle(media::MediaManagerHandle);
 #[wasm_bindgen]
 #[allow(clippy::unused_self)]
 impl MediaManagerHandle {
-    /// Returns array of [`InputDeviceInfo`] objects, which represent available
+    /// Returns a list of [`InputDeviceInfo`] objects representing available
     /// media input and output devices, such as microphones, cameras, and so
     /// forth.
     pub fn enumerate_devices(&self) -> Promise {
@@ -58,7 +63,7 @@ impl MediaManagerHandle {
         })
     }
 
-    /// Returns [`LocalMediaTrack`]s objects, built from provided
+    /// Returns [`LocalMediaTrack`]s objects, built from the provided
     /// [`MediaStreamSettings`].
     pub fn init_local_tracks(&self, caps: &MediaStreamSettings) -> Promise {
         let this = self.0.clone();

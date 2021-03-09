@@ -1,3 +1,5 @@
+//! JS side handle for reconnections with a media server.
+
 use derive_more::From;
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
@@ -7,14 +9,14 @@ use crate::rpc;
 
 use super::jason_error::JasonError;
 
-/// Handle that JS side can reconnect to the Medea media server on
-/// a connection loss with.
+/// Handle that JS side can reconnect to a media server with when a connection
+/// is lost.
 ///
-/// This handle will be provided into [`RoomHandle.on_connection_loss`]
-/// callback.
+/// This handle is passed into a [`RoomHandle.on_connection_loss`] callback.
 ///
-/// Like all handlers it contains weak reference to object that is managed by
-/// Rust, so its methods will fail if weak reference could not be upgraded.
+/// Like all the handles it contains a weak reference to the object that is
+/// managed by Rust, so its methods will fail if a weak reference could not be
+/// upgraded.
 ///
 /// [`RoomHandle.on_connection_loss`]: crate::api::RoomHandle.on_connection_loss
 #[wasm_bindgen]
@@ -25,9 +27,9 @@ pub struct ReconnectHandle(rpc::ReconnectHandle);
 impl ReconnectHandle {
     /// Tries to reconnect after the provided delay in milliseconds.
     ///
-    /// If [`RpcSession`] is already reconnecting then new reconnection attempt
-    /// won't be performed. Instead, it will wait for the first reconnection
-    /// attempt result and use it here.
+    /// If [`RpcSession`] is already reconnecting then a new reconnection
+    /// attempt won't be performed. Instead, it will wait for the first
+    /// reconnection attempt result and use it.
     ///
     /// [`RpcSession`]: rpc::RpcSession
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
@@ -40,7 +42,7 @@ impl ReconnectHandle {
         })
     }
 
-    /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
+    /// Tries to reconnect a [`RpcSession`] in a loop with a growing backoff
     /// delay.
     ///
     /// The first attempt to reconnect is guaranteed to happen no earlier than

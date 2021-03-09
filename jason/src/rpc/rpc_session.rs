@@ -1,4 +1,5 @@
-//! Wrapper for [WebSocket] based transport that implements `Room` management.
+//! Wrapper around [WebSocket] based transport that implements `Room`
+//! management.
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
@@ -40,7 +41,7 @@ pub enum SessionError {
 
     /// [`WebSocketRpcSession`] doesn't have any credentials to authorize with.
     #[display(
-        fmt = "RPC Session doesn't have any credentials to authorize with"
+    fmt = "RPC Session doesn't have any credentials to authorize with"
     )]
     NoCredentials,
 

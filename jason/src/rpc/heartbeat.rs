@@ -33,10 +33,10 @@ struct Inner {
     /// [`platform::RpcTransport`] which heartbeats.
     transport: Rc<dyn platform::RpcTransport>,
 
-    /// Idle timeout of [`platform::RpcTransport`].
+    /// Idle timeout of the [`platform::RpcTransport`].
     idle_timeout: IdleTimeout,
 
-    /// Ping interval of [`platform::RpcTransport`].
+    /// Ping interval of the [`platform::RpcTransport`].
     ping_interval: PingInterval,
 
     /// [`TaskHandle`] for [`Future`] which sends [`ClientMsg::Pong`] on
@@ -72,8 +72,9 @@ impl Inner {
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
-    /// Start this [`Heartbeat`] for the provided [`platform::RpcTransport`]
+    /// Starts this [`Heartbeat`] for the provided [`platform::RpcTransport`]
     /// with the provided `idle_timeout` and `ping_interval`.
+    #[must_use]
     pub fn start(
         transport: Rc<dyn platform::RpcTransport>,
         ping_interval: PingInterval,

@@ -1,4 +1,4 @@
-//! Wrapper around [`platform::MediaStreamTrack`] received from
+//! Wrapper around a [`platform::MediaStreamTrack`] received from a
 //! [getUserMedia()][1]/[getDisplayMedia()][2] request.
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
@@ -14,7 +14,7 @@ use crate::{
     platform,
 };
 
-/// Wrapper around [`platform::MediaStreamTrack`] received from from
+/// Wrapper around a [`platform::MediaStreamTrack`] received from a
 /// [getUserMedia()][1]/[getDisplayMedia()][2] request.
 ///
 /// Underlying [`platform::MediaStreamTrack`] is stopped on this [`Track`]'s
@@ -22,7 +22,7 @@ use crate::{
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-#[derive(Debug, AsRef)]
+#[derive(AsRef, Debug)]
 pub struct Track {
     /// Actual [`platform::MediaStreamTrack`].
     #[as_ref]
@@ -41,8 +41,9 @@ pub struct Track {
 }
 
 impl Track {
-    /// Builds new [`Track`] from the provided [`platform::MediaStreamTrack`]
+    /// Builds a new [`Track`] from the provided [`platform::MediaStreamTrack`]
     /// and [`proto::MediaSourceKind`].
+    #[inline]
     #[must_use]
     pub fn new(
         track: platform::MediaStreamTrack,
@@ -91,8 +92,8 @@ impl Track {
 
     /// Forks this [`Track`].
     ///
-    /// Creates new [`platform::MediaStreamTrack`] from this [`Track`]'s
-    /// [`platform::MediaStreamTrack`] using [`clone()`][1] method.
+    /// Creates new a [`platform::MediaStreamTrack`] from this [`Track`]'s
+    /// [`platform::MediaStreamTrack`] using a [`clone()`][1] method.
     ///
     /// Forked [`Track`] will hold a strong reference to this [`Track`].
     ///
@@ -116,7 +117,7 @@ impl Drop for Track {
     }
 }
 
-/// Strongly referenced [`Track`] received from
+/// Strongly referenced [`Track`] received from a
 /// [getUserMedia()][1]/[getDisplayMedia()][2] request.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
@@ -124,7 +125,7 @@ impl Drop for Track {
 pub struct LocalMediaTrack(Rc<Track>);
 
 impl LocalMediaTrack {
-    /// Creates new [`LocalMediaTrack`] from the provided [`Track`].
+    /// Createsa  new [`LocalMediaTrack`] from the provided [`Track`].
     #[inline]
     #[must_use]
     pub fn new(track: Rc<Track>) -> Self {
@@ -134,24 +135,27 @@ impl LocalMediaTrack {
     /// Returns the underlying [`platform::MediaStreamTrack`] of this
     /// [`LocalMediaTrack`].
     #[inline]
+    #[must_use]
     pub fn get_track(&self) -> &platform::MediaStreamTrack {
         &self.0.track
     }
 
-    /// Returns [`MediaKind::Audio`] if this [`LocalMediaTrack`] represents an
-    /// audio track, or [`MediaKind::Video`] if it represents a video track.
+    /// Returns a [`MediaKind::Audio`] if this [`LocalMediaTrack`] represents an
+    /// audio track, or a [`MediaKind::Video`] if it represents a video track.
     #[inline]
+    #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.0.kind()
     }
 
-    /// Returns [`MediaSourceKind::Device`] if this [`LocalMediaTrack`] is
+    /// Returns a [`MediaSourceKind::Device`] if this [`LocalMediaTrack`] is
     /// sourced from some device (webcam/microphone), or
-    /// [`MediaSourceKind::Display`] if ot is captured via
+    /// a [`MediaSourceKind::Display`] if it's captured via
     /// [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     #[inline]
+    #[must_use]
     pub fn media_source_kind(&self) -> MediaSourceKind {
         self.0.media_source_kind().into()
     }
