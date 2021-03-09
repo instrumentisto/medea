@@ -145,8 +145,8 @@ impl Track {
     }
 
     /// Indicate whether this [`Track`] is enabled.
-    #[wasm_bindgen(js_name = enabled)]
     #[must_use]
+    #[wasm_bindgen(js_name = enabled)]
     pub fn js_enabled(&self) -> bool {
         self.0.enabled.get()
     }
@@ -163,8 +163,8 @@ impl Track {
 
     /// Returns [`MediaKind::Audio`] if this [`Track`] represents an audio
     /// track, or [`MediaKind::Video`] if it represents a video track.
-    #[wasm_bindgen(js_name = kind)]
     #[must_use]
+    #[wasm_bindgen(js_name = kind)]
     pub fn js_kind(&self) -> MediaKind {
         self.kind()
     }
@@ -174,8 +174,8 @@ impl Track {
     /// it's captured via [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-    #[wasm_bindgen(js_name = media_source_kind)]
     #[must_use]
+    #[wasm_bindgen(js_name = media_source_kind)]
     pub fn js_media_source_kind(&self) -> JsMediaSourceKind {
         self.0.media_source_kind.into()
     }

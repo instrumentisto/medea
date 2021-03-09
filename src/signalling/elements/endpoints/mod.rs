@@ -37,6 +37,7 @@ impl Endpoint {
 }
 
 impl Into<proto::Element> for Endpoint {
+    #[inline]
     fn into(self) -> proto::Element {
         match self {
             Self::WebRtcPublishEndpoint(play) => play.into(),

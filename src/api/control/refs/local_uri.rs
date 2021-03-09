@@ -172,6 +172,7 @@ impl StatefulLocalUri {
     /// Returns reference to [`RoomId`].
     ///
     /// This is possible in any [`LocalUri`] state.
+    #[inline]
     #[must_use]
     pub fn room_id(&self) -> &RoomId {
         match self {

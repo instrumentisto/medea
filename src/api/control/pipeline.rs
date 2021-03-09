@@ -32,6 +32,7 @@ impl<K: Hash + Eq, V> Pipeline<K, V> {
 
     /// Lookups element of [`Pipeline`] by ID.
     #[inline]
+    #[must_use]
     pub fn get(&self, id: &K) -> Option<&V> {
         self.pipeline.get(id)
     }

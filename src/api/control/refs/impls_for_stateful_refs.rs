@@ -170,6 +170,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`RoomId`].
             ///
             /// [`RoomId`]: medea_client_api_proto::RoomId
+            #[inline]
             #[must_use]
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
@@ -178,6 +179,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`MemberId`].
             ///
             /// [`MemberId`]: medea_client_api_proto::MemberId
+            #[inline]
             #[must_use]
             pub fn member_id(&self) -> &$crate::api::control::MemberId {
                 &self.state.1
@@ -186,6 +188,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`EndpointId`].
             ///
             /// [`EndpointId`]: crate::api::control::EndpointId
+            #[inline]
             #[must_use]
             pub fn endpoint_id(&self) -> &$crate::api::control::EndpointId {
                 &self.state.2

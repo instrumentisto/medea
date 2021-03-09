@@ -1596,7 +1596,7 @@ pub mod tests {
         ));
 
         let peer = peer.set_local_offer(String::new());
-        let _peer = peer.set_remote_answer(String::new());
+        let _ = peer.set_remote_answer(String::new());
 
         let peer_id = negotiation_needed_rx.recv().unwrap();
         assert_eq!(peer_id, PeerId(0));

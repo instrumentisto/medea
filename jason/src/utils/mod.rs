@@ -36,6 +36,7 @@ pub use self::{
 /// # Panics
 ///
 /// When global [`Window`] object is inaccessible.
+#[inline]
 #[must_use]
 pub fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.

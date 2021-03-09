@@ -322,8 +322,8 @@ pub struct MediaStreamSettings {
 #[wasm_bindgen]
 impl MediaStreamSettings {
     /// Creates new [`MediaStreamSettings`] with none constraints configured.
-    #[wasm_bindgen(constructor)]
     #[must_use]
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
             audio: AudioMediaTracksSettings {
@@ -884,8 +884,8 @@ pub struct AudioTrackConstraints {
 #[wasm_bindgen]
 impl AudioTrackConstraints {
     /// Creates new [`AudioTrackConstraints`] with none constraints configured.
-    #[wasm_bindgen(constructor)]
     #[must_use]
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -1203,6 +1203,7 @@ impl DeviceVideoTrackConstraints {
     ///
     /// If this [`DeviceVideoTrackConstraints`] is important then without this
     /// [`DeviceVideoTrackConstraints`] call session can't be started.
+    #[inline]
     #[must_use]
     pub fn required(&self) -> bool {
         self.required
@@ -1214,8 +1215,8 @@ impl DeviceVideoTrackConstraints {
 impl DeviceVideoTrackConstraints {
     /// Creates new [`DeviceVideoTrackConstraints`] with none constraints
     /// configured.
-    #[wasm_bindgen(constructor)]
     #[must_use]
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
     }
@@ -1333,8 +1334,8 @@ impl DisplayVideoTrackConstraints {
 impl DisplayVideoTrackConstraints {
     /// Creates new [`DisplayVideoTrackConstraints`] with none constraints
     /// configured.
-    #[wasm_bindgen(constructor)]
     #[must_use]
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
     }

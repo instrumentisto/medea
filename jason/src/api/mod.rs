@@ -51,8 +51,8 @@ struct Inner {
 #[wasm_bindgen]
 impl Jason {
     /// Instantiates new [`Jason`] interface to interact with this library.
-    #[wasm_bindgen(constructor)]
     #[must_use]
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
         wasm_logger::init(wasm_logger::Config::default());

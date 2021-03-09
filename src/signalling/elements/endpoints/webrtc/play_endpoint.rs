@@ -209,6 +209,7 @@ impl WebRtcPlayEndpoint {
     /// Compares [`WebRtcPlayEndpoint`]'s inner pointers. If both pointers
     /// points to the same address, then returns `true`.
     #[cfg(test)]
+    #[must_use]
     pub fn ptr_eq(&self, another_play: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_play.0)
     }
@@ -232,7 +233,8 @@ impl WeakWebRtcPlayEndpoint {
 
     /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
-    /// Returns `None` if weak pointer has been dropped.
+    /// Returns [`None`] if weak pointer has been dropped.
+    #[inline]
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
         self.0.upgrade().map(WebRtcPlayEndpoint)
     }

@@ -51,6 +51,7 @@ impl BackoffDelayer {
     }
 
     /// Returns current interval and increases it for next call.
+    #[must_use]
     fn get_delay(&mut self) -> JsDuration {
         if self.is_max_interval_reached() {
             self.max_interval
@@ -64,6 +65,7 @@ impl BackoffDelayer {
 
     /// Returns `true` when max delay ([`BackoffDelayer::max_interval`]) is
     /// reached.
+    #[must_use]
     fn is_max_interval_reached(&self) -> bool {
         self.current_interval >= self.max_interval
     }

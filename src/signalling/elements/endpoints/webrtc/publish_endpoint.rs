@@ -192,6 +192,7 @@ impl WebRtcPublishEndpoint {
 
     /// Removes [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
     #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[inline]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
         self.0.borrow_mut().remove_peer_id(peer_id)
     }
@@ -269,6 +270,7 @@ impl WebRtcPublishEndpoint {
     /// Compares [`WebRtcPublishEndpoint`]'s inner pointers. If both pointers
     /// points to the same address, then returns `true`.
     #[cfg(test)]
+    #[inline]
     pub fn ptr_eq(&self, another_publish: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_publish.0)
     }
@@ -292,7 +294,7 @@ impl WeakWebRtcPublishEndpoint {
 
     /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
-    /// Returns `None` if weak pointer was dropped.
+    /// Returns [`None`] if weak pointer was dropped.
     #[inline]
     #[must_use]
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
