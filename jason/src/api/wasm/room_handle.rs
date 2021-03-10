@@ -172,9 +172,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::unmute_audio`] was called while muting.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::unmute_audio`] is
+    /// called while muting or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn mute_audio(&self) -> Promise {
@@ -190,9 +189,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::mute_audio`] was called while unmuting.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::mute_audio`] is
+    /// called while unmuting or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn unmute_audio(&self) -> Promise {
@@ -208,9 +206,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::unmute_video`] was called while muting.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::unmute_video`] is
+    /// called while muting or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn mute_video(&self, source_kind: Option<MediaSourceKind>) -> Promise {
@@ -228,9 +225,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::mute_video`] was called while unmuting.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::mute_video`] is
+    /// called while unmuting or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn unmute_video(
@@ -251,13 +247,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and ` MediaExchangeState of Sender can't be
-    /// transited into disabled state, because this Sender is required.` message
-    /// if server forbids audio track disabling.
-    ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::enable_audio`] was called while disabling.
+    /// With `name = 'MediaConnections'` if target sender is configured as
+    /// `required` by media server or [`RoomHandle::enable_audio`] is called
+    /// while disabling or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn disable_audio(&self) -> Promise {
@@ -273,9 +265,11 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::disable_audio`] was called while enabling.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::disable_audio`] was
+    /// called while enabling or server didn't approve state transition.
+    ///
+    /// With `name = 'MediaManagerError'` if media acquisition request to User
+    /// Agent failed.
     ///
     /// [`Room`]: room::Room
     pub fn enable_audio(&self) -> Promise {
@@ -293,13 +287,9 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and ` MediaExchangeState of Sender can't be
-    /// transited into disabled state, because this Sender is required.` message
-    /// if server forbids a video track disabling.
-    ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::enable_video`] was called while disabling.
+    /// With `name = 'MediaConnections'` if target sender is configured as
+    /// `required` by media server or [`RoomHandle::enable_video`] is called
+    /// while disabling or server didn't approve state transition.
     pub fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -321,9 +311,11 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::disable_video`] was called while enabling.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::disable_video`] was
+    /// called while enabling or server didn't approve state transition.
+    ///
+    /// With `name = 'MediaManagerError'` if media acquisition request to User
+    /// Agent failed.
     pub fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -342,9 +334,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::enable_remote_audio`] was called while disabling.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::enable_remote_audio`]
+    /// is called while disabling or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn disable_remote_audio(&self) -> Promise {
@@ -362,9 +353,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::enable_remote_video`] was called while disabling.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::enable_remote_video`]
+    /// is called while disabling or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn disable_remote_video(&self) -> Promise {
@@ -382,9 +372,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::disable_remote_audio`] was called while enabling.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::disable_remote_audio`]
+    /// is called while enabling or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn enable_remote_audio(&self) -> Promise {
@@ -400,9 +389,8 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With `MediaConnections` name and `MediaState of Sender transits into
-    /// opposite to expected MediaExchangeState` message if
-    /// [`RoomHandle::disable_remote_video`] was called while enabling.
+    /// With `name = 'MediaConnections'` if [`RoomHandle::disable_remote_video`]
+    /// is called while enabling or server didn't approve state transition.
     ///
     /// [`Room`]: room::Room
     pub fn enable_remote_video(&self) -> Promise {
