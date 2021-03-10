@@ -345,7 +345,7 @@ impl MediaManagerHandle {
     /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
     /// With [`MediaManagerError::CouldNotGetMediaDevices`] if media devices
-    /// request to UA failed.
+    /// request to User Agent failed.
     ///
     /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.

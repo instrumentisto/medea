@@ -11,11 +11,11 @@ use crate::{
     utils::JsCaused,
 };
 
-/// Errors that may occur in a [`ReconnectHandle`].
+/// Errors occurring in a [`ReconnectHandle`].
 #[derive(Clone, From, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum ReconnectError {
-    /// Some [`SessionError`] occurred while reconnecting.
+    /// Some [`SessionError`] has occurred while reconnecting.
     #[display(fmt = "{}", _0)]
     Session(#[js(cause)] SessionError),
 
@@ -49,7 +49,8 @@ impl ReconnectHandle {
     ///
     /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
-    /// With [`ReconnectError::Session`] if error while reconnecting occurred.
+    /// With [`ReconnectError::Session`] if error while reconnecting has
+    /// occurred.
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
@@ -60,11 +61,8 @@ impl ReconnectHandle {
             .0
             .upgrade()
             .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?;
-        rpc.reconnect()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
 
-        Ok(())
+        rpc.reconnect().await.map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff

@@ -71,7 +71,8 @@ impl AudioTrackConstraints {
 #[derive(From, Into)]
 pub struct DeviceVideoTrackConstraints(media::DeviceVideoTrackConstraints);
 
-/// Constraints applicable to video tracks that are sourced from screen-capture.
+/// Constraints applicable to video tracks that are sourced from a screen
+/// capturing.
 #[wasm_bindgen]
 impl DeviceVideoTrackConstraints {
     /// Creates new [`DeviceVideoTrackConstraints`] with none constraints

@@ -217,7 +217,8 @@ impl RoomHandle {
     /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
     /// `on_connection_loss` callback is not set.
     ///
-    /// With [`RoomError::ConnectionInfoParse`] if provided URL parsing fails.
+    /// With [`RoomError::ConnectionInfoParse`] if the provided URL parsing
+    /// fails.
     ///
     /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
@@ -418,11 +419,11 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`ConstraintsUpdateException::Errored`] if error while provided
-    /// [`MediaStreamSettings`] applying occured.
+    /// With [`ConstraintsUpdateException::Errored`] if and error has occurred
+    /// while applying the provided [`MediaStreamSettings`].
     ///
     /// With [`ConstraintsUpdateException::Recovered`] if
-    /// [`MediaStreamSettings`] are rollbacked because error occured.
+    /// [`MediaStreamSettings`] are rolled-back because an error had occurred.
     ///
     /// With [`ConstraintsUpdateException::RecoverFailed`] if
     /// [`MediaStreamSettings`] rollback failed.
@@ -468,21 +469,20 @@ impl RoomHandle {
             direction,
             source_kind.map(Into::into),
         )
-        .await?;
-
-        Ok(())
+        .await
+        .map_err(tracerr::wrap!())
     }
 
     /// Mutes outbound audio in this [`Room`].
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::unmute_audio`] is called while muting or media server
-    /// didn't approve state transition.
+    /// [`RoomHandle::unmute_audio()`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
     pub async fn mute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -499,12 +499,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::mute_audio`] is called while muting or media server
-    /// didn't approve state transition.
+    /// [`RoomHandle::mute_audio`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
     pub async fn unmute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -521,12 +521,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::unmute_video`] is called while muting or media server
-    /// didn't approve state transition.
+    /// [`RoomHandle::unmute_video()`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
     pub async fn mute_video(
         &self,
@@ -546,12 +546,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::mute_video`] is called while muting or media server
-    /// didn't approve state transition.
+    /// [`RoomHandle::mute_video()`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
     pub async fn unmute_video(
         &self,
@@ -571,16 +571,16 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`] if audio track
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] if audio track's
     /// sender is configured as `required`.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::enable_audio`] is called while disabling or server didn't
-    /// approve state transition.
+    /// [`RoomHandle::enable_audio()`] was called while disabling or a media
+    /// server didn't approve this state transition.
     #[inline]
     pub async fn disable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -597,12 +597,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::disable_audio`] is called while enabling or server didn't
-    /// approve state transition.
+    /// [`RoomHandle::disable_audio`] was called while enabling or a media
+    /// server didn't approve this state transition.
     ///
     /// With [`RoomError::MediaManagerError`] with
     /// [`MediaManagerError::CouldNotGetMediaDevices`] or
@@ -626,16 +626,16 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
-    /// [`MediaConnectionsError::CannotDisableRequiredSender`] video track
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] video track's
     /// sender is configured as `required`.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::enable_video`] is called while disabling or server didn't
-    /// approve state transition.
+    /// [`RoomHandle::enable_video()`] was called while disabling or a media
+    /// server didn't approve this state transition.
     #[inline]
     pub async fn disable_video(
         &self,
@@ -657,12 +657,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::disable_video`] is called while enabling or server didn't
-    /// approve state transition.
+    /// [`RoomHandle::disable_video()`] was called while enabling or a media
+    /// server didn't approve this state transition.
     ///
     /// With [`RoomError::MediaManagerError`] with
     /// [`MediaManagerError::CouldNotGetMediaDevices`] or
@@ -687,12 +687,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::enable_remote_audio`] is called while disabling or media
-    /// server didn't approve state transition.
+    /// [`RoomHandle::enable_remote_audio()`] was called while disabling or a
+    /// media server didn't approve this state transition.
     #[inline]
     pub async fn disable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -709,12 +709,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::enable_remote_video`] is called while disabling or media
-    /// server didn't approve state transition.
+    /// [`RoomHandle::enable_remote_video()`] was called while disabling or a
+    /// media server didn't approve this state transition.
     #[inline]
     pub async fn disable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -731,12 +731,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::disable_remote_audio`] is called while enabling or media
-    /// server didn't approve state transition.
+    /// [`RoomHandle::disable_remote_audio()`] was called while enabling or a
+    /// media server didn't approve this state transition.
     #[inline]
     pub async fn enable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -753,12 +753,12 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::Detached`] if inner [`Weak`] pointer upgrade fails.
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
     ///
     /// With [`RoomError::MediaConnections`] with
     /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
-    /// [`RoomHandle::disable_remote_video`] is called while enabling or media
-    /// server didn't approve state transition.
+    /// [`RoomHandle::disable_remote_video()`] was called while enabling or a
+    /// media server didn't approve this state transition.
     #[inline]
     pub async fn enable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
@@ -835,25 +835,25 @@ impl Room {
                 if let Some(inner) = inner.upgrade() {
                     match event {
                         RoomEvent::RpcEvent(event) => {
-                            if let Err(err) = event
+                            if let Err(e) = event
                                 .dispatch_with(inner.deref())
                                 .await
                                 .map_err(
                                     tracerr::map_from_and_wrap!(=> RoomError),
                                 )
                             {
-                                log::error!("{}", err);
+                                log::error!("{}", e);
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(err) = event
+                            if let Err(e) = event
                                 .dispatch_with(inner.deref())
                                 .await
                                 .map_err(
                                     tracerr::map_from_and_wrap!(=> RoomError),
                                 )
                             {
-                                log::error!("{}", err);
+                                log::error!("{}", e);
                             };
                         }
                         RoomEvent::RpcClientLostConnection => {
@@ -975,7 +975,7 @@ pub enum ConstraintsUpdateException {
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
     Recovered {
-        /// [`RoomError`] due to which recovery happened.
+        /// [`RoomError`] due to which recovery has happened.
         recover_reason: Traced<RoomError>,
     },
 
@@ -983,10 +983,10 @@ pub enum ConstraintsUpdateException {
     /// failed.
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
-        /// [`RoomError`] due to which recovery happened.
+        /// [`RoomError`] due to which recovery has happened.
         recover_reason: Traced<RoomError>,
 
-        /// Vector of [`RoomError`]s due to which recovery failed.
+        /// Vector of [`RoomError`]s due to which recovery has failed.
         recover_fail_reasons: Vec<Traced<RoomError>>,
     },
 
@@ -1003,8 +1003,8 @@ impl ConstraintsUpdateException {
         self.to_string()
     }
 
-    /// Returns [`RoomError`] if this [`ConstraintsUpdateException`] represents
-    /// `RecoveredException` or `RecoverFailedException`.
+    /// Returns a [`RoomError`] if this [`ConstraintsUpdateException`]
+    /// represents a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
     #[inline]
@@ -1032,8 +1032,8 @@ impl ConstraintsUpdateException {
         }
     }
 
-    /// Returns [`RoomError`] if this [`ConstraintsUpdateException`] represents
-    /// an `ErroredException`.
+    /// Returns a [`RoomError`] if this [`ConstraintsUpdateException`]
+    /// represents an `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
     #[inline]

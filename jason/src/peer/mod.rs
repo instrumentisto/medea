@@ -386,11 +386,11 @@ impl PeerConnection {
         // Bind to `track` event.
         let media_connections = Rc::clone(&peer.media_connections);
         peer.peer.on_track(Some(move |track, transceiver| {
-            if let Err(err) = media_connections
+            if let Err(e) = media_connections
                 .add_remote_track(track, transceiver)
                 .map_err(tracerr::map_from_and_wrap!(=> PeerError))
             {
-                log::error!("{}", err);
+                log::error!("{}", e);
             };
         }));
 
@@ -508,9 +508,7 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!(=> PeerError))
         {
             Ok(stats) => self.send_peer_stats(stats),
-            Err(e) => {
-                log::error!("{}", e);
-            }
+            Err(e) => log::error!("{}", e),
         };
     }
 

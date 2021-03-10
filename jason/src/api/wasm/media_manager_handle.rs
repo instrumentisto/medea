@@ -12,7 +12,7 @@ use crate::{
     media,
 };
 
-use super::jason_error::JasonError;
+use super::JasonError;
 
 /// [`MediaManagerHandle`] is a weak reference to a [`MediaManager`].
 ///

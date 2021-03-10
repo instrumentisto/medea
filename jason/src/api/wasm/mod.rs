@@ -3,9 +3,6 @@
 //!
 //! [`Jason`]: crate::api::Jason
 
-use derive_more::Display;
-use wasm_bindgen::prelude::*;
-
 pub mod connection_handle;
 pub mod constraints_update_exception;
 pub mod input_device_info;
@@ -18,6 +15,11 @@ pub mod reconnect_handle;
 pub mod remote_media_track;
 pub mod room_close_reason;
 pub mod room_handle;
+
+use derive_more::Display;
+use wasm_bindgen::prelude::*;
+
+pub use self::jason_error::JasonError;
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
