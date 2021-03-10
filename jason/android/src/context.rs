@@ -1,9 +1,6 @@
 use std::sync::mpsc as std_mpsc;
 
-use crate::jni::{
-    util::{JNIEnv, JavaVM},
-    AsyncTaskCallback,
-};
+use crate::jni::{util::{JNIEnv, JavaVM}, AsyncTaskCallback, AsyncOutput};
 
 use futures::{
     channel::mpsc as fut_mpsc, future::BoxFuture, stream::StreamExt, Future,
@@ -43,14 +40,15 @@ impl RustExecutor {
         Self(tx)
     }
 
-    pub fn really_spawn_async<T>(&self, task: T, cb: AsyncTaskCallback<()>)
+    pub fn really_spawn_async<T, O>(&self, task: T, cb: AsyncTaskCallback<O>)
     where
-        T: Future + Send + 'static,
+        T: Future<Output = O> + Send + 'static,
+        O: AsyncOutput + Send + 'static,
     {
         self.0
             .unbounded_send(Task::Async(Box::pin(async {
-                task.await; // TODO: pass result to callback
-                cb.resolve(());
+                let out = task.await; // TODO: pass result to callback
+                cb.resolve(out);
             })))
             .unwrap();
     }

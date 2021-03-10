@@ -2,18 +2,10 @@ use super::*;
 
 use crate::{util::JNIEnv, InputDeviceInfo};
 
-impl ForeignClass for InputDeviceInfo {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_INPUTDEVICEINFO }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_INPUTDEVICEINFO_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for InputDeviceInfo {}
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeDeviceId(
+pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeDeviceId<'a>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -21,12 +13,12 @@ pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeDeviceId(
     let env = unsafe { JNIEnv::from_raw(env) };
     let device_id = rust_exec_context().blocking_exec(move || {
         let this: &InputDeviceInfo = unsafe {
-            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+            InputDeviceInfo::get_ptr(this).as_mut().unwrap()
         };
         this.device_id()
     });
 
-    env.string_to_jstring(device_id)
+    env.string_to_jstring(device_id).into_inner()
 }
 
 #[no_mangle]
@@ -37,14 +29,14 @@ pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeKind(
 ) -> jint {
     rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+            InputDeviceInfo::get_ptr(this).as_mut().unwrap()
         };
         this.kind().as_jint()
     })
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeLabel(
+pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeLabel<'a>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -52,16 +44,16 @@ pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeLabel(
     let env = unsafe { JNIEnv::from_raw(env) };
     let label = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+            InputDeviceInfo::get_ptr(this).as_mut().unwrap()
         };
         this.label()
     });
 
-    env.string_to_jstring(label)
+    env.string_to_jstring(label).into_inner()
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId(
+pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId<'a>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -69,12 +61,12 @@ pub extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId(
     let env = unsafe { JNIEnv::from_raw(env) };
     let group_id = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<InputDeviceInfo>(this).as_mut().unwrap()
+            InputDeviceInfo::get_ptr(this).as_mut().unwrap()
         };
         this.group_id()
     });
 
-    env.string_to_jstring(group_id)
+    env.string_to_jstring(group_id).into_inner()
 }
 
 #[no_mangle]

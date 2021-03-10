@@ -2,15 +2,7 @@ use super::*;
 
 use crate::LocalMediaTrack;
 
-impl ForeignClass for LocalMediaTrack {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_LOCALMEDIATRACK }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_LOCALMEDIATRACK_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for LocalMediaTrack {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_LocalMediaTrack_nativeKind(
@@ -20,7 +12,7 @@ pub extern "C" fn Java_com_jason_api_LocalMediaTrack_nativeKind(
 ) -> jint {
     rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<LocalMediaTrack>(this).as_mut().unwrap()
+            LocalMediaTrack::get_ptr(this).as_mut().unwrap()
         };
         this.kind().as_jint()
     })
@@ -34,7 +26,7 @@ pub extern "C" fn Java_com_jason_api_LocalMediaTrack_nativeMediaSourceKind(
 ) -> jint {
     rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<LocalMediaTrack>(this).as_mut().unwrap()
+            LocalMediaTrack::get_ptr(this).as_mut().unwrap()
         };
         this.media_source_kind().as_jint()
     })

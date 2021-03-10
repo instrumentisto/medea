@@ -1,7 +1,11 @@
 package com.jason.api;
 
+import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import com.jason.utils.PtrConsumer;
 
 import java.util.function.Consumer;
 
@@ -19,23 +23,27 @@ public final class RoomHandle {
     }
 
     public void onNewConnection(@NonNull Consumer<ConnectionHandle> cb) throws Exception {
-        nativeOnNewConnection(nativePtr, cb);
+        nativeOnNewConnection(nativePtr, (ptr) -> {
+            cb.accept(new ConnectionHandle(ptr));
+        });
     }
 
     public void onClose(@NonNull Consumer<RoomCloseReason> cb) throws Exception {
-        nativeOnClose(nativePtr, cb);
+        nativeOnClose(nativePtr, (ptr) -> {
+            cb.accept(new RoomCloseReason(ptr));
+        });
     }
 
     public void onLocalTrack(@NonNull Consumer<LocalMediaTrack> cb) throws Exception {
-        nativeOnLocalTrack(nativePtr, cb);
+        nativeOnLocalTrack(nativePtr, (ptr) -> cb.accept(new LocalMediaTrack(ptr)));
     }
 
     public void onFailedLocalMedia(@NonNull Consumer<JasonError> cb) throws Exception {
-        nativeOnFailedLocalMedia(nativePtr, cb);
+        nativeOnFailedLocalMedia(nativePtr, (ptr) -> cb.accept(new JasonError(ptr)));
     }
 
     public void onConnectionLoss(@NonNull Consumer<ReconnectHandle> cb) throws Exception {
-        nativeOnConnectionLoss(nativePtr, cb);
+        nativeOnConnectionLoss(nativePtr, (ptr) -> cb.accept(new ReconnectHandle(ptr)));
     }
 
     public void setLocalMediaSettings(@NonNull MediaStreamSettings settings, boolean stopFirst, boolean rollbackOnFail) throws Exception {
@@ -44,68 +52,68 @@ public final class RoomHandle {
         ReachabilityFence.reachabilityFence(settings);
     }
 
-    public void muteAudio() throws Exception {
-        nativeMuteAudio(nativePtr);
+    public void muteAudio(@NonNull  AsyncTaskCallback<Void> cb) throws Exception {
+        nativeMuteAudio(nativePtr, cb);
     }
 
-    public void unmuteAudio() throws Exception {
-        nativeUnmuteAudio(nativePtr);
+    public void unmuteAudio(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeUnmuteAudio(nativePtr, cb);
     }
 
-    public void muteVideo(@Nullable MediaSourceKind sourceKind) throws Exception {
+    public void muteVideo(@Nullable MediaSourceKind sourceKind, @NonNull AsyncTaskCallback<Void> cb) throws Exception {
         int optionalSourceKind = (sourceKind != null) ? sourceKind.ordinal() : -1;
 
-        nativeMuteVideo(nativePtr, optionalSourceKind);
+        nativeMuteVideo(nativePtr, optionalSourceKind, cb);
 
         ReachabilityFence.reachabilityFence(sourceKind);
     }
 
-    public void unmuteVideo(@Nullable MediaSourceKind sourceKind) throws Exception {
+    public void unmuteVideo(@Nullable MediaSourceKind sourceKind, @NonNull AsyncTaskCallback<Void> cb) throws Exception {
         int optionalSourceKind = (sourceKind != null) ? sourceKind.ordinal() : -1;
 
-        nativeUnmuteVideo(nativePtr, optionalSourceKind);
+        nativeUnmuteVideo(nativePtr, optionalSourceKind, cb);
 
         ReachabilityFence.reachabilityFence(sourceKind);
     }
 
-    public void disableAudio() throws Exception {
-        nativeDisableAudio(nativePtr);
+    public void disableAudio(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeDisableAudio(nativePtr, cb);
     }
 
-    public void enableAudio() throws Exception {
-        nativeEnableAudio(nativePtr);
+    public void enableAudio(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeEnableAudio(nativePtr, cb);
     }
 
-    public void disableVideo(@Nullable MediaSourceKind sourceKind) throws Exception {
+    public void disableVideo(@Nullable MediaSourceKind sourceKind, @NonNull AsyncTaskCallback<Void> cb) throws Exception {
         int optionalSourceKind = (sourceKind != null) ? sourceKind.ordinal() : -1;
 
-        nativeDisableVideo(nativePtr, optionalSourceKind);
+        nativeDisableVideo(nativePtr, optionalSourceKind, cb);
 
         ReachabilityFence.reachabilityFence(sourceKind);
     }
 
-    public void enableVideo(@Nullable MediaSourceKind sourceKind) throws Exception {
+    public void enableVideo(@Nullable MediaSourceKind sourceKind, @NonNull AsyncTaskCallback<Void> cb) throws Exception {
         int optionalSourceKind = (sourceKind != null) ? sourceKind.ordinal() : -1;
 
-        nativeEnableVideo(nativePtr, optionalSourceKind);
+        nativeEnableVideo(nativePtr, optionalSourceKind, cb);
 
         ReachabilityFence.reachabilityFence(sourceKind);
     }
 
-    public void disableRemoteAudio() throws Exception {
-        nativeDisableRemoteAudio(nativePtr);
+    public void disableRemoteAudio(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeDisableRemoteAudio(nativePtr, cb);
     }
 
-    public void disableRemoteVideo() throws Exception {
-        nativeDisableRemoteVideo(nativePtr);
+    public void disableRemoteVideo(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeDisableRemoteVideo(nativePtr, cb);
     }
 
-    public void enableRemoteAudio() throws Exception {
-        nativeEnableRemoteAudio(nativePtr);
+    public void enableRemoteAudio(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeEnableRemoteAudio(nativePtr, cb);
     }
 
-    public void enableRemoteVideo() throws Exception {
-        nativeEnableRemoteVideo(nativePtr);
+    public void enableRemoteVideo(@NonNull AsyncTaskCallback<Void> cb) throws Exception {
+        nativeEnableRemoteVideo(nativePtr, cb);
     }
 
     public synchronized void free() {
@@ -122,41 +130,41 @@ public final class RoomHandle {
 
     private static native void nativeAsyncJoin(long self, String token, AsyncTaskCallback<Void> asyncCb) throws Exception;
 
-    private static native void nativeOnNewConnection(long self, Consumer<ConnectionHandle> cb) throws Exception;
+    private static native void nativeOnNewConnection(long self, PtrConsumer cb) throws Exception;
 
-    private static native void nativeOnClose(long self, Consumer<RoomCloseReason> cb) throws Exception;
+    private static native void nativeOnClose(long self, PtrConsumer cb) throws Exception;
 
-    private static native void nativeOnLocalTrack(long self, Consumer<LocalMediaTrack> cb) throws Exception;
+    private static native void nativeOnLocalTrack(long self, PtrConsumer cb) throws Exception;
 
-    private static native void nativeOnFailedLocalMedia(long self, Consumer<JasonError> cb) throws Exception;
+    private static native void nativeOnFailedLocalMedia(long self, PtrConsumer cb) throws Exception;
 
-    private static native void nativeOnConnectionLoss(long self, Consumer<ReconnectHandle> cb) throws Exception;
+    private static native void nativeOnConnectionLoss(long self, PtrConsumer cb) throws Exception;
 
     private static native void nativeSetLocalMediaSettings(long self, long settings, boolean stopFirst, boolean rollbackOnFail) throws Exception;
 
-    private static native void nativeMuteAudio(long self) throws Exception;
+    private static native void nativeMuteAudio(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeUnmuteAudio(long self) throws Exception;
+    private static native void nativeUnmuteAudio(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeMuteVideo(long self, int sourceKind) throws Exception;
+    private static native void nativeMuteVideo(long self, int sourceKind, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeUnmuteVideo(long self, int sourceKind) throws Exception;
+    private static native void nativeUnmuteVideo(long self, int sourceKind, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeDisableAudio(long self) throws Exception;
+    private static native void nativeDisableAudio(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeEnableAudio(long self) throws Exception;
+    private static native void nativeEnableAudio(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeDisableVideo(long self, int sourceKind) throws Exception;
+    private static native void nativeDisableVideo(long self, int sourceKind, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeEnableVideo(long self, int sourceKind) throws Exception;
+    private static native void nativeEnableVideo(long self, int sourceKind, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeDisableRemoteAudio(long self) throws Exception;
+    private static native void nativeDisableRemoteAudio(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeDisableRemoteVideo(long self) throws Exception;
+    private static native void nativeDisableRemoteVideo(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeEnableRemoteAudio(long self) throws Exception;
+    private static native void nativeEnableRemoteAudio(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
-    private static native void nativeEnableRemoteVideo(long self) throws Exception;
+    private static native void nativeEnableRemoteVideo(long self, AsyncTaskCallback<Void> cb) throws Exception;
 
     private static native void nativeFree(long self);
 }

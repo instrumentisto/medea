@@ -5,15 +5,7 @@ use crate::{
     MediaManagerHandle, MediaStreamSettings,
 };
 
-impl ForeignClass for MediaManagerHandle {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_MEDIAMANAGERHANDLE }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_MEDIAMANAGERHANDLE_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for MediaManagerHandle {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_MediaManagerHandle_nativeEnumerateDevices(
@@ -24,7 +16,7 @@ pub extern "C" fn Java_com_jason_api_MediaManagerHandle_nativeEnumerateDevices(
     let env = unsafe { JNIEnv::from_raw(env) };
     let result = rust_exec_context().spawn_async(async move {
         let this = unsafe {
-            jlong_to_pointer::<MediaManagerHandle>(this)
+            MediaManagerHandle::get_ptr(this)
                 .as_mut()
                 .unwrap()
         };
@@ -51,12 +43,12 @@ pub extern "C" fn Java_com_jason_api_MediaManagerHandle_nativeInitLocalTracks(
     let env = unsafe { JNIEnv::from_raw(env) };
     let result = rust_exec_context().spawn_async(async move {
         let caps = unsafe {
-            jlong_to_pointer::<MediaStreamSettings>(caps)
+            MediaStreamSettings::get_ptr(caps)
                 .as_mut()
                 .unwrap()
         };
         let this = unsafe {
-            jlong_to_pointer::<MediaManagerHandle>(this)
+            MediaManagerHandle::get_ptr(this)
                 .as_mut()
                 .unwrap()
         };

@@ -338,7 +338,7 @@ impl RemoteMediaTrack {
     }
 
     pub fn on_enabled(&self, cb: Arc<JavaCallback<()>>) {
-        cb.accept(());
+        cb.accept();
     }
 
     pub fn on_disabled(&self, _cb: Arc<JavaCallback<()>>) {}

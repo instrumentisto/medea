@@ -1,32 +1,24 @@
 use super::*;
 
 use crate::DeviceVideoTrackConstraints;
+use jni::objects::JString;
+use crate::MediaSourceKind::Device;
 
-impl ForeignClass for DeviceVideoTrackConstraints {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_DEVICEVIDEOTRACKCONSTRAINTS }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_DEVICEVIDEOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for DeviceVideoTrackConstraints {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeDeviceId(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    device_id: jstring,
+    device_id: JString,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let device_id = env.clone_jstring_to_string(device_id);
 
     rust_exec_context().blocking_exec(move || {
         let this: &mut DeviceVideoTrackConstraints = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.device_id(device_id);
     })
@@ -42,9 +34,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactFaci
     rust_exec_context().blocking_exec(move || {
         let facing_mode = FacingMode::from_jint(facing_mode);
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.exact_facing_mode(facing_mode);
     })
@@ -60,9 +50,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealFaci
     rust_exec_context().blocking_exec(move || {
         let facing_mode = FacingMode::from_jint(facing_mode);
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.ideal_facing_mode(facing_mode);
     })
@@ -79,9 +67,8 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactHeig
         let height = u32::try_from(height)
             .expect("invalid jlong, in jlong => u32 conversation");
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this)
+                .as_mut().unwrap()
         };
         this.exact_height(height);
     })
@@ -98,9 +85,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealHeig
         let height = u32::try_from(height)
             .expect("invalid jlong, in jlong => u32 conversation");
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.ideal_height(height);
     })
@@ -120,9 +105,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeHeightInR
         let max = u32::try_from(max)
             .expect("invalid jlong, in jlong => u32 conversation");
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.height_in_range(min, max);
     })
@@ -139,9 +122,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeExactWidt
         let width = u32::try_from(width)
             .expect("invalid jlong, in jlong => u32 conversation");
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.exact_width(width);
     })
@@ -158,9 +139,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeIdealWidt
         let width = u32::try_from(width)
             .expect("invalid jlong, in jlong => u32 conversation");
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.ideal_width(width);
     })
@@ -180,9 +159,7 @@ pub extern "C" fn Java_com_jason_api_DeviceVideoTrackConstraints_nativeWidthInRa
         let max = u32::try_from(max)
             .expect("invalid jlong, in jlong => u32 conversation");
         let this = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(this)
-                .as_mut()
-                .unwrap()
+            DeviceVideoTrackConstraints::get_ptr(this).as_mut().unwrap()
         };
         this.width_in_range(min, max);
     })

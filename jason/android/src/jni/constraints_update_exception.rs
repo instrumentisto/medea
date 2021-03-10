@@ -1,27 +1,17 @@
-use jni_sys::{jclass, jfieldID, jlong, jstring};
+use jni_sys::{jclass, jlong, jstring};
 
 use crate::{
-    jni::{
-        jlong_to_pointer, rust_exec_context, ForeignClass,
-        FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION,
-        FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION_NATIVEPTR_FIELD,
-    },
+    jni::{rust_exec_context, ForeignClass},
     util::{JForeignObjectsArray, JNIEnv},
     ConstraintsUpdateException, JasonError,
 };
 
-impl ForeignClass for ConstraintsUpdateException {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_CONSTRAINTSUPDATEEXCEPTION_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for ConstraintsUpdateException {}
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeName(
+pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeName<
+    'a,
+>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -29,15 +19,13 @@ pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeName(
     let env = unsafe { JNIEnv::from_raw(env) };
     let name = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConstraintsUpdateException>(this)
-                .as_mut()
-                .unwrap()
+            ConstraintsUpdateException::get_ptr(this).as_mut().unwrap()
         };
 
         this.name()
     });
 
-    env.string_to_jstring(name)
+    env.string_to_jstring(name).into_inner()
 }
 
 #[no_mangle]
@@ -48,9 +36,7 @@ pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeRecoverRea
 ) -> jlong {
     let recover_reason = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConstraintsUpdateException>(this)
-                .as_mut()
-                .unwrap()
+            ConstraintsUpdateException::get_ptr(this).as_mut().unwrap()
         };
 
         this.recover_reason()
@@ -73,9 +59,7 @@ pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeRecoverFai
     let env = unsafe { JNIEnv::from_raw(env) };
     let recover_fail_reasons = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConstraintsUpdateException>(this)
-                .as_mut()
-                .unwrap()
+            ConstraintsUpdateException::get_ptr(this).as_mut().unwrap()
         };
 
         this.recover_fail_reasons()
@@ -92,9 +76,7 @@ pub extern "C" fn Java_com_jason_api_ConstraintsUpdateException_nativeError(
 ) -> jlong {
     let error = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConstraintsUpdateException>(this)
-                .as_mut()
-                .unwrap()
+            ConstraintsUpdateException::get_ptr(this).as_mut().unwrap()
         };
 
         this.error()

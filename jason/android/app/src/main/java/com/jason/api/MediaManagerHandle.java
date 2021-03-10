@@ -2,6 +2,11 @@ package com.jason.api;
 
 import androidx.annotation.NonNull;
 
+import java.util.Arrays;
+import java.util.List;
+
+import static java.util.stream.Collectors.toList;
+
 public final class MediaManagerHandle {
 
     volatile long nativePtr;
@@ -13,7 +18,14 @@ public final class MediaManagerHandle {
 
     public @NonNull
     InputDeviceInfo[] enumerateDevices() throws Exception {
-        return nativeEnumerateDevices(nativePtr);
+        long[] devices = nativeEnumerateDevices(nativePtr);
+        InputDeviceInfo[] output = new InputDeviceInfo[devices.length];
+
+        for (int i = 0; i < devices.length; i++) {
+           output[i] = new InputDeviceInfo(devices[i]);
+        }
+
+        return output;
     }
 
     public @NonNull
@@ -38,7 +50,7 @@ public final class MediaManagerHandle {
     }
 
     private static native @NonNull
-    InputDeviceInfo[] nativeEnumerateDevices(long self) throws Exception;
+    long[] nativeEnumerateDevices(long self) throws Exception;
 
     private static native @NonNull
     LocalMediaTrack[] nativeInitLocalTracks(long self, long caps) throws Exception;

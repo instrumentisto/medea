@@ -1,42 +1,30 @@
-use std::ptr;
+use std::{ptr, sync::Arc};
 
-use jni_sys::{jclass, jfieldID, jlong, jobject, jstring};
+use jni_sys::{jclass, jlong, jstring};
 
 use crate::{
-    jlong_to_pointer,
-    jni::{
-        ForeignClass, JavaCallback, FOREIGN_CLASS_CONNECTIONHANDLE,
-        FOREIGN_CLASS_CONNECTIONHANDLE_NATIVEPTR_FIELD,
-    },
+    jni::{ForeignClass, JavaCallback},
     rust_exec_context,
     util::JNIEnv,
     ConnectionHandle,
 };
-use std::sync::Arc;
+use jni::objects::JObject;
 
-impl ForeignClass for ConnectionHandle {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_CONNECTIONHANDLE }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_CONNECTIONHANDLE_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for ConnectionHandle {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnClose(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap()
+            ConnectionHandle::get_ptr(this).as_mut().unwrap()
         };
         this.on_close(Arc::new(cb))
     });
@@ -47,7 +35,9 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnClose(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeGetRemoteMemberId(
+pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeGetRemoteMemberId<
+    'a,
+>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -55,13 +45,15 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeGetRemoteMemberId(
     let env = unsafe { JNIEnv::from_raw(env) };
     let result = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap()
+            ConnectionHandle::get_ptr(this).as_mut().unwrap()
         };
         this.get_remote_member_id()
     });
 
     match result {
-        Ok(remote_member_id) => env.string_to_jstring(remote_member_id),
+        Ok(remote_member_id) => {
+            env.string_to_jstring(remote_member_id).into_inner()
+        }
         Err(msg) => {
             env.throw_new(&msg);
             ptr::null_mut()
@@ -74,14 +66,14 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnRemoteTrackAdded(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap()
+            ConnectionHandle::get_ptr(this).as_mut().unwrap()
         };
         this.on_remote_track_added(Arc::new(cb))
     });
@@ -96,14 +88,14 @@ pub extern "C" fn Java_com_jason_api_ConnectionHandle_nativeOnQualityScoreUpdate
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this = unsafe {
-            jlong_to_pointer::<ConnectionHandle>(this).as_mut().unwrap()
+            ConnectionHandle::get_ptr(this).as_mut().unwrap()
         };
         this.on_quality_score_update(Arc::new(cb))
     });

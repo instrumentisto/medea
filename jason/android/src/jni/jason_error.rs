@@ -1,28 +1,14 @@
-use jni_sys::{jclass, jfieldID, jlong, jstring};
+use jni_sys::{jclass, jlong, jstring};
 
 use crate::{
-    jlong_to_pointer,
-    jni::{
-        ForeignClass, FOREIGN_CLASS_JASONERROR,
-        FOREIGN_CLASS_JASONERROR_NATIVEPTR_FIELD,
-    },
-    rust_exec_context,
-    util::JNIEnv,
+    jni::ForeignClass, rust_exec_context, util::JNIEnv,
     JasonError,
 };
 
-impl ForeignClass for JasonError {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_JASONERROR }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_JASONERROR_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for JasonError {}
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeName(
+pub extern "C" fn Java_com_jason_api_JasonError_nativeName<'a>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -30,15 +16,15 @@ pub extern "C" fn Java_com_jason_api_JasonError_nativeName(
     let env = unsafe { JNIEnv::from_raw(env) };
     let name = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<JasonError>(this).as_mut().unwrap() };
+            unsafe { JasonError::get_ptr(this).as_mut().unwrap() };
         this.name()
     });
 
-    env.string_to_jstring(name)
+    env.string_to_jstring(name).into_inner()
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeMessage(
+pub extern "C" fn Java_com_jason_api_JasonError_nativeMessage<'a>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -46,15 +32,15 @@ pub extern "C" fn Java_com_jason_api_JasonError_nativeMessage(
     let env = unsafe { JNIEnv::from_raw(env) };
     let message = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<JasonError>(this).as_mut().unwrap() };
+            unsafe { JasonError::get_ptr(this).as_mut().unwrap() };
         this.message()
     });
 
-    env.string_to_jstring(message)
+    env.string_to_jstring(message).into_inner()
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_jason_api_JasonError_nativeTrace(
+pub extern "C" fn Java_com_jason_api_JasonError_nativeTrace<'a>(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
@@ -62,11 +48,11 @@ pub extern "C" fn Java_com_jason_api_JasonError_nativeTrace(
     let env = unsafe { JNIEnv::from_raw(env) };
     let trace = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<JasonError>(this).as_mut().unwrap() };
+            unsafe { JasonError::get_ptr(this).as_mut().unwrap() };
         this.trace()
     });
 
-    env.string_to_jstring(trace)
+    env.string_to_jstring(trace).into_inner()
 }
 
 #[no_mangle]

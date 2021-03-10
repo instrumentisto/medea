@@ -1,154 +1,88 @@
-use std::{
-    convert::TryFrom as _,
-    ffi::{CStr, CString},
-    marker::PhantomData,
-    os::raw::c_char,
-    ptr,
-};
+use std::{convert::TryFrom as _, ffi::CStr, marker::PhantomData, ptr};
 
-use jni_sys::{
-    jclass, jfieldID, jlong, jmethodID, jobject, jobjectArray, jsize, jstring,
-    jvalue,
+use jni::{
+    objects::{GlobalRef, JClass, JMethodID, JObject, JString, JValue},
+    signature::{JavaType, Primitive},
 };
+use jni_sys::{jmethodID, jobject, jobjectArray, jsize};
 
-use crate::jni::{ForeignClass, JAVA_LANG_EXCEPTION};
+use crate::jni::{ForeignClass};
 
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct JNIEnv<'a> {
-    ptr: *mut jni_sys::JNIEnv,
+    ptr: jni::JNIEnv<'a>,
     _lifetime: PhantomData<&'a ()>,
 }
 
 impl<'a> JNIEnv<'a> {
     pub unsafe fn from_raw(ptr: *mut jni_sys::JNIEnv) -> Self {
-        assert!(!ptr.is_null());
         JNIEnv {
-            ptr,
+            ptr: jni::JNIEnv::from_raw(ptr).unwrap(),
             _lifetime: PhantomData,
         }
     }
 
-    pub fn get_static_object_field(
-        &self,
-        class: jclass,
-        field: jfieldID,
-    ) -> jobject {
-        unsafe {
-            (**self.ptr).GetStaticObjectField.unwrap()(self.ptr, class, field)
-        }
-    }
-
-    pub fn set_long_field(&self, obj: jobject, field: jfieldID, value: jlong) {
-        unsafe {
-            (**self.ptr).SetLongField.unwrap()(self.ptr, obj, field, value);
-        }
-    }
-
-    pub fn alloc_object(&self, class: jclass) -> jobject {
-        unsafe { (**self.ptr).AllocObject.unwrap()(self.ptr, class) }
-    }
-
     pub fn new_object_array<T: ForeignClass>(
         &self,
-        mut arr: Vec<T>,
+        arr: Vec<T>,
     ) -> JForeignObjectsArray<T> {
-        let jcls: jclass = <T>::jni_class();
-        assert!(!jcls.is_null());
         let arr_len = jsize::try_from(arr.len())
             .expect("invalid usize, in usize => to jsize conversation");
-        let obj_arr: jobjectArray = unsafe {
-            (**self.ptr).NewObjectArray.unwrap()(
-                self.ptr,
-                arr_len,
-                jcls,
-                ptr::null_mut(),
-            )
-        };
-        assert!(!obj_arr.is_null());
-        let field_id = <T>::native_ptr_field();
-        assert!(!field_id.is_null());
-        for (i, r_obj) in arr.drain(..).enumerate() {
-            let jobj: jobject =
-                unsafe { (**self.ptr).AllocObject.unwrap()(self.ptr, jcls) };
-            assert!(!jobj.is_null());
-            let r_obj: jlong = <T>::box_object(r_obj);
-            unsafe {
-                (**self.ptr).SetLongField.unwrap()(
-                    self.ptr, jobj, field_id, r_obj,
-                );
-                if (**self.ptr).ExceptionCheck.unwrap()(self.ptr) != 0 {
-                    panic!("Can not nativePtr field: catch exception");
-                }
-                (**self.ptr).SetObjectArrayElement.unwrap()(
-                    self.ptr, obj_arr, i as jsize, jobj,
-                );
-                if (**self.ptr).ExceptionCheck.unwrap()(self.ptr) != 0 {
-                    panic!("SetObjectArrayElement({}) failed", i);
-                }
-                (**self.ptr).DeleteLocalRef.unwrap()(self.ptr, jobj);
-            }
-        }
+        let jarr = self.ptr.new_long_array(arr_len).unwrap();
+        let values: Vec<_> =
+            arr.into_iter().map(|obj| obj.box_object()).collect();
+        self.ptr.set_long_array_region(jarr, 0, &values).unwrap();
+
         JForeignObjectsArray {
-            _inner: obj_arr,
+            _inner: jarr,
             _marker: PhantomData,
         }
     }
 
-    // TODO: create GlobalJObject wrapper with DeleteGlobalRef on drop
-    pub fn new_global_ref(&self, obj: jobject) -> jobject {
-        unsafe { (**self.ptr).NewGlobalRef.unwrap()(self.ptr, obj) }
+    pub fn new_global_ref(&self, obj: JObject) -> GlobalRef {
+        self.ptr.new_global_ref(obj).unwrap()
     }
 
     pub fn throw_new(&self, message: &str) {
-        let exception_class = unsafe { JAVA_LANG_EXCEPTION };
-
-        let res = unsafe {
-            (**self.ptr).ThrowNew.unwrap()(
-                self.ptr,
-                exception_class,
-                as_c_str_unchecked(message),
-            )
-        };
-        if res != 0 {
-            log::error!(
-                "JNI ThrowNew({}) failed for class {:?} failed",
-                message,
-                exception_class
-            );
-        }
+        self.ptr.throw_new("java/lang/Exception", message)
+            .unwrap();
     }
 
     pub fn get_method_id(
         &self,
-        class: jclass,
+        class: JClass,
         name: &str,
         sig: &str,
-    ) -> jmethodID {
-        unsafe {
-            (**self.ptr).GetMethodID.unwrap()(
-                self.ptr,
-                class,
-                as_c_str_unchecked(name),
-                as_c_str_unchecked(sig),
+    ) -> jni::objects::JMethodID {
+        self.ptr.get_method_id(class, name, sig).unwrap()
+    }
+
+    pub fn call_object_method(
+        &self,
+        object: jobject,
+        method: jmethodID,
+    ) -> JValue {
+        self.ptr
+            .call_method_unchecked(
+                JObject::from(object),
+                JMethodID::from(method),
+                jni::signature::JavaType::Object(String::new()),
+                &[],
             )
-        }
+            .unwrap()
     }
 
-    pub fn get_object_class(&self, obj: jobject) -> jclass {
-        unsafe { (**self.ptr).GetObjectClass.unwrap()(self.ptr, obj) }
+    pub fn get_object_class(&self, obj: JObject) -> JClass {
+        self.ptr.get_object_class(obj).unwrap()
     }
 
-    pub fn string_to_jstring(&self, string: String) -> jstring {
-        let string = string.into_bytes();
-        unsafe {
-            let string = CString::from_vec_unchecked(string);
-            (**self.ptr).NewStringUTF.unwrap()(self.ptr, string.as_ptr())
-        }
+    pub fn string_to_jstring(&self, string: String) -> JString {
+        self.ptr.new_string(string).unwrap()
     }
 
-    pub fn clone_jstring_to_string(&self, string: jstring) -> String {
-        let chars = self.get_string_utf_chars(string);
+    pub fn clone_jstring_to_string(&self, string: JString) -> String {
+        let chars = self.ptr.get_string_utf_chars(string).unwrap();
 
         // safe to unwrap cause we call GetStringUTFChars which guarantees that
         // UTF-8 encoding is used.
@@ -156,56 +90,37 @@ impl<'a> JNIEnv<'a> {
             .to_str()
             .unwrap()
             .to_owned();
-        self.release_string_utf_chars(string, chars);
+        self.ptr.release_string_utf_chars(string, chars).unwrap();
 
         owned
     }
 
     pub fn call_void_method(
         &self,
-        object: jobject,
-        method: jmethodID,
-        args: &[jvalue],
+        object: JObject,
+        method: JMethodID,
+        args: &[JValue],
     ) {
-        unsafe {
-            (**self.ptr).CallVoidMethodA.unwrap()(
-                self.ptr,
+        self.ptr
+            .call_method_unchecked(
                 object,
                 method,
-                args.as_ptr(),
-            );
-        };
+                JavaType::Primitive(Primitive::Void),
+                args,
+            )
+            .unwrap();
     }
 
     pub fn exception_check(&self) -> bool {
-        let res = unsafe { (**self.ptr).ExceptionCheck.unwrap()(self.ptr) };
-
-        res != 0
+        self.ptr.exception_check().unwrap()
     }
 
     pub fn exception_describe(&self) {
-        unsafe { (**self.ptr).ExceptionDescribe.unwrap()(self.ptr) }
+        self.ptr.exception_describe().unwrap()
     }
 
     pub fn exception_clear(&self) {
-        unsafe { (**self.ptr).ExceptionClear.unwrap()(self.ptr) }
-    }
-
-    fn get_string_utf_chars(&self, string: jstring) -> *const c_char {
-        unsafe {
-            (**self.ptr).GetStringUTFChars.unwrap()(
-                self.ptr,
-                string,
-                ptr::null_mut(),
-            )
-        }
-    }
-
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
-    fn release_string_utf_chars(&self, string: jstring, chars: *const c_char) {
-        unsafe {
-            (**self.ptr).ReleaseStringUTFChars.unwrap()(self.ptr, string, chars)
-        };
+        self.ptr.exception_clear().unwrap()
     }
 }
 
@@ -222,10 +137,4 @@ impl<T> JForeignObjectsArray<T> {
             _marker: PhantomData,
         }
     }
-}
-
-// Provided string MUST not contain null-bytes.
-fn as_c_str_unchecked(string: &str) -> *const c_char {
-    let null_terminated = &[string, "\0"].concat();
-    null_terminated.as_ptr() as *const c_char
 }

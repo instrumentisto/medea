@@ -2,15 +2,7 @@ use super::*;
 
 use crate::DisplayVideoTrackConstraints;
 
-impl ForeignClass for DisplayVideoTrackConstraints {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_DISPLAYVIDEOTRACKCONSTRAINTS }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_DISPLAYVIDEOTRACKCONSTRAINTS_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for DisplayVideoTrackConstraints {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_DisplayVideoTrackConstraints_nativeFree(

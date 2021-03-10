@@ -1,25 +1,20 @@
+use std::sync::Arc;
+
+use jni::objects::JString;
+
 use super::*;
 
 use crate::{MediaStreamSettings, RoomHandle};
-use std::sync::Arc;
 
-impl ForeignClass for RoomHandle {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_ROOMHANDLE }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_ROOMHANDLE_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for RoomHandle {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_RoomHandle_nativeAsyncJoin(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    token: jstring,
-    cb: jobject,
+    token: JString,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let token = env.clone_jstring_to_string(token);
@@ -28,7 +23,7 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeAsyncJoin(
     rust_exec_context().really_spawn_async(
         async move {
             let this = unsafe {
-                jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap()
+                RoomHandle::get_ptr(this).as_mut().unwrap()
             };
 
             this.join(token).await.unwrap();
@@ -46,14 +41,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnNewConnection(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
         this.on_new_connection(Arc::new(cb))
     });
@@ -68,14 +63,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnClose(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
         this.on_close(Arc::new(cb))
     });
 
@@ -89,14 +84,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnLocalTrack(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
         this.on_local_track(Arc::new(cb))
     });
@@ -111,14 +106,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnFailedLocalMedia(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
         this.on_failed_local_media(Arc::new(cb))
     });
@@ -133,14 +128,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeOnConnectionLoss(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
-    cb: jobject,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
     let cb = JavaCallback::new(env, cb);
 
     let result = rust_exec_context().blocking_exec(move || {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
         this.on_connection_loss(Arc::new(cb))
     });
 
@@ -157,11 +152,14 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeSetLocalMediaSettings(
     settings: jlong,
     stop_first: jboolean,
     rollback_on_fail: jboolean,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+
+    rust_exec_context().really_spawn_async(async move {
         let settings = unsafe {
-            jlong_to_pointer::<MediaStreamSettings>(settings)
+            MediaStreamSettings::get_ptr(settings)
                 .as_mut()
                 .unwrap()
         };
@@ -169,15 +167,15 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeSetLocalMediaSettings(
         let rollback_on_fail = rollback_on_fail != 0;
 
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
         this.set_local_media_settings(settings, stop_first, rollback_on_fail)
-            .await
-    });
+            .await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -185,18 +183,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeMuteAudio(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.mute_audio().await
-    });
+        this.mute_audio().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -204,18 +204,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeUnmuteAudio(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.unmute_audio().await
-    });
+        this.unmute_audio().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -224,23 +226,25 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeMuteVideo(
     _: jclass,
     this: jlong,
     source_kind: jint,
+    cb: JObject
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let source_kind = if source_kind == -1 {
             None
         } else {
             Some(MediaSourceKind::from_jint(source_kind))
         };
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.mute_video(source_kind).await
-    });
+        this.mute_video(source_kind).await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -249,23 +253,25 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeUnmuteVideo(
     _: jclass,
     this: jlong,
     source_kind: jint,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+     rust_exec_context().really_spawn_async(async move {
         let source_kind = if source_kind == -1 {
             None
         } else {
             Some(MediaSourceKind::from_jint(source_kind))
         };
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.unmute_video(source_kind).await
-    });
+        this.unmute_video(source_kind).await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -273,18 +279,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableAudio(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    let result = rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.disable_audio().await
-    });
+        this.disable_audio().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -292,18 +300,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableAudio(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.enable_audio().await
-    });
+        this.enable_audio().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -312,23 +322,25 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableVideo(
     _: jclass,
     this: jlong,
     source_kind: jint,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let source_kind = if source_kind == -1 {
             None
         } else {
             Some(MediaSourceKind::from_jint(source_kind))
         };
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.disable_video(source_kind).await
-    });
+        this.disable_video(source_kind).await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -337,23 +349,25 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableVideo(
     _: jclass,
     this: jlong,
     source_kind: jint,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let source_kind = if source_kind == -1 {
             None
         } else {
             Some(MediaSourceKind::from_jint(source_kind))
         };
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.enable_video(source_kind).await
-    });
+        this.enable_video(source_kind).await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -361,18 +375,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableRemoteAudio(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.disable_remote_audio().await
-    });
+        this.disable_remote_audio().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -380,18 +396,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeDisableRemoteVideo(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.disable_remote_video().await
-    });
+        this.disable_remote_video().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -399,18 +417,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableRemoteAudio(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.enable_remote_audio().await
-    });
+        this.enable_remote_audio().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]
@@ -418,18 +438,20 @@ pub extern "C" fn Java_com_jason_api_RoomHandle_nativeEnableRemoteVideo(
     env: *mut jni_sys::JNIEnv,
     _: jclass,
     this: jlong,
+    cb: JObject,
 ) {
     let env = unsafe { JNIEnv::from_raw(env) };
-    let result = rust_exec_context().spawn_async(async move {
+    let async_cb: AsyncTaskCallback<()> = AsyncTaskCallback::<()>::new(env, cb);
+    rust_exec_context().really_spawn_async(async move {
         let this =
-            unsafe { jlong_to_pointer::<RoomHandle>(this).as_mut().unwrap() };
+            unsafe { RoomHandle::get_ptr(this).as_mut().unwrap() };
 
-        this.enable_remote_video().await
-    });
+        this.enable_remote_video().await;
+    }, async_cb);
 
-    if let Err(msg) = result {
-        env.throw_new(&msg);
-    }
+    // if let Err(msg) = result {
+    //     env.throw_new(&msg);
+    // }
 }
 
 #[no_mangle]

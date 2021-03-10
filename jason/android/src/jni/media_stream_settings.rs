@@ -5,15 +5,7 @@ use crate::{
     MediaStreamSettings,
 };
 
-impl ForeignClass for MediaStreamSettings {
-    fn jni_class() -> jclass {
-        unsafe { FOREIGN_CLASS_MEDIASTREAMSETTINGS }
-    }
-
-    fn native_ptr_field() -> jfieldID {
-        unsafe { FOREIGN_CLASS_MEDIASTREAMSETTINGS_NATIVEPTR_FIELD }
-    }
-}
+impl ForeignClass for MediaStreamSettings {}
 
 #[no_mangle]
 pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeAudio(
@@ -24,14 +16,14 @@ pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeAudio(
 ) {
     rust_exec_context().blocking_exec(move || {
         let constraints: *mut AudioTrackConstraints = unsafe {
-            jlong_to_pointer::<AudioTrackConstraints>(constraints)
+            AudioTrackConstraints::get_ptr(constraints)
                 .as_mut()
                 .unwrap()
         };
         let constraints: Box<AudioTrackConstraints> =
             unsafe { Box::from_raw(constraints) };
         let this: &mut MediaStreamSettings = unsafe {
-            jlong_to_pointer::<MediaStreamSettings>(this)
+            MediaStreamSettings::get_ptr(this)
                 .as_mut()
                 .unwrap()
         };
@@ -48,14 +40,14 @@ pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeDeviceVideo(
 ) {
     rust_exec_context().blocking_exec(move || {
         let constraints: *mut DeviceVideoTrackConstraints = unsafe {
-            jlong_to_pointer::<DeviceVideoTrackConstraints>(constraints)
+            DeviceVideoTrackConstraints::get_ptr(constraints)
                 .as_mut()
                 .unwrap()
         };
         let constraints: Box<DeviceVideoTrackConstraints> =
             unsafe { Box::from_raw(constraints) };
         let this: &mut MediaStreamSettings = unsafe {
-            jlong_to_pointer::<MediaStreamSettings>(this)
+            MediaStreamSettings::get_ptr(this)
                 .as_mut()
                 .unwrap()
         };
@@ -72,14 +64,14 @@ pub extern "C" fn Java_com_jason_api_MediaStreamSettings_nativeDisplayVideo(
 ) {
     rust_exec_context().blocking_exec(move || {
         let constraints: *mut DisplayVideoTrackConstraints = unsafe {
-            jlong_to_pointer::<DisplayVideoTrackConstraints>(constraints)
+            DisplayVideoTrackConstraints::get_ptr(constraints)
                 .as_mut()
                 .unwrap()
         };
         let constraints: Box<DisplayVideoTrackConstraints> =
             unsafe { Box::from_raw(constraints) };
         let this: &mut MediaStreamSettings = unsafe {
-            jlong_to_pointer::<MediaStreamSettings>(this)
+            MediaStreamSettings::get_ptr(this)
                 .as_mut()
                 .unwrap()
         };
