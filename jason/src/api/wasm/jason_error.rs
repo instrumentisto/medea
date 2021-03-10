@@ -25,7 +25,7 @@ pub struct JasonError {
 impl JasonError {
     /// Returns a name of this error.
     pub fn name(&self) -> String {
-        self.name.to_string()
+        self.name.to_owned()
     }
 
     /// Returns a message of this errors.

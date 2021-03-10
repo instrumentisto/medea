@@ -343,6 +343,18 @@ impl MediaManagerHandle {
     /// # Errors
     ///
     /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`MediaManagerError::CouldNotGetMediaDevices`] if media devices
+    /// request to UA failed.
+    ///
+    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// request failed.
+    ///
+    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// [getDisplayMedia()][2] request failed.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub async fn init_local_tracks(
         &self,
         caps: MediaStreamSettings,
