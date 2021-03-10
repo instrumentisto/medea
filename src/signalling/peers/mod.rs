@@ -477,8 +477,10 @@ impl PeersService {
             .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
             .await?;
 
-        self.peers
-            .map_peer_by_id_mut(peer_id, move |p| p.set_ice_user(ice_user))?;
+        self.peers.map_peer_by_id_mut(peer_id, move |p| {
+            p.set_ice_user(ice_user);
+            p.initialized();
+        })?;
 
         if endpoint.has_traffic_callback() {
             self.peers_traffic_watcher

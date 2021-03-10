@@ -199,6 +199,7 @@ impl PeerError {
 #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
 #[enum_delegate(pub fn is_known_to_remote(&self) -> bool)]
 #[enum_delegate(pub fn force_commit_partner_changes(&mut self))]
+#[enum_delegate(pub fn initialized(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -389,6 +390,16 @@ enum OnNegotiationFinish {
     Noop,
 }
 
+/// State of the [`Peer`] initialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum InitializationState {
+    /// Indicates that [`Peer`] initialized.
+    Done,
+
+    /// Indicates that [`Peer`] currently initializes.
+    InProgress,
+}
+
 #[derive(Debug)]
 pub struct Context {
     /// [`PeerId`] of this [`Peer`].
@@ -456,6 +467,9 @@ pub struct Context {
 
     /// Action which should be done on a negotiation process finish.
     on_negotiation_finish: OnNegotiationFinish,
+
+    /// State of the [`Peer`] initialization.
+    initialization_state: InitializationState,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -996,6 +1010,12 @@ impl<T> Peer<T> {
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.context.negotiation_role.clone()
     }
+
+    /// State of the [`Peer`] initialization.
+    #[inline]
+    pub fn initialized(&mut self) {
+        self.context.initialization_state = InitializationState::Done;
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -1134,6 +1154,7 @@ impl Peer<Stable> {
             ice_restart: false,
             negotiation_role: None,
             on_negotiation_finish: OnNegotiationFinish::Noop,
+            initialization_state: InitializationState::InProgress,
         };
 
         Self {
@@ -1212,7 +1233,10 @@ impl Peer<Stable> {
     /// regardless of negotiation state will be immediately force-pushed to
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
-        if self.context.ice_user.is_some()
+        // If InitializationState is not Done, then we can safely skip this
+        // negotiation, because these changes will be committed by ongoing
+        // initializer.
+        if self.context.initialization_state == InitializationState::Done
             && (!self.context.track_changes_queue.is_empty()
                 || matches!(
                     self.context.on_negotiation_finish,
