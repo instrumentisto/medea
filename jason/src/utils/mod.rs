@@ -15,43 +15,9 @@ use medea_reactive::Guarded;
 #[doc(inline)]
 pub use self::{
     component::{AsProtoState, Component, SynchronizableState, Updatable},
-    errors::{HandlerDetachedError, JasonError, JsCaused, JsonParseError},
+    errors::{JsCaused, JsonParseError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
 };
-
-/// Upgrades provided [`Weak`] reference, mapping it to a [`Result`] with
-/// [`HandlerDetachedError`] and invokes [`Into::into`] on the error.
-/// If the error type cannot be inferred, then you can provide a concrete type
-/// (usually being [`JasonError`] or [`JsValue`]).
-///
-/// [`Weak`]: std::rc::Weak
-macro_rules! upgrade_or_detached {
-    ($v:expr) => {{
-        $v.upgrade()
-            .ok_or_else(|| new_js_error!(HandlerDetachedError))
-    }};
-    ($v:expr, $err:ty) => {{
-        $v.upgrade()
-            .ok_or_else(|| new_js_error!(HandlerDetachedError => $err))
-    }};
-}
-
-/// Adds [`tracerr`] information to the provided error, wraps it into
-/// [`JasonError`] and converts it into the expected error type.
-///
-/// This macro has two syntaxes:
-/// - `new_js_error!(DetachedStateError)` - converts provided error wrapped into
-///   [`JasonError`] with [`Into::into`] automatically;
-/// - `new_js_error!(DetachedStateError => platform::Error)` - annotates
-///   explicitly which type conversion is required.
-macro_rules! new_js_error {
-    ($e:expr) => {
-        $crate::utils::JasonError::from(tracerr::new!($e)).into()
-    };
-    ($e:expr => $o:ty) => {
-        <$o>::from($crate::utils::JasonError::from(tracerr::new!($e)))
-    };
-}
 
 /// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
 ///

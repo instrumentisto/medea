@@ -8,9 +8,11 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    api::{InputDeviceInfo, JasonError, LocalMediaTrack, MediaStreamSettings},
+    api::{InputDeviceInfo, LocalMediaTrack, MediaStreamSettings},
     media,
 };
+
+use super::JasonError;
 
 /// [`MediaManagerHandle`] is a weak reference to a [`MediaManager`].
 ///

@@ -17,7 +17,6 @@ use crate::{
         wasm::utils::EventListener,
     },
     rpc::{websocket::ClientDisconnect, ApiUrl, CloseMsg},
-    utils::JasonError,
 };
 
 /// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
@@ -211,7 +210,7 @@ impl WebSocketRpcTransport {
                         Err(e) => {
                             // TODO: protocol versions mismatch? should drop
                             //       connection if so
-                            JasonError::from(tracerr::new!(e)).print();
+                            log::error!("{}", tracerr::new!(e));
                             return;
                         }
                     };

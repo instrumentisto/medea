@@ -1,8 +1,5 @@
 //! Acquiring and storing [`local::Track`]s.
 
-// TODO: Remove when moving `JasonError` to `api::wasm`.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -19,7 +16,7 @@ use crate::{
         MultiSourceTracksConstraints,
     },
     platform,
-    utils::{HandlerDetachedError, JasonError, JsCaused},
+    utils::JsCaused,
 };
 
 use super::track::local;
@@ -60,6 +57,10 @@ pub enum MediaManagerError {
     /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     #[display(fmt = "{} track is ended", _0)]
     LocalTrackIsEnded(MediaKind),
+
+    /// [`MediaManagerHandle`]'s inner [`Weak`] pointer could not be upgraded.
+    #[display(fmt = "MediaManagerHandle is in detached state")]
+    Detached,
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
@@ -322,23 +323,47 @@ impl MediaManagerHandle {
     /// Returns a list of [`platform::InputDeviceInfo`] objects representing
     /// available media input and output devices, such as microphones, cameras,
     /// and so forth.
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaManagerError::CouldNotGetMediaDevices`] or
+    /// [`MediaManagerError::EnumerateDevicesFailed`] if devices enumeration
+    /// failed.
     pub async fn enumerate_devices(
         &self,
-    ) -> std::result::Result<Vec<platform::InputDeviceInfo>, JasonError> {
+    ) -> Result<Vec<platform::InputDeviceInfo>> {
         InnerMediaManager::enumerate_devices()
             .await
             .map_err(tracerr::wrap!(=> MediaManagerError))
-            .map_err(JasonError::from)
     }
 
     /// Returns [`local::LocalMediaTrack`]s objects, built from the provided
     /// [`MediaStreamSettings`].
+    ///
+    /// # Errors
+    ///
+    /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`MediaManagerError::CouldNotGetMediaDevices`] if media devices
+    /// request to User Agent failed.
+    ///
+    /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
+    /// request failed.
+    ///
+    /// With [`MediaManagerError::GetDisplayMediaFailed`] if
+    /// [getDisplayMedia()][2] request failed.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     pub async fn init_local_tracks(
         &self,
         caps: MediaStreamSettings,
-    ) -> std::result::Result<Vec<local::LocalMediaTrack>, JasonError> {
-        upgrade_or_detached!(self.0, JasonError)?
-            .get_tracks(caps)
+    ) -> Result<Vec<local::LocalMediaTrack>> {
+        let this = self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(MediaManagerError::Detached))?;
+        this.get_tracks(caps)
             .await
             .map(|tracks| {
                 tracks
@@ -347,6 +372,5 @@ impl MediaManagerHandle {
                     .collect::<Vec<_>>()
             })
             .map_err(tracerr::wrap!(=> MediaManagerError))
-            .map_err(JasonError::from)
     }
 }

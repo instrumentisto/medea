@@ -1,23 +1,28 @@
 //! Reconnection for [`RpcSession`].
 
-// TODO: Remove when moving `JasonError` to `api::wasm`.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{rc::Weak, time::Duration};
 
-use derive_more::Display;
+use derive_more::{Display, From};
+use tracerr::Traced;
 
 use crate::{
     platform,
-    rpc::{BackoffDelayer, RpcSession},
-    utils::{HandlerDetachedError, JasonError, JsCaused},
+    rpc::{BackoffDelayer, RpcSession, SessionError},
+    utils::JsCaused,
 };
 
-/// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]
-/// tries to reconnect) token is `None`.
-#[derive(Debug, Display, JsCaused)]
+/// Errors occurring in a [`ReconnectHandle`].
+#[derive(Clone, From, Display, JsCaused)]
 #[js(error = "platform::Error")]
-struct NoTokenError;
+pub enum ReconnectError {
+    /// Some [`SessionError`] has occurred while reconnecting.
+    #[display(fmt = "{}", _0)]
+    Session(#[js(cause)] SessionError),
+
+    /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "Reconnector is in detached state")]
+    Detached,
+}
 
 /// External handle used to reconnect to a media server when connection is lost.
 ///
@@ -39,16 +44,25 @@ impl ReconnectHandle {
     /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
+    ///
+    /// # Errors
+    ///
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`ReconnectError::Session`] if error while reconnecting has
+    /// occurred.
     pub async fn reconnect_with_delay(
         &self,
         delay_ms: u32,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<ReconnectError>> {
         platform::delay_for(Duration::from_millis(u64::from(delay_ms))).await;
 
-        let rpc = upgrade_or_detached!(self.0, JasonError)?;
-        rpc.reconnect().await.map_err(JasonError::from)?;
+        let rpc = self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?;
 
-        Ok(())
+        rpc.reconnect().await.map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
@@ -69,19 +83,26 @@ impl ReconnectHandle {
     ///
     /// If `multiplier` is negative number than `multiplier` will be considered
     /// as `0.0`.
+    ///
+    /// # Errors
+    ///
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
         multiplier: f32,
         max_delay: u32,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<ReconnectError>> {
         let mut backoff_delayer = BackoffDelayer::new(
             Duration::from_millis(u64::from(starting_delay_ms)),
             multiplier,
             Duration::from_millis(u64::from(max_delay)),
         );
         backoff_delayer.delay().await;
-        while upgrade_or_detached!(self.0, JasonError)?
+        while self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?
             .reconnect()
             .await
             .is_err()

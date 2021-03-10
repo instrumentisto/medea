@@ -51,7 +51,7 @@ pub struct IceCandidate {
 /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
-pub enum RTCPeerConnectionError {
+pub enum RtcPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
     ///

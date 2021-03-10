@@ -1,8 +1,5 @@
 //! Medea [`Room`].
 
-// TODO: Remove when moving `JasonError` to `api::wasm`.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
@@ -26,6 +23,7 @@ use tracerr::Traced;
 
 use crate::{
     api,
+    api::JasonError,
     connection::Connections,
     media::{
         track::{local, remote},
@@ -42,7 +40,7 @@ use crate::{
         ClientDisconnect, CloseReason, ConnectionInfo,
         ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
-    utils::{AsProtoState, HandlerDetachedError, JasonError, JsCaused},
+    utils::{AsProtoState, JsCaused},
 };
 
 /// Reason of why [`Room`] has been closed.
@@ -162,6 +160,14 @@ pub enum RoomError {
     /// [`peer::repo::Component`] returned [`MediaManagerError`].
     #[display(fmt = "Failed to get local tracks: {}", _0)]
     MediaManagerError(#[js(cause)] MediaManagerError),
+
+    /// [`ConnectionInfo`] parsing failed.
+    #[display(fmt = "Failed to parse ConnectionInfo: {}", _0)]
+    ConnectionInfoParse(ConnectionInfoParseError),
+
+    /// [`RoomHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "Room is in detached state")]
+    Detached,
 }
 
 impl From<PeerError> for RoomError {
@@ -184,6 +190,13 @@ impl From<PeerError> for RoomError {
     }
 }
 
+macro_rules! upgrade_inner {
+    ($v:expr) => {
+        $v.upgrade()
+            .ok_or_else(|| tracerr::new!(RoomError::Detached))
+    };
+}
+
 /// External handle to a [`Room`].
 #[derive(Clone)]
 pub struct RoomHandle(Weak<InnerRoom>);
@@ -201,25 +214,31 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// - When `on_failed_local_media` callback is not set.
-    /// - When `on_connection_loss` callback is not set.
-    /// - When unable to connect to a media server.
-    pub async fn join(&self, url: String) -> Result<(), JasonError> {
-        let inner = upgrade_or_detached!(self.0, JasonError)?;
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
+    /// `on_connection_loss` callback is not set.
+    ///
+    /// With [`RoomError::ConnectionInfoParse`] if the provided URL parsing
+    /// fails.
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::SessionError`] when unable to connect to a media
+    /// server.
+    pub async fn join(&self, url: String) -> Result<(), Traced<RoomError>> {
+        let inner = upgrade_inner!(self.0)?;
 
-        let connection_info: ConnectionInfo = url.parse().map_err(
-            tracerr::map_from_and_wrap!(=> ConnectionInfoParseError),
-        )?;
+        let connection_info: ConnectionInfo =
+            url.parse().map_err(tracerr::map_from_and_wrap!())?;
 
         if !inner.on_failed_local_media.is_set() {
-            return Err(JasonError::from(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_failed_local_media()")
+            return Err(tracerr::new!(RoomError::CallbackNotSet(
+                "Room.on_failed_local_media()"
             )));
         }
 
         if !inner.on_connection_loss.is_set() {
-            return Err(JasonError::from(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_connection_loss()")
+            return Err(tracerr::new!(RoomError::CallbackNotSet(
+                "Room.on_connection_loss()"
             )));
         }
 
@@ -239,8 +258,8 @@ impl RoomHandle {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<proto::MediaSourceKind>,
-    ) -> Result<(), JasonError> {
-        let inner = upgrade_or_detached!(self.0, JasonError)?;
+    ) -> Result<(), Traced<RoomError>> {
+        let inner = upgrade_inner!(self.0)?;
         inner.set_constraints_media_state(
             new_state,
             kind,
@@ -263,7 +282,7 @@ impl RoomHandle {
             inner
                 .get_local_tracks(kind, source_kind)
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?
+                .map_err(tracerr::map_from_and_wrap!())?
         } else {
             Vec::new()
         };
@@ -277,7 +296,7 @@ impl RoomHandle {
             if let Err(e) = inner
                 .toggle_media_state(new_state, kind, direction, source_kind)
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                .map_err(tracerr::map_from_and_wrap!())
             {
                 if direction_send && enabling {
                     inner.set_constraints_media_state(
@@ -295,7 +314,7 @@ impl RoomHandle {
                         )
                         .await?;
                 }
-                return Err(e.into());
+                return Err(e);
             }
         }
         Ok(())
@@ -304,22 +323,30 @@ impl RoomHandle {
     /// Sets callback, invoked when a new [`Connection`] with some remote `Peer`
     /// is established.
     ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
     /// [`Connection`]: crate::connection::Connection
     pub fn on_new_connection(
         &self,
         f: platform::Function<api::ConnectionHandle>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
+    ) -> Result<(), Traced<RoomError>> {
+        upgrade_inner!(self.0)
             .map(|inner| inner.connections.on_new_connection(f))
     }
 
     /// Sets `on_close` callback, invoked on this [`Room`] close, providing a
     /// [`RoomCloseReason`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_close(
         &self,
         f: platform::Function<api::RoomCloseReason>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
+    ) -> Result<(), Traced<RoomError>> {
+        upgrade_inner!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
     /// Sets callback, invoked when a new [`local::Track`] is added to this
@@ -329,32 +356,42 @@ impl RoomHandle {
     /// 1. Media server initiates a media request.
     /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_local_track(
         &self,
         f: platform::Function<api::LocalMediaTrack>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_local_track.set_func(f))
+    ) -> Result<(), Traced<RoomError>> {
+        upgrade_inner!(self.0).map(|inner| inner.on_local_track.set_func(f))
     }
 
     /// Sets `on_failed_local_media` callback, invoked on a local media
     /// acquisition failures.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_failed_local_media(
         &self,
         f: platform::Function<api::JasonError>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
+    ) -> Result<(), Traced<RoomError>> {
+        upgrade_inner!(self.0)
             .map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
     /// Sets `on_connection_loss` callback, invoked when a connection with
     /// server is lost.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_connection_loss(
         &self,
         f: platform::Function<api::ReconnectHandle>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_connection_loss.set_func(f))
+    ) -> Result<(), Traced<RoomError>> {
+        upgrade_inner!(self.0).map(|inner| inner.on_connection_loss.set_func(f))
     }
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
@@ -380,6 +417,17 @@ impl RoomHandle {
     /// If recovering from fail state isn't possible then affected media types
     /// will be disabled.
     ///
+    /// # Errors
+    ///
+    /// With [`ConstraintsUpdateException::Errored`] if and error has occurred
+    /// while applying the provided [`MediaStreamSettings`].
+    ///
+    /// With [`ConstraintsUpdateException::Recovered`] if
+    /// [`MediaStreamSettings`] are rolled-back because an error had occurred.
+    ///
+    /// With [`ConstraintsUpdateException::RecoverFailed`] if
+    /// [`MediaStreamSettings`] rollback failed.
+    ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub async fn set_local_media_settings(
         &self,
@@ -388,8 +436,8 @@ impl RoomHandle {
         rollback_on_fail: bool,
     ) -> Result<(), ConstraintsUpdateException> {
         let inner = (self.0).upgrade().ok_or_else(|| {
-            ConstraintsUpdateException::Errored(new_js_error!(
-                HandlerDetachedError
+            ConstraintsUpdateException::Errored(tracerr::new!(
+                RoomError::Detached
             ))
         })?;
 
@@ -399,8 +447,8 @@ impl RoomHandle {
             .map_err(ConstraintsUpdateException::from)
     }
 
-    /// Changes a [`MediaState`] of the provided [`MediaKind`],
-    /// [`TrackDirection`] and [`MediaSourceKind`] to the provided one.
+    /// Changes [`MediaState`] of the provided [`MediaKind`], [`TrackDirection`]
+    /// and [`MediaSourceKind`] to the provided [`MediaState`].
     ///
     /// Helper function for all the exported mute/unmute/enable/disable
     /// audio/video send/receive methods.
@@ -411,7 +459,7 @@ impl RoomHandle {
         kind: MediaKind,
         direction: TrackDirection,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), JasonError>
+    ) -> Result<(), Traced<RoomError>>
     where
         S: Into<MediaState> + 'static,
     {
@@ -422,11 +470,21 @@ impl RoomHandle {
             source_kind.map(Into::into),
         )
         .await
+        .map_err(tracerr::wrap!())
     }
 
     /// Mutes outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::unmute_audio()`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
-    pub async fn mute_audio(&self) -> Result<(), JasonError> {
+    pub async fn mute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             mute_state::Stable::Muted,
             MediaKind::Audio,
@@ -434,11 +492,21 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Unmutes outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::mute_audio`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
-    pub async fn unmute_audio(&self) -> Result<(), JasonError> {
+    pub async fn unmute_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             mute_state::Stable::Unmuted,
             MediaKind::Audio,
@@ -446,14 +514,24 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Mutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::unmute_video()`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
     pub async fn mute_video(
         &self,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             mute_state::Stable::Muted,
             MediaKind::Video,
@@ -461,14 +539,24 @@ impl RoomHandle {
             source_kind,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Unmutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::mute_video()`] was called while muting or a media server
+    /// didn't approve this state transition.
     #[inline]
     pub async fn unmute_video(
         &self,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             mute_state::Stable::Unmuted,
             MediaKind::Video,
@@ -476,11 +564,25 @@ impl RoomHandle {
             source_kind,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] if audio track's
+    /// sender is configured as `required`.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::enable_audio()`] was called while disabling or a media
+    /// server didn't approve this state transition.
     #[inline]
-    pub async fn disable_audio(&self) -> Result<(), JasonError> {
+    pub async fn disable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
             MediaKind::Audio,
@@ -488,11 +590,26 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::disable_audio`] was called while enabling or a media
+    /// server didn't approve this state transition.
+    ///
+    /// With [`RoomError::MediaManagerError`] with
+    /// [`MediaManagerError::CouldNotGetMediaDevices`] or
+    /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
+    /// failed.
     #[inline]
-    pub async fn enable_audio(&self) -> Result<(), JasonError> {
+    pub async fn enable_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,
             MediaKind::Audio,
@@ -500,16 +617,30 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables outbound video.
     ///
     /// Affects only video with specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::CannotDisableRequiredSender`] video track's
+    /// sender is configured as `required`.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::enable_video()`] was called while disabling or a media
+    /// server didn't approve this state transition.
     #[inline]
     pub async fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
             MediaKind::Video,
@@ -517,16 +648,31 @@ impl RoomHandle {
             source_kind,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables outbound video.
     ///
     /// Affects only video with specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::disable_video()`] was called while enabling or a media
+    /// server didn't approve this state transition.
+    ///
+    /// With [`RoomError::MediaManagerError`] with
+    /// [`MediaManagerError::CouldNotGetMediaDevices`] or
+    /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
+    /// failed.
     #[inline]
     pub async fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
-    ) -> Result<(), JasonError> {
+    ) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,
             MediaKind::Video,
@@ -534,11 +680,21 @@ impl RoomHandle {
             source_kind,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables inbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::enable_remote_audio()`] was called while disabling or a
+    /// media server didn't approve this state transition.
     #[inline]
-    pub async fn disable_remote_audio(&self) -> Result<(), JasonError> {
+    pub async fn disable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
             MediaKind::Audio,
@@ -546,11 +702,21 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Disables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::enable_remote_video()`] was called while disabling or a
+    /// media server didn't approve this state transition.
     #[inline]
-    pub async fn disable_remote_video(&self) -> Result<(), JasonError> {
+    pub async fn disable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Disabled,
             MediaKind::Video,
@@ -558,11 +724,21 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables inbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::disable_remote_audio()`] was called while enabling or a
+    /// media server didn't approve this state transition.
     #[inline]
-    pub async fn enable_remote_audio(&self) -> Result<(), JasonError> {
+    pub async fn enable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,
             MediaKind::Audio,
@@ -570,11 +746,21 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Enables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::Detached`] if an inner [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`RoomError::MediaConnections`] with
+    /// [`MediaConnectionsError::MediaStateTransitsIntoOppositeState`] if
+    /// [`RoomHandle::disable_remote_video()`] was called while enabling or a
+    /// media server didn't approve this state transition.
     #[inline]
-    pub async fn enable_remote_video(&self) -> Result<(), JasonError> {
+    pub async fn enable_remote_video(&self) -> Result<(), Traced<RoomError>> {
         self.change_media_state(
             media_exchange_state::Stable::Enabled,
             MediaKind::Video,
@@ -582,6 +768,7 @@ impl RoomHandle {
             None,
         )
         .await
+        .map_err(tracerr::map_from_and_wrap!())
     }
 }
 
@@ -648,17 +835,25 @@ impl Room {
                 if let Some(inner) = inner.upgrade() {
                     match event {
                         RoomEvent::RpcEvent(event) => {
-                            if let Err(err) =
-                                event.dispatch_with(inner.deref()).await
+                            if let Err(e) = event
+                                .dispatch_with(inner.deref())
+                                .await
+                                .map_err(
+                                    tracerr::map_from_and_wrap!(=> RoomError),
+                                )
                             {
-                                JasonError::from(err).print();
+                                log::error!("{}", e);
                             };
                         }
                         RoomEvent::PeerEvent(event) => {
-                            if let Err(err) =
-                                event.dispatch_with(inner.deref()).await
+                            if let Err(e) = event
+                                .dispatch_with(inner.deref())
+                                .await
+                                .map_err(
+                                    tracerr::map_from_and_wrap!(=> RoomError),
+                                )
                             {
-                                JasonError::from(err).print();
+                                log::error!("{}", e);
                             };
                         }
                         RoomEvent::RpcClientLostConnection => {
@@ -780,24 +975,24 @@ pub enum ConstraintsUpdateException {
     /// (`rollback_on_fail`/`stop_first` arguments).
     #[display(fmt = "RecoveredException")]
     Recovered {
-        /// [`JasonError`] due to which recovery happened.
-        recover_reason: JasonError,
+        /// [`RoomError`] due to which recovery has happened.
+        recover_reason: Traced<RoomError>,
     },
 
     /// New [`MediaStreamSettings`] set failed and state recovering also
     /// failed.
     #[display(fmt = "RecoverFailedException")]
     RecoverFailed {
-        /// [`JasonError`] due to which recovery happened.
-        recover_reason: JasonError,
+        /// [`RoomError`] due to which recovery has happened.
+        recover_reason: Traced<RoomError>,
 
-        /// Vector of [`JasonError`]s due to which recovery failed.
-        recover_fail_reasons: Vec<JasonError>,
+        /// Vector of [`RoomError`]s due to which recovery has failed.
+        recover_fail_reasons: Vec<Traced<RoomError>>,
     },
 
     /// Some other error occurred.
     #[display(fmt = "ErroredException")]
-    Errored(JasonError),
+    Errored(Traced<RoomError>),
 }
 
 impl ConstraintsUpdateException {
@@ -808,13 +1003,13 @@ impl ConstraintsUpdateException {
         self.to_string()
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// a `RecoveredException` or a `RecoverFailedException`.
+    /// Returns a [`RoomError`] if this [`ConstraintsUpdateException`]
+    /// represents a `RecoveredException` or a `RecoverFailedException`.
     ///
     /// Returns `undefined` otherwise.
     #[inline]
     #[must_use]
-    pub fn recover_reason(&self) -> Option<JasonError> {
+    pub fn recover_reason(&self) -> Option<Traced<RoomError>> {
         match &self {
             Self::RecoverFailed { recover_reason, .. }
             | Self::Recovered { recover_reason, .. } => {
@@ -824,10 +1019,10 @@ impl ConstraintsUpdateException {
         }
     }
 
-    /// Returns a list of [`JasonError`]s due to which a recovery has failed.
+    /// Returns a list of [`RoomError`]s due to which a recovery has failed.
     #[inline]
     #[must_use]
-    pub fn recover_fail_reasons(&self) -> Vec<JasonError> {
+    pub fn recover_fail_reasons(&self) -> Vec<Traced<RoomError>> {
         match &self {
             Self::RecoverFailed {
                 recover_fail_reasons,
@@ -837,13 +1032,13 @@ impl ConstraintsUpdateException {
         }
     }
 
-    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
-    /// an `ErroredException`.
+    /// Returns a [`RoomError`] if this [`ConstraintsUpdateException`]
+    /// represents an `ErroredException`.
     ///
     /// Returns `undefined` otherwise.
     #[inline]
     #[must_use]
-    pub fn error(&self) -> Option<JasonError> {
+    pub fn error(&self) -> Option<Traced<RoomError>> {
         match &self {
             Self::Errored(reason) => Some(reason.clone()),
             _ => None,
@@ -920,22 +1115,22 @@ impl From<ConstraintsUpdateError> for ConstraintsUpdateException {
         use ConstraintsUpdateError as E;
         match from {
             E::Recovered { recover_reason } => Self::Recovered {
-                recover_reason: JasonError::from(recover_reason),
+                recover_reason: tracerr::new!(recover_reason),
             },
             E::RecoverFailed {
                 recover_reason,
                 recover_fail_reasons,
             } => Self::RecoverFailed {
-                recover_reason: JasonError::from(recover_reason),
+                recover_reason: tracerr::new!(recover_reason),
                 recover_fail_reasons: {
                     recover_fail_reasons
                         .into_iter()
-                        .map(JasonError::from)
+                        .map(tracerr::map_from_and_wrap!())
                         .collect()
                 },
             },
             E::Errored { error: reason } => {
-                Self::Errored(JasonError::from(reason))
+                Self::Errored(tracerr::new!(reason))
             }
         }
     }

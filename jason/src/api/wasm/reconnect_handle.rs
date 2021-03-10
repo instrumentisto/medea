@@ -5,7 +5,9 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{api::JasonError, rpc};
+use crate::rpc;
+
+use super::JasonError;
 
 /// Handle that JS side can reconnect to a media server with when a connection
 /// is lost.

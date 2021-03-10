@@ -8,12 +8,11 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    api::{
-        ConstraintsUpdateException, JasonError, MediaSourceKind,
-        MediaStreamSettings,
-    },
+    api::{ConstraintsUpdateException, MediaSourceKind, MediaStreamSettings},
     room,
 };
+
+use super::JasonError;
 
 /// JS side handle to a [`Room`] where all the media happens.
 ///
@@ -171,6 +170,12 @@ impl RoomHandle {
 
     /// Mutes outbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if [`RoomHandle::unmute_audio()`] was
+    /// called while muting or a media server didn't approve this state
+    /// transition.
+    ///
     /// [`Room`]: room::Room
     pub fn mute_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -183,6 +188,12 @@ impl RoomHandle {
 
     /// Unmutes outbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if [`RoomHandle::mute_audio()`] was
+    /// called while unmuting or a media server didn't approve this state
+    /// transition.
+    ///
     /// [`Room`]: room::Room
     pub fn unmute_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -194,6 +205,12 @@ impl RoomHandle {
     }
 
     /// Mutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if [`RoomHandle::unmute_video()`] was
+    /// called while muting or a media server didn't approve this state
+    /// transition.
     ///
     /// [`Room`]: room::Room
     pub fn mute_video(&self, source_kind: Option<MediaSourceKind>) -> Promise {
@@ -208,6 +225,12 @@ impl RoomHandle {
     }
 
     /// Unmutes outbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if [`RoomHandle::mute_video()`] was
+    /// called while unmuting or a media server didn't approve this state
+    /// transition.
     ///
     /// [`Room`]: room::Room
     pub fn unmute_video(
@@ -226,6 +249,13 @@ impl RoomHandle {
 
     /// Disables outbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if the target sender is configured as
+    /// `required` by a media server or [`RoomHandle::enable_audio()`] was
+    /// called while disabling or a media server didn't approve this state
+    /// transition.
+    ///
     /// [`Room`]: room::Room
     pub fn disable_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -237,6 +267,15 @@ impl RoomHandle {
     }
 
     /// Enables outbound audio in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if [`RoomHandle::disable_audio()`] was
+    /// called while enabling or a media server didn't approve this state
+    /// transition.
+    ///
+    /// With `name = 'MediaManagerError'` if media acquisition request to User
+    /// Agent failed.
     ///
     /// [`Room`]: room::Room
     pub fn enable_audio(&self) -> Promise {
@@ -251,6 +290,13 @@ impl RoomHandle {
     /// Disables outbound video.
     ///
     /// Affects only video with a specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if the target sender is configured as
+    /// `required` by a media server or [`RoomHandle::enable_video()`] was
+    /// called while disabling or a media server didn't approve this state
+    /// transition.
     pub fn disable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -269,6 +315,15 @@ impl RoomHandle {
     /// Enables outbound video.
     ///
     /// Affects only video with a specific [`MediaSourceKind`] if specified.
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if [`RoomHandle::disable_video()`] was
+    /// called while enabling or a media server didn't approve this state
+    /// transition.
+    ///
+    /// With `name = 'MediaManagerError'` if media acquisition request to User
+    /// Agent failed.
     pub fn enable_video(
         &self,
         source_kind: Option<MediaSourceKind>,
@@ -285,6 +340,12 @@ impl RoomHandle {
 
     /// Disables inbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if
+    /// [`RoomHandle::enable_remote_audio()`] was called while disabling or a
+    /// media server didn't approve this state transition.
+    ///
     /// [`Room`]: room::Room
     pub fn disable_remote_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -298,6 +359,12 @@ impl RoomHandle {
     }
 
     /// Disables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if
+    /// [`RoomHandle::enable_remote_video()`] was called while disabling or
+    /// a media server didn't approve this state transition.
     ///
     /// [`Room`]: room::Room
     pub fn disable_remote_video(&self) -> Promise {
@@ -313,6 +380,12 @@ impl RoomHandle {
 
     /// Enables inbound audio in this [`Room`].
     ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if
+    /// [`RoomHandle::disable_remote_audio()`] was called while enabling or a
+    /// media server didn't approve this state transition.
+    ///
     /// [`Room`]: room::Room
     pub fn enable_remote_audio(&self) -> Promise {
         let this = self.0.clone();
@@ -324,6 +397,12 @@ impl RoomHandle {
     }
 
     /// Enables inbound video in this [`Room`].
+    ///
+    /// # Errors
+    ///
+    /// With `name = 'MediaConnections'` if
+    /// [`RoomHandle::disable_remote_video()`] was called while enabling or a
+    /// media server didn't approve this state transition.
     ///
     /// [`Room`]: room::Room
     pub fn enable_remote_video(&self) -> Promise {

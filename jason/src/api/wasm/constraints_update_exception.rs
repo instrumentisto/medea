@@ -7,7 +7,9 @@ use std::iter::FromIterator as _;
 use derive_more::From;
 use wasm_bindgen::prelude::*;
 
-use crate::{api::JasonError, room};
+use crate::room;
+
+use super::JasonError;
 
 /// Exception returned from [`RoomHandle::set_local_media_settings()`][1].
 ///

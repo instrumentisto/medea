@@ -1,14 +1,8 @@
 //! Helpers for application errors.
 
-use std::{
-    fmt::{Debug, Display},
-    rc::Rc,
-};
+use std::{fmt::Debug, rc::Rc};
 
 use derive_more::{Display, From};
-use tracerr::{Trace, Traced};
-
-use crate::platform;
 
 pub use medea_macro::JsCaused;
 
@@ -24,82 +18,6 @@ pub trait JsCaused {
     /// Returns JS error if it is the cause.
     fn js_cause(self) -> Option<Self::Error>;
 }
-
-// TODO: Consider moving to `api::wasm`.
-/// Abstract application error.
-#[derive(Clone, Debug, Display)]
-#[display(fmt = "{}: {}\n{}", name, message, trace)]
-pub struct JasonError {
-    name: &'static str,
-    message: String,
-    trace: Trace,
-    source: Option<platform::Error>,
-}
-
-impl JasonError {
-    /// Returns name of this error.
-    #[inline]
-    #[must_use]
-    pub fn name(&self) -> String {
-        String::from(self.name)
-    }
-
-    /// Returns message of this error.
-    #[inline]
-    #[must_use]
-    pub fn message(&self) -> String {
-        self.message.clone()
-    }
-
-    /// Returns trace information of this error.
-    #[inline]
-    #[must_use]
-    pub fn trace(&self) -> String {
-        self.trace.to_string()
-    }
-
-    /// Returns [`platform::Error`] if it's the cause.
-    #[inline]
-    #[must_use]
-    pub fn source(&self) -> Option<platform::Error> {
-        Clone::clone(&self.source)
-    }
-
-    /// Prints error information to default logger with an `ERROR` level.
-    #[inline]
-    pub fn print(&self) {
-        log::error!("{}", self);
-    }
-}
-
-impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
-where
-    E::Error: Into<platform::Error>,
-{
-    fn from((err, trace): (E, Trace)) -> Self {
-        Self {
-            name: err.name(),
-            message: err.to_string(),
-            trace,
-            source: err.js_cause().map(Into::into),
-        }
-    }
-}
-
-impl<E: JsCaused + Display> From<Traced<E>> for JasonError
-where
-    E::Error: Into<platform::Error>,
-{
-    fn from(traced: Traced<E>) -> Self {
-        Self::from(traced.into_parts())
-    }
-}
-
-/// Occurs if referenced value was dropped.
-#[derive(Debug, Display, JsCaused)]
-#[display(fmt = "Handler is in detached state.")]
-#[js(error = "platform::Error")]
-pub struct HandlerDetachedError;
 
 /// Wrapper for [`serde_json::error::Error`] that provides [`Clone`], [`Debug`],
 /// [`Display`] implementations.

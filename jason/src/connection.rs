@@ -1,22 +1,16 @@
 //! [`Connection`] with a specific remote `Member`.
 
-// TODO: Remove when moving `JasonError` to `api::wasm`.
-#![allow(clippy::missing_errors_doc)]
-
 use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
+use derive_more::Display;
 use medea_client_api_proto::{ConnectionQualityScore, MemberId, PeerId};
+use tracerr::Traced;
 
-use crate::{
-    api,
-    media::track::remote,
-    platform,
-    utils::{HandlerDetachedError, JasonError},
-};
+use crate::{api, media::track::remote, platform, utils::JsCaused};
 
 /// Service which manages [`Connection`]s with remote `Member`s.
 #[derive(Default)]
@@ -90,6 +84,15 @@ impl Connections {
     }
 }
 
+/// Errors that may occur in a [`ConnectionHandle`].
+#[derive(Clone, Copy, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum ConnectionError {
+    /// [`ConnectionHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "Connection is in detached state")]
+    Detached,
+}
+
 /// External handler to a [`Connection`] with a remote `Member`.
 ///
 /// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
@@ -117,35 +120,63 @@ struct InnerConnection {
 
 impl ConnectionHandle {
     /// Sets callback, invoked when this `Connection` will close.
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_close(
         &self,
         f: platform::Function<()>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
+    ) -> Result<(), Traced<ConnectionError>> {
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .map(|inner| inner.on_close.set_func(f))
     }
 
     /// Returns remote `Member` ID.
-    pub fn get_remote_member_id(&self) -> Result<String, JasonError> {
-        upgrade_or_detached!(self.0).map(|inner| inner.remote_id.0.clone())
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
+    pub fn get_remote_member_id(
+        &self,
+    ) -> Result<String, Traced<ConnectionError>> {
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
+            .map(|inner| inner.remote_id.0.clone())
     }
 
     /// Sets callback, invoked when a new [`remote::Track`] will is added to
     /// this [`Connection`].
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_remote_track_added(
         &self,
         f: platform::Function<api::RemoteMediaTrack>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
+    ) -> Result<(), Traced<ConnectionError>> {
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
             .map(|inner| inner.on_remote_track_added.set_func(f))
     }
 
     /// Sets callback, invoked when a connection quality score is updated by
     /// a server.
+    ///
+    /// # Errors
+    ///
+    /// With [`ConnectionError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_quality_score_update(
         &self,
         f: platform::Function<u8>,
-    ) -> Result<(), JasonError> {
-        upgrade_or_detached!(self.0)
+    ) -> Result<(), Traced<ConnectionError>> {
+        self.0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ConnectionError::Detached))
             .map(|inner| inner.on_quality_score_update.set_func(f))
     }
 }
