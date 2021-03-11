@@ -18,9 +18,7 @@ async fn when_control_api_removes_room(world: &mut World) {
     world.delete_room_element().await;
 }
 
-#[when(
-    regex = r"^Control API interconnected (audio|video) of (\S+) and (\S+)$"
-)]
+#[when(regex = r"^Control API interconnects (audio|video) of (\S+) and (\S+)$")]
 async fn when_interconnects_kind(
     world: &mut World,
     kind: String,
@@ -61,8 +59,10 @@ async fn when_interconnects_kind(
         .unwrap();
 }
 
-#[then(regex = "^Control API sends OnLeave callback with `(.+)` reason for \
-                member (\\S+)$")]
+#[then(
+    regex = "^Control API sends `OnLeave` callback with `(.+)` reason for \
+                member (\\S+)$"
+)]
 async fn then_control_api_sends_on_leave(
     world: &mut World,
     reason: String,
@@ -74,12 +74,12 @@ async fn then_control_api_sends_on_leave(
 }
 
 #[then(
-    regex = r"^Control API doesn't sends `OnLeave` callback for member (\S+)$"
+    regex = r"^Control API doesn't send `OnLeave` callback for member (\S+)$"
 )]
 async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
     timeout(
         Duration::from_millis(300),
-        world.wait_for_on_leave(id, "".to_string()),
+        world.wait_for_on_leave(id, String::new()),
     )
     .await
     .unwrap_err();

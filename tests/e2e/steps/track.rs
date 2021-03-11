@@ -2,7 +2,7 @@ use cucumber_rust::then;
 
 use crate::{
     object::{MediaKind, MediaSourceKind},
-    parse_media_kinds,
+    steps::parse_media_kinds,
     world::World,
 };
 
@@ -20,7 +20,7 @@ async fn then_member_has_local_tracks(
 
 #[then(
     regex = "^(\\S+) has (audio|video|audio and video) remote track(?:s)? \
-             with (\\S+)"
+             from (\\S+)"
 )]
 async fn then_member_has_remote_track(
     world: &mut World,
@@ -141,7 +141,7 @@ async fn then_on_remote_enabled_callback_fires(
 }
 
 #[then(regex = "^(\\S+)'s (audio|(?:display|device) video) remote track \
-                 with (\\S+) is (enabled|disabled)$")]
+                 from (\\S+) is (enabled|disabled)$")]
 async fn then_remote_media_track(
     world: &mut World,
     id: String,
@@ -171,7 +171,7 @@ async fn then_remote_media_track(
 }
 
 #[then(regex = "^(\\S+) doesn't have (audio|(?:device|display) video) \
-                 remote track with (\\S+)$")]
+                 remote track from (\\S+)$")]
 async fn then_doesnt_have_remote_track(
     world: &mut World,
     id: String,
@@ -193,8 +193,8 @@ async fn then_doesnt_have_remote_track(
         .unwrap());
 }
 
-#[then(regex = r"^(\S+) doesn't has remote tracks from (\S+)$")]
-async fn then_member_doesnt_has_remote_tracks_with(
+#[then(regex = r"^(\S+) doesn't have remote tracks from (\S+)$")]
+async fn then_member_doesnt_have_remote_tracks_with(
     world: &mut World,
     id: String,
     partner_id: String,

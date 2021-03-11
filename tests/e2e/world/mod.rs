@@ -23,10 +23,7 @@ use crate::{
     object::{self, Jason, Object},
 };
 
-use self::member::Member;
-
-#[doc(inline)]
-pub use self::member::Builder as MemberBuilder;
+pub use self::member::{Builder as MemberBuilder, Member};
 
 /// Returns Control API path for the provided `room_id`, `member_id` and
 /// `endpoint_id`.
@@ -117,10 +114,10 @@ impl World {
         let mut pipeline = HashMap::new();
         if builder.is_send {
             pipeline.insert(
-                "publish".to_string(),
+                String::from("publish"),
                 proto::Endpoint::WebRtcPublishEndpoint(
                     proto::WebRtcPublishEndpoint {
-                        id: "publish".to_string(),
+                        id: String::from("publish"),
                         p2p: proto::P2pMode::Always,
                         force_relay: false,
                         audio_settings: proto::AudioSettings::default(),
@@ -155,11 +152,11 @@ impl World {
                 proto::Element::Member(proto::Member {
                     id: builder.id.clone(),
                     pipeline,
-                    credentials: Some(proto::Credentials::Plain(
-                        "test".to_string(),
-                    )),
-                    on_join: Some("grpc://127.0.0.1:9099".to_string()),
-                    on_leave: Some("grpc://127.0.0.1:9099".to_string()),
+                    credentials: Some(proto::Credentials::Plain(String::from(
+                        "test",
+                    ))),
+                    on_join: Some(String::from("grpc://127.0.0.1:9099")),
+                    on_leave: Some(String::from("grpc://127.0.0.1:9099")),
                     idle_timeout: None,
                     reconnect_timeout: None,
                     ping_interval: None,
@@ -204,8 +201,8 @@ impl World {
         let room = jason.init_room().await?;
         let member = builder.build(room).await?;
 
-        self.jasons.insert(member.id().to_string(), jason);
-        self.members.insert(member.id().to_string(), member);
+        self.jasons.insert(member.id().to_owned(), jason);
+        self.members.insert(member.id().to_owned(), member);
 
         Ok(())
     }
@@ -225,7 +222,7 @@ impl World {
         let member = self
             .members
             .get_mut(member_id)
-            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_owned()))?;
         member.join_room(&self.room_id).await?;
         self.wait_for_interconnection(member_id).await?;
         Ok(())
@@ -246,7 +243,7 @@ impl World {
                 member.count_of_tracks_between_members(partner);
             let conn = member
                 .connections()
-                .wait_for_connection(partner.id().to_string())
+                .wait_for_connection(partner.id().to_owned())
                 .await?;
             conn.tracks_store()
                 .await?
@@ -255,7 +252,7 @@ impl World {
 
             let partner_conn = partner
                 .connections()
-                .wait_for_connection(member_id.to_string())
+                .wait_for_connection(member_id.to_owned())
                 .await?;
             partner_conn
                 .tracks_store()
@@ -285,7 +282,7 @@ impl World {
         let member = self
             .members
             .get(member_id)
-            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_owned()))?;
 
         Ok(member.room().wait_for_close().await?)
     }
@@ -300,7 +297,6 @@ impl World {
     ) {
         let mut interval = interval(Duration::from_millis(50));
         loop {
-            interval.tick().await;
             let callbacks = self.get_callbacks().await;
             let on_leave = callbacks
                 .into_iter()
@@ -316,6 +312,7 @@ impl World {
                 assert_eq!(on_leave.reason.to_string(), reason);
                 break;
             }
+            interval.tick().await;
         }
     }
 
@@ -323,7 +320,6 @@ impl World {
     pub async fn wait_for_on_join(&mut self, member_id: String) {
         let mut interval = interval(Duration::from_millis(50));
         loop {
-            interval.tick().await;
             let callbacks = self.get_callbacks().await;
             let on_join_found = callbacks
                 .into_iter()
@@ -332,19 +328,8 @@ impl World {
             if on_join_found {
                 break;
             }
+            interval.tick().await;
         }
-    }
-
-    /// Returns all [`CallbackItem`]s sent by Control API for this [`World`]'s
-    /// `Room`.
-    pub async fn get_callbacks(&mut self) -> Vec<CallbackItem> {
-        self.control_client
-            .callbacks()
-            .await
-            .unwrap()
-            .into_iter()
-            .filter(|i| i.fid.contains(&self.room_id))
-            .collect()
     }
 
     /// Creates `WebRtcPublishEndpoint`s and `WebRtcPlayEndpoint`s for the
@@ -399,17 +384,6 @@ impl World {
                 .await?;
         }
 
-        {
-            let left_member = self.members.get_mut(&pair.left.id).unwrap();
-            left_member.set_is_send(pair.left.is_send());
-            left_member.set_is_recv(pair.right.recv);
-        }
-        {
-            let right_member = self.members.get_mut(&pair.right.id).unwrap();
-            right_member.set_is_send(pair.right.is_send());
-            right_member.set_is_recv(pair.right.recv);
-        }
-
         Ok(())
     }
 
@@ -441,6 +415,18 @@ impl World {
             .unwrap();
         assert!(resp.error.is_none());
     }
+
+    /// Returns all [`CallbackItem`]s sent by Control API for this [`World`]'s
+    /// `Room`.
+    async fn get_callbacks(&mut self) -> Vec<CallbackItem> {
+        self.control_client
+            .callbacks()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|i| i.fid.contains(&self.room_id))
+            .collect()
+    }
 }
 
 /// `Member`s pairing configuration.
@@ -471,7 +457,7 @@ impl PairedMember {
     fn publish_endpoint(&self) -> Option<proto::WebRtcPublishEndpoint> {
         if self.is_send() {
             Some(proto::WebRtcPublishEndpoint {
-                id: "publish".to_string(),
+                id: String::from("publish"),
                 p2p: proto::P2pMode::Always,
                 force_relay: false,
                 audio_settings: self.send_audio.clone().unwrap_or(

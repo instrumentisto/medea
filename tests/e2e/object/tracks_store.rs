@@ -165,9 +165,9 @@ impl<T> Object<TracksStore<T>> {
                             if (kind === meta.kind
                                 && sourceKind === meta.sourceKind) {
                                 resolve(track);
-                                return false;
-                            } else {
                                 return true;
+                            } else {
+                                return false;
                             }
                         });
                     });
