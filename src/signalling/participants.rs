@@ -74,6 +74,8 @@ pub struct ParticipantService {
     /// [`Room`]s id from which this [`ParticipantService`] was created.
     room_id: RoomId,
 
+    public_url: String,
+
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
@@ -108,6 +110,7 @@ impl ParticipantService {
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
+            public_url: context.config.server.client.http.public_url.clone(),
             members: parse_members(room_spec, context.config.rpc)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
@@ -377,7 +380,7 @@ impl ParticipantService {
         &mut self,
         id: MemberId,
         spec: &MemberSpec,
-    ) -> Result<(), RoomError> {
+    ) -> Result<String, RoomError> {
         if self.get_member_by_id(&id).is_ok() {
             return Err(RoomError::MemberAlreadyExists(
                 self.get_fid_to_member(id),
@@ -436,9 +439,10 @@ impl ParticipantService {
             src.add_sink(sink.downgrade());
         }
 
+        let sid = signalling_member.get_sid(&self.public_url);
         self.insert_member(id, signalling_member);
 
-        Ok(())
+        Ok(sid)
     }
 }
 

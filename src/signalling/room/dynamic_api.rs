@@ -34,6 +34,7 @@ use crate::{
 };
 
 use super::{Room, RoomError};
+use crate::signalling::room_service::Sids;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -390,52 +391,59 @@ impl Handler<Delete> for Room {
 }
 
 #[derive(Message, Debug)]
-#[rtype(result = "Result<(), RoomError>")]
+#[rtype(result = "Result<Sids, RoomError>")]
 pub struct ApplyMember(pub MemberId, pub MemberSpec);
 
 impl Handler<ApplyMember> for Room {
-    type Result = Result<(), RoomError>;
+    type Result = Result<Sids, RoomError>;
 
     fn handle(
         &mut self,
         msg: ApplyMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member(&msg.0)?;
-        for (id, endpoint) in msg.1.publish_endpoints() {
-            if member.get_src_by_id(&id).is_none() {
-                self.create_src_endpoint(&msg.0, id, endpoint)?;
+        let mut sids = Sids::new();
+        if let Ok(member) = self.members.get_member(&msg.0) {
+            for (id, endpoint) in msg.1.publish_endpoints() {
+                if member.get_src_by_id(&id).is_none() {
+                    self.create_src_endpoint(&msg.0, id, endpoint)?;
+                }
             }
-        }
-        for (id, endpoint) in msg.1.play_endpoints() {
-            if member.get_sink_by_id(&id).is_none() {
-                self.create_sink_endpoint(&msg.0, id, endpoint.clone())?;
+            for (id, endpoint) in msg.1.play_endpoints() {
+                if member.get_sink_by_id(&id).is_none() {
+                    self.create_sink_endpoint(&msg.0, id, endpoint.clone())?;
+                }
             }
-        }
-        for id in member.srcs_ids() {
-            if msg.1.get_publish_endpoint_by_id(id.clone()).is_none() {
-                self.delete_endpoint(&msg.0, id.into());
+            for id in member.srcs_ids() {
+                if msg.1.get_publish_endpoint_by_id(id.clone()).is_none() {
+                    self.delete_endpoint(&msg.0, id.into());
+                }
             }
-        }
-        for id in member.sinks_ids() {
-            if msg.1.get_play_endpoint_by_id(id.clone()).is_none() {
-                self.delete_endpoint(&msg.0, id.into());
+            for id in member.sinks_ids() {
+                if msg.1.get_play_endpoint_by_id(id.clone()).is_none() {
+                    self.delete_endpoint(&msg.0, id.into());
+                }
             }
+        } else {
+            let sid = self.members.create_member(msg.0.clone(), &msg.1)?;
+            // TODO: Use RoomId in Sids HashMap
+            sids.insert(msg.0.to_string(), sid);
         }
-        Ok(())
+        Ok(sids)
     }
 }
 
 #[derive(Message, Debug)]
-#[rtype(result = "Result<(), RoomError>")]
+#[rtype(result = "Result<Sids, RoomError>")]
 pub struct Apply(pub RoomSpec);
 
 impl Handler<Apply> for Room {
-    type Result = Result<(), RoomError>;
+    type Result = Result<Sids, RoomError>;
 
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
         let mut create_src_endpoint = Vec::new();
         let mut create_sink_endpoint = Vec::new();
+        let mut sids = Sids::new();
         for (id, element) in &msg.0.pipeline {
             let RoomElement::Member(spec) = element;
             if let Ok(member) = self.members.get_member(&id) {
@@ -468,7 +476,8 @@ impl Handler<Apply> for Room {
                     }
                 }
             } else {
-                self.members.create_member(id.clone(), &spec)?;
+                let sid = self.members.create_member(id.clone(), &spec)?;
+                sids.insert(id.to_string(), sid);
             }
         }
 
@@ -485,7 +494,7 @@ impl Handler<Apply> for Room {
             }
         }
 
-        Ok(())
+        Ok(sids)
     }
 }
 

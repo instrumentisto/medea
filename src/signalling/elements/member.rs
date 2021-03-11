@@ -136,6 +136,21 @@ impl Member {
         })))
     }
 
+    pub fn get_sid(&self, public_url: &str) -> String {
+        let inner = self.0.borrow();
+        match &inner.credentials {
+            Credential::Hash(_) => {
+                format!("{}/{}/{}", public_url, inner.room_id.0, inner.id.0)
+            }
+            Credential::Plain(plain) => {
+                format!(
+                    "{}/{}/{}?token={}",
+                    public_url, inner.room_id.0, inner.id.0, plain,
+                )
+            }
+        }
+    }
+
     /// Lookups [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
     ///
     /// Returns [`MembersLoadError::MemberNotFound`] when member not found.

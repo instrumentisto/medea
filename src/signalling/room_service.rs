@@ -326,8 +326,9 @@ impl Handler<ApplyRoom> for RoomService {
         if let Some(room) = self.room_repo.get(&msg.id) {
             let fut = room.send(Apply(msg.spec));
             Box::pin(async move {
-                fut.await.map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(Sids::new())
+                let sids =
+                    fut.await.map_err(RoomServiceError::RoomMailboxErr)??;
+                Ok(sids)
             })
         } else {
             let res = self.create_room(msg.spec);

@@ -124,6 +124,8 @@ pub struct Room {
     /// [`CallbackEvent`]: crate::api::control::callback::CallbackEvent
     callbacks: CallbackService<CallbackClientFactoryImpl>,
 
+    public_url: String,
+
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
@@ -154,6 +156,7 @@ impl Room {
         let ctx = Context::with_receiver(rx);
         let this = Self {
             id: room_spec.id().clone(),
+            public_url: context.config.server.client.http.public_url.clone(),
             peers: PeersService::new(
                 room_spec.id().clone(),
                 context.turn_service.clone(),
