@@ -2,8 +2,12 @@
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
 
+use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
+
+#[derive(Clone, Debug, Display, Deserialize, Serialize, From)]
+pub struct PublicUrl(pub String);
 
 /// [Client API] servers settings.
 ///
@@ -34,8 +38,9 @@ pub struct ClientApiHttpServer {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
-    #[default = "ws://127.0.0.1:8080/ws"]
-    pub public_url: String,
+    // #[default = "ws://127.0.0.1:8080/ws"]
+    #[default(PublicUrl("ws://127.0.0.1:8080/ws".to_owned()))]
+    pub public_url: PublicUrl,
 
     /// IP address to bind HTTP server to.
     ///

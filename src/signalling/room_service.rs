@@ -18,11 +18,12 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
-        member::Credential,
+        member::Sid,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomSpec,
         TryFromElementError,
     },
+    conf::server::PublicUrl,
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
@@ -122,7 +123,7 @@ pub struct RoomService {
     /// Public URL of server. Address for exposed [Client API].
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
-    public_url: String,
+    public_url: PublicUrl,
 
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
@@ -186,33 +187,6 @@ impl RoomService {
             })
     }
 
-    /// Returns [Control API] sid based on provided arguments and
-    /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
-    ///
-    /// Returns sid with a token (`?token=<token>`) if [`ControlCredential`] is
-    /// [`ControlCredential::Plain`].
-    ///
-    /// Returns sid without token if [`ControlCredential`] is
-    /// [`ControlCredential::Hash`].
-    fn get_sid(
-        &self,
-        room_id: &RoomId,
-        member_id: &MemberId,
-        credentials: &Credential,
-    ) -> String {
-        match credentials {
-            Credential::Hash(_) => {
-                format!("{}/{}/{}", self.public_url, room_id, member_id)
-            }
-            Credential::Plain(plain) => {
-                format!(
-                    "{}/{}/{}?token={}",
-                    self.public_url, room_id, member_id, plain,
-                )
-            }
-        }
-    }
-
     fn create_room(
         &self,
         room_spec: RoomSpec,
@@ -221,12 +195,13 @@ impl RoomService {
             Ok(members) => members
                 .iter()
                 .map(|(member_id, member)| {
-                    let uri = self.get_sid(
-                        room_spec.id(),
-                        &member_id,
-                        member.credentials(),
+                    let sid = Sid::new(
+                        self.public_url.clone(),
+                        room_spec.id().clone(),
+                        member_id.clone(),
+                        member.credentials().clone(),
                     );
-                    (member_id.clone().to_string(), uri)
+                    (member_id.clone(), sid)
                 })
                 .collect(),
             Err(e) => return Err(RoomServiceError::TryFromElement(e)),
@@ -306,7 +281,7 @@ impl Handler<StartStaticRooms> for RoomService {
 /// Type alias for success [`CreateResponse`]'s sids.
 ///
 /// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
-pub type Sids = HashMap<String, String>;
+pub type Sids = HashMap<MemberId, Sid>;
 
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
@@ -412,7 +387,6 @@ impl Handler<CreateMemberInRoom> for RoomService {
         let room_id = msg.parent_fid.take_room_id();
         let id = msg.id;
         let spec = msg.spec;
-        let sid = self.get_sid(&room_id, &id, spec.credentials());
 
         self.room_repo.get(&room_id).map_or_else(
             || {
@@ -423,11 +397,11 @@ impl Handler<CreateMemberInRoom> for RoomService {
             },
             |room| {
                 async move {
-                    let id_str = id.to_string();
-                    room.send(CreateMember(id, spec))
+                    let sids = room
+                        .send(CreateMember(id, spec))
                         .await
                         .map_err(RoomServiceError::RoomMailboxErr)??;
-                    Ok(hashmap! {id_str => sid})
+                    Ok(sids)
                 }
                 .boxed_local()
             },

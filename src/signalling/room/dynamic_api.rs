@@ -426,8 +426,7 @@ impl Handler<ApplyMember> for Room {
             }
         } else {
             let sid = self.members.create_member(msg.0.clone(), &msg.1)?;
-            // TODO: Use RoomId in Sids HashMap
-            sids.insert(msg.0.to_string(), sid);
+            sids.insert(msg.0, sid);
         }
         Ok(sids)
     }
@@ -477,7 +476,7 @@ impl Handler<Apply> for Room {
                 }
             } else {
                 let sid = self.members.create_member(id.clone(), &spec)?;
-                sids.insert(id.to_string(), sid);
+                sids.insert(id.clone(), sid);
             }
         }
 
@@ -500,23 +499,25 @@ impl Handler<Apply> for Room {
 
 /// Signal for creating new `Member` in this [`Room`].
 #[derive(Message, Debug)]
-#[rtype(result = "Result<(), RoomError>")]
+#[rtype(result = "Result<Sids, RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);
 
 impl Handler<CreateMember> for Room {
-    type Result = Result<(), RoomError>;
+    type Result = Result<Sids, RoomError>;
 
     fn handle(
         &mut self,
         msg: CreateMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        self.members.create_member(msg.0.clone(), &msg.1)?;
+        let sid = self.members.create_member(msg.0.clone(), &msg.1)?;
+        let mut sids = Sids::new();
+        sids.insert(msg.0.clone(), sid);
         debug!(
             "Member [id = {}] created in Room [id = {}].",
             msg.0, self.id
         );
-        Ok(())
+        Ok(sids)
     }
 }
 

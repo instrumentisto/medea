@@ -5,10 +5,11 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    fmt,
     time::Duration,
 };
 
-use medea_client_api_proto::{self as client_proto, MemberId as Id};
+use medea_client_api_proto::{self as client_proto, MemberId as Id, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -24,8 +25,43 @@ use crate::{
         EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
         WebRtcPlayId,
     },
+    conf::server::PublicUrl,
     utils,
 };
+
+#[derive(Clone, Debug)]
+pub struct Sid {
+    public_url: PublicUrl,
+    room_id: RoomId,
+    member_id: Id,
+    credential: Credential,
+}
+
+impl Sid {
+    pub fn new(
+        public_url: PublicUrl,
+        room_id: RoomId,
+        member_id: Id,
+        credential: Credential,
+    ) -> Self {
+        Self {
+            public_url,
+            room_id,
+            member_id,
+            credential,
+        }
+    }
+}
+
+impl fmt::Display for Sid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}/{}", self.public_url, self.room_id, self.member_id)?;
+        if let Credential::Plain(plain) = &self.credential {
+            write!(f, "?token={}", plain)?;
+        }
+        Ok(())
+    }
+}
 
 /// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]

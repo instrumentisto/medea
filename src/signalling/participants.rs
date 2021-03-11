@@ -26,11 +26,12 @@ use crate::{
             ClosedReason, RpcConnection, RpcConnectionClosed,
         },
         control::{
+            member::Sid,
             refs::{Fid, ToEndpoint, ToMember},
             MemberSpec, RoomSpec,
         },
     },
-    conf::Rpc as RpcConf,
+    conf::{server::PublicUrl, Rpc as RpcConf},
     log::prelude::*,
     signalling::{
         elements::{
@@ -74,7 +75,7 @@ pub struct ParticipantService {
     /// [`Room`]s id from which this [`ParticipantService`] was created.
     room_id: RoomId,
 
-    public_url: String,
+    public_url: PublicUrl,
 
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
@@ -380,7 +381,7 @@ impl ParticipantService {
         &mut self,
         id: MemberId,
         spec: &MemberSpec,
-    ) -> Result<String, RoomError> {
+    ) -> Result<Sid, RoomError> {
         if self.get_member_by_id(&id).is_ok() {
             return Err(RoomError::MemberAlreadyExists(
                 self.get_fid_to_member(id),
@@ -439,7 +440,7 @@ impl ParticipantService {
             src.add_sink(sink.downgrade());
         }
 
-        let sid = signalling_member.get_sid(&self.public_url);
+        let sid = signalling_member.get_sid(self.public_url.clone());
         self.insert_member(id, signalling_member);
 
         Ok(sid)

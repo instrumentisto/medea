@@ -259,6 +259,12 @@ impl ControlApiService {
     }
 }
 
+fn proto_sids(sids: Sids) -> HashMap<String, String> {
+    sids.into_iter()
+        .map(|(id, sid)| (id.to_string(), sid.to_string()))
+        .collect()
+}
+
 #[async_trait]
 impl ControlApi for ControlApiService {
     async fn create(
@@ -268,7 +274,10 @@ impl ControlApi for ControlApiService {
         debug!("Create gRPC Request: [{:?}]", request);
         let create_response =
             match self.create_element(request.into_inner()).await {
-                Ok(sid) => proto::CreateResponse { sid, error: None },
+                Ok(sid) => proto::CreateResponse {
+                    sid: proto_sids(sid),
+                    error: None,
+                },
                 Err(err) => proto::CreateResponse {
                     sid: HashMap::new(),
                     error: Some(err.into()),
@@ -314,7 +323,10 @@ impl ControlApi for ControlApiService {
         request: tonic::Request<proto::CreateRequest>,
     ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
         let resp = match self.apply_element(request.into_inner()).await {
-            Ok(sid) => proto::CreateResponse { sid, error: None },
+            Ok(sid) => proto::CreateResponse {
+                sid: proto_sids(sid),
+                error: None,
+            },
             Err(err) => proto::CreateResponse {
                 sid: HashMap::new(),
                 error: Some(err.into()),
