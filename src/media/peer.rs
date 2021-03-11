@@ -1707,7 +1707,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
-        peer.initialized();
+        peer.set_initialized();
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
             peer
