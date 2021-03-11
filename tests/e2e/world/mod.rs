@@ -114,10 +114,10 @@ impl World {
         let mut pipeline = HashMap::new();
         if builder.is_send {
             pipeline.insert(
-                String::from("publish"),
+                "publish".to_owned(),
                 proto::Endpoint::WebRtcPublishEndpoint(
                     proto::WebRtcPublishEndpoint {
-                        id: String::from("publish"),
+                        id: "publish".to_owned(),
                         p2p: proto::P2pMode::Always,
                         force_relay: false,
                         audio_settings: proto::AudioSettings::default(),
@@ -152,11 +152,11 @@ impl World {
                 proto::Element::Member(proto::Member {
                     id: builder.id.clone(),
                     pipeline,
-                    credentials: Some(proto::Credentials::Plain(String::from(
-                        "test",
-                    ))),
-                    on_join: Some(String::from("grpc://127.0.0.1:9099")),
-                    on_leave: Some(String::from("grpc://127.0.0.1:9099")),
+                    credentials: Some(proto::Credentials::Plain(
+                        "test".to_owned(),
+                    )),
+                    on_join: Some("grpc://127.0.0.1:9099".to_owned()),
+                    on_leave: Some("grpc://127.0.0.1:9099".to_owned()),
                     idle_timeout: None,
                     reconnect_timeout: None,
                     ping_interval: None,
@@ -289,7 +289,7 @@ impl World {
 
     /// Waits for `OnLeave` Control API callback for the provided [`Member`] ID.
     ///
-    /// Panics if `OnLeave` reason is not equal to the provided one.
+    /// Asserts the `OnLeave` reason to be equal to the provided one.
     pub async fn wait_for_on_leave(
         &mut self,
         member_id: String,
@@ -445,67 +445,71 @@ impl World {
 /// Based on this configuration [`World`] can dynamically create `Endpoint`s for
 /// this `Member`s.
 pub struct MembersPair {
+    /// First [`PairedMember`] in a pair.
     pub left: PairedMember,
+
+    /// Second [`PairedMember`] in a pair.
     pub right: PairedMember,
 }
 
-/// `Endpoint`s configuration of `Member`.
+/// `Endpoint`s configuration of a `Member`.
 pub struct PairedMember {
+    /// Unique ID of this [`PairedMember`].
     pub id: String,
+
+    /// Audio settings to be sent by this [`PairedMember`].
     pub send_audio: Option<proto::AudioSettings>,
+
+    /// Video settings to be sent by this [`PairedMember`].
     pub send_video: Option<proto::VideoSettings>,
+
+    /// Indicator whether this is a receiving configuration, rather than
+    /// publishing.
     pub recv: bool,
 }
 
 impl PairedMember {
-    /// Returns `true` if this [`PairedMember`] should publish media.
+    /// Indicates whether this [`PairedMember`] should publish media.
+    #[inline]
+    #[must_use]
     fn is_send(&self) -> bool {
         self.send_audio.is_some() || self.send_video.is_some()
     }
 
-    /// Returns [`proto::WebRtcPublishEndpoint`] for this [`PairedMember`] if
+    /// Returns a [`proto::WebRtcPublishEndpoint`] for this [`PairedMember`] if
     /// publishing is enabled.
+    #[must_use]
     fn publish_endpoint(&self) -> Option<proto::WebRtcPublishEndpoint> {
-        if self.is_send() {
-            Some(proto::WebRtcPublishEndpoint {
-                id: String::from("publish"),
-                p2p: proto::P2pMode::Always,
-                force_relay: false,
-                audio_settings: self.send_audio.clone().unwrap_or(
-                    proto::AudioSettings {
-                        publish_policy: PublishPolicy::Disabled,
-                    },
-                ),
-                video_settings: self.send_video.clone().unwrap_or(
-                    proto::VideoSettings {
-                        publish_policy: PublishPolicy::Disabled,
-                    },
-                ),
-            })
-        } else {
-            None
-        }
+        self.is_send().then(|| proto::WebRtcPublishEndpoint {
+            id: "publish".to_owned(),
+            p2p: proto::P2pMode::Always,
+            force_relay: false,
+            audio_settings: self.send_audio.clone().unwrap_or(
+                proto::AudioSettings {
+                    publish_policy: PublishPolicy::Disabled,
+                },
+            ),
+            video_settings: self.send_video.clone().unwrap_or(
+                proto::VideoSettings {
+                    publish_policy: PublishPolicy::Disabled,
+                },
+            ),
+        })
     }
 
-    /// Returns [`proto::WebRtcPlayEndpoint`] for this [`PairedMember`] which
+    /// Returns a [`proto::WebRtcPlayEndpoint`] for this [`PairedMember`] which
     /// will receive media from the provided [`PairedMember`] if receiving is
     /// enabled.
+    #[must_use]
     fn play_endpoint_for(
         &self,
         room_id: &str,
         publisher: &PairedMember,
     ) -> Option<proto::WebRtcPlayEndpoint> {
-        if self.recv {
-            Some(proto::WebRtcPlayEndpoint {
-                id: format!("play-{}", publisher.id),
-                src: format!(
-                    "local://{}/{}/{}",
-                    room_id, publisher.id, "publish"
-                ),
-                force_relay: false,
-            })
-        } else {
-            None
-        }
+        self.recv.then(|| proto::WebRtcPlayEndpoint {
+            id: format!("play-{}", publisher.id),
+            src: format!("local://{}/{}/{}", room_id, publisher.id, "publish"),
+            force_relay: false,
+        })
     }
 }

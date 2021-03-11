@@ -199,7 +199,7 @@ impl PeerError {
 #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
 #[enum_delegate(pub fn is_known_to_remote(&self) -> bool)]
 #[enum_delegate(pub fn force_commit_partner_changes(&mut self))]
-#[enum_delegate(pub fn initialized(&mut self))]
+#[enum_delegate(pub fn set_initialized(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -390,13 +390,13 @@ enum OnNegotiationFinish {
     Noop,
 }
 
-/// State of the [`Peer`] initialization.
+/// State of a [`Peer`] initialization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum InitializationState {
-    /// Indicates that [`Peer`] initialized.
+    /// [`Peer`] is initialized.
     Done,
 
-    /// Indicates that [`Peer`] currently initializes.
+    /// [`Peer`] is initializing currently.
     InProgress,
 }
 
@@ -1011,9 +1011,9 @@ impl<T> Peer<T> {
         self.context.negotiation_role.clone()
     }
 
-    /// State of the [`Peer`] initialization.
+    /// Marks this [`Peer`] as initialized.
     #[inline]
-    pub fn initialized(&mut self) {
+    pub fn set_initialized(&mut self) {
         self.context.initialization_state = InitializationState::Done;
     }
 }
@@ -1516,7 +1516,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
-        peer.initialized();
+        peer.set_initialized();
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
         peer.as_changes_scheduler().add_sender(media_track(1));
@@ -1554,7 +1554,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
-        peer.initialized();
+        peer.set_initialized();
 
         let mut peer = peer.start_as_offerer();
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1604,7 +1604,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
-        peer.initialized();
+        peer.set_initialized();
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
@@ -2007,7 +2007,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
-            peer.initialized();
+            peer.set_initialized();
             peer.context.track_changes_queue = changes;
             peer.commit_scheduled_changes();
         }
@@ -2052,7 +2052,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
-            peer.initialized();
+            peer.set_initialized();
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2097,7 +2097,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
-            peer.initialized();
+            peer.set_initialized();
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2134,7 +2134,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
-            peer.initialized();
+            peer.set_initialized();
 
             peer
         }

@@ -171,8 +171,7 @@ impl<T> Object<TracksStore<T>> {
                             }
                         });
                     });
-                    let res = await waiter;
-                    return res;
+                    return await waiter;
                 }
             "#,
             [],

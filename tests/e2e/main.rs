@@ -1,5 +1,3 @@
-#![allow(clippy::module_name_repetitions)]
-
 mod browser;
 mod conf;
 mod control;

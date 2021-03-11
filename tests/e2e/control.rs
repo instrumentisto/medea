@@ -51,8 +51,8 @@ impl Client {
     }
 
     // TODO: Server side filtering on GET requests or SSE/WS subscription would
-    //      speed up things. We a probably wasting a lot of time on ser/deser
-    //      of huge JSON's.
+    //       speed up things. We a probably wasting a lot of time on ser/deser
+    //       of huge JSON's.
     /// Fetches all callbacks received by Control API mock server.
     pub async fn callbacks(&self) -> Result<Vec<CallbackItem>> {
         Ok(self

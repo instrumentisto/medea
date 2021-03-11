@@ -83,7 +83,7 @@ impl Statement {
     ///
     /// The success value is passed to the next [`Statement`] as a JS lambda
     /// argument.
-    #[allow(clippy::option_if_let_else)]
+    #[allow(clippy::option_if_let_else)] // due to moving `another` value
     #[inline]
     #[must_use]
     pub fn and_then(mut self, another: Self) -> Self {

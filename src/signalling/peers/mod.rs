@@ -479,7 +479,7 @@ impl PeersService {
 
         self.peers.map_peer_by_id_mut(peer_id, move |p| {
             p.set_ice_user(ice_user);
-            p.initialized();
+            p.set_initialized();
         })?;
 
         if endpoint.has_traffic_callback() {

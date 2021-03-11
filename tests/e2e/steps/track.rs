@@ -18,10 +18,8 @@ async fn then_member_has_local_tracks(
     assert_eq!(count, tracks.count().await.unwrap());
 }
 
-#[then(
-    regex = "^(\\S+) has (audio|video|audio and video) remote track(?:s)? \
-             from (\\S+)"
-)]
+#[then(regex = "^(\\S+) has (audio|video|audio and video) remote \
+                 track(?:s)? from (\\S+)$")]
 async fn then_member_has_remote_track(
     world: &mut World,
     id: String,
@@ -37,16 +35,16 @@ async fn then_member_has_remote_track(
     let tracks_store = connection.tracks_store().await.unwrap();
 
     if kind.contains("audio") {
-        tracks_store
+        assert!(tracks_store
             .get_track(MediaKind::Audio, MediaSourceKind::Device)
             .await
-            .unwrap();
+            .is_ok());
     }
     if kind.contains("video") {
-        tracks_store
+        assert!(tracks_store
             .get_track(MediaKind::Video, MediaSourceKind::Device)
             .await
-            .unwrap();
+            .is_ok());
     }
 }
 
@@ -57,7 +55,7 @@ async fn then_has_local_track(world: &mut World, id: String, kind: String) {
     let tracks = room.local_tracks().await.unwrap();
     let media_kind = kind.parse().unwrap();
 
-    let mut source_kinds = Vec::new();
+    let mut source_kinds = Vec::with_capacity(2);
     if let Ok(kind) = kind.parse() {
         source_kinds.push(kind);
     } else {

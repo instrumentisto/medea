@@ -109,7 +109,7 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 }
 
 /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
