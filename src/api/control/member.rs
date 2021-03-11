@@ -370,10 +370,8 @@ impl TryFrom<&RoomElement> for MemberSpec {
     #[allow(unreachable_patterns)]
     fn try_from(from: &RoomElement) -> Result<Self, Self::Error> {
         match from {
-            RoomElement::Member(spec) => {
-                Ok(spec.clone())
-            },
-            _ => Err(TryFromElementError::NotMember)
+            RoomElement::Member(spec) => Ok(spec.clone()),
+            _ => Err(TryFromElementError::NotMember),
         }
     }
 }

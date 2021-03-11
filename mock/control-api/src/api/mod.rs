@@ -87,7 +87,7 @@ pub async fn run(
                     .route(web::get().to(get::get1))
                     .route(web::delete().to(delete::delete1))
                     .route(web::patch().to(apply::apply1)),
-        )
+            )
             .service(
                 web::resource("/control-api/{a}/{b}")
                     .route(web::post().to(create::create2))
@@ -99,7 +99,7 @@ pub async fn run(
                 web::resource("/control-api/{a}/{b}/{c}")
                     .route(web::post().to(create::create3))
                     .route(web::get().to(get::get3))
-                    .route(web::delete().to(delete::delete3))
+                    .route(web::delete().to(delete::delete3)),
             )
             .service(
                 web::resource("/callbacks").route(web::get().to(get_callbacks)),

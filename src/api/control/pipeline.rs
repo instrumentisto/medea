@@ -39,6 +39,10 @@ impl<K: Hash + Eq, V> Pipeline<K, V> {
     pub fn get(&self, id: &K) -> Option<&V> {
         self.pipeline.get(id)
     }
+
+    pub fn contains_key(&self, id: &K) -> bool {
+        self.pipeline.contains_key(id)
+    }
 }
 
 impl<'a, K: Eq + Hash, V> IntoIterator for &'a Pipeline<K, V> {

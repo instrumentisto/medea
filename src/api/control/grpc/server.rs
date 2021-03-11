@@ -148,7 +148,9 @@ impl ControlApiService {
             StatefulFid::Room(fid) => match elem {
                 proto::create_request::El::Room(_) => {
                     let room_spec = RoomSpec::try_from(elem)?;
-                    Ok(self.apply_room(fid.room_id().clone(), room_spec).await?)
+                    Ok(self
+                        .apply_room(fid.room_id().clone(), room_spec)
+                        .await?)
                 }
                 _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
             },

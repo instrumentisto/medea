@@ -213,7 +213,10 @@ impl RoomService {
         }
     }
 
-    fn create_room(&self, room_spec: RoomSpec) -> Result<Sids, RoomServiceError> {
+    fn create_room(
+        &self,
+        room_spec: RoomSpec,
+    ) -> Result<Sids, RoomServiceError> {
         let sid = match room_spec.members() {
             Ok(members) => members
                 .iter()
@@ -323,12 +326,12 @@ impl Handler<ApplyRoom> for RoomService {
         if let Some(room) = self.room_repo.get(&msg.id) {
             let fut = room.send(Apply(msg.spec));
             Box::pin(async move {
-                fut.await;
+                fut.await.map_err(RoomServiceError::RoomMailboxErr)??;
                 Ok(Sids::new())
             })
         } else {
-            self.create_room(msg.spec);
-            Box::pin(future::ok(Sids::new()))
+            let res = self.create_room(msg.spec);
+            Box::pin(async move { res })
         }
     }
 }
@@ -377,7 +380,7 @@ impl Handler<ApplyMember> for RoomService {
             ));
 
             Box::pin(async move {
-                fut.await;
+                fut.await.map_err(RoomServiceError::RoomMailboxErr)??;
                 Ok(Sids::new())
             })
         } else {

@@ -2,21 +2,16 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom, time::Duration};
+use std::{collections::HashMap, convert::TryFrom};
 
 use medea_client_api_proto::{MemberId, RoomId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use crate::api::control::{
-    callback::url::CallbackUrl, member::Credential, EndpointId,
-    TryFromProtobufError,
-};
+use crate::api::control::TryFromProtobufError;
 
 use super::{
-    member::{MemberElement, MemberSpec},
-    pipeline::Pipeline,
-    RootElement, TryFromElementError,
+    member::MemberSpec, pipeline::Pipeline, RootElement, TryFromElementError,
 };
 
 /// Element of [`Room`]'s [`Pipeline`].

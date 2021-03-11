@@ -142,7 +142,12 @@ impl ControlClient {
         response.map(tonic::Response::into_inner)
     }
 
-    pub async fn apply(&self, id: String, fid: Fid, element: Element) -> Result<proto::CreateResponse, Status> {
+    pub async fn apply(
+        &self,
+        id: String,
+        fid: Fid,
+        element: Element,
+    ) -> Result<proto::CreateResponse, Status> {
         use proto::create_request::El;
 
         let el = match element {

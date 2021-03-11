@@ -3,16 +3,15 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use actix::{
-    fut, ActorFuture as _, AsyncContext as _, AsyncContext, AtomicResponse,
-    Context, Handler, Message, WrapFuture as _,
+    fut, ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler,
+    Message, WrapFuture as _,
 };
 use medea_client_api_proto::{CloseReason, MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
-use crate::api::control::RoomElement;
 use crate::{
     api::control::{
         callback::OnLeaveReason,
@@ -21,7 +20,8 @@ use crate::{
             WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
         },
         refs::StatefulFid,
-        EndpointId, EndpointSpec, MemberSpec, WebRtcPlayId, WebRtcPublishId,
+        EndpointId, EndpointSpec, MemberSpec, RoomElement, RoomSpec,
+        WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
     signalling::{
@@ -34,7 +34,6 @@ use crate::{
 };
 
 use super::{Room, RoomError};
-use crate::{api::control::RoomSpec, signalling::room_service::ApplyRoom};
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -400,28 +399,27 @@ impl Handler<ApplyMember> for Room {
     fn handle(
         &mut self,
         msg: ApplyMember,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        if let Ok(member) = self.members.get_member(&msg.0) {
-            for (id, endpoint) in msg.1.publish_endpoints() {
-                if member.get_src_by_id(&id).is_none() {
-                    self.create_src_endpoint(&msg.0, id, endpoint);
-                }
+        let member = self.members.get_member(&msg.0)?;
+        for (id, endpoint) in msg.1.publish_endpoints() {
+            if member.get_src_by_id(&id).is_none() {
+                self.create_src_endpoint(&msg.0, id, endpoint)?;
             }
-            for (id, endpoint) in msg.1.play_endpoints() {
-                if member.get_sink_by_id(&id).is_none() {
-                    self.create_sink_endpoint(&msg.0, id, endpoint.clone());
-                }
+        }
+        for (id, endpoint) in msg.1.play_endpoints() {
+            if member.get_sink_by_id(&id).is_none() {
+                self.create_sink_endpoint(&msg.0, id, endpoint.clone())?;
             }
-            for (id, endpoint) in member.srcs() {
-                if msg.1.get_publish_endpoint_by_id(id.clone()).is_none() {
-                    self.delete_endpoint(&msg.0, id.into());
-                }
+        }
+        for id in member.srcs_ids() {
+            if msg.1.get_publish_endpoint_by_id(id.clone()).is_none() {
+                self.delete_endpoint(&msg.0, id.into());
             }
-            for (id, endpoint) in member.sinks() {
-                if msg.1.get_play_endpoint_by_id(id.clone()).is_none() {
-                    self.delete_endpoint(&msg.0, id.into());
-                }
+        }
+        for id in member.sinks_ids() {
+            if msg.1.get_play_endpoint_by_id(id.clone()).is_none() {
+                self.delete_endpoint(&msg.0, id.into());
             }
         }
         Ok(())
@@ -436,56 +434,53 @@ impl Handler<Apply> for Room {
     type Result = Result<(), RoomError>;
 
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
-        let mut applied_members = HashSet::new();
         let mut create_src_endpoint = Vec::new();
         let mut create_sink_endpoint = Vec::new();
-        for (id, element) in msg.0.pipeline {
-            match element {
-                RoomElement::Member(spec) => {
-                    if let Ok(member) = self.members.get_member(&id) {
-                        applied_members.insert(id.clone());
-
-                        for (src_id, src) in spec.publish_endpoints() {
-                            if member.get_src_by_id(&src_id).is_none() {
-                                create_src_endpoint.push((id.clone(), src_id.clone(), src.clone()));
-                            }
-                        }
-
-                        for (sink_id, sink) in spec.play_endpoints() {
-                            if member.get_sink_by_id(&sink_id).is_none() {
-                                create_sink_endpoint.push((id.clone(), sink_id.clone(), sink.clone()));
-                            }
-                        }
-
-                        for (src_id, _) in member.srcs() {
-                            if spec.get_publish_endpoint_by_id(src_id.clone()).is_none() {
-                                self.delete_endpoint(&id, src_id.into());
-                            }
-                        }
-
-                        for (sink_id, _) in member.sinks() {
-                            if spec.get_play_endpoint_by_id(sink_id.clone()).is_none() {
-                                self.delete_endpoint(&id, sink_id.into());
-                            }
-                        }
-                    } else {
-                        self.members.create_member(id.clone(), &spec);
-                        applied_members.insert(id.clone());
+        for (id, element) in &msg.0.pipeline {
+            let RoomElement::Member(spec) = element;
+            if let Ok(member) = self.members.get_member(&id) {
+                for (src_id, src) in spec.publish_endpoints() {
+                    if member.get_src_by_id(&src_id).is_none() {
+                        create_src_endpoint.push((id, src_id.clone(), src));
                     }
                 }
+
+                for (sink_id, sink) in spec.play_endpoints() {
+                    if member.get_sink_by_id(&sink_id).is_none() {
+                        create_sink_endpoint.push((
+                            id,
+                            sink_id.clone(),
+                            sink.clone(),
+                        ));
+                    }
+                }
+
+                for (src_id, _) in member.srcs() {
+                    if spec.get_publish_endpoint_by_id(src_id.clone()).is_none()
+                    {
+                        self.delete_endpoint(&id, src_id.into());
+                    }
+                }
+
+                for (sink_id, _) in member.sinks() {
+                    if spec.get_play_endpoint_by_id(sink_id.clone()).is_none() {
+                        self.delete_endpoint(&id, sink_id.into());
+                    }
+                }
+            } else {
+                self.members.create_member(id.clone(), &spec)?;
             }
         }
 
-        for (a, b, c) in create_src_endpoint {
-            self.create_src_endpoint(&a, b, &c);
+        for (id, src_id, src) in create_src_endpoint {
+            self.create_src_endpoint(id, src_id, src)?;
         }
-        for (a, b, c) in create_sink_endpoint {
-            self.create_sink_endpoint(&a, b, c);
+        for (id, sink_id, sink) in create_sink_endpoint {
+            self.create_sink_endpoint(&id, sink_id, sink)?;
         }
 
-
-        for (id, member) in self.members.members() {
-            if !applied_members.contains(&id) {
+        for id in self.members.members_ids() {
+            if !msg.0.pipeline.contains_key(&id) {
                 self.delete_member(&id, ctx);
             }
         }

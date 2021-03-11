@@ -341,6 +341,14 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
+    pub fn sinks_ids(&self) -> Vec<WebRtcPlayId> {
+        self.0.borrow().sinks.keys().cloned().collect()
+    }
+
+    pub fn srcs_ids(&self) -> Vec<WebRtcPublishId> {
+        self.0.borrow().srcs.keys().cloned().collect()
+    }
+
     /// Returns partner [`Member`]s of this [`Member`].
     #[must_use]
     pub fn partners(&self) -> Vec<Member> {
