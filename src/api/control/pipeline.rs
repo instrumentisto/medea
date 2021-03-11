@@ -3,7 +3,10 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{
-    collections::{hash_map::Iter, HashMap},
+    collections::{
+        hash_map::{IntoIter, Iter},
+        HashMap,
+    },
     hash::Hash,
     iter::IntoIterator,
 };
@@ -45,5 +48,15 @@ impl<'a, K: Eq + Hash, V> IntoIterator for &'a Pipeline<K, V> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.pipeline.iter()
+    }
+}
+
+impl<K: Eq + Hash, V> IntoIterator for Pipeline<K, V> {
+    type IntoIter = IntoIter<K, V>;
+    type Item = (K, V);
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.pipeline.into_iter()
     }
 }

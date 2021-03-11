@@ -42,7 +42,8 @@ use crate::{
 };
 
 pub use dynamic_api::{
-    Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
+    Apply, ApplyMember, Close, CreateEndpoint, CreateMember, Delete,
+    SerializeProto,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].

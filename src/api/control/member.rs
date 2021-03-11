@@ -201,6 +201,20 @@ impl MemberSpec {
         }
     }
 
+    /// Lookups [`WebRtcPlayEndpoint`] by ID.
+    #[must_use]
+    pub fn get_play_endpoint_by_id(
+        &self,
+        id: WebRtcPlayId,
+    ) -> Option<&WebRtcPlayEndpoint> {
+        let e = self.pipeline.get(&id.into())?;
+        if let MemberElement::WebRtcPlayEndpoint { spec } = e {
+            Some(spec)
+        } else {
+            None
+        }
+    }
+
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,

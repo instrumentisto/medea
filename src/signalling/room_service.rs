@@ -28,7 +28,7 @@ use crate::{
     signalling::{
         peers::{build_peers_traffic_watcher, PeerTrafficWatcher},
         room::{
-            Close, CreateEndpoint, CreateMember, Delete, RoomError,
+            Apply, Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
         },
         room_repo::RoomRepository,
@@ -265,6 +265,29 @@ impl Handler<StartStaticRooms> for RoomService {
 /// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<String, String>;
 
+#[derive(Message)]
+#[rtype(result = "Result<Sids, RoomServiceError>")]
+pub struct ApplyRoom {
+    pub spec: RoomSpec,
+}
+
+impl Handler<ApplyRoom> for RoomService {
+    type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
+
+    fn handle(
+        &mut self,
+        msg: ApplyRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room) = self.room_repo.get(&msg.spec.id) {
+            Box::pin(room.send(Apply(msg.spec)).map(|r| {
+            }))
+        } else {
+            todo!()
+        }
+    }
+}
+
 /// Signal for creating new [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
@@ -321,6 +344,35 @@ impl Handler<CreateRoom> for RoomService {
         self.room_repo.add(room_spec.id, room_addr);
 
         Ok(sid)
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<Sids, RoomServiceError>")]
+pub struct ApplyMember {
+    pub fid: Fid<ToMember>,
+    pub spec: MemberSpec,
+}
+
+impl Handler<ApplyMember> for RoomService {
+    type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
+
+    fn handle(
+        &mut self,
+        msg: ApplyMember,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room) = self.room_repo.get(&msg.fid.room_id()) {
+            Box::pin(
+                room.send(crate::signalling::room::ApplyMember(
+                    msg.fid.member_id().clone(),
+                    msg.spec,
+                ))
+                .map(|o| todo!()),
+            )
+        } else {
+            todo!()
+        }
     }
 }
 

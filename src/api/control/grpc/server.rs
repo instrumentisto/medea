@@ -11,7 +11,7 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::MemberId;
+use medea_client_api_proto::{MemberId, RoomId};
 use medea_control_api_proto::grpc::{
     api as proto,
     api::control_api_server::{
@@ -34,8 +34,8 @@ use crate::{
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
-        CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
-        Get, RoomService, RoomServiceError, Sids,
+        ApplyMember, ApplyRoom, CreateEndpointInRoom, CreateMemberInRoom,
+        CreateRoom, DeleteElements, Get, RoomService, RoomServiceError, Sids,
     },
     AppContext,
 };
@@ -111,6 +111,55 @@ impl ControlApiService {
                 spec,
             })
             .await??)
+    }
+
+    async fn apply_room(
+        &self,
+        spec: RoomSpec,
+    ) -> Result<Sids, GrpcControlApiError> {
+        Ok(self.0.send(ApplyRoom { spec }).await??)
+    }
+
+    async fn apply_member(
+        &self,
+        fid: Fid<ToMember>,
+        spec: MemberSpec,
+    ) -> Result<Sids, GrpcControlApiError> {
+        Ok(self.0.send(ApplyMember { fid, spec }).await??)
+    }
+
+    async fn apply_element(
+        &self,
+        req: proto::CreateRequest,
+    ) -> Result<Sids, ErrorResponse> {
+        let unparsed_fid = req.parent_fid;
+        let elem = if let Some(elem) = req.el {
+            elem
+        } else {
+            return Err(ErrorResponse::new(
+                ErrorCode::NoElement,
+                &unparsed_fid,
+            ));
+        };
+
+        let parent_fid = StatefulFid::try_from(unparsed_fid)?;
+        match parent_fid {
+            StatefulFid::Room(fid) => match elem {
+                proto::create_request::El::Room(_) => {
+                    let room_spec = RoomSpec::try_from(elem)?;
+                    Ok(self.apply_room(room_spec).await?)
+                }
+                _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
+            },
+            StatefulFid::Member(fid) => match elem {
+                proto::create_request::El::Member(member) => {
+                    let member_spec = MemberSpec::try_from(member)?;
+                    Ok(self.apply_member(fid.clone(), member_spec).await?)
+                }
+                _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
+            },
+            _ => Err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid)),
+        }
     }
 
     /// Creates element based on provided [`proto::CreateRequest`].
@@ -255,6 +304,21 @@ impl ControlApi for ControlApiService {
             },
         };
         Ok(tonic::Response::new(response))
+    }
+
+    async fn apply(
+        &self,
+        request: tonic::Request<proto::CreateRequest>,
+    ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
+        let resp = match self.apply_element(request.into_inner()).await {
+            Ok(sid) => proto::CreateResponse { sid, error: None },
+            Err(err) => proto::CreateResponse {
+                sid: HashMap::new(),
+                error: Some(err.into()),
+            },
+        };
+
+        Ok(tonic::Response::new(resp))
     }
 }
 
