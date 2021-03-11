@@ -320,9 +320,10 @@ jobs:
       matrix:
         include:
           - image: medea
-            cache: ${{ github.ref != 'refs/heads/master'
-                       && !startsWith(github.ref, 'refs/tags/medea-')
-                       && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            cache: false  # temporary disable caching due to CI issues
+            #cache: ${{ github.ref != 'refs/heads/master'
+            #           && !startsWith(github.ref, 'refs/tags/medea-')
+            #           && !contains(github.event.head_commit.message, '[fresh ci]') }}
             export: true
             if: true
 
