@@ -4,13 +4,13 @@ Feature: Media muting
     Given room with joined member Alice
     And member Bob with muted video publishing
     When Bob joins the room
-    Then Alice's device video remote track with Bob is enabled
+    Then Alice's device video remote track from Bob is enabled
 
   Scenario: Member mutes audio before call and track is created and enabled
     Given room with joined member Alice
     And member Bob with muted audio publishing
     When Bob joins the room
-    Then Alice's audio remote track with Bob is enabled
+    Then Alice's audio remote track from Bob is enabled
 
   Scenario: Local track is not muted when member mutes audio before call
     Given room with joined member Alice

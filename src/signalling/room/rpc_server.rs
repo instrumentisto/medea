@@ -119,17 +119,17 @@ impl RpcServer for Addr<Room> {
 
     /// Sends [`actix::Message`] to Room actor ignoring any errors.
     fn connection_closed(
-        &self,
+        self: Box<Self>,
         member_id: MemberId,
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()> {
-        self.send(RpcConnectionClosed { member_id, reason })
-            .map(|res| {
-                if let Err(e) = res {
-                    error!("Failed to send RpcConnectionClosed cause {:?}", e,);
-                };
-            })
-            .boxed_local()
+        Box::pin(async move {
+            if let Err(e) =
+                self.send(RpcConnectionClosed { member_id, reason }).await
+            {
+                error!("Failed to send RpcConnectionClosed cause {:?}", e);
+            }
+        })
     }
 
     /// Sends [`actix::Message`] message to Room actor ignoring any errors.

@@ -35,7 +35,7 @@ impl Object<Jason> {
                     let closeListener = {
                         closeReason: null,
                         isClosed: false,
-                        subs: [],
+                        subs: []
                     };
                     let localTracksStore = {
                         tracks: [],
@@ -44,16 +44,16 @@ impl Object<Jason> {
                     room.on_close((reason) => {
                         closeListener.closeReason = reason;
                         closeListener.isClosed = true;
-                        for (sub of subs) {
+                        for (sub of closeListener.subs) {
                             sub(reason);
                         }
                     });
                     room.on_local_track((t) => {
                         let track = { track: t };
                         localTracksStore.tracks.push(track);
-                        for (sub of room.localTracksStore.subs) {
-                            sub(track);
-                        }
+                        let newSubs = localTracksStore.subs
+                            .filter((sub) => sub(track));
+                        localTracksStore.subs = newSubs;
                     });
 
                     let constraints = new rust.MediaStreamSettings();

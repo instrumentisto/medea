@@ -20,6 +20,7 @@ use actix_web::{
     App, HttpResponse, HttpServer,
 };
 use clap::ArgMatches;
+use derive_more::From;
 use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
@@ -345,7 +346,7 @@ impl From<proto::CreateResponse> for CreateResponse {
 /// Union of all elements which exists in [Medea].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Deserialize, From, Serialize)]
 #[serde(tag = "kind")]
 pub enum Element {
     Member(Member),

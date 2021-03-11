@@ -14,6 +14,7 @@ use crate::{
     world::{member::Builder as MemberBuilder, World},
 };
 
+#[allow(clippy::too_many_arguments)]
 #[given(regex = "^(?:room with )?(joined )?member(?:s)? (\\S+)\
                   (?:(?:, | and )(\\S+)(?: and (\\S+)?)?)?\
                   (?: with (no (play |publish )?WebRTC endpoints\

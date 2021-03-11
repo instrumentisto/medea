@@ -199,6 +199,7 @@ impl PeerError {
 #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
 #[enum_delegate(pub fn is_known_to_remote(&self) -> bool)]
 #[enum_delegate(pub fn force_commit_partner_changes(&mut self))]
+#[enum_delegate(pub fn set_initialized(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -389,6 +390,16 @@ enum OnNegotiationFinish {
     Noop,
 }
 
+/// State of a [`Peer`] initialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum InitializationState {
+    /// [`Peer`] is initialized.
+    Done,
+
+    /// [`Peer`] is initializing currently.
+    InProgress,
+}
+
 #[derive(Debug)]
 pub struct Context {
     /// [`PeerId`] of this [`Peer`].
@@ -456,6 +467,9 @@ pub struct Context {
 
     /// Action which should be done on a negotiation process finish.
     on_negotiation_finish: OnNegotiationFinish,
+
+    /// State of the [`Peer`] initialization.
+    initialization_state: InitializationState,
 }
 
 /// Tracks changes, that remote [`Peer`] is not aware of.
@@ -996,6 +1010,12 @@ impl<T> Peer<T> {
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.context.negotiation_role.clone()
     }
+
+    /// Marks this [`Peer`] as initialized.
+    #[inline]
+    pub fn set_initialized(&mut self) {
+        self.context.initialization_state = InitializationState::Done;
+    }
 }
 
 impl Peer<WaitLocalSdp> {
@@ -1134,6 +1154,7 @@ impl Peer<Stable> {
             ice_restart: false,
             negotiation_role: None,
             on_negotiation_finish: OnNegotiationFinish::Noop,
+            initialization_state: InitializationState::InProgress,
         };
 
         Self {
@@ -1212,11 +1233,15 @@ impl Peer<Stable> {
     /// regardless of negotiation state will be immediately force-pushed to
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
-        if !self.context.track_changes_queue.is_empty()
-            || matches!(
-                self.context.on_negotiation_finish,
-                OnNegotiationFinish::Renegotiate
-            )
+        // If InitializationState is not Done, then we can safely skip this
+        // negotiation, because these changes will be committed by ongoing
+        // initializer.
+        if self.context.initialization_state == InitializationState::Done
+            && (!self.context.track_changes_queue.is_empty()
+                || matches!(
+                    self.context.on_negotiation_finish,
+                    OnNegotiationFinish::Renegotiate
+                ))
         {
             let mut negotiationless_changes = Vec::new();
             for task in std::mem::take(&mut self.context.track_changes_queue) {
@@ -1486,6 +1511,12 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
         peer.as_changes_scheduler().add_sender(media_track(1));
@@ -1510,7 +1541,7 @@ pub mod tests {
                 tx.send(peer_id).unwrap();
             });
 
-        let peer = Peer::new(
+        let mut peer = Peer::new(
             PeerId(0),
             MemberId::from("member-1"),
             PeerId(1),
@@ -1518,6 +1549,12 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
 
         let mut peer = peer.start_as_offerer();
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1562,6 +1599,12 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
@@ -1659,6 +1702,12 @@ pub mod tests {
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
         let mut peer = PeerStateMachine::from(peer);
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
             peer
@@ -1953,7 +2002,12 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
+            peer.set_initialized();
             peer.context.track_changes_queue = changes;
             peer.commit_scheduled_changes();
         }
@@ -1993,6 +2047,12 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
+            peer.set_initialized();
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2032,6 +2092,12 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
+            peer.set_initialized();
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2068,6 +2134,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
+            peer.set_initialized();
 
             peer
         }

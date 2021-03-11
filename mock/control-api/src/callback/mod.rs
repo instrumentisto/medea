@@ -3,10 +3,10 @@
 pub mod server;
 
 use medea_control_api_proto::grpc::callback as proto;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// All callbacks which can happen.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(tag = "type")]
 pub enum CallbackEvent {
     OnJoin(join::OnJoin),
@@ -27,16 +27,16 @@ impl From<proto::request::Event> for CallbackEvent {
 }
 
 /// Control API callback.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct CallbackItem {
     /// FID (Full ID) of element with which this event was occurred.
-    fid: String,
+    pub fid: String,
 
     /// Event which occurred.
-    event: CallbackEvent,
+    pub event: CallbackEvent,
 
     /// Time on which callback was occurred.
-    at: String,
+    pub at: String,
 }
 
 impl From<proto::Request> for CallbackItem {
@@ -52,10 +52,10 @@ impl From<proto::Request> for CallbackItem {
 /// `on_join` callback's related entities and implementations.
 mod join {
     use medea_control_api_proto::grpc::callback as proto;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
 
     /// `OnJoin` callback for Control API.
-    #[derive(Clone, Serialize)]
+    #[derive(Clone, Deserialize, Serialize)]
     pub struct OnJoin;
 
     impl From<proto::OnJoin> for OnJoin {
@@ -67,14 +67,15 @@ mod join {
 
 /// `on_leave` callback's related entities and implementations.
 mod leave {
+    use derive_more::Display;
     use medea_control_api_proto::grpc::callback as proto;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
 
     /// `OnLeave` callback of Control API.
-    #[derive(Clone, Serialize)]
+    #[derive(Clone, Deserialize, Serialize)]
     pub struct OnLeave {
         /// Reason of why `Member` leaves.
-        reason: OnLeaveReason,
+        pub reason: OnLeaveReason,
     }
 
     impl From<proto::OnLeave> for OnLeave {
@@ -88,7 +89,7 @@ mod leave {
     }
 
     /// Reason of why `Member` leaves.
-    #[derive(Clone, Serialize)]
+    #[derive(Clone, Deserialize, Display, Serialize)]
     pub enum OnLeaveReason {
         /// `Member` was normally disconnected.
         Disconnected,

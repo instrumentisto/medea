@@ -32,9 +32,9 @@ env_var!(
 env_var!(
     /// Address of a Control API mock server.
     ///
-    /// Default: `http://127.0.0.1:8000/control-api`
+    /// Default: `http://127.0.0.1:8000`
     CONTROL_API_ADDR
-        || "http://127.0.0.1:8000/control-api"
+        || "http://127.0.0.1:8000"
 );
 
 env_var!(
