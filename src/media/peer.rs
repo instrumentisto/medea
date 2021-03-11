@@ -1516,6 +1516,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
+        peer.initialized();
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
         peer.as_changes_scheduler().add_sender(media_track(1));
@@ -1553,6 +1554,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
+        peer.initialized();
 
         let mut peer = peer.start_as_offerer();
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1602,6 +1604,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
+        peer.initialized();
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
@@ -1704,6 +1707,7 @@ pub mod tests {
             String::new(),
             String::new(),
         ));
+        peer.initialized();
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
             peer
@@ -2003,7 +2007,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
-
+            peer.initialized();
             peer.context.track_changes_queue = changes;
             peer.commit_scheduled_changes();
         }
@@ -2048,6 +2052,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
+            peer.initialized();
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2092,6 +2097,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
+            peer.initialized();
 
             peer.context.track_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
@@ -2128,6 +2134,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
+            peer.initialized();
 
             peer
         }
