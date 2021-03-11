@@ -212,6 +212,46 @@ impl RoomService {
             }
         }
     }
+
+    fn create_room(&self, room_spec: RoomSpec) -> Result<Sids, RoomServiceError> {
+        let sid = match room_spec.members() {
+            Ok(members) => members
+                .iter()
+                .map(|(member_id, member)| {
+                    let uri = self.get_sid(
+                        room_spec.id(),
+                        &member_id,
+                        member.credentials(),
+                    );
+                    (member_id.clone().to_string(), uri)
+                })
+                .collect(),
+            Err(e) => return Err(RoomServiceError::TryFromElement(e)),
+        };
+
+        if self.room_repo.get(&room_spec.id).is_some() {
+            return Err(RoomServiceError::RoomAlreadyExists(
+                Fid::<ToRoom>::new(room_spec.id),
+            ));
+        }
+
+        let room_addr = Room::start(
+            &room_spec,
+            &self.app,
+            self.peer_traffic_watcher.clone(),
+        )?;
+
+        shutdown::subscribe(
+            &self.graceful_shutdown,
+            room_addr.clone().recipient(),
+            shutdown::Priority(2),
+        );
+
+        debug!("New Room [id = {}] started.", room_spec.id);
+        self.room_repo.add(room_spec.id, room_addr);
+
+        Ok(sid)
+    }
 }
 
 impl Actor for RoomService {
@@ -268,6 +308,7 @@ pub type Sids = HashMap<String, String>;
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct ApplyRoom {
+    pub id: RoomId,
     pub spec: RoomSpec,
 }
 
@@ -277,13 +318,17 @@ impl Handler<ApplyRoom> for RoomService {
     fn handle(
         &mut self,
         msg: ApplyRoom,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.spec.id) {
-            Box::pin(room.send(Apply(msg.spec)).map(|r| {
-            }))
+        if let Some(room) = self.room_repo.get(&msg.id) {
+            let fut = room.send(Apply(msg.spec));
+            Box::pin(async move {
+                fut.await;
+                Ok(Sids::new())
+            })
         } else {
-            todo!()
+            self.create_room(msg.spec);
+            Box::pin(future::ok(Sids::new()))
         }
     }
 }
@@ -306,44 +351,7 @@ impl Handler<CreateRoom> for RoomService {
         msg: CreateRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let room_spec = msg.spec;
-        let sid = match room_spec.members() {
-            Ok(members) => members
-                .iter()
-                .map(|(member_id, member)| {
-                    let uri = self.get_sid(
-                        room_spec.id(),
-                        &member_id,
-                        member.credentials(),
-                    );
-                    (member_id.clone().to_string(), uri)
-                })
-                .collect(),
-            Err(e) => return Err(RoomServiceError::TryFromElement(e)),
-        };
-
-        if self.room_repo.get(&room_spec.id).is_some() {
-            return Err(RoomServiceError::RoomAlreadyExists(
-                Fid::<ToRoom>::new(room_spec.id),
-            ));
-        }
-
-        let room_addr = Room::start(
-            &room_spec,
-            &self.app,
-            self.peer_traffic_watcher.clone(),
-        )?;
-
-        shutdown::subscribe(
-            &self.graceful_shutdown,
-            room_addr.clone().recipient(),
-            shutdown::Priority(2),
-        );
-
-        debug!("New Room [id = {}] started.", room_spec.id);
-        self.room_repo.add(room_spec.id, room_addr);
-
-        Ok(sid)
+        self.create_room(msg.spec)
     }
 }
 
@@ -360,16 +368,18 @@ impl Handler<ApplyMember> for RoomService {
     fn handle(
         &mut self,
         msg: ApplyMember,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.room_repo.get(&msg.fid.room_id()) {
-            Box::pin(
-                room.send(crate::signalling::room::ApplyMember(
-                    msg.fid.member_id().clone(),
-                    msg.spec,
-                ))
-                .map(|o| todo!()),
-            )
+            let fut = room.send(crate::signalling::room::ApplyMember(
+                msg.fid.member_id().clone(),
+                msg.spec,
+            ));
+
+            Box::pin(async move {
+                fut.await;
+                Ok(Sids::new())
+            })
         } else {
             todo!()
         }

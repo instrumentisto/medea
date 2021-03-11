@@ -142,6 +142,28 @@ impl ControlClient {
         response.map(tonic::Response::into_inner)
     }
 
+    pub async fn apply(&self, id: String, fid: Fid, element: Element) -> Result<proto::CreateResponse, Status> {
+        use proto::create_request::El;
+
+        let el = match element {
+            Element::Room(room) => El::Room(room.into_proto(id)),
+            Element::Member(member) => El::Member(member.into_proto(id)),
+            Element::WebRtcPlayEndpoint(webrtc_play) => {
+                El::WebrtcPlay(webrtc_play.into_proto(id))
+            }
+            Element::WebRtcPublishEndpoint(webrtc_pub) => {
+                El::WebrtcPub(webrtc_pub.into_proto(id))
+            }
+        };
+        let req = proto::CreateRequest {
+            parent_fid: fid.into(),
+            el: Some(el),
+        };
+
+        let response = self.get_client().apply(tonic::Request::new(req)).await;
+        response.map(tonic::Response::into_inner)
+    }
+
     /// Gets element from Control API by FID.
     ///
     /// # Errors

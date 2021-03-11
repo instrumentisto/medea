@@ -27,18 +27,7 @@ use super::{
 pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
-    Member {
-        spec: Pipeline<EndpointId, MemberElement>,
-        credentials: Credential,
-        on_leave: Option<CallbackUrl>,
-        on_join: Option<CallbackUrl>,
-        #[serde(default, with = "humantime_serde")]
-        idle_timeout: Option<Duration>,
-        #[serde(default, with = "humantime_serde")]
-        reconnect_timeout: Option<Duration>,
-        #[serde(default, with = "humantime_serde")]
-        ping_interval: Option<Duration>,
-    },
+    Member(MemberSpec),
 }
 
 /// [Control API]'s `Room` element specification.

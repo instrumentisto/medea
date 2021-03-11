@@ -108,10 +108,10 @@ pub enum MemberElement {
 }
 
 /// Newtype for [`RoomElement::Member`] variant.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    pipeline: Pipeline<EndpointId, MemberElement>,
+    spec: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
     credentials: Credential,
@@ -126,28 +126,23 @@ pub struct MemberSpec {
     /// API.
     ///
     /// Once reached, the `Member` is considered being idle.
+    #[serde(default, with = "humantime_serde")]
     idle_timeout: Option<Duration>,
 
     /// Timeout of the `Member` reconnecting via Client API.
     ///
     /// Once reached, the `Member` is considered disconnected.
+    #[serde(default, with = "humantime_serde")]
     reconnect_timeout: Option<Duration>,
 
     /// Interval of sending `Ping`s to the `Member` via Client API.
+    #[serde(default, with = "humantime_serde")]
     ping_interval: Option<Duration>,
 }
 
 impl Into<RoomElement> for MemberSpec {
     fn into(self) -> RoomElement {
-        RoomElement::Member {
-            spec: self.pipeline,
-            credentials: self.credentials,
-            on_join: self.on_join,
-            on_leave: self.on_leave,
-            idle_timeout: self.idle_timeout,
-            reconnect_timeout: self.reconnect_timeout,
-            ping_interval: self.ping_interval,
-        }
+        RoomElement::Member(self)
     }
 }
 
@@ -165,7 +160,7 @@ impl MemberSpec {
         ping_interval: Option<Duration>,
     ) -> Self {
         Self {
-            pipeline,
+            spec: pipeline,
             credentials,
             on_join,
             on_leave,
@@ -179,7 +174,7 @@ impl MemberSpec {
     pub fn play_endpoints(
         &self,
     ) -> impl Iterator<Item = (WebRtcPlayId, &WebRtcPlayEndpoint)> {
-        self.pipeline.iter().filter_map(|(id, e)| match e {
+        self.spec.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPlayEndpoint { spec } => {
                 Some((id.clone().into(), spec))
             }
@@ -193,7 +188,7 @@ impl MemberSpec {
         &self,
         id: WebRtcPublishId,
     ) -> Option<&WebRtcPublishEndpoint> {
-        let e = self.pipeline.get(&id.into())?;
+        let e = self.spec.get(&id.into())?;
         if let MemberElement::WebRtcPublishEndpoint { spec } = e {
             Some(spec)
         } else {
@@ -207,7 +202,7 @@ impl MemberSpec {
         &self,
         id: WebRtcPlayId,
     ) -> Option<&WebRtcPlayEndpoint> {
-        let e = self.pipeline.get(&id.into())?;
+        let e = self.spec.get(&id.into())?;
         if let MemberElement::WebRtcPlayEndpoint { spec } = e {
             Some(spec)
         } else {
@@ -219,7 +214,7 @@ impl MemberSpec {
     pub fn publish_endpoints(
         &self,
     ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint)> {
-        self.pipeline.iter().filter_map(|(id, e)| match e {
+        self.spec.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPublishEndpoint { spec } => {
                 Some((id.clone().into(), spec))
             }
@@ -333,7 +328,7 @@ impl TryFrom<proto::Member> for MemberSpec {
             parse_duration(member.ping_interval, &member.id, "ping_interval")?;
 
         Ok(Self {
-            pipeline: Pipeline::new(pipeline),
+            spec: Pipeline::new(pipeline),
             credentials,
             on_join,
             on_leave,
@@ -375,24 +370,10 @@ impl TryFrom<&RoomElement> for MemberSpec {
     #[allow(unreachable_patterns)]
     fn try_from(from: &RoomElement) -> Result<Self, Self::Error> {
         match from {
-            RoomElement::Member {
-                spec,
-                credentials,
-                on_leave,
-                on_join,
-                idle_timeout,
-                reconnect_timeout,
-                ping_interval,
-            } => Ok(Self {
-                pipeline: spec.clone(),
-                credentials: credentials.clone(),
-                on_leave: on_leave.clone(),
-                on_join: on_join.clone(),
-                idle_timeout: *idle_timeout,
-                reconnect_timeout: *reconnect_timeout,
-                ping_interval: *ping_interval,
-            }),
-            _ => Err(TryFromElementError::NotMember),
+            RoomElement::Member(spec) => {
+                Ok(spec.clone())
+            },
+            _ => Err(TryFromElementError::NotMember)
         }
     }
 }

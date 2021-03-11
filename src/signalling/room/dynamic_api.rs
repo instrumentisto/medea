@@ -3,7 +3,7 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use actix::{
     fut, ActorFuture as _, AsyncContext as _, AsyncContext, AtomicResponse,
@@ -12,6 +12,7 @@ use actix::{
 use medea_client_api_proto::{CloseReason, MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
+use crate::api::control::RoomElement;
 use crate::{
     api::control::{
         callback::OnLeaveReason,
@@ -435,65 +436,60 @@ impl Handler<Apply> for Room {
     type Result = Result<(), RoomError>;
 
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
-        use crate::api::control::RoomElement;
+        let mut applied_members = HashSet::new();
+        let mut create_src_endpoint = Vec::new();
+        let mut create_sink_endpoint = Vec::new();
         for (id, element) in msg.0.pipeline {
             match element {
-                RoomElement::Member {
-                    spec,
-                    credentials,
-                    on_leave,
-                    on_join,
-                    idle_timeout,
-                    reconnect_timeout,
-                    ping_interval,
-                } => {
-                    let member_spec = MemberSpec::new(
-                        spec,
-                        credentials,
-                        on_join,
-                        on_leave,
-                        idle_timeout,
-                        reconnect_timeout,
-                        ping_interval,
-                    );
+                RoomElement::Member(spec) => {
                     if let Ok(member) = self.members.get_member(&id) {
-                        ctx.notify(ApplyMember(id, member_spec));
+                        applied_members.insert(id.clone());
+
+                        for (src_id, src) in spec.publish_endpoints() {
+                            if member.get_src_by_id(&src_id).is_none() {
+                                create_src_endpoint.push((id.clone(), src_id.clone(), src.clone()));
+                            }
+                        }
+
+                        for (sink_id, sink) in spec.play_endpoints() {
+                            if member.get_sink_by_id(&sink_id).is_none() {
+                                create_sink_endpoint.push((id.clone(), sink_id.clone(), sink.clone()));
+                            }
+                        }
+
+                        for (src_id, _) in member.srcs() {
+                            if spec.get_publish_endpoint_by_id(src_id.clone()).is_none() {
+                                self.delete_endpoint(&id, src_id.into());
+                            }
+                        }
+
+                        for (sink_id, _) in member.sinks() {
+                            if spec.get_play_endpoint_by_id(sink_id.clone()).is_none() {
+                                self.delete_endpoint(&id, sink_id.into());
+                            }
+                        }
                     } else {
-                        self.members.create_member(id.clone(), &member_spec);
+                        self.members.create_member(id.clone(), &spec);
+                        applied_members.insert(id.clone());
                     }
                 }
             }
         }
 
+        for (a, b, c) in create_src_endpoint {
+            self.create_src_endpoint(&a, b, &c);
+        }
+        for (a, b, c) in create_sink_endpoint {
+            self.create_sink_endpoint(&a, b, c);
+        }
 
-        for (id, element) in msg.0.pipeline {
-            match element {
-                RoomElement::Member {
-                    spec,
-                    credentials,
-                    on_leave,
-                    on_join,
-                    idle_timeout,
-                    reconnect_timeout,
-                    ping_interval,
-                } => {
-                    let member_spec = MemberSpec::new(
-                        spec,
-                        credentials,
-                        on_join,
-                        on_leave,
-                        idle_timeout,
-                        reconnect_timeout,
-                        ping_interval,
-                    );
-                    if let Ok(member) = self.members.get_member(&id) {
-                        ctx.notify(ApplyMember(id, member_spec));
-                    } else {
-                        self.members.create_member(id.clone(), &member_spec);
-                    }
-                }
+
+        for (id, member) in self.members.members() {
+            if !applied_members.contains(&id) {
+                self.delete_member(&id, ctx);
             }
         }
+
         Ok(())
     }
 }
