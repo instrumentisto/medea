@@ -145,12 +145,6 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<receiver::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        if matches!(
-            state.negotiation_role.get(),
-            Some(NegotiationRole::Answerer(_))
-        ) {
-            state.remote_sdp.when_all_processed().await;
-        }
         let ((_, receiver), _guard) = val.into_parts();
         peer.connections
             .create_connection(state.id, receiver.sender_id());
