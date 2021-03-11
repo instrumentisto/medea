@@ -384,6 +384,17 @@ impl World {
                 .await?;
         }
 
+        {
+            let left_member = self.members.get_mut(&pair.left.id).unwrap();
+            left_member.set_is_send(pair.left.is_send());
+            left_member.set_is_recv(pair.right.recv);
+        }
+        {
+            let right_member = self.members.get_mut(&pair.right.id).unwrap();
+            right_member.set_is_send(pair.right.is_send());
+            right_member.set_is_recv(pair.right.recv);
+        }
+
         Ok(())
     }
 

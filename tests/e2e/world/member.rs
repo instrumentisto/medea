@@ -115,6 +115,18 @@ impl Member {
         self.is_recv
     }
 
+    /// Updates flag which indicates that [`Member`] should publish media.
+    #[inline]
+    pub fn set_is_send(&mut self, is_send: bool) {
+        self.is_send = is_send;
+    }
+
+    /// Updates flag which indicates that [`Member`] should receive media.
+    #[inline]
+    pub fn set_is_recv(&mut self, is_recv: bool) {
+        self.is_recv = is_recv;
+    }
+
     /// Indicates whether this [`Member`] is joined a [`Room`] on a media
     /// server.
     #[inline]
