@@ -425,8 +425,7 @@ impl Handler<ApplyMember> for Room {
                 }
             }
         } else {
-            let sid = self.members.create_member(msg.0.clone(), &msg.1)?;
-            sids.insert(msg.0, sid);
+            sids = self.members.create_members(&[(&msg.0, &msg.1)])?;
         }
         Ok(sids)
     }
@@ -442,7 +441,7 @@ impl Handler<Apply> for Room {
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
         let mut create_src_endpoint = Vec::new();
         let mut create_sink_endpoint = Vec::new();
-        let mut sids = Sids::new();
+        let mut create_members = Vec::new();
         for (id, element) in &msg.0.pipeline {
             let RoomElement::Member(spec) = element;
             if let Ok(member) = self.members.get_member(&id) {
@@ -475,10 +474,11 @@ impl Handler<Apply> for Room {
                     }
                 }
             } else {
-                let sid = self.members.create_member(id.clone(), &spec)?;
-                sids.insert(id.clone(), sid);
+                create_members.push((id, spec));
             }
         }
+
+        let sids = self.members.create_members(&create_members)?;
 
         for (id, src_id, src) in create_src_endpoint {
             self.create_src_endpoint(id, src_id, src)?;
@@ -510,9 +510,7 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let sid = self.members.create_member(msg.0.clone(), &msg.1)?;
-        let mut sids = Sids::new();
-        sids.insert(msg.0.clone(), sid);
+        let sids = self.members.create_members(&[(&msg.0, &msg.1)])?;
         debug!(
             "Member [id = {}] created in Room [id = {}].",
             msg.0, self.id
