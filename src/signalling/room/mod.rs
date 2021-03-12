@@ -27,6 +27,7 @@ use crate::{
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
         room::RoomSpec,
+        TryFromElementError,
     },
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, Stable},
@@ -112,6 +113,12 @@ pub enum RoomError {
     /// Failed to send callback via [`CallbackService`]
     #[display(fmt = "CallbackService errored in Room: {}", _0)]
     CallbackClientError(CallbackClientError),
+
+    /// Errors that can occur when we try transform some spec from `Element`.
+    ///
+    /// This error used in all [`TryFrom`] of Control API.
+    #[display(fmt = "Failed to convert element: {:?}", _0)]
+    TryFromElement(TryFromElementError),
 }
 
 /// Media server room with its [`Member`]s.

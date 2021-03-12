@@ -3,7 +3,7 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto as _};
 
 use actix::{
     fut, ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler,
@@ -20,8 +20,8 @@ use crate::{
             WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
         },
         refs::StatefulFid,
-        EndpointId, EndpointSpec, MemberSpec, RoomElement, RoomSpec,
-        WebRtcPlayId, WebRtcPublishId,
+        EndpointId, EndpointSpec, MemberSpec, RoomSpec, WebRtcPlayId,
+        WebRtcPublishId,
     },
     log::prelude::*,
     signalling::{
@@ -426,7 +426,7 @@ impl Handler<ApplyMember> for Room {
                 }
             }
         } else {
-            sids = self.members.create_members(&[(&msg.0, &msg.1)])?;
+            sids = self.members.create_members(&[(&msg.0, msg.1)])?;
         }
         Ok(sids)
     }
@@ -445,11 +445,15 @@ impl Handler<Apply> for Room {
         let mut create_sink_endpoint = Vec::new();
         let mut create_members = Vec::new();
         for (id, element) in &msg.0.pipeline {
-            let RoomElement::Member(spec) = element;
+            let spec: MemberSpec = element.try_into()?;
             if let Ok(member) = self.members.get_member(&id) {
                 for (src_id, src) in spec.publish_endpoints() {
                     if member.get_src_by_id(&src_id).is_none() {
-                        create_src_endpoint.push((id, src_id.clone(), src));
+                        create_src_endpoint.push((
+                            id,
+                            src_id.clone(),
+                            src.clone(),
+                        ));
                     }
                 }
 
@@ -483,7 +487,7 @@ impl Handler<Apply> for Room {
         let sids = self.members.create_members(&create_members)?;
 
         for (id, src_id, src) in create_src_endpoint {
-            self.create_src_endpoint(id, src_id, src)?;
+            self.create_src_endpoint(id, src_id, &src)?;
         }
         for (id, sink_id, sink) in create_sink_endpoint {
             self.create_sink_endpoint(&id, sink_id, sink)?;
@@ -512,11 +516,9 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let sids = self.members.create_members(&[(&msg.0, &msg.1)])?;
-        debug!(
-            "Member [id = {}] created in Room [id = {}].",
-            msg.0, self.id
-        );
+        let CreateMember(id, spec) = msg;
+        let sids = self.members.create_members(&[(&id, spec)])?;
+        debug!("Member [id = {}] created in Room [id = {}].", id, self.id);
         Ok(sids)
     }
 }

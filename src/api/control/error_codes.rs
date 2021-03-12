@@ -436,7 +436,8 @@ impl From<RoomError> for ErrorResponse {
             | E::BadRoomSpec(_)
             | E::PeerTrafficWatcherMailbox(_)
             | E::AuthorizationError
-            | E::TurnServiceErr(_) => Self::unexpected(&err),
+            | E::TurnServiceErr(_)
+            | E::TryFromElement(_) => Self::unexpected(&err),
         }
     }
 }

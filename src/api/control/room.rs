@@ -2,16 +2,21 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
 use medea_client_api_proto::{MemberId, RoomId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
-use crate::api::control::TryFromProtobufError;
+use crate::api::control::{
+    callback::url::CallbackUrl, member::Credential, EndpointId,
+    TryFromProtobufError,
+};
 
 use super::{
-    member::MemberSpec, pipeline::Pipeline, RootElement, TryFromElementError,
+    member::{MemberElement, MemberSpec},
+    pipeline::Pipeline,
+    RootElement, TryFromElementError,
 };
 
 /// Element of [`Room`]'s [`Pipeline`].
@@ -22,7 +27,18 @@ use super::{
 pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
-    Member(MemberSpec),
+    Member {
+        spec: Pipeline<EndpointId, MemberElement>,
+        credentials: Credential,
+        on_leave: Option<CallbackUrl>,
+        on_join: Option<CallbackUrl>,
+        #[serde(default, with = "humantime_serde")]
+        idle_timeout: Option<Duration>,
+        #[serde(default, with = "humantime_serde")]
+        reconnect_timeout: Option<Duration>,
+        #[serde(default, with = "humantime_serde")]
+        ping_interval: Option<Duration>,
+    },
 }
 
 /// [Control API]'s `Room` element specification.

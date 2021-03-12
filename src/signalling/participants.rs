@@ -382,7 +382,7 @@ impl ParticipantService {
     /// provided [`MemberId`] already exists in [`ParticipantService`].
     pub fn create_members(
         &mut self,
-        specs: &[(&MemberId, &MemberSpec)],
+        specs: &[(&MemberId, MemberSpec)],
     ) -> Result<Sids, RoomError> {
         let mut members = HashMap::new();
         for (id, spec) in specs {
@@ -516,7 +516,7 @@ mod test {
 
         let test_member_id = MemberId::from("test-member");
         members
-            .create_members(&[(&test_member_id, &test_member_spec)])
+            .create_members(&[(&test_member_id, test_member_spec)])
             .unwrap();
 
         let test_member = members.get_member_by_id(&test_member_id).unwrap();
@@ -558,7 +558,7 @@ mod test {
 
         let test_member_id = MemberId::from("test-member");
         members
-            .create_members(&[(&test_member_id, &test_member_spec)])
+            .create_members(&[(&test_member_id, test_member_spec)])
             .unwrap();
 
         let test_member = members.get_member_by_id(&test_member_id).unwrap();

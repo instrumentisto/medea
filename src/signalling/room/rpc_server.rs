@@ -383,7 +383,7 @@ mod test {
         );
 
         room.members
-            .create_members(&[(&MemberId::from("member1"), &member1)])
+            .create_members(&[(&MemberId::from("member1"), member1)])
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
@@ -424,7 +424,7 @@ mod test {
         );
 
         room.members
-            .create_members(&[(&MemberId::from("member1"), &member1)])
+            .create_members(&[(&MemberId::from("member1"), member1)])
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
@@ -492,15 +492,15 @@ mod test {
                 None
             };
             let id = MemberId::from("member");
-            let member = RoomElement::Member(MemberSpec::new (
-                Pipeline::new(HashMap::new()),
-                Credential::Plain(String::from("test")),
+            let member = RoomElement::Member {
+                spec: Pipeline::new(HashMap::new()),
+                credentials: Credential::Plain(String::from("test")),
                 on_leave,
                 on_join,
-                None,
-                None,
-                None,
-            ));
+                idle_timeout: None,
+                reconnect_timeout: None,
+                ping_interval: None,
+            };
             RoomSpec {
                 id: RoomId::from("test"),
                 pipeline: Pipeline::new(hashmap! {id => member}),
