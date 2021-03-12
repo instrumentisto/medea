@@ -187,6 +187,14 @@ impl RoomService {
             })
     }
 
+    /// Creates new [`Room`] by provided [`RoomSpec`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomServiceError::TryFromElement`] if provided spec is invalid.
+    ///
+    /// With [`RoomServiceError::RoomAlreadyExists`] if [`Room`] with a provided
+    /// ID already exists.
     fn create_room(
         &self,
         room_spec: RoomSpec,
@@ -283,6 +291,7 @@ impl Handler<StartStaticRooms> for RoomService {
 /// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<MemberId, Sid>;
 
+/// Signal for applying [`RoomSpec`] on [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct ApplyRoom {
@@ -293,6 +302,7 @@ pub struct ApplyRoom {
 impl Handler<ApplyRoom> for RoomService {
     type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
 
+    #[allow(clippy::option_if_let_else)]
     fn handle(
         &mut self,
         msg: ApplyRoom,
@@ -334,6 +344,7 @@ impl Handler<CreateRoom> for RoomService {
     }
 }
 
+/// Signal for applying [`MemberSpec`] in [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct ApplyMember {

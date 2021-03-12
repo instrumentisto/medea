@@ -243,6 +243,9 @@ mod create {
     }
 }
 
+/// Implementation of `Patch` requests to [Control API] mock.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 mod apply {
     use super::{
         error, AppContext, CreateResponse, Data, Element, Fid, HttpResponse,

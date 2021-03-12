@@ -29,6 +29,8 @@ use crate::{
     utils,
 };
 
+/// URI which should be used by clients to connect to a media server via Client
+/// API
 #[derive(Clone, Debug)]
 pub struct Sid {
     public_url: PublicUrl,
@@ -38,6 +40,9 @@ pub struct Sid {
 }
 
 impl Sid {
+    /// Returns new [`Sid`] for the provided authentication data.
+    #[inline]
+    #[must_use]
     pub fn new(
         public_url: PublicUrl,
         room_id: RoomId,
@@ -187,7 +192,7 @@ impl MemberSpec {
     #[inline]
     #[must_use]
     pub fn new(
-        pipeline: Pipeline<EndpointId, MemberElement>,
+        spec: Pipeline<EndpointId, MemberElement>,
         credentials: Credential,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
@@ -196,7 +201,7 @@ impl MemberSpec {
         ping_interval: Option<Duration>,
     ) -> Self {
         Self {
-            spec: pipeline,
+            spec,
             credentials,
             on_join,
             on_leave,

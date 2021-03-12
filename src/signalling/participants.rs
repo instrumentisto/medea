@@ -75,6 +75,7 @@ pub struct ParticipantService {
     /// [`Room`]s id from which this [`ParticipantService`] was created.
     room_id: RoomId,
 
+    /// Public URL of HTTP server.
     public_url: PublicUrl,
 
     /// [`Member`]s which currently are present in this [`Room`].
@@ -171,6 +172,8 @@ impl ParticipantService {
         self.members.clone()
     }
 
+    /// Returns [`MemberId`]s of all [`Member`]s from this
+    /// [`ParticipantService`].
     #[inline]
     #[must_use]
     pub fn members_ids(&self) -> Vec<MemberId> {
@@ -368,6 +371,15 @@ impl ParticipantService {
         self.members.iter()
     }
 
+    /// Creates new [`Member`]s in this [`ParticipantService`].
+    ///
+    /// This function will check that new [`Member`]s IDs not present in
+    /// [`ParticipantService`].
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
+    /// provided [`MemberId`] already exists in [`ParticipantService`].
     pub fn create_members(
         &mut self,
         specs: &[(&MemberId, &MemberSpec)],
@@ -390,10 +402,10 @@ impl ParticipantService {
             );
 
             signalling_member.set_callback_urls(spec);
-            members.insert(id.clone(), (signalling_member, spec));
+            members.insert(*id, (signalling_member, spec));
         }
 
-        for (_, (signalling_member, spec)) in &members {
+        for (signalling_member, spec) in members.values() {
             for (id, publish) in spec.publish_endpoints() {
                 let signalling_publish = WebRtcPublishEndpoint::new(
                     id.clone(),
@@ -410,23 +422,18 @@ impl ParticipantService {
         let mut sids = HashMap::new();
         for (id, (signalling_member, spec)) in &members {
             for (id, play) in spec.play_endpoints() {
-                let partner_member =
-                    if let Ok(m) = self.get_member(&play.src.member_id) {
-                        m
-                    } else {
-                        if let Some((m, _)) = members.get(&play.src.member_id) {
-                            m.clone()
-                        } else {
-                            return Err(
-                                ParticipantServiceErr::ParticipantNotFound(
-                                    self.get_fid_to_member(
-                                        play.src.member_id.clone(),
-                                    ),
-                                )
-                                .into(),
-                            );
-                        }
-                    };
+                let partner_member = if let Ok(m) =
+                    self.get_member(&play.src.member_id)
+                {
+                    m
+                } else if let Some((m, _)) = members.get(&play.src.member_id) {
+                    m.clone()
+                } else {
+                    return Err(ParticipantServiceErr::ParticipantNotFound(
+                        self.get_fid_to_member(play.src.member_id.clone()),
+                    )
+                    .into());
+                };
                 let src = partner_member
                     .get_src_by_id(&play.src.endpoint_id)
                     .ok_or_else(|| {

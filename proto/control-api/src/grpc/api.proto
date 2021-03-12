@@ -24,6 +24,9 @@ service ControlApi {
   // If no ID specified, returns all Elements declared.
   rpc Get (IdRequest) returns (GetResponse);
 
+  // Applies Element with a given ID.
+  //
+  // Idempotent. If an Element with the same ID already exists, then succeeds.
   rpc Apply(CreateRequest) returns (CreateResponse);
 }
 

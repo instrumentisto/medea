@@ -3,10 +3,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{
-    collections::{
-        hash_map::{IntoIter, Iter},
-        HashMap,
-    },
+    collections::{hash_map::Iter, HashMap},
     hash::Hash,
     iter::IntoIterator,
 };
@@ -40,6 +37,10 @@ impl<K: Hash + Eq, V> Pipeline<K, V> {
         self.pipeline.get(id)
     }
 
+    /// Returns `true` if the [`Pipeline`] contains a value for the specified
+    /// ID.
+    #[inline]
+    #[must_use]
     pub fn contains_key(&self, id: &K) -> bool {
         self.pipeline.contains_key(id)
     }
@@ -52,15 +53,5 @@ impl<'a, K: Eq + Hash, V> IntoIterator for &'a Pipeline<K, V> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.pipeline.iter()
-    }
-}
-
-impl<K: Eq + Hash, V> IntoIterator for Pipeline<K, V> {
-    type IntoIter = IntoIter<K, V>;
-    type Item = (K, V);
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.pipeline.into_iter()
     }
 }

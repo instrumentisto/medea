@@ -19,12 +19,13 @@ use crate::{
     api::control::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        member::Credential,
+        member::{Credential, Sid},
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
         WebRtcPublishId,
     },
     conf,
+    conf::server::PublicUrl,
     log::prelude::*,
 };
 
@@ -32,7 +33,6 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
-use crate::{api::control::member::Sid, conf::server::PublicUrl};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -137,6 +137,9 @@ impl Member {
         })))
     }
 
+    /// Returns [`Sid`] for this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn get_sid(&self, public_url: PublicUrl) -> Sid {
         let inner = self.0.borrow();
         Sid::new(
@@ -352,10 +355,16 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
+    /// Returns [`WebRtcPlayId`] of all sinks of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn sinks_ids(&self) -> Vec<WebRtcPlayId> {
         self.0.borrow().sinks.keys().cloned().collect()
     }
 
+    /// Returns [`WebRtcPublishId`] of all srcs of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn srcs_ids(&self) -> Vec<WebRtcPublishId> {
         self.0.borrow().srcs.keys().cloned().collect()
     }

@@ -11,7 +11,7 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_client_api_proto::{MemberId, RoomId};
+use medea_client_api_proto::MemberId;
 use medea_control_api_proto::grpc::{
     api as proto,
     api::control_api_server::{
@@ -113,22 +113,7 @@ impl ControlApiService {
             .await??)
     }
 
-    async fn apply_room(
-        &self,
-        id: RoomId,
-        spec: RoomSpec,
-    ) -> Result<Sids, GrpcControlApiError> {
-        Ok(self.0.send(ApplyRoom { id, spec }).await??)
-    }
-
-    async fn apply_member(
-        &self,
-        fid: Fid<ToMember>,
-        spec: MemberSpec,
-    ) -> Result<Sids, GrpcControlApiError> {
-        Ok(self.0.send(ApplyMember { fid, spec }).await??)
-    }
-
+    /// Implementation of `Apply` method for `Endpoint` element.
     async fn apply_element(
         &self,
         req: proto::CreateRequest,
@@ -146,22 +131,30 @@ impl ControlApiService {
         let parent_fid = StatefulFid::try_from(unparsed_fid)?;
         match parent_fid {
             StatefulFid::Room(fid) => match elem {
-                proto::create_request::El::Room(_) => {
-                    let room_spec = RoomSpec::try_from(elem)?;
-                    Ok(self
-                        .apply_room(fid.room_id().clone(), room_spec)
-                        .await?)
-                }
+                proto::create_request::El::Room(_) => Ok(self
+                    .0
+                    .send(ApplyRoom {
+                        id: fid.room_id().clone(),
+                        spec: RoomSpec::try_from(elem)?,
+                    })
+                    .await
+                    .map_err(GrpcControlApiError::from)??),
                 _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
             },
             StatefulFid::Member(fid) => match elem {
-                proto::create_request::El::Member(member) => {
-                    let member_spec = MemberSpec::try_from(member)?;
-                    Ok(self.apply_member(fid.clone(), member_spec).await?)
-                }
+                proto::create_request::El::Member(member) => Ok(self
+                    .0
+                    .send(ApplyMember {
+                        fid,
+                        spec: MemberSpec::try_from(member)?,
+                    })
+                    .await
+                    .map_err(GrpcControlApiError::from)??),
                 _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
             },
-            _ => Err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid)),
+            StatefulFid::Endpoint(_) => {
+                Err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid))
+            }
         }
     }
 
@@ -259,6 +252,7 @@ impl ControlApiService {
     }
 }
 
+/// Converts [`Sids`] to the [`HashMap`] for gRPC Control API protocol.
 fn proto_sids(sids: Sids) -> HashMap<String, String> {
     sids.into_iter()
         .map(|(id, sid)| (id.to_string(), sid.to_string()))

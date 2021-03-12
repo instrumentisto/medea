@@ -30,11 +30,11 @@ use crate::{
             member::MemberError,
         },
         room::ActFuture,
+        room_service::Sids,
     },
 };
 
 use super::{Room, RoomError};
-use crate::signalling::room_service::Sids;
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
@@ -390,6 +390,7 @@ impl Handler<Delete> for Room {
     }
 }
 
+/// Signal for applying [`MemberSpec`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<Sids, RoomError>")]
 pub struct ApplyMember(pub MemberId, pub MemberSpec);
@@ -431,6 +432,7 @@ impl Handler<ApplyMember> for Room {
     }
 }
 
+/// Signal for applying [`RoomSpec`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<Sids, RoomError>")]
 pub struct Apply(pub RoomSpec);

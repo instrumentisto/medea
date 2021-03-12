@@ -142,6 +142,11 @@ impl ControlClient {
         response.map(tonic::Response::into_inner)
     }
 
+    /// Applies provided element with gRPC Control API.
+    ///
+    /// # Errors
+    ///
+    /// Errors if gRPC request fails.
     pub async fn apply(
         &self,
         id: String,

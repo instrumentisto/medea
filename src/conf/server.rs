@@ -6,6 +6,15 @@ use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
+/// Public URL of HTTP server. Address for exposed [Client API].
+/// It's assumed that HTTP server can be reached via this URL externally.
+///
+/// This address is returned from [Control API] in `sids` field
+/// and [Jason] uses this address to start its session.
+///
+/// [Client API]: https://tinyurl.com/yx9thsnr
+/// [Control API]: https://tinyurl.com/yxsqplq7
+/// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
 #[derive(Clone, Debug, Display, Deserialize, Serialize, From)]
 pub struct PublicUrl(pub String);
 
@@ -38,7 +47,6 @@ pub struct ClientApiHttpServer {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
-    // #[default = "ws://127.0.0.1:8080/ws"]
     #[default(PublicUrl("ws://127.0.0.1:8080/ws".to_owned()))]
     pub public_url: PublicUrl,
 

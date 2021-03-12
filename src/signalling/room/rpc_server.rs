@@ -492,15 +492,15 @@ mod test {
                 None
             };
             let id = MemberId::from("member");
-            let member = RoomElement::Member {
-                spec: Pipeline::new(HashMap::new()),
-                credentials: Credential::Plain(String::from("test")),
+            let member = RoomElement::Member(MemberSpec::new (
+                Pipeline::new(HashMap::new()),
+                Credential::Plain(String::from("test")),
                 on_leave,
                 on_join,
-                idle_timeout: None,
-                reconnect_timeout: None,
-                ping_interval: None,
-            };
+                None,
+                None,
+                None,
+            ));
             RoomSpec {
                 id: RoomId::from("test"),
                 pipeline: Pipeline::new(hashmap! {id => member}),
