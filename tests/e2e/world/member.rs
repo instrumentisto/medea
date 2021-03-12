@@ -98,6 +98,7 @@ pub struct Member {
     /// [`Connection`]: object::connection::Connection
     connection_store: Object<ConnectionStore>,
 
+    /// [`Window`] in which this [`Member`] is exists.
     window: Window,
 }
 
@@ -339,6 +340,10 @@ impl Member {
         &self.room
     }
 
+    /// Returns WebAPI `WebSocket` mock object for [`Window`] of this
+    /// [`Member`].
+    #[inline]
+    #[must_use]
     pub fn ws_mock(&self) -> mock::WebSocket {
         self.window.websocket_mock()
     }

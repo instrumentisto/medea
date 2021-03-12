@@ -1,14 +1,19 @@
-pub mod websocket;
+//! Implementations of the mocks for the WebAPI.
+
+mod websocket;
 
 use super::Window;
 
+#[doc(inline)]
 pub use websocket::WebSocket;
 
+/// Instantiates all possible WebAPI mocks in the provided [`Window`].
 pub async fn instantiate_mocks(window: &Window) {
     WebSocket::instantiate(window).await;
 }
 
 impl Window {
+    /// Returns `WebSocket` object mock for this [`Window`].
     pub fn websocket_mock(&self) -> WebSocket {
         WebSocket(self)
     }

@@ -92,6 +92,8 @@ impl Drop for Window {
 
 impl Window {
     /// Creates a new [`Window`] in the provided [`WebDriverClient`].
+    ///
+    /// Instantiates all possible WebAPI mocks in the created [`Window`].
     async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();
 
