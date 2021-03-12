@@ -147,7 +147,7 @@ impl WsSession {
                 debug!("{}: Received Pong: {}", self, n);
             }
             Ok(ClientMsg::Command { room_id, command }) => {
-                debug!("{}: Received Command: {:?}", self, command);
+                warn!("{}: Received Command: {:?}", self, command);
                 match command {
                     Command::JoinRoom {
                         member_id,
@@ -469,7 +469,7 @@ impl WsSession {
         room_id: RoomId,
         event: Event,
     ) {
-        debug!(
+        warn!(
             "{}: Sending Event for Room [id = {}]: {:?}]",
             self, room_id, event
         );

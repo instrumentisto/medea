@@ -170,7 +170,7 @@ jobs:
       #        timeout-minutes: 5
       #        continue-on-error: true
       - name: Chrome
-        run: env MEDEA_LOG__LEVEL=DEBUG FEATURES_PATH=tests/e2e/features/test make test.e2e up=yes browser=chrome
+        run: env MEDEA_LOG__LEVEL=WARN RUST_LOG=WARN FEATURES_PATH=tests/e2e/features/test make test.e2e up=yes browser=chrome
 #      - name: Firefox
 #        run: make test.e2e up=yes browser=firefox
 #

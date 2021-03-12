@@ -6,7 +6,7 @@ use chrono::Local;
 use slog::{
     o, Drain, Duplicate, FnValue, Fuse, Level, Logger, PushFnValue, Record,
 };
-use slog_async::Async;
+use slog_async::{Async, OverflowStrategy};
 use slog_json::Json;
 
 /// Re-exports common definitions for logging.
@@ -45,7 +45,7 @@ where
     )
     .map(Fuse);
     let drain = slog_envlogger::new(drain).fuse();
-    let drain = Async::new(drain).chan_size(2048).build().fuse();
+    let drain = Async::new(drain).overflow_strategy(OverflowStrategy::Block).chan_size(2048).build().fuse();
     add_default_keys(&Logger::root(drain, o!()))
 }
 
