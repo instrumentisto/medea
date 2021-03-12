@@ -55,7 +55,7 @@ mod join {
     use serde::{Deserialize, Serialize};
 
     /// `OnJoin` callback for Control API.
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone, Deserialize, Serialize)]
     pub struct OnJoin;
 
     impl From<proto::OnJoin> for OnJoin {

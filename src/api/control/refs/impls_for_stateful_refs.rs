@@ -24,6 +24,7 @@ macro_rules! impls_for_stateful_refs {
     ($container:tt) => {
         impl $container<ToRoom> {
             #[doc = "Create new reference in [`ToRoom`] state."]
+            #[must_use]
             pub fn new(room_id: $crate::api::control::RoomId) -> Self {
                 Self {
                     state: ToRoom(room_id),
@@ -33,6 +34,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`RoomId`].
             ///
             /// [`RoomId`]: medea_client_api_proto::RoomId
+            #[must_use]
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
             }
@@ -40,6 +42,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns [`RoomId`].
             ///
             /// [`RoomId`]: medea_client_api_proto::RoomId
+            #[must_use]
             pub fn take_room_id(self) -> $crate::api::control::RoomId {
                 self.state.0
             }
@@ -49,6 +52,7 @@ macro_rules! impls_for_stateful_refs {
             ///
             /// [`MemberId`]: medea_client_api_proto::MemberId
             /// [`ToMember`]: crate::api::control::refs::ToMember
+            #[must_use]
             pub fn push_member_id(
                 self,
                 member_id: $crate::api::control::MemberId,
@@ -64,6 +68,7 @@ macro_rules! impls_for_stateful_refs {
             /// Create new reference in [`ToMember`] state.
             ///
             /// [`ToMember`]: crate::api::control::refs::ToMember
+            #[must_use]
             pub fn new(
                 room_id: $crate::api::control::RoomId,
                 member_id: $crate::api::control::MemberId,
@@ -78,6 +83,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`RoomId`].
             ///
             /// [`RoomId`]: medea_client_api_proto::RoomId
+            #[must_use]
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
             }
@@ -85,6 +91,7 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`MemberId`].
             ///
             /// [`MemberId`]: medea_client_api_proto::MemberId
+            #[must_use]
             pub fn member_id(&self) -> &$crate::api::control::MemberId {
                 &self.state.1
             }
@@ -93,6 +100,7 @@ macro_rules! impls_for_stateful_refs {
             ///
             /// [`MemberId`]: medea_client_api_proto::MemberId
             /// [`ToRoom`]: crate::api::control::refs::ToRoom
+            #[must_use]
             pub fn take_member_id(
                 self,
             ) -> (
@@ -111,6 +119,7 @@ macro_rules! impls_for_stateful_refs {
             /// reference in [`ToEndpoint`] state.
             ///
             /// [`ToEndpoint`]: crate::api::control::refs::ToEndpoint
+            #[must_use]
             pub fn push_endpoint_id(
                 self,
                 endpoint_id: $crate::api::control::EndpointId,
@@ -128,6 +137,7 @@ macro_rules! impls_for_stateful_refs {
             ///
             /// [`RoomId`]: medea_client_api_proto::RoomId
             /// [`MemberId`]: medea_client_api_proto::MemberId
+            #[must_use]
             pub fn take_all(
                 self,
             ) -> ($crate::api::control::RoomId, $crate::api::control::MemberId)
@@ -142,6 +152,7 @@ macro_rules! impls_for_stateful_refs {
             /// Creates new reference in [`ToEndpoint`] state.
             ///
             /// [`ToEndpoint`]: crate::api::control::refs::ToEndpoint
+            #[must_use]
             pub fn new(
                 room_id: $crate::api::control::RoomId,
                 member_id: $crate::api::control::MemberId,
@@ -159,6 +170,8 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`RoomId`].
             ///
             /// [`RoomId`]: medea_client_api_proto::RoomId
+            #[inline]
+            #[must_use]
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
             }
@@ -166,6 +179,8 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`MemberId`].
             ///
             /// [`MemberId`]: medea_client_api_proto::MemberId
+            #[inline]
+            #[must_use]
             pub fn member_id(&self) -> &$crate::api::control::MemberId {
                 &self.state.1
             }
@@ -173,6 +188,8 @@ macro_rules! impls_for_stateful_refs {
             /// Returns borrowed [`EndpointId`].
             ///
             /// [`EndpointId`]: crate::api::control::EndpointId
+            #[inline]
+            #[must_use]
             pub fn endpoint_id(&self) -> &$crate::api::control::EndpointId {
                 &self.state.2
             }
@@ -181,6 +198,7 @@ macro_rules! impls_for_stateful_refs {
             ///
             /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
             /// [`ToMember`]: crate::api::control::refs::ToMember
+            #[must_use]
             pub fn take_endpoint_id(
                 self,
             ) -> (
@@ -201,6 +219,7 @@ macro_rules! impls_for_stateful_refs {
             /// [`EndpointId`]: crate::api::control::EndpointId
             /// [`RoomId`]: medea_client_api_proto::RoomId
             /// [`MemberId`]: medea_client_api_proto::MemberId
+            #[must_use]
             pub fn take_all(
                 self,
             ) -> (

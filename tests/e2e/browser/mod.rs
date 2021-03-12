@@ -92,7 +92,6 @@ impl Drop for Window {
 
 impl Window {
     /// Creates a new [`Window`] in the provided [`WebDriverClient`].
-    #[must_use]
     async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();
 
@@ -134,7 +133,6 @@ impl WindowFactory {
 
     /// Creates and returns a new [`Window`].
     #[inline]
-    #[must_use]
     pub async fn new_window(&self) -> Window {
         Window::new(self.0.clone()).await
     }

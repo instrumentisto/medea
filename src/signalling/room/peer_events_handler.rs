@@ -30,7 +30,7 @@ impl Room {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
             match self.peers.take_inner_peer(peer.partner_peer_id()) {
-                Ok(peer) => peer,
+                Ok(p) => p,
                 Err(e) => {
                     self.peers.add_peer(peer);
                     return Err(e);

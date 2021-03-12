@@ -145,6 +145,8 @@ pub enum TransportState {
 
 impl TransportState {
     /// Returns `true` if socket can be closed.
+    #[inline]
+    #[must_use]
     pub fn can_close(self) -> bool {
         matches!(self, Self::Connecting | Self::Open)
     }

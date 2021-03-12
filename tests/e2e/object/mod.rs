@@ -90,7 +90,9 @@ impl<T> Object<T> {
         }
     }
 
-    /// Returns [`ObjectPtr`] for this [`Object`].
+    /// Returns an [`ObjectPtr`] to this [`Object`].
+    #[inline]
+    #[must_use]
     pub fn ptr(&self) -> ObjectPtr {
         self.ptr.clone()
     }
@@ -121,11 +123,7 @@ impl<T> Object<T> {
     pub async fn is_undefined(&self) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
-            r#"
-                async (o) => {
-                    return o === undefined;
-                }
-            "#,
+            r#"async (o) => o === undefined"#,
             [],
         ))
         .await?

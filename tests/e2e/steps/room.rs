@@ -2,7 +2,8 @@ use cucumber_rust::{then, when};
 
 use crate::world::World;
 
-#[then(regex = r"^(\S+)'s Room.on_close callback fires with `(\S+)` reason$")]
+#[then(regex = "^(\\S+)'s `on_close` room's callback fires with `(\\S+)` \
+                 reason$")]
 async fn then_on_close_fires(
     world: &mut World,
     id: String,
@@ -12,7 +13,7 @@ async fn then_on_close_fires(
     assert_eq!(expect_reason, reason);
 }
 
-#[when(regex = r"^(\S+) joins room")]
+#[when(regex = r"^(\S+) joins the room$")]
 async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
     world.wait_for_interconnection(&id).await.unwrap();
@@ -23,7 +24,7 @@ async fn when_room_closed_by_client(world: &mut World, id: String) {
     world.close_room(&id).await.unwrap();
 }
 
-#[when(regex = r"^(\S+)'s Jason object disposes$")]
+#[when(regex = r"^(\S+) disposes Jason object$")]
 async fn when_jason_object_disposes(world: &mut World, id: String) {
     world.dispose_jason(&id).await.unwrap();
 }

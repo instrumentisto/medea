@@ -84,6 +84,8 @@ impl LocalTracksConstraints {
     /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
+    #[inline]
+    #[must_use]
     pub fn calculate_kinds_diff(
         &self,
         settings: &MediaStreamSettings,
@@ -320,6 +322,7 @@ pub struct MediaStreamSettings {
 #[wasm_bindgen]
 impl MediaStreamSettings {
     /// Creates new [`MediaStreamSettings`] with none constraints configured.
+    #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
@@ -409,6 +412,7 @@ impl MediaStreamSettings {
 
     /// Returns only audio constraints.
     #[inline]
+    #[must_use]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
         &self.audio.constraints
     }
@@ -418,6 +422,7 @@ impl MediaStreamSettings {
     ///
     /// Returns [`None`] if [`DisplayVideoTrackConstraints`] is unconstrained.
     #[inline]
+    #[must_use]
     pub fn get_display_video(&self) -> Option<&DisplayVideoTrackConstraints> {
         self.display_video.constraints.as_ref()
     }
@@ -427,6 +432,7 @@ impl MediaStreamSettings {
     ///
     /// Returns [`None`] if [`DeviceVideoTrackConstraints`] is unconstrained.
     #[inline]
+    #[must_use]
     pub fn get_device_video(&self) -> Option<&DeviceVideoTrackConstraints> {
         self.device_video.constraints.as_ref()
     }
@@ -549,6 +555,7 @@ impl MediaStreamSettings {
 
     /// Indicates whether audio is enabled in this [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn is_audio_enabled(&self) -> bool {
         self.audio.enabled
     }
@@ -556,6 +563,7 @@ impl MediaStreamSettings {
     /// Returns `true` if [`DeviceVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
+    #[must_use]
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.enabled()
     }
@@ -563,6 +571,7 @@ impl MediaStreamSettings {
     /// Returns `true` if [`DisplayVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
+    #[must_use]
     pub fn is_display_video_enabled(&self) -> bool {
         self.display_video.enabled()
     }
@@ -570,6 +579,7 @@ impl MediaStreamSettings {
     /// Indicates whether the given [`MediaType`] is enabled and constrained in
     /// this [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn enabled(&self, kind: &MediaType) -> bool {
         match kind {
             MediaType::Video(video) => {
@@ -739,6 +749,7 @@ impl VideoSource {
     /// If this [`VideoSource`] is important then without this [`VideoSource`]
     /// call session can't be started.
     #[inline]
+    #[must_use]
     pub fn required(&self) -> bool {
         match self {
             VideoSource::Device(device) => device.required,
@@ -807,6 +818,7 @@ impl TrackConstraints {
     ///
     /// If this [`TrackConstraints`] is important then without this
     /// [`TrackConstraints`] call session can't be started.
+    #[must_use]
     pub fn required(&self) -> bool {
         match self {
             TrackConstraints::Video(video) => video.required(),
@@ -815,6 +827,7 @@ impl TrackConstraints {
     }
 
     /// Returns this [`TrackConstraints`] media source kind.
+    #[must_use]
     pub fn media_source_kind(&self) -> MediaSourceKind {
         match &self {
             TrackConstraints::Audio(_) => MediaSourceKind::Device,
@@ -828,6 +841,7 @@ impl TrackConstraints {
     }
 
     /// Returns [`MediaKind`] of these [`TrackConstraints`].
+    #[must_use]
     pub fn media_kind(&self) -> MediaKind {
         match &self {
             TrackConstraints::Audio(_) => MediaKind::Audio,
@@ -870,6 +884,7 @@ pub struct AudioTrackConstraints {
 #[wasm_bindgen]
 impl AudioTrackConstraints {
     /// Creates new [`AudioTrackConstraints`] with none constraints configured.
+    #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
@@ -911,6 +926,7 @@ impl AudioTrackConstraints {
     ///
     /// If this [`AudioTrackConstraints`] is important then without this
     /// [`AudioTrackConstraints`] call session can't be started.
+    #[must_use]
     pub fn required(&self) -> bool {
         self.required
     }
@@ -1152,6 +1168,7 @@ impl DeviceVideoTrackConstraints {
     /// [`DeviceVideoTrackConstraints`] contained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[must_use]
     pub fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
         satisfies_track(track, MediaKind::Video)
             && ConstrainString::satisfies(&self.device_id, track)
@@ -1186,6 +1203,8 @@ impl DeviceVideoTrackConstraints {
     ///
     /// If this [`DeviceVideoTrackConstraints`] is important then without this
     /// [`DeviceVideoTrackConstraints`] call session can't be started.
+    #[inline]
+    #[must_use]
     pub fn required(&self) -> bool {
         self.required
     }
@@ -1196,6 +1215,7 @@ impl DeviceVideoTrackConstraints {
 impl DeviceVideoTrackConstraints {
     /// Creates new [`DeviceVideoTrackConstraints`] with none constraints
     /// configured.
+    #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
@@ -1283,6 +1303,7 @@ impl DisplayVideoTrackConstraints {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     #[allow(clippy::unused_self)]
     #[inline]
+    #[must_use]
     pub fn satisfies(&self, track: &sys::MediaStreamTrack) -> bool {
         satisfies_track(track, MediaKind::Video)
             && guess_is_from_display(&track)
@@ -1303,6 +1324,7 @@ impl DisplayVideoTrackConstraints {
     /// If this [`DisplayVideoTrackConstraints`] is important then without this
     /// [`DisplayVideoTrackConstraints`] call session can't be started.
     #[inline]
+    #[must_use]
     pub fn required(&self) -> bool {
         self.required
     }
@@ -1312,6 +1334,7 @@ impl DisplayVideoTrackConstraints {
 impl DisplayVideoTrackConstraints {
     /// Creates new [`DisplayVideoTrackConstraints`] with none constraints
     /// configured.
+    #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()

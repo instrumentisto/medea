@@ -50,7 +50,10 @@ impl Client {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
     }
 
-    /// Returns all received by Control API mock server callbacks.
+    // TODO: Server side filtering on GET requests or SSE/WS subscription would
+    //       speed up things. We a probably wasting a lot of time on ser/deser
+    //       of huge JSON's.
+    /// Fetches all callbacks received by Control API mock server.
     pub async fn callbacks(&self) -> Result<Vec<CallbackItem>> {
         Ok(self
             .0

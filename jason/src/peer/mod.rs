@@ -18,7 +18,6 @@ use std::{
     convert::TryFrom as _,
     hash::{Hash, Hasher},
     rc::Rc,
-    time::Duration,
 };
 
 use derive_more::{Display, From};
@@ -39,7 +38,7 @@ use crate::{
         LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
         RecvConstraints,
     },
-    utils::{delay_for, JasonError, JsCaused, JsError},
+    utils::{JasonError, JsCaused, JsError},
     MediaStreamSettings,
 };
 
@@ -394,15 +393,11 @@ impl PeerConnection {
         let media_connections = Rc::clone(&peer.media_connections);
         peer.peer
             .on_track(Some(move |track_event| {
-                let media_connections = Rc::clone(&media_connections);
-                spawn_local(async move {
-                    while let Err(err) =
-                        media_connections.add_remote_track(&track_event)
-                    {
-                        delay_for(Duration::from_millis(100).into()).await;
-                        JasonError::from(err).print();
-                    }
-                })
+                if let Err(err) =
+                    media_connections.add_remote_track(&track_event)
+                {
+                    JasonError::from(err).print();
+                };
             }))
             .map_err(tracerr::map_from_and_wrap!())?;
 

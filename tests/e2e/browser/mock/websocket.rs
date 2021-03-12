@@ -1,4 +1,4 @@
-use crate::browser::{Window, Statement};
+use crate::browser::{Statement, Window};
 
 pub struct WebSocket<'a>(pub(super) &'a Window);
 
@@ -32,25 +32,31 @@ impl<'a> WebSocket<'a> {
     }
 
     pub async fn enable_message_loss(&self) {
-        self.0.execute(Statement::new(
-            r#"
+        self.0
+            .execute(Statement::new(
+                r#"
                 async () => {
                     WebSocket.prototype.send = () => {};
                 }
             "#,
-            vec![]
-        )).await.unwrap();
+                vec![],
+            ))
+            .await
+            .unwrap();
     }
 
     pub async fn disable_message_loss(&self) {
-        self.0.execute(Statement::new(
-            r#"
+        self.0
+            .execute(Statement::new(
+                r#"
                 async () => {
                     WebSocket.prototype.send = window.wsMock.originalSend;
                 }
             "#,
-            vec![]
-        )).await.unwrap();
+                vec![],
+            ))
+            .await
+            .unwrap();
     }
 
     pub async fn enable_connection_loss(&self, code: u64) {
@@ -67,11 +73,17 @@ impl<'a> WebSocket<'a> {
     }
 
     pub async fn disable_connection_loss(&self) {
-        self.0.execute(Statement::new(r#"
+        self.0
+            .execute(Statement::new(
+                r#"
             async () => {
                 window.wsMock.isClosed = false;
                 window.wsMock.closeCode = 0;
             }
-        "#, vec![])).await.unwrap();
+        "#,
+                vec![],
+            ))
+            .await
+            .unwrap();
     }
 }

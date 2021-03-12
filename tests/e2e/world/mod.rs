@@ -12,8 +12,9 @@ use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
     callback::{CallbackEvent, CallbackItem},
     proto,
+    proto::PublishPolicy,
 };
-use tokio_1 as tokio;
+use tokio_1::time::interval;
 use uuid::Uuid;
 
 use crate::{
@@ -22,11 +23,7 @@ use crate::{
     object::{self, Jason, Object},
 };
 
-use self::member::Member;
-
-#[doc(inline)]
-pub use self::member::MemberBuilder;
-use medea_control_api_mock::proto::PublishPolicy;
+pub use self::member::{Builder as MemberBuilder, Member};
 
 /// Returns Control API path for the provided `room_id`, `member_id` and
 /// `endpoint_id`.
@@ -117,10 +114,10 @@ impl World {
         let mut pipeline = HashMap::new();
         if builder.is_send {
             pipeline.insert(
-                "publish".to_string(),
+                "publish".to_owned(),
                 proto::Endpoint::WebRtcPublishEndpoint(
                     proto::WebRtcPublishEndpoint {
-                        id: "publish".to_string(),
+                        id: "publish".to_owned(),
                         p2p: proto::P2pMode::Always,
                         force_relay: false,
                         audio_settings: proto::AudioSettings::default(),
@@ -156,11 +153,11 @@ impl World {
                     id: builder.id.clone(),
                     pipeline,
                     credentials: Some(proto::Credentials::Plain(
-                        "test".to_string(),
+                        "test".to_owned(),
                     )),
-                    on_join: Some("grpc://127.0.0.1:9099".to_string()),
-                    on_leave: Some("grpc://127.0.0.1:9099".to_string()),
-                    idle_timeout: Some(Duration::from_millis(500)),
+                    on_join: Some("grpc://127.0.0.1:9099".to_owned()),
+                    on_leave: Some("grpc://127.0.0.1:9099".to_owned()),
+                    idle_timeout: None,
                     reconnect_timeout: None,
                     ping_interval: None,
                 }),
@@ -199,14 +196,12 @@ impl World {
             }
         }
         let window = self.window_factory.new_window().await;
-        let jason =
-            Object::spawn(Jason, window.clone())
-                .await?;
+        let jason = Object::spawn(Jason, window.clone()).await?;
         let room = jason.init_room().await?;
         let member = builder.build(room, window).await?;
 
-        self.jasons.insert(member.id().to_string(), jason);
-        self.members.insert(member.id().to_string(), member);
+        self.jasons.insert(member.id().to_owned(), jason);
+        self.members.insert(member.id().to_owned(), member);
 
         Ok(())
     }
@@ -226,8 +221,9 @@ impl World {
         let member = self
             .members
             .get_mut(member_id)
-            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_owned()))?;
         member.join_room(&self.room_id).await?;
+        self.wait_for_interconnection(member_id).await?;
         Ok(())
     }
 
@@ -246,7 +242,7 @@ impl World {
                 member.count_of_tracks_between_members(partner);
             let conn = member
                 .connections()
-                .wait_for_connection(partner.id().to_string())
+                .wait_for_connection(partner.id().to_owned())
                 .await?;
             conn.tracks_store()
                 .await?
@@ -255,7 +251,7 @@ impl World {
 
             let partner_conn = partner
                 .connections()
-                .wait_for_connection(member_id.to_string())
+                .wait_for_connection(member_id.to_owned())
                 .await?;
             partner_conn
                 .tracks_store()
@@ -267,7 +263,7 @@ impl World {
         Ok(())
     }
 
-    /// Closes [`Room`] of the provided [`Member`].
+    /// Closes a [`Room`] of the provided [`Member`].
     ///
     /// [`Room`]: crate::object::room::Room
     pub async fn close_room(&mut self, member_id: &str) -> Result<()> {
@@ -278,59 +274,28 @@ impl World {
         Ok(())
     }
 
-    /// Wait for [`Member`]'s [`Room`] close.
+    /// Waits for the [`Member`]'s [`Room`] being closed.
     ///
     /// [`Room`]: crate::object::room::Room
     pub async fn wait_for_on_close(&self, member_id: &str) -> Result<String> {
         let member = self
             .members
             .get(member_id)
-            .ok_or_else(|| Error::MemberNotFound(member_id.to_string()))?;
+            .ok_or_else(|| Error::MemberNotFound(member_id.to_owned()))?;
 
         Ok(member.room().wait_for_close().await?)
     }
 
-    /// Disposes [`Jason`] object of the provided [`Member`] ID.
-    pub async fn dispose_jason(&mut self, member_id: &str) -> Result<()> {
-        let jason = self.jasons.remove(member_id).unwrap();
-        jason.dispose().await?;
-        Ok(())
-    }
-
-    /// Deletes Control API element of the [`Member`] with a provided ID.
-    pub async fn delete_member_element(&mut self, member_id: &str) {
-        let resposne = self
-            .control_client
-            .delete(&format!("{}/{}", self.room_id, member_id))
-            .await
-            .unwrap();
-        assert!(resposne.error.is_none());
-    }
-
-    /// Deletes Control API element of the [`Room`] with a provided ID.
+    /// Waits for `OnLeave` Control API callback for the provided [`Member`] ID.
     ///
-    /// [`Room`]: crate::object::room::Room
-    pub async fn delete_room_element(&mut self) {
-        let resp = self
-            .control_client
-            .delete(self.room_id.as_str())
-            .await
-            .unwrap();
-        assert!(resp.error.is_none());
-    }
-
-    /// Returns [`Future`] which will be resolved when `OnLeave` Control API
-    /// callback will be received for the provided [`Member`] ID.
-    ///
-    /// Panics if `OnLeave` reason is not equal to the provided one.
+    /// Asserts the `OnLeave` reason to be equal to the provided one.
     pub async fn wait_for_on_leave(
         &mut self,
         member_id: String,
         reason: String,
     ) {
-        let mut interval = tokio::time::interval(Duration::from_millis(50));
+        let mut interval = interval(Duration::from_millis(50));
         loop {
-            interval.tick().await;
             let callbacks = self.get_callbacks().await;
             let on_leave = callbacks
                 .into_iter()
@@ -346,15 +311,14 @@ impl World {
                 assert_eq!(on_leave.reason.to_string(), reason);
                 break;
             }
+            interval.tick().await;
         }
     }
 
-    /// Returns [`Future`] which will be resolved when `OnJoin` Control API
-    /// callback will be received for the provided [`Member`] ID.
+    /// Waits for `OnJoin` Control API callback for the provided [`Member`] ID.
     pub async fn wait_for_on_join(&mut self, member_id: String) {
-        let mut interval = tokio::time::interval(Duration::from_millis(50));
+        let mut interval = interval(Duration::from_millis(50));
         loop {
-            interval.tick().await;
             let callbacks = self.get_callbacks().await;
             let on_join_found = callbacks
                 .into_iter()
@@ -363,19 +327,8 @@ impl World {
             if on_join_found {
                 break;
             }
+            interval.tick().await;
         }
-    }
-
-    /// Returns all [`CallbackItem`]s sent by Control API for this [`World`]'s
-    /// `Room`.
-    pub async fn get_callbacks(&mut self) -> Vec<CallbackItem> {
-        self.control_client
-            .callbacks()
-            .await
-            .unwrap()
-            .into_iter()
-            .filter(|i| i.fid.contains(&self.room_id))
-            .collect()
     }
 
     /// Creates `WebRtcPublishEndpoint`s and `WebRtcPlayEndpoint`s for the
@@ -443,6 +396,47 @@ impl World {
 
         Ok(())
     }
+
+    /// Disposes a [`Jason`] object of the provided [`Member`] ID.
+    pub async fn dispose_jason(&mut self, member_id: &str) -> Result<()> {
+        let jason = self.jasons.remove(member_id).unwrap();
+        jason.dispose().await?;
+        Ok(())
+    }
+
+    /// Deletes a Control API element of the [`Member`] with the provided ID.
+    pub async fn delete_member_element(&mut self, member_id: &str) {
+        let resposne = self
+            .control_client
+            .delete(&format!("{}/{}", self.room_id, member_id))
+            .await
+            .unwrap();
+        assert!(resposne.error.is_none());
+    }
+
+    /// Deletes a Control API element of the [`Room`] with the provided ID.
+    ///
+    /// [`Room`]: crate::object::room::Room
+    pub async fn delete_room_element(&mut self) {
+        let resp = self
+            .control_client
+            .delete(self.room_id.as_str())
+            .await
+            .unwrap();
+        assert!(resp.error.is_none());
+    }
+
+    /// Returns all [`CallbackItem`]s sent by Control API for this [`World`]'s
+    /// `Room`.
+    async fn get_callbacks(&mut self) -> Vec<CallbackItem> {
+        self.control_client
+            .callbacks()
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|i| i.fid.contains(&self.room_id))
+            .collect()
+    }
 }
 
 /// `Member`s pairing configuration.
@@ -450,67 +444,71 @@ impl World {
 /// Based on this configuration [`World`] can dynamically create `Endpoint`s for
 /// this `Member`s.
 pub struct MembersPair {
+    /// First [`PairedMember`] in a pair.
     pub left: PairedMember,
+
+    /// Second [`PairedMember`] in a pair.
     pub right: PairedMember,
 }
 
-/// `Endpoint`s configuration of `Member`.
+/// `Endpoint`s configuration of a `Member`.
 pub struct PairedMember {
+    /// Unique ID of this [`PairedMember`].
     pub id: String,
+
+    /// Audio settings to be sent by this [`PairedMember`].
     pub send_audio: Option<proto::AudioSettings>,
+
+    /// Video settings to be sent by this [`PairedMember`].
     pub send_video: Option<proto::VideoSettings>,
+
+    /// Indicator whether this is a receiving configuration, rather than
+    /// publishing.
     pub recv: bool,
 }
 
 impl PairedMember {
-    /// Returns `true` if this [`PairedMember`] should publish media.
+    /// Indicates whether this [`PairedMember`] should publish media.
+    #[inline]
+    #[must_use]
     fn is_send(&self) -> bool {
         self.send_audio.is_some() || self.send_video.is_some()
     }
 
-    /// Returns [`proto::WebRtcPublishEndpoint`] for this [`PairedMember`] if
+    /// Returns a [`proto::WebRtcPublishEndpoint`] for this [`PairedMember`] if
     /// publishing is enabled.
+    #[must_use]
     fn publish_endpoint(&self) -> Option<proto::WebRtcPublishEndpoint> {
-        if self.is_send() {
-            Some(proto::WebRtcPublishEndpoint {
-                id: "publish".to_string(),
-                p2p: proto::P2pMode::Always,
-                force_relay: false,
-                audio_settings: self.send_audio.clone().unwrap_or_else(|| {
-                    proto::AudioSettings {
-                        publish_policy: PublishPolicy::Disabled,
-                    }
-                }),
-                video_settings: self.send_video.clone().unwrap_or_else(|| {
-                    proto::VideoSettings {
-                        publish_policy: PublishPolicy::Disabled,
-                    }
-                }),
-            })
-        } else {
-            None
-        }
+        self.is_send().then(|| proto::WebRtcPublishEndpoint {
+            id: "publish".to_owned(),
+            p2p: proto::P2pMode::Always,
+            force_relay: false,
+            audio_settings: self.send_audio.clone().unwrap_or(
+                proto::AudioSettings {
+                    publish_policy: PublishPolicy::Disabled,
+                },
+            ),
+            video_settings: self.send_video.clone().unwrap_or(
+                proto::VideoSettings {
+                    publish_policy: PublishPolicy::Disabled,
+                },
+            ),
+        })
     }
 
-    /// Returns [`proto::WebRtcPlayEndpoint`] for this [`PairedMember`] which
+    /// Returns a [`proto::WebRtcPlayEndpoint`] for this [`PairedMember`] which
     /// will receive media from the provided [`PairedMember`] if receiving is
     /// enabled.
+    #[must_use]
     fn play_endpoint_for(
         &self,
         room_id: &str,
         publisher: &PairedMember,
     ) -> Option<proto::WebRtcPlayEndpoint> {
-        if self.recv {
-            Some(proto::WebRtcPlayEndpoint {
-                id: format!("play-{}", publisher.id),
-                src: format!(
-                    "local://{}/{}/{}",
-                    room_id, publisher.id, "publish"
-                ),
-                force_relay: false,
-            })
-        } else {
-            None
-        }
+        self.recv.then(|| proto::WebRtcPlayEndpoint {
+            id: format!("play-{}", publisher.id),
+            src: format!("local://{}/{}/{}", room_id, publisher.id, "publish"),
+            force_relay: false,
+        })
     }
 }

@@ -27,7 +27,7 @@ const CHROME_ARGS: &[&str] = &[
 /// Arguments for Firefox browser.
 const FIREFOX_ARGS: &[&str] = &[];
 
-/// Result returned from the all JS code executed in a browser.
+/// Result returned from all the JS code executed in a browser.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum JsResult {
@@ -63,7 +63,7 @@ impl WebDriverClient {
         Ok(Self(Arc::new(Mutex::new(Inner::new().await?))))
     }
 
-    /// Creates a new window in a browser and returns it's ID.
+    /// Creates a new window in a browser and returns its ID.
     #[inline]
     pub async fn new_window(&self) -> Result<WebWindow> {
         self.0.lock().await.new_window().await
@@ -201,7 +201,7 @@ impl Inner {
         exec: Statement,
     ) -> Result<Json> {
         self.0.switch_to_window(window).await?;
-        Ok(self.execute(exec).await?)
+        self.execute(exec).await
     }
 
     /// Closes the provided [`WebWindow`].
@@ -244,8 +244,8 @@ impl Inner {
     /// [1]: https:/mdn.io/Web/WebDriver/Capabilities
     fn get_webdriver_capabilities() -> Capabilities {
         let mut caps = Capabilities::new();
-        caps.insert("moz:firefoxOptions".to_string(), Self::get_firefox_caps());
-        caps.insert("goog:chromeOptions".to_string(), Self::get_chrome_caps());
+        caps.insert("moz:firefoxOptions".to_owned(), Self::get_firefox_caps());
+        caps.insert("goog:chromeOptions".to_owned(), Self::get_chrome_caps());
         caps
     }
 }
