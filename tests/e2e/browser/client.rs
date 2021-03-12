@@ -244,8 +244,8 @@ impl Inner {
     /// [1]: https:/mdn.io/Web/WebDriver/Capabilities
     fn get_webdriver_capabilities() -> Capabilities {
         let mut caps = Capabilities::new();
-        caps.insert("moz:firefoxOptions".to_string(), Self::get_firefox_caps());
-        caps.insert("goog:chromeOptions".to_string(), Self::get_chrome_caps());
+        caps.insert("moz:firefoxOptions".to_owned(), Self::get_firefox_caps());
+        caps.insert("goog:chromeOptions".to_owned(), Self::get_chrome_caps());
         caps
     }
 }

@@ -297,7 +297,7 @@ impl WsSession {
         reason: ClosedReason,
     ) {
         if let Some((member, room)) = self.sessions.remove(&room_id) {
-            ctx.spawn(room.connection_closed(member, reason).into_actor(self));
+            Arbiter::spawn(room.connection_closed(member, reason));
         }
         if self.sessions.is_empty() {
             self.close_in_place(
