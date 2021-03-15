@@ -21,6 +21,9 @@ All user visible changes to this project will be documented in this file. This p
     - `DELETE /control-api/{room_id}` ([#36]);
     - `DELETE /control-api/{room_id}/{element_id}` ([#36]);
     - `DELETE /control-api/{room_id}/{element_id}/{endpoint_id}` ([#36]);
+    - `PATCH /control-api/{room_id}` ([#187]);
+    - `PATCH /control-api/{room_id}/{element_id}` ([#187]);
+    - `PATCH /control-api/{room_id}/{element_id}/{endpoint_id}` ([#187]);
     - `GET /callbacks` ([#36], [#63]);
     - `GET /subscribe/{room_id}` ([#118], [#136]).
 - Events:
@@ -32,6 +35,7 @@ All user visible changes to this project will be documented in this file. This p
 [#63]: /../../pull/63
 [#118]: /../../pull/118
 [#136]: /../../pull/136
+[#187]: /../../pull/187
 
 
 

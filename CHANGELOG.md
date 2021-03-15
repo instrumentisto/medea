@@ -25,7 +25,8 @@ All user visible changes to this project will be documented in this file. This p
     - Dynamic Control API exposed via gRPC ([#33]):
         - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
-        - `Delete` method for `Room`, `Member`, `Endpoint`.
+        - `Delete` method for `Room`, `Member`, `Endpoint`;
+        - `Apply` method for `Room`, `Member` and `Endpoint` creation.
     - gRPC Control API callbacks:
         - `on_join` ([#63], [#153]);
         - `on_leave` ([#63]).
@@ -91,6 +92,7 @@ All user visible changes to this project will be documented in this file. This p
 [#156]: /../../pull/156
 [#167]: /../../pull/167
 [#168]: /../../pull/168
+[#187]: /../../pull/187
 
 
 
