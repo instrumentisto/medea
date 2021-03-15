@@ -157,7 +157,7 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        {};
+                        await {};
                     }}
                 "#,
                 enable,
