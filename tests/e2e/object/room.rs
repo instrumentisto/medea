@@ -123,7 +123,7 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        {};
+                        await {};
                     }}
                 "#,
                 disable,
@@ -261,7 +261,7 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        {};
+                        await {};
                     }}
                 "#,
                 mute,
@@ -295,7 +295,7 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        {};
+                        await {};
                     }}
                 "#,
                 unmute,
