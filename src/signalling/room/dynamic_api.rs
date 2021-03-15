@@ -5,7 +5,10 @@
 
 use std::{collections::HashMap, convert::TryInto as _};
 
-use actix::{fut, ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler, Message, WrapFuture as _, ActorFuture};
+use actix::{
+    ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler, Message,
+    WrapFuture as _,
+};
 use medea_client_api_proto::{CloseReason, MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
@@ -26,7 +29,6 @@ use crate::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             member::MemberError,
         },
-        room::ActFuture,
         room_service::Sids,
     },
 };
@@ -173,10 +175,11 @@ impl Room {
     /// [1]: crate::signalling::participants::ParticipantService
     fn create_sink_endpoint(
         &mut self,
+        ctx: &mut Context<Self>,
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
-    ) -> Result<ActFuture<Result<(), RoomError>>, RoomError> {
+    ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;
 
         let is_member_have_this_sink_id =
@@ -221,35 +224,30 @@ impl Room {
         );
 
         member.insert_sink(sink);
-        println!("Sink inserted");
 
-        Ok(Box::pin(fut::ready(()).map(
-            move |_, this: &mut Self, ctx| {
-                let member_id = member.id();
-                println!("Inti member connection");
-                if this.members.member_has_connection(&member_id) {
-                    ctx.spawn(this.init_member_connections(&member).map(
-                        move |res, this, ctx| {
-                            println!("Inited");
-                            if let Err(e) = res {
-                                error!(
-                                    "Failed to interconnect Members, because \
-                                     {}",
-                                    e,
-                                );
-                                this.disconnect_member(
-                                    &member_id,
-                                    CloseReason::InternalError,
-                                    Some(OnLeaveReason::Kicked),
-                                    ctx,
-                                );
-                            }
-                        },
-                    ));
-                }
-                Ok(())
-            },
-        )))
+        if self.members.member_has_connection(&member_id) {
+            let member_id = member_id.clone();
+            ctx.spawn(
+                self.init_member_connections(&member).map(
+                    move |res, this, ctx| {
+                        if let Err(e) = res {
+                            error!(
+                                "Failed to interconnect Members, because {}",
+                                e,
+                            );
+                            this.disconnect_member(
+                                &member_id,
+                                CloseReason::InternalError,
+                                Some(OnLeaveReason::Kicked),
+                                ctx,
+                            );
+                        }
+                    },
+                ),
+            );
+        }
+
+        Ok(())
     }
 
     /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
@@ -412,9 +410,12 @@ impl Handler<ApplyMember> for Room {
             }
             for (id, endpoint) in msg.1.play_endpoints() {
                 if member.get_sink_by_id(&id).is_none() {
-                    ctx.spawn(
-                        self.create_sink_endpoint(&msg.0, id, endpoint.clone())?.map(|_, _, _| ())
-                    );
+                    self.create_sink_endpoint(
+                        ctx,
+                        &msg.0,
+                        id,
+                        endpoint.clone(),
+                    )?;
                 }
             }
             for id in member.srcs_ids() {
@@ -492,9 +493,7 @@ impl Handler<Apply> for Room {
             self.create_src_endpoint(id, src_id, &src)?;
         }
         for (id, sink_id, sink) in create_sink_endpoint {
-            ctx.spawn(
-                self.create_sink_endpoint(&id, sink_id, sink)?.map(|_, _, _| ())
-            );
+            self.create_sink_endpoint(ctx, &id, sink_id, sink)?;
         }
 
         for id in self.members.members_ids() {
@@ -537,36 +536,31 @@ pub struct CreateEndpoint {
 }
 
 impl Handler<CreateEndpoint> for Room {
-    type Result = ActFuture<Result<(), RoomError>>;
+    type Result = Result<(), RoomError>;
 
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
-                match self.create_sink_endpoint(
+                self.create_sink_endpoint(
+                    ctx,
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
-                ) {
-                    Ok(fut) => Box::pin(fut),
-                    Err(e) => Box::pin(fut::err(e)),
-                }
+                )?;
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
-                if let Err(e) = self.create_src_endpoint(
+                self.create_src_endpoint(
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     &endpoint,
-                ) {
-                    Box::pin(fut::err(e))
-                } else {
-                    Box::pin(fut::ok(()))
-                }
+                )?;
             }
         }
+        Ok(())
     }
 }
 

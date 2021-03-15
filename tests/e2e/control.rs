@@ -54,8 +54,13 @@ impl Client {
         Ok(self.0.get(&get_url(path)).send().await?.json().await?)
     }
 
-    /// Applies the provided media [`Element`] in the provided `path` on a Medea media server.
-    pub async fn apply(&self, path: &str, element: Element) -> Result<CreateResponse> {
+    /// Applies the provided media [`Element`] in the provided `path` on a Medea
+    /// media server.
+    pub async fn apply(
+        &self,
+        path: &str,
+        element: Element,
+    ) -> Result<CreateResponse> {
         Ok(self
             .0
             .patch(&get_url(path))

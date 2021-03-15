@@ -332,20 +332,43 @@ impl World {
         }
     }
 
-    pub async fn interconnect_members_by_apply(
-        &mut self,
-        pair: MembersPair,
-    ) {
+    pub async fn interconnect_members_by_apply(&mut self, pair: MembersPair) {
         let mut spec = self.get_spec().await;
-        if let Some(proto::RoomElement::Member(member)) = spec.pipeline.get_mut(&pair.left.id) {
-            member.pipeline.insert("publish".to_string(), proto::Endpoint::WebRtcPublishEndpoint(pair.left.publish_endpoint().unwrap()));
-            let play_endpoint = pair.left.play_endpoint_for(&self.room_id, &pair.right).unwrap();
-            member.pipeline.insert(play_endpoint.id.clone(), proto::Endpoint::WebRtcPlayEndpoint(play_endpoint));
+        if let Some(proto::RoomElement::Member(member)) =
+            spec.pipeline.get_mut(&pair.left.id)
+        {
+            member.pipeline.insert(
+                "publish".to_string(),
+                proto::Endpoint::WebRtcPublishEndpoint(
+                    pair.left.publish_endpoint().unwrap(),
+                ),
+            );
+            let play_endpoint = pair
+                .left
+                .play_endpoint_for(&self.room_id, &pair.right)
+                .unwrap();
+            member.pipeline.insert(
+                play_endpoint.id.clone(),
+                proto::Endpoint::WebRtcPlayEndpoint(play_endpoint),
+            );
         }
-        if let Some(proto::RoomElement::Member(member)) = spec.pipeline.get_mut(&pair.right.id) {
-            member.pipeline.insert("publish".to_string(), proto::Endpoint::WebRtcPublishEndpoint(pair.right.publish_endpoint().unwrap()));
-            let play_endpoint = pair.right.play_endpoint_for(&self.room_id, &pair.left).unwrap();
-            member.pipeline.insert(play_endpoint.id.clone(), proto::Endpoint::WebRtcPlayEndpoint(play_endpoint));
+        if let Some(proto::RoomElement::Member(member)) =
+            spec.pipeline.get_mut(&pair.right.id)
+        {
+            member.pipeline.insert(
+                "publish".to_string(),
+                proto::Endpoint::WebRtcPublishEndpoint(
+                    pair.right.publish_endpoint().unwrap(),
+                ),
+            );
+            let play_endpoint = pair
+                .right
+                .play_endpoint_for(&self.room_id, &pair.left)
+                .unwrap();
+            member.pipeline.insert(
+                play_endpoint.id.clone(),
+                proto::Endpoint::WebRtcPlayEndpoint(play_endpoint),
+            );
         }
         self.apply(spec).await;
     }
@@ -458,7 +481,13 @@ impl World {
     }
 
     pub async fn get_spec(&mut self) -> proto::Room {
-        let el = self.control_client.get(&self.room_id).await.unwrap().element.unwrap();
+        let el = self
+            .control_client
+            .get(&self.room_id)
+            .await
+            .unwrap()
+            .element
+            .unwrap();
         if let proto::Element::Room(room) = el {
             room
         } else {
@@ -467,7 +496,10 @@ impl World {
     }
 
     pub async fn apply(&mut self, el: proto::Room) {
-        self.control_client.apply(&self.room_id, proto::Element::Room(el)).await.unwrap();
+        self.control_client
+            .apply(&self.room_id, proto::Element::Room(el))
+            .await
+            .unwrap();
     }
 }
 
