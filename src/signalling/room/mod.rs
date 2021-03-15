@@ -117,6 +117,8 @@ pub enum RoomError {
     /// Errors that can occur when we try transform some spec from `Element`.
     ///
     /// This error used in all [`TryFrom`] of Control API.
+    ///
+    /// [`TryFrom`]: std::convert::TryFrom
     #[display(fmt = "Failed to convert element: {:?}", _0)]
     TryFromElement(TryFromElementError),
 }
