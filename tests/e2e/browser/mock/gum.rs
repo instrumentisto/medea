@@ -1,8 +1,13 @@
+//! Implementation of the `MediaDevices.getUserMedia` function mock.
+
 use crate::browser::{Statement, Window};
 
+/// Mock for the `WebSocket` WebAPI object.
 pub struct Gum<'a>(pub(super) &'a Window);
 
 impl<'a> Gum<'a> {
+    /// Instantiates `MediaDevices.getUserMedia` mock in the provided
+    /// [`Window`].
     pub(super) async fn instantiate(window: &Window) {
         window
             .execute(Statement::new(
@@ -20,6 +25,10 @@ impl<'a> Gum<'a> {
             .unwrap();
     }
 
+    /// Brokes `MediaDevice.getUserMedia` requests for the provided media types.
+    ///
+    /// If some media type is broken, then `NotFoundError` will be thrown on
+    /// each gUM request.
     pub async fn broke_gum(&self, video: bool, audio: bool) {
         self.0
             .execute(Statement::new(
@@ -39,22 +48,6 @@ impl<'a> Gum<'a> {
                 }
             "#,
                 vec![video.into(), audio.into()],
-            ))
-            .await
-            .unwrap();
-    }
-
-    pub async fn unbroke_gum(&self) {
-        self.0
-            .execute(Statement::new(
-                // language=JavaScript
-                r#"
-                async () => {
-                    navigator.mediaDevices.getUserMedia =
-                        window.gumMock.original;
-                }
-            "#,
-                vec![],
             ))
             .await
             .unwrap();

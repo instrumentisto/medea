@@ -422,6 +422,8 @@ impl Object<Room> {
         .map(ToOwned::to_owned)
     }
 
+    /// Enables or disables media type by `Room.set_local_media_settings`
+    /// function call.
     pub async fn set_local_media_settings(
         &self,
         video: bool,
@@ -459,6 +461,8 @@ impl Object<Room> {
         Ok(())
     }
 
+    /// Waits for provided count of `Room.on_failed_local_stream` callback
+    /// fires.
     pub async fn when_failed_local_stream_count(&self, count: u64) {
         self.execute(Statement::new(
             // language=JavaScript
@@ -489,6 +493,7 @@ impl Object<Room> {
         .unwrap();
     }
 
+    /// Removes all local `LocalMediaTrack`s from the JS side.
     pub async fn clean_all_local_tracks(&self) {
         self.execute(Statement::new(
             r#"

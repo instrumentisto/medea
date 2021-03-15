@@ -208,7 +208,7 @@ async fn then_member_doesnt_have_remote_tracks_with(
     assert_eq!(tracks_count, 0);
 }
 
-#[then(regex = "^(\\S*) doesn't have live tracks$")]
+#[then(regex = r"^(\S+) doesn't have live tracks$")]
 async fn then_member_doesnt_has_live_tracks(world: &mut World, id: String) {
     let member = world.get_member(&id).unwrap();
     let local_tracks = member.room().local_tracks().await.unwrap();
