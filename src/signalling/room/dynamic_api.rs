@@ -5,10 +5,7 @@
 
 use std::{collections::HashMap, convert::TryInto as _};
 
-use actix::{
-    fut, ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler,
-    Message, WrapFuture as _,
-};
+use actix::{fut, ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler, Message, WrapFuture as _, ActorFuture};
 use medea_client_api_proto::{CloseReason, MemberId, PeerId};
 use medea_control_api_proto::grpc::api as proto;
 
@@ -224,13 +221,16 @@ impl Room {
         );
 
         member.insert_sink(sink);
+        println!("Sink inserted");
 
         Ok(Box::pin(fut::ready(()).map(
             move |_, this: &mut Self, ctx| {
                 let member_id = member.id();
+                println!("Inti member connection");
                 if this.members.member_has_connection(&member_id) {
                     ctx.spawn(this.init_member_connections(&member).map(
                         move |res, this, ctx| {
+                            println!("Inited");
                             if let Err(e) = res {
                                 error!(
                                     "Failed to interconnect Members, because \
@@ -401,7 +401,7 @@ impl Handler<ApplyMember> for Room {
     fn handle(
         &mut self,
         msg: ApplyMember,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         let mut sids = Sids::new();
         if let Ok(member) = self.members.get_member(&msg.0) {
@@ -412,7 +412,9 @@ impl Handler<ApplyMember> for Room {
             }
             for (id, endpoint) in msg.1.play_endpoints() {
                 if member.get_sink_by_id(&id).is_none() {
-                    self.create_sink_endpoint(&msg.0, id, endpoint.clone())?;
+                    ctx.spawn(
+                        self.create_sink_endpoint(&msg.0, id, endpoint.clone())?.map(|_, _, _| ())
+                    );
                 }
             }
             for id in member.srcs_ids() {
@@ -490,7 +492,9 @@ impl Handler<Apply> for Room {
             self.create_src_endpoint(id, src_id, &src)?;
         }
         for (id, sink_id, sink) in create_sink_endpoint {
-            self.create_sink_endpoint(&id, sink_id, sink)?;
+            ctx.spawn(
+                self.create_sink_endpoint(&id, sink_id, sink)?.map(|_, _, _| ())
+            );
         }
 
         for id in self.members.members_ids() {
