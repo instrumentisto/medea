@@ -10,31 +10,33 @@ impl<'a> WebSocket<'a> {
     pub(super) async fn instantiate(window: &Window) {
         window
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
-                async () => {
-                    let ws = {
-                        originalSend: WebSocket.prototype.send,
-                        originalConstructor: WebSocket.prototype.constructor,
-                        isClosed: false,
-                        closeCode: 0,
-                        allSockets: []
-                    };
-                    window.wsMock = ws;
+                    async () => {
+                        let ws = {
+                            originalSend: WebSocket.prototype.send,
+                            originalConstructor:
+                                WebSocket.prototype.constructor,
+                            isClosed: false,
+                            closeCode: 0,
+                            allSockets: []
+                        };
+                        window.wsMock = ws;
 
-                    WebSocket.prototype.constructor = (url) => {
-                        let createdWs = ws.originalConstructor(url);
-                        ws.allSockets.push(createdWs);
-                        if (ws.isClosed) {
-                            createdWs.dispatchEvent(
-                                new CloseEvent("close", { code: ws.code })
-                            );
-                        }
+                        WebSocket.prototype.constructor = (url) => {
+                            let createdWs = ws.originalConstructor(url);
+                            ws.allSockets.push(createdWs);
+                            if (ws.isClosed) {
+                                createdWs.dispatchEvent(
+                                    new CloseEvent("close", { code: ws.code })
+                                );
+                            }
 
-                        return createdWs;
-                    };
-                }
-            "#,
-                vec![],
+                            return createdWs;
+                        };
+                    }
+                "#,
+                [],
             ))
             .await
             .unwrap();
@@ -48,19 +50,20 @@ impl<'a> WebSocket<'a> {
     pub async fn enable_connection_loss(&self, code: u64) {
         self.0
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
-            async () => {
-                const [code] = args;
-                for (socket of window.wsMock.allSockets) {
-                    window.wsMock.isClosed = true;
-                    window.wsMock.closeCode = code;
-                    socket.dispatchEvent(
-                        new CloseEvent("close", { code: code })
-                    );
-                }
-            }
-        "#,
-                vec![code.into()],
+                    async () => {
+                        const [code] = args;
+                        for (socket of window.wsMock.allSockets) {
+                            window.wsMock.isClosed = true;
+                            window.wsMock.closeCode = code;
+                            socket.dispatchEvent(
+                                new CloseEvent("close", { code: code })
+                            );
+                        }
+                    }
+                "#,
+                [code.into()],
             ))
             .await
             .unwrap();
@@ -73,13 +76,14 @@ impl<'a> WebSocket<'a> {
     pub async fn disable_connection_loss(&self) {
         self.0
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
-            async () => {
-                window.wsMock.isClosed = false;
-                window.wsMock.closeCode = 0;
-            }
-        "#,
-                vec![],
+                    async () => {
+                        window.wsMock.isClosed = false;
+                        window.wsMock.closeCode = 0;
+                    }
+                "#,
+                [],
             ))
             .await
             .unwrap();
