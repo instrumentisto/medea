@@ -22,7 +22,7 @@ Feature: State synchronization works
     And Alice restores WebSocket connection
     Then Bob's audio remote track from Alice is enabled
 
-  Scenario: Audio endpoint added while disconnect
+  Scenario: Audio endpoint added while disconnected
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Alice loses WebSocket connection
     And Control API interconnects audio of Alice and Bob
@@ -30,7 +30,7 @@ Feature: State synchronization works
     Then Alice has audio remote tracks from Bob
     And Bob has audio remote tracks from Alice
 
-  Scenario: Video endpoint added while disconnect
+  Scenario: Video endpoint added while disconnected
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Alice loses WebSocket connection
     And Control API interconnects video of Alice and Bob
@@ -46,7 +46,7 @@ Feature: State synchronization works
     Then Alice has audio and video remote tracks from Bob
     And Bob has audio and video remote tracks from Alice
 
-  Scenario: New Member joins while disconnect
+  Scenario: New Member joins while disconnected
     Given room with joined member Alice
     And member Bob
     When Alice loses WebSocket connection
@@ -55,14 +55,14 @@ Feature: State synchronization works
     Then Alice receives connection with Bob
     And Bob receives connection with Alice
 
-  Scenario: Connection.on_close fires on partner Member leave
+  Scenario: `Connection.on_close()` fires when partner Member leave while disconnected
     Given room with joined members Alice and Bob
     When Alice loses WebSocket connection
     And Bob's room closed by client
     And Alice restores WebSocket connection
     Then Alice's connection with Bob closes
 
-  Scenario: Connection closes on partner Member delete by Control API
+  Scenario: `Connection.on_close()` fires when partner Member is deleted by Control API while disconnected
     Given room with joined members Alice and Bob
     When Alice loses WebSocket connection
     And Control API removes member Bob
