@@ -14,15 +14,14 @@ impl<'a> WebSocket<'a> {
                 async () => {
                     let ws = {
                         originalSend: WebSocket.prototype.send,
-                        originalConstructor: WebSocket.prototype.constructor,
                         isClosed: false,
                         closeCode: 0,
                         allSockets: []
                     };
                     window.wsMock = ws;
 
-                    WebSocket.prototype.constructor = (url) => {
-                        let createdWs = ws.originalConstructor(url);
+                    window.wsConstructor = (url) => {
+                        let createdWs = new window.originalWs(url);
                         ws.allSockets.push(createdWs);
                         if (ws.isClosed) {
                             createdWs.dispatchEvent(

@@ -5,6 +5,13 @@
   <script type="module">
     import init, {Jason} from "/pkg/medea_jason.js";
 
+    window.originalWs = WebSocket;
+    let oldProto = WebSocket.prototype;
+    WebSocket = function(url) {
+        return window.wsConstructor(url);
+    };
+    WebSocket.prototype = oldProto;
+
     window.onload = async () => {
       await init();
       window.rust = await import("/pkg/medea_jason.js");

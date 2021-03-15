@@ -31,7 +31,9 @@ impl Object<Jason> {
                 async (jason) => {
                     let room = await jason.init_room();
                     room.on_failed_local_media(() => {});
-                    room.on_connection_loss(() => {});
+                    room.on_connection_loss(async (recon) => {
+                        await recon.reconnect_with_backoff(100, 1.0, 100);
+                    });
                     let closeListener = {
                         closeReason: null,
                         isClosed: false,
