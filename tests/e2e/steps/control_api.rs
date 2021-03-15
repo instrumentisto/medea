@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use cucumber_rust::{then, when};
-use medea_control_api_mock::proto::{AudioSettings, VideoSettings};
+use medea_control_api_mock::proto::{
+    self as proto, AudioSettings, VideoSettings,
+};
 use tokio_1::time::timeout;
 
 use crate::world::{MembersPair, PairedMember, World};
@@ -11,35 +13,24 @@ async fn when_control_api_removes_member(world: &mut World, id: String) {
     world.delete_member_element(&id).await;
 }
 
-#[when(regex = r"^Control API removes room$")]
+#[when(regex = r"^Control API removes the room$")]
 async fn when_control_api_removes_room(world: &mut World) {
     world.delete_room_element().await;
 }
 
-#[when(
-    regex = "^Control API interconnected (audio|video) of (\\S*) and (\\S*)$"
-)]
+#[when(regex = r"^Control API interconnects (audio|video) of (\S+) and (\S+)$")]
 async fn when_interconnects_kind(
     world: &mut World,
     kind: String,
     left_member_id: String,
     right_member_id: String,
 ) {
-    let send_video = if kind.contains("video") {
-        Some(VideoSettings {
-            publish_policy: proto::PublishPolicy::Optional,
-        })
-    } else {
-        None
-    };
-    use medea_control_api_mock::proto;
-    let send_audio = if kind.contains("audio") {
-        Some(AudioSettings {
-            publish_policy: proto::PublishPolicy::Optional,
-        })
-    } else {
-        None
-    };
+    let send_video = kind.contains("video").then(|| VideoSettings {
+        publish_policy: proto::PublishPolicy::Optional,
+    });
+    let send_audio = kind.contains("audio").then(|| AudioSettings {
+        publish_policy: proto::PublishPolicy::Optional,
+    });
 
     world
         .interconnect_members(MembersPair {
@@ -60,40 +51,39 @@ async fn when_interconnects_kind(
         .unwrap();
 }
 
-#[then(regex = "^Control API sends OnLeave callback with `(.*)` reason for \
-                member (\\S*)$")]
+#[then(regex = "^Control API sends `OnLeave` callback with `(.+)` reason \
+                 for member (\\S+)$")]
 async fn then_control_api_sends_on_leave(
     world: &mut World,
     reason: String,
     id: String,
 ) {
+    // Assertion is done inside `wait_for_on_leave()` method.
     timeout(Duration::from_secs(10), world.wait_for_on_leave(id, reason))
         .await
         .unwrap();
 }
 
-#[rustfmt::skip]
-#[then(
-    regex = "^Control API doesn't sends OnLeave callback for member (\\S*)$"
-)]
+#[then(regex = "^Control API doesn't send `OnLeave` callback for \
+                 member (\\S+)$")]
 async fn then_control_api_doesnt_sends_on_leave(world: &mut World, id: String) {
-    timeout(
+    assert!(timeout(
         Duration::from_millis(300),
-        world.wait_for_on_leave(id, "".to_string()),
+        world.wait_for_on_leave(id, String::new()),
     )
-        .await
-        .unwrap_err();
+    .await
+    .is_err());
 }
 
-#[then(regex = "^Control API sends OnJoin callback for member (\\S*)$")]
+#[then(regex = r"^Control API sends `OnJoin` callback for member (\S+)$")]
 async fn then_control_api_sends_on_join(world: &mut World, id: String) {
-    timeout(Duration::from_secs(10), world.wait_for_on_join(id))
+    assert!(timeout(Duration::from_secs(10), world.wait_for_on_join(id))
         .await
-        .unwrap();
+        .is_ok());
 }
 
-#[when(regex = "^Control API starts (\\S*)'s (audio|video|media) publishing \
-                to (\\S*)$")]
+#[when(regex = "^Control API starts (\\S+)'s (audio|video|media) publishing \
+                 to (\\S+)$")]
 async fn when_control_api_starts_publishing(
     world: &mut World,
     publisher_id: String,
@@ -101,16 +91,10 @@ async fn when_control_api_starts_publishing(
     receiver_id: String,
 ) {
     let all_kinds = kind.contains("media");
-    let send_audio = if all_kinds || kind.contains("audio") {
-        Some(AudioSettings::default())
-    } else {
-        None
-    };
-    let send_video = if all_kinds || kind.contains("video") {
-        Some(VideoSettings::default())
-    } else {
-        None
-    };
+    let send_audio =
+        (all_kinds || kind.contains("audio")).then(AudioSettings::default);
+    let send_video =
+        (all_kinds || kind.contains("video")).then(VideoSettings::default);
     world
         .interconnect_members(MembersPair {
             left: PairedMember {
@@ -130,7 +114,7 @@ async fn when_control_api_starts_publishing(
         .unwrap();
 }
 
-#[when(regex = "^Control API interconnects (\\S*) and (\\S*)$")]
+#[when(regex = r"^Control API interconnects (\S+) and (\S+)$")]
 async fn when_control_api_interconnects_members(
     world: &mut World,
     id: String,

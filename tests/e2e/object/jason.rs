@@ -1,4 +1,4 @@
-//! [`Object`] representing a `Jason` JS object.
+//! `Jason` JS object's representation.
 
 use crate::{
     browser::Statement,
@@ -12,6 +12,7 @@ pub struct Jason;
 
 impl Builder for Jason {
     #[inline]
+    #[must_use]
     fn build(self) -> Statement {
         Statement::new(
             // language=JavaScript
@@ -35,14 +36,17 @@ impl Object<Jason> {
                     };
                     room.on_failed_local_media(() => {
                         onFailedLocalStreamListener.count++;
-                        onFailedLocalStreamListener.subs = onFailedLocalStreamListener.subs
-                            .filter((sub) => sub());
+                        onFailedLocalStreamListener.subs =
+                            onFailedLocalStreamListener.subs
+                                .filter((sub) => sub());
                     });
-                    room.on_connection_loss(() => {});
+                    room.on_connection_loss(async (recon) => {
+                        await recon.reconnect_with_backoff(100, 1.0, 100);
+                    });
                     let closeListener = {
                         closeReason: null,
                         isClosed: false,
-                        subs: [],
+                        subs: []
                     };
                     let localTracksStore = {
                         tracks: [],
@@ -61,14 +65,6 @@ impl Object<Jason> {
                         let newSubs = localTracksStore.subs
                             .filter((sub) => sub(track));
                         localTracksStore.subs = newSubs;
-                    });
-                    room.on_connection_loss(async (recon) => {
-                        while (true) {
-                            try {
-                                await recon.reconnect_with_delay(10);
-                                break;
-                            } catch(e) {}
-                        }
                     });
 
                     let constraints = new rust.MediaStreamSettings();
@@ -94,31 +90,33 @@ impl Object<Jason> {
     /// Closes the provided [`Room`].
     pub async fn close_room(&self, room: &Object<Room>) -> Result<(), Error> {
         self.execute(Statement::with_objs(
+            // language=JavaScript
             r#"
                 async (jason) => {
                     const [room] = objs;
                     jason.close_room(room.room);
                 }
             "#,
-            vec![],
-            vec![room.ptr()],
+            [],
+            [room.ptr()],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 
-    /// Drops [`Jason`] API object, so all related objects (rooms, connections,
-    /// streams etc.) respectively.
+    /// Drops [`Jason`] API object, so all the related objects (rooms,
+    /// connections, streams, etc.) respectively.
     pub async fn dispose(self) -> Result<(), Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (jason) => {
                     jason.dispose();
                 }
             "#,
-            vec![],
+            [],
         ))
-        .await?;
-        Ok(())
+        .await
+        .map(|_| ())
     }
 }

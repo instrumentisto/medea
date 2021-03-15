@@ -1,29 +1,29 @@
-Feature: Local Track are created
+Feature: Local tracks are created
 
-  Scenario: Local Track are created on connect
+  Scenario: Local tracks are created when connecting
     Given room with member Alice
     And joined member Bob
-    When Alice joins room
-    Then Member Alice has 2 local tracks
+    When Alice joins the room
+    Then Alice has 2 local tracks
     And Alice has local device video
     And Alice has local audio
 
-  Scenario: Local Tracks are not created when all media disabled
+  Scenario: Local tracks are not created when all media is disabled
     Given room with member Alice with disabled media publishing
     And joined member Bob
-    When Alice joins room
-    Then Member Alice has 0 local tracks
+    When Alice joins the room
+    Then Alice has 0 local tracks
 
-  Scenario: Local Track creates when Member enables video
+  Scenario: Local video track is created when member enables video
     Given room with joined member Alice with disabled media publishing
     And joined member Bob
     When Alice enables video
-    Then Member Alice has 1 local tracks
+    Then Alice has 1 local tracks
     And Alice has local device video
 
-  Scenario: Local Track creates when Member enables audio
-    Given joined member Alice with disabled media publishing
+  Scenario: Local audio track is created when member enables audio
+    Given room with joined member Alice with disabled media publishing
     And joined member Bob
     When Alice enables audio
-    Then Member Alice has 1 local tracks
+    Then Alice has 1 local tracks
     And Alice has local audio

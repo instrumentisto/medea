@@ -28,6 +28,8 @@ pub struct ReconnectHandle(Weak<dyn RpcSession>);
 impl ReconnectHandle {
     /// Instantiates new [`ReconnectHandle`] from the given [`RpcSession`]
     /// reference.
+    #[inline]
+    #[must_use]
     pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
     }

@@ -52,6 +52,7 @@ enum State {
 impl GracefulShutdown {
     /// Creates new [`GracefulShutdown`] service.
     #[inline]
+    #[must_use]
     pub fn new(timeout: Duration) -> Self {
         Self {
             subs: BTreeMap::new(),

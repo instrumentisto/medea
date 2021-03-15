@@ -6,6 +6,7 @@ impl<'a> Gum<'a> {
     pub(super) async fn instantiate(window: &Window) {
         window
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
                 async () => {
                     window.gumMock = {
@@ -22,6 +23,7 @@ impl<'a> Gum<'a> {
     pub async fn broke_gum(&self, video: bool, audio: bool) {
         self.0
             .execute(Statement::new(
+                // language=JavaScript
                 r#"
                 async () => {
                     const [isVideoBroken, isAudioBroken] = args;
@@ -43,13 +45,18 @@ impl<'a> Gum<'a> {
     }
 
     pub async fn unbroke_gum(&self) {
-        self.0.execute(Statement::new(
-            r#"
+        self.0
+            .execute(Statement::new(
+                // language=JavaScript
+                r#"
                 async () => {
-                    navigator.mediaDevices.getUserMedia = window.gumMock.original;
+                    navigator.mediaDevices.getUserMedia =
+                        window.gumMock.original;
                 }
             "#,
-            vec![]
-        )).await.unwrap();
+                vec![],
+            ))
+            .await
+            .unwrap();
     }
 }

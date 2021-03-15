@@ -27,6 +27,7 @@ pub struct OnLeaveEvent {
 
 impl OnLeaveEvent {
     #[inline]
+    #[must_use]
     pub fn new(reason: OnLeaveReason) -> Self {
         Self { reason }
     }
@@ -120,6 +121,7 @@ impl MediaType {
     ///
     /// This [`MediaType`] should be what was before `RTCStat` update and
     /// as argument is [`MediaType`] which was got after `RTCStat` update.
+    #[must_use]
     pub fn get_started(self, after: Self) -> Option<Self> {
         match self {
             MediaType::Audio => match after {
@@ -183,6 +185,8 @@ pub struct CallbackRequest {
 impl CallbackRequest {
     /// Returns [`CallbackRequest`] with provided fields and current time as
     /// `at`.
+    #[inline]
+    #[must_use]
     pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
         Self {
             fid: element,
