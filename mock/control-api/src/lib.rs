@@ -19,6 +19,7 @@ pub mod proto {
             AudioSettings, Endpoint, P2pMode, PublishPolicy, VideoSettings,
             WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         },
+        room::RoomElement,
         member::{Credentials, Member},
         room::Room,
         CreateResponse, Element, ErrorResponse, Response, SingleGetResponse,

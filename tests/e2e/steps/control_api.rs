@@ -138,3 +138,37 @@ async fn when_control_api_interconnects_members(
         .await
         .unwrap();
 }
+
+#[when(regex = r"^Control API removes (\S+) by apply$")]
+async fn when_control_api_removes_member_by_apply(
+    world: &mut World,
+    id: String,
+) {
+    let mut spec = world.get_spec().await;
+    spec.pipeline.remove(&id).unwrap();
+    world.apply(spec).await;
+}
+
+#[when(regex = r"Control API interconnects (\S+) and (\S+) by apply")]
+async fn when_control_api_interconnects_by_apply(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    world
+        .interconnect_members_by_apply(MembersPair {
+            left: PairedMember {
+                id,
+                recv: true,
+                send_video: Some(VideoSettings::default()),
+                send_audio: Some(AudioSettings::default()),
+            },
+            right: PairedMember {
+                id: partner_id,
+                recv: true,
+                send_video: Some(VideoSettings::default()),
+                send_audio: Some(AudioSettings::default()),
+            },
+        })
+        .await;
+}
