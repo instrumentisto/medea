@@ -31,8 +31,18 @@ impl Object<Jason> {
                 async (jason) => {
                     let room = await jason.init_room();
                     room.on_failed_local_media(() => {});
+                    let connLossListener = {
+                        isLost: false,
+                        subs: []
+                    };
                     room.on_connection_loss(async (recon) => {
+                        connLossListener.isLost = true;
+                        for (sub of connLossListener.subs) {
+                            sub();
+                        }
+                        connLossListener.subs = [];
                         await recon.reconnect_with_backoff(100, 1.0, 100);
+                        connLossListener.isLost = false;
                     });
                     let closeListener = {
                         closeReason: null,
@@ -68,7 +78,8 @@ impl Object<Jason> {
                     return {
                         room: room,
                         closeListener: closeListener,
-                        localTracksStore: localTracksStore
+                        localTracksStore: localTracksStore,
+                        connLossListener: connLossListener
                     };
                 }
             "#,

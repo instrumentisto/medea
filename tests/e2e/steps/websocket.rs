@@ -1,4 +1,4 @@
-use cucumber_rust::when;
+use cucumber_rust::{then, when};
 
 use crate::world::World;
 
@@ -12,4 +12,10 @@ async fn ws_connection_loss(world: &mut World, id: String) {
 async fn ws_connection_restore(world: &mut World, id: String) {
     let member = world.get_member(&id).unwrap();
     member.ws_mock().disable_connection_loss().await;
+}
+
+#[then(regex = r"^(\S+)'s WebSocket connection is lost$")]
+async fn connection_is_lost(world: &mut World, id: String) {
+    let member = world.get_member(&id).unwrap();
+    member.room().wait_for_connection_loss().await.unwrap();
 }
