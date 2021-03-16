@@ -33,8 +33,8 @@ impl<'a> WebSocket<'a> {
                             return createdWs;
                         };
                     }
-            "#,
-                vec![],
+                "#,
+                [],
             ))
             .await
             .unwrap();
