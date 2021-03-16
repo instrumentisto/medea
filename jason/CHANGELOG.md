@@ -94,7 +94,7 @@ All user visible changes to this project will be documented in this file. This p
         - Enabling/disabling audio/video send/receive via `UpdateTracks` command ([#81], [#155]);
         - Muting/unmuting audio/video send via `UpdateTracks` ([#156]).
     - Handling of RPC events:
-        - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
+        - `PeerUpdated` with `PeerUpdate::Added`, `PeerUpdate::Updated` and `PeerUpdate::IceRestart` ([#105], [#138]);
         - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:

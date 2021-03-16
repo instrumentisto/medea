@@ -7,8 +7,8 @@ use function_name::named;
 use futures::{channel::mpsc::*, StreamExt as _};
 use medea::hashmap;
 use medea_client_api_proto::{
-    Command, Event, NegotiationRole, PeerConnectionState, PeerMetrics, TrackId,
-    TrackUpdate,
+    Command, Event, NegotiationRole, PeerConnectionState, PeerMetrics,
+    PeerUpdate, TrackId,
 };
 
 use crate::{
@@ -168,7 +168,7 @@ async fn ice_restart() {
     {
         let event = responder_rx.next().await.unwrap();
         match event {
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 peer_id,
                 updates,
                 negotiation_role,
@@ -177,7 +177,7 @@ async fn ice_restart() {
                 assert_eq!(negotiation_role, Some(NegotiationRole::Offerer));
                 let is_ice_restart = updates
                     .iter()
-                    .find(|upd| matches!(upd, TrackUpdate::IceRestart))
+                    .find(|upd| matches!(upd, PeerUpdate::IceRestart))
                     .is_some();
                 assert!(is_ice_restart);
             }
@@ -205,7 +205,7 @@ async fn ice_restart() {
     {
         let event = publisher_rx.next().await.unwrap();
         match event {
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 peer_id,
                 updates: _,
                 negotiation_role,

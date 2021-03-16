@@ -1,8 +1,8 @@
 use function_name::named;
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::{
-    Command, Event, PeerId, TrackId, TrackPatchCommand, TrackPatchEvent,
-    TrackUpdate,
+    Command, Event, PeerId, PeerUpdate, TrackId, TrackPatchCommand,
+    TrackPatchEvent,
 };
 
 use crate::{
@@ -63,7 +63,7 @@ async fn track_mute_doesnt_renegotiates() {
         .unwrap();
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -76,7 +76,7 @@ async fn track_mute_doesnt_renegotiates() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: None,
@@ -88,7 +88,7 @@ async fn track_mute_doesnt_renegotiates() {
     }
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -101,7 +101,7 @@ async fn track_mute_doesnt_renegotiates() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: None,
@@ -164,7 +164,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
         .unwrap();
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -177,7 +177,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: Some(false),
@@ -189,7 +189,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
     }
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -202,7 +202,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: Some(false),

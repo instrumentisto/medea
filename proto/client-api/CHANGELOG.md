@@ -55,7 +55,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
 - `required` field to `AudioSettings` and `VideoSettings` ([#106], [#155]);
-- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]);
+- `PeerUpdated` event with `PeerUpdate::Updated` and `PeerUpdate::Added` variants ([#81], [#105]);
 - `ConnectionQualityUpdated` event ([#132]);
 - `TrackPatchCommand` ([#127]):
     - `enabled` ([#127], [#155]);
@@ -64,7 +64,7 @@ All user visible changes to this project will be documented in this file. This p
     - `enabled_individual` ([#127], [#155]);
     - `enabled_general` ([#127], [#155]);
     - `muted` ([#156]).
-- `IceRestart` variant to `TrackUpdate` ([#138]);
+- `IceRestart` variant to `PeerUpdate` ([#138]);
 - `source_kind` field to `VideoSettings` type ([#145]);
 - `RoomId` and `Credential` types ([#148]);
 - `JoinRoom` and `LeaveRoom` client messages ([#147]);
