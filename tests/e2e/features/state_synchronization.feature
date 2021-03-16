@@ -1,5 +1,7 @@
 Feature: State synchronization works
 
+# TODO: make sure on_connection_loss fires
+
   Scenario: Remote track disable works while disconnect
     Given room with joined member Alice and Bob
     When Alice loses WebSocket connection
@@ -34,6 +36,7 @@ Feature: State synchronization works
     Given room with joined member Alice and Bob with no WebRTC endpoints
     When Alice loses WebSocket connection
     And Control API interconnects video of Alice and Bob
+    # TODO: bob sends makesdpoffer
     And Alice restores WebSocket connection
     Then Alice has video remote tracks from Bob
     And Bob has video remote tracks from Alice
