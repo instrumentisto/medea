@@ -42,7 +42,7 @@ All user visible changes to this project will be documented in this file. This p
     - `PeerConnection` renegotiation functionality ([#105]);
     - Calculate and send call quality score based on RTC stats ([#132]);
     - Enabling/disabling `MediaTrack`s by receiver ([#127], [#155]);
-    - Send `PeerUpdate::IceRestart` based on RTC stats analysis ([#138]);
+    - Send `PeerUpdate::IceRestart` based on RTC stats analysis ([#138], [#139]);
     - Multiple `Room`s served by one RPC connection support ([#147]);
     - Muting/unmuting `MediaTrack`s ([#156]);
     - State synchronization on a RPC reconnection ([#167]).
