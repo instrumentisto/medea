@@ -1,6 +1,6 @@
 Feature: State synchronization works
 
-  Scenario: on_connection_loss fires when WebSocket connection lost
+  Scenario: `RoomHandle.on_connection_loss()` fires when WebSocket connection lost
     Given room with joined member Alice with no WebRTC endpoints
     When Alice loses WebSocket connection
     Then Alice's WebSocket connection is lost
