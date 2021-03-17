@@ -1192,7 +1192,7 @@ mod patches_generation {
         });
         rpc.expect_subscribe()
             .return_once(move || Box::pin(event_rx));
-        rpc.expect_close_with_reason().return_once(|_| ());
+        rpc.expect_close_with_reason().return_once(drop);
         rpc.expect_on_connection_loss()
             .return_once(|| stream::pending().boxed_local());
         rpc.expect_on_reconnected()
@@ -2303,7 +2303,7 @@ mod set_local_media_settings {
             timeout(1000, test_rx)
                 .await
                 .map(|rx| rx.unwrap())
-                .map_err(|_| ())
+                .map_err(drop)
         }
 
         // on_failed_local_media callback does not fire
@@ -2550,7 +2550,7 @@ mod state_synchronization {
         rpc_session
             .expect_on_reconnected()
             .return_once(|| Box::pin(stream::pending()));
-        rpc_session.expect_close_with_reason().returning(|_| ());
+        rpc_session.expect_close_with_reason().returning(drop);
         rpc_session.expect_send_command().returning(move |cmd| {
             let _ = command_tx.unbounded_send(cmd);
         });

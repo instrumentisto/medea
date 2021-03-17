@@ -102,7 +102,7 @@ impl Object<Jason> {
             [room.ptr()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Drops [`Jason`] API object, so all the related objects (rooms,
@@ -118,6 +118,6 @@ impl Object<Jason> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 }

@@ -25,7 +25,7 @@ impl Object<RemoteTrack> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Waits for this [`RemoteTrack`] being disabled, or the
@@ -46,7 +46,7 @@ impl Object<RemoteTrack> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Indicates whether this [`RemoteTrack`]'s underlying `MediaStreamTrack`
@@ -87,7 +87,7 @@ impl Object<RemoteTrack> {
             [count.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Waits for the `RemoteMediaTrack.on_enabled()` callback to fire `count`
@@ -115,6 +115,6 @@ impl Object<RemoteTrack> {
             [count.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 }

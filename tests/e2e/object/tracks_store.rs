@@ -65,7 +65,7 @@ impl<T> Object<TracksStore<T>> {
             [count.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Indicates whether this [`TracksStore`] contains a track with the

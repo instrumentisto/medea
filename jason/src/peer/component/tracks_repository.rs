@@ -112,7 +112,7 @@ impl TracksRepository<sender::State> {
                         .map_err(tracerr::map_from_and_wrap!()),
                 )
             }))
-            .map(|r| r.map(|_| ())),
+            .map(|r| r.map(drop)),
         )
     }
 }

@@ -97,7 +97,7 @@ impl Object<Room> {
             [uri.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Disables media publishing for the provided [`MediaKind`] and
@@ -131,7 +131,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Enables media publishing for the provided [`MediaKind`] and
@@ -165,7 +165,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Disables remote media receiving for the provided [`MediaKind`] and
@@ -200,7 +200,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Enables remote media receiving for the provided [`MediaKind`] and
@@ -235,7 +235,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Mutes media publishing for the provided [`MediaKind`] and
@@ -269,7 +269,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Unmutes media publishing for the provided [`MediaKind`] and
@@ -303,7 +303,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Returns a [`ConnectionStore`] of this [`Room`].
@@ -440,7 +440,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 }
 
