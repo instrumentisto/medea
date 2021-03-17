@@ -79,6 +79,28 @@ impl Component {
         Ok(())
     }
 
+    #[watch(self.senders.on_remove())]
+    async fn sender_removed(
+        peer: Rc<PeerConnection>,
+        _: Rc<State>,
+        val: Guarded<(TrackId, Rc<sender::State>)>,
+    ) -> Result<(), Traced<PeerError>> {
+        let ((track_id, _), _guard) = val.into_parts();
+        peer.remove_track(track_id);
+        Ok(())
+    }
+
+    #[watch(self.receivers.on_remove())]
+    async fn receiver_removed(
+        peer: Rc<PeerConnection>,
+        _: Rc<State>,
+        val: Guarded<(TrackId, Rc<receiver::State>)>,
+    ) -> Result<(), Traced<PeerError>> {
+        let ((track_id, _), _guard) = val.into_parts();
+        peer.remove_track(track_id);
+        Ok(())
+    }
+
     /// Watcher for the [`State::senders`] insert update.
     ///
     /// Waits until [`ReceiverComponent`]s creation is finished.

@@ -232,6 +232,11 @@ impl State {
         self.restart_ice.set(true);
     }
 
+    pub fn remove_track(&self, track_id: TrackId) {
+        self.senders.remove(track_id);
+        self.receivers.remove(track_id);
+    }
+
     /// Sets remote SDP offer to the provided value.
     #[inline]
     pub fn set_remote_sdp(&self, sdp: String) {

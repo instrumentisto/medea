@@ -6,6 +6,7 @@ use std::{cell::Cell, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::TrackId;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
@@ -252,5 +253,17 @@ impl Sender {
     #[must_use]
     pub fn muted(&self) -> bool {
         self.muted.get()
+    }
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        if !self.transceiver.is_stopped() {
+            self.transceiver.sub_direction(TransceiverDirection::SEND);
+            let fut = self.transceiver.set_send_track(None);
+            spawn_local(async move {
+                let _ = fut.await;
+            });
+        }
     }
 }

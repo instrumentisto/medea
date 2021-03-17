@@ -255,3 +255,13 @@ impl Receiver {
         self.enabled_general.get()
     }
 }
+
+impl Drop for Receiver {
+    fn drop(&mut self) {
+        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
+            if !transceiver.is_stopped() {
+                transceiver.sub_direction(TransceiverDirection::RECV);
+            }
+        }
+    }
+}

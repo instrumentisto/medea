@@ -9,6 +9,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::media::track::local;
+use futures::future::LocalBoxFuture;
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -52,19 +53,19 @@ impl Transceiver {
     /// Errors with JS error if the underlying [`replaceTrack`][1] call fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    pub async fn set_send_track(
+    pub fn set_send_track(
         &self,
         new_track: Option<Rc<local::Track>>,
-    ) -> Result<(), JsValue> {
+    ) -> LocalBoxFuture<'static, Result<(), JsValue>> {
         if new_track.is_none() {
             self.send_track.replace(None);
         }
         let sys_track = new_track.as_ref().map(|t| t.sys_track());
-        JsFuture::from(self.transceiver.sender().replace_track(sys_track))
-            .await
-            .map(|_| {
-                self.send_track.replace(new_track);
-            })
+        let fut =
+            JsFuture::from(self.transceiver.sender().replace_track(sys_track));
+        // TODO(evdokimovs): Do this after Future resolve
+        self.send_track.replace(new_track);
+        Box::pin(async move { fut.await.map(|_| ()) })
     }
 
     /// Returns [`mid`] of this [`Transceiver`].
@@ -92,6 +93,10 @@ impl Transceiver {
         if let Some(track) = self.send_track.borrow().as_ref() {
             track.set_enabled(enabled);
         }
+    }
+
+    pub fn is_stopped(&self) -> bool {
+        self.transceiver.stopped()
     }
 }
 

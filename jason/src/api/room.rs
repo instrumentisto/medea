@@ -1529,6 +1529,9 @@ impl EventHandler for InnerRoom {
                 TrackUpdate::IceRestart => {
                     peer_state.restart_ice();
                 }
+                TrackUpdate::Removed(track_id) => {
+                    peer_state.remove_track(track_id);
+                }
             }
         }
         if let Some(negotiation_role) = negotiation_role {

@@ -743,6 +743,12 @@ impl MediaConnections {
         );
         remove_tracks_fut.await;
     }
+
+    pub fn remove_track(&self, track_id: TrackId) {
+        let mut inner = self.0.borrow_mut();
+        inner.senders.remove(&track_id);
+        inner.receivers.remove(&track_id);
+    }
 }
 
 #[cfg(feature = "mockable")]

@@ -947,6 +947,10 @@ impl PeerConnection {
         }
         Ok(())
     }
+
+    pub fn remove_track(&self, track_id: TrackId) {
+        self.media_connections.remove_track(track_id);
+    }
 }
 
 #[cfg(feature = "mockable")]

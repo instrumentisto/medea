@@ -68,6 +68,18 @@ impl<S> TracksRepository<S> {
     ) -> LocalBoxStream<'static, Guarded<(TrackId, Rc<S>)>> {
         self.0.borrow().on_insert_with_replay()
     }
+
+    #[inline]
+    pub fn on_remove(
+        &self,
+    ) -> LocalBoxStream<'static, Guarded<(TrackId, Rc<S>)>> {
+        self.0.borrow().on_remove()
+    }
+
+    #[inline]
+    pub fn remove(&self, track_id: TrackId) {
+        self.0.borrow_mut().remove(&track_id);
+    }
 }
 
 impl TracksRepository<sender::State> {

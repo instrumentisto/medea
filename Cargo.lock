@@ -2169,7 +2169,7 @@ dependencies = [
  "humantime-serde",
  "hyper 0.14.4",
  "lazy_static",
- "medea-client-api-proto 0.2.0",
+ "medea-client-api-proto",
  "medea-control-api-mock",
  "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2207,20 +2207,6 @@ dependencies = [
 [[package]]
 name = "medea-client-api-proto"
 version = "0.2.0"
-dependencies = [
- "async-trait",
- "derive_more",
- "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.124",
- "serde_json",
- "serde_with",
-]
-
-[[package]]
-name = "medea-client-api-proto"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1303db14dcbd46378f8e76ad08c48cb36f7c2b619c6fd003740956e7f22fcdcb"
 dependencies = [
  "async-trait",
  "derive_more",
@@ -2325,7 +2311,7 @@ dependencies = [
  "futures 0.3.13",
  "js-sys",
  "log",
- "medea-client-api-proto 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-client-api-proto",
  "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-reactive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mockall",
