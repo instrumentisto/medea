@@ -421,6 +421,27 @@ impl Object<Room> {
         .ok_or(Error::TypeCast)
         .map(ToOwned::to_owned)
     }
+
+    /// Waits for the `Room.on_connection_loss()` callback to fire.
+    ///
+    /// Resolves instantly if WebSocket connection currently is lost.
+    pub async fn wait_for_connection_loss(&self) -> Result<(), Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    if (!room.connLossListener.isLost) {
+                        await new Promise((resolve) => {
+                            room.connLossListener.subs.push(resolve);
+                        });
+                    }
+                }
+            "#,
+            [],
+        ))
+        .await
+        .map(|_| ())
+    }
 }
 
 /// Error of parsing a [`MediaKind`] or a [`MediaSourceKind`].

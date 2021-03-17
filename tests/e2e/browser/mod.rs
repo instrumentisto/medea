@@ -4,6 +4,7 @@
 
 mod client;
 mod js;
+pub mod mock;
 
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -93,11 +94,14 @@ impl Window {
     /// Creates a new [`Window`] in the provided [`WebDriverClient`].
     async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();
-        Self {
+
+        let this = Self {
             client,
             window,
             rc: Arc::new(AtomicUsize::new(1)),
-        }
+        };
+        mock::instantiate_mocks(&this).await;
+        this
     }
 
     /// Executes the provided [`Statement`] in this [`Window`].
