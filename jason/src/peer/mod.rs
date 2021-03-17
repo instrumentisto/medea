@@ -948,6 +948,8 @@ impl PeerConnection {
         Ok(())
     }
 
+    /// Removes [`sender::Component`] and [`receiver::Component`] with a
+    /// provided [`TrackId`] from this [`PeerConnection`].
     pub fn remove_track(&self, track_id: TrackId) {
         self.media_connections.remove_track(track_id);
     }

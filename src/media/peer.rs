@@ -485,7 +485,7 @@ pub enum TrackChange {
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
 
-    /// [`TrackId`] of the removed [`MediaTrack`]. Remote Peer currently
+    /// [`TrackId`] of the removed [`MediaTrack`]. Remote [`Peer`] currently
     /// doesn't know that this [`MediaTrack`] was removed on the server.
     RemoveTrack(TrackId),
 
@@ -645,7 +645,7 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::TrackPatch(patch)
     }
 
-    /// Sets [`Context::ice_restart`] flag to `true`.
+    /// Removes [`MediaTrack`] with the provided [`TrackId`] from this [`Peer`].
     #[inline]
     fn on_remove_track(&mut self, track_id: TrackId) -> Self::Output {
         self.context.senders.remove(&track_id);
@@ -653,6 +653,8 @@ impl<T> TrackChangeHandler for Peer<T> {
         TrackChange::RemoveTrack(track_id)
     }
 
+    /// Sets [`Context::ice_restart`] flag to `true`.
+    #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
         self.context.ice_restart = true;
         TrackChange::IceRestart
@@ -1454,8 +1456,9 @@ impl<'a> PeerChangesScheduler<'a> {
         self.schedule_change(TrackChange::AddSendTrack(track));
     }
 
-    pub fn remove_tracks(&mut self, track_ids: HashSet<TrackId>) {
-        track_ids.into_iter().for_each(|id| {
+    /// Removes [`Track`]s with a provided [`TrackId`]s from this [`Peer`].
+    pub fn remove_tracks(&mut self, track_ids: &[TrackId]) {
+        track_ids.iter().for_each(|id| {
             let tasks_index_to_remove: Vec<_> = self
                 .context
                 .track_changes_queue
@@ -1464,7 +1467,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 .filter_map(|(n, change)| match change {
                     TrackChange::AddSendTrack(track)
                     | TrackChange::AddRecvTrack(track) => {
-                        if track.id() == id {
+                        if track.id() == *id {
                             Some(n)
                         } else {
                             None
@@ -1474,7 +1477,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 })
                 .collect();
             if tasks_index_to_remove.is_empty() {
-                self.schedule_change(TrackChange::RemoveTrack(id))
+                self.schedule_change(TrackChange::RemoveTrack(*id))
             } else {
                 for remove_index in tasks_index_to_remove {
                     self.context.track_changes_queue.remove(remove_index);

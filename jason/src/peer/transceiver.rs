@@ -66,6 +66,8 @@ impl Transceiver {
         Ok(())
     }
 
+    /// Sets [`TransceiverDirection::SEND`] [`local::Track`] of this
+    /// [`Transceiver`] to [`None`].
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
         self.send_track.replace(None);
         Box::pin(
@@ -105,6 +107,9 @@ impl Transceiver {
         }
     }
 
+    /// Returns `true` if underlying [`RtcRtpTransceiver`] is stopped.
+    #[inline]
+    #[must_use]
     pub fn is_stopped(&self) -> bool {
         self.transceiver.stopped()
     }

@@ -69,6 +69,7 @@ impl<S> TracksRepository<S> {
         self.0.borrow().on_insert_with_replay()
     }
 
+    /// Returns a [`Stream`] streaming the all [`TracksRepository::remove`]s.
     #[inline]
     pub fn on_remove(
         &self,
@@ -76,6 +77,7 @@ impl<S> TracksRepository<S> {
         self.0.borrow().on_remove()
     }
 
+    /// Removes a track with the provided `id`.
     #[inline]
     pub fn remove(&self, track_id: TrackId) {
         self.0.borrow_mut().remove(&track_id);

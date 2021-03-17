@@ -232,6 +232,9 @@ impl State {
         self.restart_ice.set(true);
     }
 
+    /// Removes [`sender::State`] and [`receiver::State`] with a provided
+    /// [`TrackId`].
+    #[inline]
     pub fn remove_track(&self, track_id: TrackId) {
         self.senders.remove(track_id);
         self.receivers.remove(track_id);

@@ -765,10 +765,10 @@ impl PeerRepository {
     ///
     /// Returns [`PeerId`] which was affected by this action.
     ///
-    /// ## Panics
+    /// # Errors
     ///
-    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
-    /// [`Stable`] state.
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
@@ -784,6 +784,11 @@ impl PeerRepository {
     /// Deletes provided [`WebRtcPlayEndpoint`].
     ///
     /// Returns [`PeerId`] which was affected by this action.
+    ///
+    /// # Errors
+    ///
+    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
+    /// exist in [`PeerRepository`].
     pub fn delete_sink_endpoint(
         &self,
         sink_endpoint: &WebRtcPlayEndpoint,
@@ -799,14 +804,14 @@ impl PeerRepository {
                         src_endpoint.get_tracks_ids_by_peer_id(src_peer_id);
                     sink_peer
                         .as_changes_scheduler()
-                        .remove_tracks(tracks_to_remove.clone());
+                        .remove_tracks(&tracks_to_remove);
 
                     (src_peer_id, tracks_to_remove)
                 })?;
             self.map_peer_by_id_mut(src_peer_id, |src_peer| {
                 src_peer
                     .as_changes_scheduler()
-                    .remove_tracks(tracks_to_remove.clone());
+                    .remove_tracks(&tracks_to_remove);
             })?;
 
             let is_sink_peer_empty =
@@ -816,7 +821,7 @@ impl PeerRepository {
 
             if is_sink_peer_empty && is_src_peer_empty {
                 let member = sink_endpoint.owner();
-                member.peers_removed(&vec![sink_peer_id]);
+                member.peers_removed(&[sink_peer_id]);
 
                 self.remove(sink_peer_id);
                 self.remove(src_peer_id);
@@ -888,6 +893,7 @@ impl PeerRepository {
     /// Returns `true` if [`Peer`] with a provided [`PeerId`] exists in this
     /// [`PeerRepository`].
     #[inline]
+    #[must_use]
     pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
         self.0.borrow().contains_key(&peer_id)
     }

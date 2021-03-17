@@ -28,7 +28,7 @@ struct WebRtcPublishEndpointInner {
 
     /// [`TrackId`]s of the [`MediaTrack`]s related to this
     /// [`WebRtcPublishEndpoint`].
-    tracks_ids: HashMap<PeerId, HashSet<TrackId>>,
+    tracks_ids: HashMap<PeerId, Vec<TrackId>>,
 
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
@@ -242,21 +242,21 @@ impl WebRtcPublishEndpoint {
 
     /// Adds [`TrackId`] of the [`MediaTrack`] related to this
     /// [`WebRtcPublishEndpoint`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
     pub fn add_track_id(&self, peer_id: PeerId, track_id: TrackId) {
         let mut inner = self.0.borrow_mut();
-        inner
-            .tracks_ids
-            .entry(peer_id)
-            .or_default()
-            .insert(track_id);
+        inner.tracks_ids.entry(peer_id).or_default().push(track_id);
     }
 
     /// Returns [`TrackId`]s of the related to this [`WebRtcPublishEndpoint`]
     /// [`MediaTrack`]s from the [`Peer`] with a provided [`PeerId`].
-    pub fn get_tracks_ids_by_peer_id(
-        &self,
-        peer_id: PeerId,
-    ) -> HashSet<TrackId> {
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
+    /// [`Peer`]: crate::media::peer::Peer
+    #[inline]
+    #[must_use]
+    pub fn get_tracks_ids_by_peer_id(&self, peer_id: PeerId) -> Vec<TrackId> {
         let inner = self.0.borrow();
         inner.tracks_ids.get(&peer_id).cloned().unwrap_or_default()
     }

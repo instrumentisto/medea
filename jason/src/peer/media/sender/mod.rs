@@ -261,7 +261,7 @@ impl Drop for Sender {
             self.transceiver.sub_direction(TransceiverDirection::SEND);
             let fut = self.transceiver.drop_send_track();
             spawn_local(async move {
-                let _ = fut.await;
+                fut.await;
             });
         }
     }

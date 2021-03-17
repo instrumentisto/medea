@@ -69,7 +69,6 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         endpoint_id: EndpointId,
-        _: &mut Context<Self>,
     ) -> Result<(), RoomError> {
         if let Ok(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
@@ -375,7 +374,7 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            let _ = self.delete_endpoint(&member_id, endpoint_id, ctx);
+            let _ = self.delete_endpoint(&member_id, endpoint_id);
         });
     }
 }
