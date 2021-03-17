@@ -9,7 +9,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::media::track::local;
-use futures::future::LocalBoxFuture;
+use futures::{future::LocalBoxFuture, FutureExt};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -53,19 +53,29 @@ impl Transceiver {
     /// Errors with JS error if the underlying [`replaceTrack`][1] call fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    pub fn set_send_track(
+    pub async fn set_send_track(
         &self,
-        new_track: Option<Rc<local::Track>>,
-    ) -> LocalBoxFuture<'static, Result<(), JsValue>> {
-        if new_track.is_none() {
-            self.send_track.replace(None);
-        }
-        let sys_track = new_track.as_ref().map(|t| t.sys_track());
-        let fut =
-            JsFuture::from(self.transceiver.sender().replace_track(sys_track));
-        // TODO(evdokimovs): Do this after Future resolve
-        self.send_track.replace(new_track);
-        Box::pin(async move { fut.await.map(|_| ()) })
+        new_track: Rc<local::Track>,
+    ) -> Result<(), JsValue> {
+        let sys_track = new_track.sys_track();
+        JsFuture::from(
+            self.transceiver.sender().replace_track(Some(sys_track)),
+        )
+        .await?;
+        self.send_track.replace(Some(new_track));
+        Ok(())
+    }
+
+    pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
+        self.send_track.replace(None);
+        Box::pin(
+            JsFuture::from(self.transceiver.sender().replace_track(None)).map(
+                |r| {
+                    // Cannot fail: https://tinyurl.com/yhrn483t
+                    r.unwrap();
+                },
+            ),
+        )
     }
 
     /// Returns [`mid`] of this [`Transceiver`].

@@ -136,8 +136,7 @@ impl Sender {
     /// sending side of inner transceiver to [`None`].
     #[inline]
     pub async fn remove_track(&self) {
-        // cannot fail
-        self.transceiver.set_send_track(None).await.unwrap();
+        self.transceiver.drop_send_track().await;
     }
 
     /// Indicates whether this [`Sender`] has [`local::Track`].
@@ -166,7 +165,7 @@ impl Sender {
         new_track.set_enabled(!self.muted.get());
 
         self.transceiver
-            .set_send_track(Some(Rc::new(new_track)))
+            .set_send_track(Rc::new(new_track))
             .await
             .map_err(Into::into)
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
@@ -260,7 +259,7 @@ impl Drop for Sender {
     fn drop(&mut self) {
         if !self.transceiver.is_stopped() {
             self.transceiver.sub_direction(TransceiverDirection::SEND);
-            let fut = self.transceiver.set_send_track(None);
+            let fut = self.transceiver.drop_send_track();
             spawn_local(async move {
                 let _ = fut.await;
             });
