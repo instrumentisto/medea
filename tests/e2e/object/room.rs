@@ -422,7 +422,7 @@ impl Object<Room> {
         .map(ToOwned::to_owned)
     }
 
-    /// Waits for the `Room.on_connection_loss` callback to fire.
+    /// Waits for the `Room.on_connection_loss()` callback to fire.
     ///
     /// Resolves instantly if WebSocket connection currently is lost.
     pub async fn wait_for_connection_loss(&self) -> Result<(), Error> {
@@ -431,7 +431,7 @@ impl Object<Room> {
             r#"
                 async (room) => {
                     if (!room.connLossListener.isLost) {
-                        await new Promise((resolve, reject) => {
+                        await new Promise((resolve) => {
                             room.connLossListener.subs.push(resolve);
                         });
                     }

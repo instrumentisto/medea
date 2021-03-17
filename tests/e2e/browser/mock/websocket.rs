@@ -1,12 +1,12 @@
-//! Implementation of the `WebSocket` object mock.
+//! `WebSocket` object mock.
 
 use crate::browser::{Statement, Window};
 
-/// Mock for the `WebSocket` WebAPI object.
+/// Mock for a `WebSocket` WebAPI object.
 pub struct WebSocket<'a>(pub(super) &'a Window);
 
 impl<'a> WebSocket<'a> {
-    /// Instantiates `WebSocket` mock in the provided [`Window`].
+    /// Instantiates a new `WebSocket` mock in the provided [`Window`].
     pub(super) async fn instantiate(window: &Window) {
         window
             .execute(Statement::new(
@@ -29,7 +29,6 @@ impl<'a> WebSocket<'a> {
                                     new CloseEvent("close", { code: ws.code })
                                 );
                             }
-
                             return createdWs;
                         };
                     }
@@ -40,11 +39,11 @@ impl<'a> WebSocket<'a> {
             .unwrap();
     }
 
-    /// Fires `CloseEvent` with a provided code on the all created `WebSocket`
-    /// instances.
+    /// Fires a `CloseEvent` with the provided code on all the created
+    /// `WebSocket` instances.
     ///
     /// Will fire this `CloseEvent` on every `WebSocket`'s constructor call,
-    /// until [`WebSocket::disable_connection_loss`] will be called.
+    /// until [`WebSocket::disable_connection_loss()`] will be called.
     pub async fn enable_connection_loss(&self, code: u64) {
         self.0
             .execute(Statement::new(
@@ -67,7 +66,7 @@ impl<'a> WebSocket<'a> {
             .unwrap();
     }
 
-    /// Disables [`WebSocket::enable_connection_loss`] effects.
+    /// Disables [`WebSocket::enable_connection_loss()`] effects.
     ///
     /// After this method call, `WebSocket`'s constructor will work the same way
     /// as without mock.
