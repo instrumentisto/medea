@@ -103,7 +103,6 @@ impl<T: Incrementable + Copy> Counter<T> {
     pub fn next_id(&self) -> T {
         let id = self.count.get();
         self.count.set(id.incr());
-
         id
     }
 }
@@ -116,16 +115,6 @@ enum GetOrCreatePeersResult {
 
     /// Requested [`Peer`] pair already existed.
     AlreadyExisted(PeerId, PeerId),
-}
-
-/// Result of the [`PeersService::connect_endpoints`] function.
-#[derive(Clone, Copy, Debug)]
-pub enum ConnectEndpointsResult {
-    /// New [`Peer`] pair was created.
-    Created(PeerId, PeerId),
-
-    /// [`Peer`] pair was updated.
-    Updated(PeerId, PeerId),
 }
 
 /// All changes which are can be performed on [`Peer`].
@@ -613,13 +602,6 @@ impl PeersService {
         Ok(())
     }
 
-    /// Returns `true` if [`Peer`] with a provided [`PeerId`] exists in this
-    /// [`PeerRepository`].
-    #[inline]
-    pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
-        self.peers.is_peer_exists(peer_id)
-    }
-
     /// Returns [`Stream`] of [`PeersMetricsEvent`]s from underlying
     /// [`RtcStatsHandler`].
     pub(super) fn subscribe_to_metrics_events(
@@ -802,11 +784,6 @@ impl PeerRepository {
     /// Deletes provided [`WebRtcPlayEndpoint`].
     ///
     /// Returns [`PeerId`] which was affected by this action.
-    ///
-    /// ## Panics
-    ///
-    /// Panics if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not in
-    /// [`Stable`] state.
     pub fn delete_sink_endpoint(
         &self,
         sink_endpoint: &WebRtcPlayEndpoint,

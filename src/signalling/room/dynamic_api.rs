@@ -109,7 +109,7 @@ impl Room {
                 }
 
                 for (member_id, peer_ids) in removed_peers {
-                    self.send_peers_removed(member_id, peer_ids).unwrap();
+                    self.send_peers_removed(member_id, peer_ids)?;
                 }
             };
         }
@@ -375,7 +375,7 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            self.delete_endpoint(&member_id, endpoint_id, ctx).unwrap();
+            let _ = self.delete_endpoint(&member_id, endpoint_id, ctx);
         });
     }
 }

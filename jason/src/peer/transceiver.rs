@@ -3,13 +3,13 @@
 use std::{cell::RefCell, rc::Rc};
 
 use bitflags::bitflags;
+use futures::{future::LocalBoxFuture, FutureExt};
 use medea_client_api_proto::Direction as DirectionProto;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::media::track::local;
-use futures::{future::LocalBoxFuture, FutureExt};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.

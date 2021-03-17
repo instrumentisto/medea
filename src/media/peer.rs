@@ -959,6 +959,11 @@ impl<T> Peer<T> {
     /// Returns `true` if this [`Peer`] doesn't have any `Send` and `Recv`
     /// [`MediaTrack`]s.
     pub fn is_empty(&self) -> bool {
+        if self.context.senders.is_empty() && self.context.receivers.is_empty()
+        {
+            return true;
+        }
+
         let removed_tracks: HashSet<_> = self
             .context
             .track_changes_queue
@@ -1416,6 +1421,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&display_video_track));
+            src.add_track_id(self.context.id, display_video_track.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(display_video_track);
