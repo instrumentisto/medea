@@ -1,8 +1,10 @@
-//! Service responsible for processing [`PeerConnection`]'s metrics received
-//! from Coturn.
+//! Service responsible for processing [`Peer`]'s metrics received from Coturn.
+//!
+//! [`Peer`]: crate::media::peer::Peer
 
 use std::{
     collections::HashMap,
+    pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -11,7 +13,7 @@ use actix::{
     fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, StreamExt as _};
-use redis::{ConnectionAddr, ConnectionInfo, RedisError};
+use redis::{ConnectionInfo, RedisError};
 
 use crate::{
     log::prelude::*,
@@ -28,11 +30,13 @@ use super::{
 const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
-pub type ActFuture<O> =
-    Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>;
+pub type ActFuture<O = ()> =
+    Pin<Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>>;
 
-/// Service responsible for processing [`PeerConnection`]'s metrics received
+/// Service responsible for processing [`Peer`]'s metrics received
 /// from Coturn.
+///
+/// [`Peer`]: crate::media::peer::Peer
 #[derive(Debug)]
 pub struct CoturnMetricsService {
     /// [`PeerTrafficWatcher`] which will be notified of all traffic events.
@@ -55,19 +59,7 @@ impl CoturnMetricsService {
         cf: &crate::conf::turn::Turn,
         peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
     ) -> Result<Self, RedisError> {
-        let connection_info = ConnectionInfo {
-            addr: Box::new(ConnectionAddr::Tcp(
-                cf.db.redis.host.to_string(),
-                cf.db.redis.port,
-            )),
-            db: cf.db.redis.db_number,
-            passwd: if cf.db.redis.pass.is_empty() {
-                None
-            } else {
-                Some(cf.db.redis.pass.to_string())
-            },
-        };
-        let client = redis::Client::open(connection_info)?;
+        let client = redis::Client::open(ConnectionInfo::from(&cf.db.redis))?;
 
         Ok(Self {
             client,
@@ -79,11 +71,13 @@ impl CoturnMetricsService {
     /// Opens new Redis connection, subscribes to Coturn events and injects
     /// [`Stream`] with these events into the [`CoturnMetricsService`]'s
     /// context.
+    ///
+    /// [`Stream`]: futures::stream::Stream
     fn connect_and_subscribe(&mut self) -> ActFuture<Result<(), RedisError>> {
         let (msg_tx, msg_stream) = mpsc::unbounded();
         let client = self.client.clone();
 
-        Box::new(
+        Box::pin(
             async move {
                 let conn = client.get_async_connection().await?;
                 let mut pubsub = conn.into_pubsub();
@@ -113,8 +107,8 @@ impl CoturnMetricsService {
     }
 
     /// Connects Redis until succeeds.
-    fn connect_until_success(&mut self) -> ActFuture<()> {
-        Box::new(self.connect_and_subscribe().then(|res, this, _| {
+    fn connect_until_success(&mut self) -> ActFuture {
+        Box::pin(self.connect_and_subscribe().then(|res, this, _| {
             if let Err(err) = res {
                 warn!(
                     "Error while creating Redis PubSub connection for the \

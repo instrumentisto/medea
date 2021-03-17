@@ -1,7 +1,7 @@
 //! Reactive mutable data containers.
 
 #![deny(
-    intra_doc_link_resolution_failure,
+    broken_intra_doc_links,
     missing_debug_implementations,
     nonstandard_style,
     rust_2018_idioms,
@@ -23,13 +23,21 @@
 
 pub mod collections;
 pub mod field;
+pub mod subscribers_store;
 
 #[doc(inline)]
 pub use crate::{
-    collections::{ObservableHashMap, ObservableHashSet, ObservableVec},
+    collections::{
+        ObservableHashMap, ObservableHashSet, ObservableVec,
+        ProgressableHashMap, ProgressableHashSet, ProgressableVec,
+    },
     field::{
         cell::ObservableCell, DroppedError, MutObservableFieldGuard,
         Observable, ObservableField, OnObservableFieldModification,
-        Subscribable, UniversalSubscriber, Whenable,
+        Progressable, ProgressableCell, UniversalSubscriber, Whenable,
     },
+    subscribers_store::progressable::processed::{
+        when_all_processed, AllProcessed, Processed,
+    },
+    subscribers_store::progressable::{Guard, Guarded},
 };

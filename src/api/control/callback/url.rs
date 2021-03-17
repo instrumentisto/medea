@@ -22,6 +22,7 @@ impl GrpcCallbackUrl {
     /// If you wish to get address with protocol - just use [`Display`]
     /// implementation.
     #[inline]
+    #[must_use]
     pub fn addr(&self) -> String {
         // TODO: Do not hardcode protocol.
         format!("http://{}", self.0)
@@ -54,9 +55,7 @@ impl TryFrom<String> for CallbackUrl {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let url = Url::parse(&value)?;
         let url_scheme = url.scheme();
-        let host = url
-            .host()
-            .ok_or_else(|| CallbackUrlParseError::MissingHost)?;
+        let host = url.host().ok_or(CallbackUrlParseError::MissingHost)?;
         let host = if let Some(port) = url.port() {
             format!("{}:{}", host, port)
         } else {

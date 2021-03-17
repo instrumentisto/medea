@@ -2,19 +2,23 @@
 
 use std::{
     cell::RefCell,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ops::Deref as _,
     rc::{Rc, Weak},
 };
 
+use async_recursion::async_recursion;
 use async_trait::async_trait;
-use derive_more::Display;
-use futures::{channel::mpsc, future, future::Either, StreamExt as _};
+use derive_more::{Display, From};
+use futures::{
+    channel::mpsc, future, FutureExt as _, StreamExt as _, TryFutureExt as _,
+};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Event as RpcEvent, EventHandler, IceCandidate, IceConnectionState,
-    IceServer, Mid, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatch, TrackUpdate,
+    self as proto, Command, ConnectionQualityScore, Event as RpcEvent,
+    EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
+    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
+    TrackId, TrackUpdate,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -23,25 +27,25 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     api::connection::Connections,
     media::{
-        LocalStreamConstraints, MediaStream, MediaStreamSettings,
-        MediaStreamTrack,
+        track::{local, remote},
+        LocalTracksConstraints, MediaKind, MediaManager, MediaManagerError,
+        MediaStreamSettings, RecvConstraints,
     },
     peer::{
-        MediaConnectionsError, MuteState, PeerError, PeerEvent,
-        PeerEventHandler, PeerRepository, RtcStats, Sender, StableMuteState,
-        TransceiverKind,
+        self, media_exchange_state, mute_state, LocalStreamUpdateCriteria,
+        MediaConnectionsError, MediaState, PeerConnection, PeerError,
+        PeerEvent, PeerEventHandler, RtcStats, TrackDirection,
     },
     rpc::{
-        ClientDisconnect, CloseReason, ReconnectHandle, RpcClient,
-        RpcClientError, TransportError,
+        ClientDisconnect, CloseReason, ConnectionInfo,
+        ConnectionInfoParseError, ReconnectHandle, RpcSession, SessionError,
     },
     utils::{
-        console_error, Callback1, HandlerDetachedError, JasonError, JsCaused,
+        AsProtoState, Callback1, HandlerDetachedError, JasonError, JsCaused,
         JsError,
     },
+    JsMediaSourceKind,
 };
-
-use crate::peer::PeerConnection;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -63,12 +67,13 @@ pub struct RoomCloseReason {
 }
 
 impl RoomCloseReason {
-    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// Creates new [`RoomCloseReason`] with provided [`CloseReason`]
     /// converted into [`String`].
     ///
     /// `is_err` may be `true` only on closing by client.
     ///
     /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
+    #[must_use]
     pub fn new(reason: CloseReason) -> Self {
         match reason {
             CloseReason::ByServer(reason) => Self {
@@ -88,87 +93,88 @@ impl RoomCloseReason {
 #[wasm_bindgen]
 impl RoomCloseReason {
     /// `wasm_bindgen` getter for [`RoomCloseReason::reason`] field.
+    #[must_use]
     pub fn reason(&self) -> String {
         self.reason.clone()
     }
 
     /// `wasm_bindgen` getter for [`RoomCloseReason::is_closed_by_server`]
     /// field.
+    #[must_use]
     pub fn is_closed_by_server(&self) -> bool {
         self.is_closed_by_server
     }
 
     /// `wasm_bindgen` getter for [`RoomCloseReason::is_err`] field.
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.is_err
     }
 }
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display, JsCaused)]
-enum RoomError {
+#[derive(Clone, Debug, Display, From, JsCaused)]
+pub enum RoomError {
     /// Returned if the mandatory callback wasn't set.
     #[display(fmt = "`{}` callback isn't set.", _0)]
+    #[from(ignore)]
     CallbackNotSet(&'static str),
 
-    /// Returned if unable to init [`RpcTransport`].
-    #[display(fmt = "Unable to init RPC transport: {}", _0)]
-    InitRpcTransportFailed(#[js(cause)] TransportError),
-
-    /// Returned if [`RpcClient`] was unable to connect to RPC server.
-    #[display(fmt = "Unable to connect RPC server: {}", _0)]
-    CouldNotConnectToServer(#[js(cause)] RpcClientError),
-
-    /// Returned if the previously added local media stream does not satisfy
+    /// Returned if the previously added local media tracks does not satisfy
     /// the tracks sent from the media server.
-    #[display(fmt = "Invalid local stream: {}", _0)]
-    InvalidLocalStream(#[js(cause)] PeerError),
+    #[display(fmt = "Invalid local tracks: {}", _0)]
+    #[from(ignore)]
+    InvalidLocalTracks(#[js(cause)] PeerError),
 
-    /// Returned if [`PeerConnection`] cannot receive the local stream from
+    /// Returned if [`PeerConnection`] cannot receive the local tracks from
     /// [`MediaManager`].
-    #[display(fmt = "Failed to get local stream: {}", _0)]
+    ///
+    /// [`MediaManager`]: crate::media::MediaManager
+    #[display(fmt = "Failed to get local tracks: {}", _0)]
+    #[from(ignore)]
     CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
+    #[from(ignore)]
     NoSuchPeer(PeerId),
 
-    /// Returned if an error occurred during the webrtc signaling process
+    /// Returned if an error occurred during the WebRTC signaling process
     /// with remote peer.
     #[display(fmt = "Some PeerConnection error: {}", _0)]
+    #[from(ignore)]
     PeerConnectionError(#[js(cause)] PeerError),
 
-    /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
-    /// [`Connection`] with remote [`Member`].
-    #[display(fmt = "Remote stream from unknown peer")]
-    UnknownRemotePeer,
+    /// Returned if was received event [`PeerEvent::NewRemoteTrack`] without
+    /// connection with remote `Member`.
+    #[display(fmt = "Remote stream from unknown member")]
+    UnknownRemoteMember,
 
-    /// Returned if [`MediaStreamTrack`] update failed.
+    /// Returned if [`track`] update failed.
+    ///
+    /// [`track`]: crate::media::track
     #[display(fmt = "Failed to update Track with {} ID.", _0)]
+    #[from(ignore)]
     FailedTrackPatch(TrackId),
 
-    /// Typically, returned if [`RoomHandle::mute_audio`]-like functions called
-    /// simultaneously.
+    /// Typically, returned if [`RoomHandle::disable_audio`]-like functions
+    /// called simultaneously.
     #[display(fmt = "Some MediaConnectionsError: {}", _0)]
     MediaConnections(#[js(cause)] MediaConnectionsError),
-}
 
-impl From<RpcClientError> for RoomError {
-    fn from(err: RpcClientError) -> Self {
-        Self::CouldNotConnectToServer(err)
-    }
-}
+    /// [`RpcSession`] returned [`SessionError`].
+    #[display(fmt = "WebSocketSession error occurred: {}", _0)]
+    SessionError(#[js(cause)] SessionError),
 
-impl From<TransportError> for RoomError {
-    fn from(err: TransportError) -> Self {
-        Self::InitRpcTransportFailed(err)
-    }
+    /// [`peer::repo::Component`] returned [`MediaManagerError`].
+    #[display(fmt = "Failed to get local tracks: {}", _0)]
+    MediaManagerError(#[js(cause)] MediaManagerError),
 }
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         use PeerError::{
-            MediaConnections, MediaManager, RtcPeerConnection, StreamRequest,
+            MediaConnections, MediaManager, RtcPeerConnection, TracksRequest,
         };
 
         match err {
@@ -176,19 +182,12 @@ impl From<PeerError> for RoomError {
                 MediaConnectionsError::InvalidTrackPatch(id) => {
                     Self::FailedTrackPatch(*id)
                 }
-                _ => Self::InvalidLocalStream(err),
+                _ => Self::InvalidLocalTracks(err),
             },
-            StreamRequest(_) => Self::InvalidLocalStream(err),
+            TracksRequest(_) => Self::InvalidLocalTracks(err),
             MediaManager(_) => Self::CouldNotGetLocalMedia(err),
             RtcPeerConnection(_) => Self::PeerConnectionError(err),
         }
-    }
-}
-
-impl From<MediaConnectionsError> for RoomError {
-    #[inline]
-    fn from(e: MediaConnectionsError) -> Self {
-        Self::MediaConnections(e)
     }
 }
 
@@ -197,7 +196,6 @@ impl From<MediaConnectionsError> for RoomError {
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
-// TODO: get rid of this RefCell.
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<InnerRoom>);
 
@@ -206,17 +204,20 @@ impl RoomHandle {
     ///
     /// # Errors
     ///
-    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_stream` or
+    /// With [`RoomError::CallbackNotSet`] if `on_failed_local_media` or
     /// `on_connection_loss` callbacks are not set.
     ///
-    /// With [`RoomError::CouldNotConnectToServer`] if cannot connect to media
-    /// server.
-    pub async fn inner_join(&self, token: String) -> Result<(), JasonError> {
+    /// With [`RoomError::SessionError`] if cannot connect to media server.
+    pub async fn inner_join(&self, url: String) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
 
-        if !inner.on_failed_local_stream.is_set() {
+        let connection_info: ConnectionInfo = url.parse().map_err(
+            tracerr::map_from_and_wrap!(=> ConnectionInfoParseError),
+        )?;
+
+        if !inner.on_failed_local_media.is_set() {
             return Err(JasonError::from(tracerr::new!(
-                RoomError::CallbackNotSet("Room.on_failed_local_stream()")
+                RoomError::CallbackNotSet("Room.on_failed_local_media()")
             )));
         }
 
@@ -226,52 +227,80 @@ impl RoomHandle {
             )));
         }
 
-        inner
-            .rpc
-            .connect(token)
+        Rc::clone(&inner.rpc)
+            .connect(connection_info)
             .await
             .map_err(tracerr::map_from_and_wrap!( => RoomError))?;
-
-        let mut connection_loss_stream = inner.rpc.on_connection_loss();
-        let weak_inner = Rc::downgrade(&inner);
-        spawn_local(async move {
-            while connection_loss_stream.next().await.is_some() {
-                match upgrade_or_detached!(weak_inner, JsValue) {
-                    Ok(inner) => {
-                        let reconnect_handle =
-                            ReconnectHandle::new(Rc::downgrade(&inner.rpc));
-                        inner.on_connection_loss.call(reconnect_handle);
-                    }
-                    Err(e) => {
-                        console_error(e);
-                        break;
-                    }
-                }
-            }
-        });
 
         Ok(())
     }
 
-    /// Calls [`InnerRoom::toggle_mute`] until all [`PeerConnection`]s of this
-    /// [`Room`] will have same [`MuteState`] as requested.
-    async fn toggle_mute(
+    /// Enables or disables specified media and source types publish or receival
+    /// in all [`PeerConnection`]s.
+    async fn set_track_media_state(
         &self,
-        is_muted: bool,
-        kind: TransceiverKind,
+        new_state: MediaState,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<MediaSourceKind>,
     ) -> Result<(), JasonError> {
         let inner = upgrade_or_detached!(self.0, JasonError)?;
-        inner.local_stream_settings.toggle_enable(!is_muted, kind);
-        while !inner
-            .is_all_peers_in_mute_state(kind, StableMuteState::from(is_muted))
-        {
+        inner.set_constraints_media_state(
+            new_state,
+            kind,
+            direction,
+            source_kind,
+        );
+
+        let direction_send = matches!(direction, TrackDirection::Send);
+        let enabling = matches!(
+            new_state,
+            MediaState::MediaExchange(media_exchange_state::Stable::Enabled)
+        );
+
+        // Perform `getUuserMedia()`/`getDisplayMedia()` right away, so we can
+        // fail fast without touching senders' states and starting all required
+        // messaging.
+        // Hold tracks through all process, to ensure that they will be reused
+        // without additional requests.
+        let _tracks_handles = if direction_send && enabling {
             inner
-                .toggle_mute(is_muted, kind)
+                .get_local_tracks(kind, source_kind)
                 .await
-                .map_err::<Traced<RoomError>, _>(|e| {
-                    inner.local_stream_settings.toggle_enable(is_muted, kind);
-                    tracerr::new!(e)
-                })?;
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?
+        } else {
+            Vec::new()
+        };
+
+        while !inner.is_all_peers_in_media_state(
+            kind,
+            direction,
+            source_kind,
+            new_state,
+        ) {
+            if let Err(e) = inner
+                .toggle_media_state(new_state, kind, direction, source_kind)
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+            {
+                if direction_send && enabling {
+                    inner.set_constraints_media_state(
+                        new_state.opposite(),
+                        kind,
+                        direction,
+                        source_kind,
+                    );
+                    inner
+                        .toggle_media_state(
+                            new_state.opposite(),
+                            kind,
+                            direction,
+                            source_kind,
+                        )
+                        .await?;
+                }
+                return Err(e.into());
+            }
         }
         Ok(())
     }
@@ -281,6 +310,8 @@ impl RoomHandle {
 impl RoomHandle {
     /// Sets callback, which will be invoked when new [`Connection`] with some
     /// remote `Peer` is established.
+    ///
+    /// [`Connection`]: crate::api::Connection
     pub fn on_new_connection(
         &self,
         f: js_sys::Function,
@@ -295,29 +326,29 @@ impl RoomHandle {
         upgrade_or_detached!(self.0).map(|inner| inner.on_close.set_func(f))
     }
 
-    /// Sets `on_local_stream` callback. This callback is invoked each time
-    /// media acquisition request will resolve successfully. This might
-    /// happen in such cases:
+    /// Sets callback, which will be invoked when new [`local::Track`] will be
+    /// added to this [`Room`].
+    /// This might happen in such cases:
     /// 1. Media server initiates media request.
-    /// 2. `unmute_audio`/`unmute_video` is called.
+    /// 2. `disable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
-    pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
+    pub fn on_local_track(&self, f: js_sys::Function) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_local_stream.set_func(f))
+            .map(|inner| inner.on_local_track.set_func(f))
     }
 
-    /// Sets `on_failed_local_stream` callback, which will be invoked on local
+    /// Sets `on_failed_local_media` callback, which will be invoked on local
     /// media acquisition failures.
-    pub fn on_failed_local_stream(
+    pub fn on_failed_local_media(
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         upgrade_or_detached!(self.0)
-            .map(|inner| inner.on_failed_local_stream.set_func(f))
+            .map(|inner| inner.on_failed_local_media.set_func(f))
     }
 
-    /// Sets `on_connection_loss` callback, which will be invoked on
-    /// [`RpcClient`] connection loss.
+    /// Sets `on_connection_loss` callback, which will be invoked on connection
+    /// with server loss.
     pub fn on_connection_loss(
         &self,
         f: js_sys::Function,
@@ -326,14 +357,18 @@ impl RoomHandle {
             .map(|inner| inner.on_connection_loss.set_func(f))
     }
 
-    /// Performs entering to a [`Room`] with the preconfigured authorization
-    /// `token` for connection with media server.
+    /// Connects media server and enters [`Room`] with provided authorization
+    /// `token`.
+    ///
+    /// Authorization token has fixed format:
+    /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
+    /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if:
-    ///   - `on_failed_local_stream` callback is not set
-    ///   - `on_connection_loss` callback is not set
-    ///   - unable to connect to media server.
+    /// - `on_failed_local_media` callback is not set
+    /// - `on_connection_loss` callback is not set
+    /// - unable to connect to media server.
     ///
     /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
@@ -346,79 +381,242 @@ impl RoomHandle {
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
-    /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
-    /// sending peers, so that might cause new [getUserMedia()][1] request.
+    /// configured for some [`Room`], then this [`Room`] can only send media
+    /// tracks that correspond to this settings. [`MediaStreamSettings`]
+    /// update will change media tracks in all sending peers, so that might
+    /// cause new [getUserMedia()][1] request.
     ///
-    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
-    /// callback.
+    /// Media obtaining/injection errors are additionally fired to
+    /// `on_failed_local_media` callback.
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
-    /// [1]: https://tinyurl.com/rnxcavf
+    /// If `stop_first` set to `true` then affected [`local::Track`]s will be
+    /// dropped before new [`MediaStreamSettings`] is applied. This is usually
+    /// required when changing video source device due to hardware limitations,
+    /// e.g. having an active track sourced from device `A` may hinder
+    /// [getUserMedia()][1] requests to device `B`.
+    ///
+    /// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+    /// request to automatically rollback to previous settings if new settings
+    /// cannot be applied.
+    ///
+    /// If recovering from fail state isn't possible then affected media types
+    /// will be disabled.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     pub fn set_local_media_settings(
         &self,
         settings: &MediaStreamSettings,
+        stop_first: bool,
+        rollback_on_fail: bool,
     ) -> Promise {
         let inner = upgrade_or_detached!(self.0, JasonError);
         let settings = settings.clone();
         future_to_promise(async move {
-            inner?.set_local_media_settings(settings).await;
+            inner?
+                .set_local_media_settings(
+                    settings,
+                    stop_first,
+                    rollback_on_fail,
+                )
+                .await
+                .map_err(ConstraintsUpdateException::from)?;
+            Ok(JsValue::UNDEFINED)
+        })
+    }
+
+    /// Returns [`Promise`] which will switch [`MediaState`] of the provided
+    /// [`MediaKind`], [`TrackDirection`] and [`JsMediaSourceKind`] to the
+    /// provided [`MediaState`].
+    ///
+    /// Helper function for all the exported mute/unmute/enable/disable
+    /// audio/video send/receive methods.
+    fn change_media_state<S>(
+        &self,
+        media_state: S,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise
+    where
+        S: Into<MediaState> + 'static,
+    {
+        let this = Self(self.0.clone());
+        future_to_promise(async move {
+            this.set_track_media_state(
+                media_state.into(),
+                kind,
+                direction,
+                source_kind.map(Into::into),
+            )
+            .await?;
             Ok(JsValue::UNDEFINED)
         })
     }
 
     /// Mutes outbound audio in this [`Room`].
     pub fn mute_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.toggle_mute(true, TransceiverKind::Audio).await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            mute_state::Stable::Muted,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
     /// Unmutes outbound audio in this [`Room`].
     pub fn unmute_audio(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.toggle_mute(false, TransceiverKind::Audio).await?;
-            Ok(JsValue::UNDEFINED)
-        })
+        self.change_media_state(
+            mute_state::Stable::Unmuted,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
     }
 
     /// Mutes outbound video in this [`Room`].
-    pub fn mute_video(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.toggle_mute(true, TransceiverKind::Video).await?;
-            Ok(JsValue::UNDEFINED)
-        })
+    pub fn mute_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        self.change_media_state(
+            mute_state::Stable::Muted,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
     }
 
     /// Unmutes outbound video in this [`Room`].
-    pub fn unmute_video(&self) -> Promise {
-        let this = Self(self.0.clone());
-        future_to_promise(async move {
-            this.toggle_mute(false, TransceiverKind::Video).await?;
-            Ok(JsValue::UNDEFINED)
-        })
+    pub fn unmute_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        self.change_media_state(
+            mute_state::Stable::Unmuted,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
+    }
+
+    /// Disables outbound audio in this [`Room`].
+    pub fn disable_audio(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+    }
+
+    /// Enables outbound audio in this [`Room`].
+    pub fn enable_audio(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Audio,
+            TrackDirection::Send,
+            None,
+        )
+    }
+
+    /// Disables outbound video.
+    ///
+    /// Affects only video with specific [`JsMediaSourceKind`] if specified.
+    pub fn disable_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
+    }
+
+    /// Enables outbound video.
+    ///
+    /// Affects only video with specific [`JsMediaSourceKind`] if specified.
+    pub fn enable_video(
+        &self,
+        source_kind: Option<JsMediaSourceKind>,
+    ) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Video,
+            TrackDirection::Send,
+            source_kind,
+        )
+    }
+
+    /// Disables inbound audio in this [`Room`].
+    pub fn disable_remote_audio(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Audio,
+            TrackDirection::Recv,
+            None,
+        )
+    }
+
+    /// Disables inbound video in this [`Room`].
+    pub fn disable_remote_video(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Disabled,
+            MediaKind::Video,
+            TrackDirection::Recv,
+            None,
+        )
+    }
+
+    /// Enables inbound audio in this [`Room`].
+    pub fn enable_remote_audio(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Audio,
+            TrackDirection::Recv,
+            None,
+        )
+    }
+
+    /// Enables inbound video in this [`Room`].
+    pub fn enable_remote_video(&self) -> Promise {
+        self.change_media_state(
+            media_exchange_state::Stable::Enabled,
+            MediaKind::Video,
+            TrackDirection::Recv,
+            None,
+        )
+    }
+}
+
+/// [`Weak`] reference upgradeable to the [`Room`].
+#[derive(Clone)]
+pub struct WeakRoom(Weak<InnerRoom>);
+
+impl WeakRoom {
+    /// Upgrades this [`WeakRoom`] to the [`Room`].
+    ///
+    /// Returns [`None`] if weak reference cannot be upgraded.
+    #[inline]
+    pub fn upgrade(&self) -> Option<Room> {
+        self.0.upgrade().map(Room)
     }
 }
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
 /// handles media server events, etc).
 ///
-/// It's used on Rust side and represents a handle to [`InnerRoom`] data.
-///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
-///
-/// [`PeerConnection`]: crate::peer::PeerConnection
 pub struct Room(Rc<InnerRoom>);
 
 impl Room {
-    /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
+    /// Creates new [`Room`] and associates it with the provided [`RpcSession`].
     #[allow(clippy::mut_mut)]
-    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
+    pub fn new(
+        rpc: Rc<dyn RpcSession>,
+        media_manager: Rc<MediaManager>,
+    ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
             PeerEvent(PeerEvent),
@@ -429,7 +627,7 @@ impl Room {
         let (tx, peer_events_rx) = mpsc::unbounded();
 
         let mut rpc_events_stream =
-            rpc.subscribe().map(RoomEvent::RpcEvent).fuse();
+            Rc::clone(&rpc).subscribe().map(RoomEvent::RpcEvent).fuse();
         let mut peer_events_stream =
             peer_events_rx.map(RoomEvent::PeerEvent).fuse();
         let mut rpc_connection_lost = rpc
@@ -441,12 +639,7 @@ impl Room {
             .map(|_| RoomEvent::RpcClientReconnected)
             .fuse();
 
-        let room = Rc::new(InnerRoom::new(
-            rpc,
-            peers,
-            tx,
-            LocalStreamConstraints::default(),
-        ));
+        let room = Rc::new(InnerRoom::new(rpc, media_manager, tx));
         let inner = Rc::downgrade(&room);
 
         spawn_local(async move {
@@ -459,49 +652,32 @@ impl Room {
                     complete => break,
                 };
 
-                match inner.upgrade() {
-                    None => {
-                        console_error("Inner Room dropped unexpectedly");
-                        break;
+                if let Some(inner) = inner.upgrade() {
+                    match event {
+                        RoomEvent::RpcEvent(event) => {
+                            if let Err(err) =
+                                event.dispatch_with(inner.deref()).await
+                            {
+                                JasonError::from(err).print();
+                            };
+                        }
+                        RoomEvent::PeerEvent(event) => {
+                            if let Err(err) =
+                                event.dispatch_with(inner.deref()).await
+                            {
+                                JasonError::from(err).print();
+                            };
+                        }
+                        RoomEvent::RpcClientLostConnection => {
+                            inner.handle_rpc_connection_lost();
+                        }
+                        RoomEvent::RpcClientReconnected => {
+                            inner.handle_rpc_connection_recovered();
+                        }
                     }
-                    Some(inner) => {
-                        match event {
-                            RoomEvent::RpcEvent(event) => {
-                                if let Err(err) =
-                                    event.dispatch_with(inner.deref()).await
-                                {
-                                    let (err, trace) = err.into_parts();
-                                    match err {
-                                        RoomError::InvalidLocalStream(_)
-                                        | RoomError::CouldNotGetLocalMedia(_) =>
-                                        {
-                                            let e =
-                                                JasonError::from((err, trace));
-                                            e.print();
-                                            inner
-                                                .on_failed_local_stream
-                                                .call(e);
-                                        }
-                                        _ => JasonError::from((err, trace))
-                                            .print(),
-                                    };
-                                };
-                            }
-                            RoomEvent::PeerEvent(event) => {
-                                if let Err(err) =
-                                    event.dispatch_with(inner.deref()).await
-                                {
-                                    JasonError::from(err).print();
-                                };
-                            }
-                            RoomEvent::RpcClientLostConnection => {
-                                inner.handle_rpc_connection_lost();
-                            }
-                            RoomEvent::RpcClientReconnected => {
-                                inner.handle_rpc_connection_recovered();
-                            }
-                        };
-                    }
+                } else {
+                    log::error!("Inner Room dropped unexpectedly");
+                    break;
                 }
             }
         });
@@ -509,37 +685,51 @@ impl Room {
         Self(room)
     }
 
-    /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
+    /// Sets `close_reason` and consumes this [`Room`].
     ///
-    /// Supposed that this function will trigger [`Drop`] implementation of
-    /// [`InnerRoom`] and call JS side `on_close` callback with provided
+    /// [`Room`] [`Drop`] triggers `on_close` callback with provided
     /// [`CloseReason`].
-    ///
-    /// Note that this function __doesn't guarantee__ that [`InnerRoom`] will be
-    /// dropped because theoretically other pointers to the [`InnerRoom`]
-    /// can exist. If you need guarantee of [`InnerRoom`] dropping then you
-    /// may check count of pointers to [`InnerRoom`] with
-    /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
+        self.0.set_close_reason(reason);
+    }
+
+    /// Sets [`Room`]'s [`CloseReason`] to the provided value.
+    #[inline]
+    pub fn set_close_reason(&self, reason: CloseReason) {
         self.0.set_close_reason(reason);
     }
 
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
+    #[must_use]
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
     }
 
-    /// Returns [`PeerConnection`] stored in repository by its ID.
-    ///
-    /// Used to inspect [`Room`]'s inner state in integration tests.
-    #[cfg(feature = "mockable")]
-    pub fn get_peer_by_id(
-        &self,
-        peer_id: PeerId,
-    ) -> Option<Rc<PeerConnection>> {
-        self.0.peers.get(peer_id)
+    /// Indicates whether this [`Room`] reference is the same as the given
+    /// [`Room`] reference. Compares pointers, not values.
+    #[inline]
+    #[must_use]
+    pub fn ptr_eq(&self, other: &Room) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Checks [`RoomHandle`] equality by comparing inner pointers.
+    #[inline]
+    #[must_use]
+    pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
+        handle
+            .0
+            .upgrade()
+            .map_or(false, |handle_inner| Rc::ptr_eq(&self.0, &handle_inner))
+    }
+
+    /// Downgrades this [`Room`] to a [`WeakRoom`] reference.
+    #[inline]
+    #[must_use]
+    pub fn downgrade(&self) -> WeakRoom {
+        WeakRoom(Rc::downgrade(&self.0))
     }
 }
 
@@ -548,33 +738,38 @@ impl Room {
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
     /// Client to talk with media server via Client API RPC.
-    rpc: Rc<dyn RpcClient>,
+    rpc: Rc<dyn RpcSession>,
 
-    /// Local media stream for injecting into new created [`PeerConnection`]s.
-    local_stream_settings: LocalStreamConstraints,
+    /// Constraints to local [`local::Track`]s that are being published by
+    /// [`PeerConnection`]s in this [`Room`].
+    send_constraints: LocalTracksConstraints,
 
-    /// [`PeerConnection`] repository.
-    peers: Box<dyn PeerRepository>,
+    /// Constraints to the [`remote::Track`] received by [`PeerConnection`]s
+    /// in this [`Room`]. Used to disable or enable media receiving.
+    recv_constraints: Rc<RecvConstraints>,
 
-    /// Channel for send events produced [`PeerConnection`] to [`Room`].
-    peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+    /// [`peer::Component`]s repository.
+    peers: peer::repo::Component,
 
-    /// Collection of [`Connection`]s with a remote [`Member`]s.
-    connections: Connections,
+    /// [`MediaManager`] for pre-obtaining [`local::Track`]s.
+    media_manager: Rc<MediaManager>,
 
-    /// Callback to be invoked when new [`MediaStream`] is acquired providing
-    /// its actual underlying [MediaStream][1] object.
+    /// Collection of [`Connection`]s with a remote `Member`s.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    // TODO: will be extended with some metadata that would allow client to
-    //       understand purpose of obtaining this stream.
-    on_local_stream: Callback1<MediaStream>,
+    /// [`Connection`]: crate::api::Connection
+    connections: Rc<Connections>,
 
-    /// Callback to be invoked when failed obtain [`MediaStream`] from
+    /// Callback to be invoked when new local [`local::JsTrack`] will be added
+    /// to this [`Room`].
+    on_local_track: Callback1<local::JsTrack>,
+
+    /// Callback to be invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_stream: Rc<Callback1<JasonError>>,
+    ///
+    /// [`MediaManager`]: crate::media::MediaManager
+    on_failed_local_media: Rc<Callback1<JasonError>>,
 
-    /// Callback to be invoked when [`RpcClient`] loses connection.
+    /// Callback to be invoked when [`RpcSession`] loses connection.
     on_connection_loss: Callback1<ReconnectHandle>,
 
     /// JS callback which will be called when this [`Room`] will be closed.
@@ -585,33 +780,253 @@ struct InnerRoom {
     /// This [`CloseReason`] will be provided into `on_close` JS callback.
     ///
     /// Note that `None` will be considered as error and `is_err` will be
-    /// `true` in [`JsCloseReason`] provided to JS callback.
+    /// `true` in [`CloseReason`] provided to JS callback.
     close_reason: RefCell<CloseReason>,
+}
+
+/// JS exception for the [`RoomHandle::set_local_media_settings`].
+#[wasm_bindgen]
+#[derive(Debug, From)]
+#[from(forward)]
+pub struct ConstraintsUpdateException(JsConstraintsUpdateError);
+
+#[wasm_bindgen]
+impl ConstraintsUpdateException {
+    /// Returns name of this [`ConstraintsUpdateException`].
+    #[must_use]
+    pub fn name(&self) -> String {
+        self.0.to_string()
+    }
+
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `RecoveredException` or `RecoverFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
+    #[must_use]
+    pub fn recover_reason(&self) -> JsValue {
+        use JsConstraintsUpdateError as E;
+        match &self.0 {
+            E::RecoverFailed { recover_reason, .. }
+            | E::Recovered { recover_reason, .. } => recover_reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
+    /// [`ConstraintsUpdateException`] represents `RecoverFailedException`.
+    ///
+    /// Returns `undefined` otherwise.
+    #[must_use]
+    pub fn recover_fail_reasons(&self) -> JsValue {
+        match &self.0 {
+            JsConstraintsUpdateError::RecoverFailed {
+                recover_fail_reasons,
+                ..
+            } => recover_fail_reasons.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+
+    /// Returns [`JasonError`] if this [`ConstraintsUpdateException`] represents
+    /// `ErroredException`.
+    ///
+    /// Returns `undefined` otherwise.
+    #[must_use]
+    pub fn error(&self) -> JsValue {
+        match &self.0 {
+            JsConstraintsUpdateError::Errored { reason } => reason.clone(),
+            _ => JsValue::UNDEFINED,
+        }
+    }
+}
+
+/// [`ConstraintsUpdateError`] for JS side.
+///
+/// Should be wrapped to [`ConstraintsUpdateException`] before returning to the
+/// JS side.
+#[derive(Debug, Display)]
+pub enum JsConstraintsUpdateError {
+    /// New [`MediaStreamSettings`] set failed and state was recovered
+    /// accordingly to the provided recover policy
+    /// (`rollback_on_fail`/`stop_first` arguments).
+    #[display(fmt = "RecoveredException")]
+    Recovered {
+        /// [`JasonError`] due to which recovery happened.
+        recover_reason: JsValue,
+    },
+
+    /// New [`MediaStreamSettings`] set failed and state recovering also
+    /// failed.
+    #[display(fmt = "RecoverFailedException")]
+    RecoverFailed {
+        /// [`JasonError`] due to which recovery happened.
+        recover_reason: JsValue,
+
+        /// [`js_sys::Array`] with a [`JasonError`]s due to which recovery
+        /// failed.
+        recover_fail_reasons: JsValue,
+    },
+
+    /// Some another error occurred.
+    #[display(fmt = "ErroredException")]
+    Errored { reason: JsValue },
+}
+
+/// Constraints errors which are can occur while updating
+/// [`MediaStreamSettings`] by [`InnerRoom::set_local_media_settings`] call.
+#[derive(Debug)]
+enum ConstraintsUpdateError {
+    /// New [`MediaStreamSettings`] set failed and state was recovered
+    /// accordingly to the provided recover policy
+    /// (`rollback_on_fail`/`stop_first` arguments).
+    Recovered {
+        /// [`RoomError`] due to which recovery happened.
+        recover_reason: Traced<RoomError>,
+    },
+
+    /// New [`MediaStreamSettings`] set failed and state recovering also
+    /// failed.
+    RecoverFailed {
+        /// [`RoomError`] due to which recovery happened.
+        recover_reason: Traced<RoomError>,
+
+        /// [`RoomError`]s due to which recovery failed.
+        recover_fail_reasons: Vec<Traced<RoomError>>,
+    },
+
+    /// Indicates that some error occurred.
+    Errored { error: Traced<RoomError> },
+}
+
+impl ConstraintsUpdateError {
+    /// Returns new [`ConstraintsUpdateError::Recovered`].
+    pub fn recovered(recover_reason: Traced<RoomError>) -> Self {
+        Self::Recovered { recover_reason }
+    }
+
+    /// Converts this [`ConstraintsUpdateError`] to the
+    /// [`ConstraintsUpdateError::RecoverFailed`].
+    pub fn recovery_failed(self, reason: Traced<RoomError>) -> Self {
+        match self {
+            Self::Recovered { recover_reason } => Self::RecoverFailed {
+                recover_reason: reason,
+                recover_fail_reasons: vec![recover_reason],
+            },
+            Self::RecoverFailed {
+                recover_reason,
+                mut recover_fail_reasons,
+            } => {
+                recover_fail_reasons.push(recover_reason);
+
+                Self::RecoverFailed {
+                    recover_reason: reason,
+                    recover_fail_reasons,
+                }
+            }
+            Self::Errored { error } => Self::RecoverFailed {
+                recover_reason: error,
+                recover_fail_reasons: vec![reason],
+            },
+        }
+    }
+
+    /// Returns [`ConstraintsUpdateError::Errored`] with a provided parameter.
+    pub fn errored(reason: Traced<RoomError>) -> Self {
+        Self::Errored { error: reason }
+    }
+}
+
+impl From<ConstraintsUpdateError> for JsConstraintsUpdateError {
+    fn from(from: ConstraintsUpdateError) -> Self {
+        use ConstraintsUpdateError as E;
+        match from {
+            E::Recovered { recover_reason } => Self::Recovered {
+                recover_reason: JasonError::from(recover_reason).into(),
+            },
+            E::RecoverFailed {
+                recover_reason,
+                recover_fail_reasons,
+            } => Self::RecoverFailed {
+                recover_reason: JasonError::from(recover_reason).into(),
+                recover_fail_reasons: {
+                    let arr = js_sys::Array::new();
+                    for e in recover_fail_reasons {
+                        arr.push(&JasonError::from(e).into());
+                    }
+
+                    arr.into()
+                },
+            },
+            E::Errored { error: reason } => Self::Errored {
+                reason: JasonError::from(reason).into(),
+            },
+        }
+    }
 }
 
 impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
     fn new(
-        rpc: Rc<dyn RpcClient>,
-        peers: Box<dyn PeerRepository>,
+        rpc: Rc<dyn RpcSession>,
+        media_manager: Rc<MediaManager>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
-        local_stream_settings: LocalStreamConstraints,
     ) -> Self {
+        let connections = Rc::new(Connections::default());
+        let send_constraints = LocalTracksConstraints::default();
+        let recv_constraints = Rc::new(RecvConstraints::default());
         Self {
+            peers: peer::repo::Component::new(
+                Rc::new(peer::repo::Repository::new(
+                    Rc::clone(&media_manager),
+                    peer_event_sender,
+                    send_constraints.clone(),
+                    Rc::clone(&recv_constraints),
+                    Rc::clone(&connections),
+                )),
+                Rc::new(peer::repo::State::default()),
+            ),
+            media_manager,
             rpc,
-            local_stream_settings,
-            peers,
-            peer_event_sender,
-            connections: Connections::default(),
-            on_local_stream: Callback1::default(),
+            send_constraints,
+            recv_constraints,
+            connections,
             on_connection_loss: Callback1::default(),
-            on_failed_local_stream: Rc::new(Callback1::default()),
+            on_failed_local_media: Rc::new(Callback1::default()),
+            on_local_track: Callback1::default(),
             on_close: Rc::new(Callback1::default()),
             close_reason: RefCell::new(CloseReason::ByClient {
                 reason: ClientDisconnect::RoomUnexpectedlyDropped,
                 is_err: true,
             }),
+        }
+    }
+
+    /// Toggles [`InnerRoom::recv_constraints`] or
+    /// [`InnerRoom::send_constraints`] media exchange status based on the
+    /// provided [`TrackDirection`], [`MediaKind`] and [`MediaSourceKind`].
+    fn set_constraints_media_state(
+        &self,
+        state: MediaState,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<MediaSourceKind>,
+    ) {
+        use media_exchange_state::Stable::Enabled;
+        use MediaState::{MediaExchange, Mute};
+        use TrackDirection::{Recv, Send};
+
+        match (direction, state) {
+            (Send, _) => {
+                self.send_constraints
+                    .set_media_state(state, kind, source_kind);
+            }
+            (Recv, MediaExchange(exchange)) => {
+                self.recv_constraints.set_enabled(exchange == Enabled, kind);
+            }
+            (Recv, Mute(_)) => {
+                unreachable!("Receivers muting is not implemented")
+            }
         }
     }
 
@@ -623,172 +1038,362 @@ impl InnerRoom {
         self.close_reason.replace(reason);
     }
 
-    /// Toggles [`Sender`]s [`MuteState`] by provided [`TransceiverKind`] in all
-    /// [`PeerConnection`]s in this [`Room`].
+    /// Toggles [`TransceiverSide`]s [`MediaState`] by provided
+    /// [`MediaKind`] in all [`PeerConnection`]s in this [`Room`].
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// [`TransceiverSide`]: crate::peer::TransceiverSide
     #[allow(clippy::filter_map)]
-    async fn toggle_mute(
+    async fn toggle_media_state(
         &self,
-        is_muted: bool,
-        kind: TransceiverKind,
+        state: MediaState,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<MediaSourceKind>,
     ) -> Result<(), Traced<RoomError>> {
-        let peer_mute_state_changed: Vec<_> = self
+        let disable_tracks: HashMap<_, _> = self
             .peers
             .get_all()
-            .iter()
+            .into_iter()
             .map(|peer| {
-                let desired_state = StableMuteState::from(is_muted);
-                let senders = peer.get_senders(kind);
-
-                let senders_to_mute = senders.into_iter().filter(|sender| {
-                    match sender.mute_state() {
-                        MuteState::Transition(t) => {
-                            t.intended() != desired_state
-                        }
-                        MuteState::Stable(s) => s != desired_state,
-                    }
-                });
-
-                let mut processed_senders: Vec<Rc<Sender>> = Vec::new();
-                let mut tracks_patches = Vec::new();
-                for sender in senders_to_mute {
-                    if let Err(e) =
-                        sender.mute_state_transition_to(desired_state)
-                    {
-                        for processed_sender in processed_senders {
-                            processed_sender.cancel_transition();
-                        }
-                        return Either::Left(future::err(tracerr::new!(e)));
-                    }
-                    tracks_patches.push(TrackPatch {
-                        id: sender.track_id(),
-                        is_muted: Some(is_muted),
-                    });
-                    processed_senders.push(sender);
-                }
-
-                let wait_state_change: Vec<_> = peer
-                    .get_senders(kind)
+                let new_media_exchange_states = peer
+                    .get_transceivers_sides(kind, direction, source_kind)
                     .into_iter()
-                    .map(|sender| sender.when_mute_state_stable(desired_state))
+                    .filter(|transceiver| transceiver.is_transitable())
+                    .map(|transceiver| (transceiver.track_id(), state))
                     .collect();
-
-                if !tracks_patches.is_empty() {
-                    self.rpc.send_command(Command::UpdateTracks {
-                        peer_id: peer.id(),
-                        tracks_patches,
-                    });
-                }
-
-                Either::Right(future::try_join_all(wait_state_change))
+                (peer.id(), new_media_exchange_states)
             })
             .collect();
 
-        future::try_join_all(peer_mute_state_changed)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-        Ok(())
+        self.update_media_states(disable_tracks).await
     }
 
-    /// Returns `true` if all [`Sender`]s of this [`Room`] is in provided
-    /// [`MuteState`].
-    pub fn is_all_peers_in_mute_state(
+    /// Updates [`MediaState`]s of the [`TransceiverSide`] with a
+    /// provided [`PeerId`] and [`TrackId`] to a provided
+    /// [`MediaState`]s.
+    ///
+    /// [`TransceiverSide`]: crate::peer::TransceiverSide
+    #[allow(clippy::filter_map)]
+    async fn update_media_states(
         &self,
-        kind: TransceiverKind,
-        mute_state: StableMuteState,
+        desired_states: HashMap<PeerId, HashMap<TrackId, MediaState>>,
+    ) -> Result<(), Traced<RoomError>> {
+        let stream_upd_sub: HashMap<PeerId, HashSet<TrackId>> = desired_states
+            .iter()
+            .map(|(id, states)| {
+                (
+                    *id,
+                    states
+                        .iter()
+                        .filter_map(|(id, state)| {
+                            if matches!(
+                                state,
+                                MediaState::MediaExchange(
+                                    media_exchange_state::Stable::Enabled
+                                )
+                            ) {
+                                Some(*id)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+        future::try_join_all(
+            desired_states
+                .into_iter()
+                .filter_map(|(peer_id, desired_states)| {
+                    self.peers.get(peer_id).map(|peer| (peer, desired_states))
+                })
+                .map(|(peer, desired_states)| {
+                    let transitions_futs: Vec<_> = desired_states
+                        .into_iter()
+                        .filter_map(move |(track_id, desired_state)| {
+                            peer.get_transceiver_side_by_id(track_id)
+                                .map(|trnscvr| (trnscvr, desired_state))
+                        })
+                        .filter_map(|(trnscvr, desired_state)| {
+                            if trnscvr.is_subscription_needed(desired_state) {
+                                Some((trnscvr, desired_state))
+                            } else {
+                                None
+                            }
+                        })
+                        .map(|(trnscvr, desired_state)| {
+                            trnscvr.media_state_transition_to(desired_state)?;
+
+                            Ok(trnscvr.when_media_state_stable(desired_state))
+                        })
+                        .collect::<Result<_, _>>()
+                        .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
+
+                    Ok(future::try_join_all(transitions_futs))
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(tracerr::map_from_and_wrap!())?,
+        )
+        .await
+        .map_err(tracerr::map_from_and_wrap!())?;
+
+        future::try_join_all(stream_upd_sub.into_iter().filter_map(
+            |(id, tracks_ids)| {
+                Some(
+                    self.peers
+                        .state()
+                        .get(id)?
+                        .local_stream_update_result(tracks_ids)
+                        .map_err(tracerr::map_from_and_wrap!(=> PeerError)),
+                )
+            },
+        ))
+        .map(|r| r.map(|_| ()))
+        .await
+        .map_err(tracerr::map_from_and_wrap!())
+        .map(|_| ())
+    }
+
+    /// Returns [`local::Track`]s for the provided [`MediaKind`] and
+    /// [`MediaSourceKind`].
+    ///
+    /// If [`MediaSourceKind`] is [`None`] then [`local::TrackHandle`]s for all
+    /// needed [`MediaSourceKind`]s will be returned.
+    ///
+    /// # Errors
+    ///
+    /// - [`RoomError::MediaManagerError`] if failed to obtain
+    ///   [`local::TrackHandle`] from the [`MediaManager`].
+    /// - [`RoomError::PeerConnectionError`] if failed to get
+    ///   [`MediaStreamSettings`].
+    ///
+    /// [`MediaStreamSettings`]: crate::MediaStreamSettings
+    async fn get_local_tracks(
+        &self,
+        kind: MediaKind,
+        source_kind: Option<MediaSourceKind>,
+    ) -> Result<Vec<Rc<local::Track>>, Traced<RoomError>> {
+        let requests: Vec<_> = self
+            .peers
+            .get_all()
+            .into_iter()
+            .filter_map(|p| p.get_media_settings(kind, source_kind).transpose())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        let mut result = Vec::new();
+        for req in requests {
+            let tracks = self
+                .media_manager
+                .get_tracks(req)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())
+                .map_err(|e| {
+                    self.on_failed_local_media
+                        .call(JasonError::from(e.clone()));
+
+                    e
+                })?;
+            for (track, is_new) in tracks {
+                if is_new {
+                    self.on_local_track
+                        .call(local::JsTrack::new(Rc::clone(&track)));
+                }
+                result.push(track);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Returns `true` if all [`Sender`]s or [`Receiver`]s with a provided
+    /// [`MediaKind`] and [`MediaSourceKind`] of this [`Room`] are in the
+    /// provided [`MediaState`].
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    /// [`Receiver`]: crate::peer::Receiver
+    pub fn is_all_peers_in_media_state(
+        &self,
+        kind: MediaKind,
+        direction: TrackDirection,
+        source_kind: Option<MediaSourceKind>,
+        state: MediaState,
     ) -> bool {
         self.peers
             .get_all()
             .into_iter()
-            .find(|p| !p.is_all_senders_in_mute_state(kind, mute_state))
+            .find(|p| {
+                !p.is_all_transceiver_sides_in_media_state(
+                    kind,
+                    direction,
+                    source_kind,
+                    state,
+                )
+            })
             .is_none()
+    }
+
+    /// Updates [`MediaState`]s to the provided `states_update` and disables all
+    /// [`Sender`]s which are doesn't have [`local::Track`].
+    ///
+    /// [`Sender`]: crate::peer::Sender
+    async fn disable_senders_without_tracks(
+        &self,
+        peer: &Rc<PeerConnection>,
+        kinds: LocalStreamUpdateCriteria,
+        mut states_update: HashMap<PeerId, HashMap<TrackId, MediaState>>,
+    ) -> Result<(), Traced<RoomError>> {
+        use media_exchange_state::Stable::Disabled;
+
+        self.send_constraints
+            .set_media_exchange_state_by_kinds(Disabled, kinds);
+        let senders_to_disable = peer.get_senders_without_tracks_ids(kinds);
+
+        states_update.entry(peer.id()).or_default().extend(
+            senders_to_disable
+                .into_iter()
+                .map(|id| (id, MediaState::from(Disabled))),
+        );
+        self.update_media_states(states_update)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(())
     }
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
     /// configured for some [`Room`], then this [`Room`] can only send
-    /// [`MediaStream`] that corresponds to this settings.
-    /// [`MediaStreamSettings`] update will change [`MediaStream`] in all
+    /// [`local::Track`]s that corresponds to this settings.
+    /// [`MediaStreamSettings`] update will change [`local::Track`]s in all
     /// sending peers, so that might cause new [getUserMedia()][1] request.
     ///
-    /// Media obtaining/injection errors are fired to `on_failed_local_stream`
+    /// Media obtaining/injection errors are fired to `on_failed_local_media`
     /// callback.
     ///
-    /// [`PeerConnection`]: crate::peer::PeerConnection
+    /// Will update [`media_exchange_state::Stable`]s of the [`Sender`]s which
+    /// are should be enabled or disabled.
+    ///
+    /// If `stop_first` set to `true` then affected [`local::Track`]s will be
+    /// dropped before new [`MediaStreamSettings`] is applied. This is usually
+    /// required when changing video source device due to hardware limitations,
+    /// e.g. having an active track sourced from device `A` may hinder
+    /// [getUserMedia()][1] requests to device `B`.
+    ///
+    /// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+    /// request to automatically rollback to previous settings if new settings
+    /// cannot be applied.
+    ///
+    /// If recovering from fail state isn't possible and `stop_first` set to
+    /// `true` then affected media types will be disabled.
+    ///
     /// [1]: https://tinyurl.com/rnxcavf
-    async fn set_local_media_settings(&self, settings: MediaStreamSettings) {
-        self.local_stream_settings.constrain(settings);
-        for peer in self.peers.get_all() {
-            if let Err(err) = peer
-                .update_local_stream()
-                .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-            {
-                self.on_failed_local_stream.call(JasonError::from(err));
+    /// [`Sender`]: crate::peer::Sender
+    #[async_recursion(?Send)]
+    async fn set_local_media_settings(
+        &self,
+        new_settings: MediaStreamSettings,
+        stop_first: bool,
+        rollback_on_fail: bool,
+    ) -> Result<(), ConstraintsUpdateError> {
+        use ConstraintsUpdateError as E;
+
+        let current_settings = self.send_constraints.inner();
+        self.send_constraints.constrain(new_settings);
+        let criteria_kinds_diff = self
+            .send_constraints
+            .calculate_kinds_diff(&current_settings);
+        let peers = self.peers.get_all();
+
+        if stop_first {
+            for peer in &peers {
+                peer.drop_send_tracks(criteria_kinds_diff).await;
             }
         }
+
+        let mut states_update: HashMap<_, HashMap<_, _>> = HashMap::new();
+        for peer in peers {
+            match peer
+                .update_local_stream(LocalStreamUpdateCriteria::all())
+                .await
+            {
+                Ok(states) => {
+                    states_update.entry(peer.id()).or_default().extend(
+                        states.into_iter().map(|(id, s)| (id, s.into())),
+                    );
+                }
+                Err(e) => {
+                    if !matches!(e.as_ref(), PeerError::MediaManager(_)) {
+                        return Err(E::errored(tracerr::map_from_and_wrap!()(
+                            e.clone(),
+                        )));
+                    }
+
+                    let err = if rollback_on_fail {
+                        self.set_local_media_settings(
+                            current_settings,
+                            stop_first,
+                            false,
+                        )
+                        .await
+                        .map_err(|err| {
+                            err.recovery_failed(tracerr::map_from_and_wrap!()(
+                                e.clone(),
+                            ))
+                        })?;
+
+                        E::recovered(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else if stop_first {
+                        self.disable_senders_without_tracks(
+                            &peer,
+                            criteria_kinds_diff,
+                            states_update,
+                        )
+                        .await
+                        .map_err(|err| {
+                            E::RecoverFailed {
+                                recover_reason: tracerr::map_from_and_new!(
+                                    e.clone()
+                                ),
+                                recover_fail_reasons: vec![
+                                    tracerr::map_from_and_new!(err),
+                                ],
+                            }
+                        })?;
+
+                        E::recovered(tracerr::map_from_and_wrap!()(e.clone()))
+                    } else {
+                        E::errored(tracerr::map_from_and_wrap!()(e.clone()))
+                    };
+
+                    return Err(err);
+                }
+            }
+        }
+
+        self.update_media_states(states_update)
+            .await
+            .map_err(|e| E::errored(tracerr::map_from_and_new!(e)))
     }
 
     /// Stops state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_lost(&self) {
-        for peer in self.peers.get_all() {
-            peer.stop_state_transitions_timers();
-        }
+        self.peers.connection_lost();
+        self.on_connection_loss
+            .call(ReconnectHandle::new(Rc::downgrade(&self.rpc)));
     }
 
+    /// Sends [`Command::SynchronizeMe`] with a current Client state to the
+    /// Media Server.
+    ///
     /// Resets state transition timers in all [`PeerConnection`]'s in this
     /// [`Room`].
     fn handle_rpc_connection_recovered(&self) {
-        for peer in self.peers.get_all() {
-            peer.reset_state_transitions_timers();
-        }
-    }
-
-    /// Creates new [`Sender`]s and [`Receiver`]s for each new [`Track`] in
-    /// provided [`PeerConnection`]. Negotiates [`PeerConnection`] if provided
-    /// `negotiation_role` is `Some`.
-    async fn create_tracks_and_maybe_negotiate(
-        &self,
-        peer: Rc<PeerConnection>,
-        tracks: Vec<Track>,
-        negotiation_role: Option<NegotiationRole>,
-    ) -> Result<(), Traced<RoomError>> {
-        match negotiation_role {
-            None => {
-                peer.create_tracks(tracks)
-                    .map_err(tracerr::map_from_and_wrap!())?;
-            }
-            Some(NegotiationRole::Offerer) => {
-                let sdp_offer = peer
-                    .get_offer(tracks)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                let mids =
-                    peer.get_mids().map_err(tracerr::map_from_and_wrap!())?;
-                let senders_statuses = peer.get_senders_statuses();
-                self.rpc.send_command(Command::MakeSdpOffer {
-                    peer_id: peer.id(),
-                    sdp_offer,
-                    senders_statuses,
-                    mids,
-                });
-            }
-            Some(NegotiationRole::Answerer(offer)) => {
-                let sdp_answer = peer
-                    .process_offer(offer, tracks)
-                    .await
-                    .map_err(tracerr::map_from_and_wrap!())?;
-                let senders_statuses = peer.get_senders_statuses();
-                self.rpc.send_command(Command::MakeSdpAnswer {
-                    peer_id: peer.id(),
-                    sdp_answer,
-                    senders_statuses,
-                });
-            }
-        };
-        Ok(())
+        self.peers.connection_recovered();
+        self.rpc.send_command(Command::SynchronizeMe {
+            state: self.peers.state().as_proto(),
+        });
     }
 }
 
@@ -802,6 +1407,8 @@ impl EventHandler for InnerRoom {
     ///
     /// If provided `sdp_offer` is `Some`, then offer is applied to a created
     /// peer, and [`Command::MakeSdpAnswer`] is emitted back to the RPC server.
+    ///
+    /// [`Connection`]: crate::api::Connection
     async fn on_peer_created(
         &self,
         peer_id: PeerId,
@@ -810,26 +1417,24 @@ impl EventHandler for InnerRoom {
         ice_servers: Vec<IceServer>,
         is_force_relayed: bool,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .create_peer(
-                peer_id,
-                ice_servers,
-                self.peer_event_sender.clone(),
-                is_force_relayed,
-                self.local_stream_settings.clone(),
-            )
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        self.connections
-            .create_connections_from_tracks(peer.id(), &tracks);
-        self.create_tracks_and_maybe_negotiate(
-            peer,
-            tracks,
+        let peer_state = peer::State::new(
+            peer_id,
+            ice_servers,
+            is_force_relayed,
             Some(negotiation_role),
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())?;
+        );
+        for track in &tracks {
+            peer_state
+                .insert_track(track, self.send_constraints.clone())
+                .map_err(|e| {
+                    self.on_failed_local_media
+                        .call(JasonError::from(e.clone()));
+                    tracerr::map_from_and_new!(e)
+                })?;
+        }
+
+        self.peers.state().insert(peer_id, peer_state);
+
         Ok(())
     }
 
@@ -841,11 +1446,28 @@ impl EventHandler for InnerRoom {
     ) -> Self::Output {
         let peer = self
             .peers
+            .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        peer.set_remote_answer(sdp_answer)
-            .await
-            .map_err(tracerr::map_from_and_wrap!())
+        peer.set_remote_sdp(sdp_answer);
+
+        Ok(())
+    }
+
+    /// Applies provided SDP to the [`peer::State`] with a provided [`PeerId`].
+    async fn on_local_description_applied(
+        &self,
+        peer_id: PeerId,
+        local_sdp: String,
+    ) -> Self::Output {
+        let peer_state = self
+            .peers
+            .state()
+            .get(peer_id)
+            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        peer_state.apply_local_sdp(local_sdp);
+
+        Ok(())
     }
 
     /// Applies specified [`IceCandidate`] to a specified [`PeerConnection`].
@@ -856,27 +1478,18 @@ impl EventHandler for InnerRoom {
     ) -> Self::Output {
         let peer = self
             .peers
+            .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
+        peer.add_ice_candidate(candidate);
 
-        peer.add_ice_candidate(
-            candidate.candidate,
-            candidate.sdp_m_line_index,
-            candidate.sdp_mid,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())
+        Ok(())
     }
 
     /// Disposes specified [`PeerConnection`]s.
-    async fn on_peers_removed(
-        &self,
-        peer_ids: HashSet<PeerId>,
-    ) -> Self::Output {
-        // TODO: drop connections
+    async fn on_peers_removed(&self, peer_ids: Vec<PeerId>) -> Self::Output {
         peer_ids.iter().for_each(|id| {
-            self.connections.close_connection(*id);
-            self.peers.remove(*id);
+            self.peers.state().remove(*id);
         });
         Ok(())
     }
@@ -886,43 +1499,81 @@ impl EventHandler for InnerRoom {
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
+    ///
+    /// [`Receiver`]: crate::peer::Receiver
+    /// [`Sender`]: crate::peer::Sender
     async fn on_tracks_applied(
         &self,
         peer_id: PeerId,
         updates: Vec<TrackUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
-        let peer = self
+        let peer_state = self
             .peers
+            .state()
             .get(peer_id)
             .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        let mut new_tracks = Vec::new();
-        let mut patches = Vec::new();
-        let mut removed_tracks = HashSet::new();
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => {
-                    new_tracks.push(track);
-                }
+                TrackUpdate::Added(track) => peer_state
+                    .insert_track(&track, self.send_constraints.clone())
+                    .map_err(|e| {
+                        self.on_failed_local_media
+                            .call(JasonError::from(e.clone()));
+                        tracerr::map_from_and_new!(e)
+                    })?,
                 TrackUpdate::Updated(track_patch) => {
-                    patches.push(track_patch);
+                    peer_state.patch_track(&track_patch)
                 }
-                TrackUpdate::Removed(track_id) => {
-                    removed_tracks.insert(track_id);
+                TrackUpdate::IceRestart => {
+                    peer_state.restart_ice();
                 }
             }
         }
-        peer.remove_tracks(&removed_tracks);
-        peer.patch_tracks(patches)
-            .map_err(tracerr::map_from_and_wrap!())?;
-        self.create_tracks_and_maybe_negotiate(
-            peer,
-            new_tracks,
-            negotiation_role,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!())?;
+        if let Some(negotiation_role) = negotiation_role {
+            peer_state.set_negotiation_role(negotiation_role).await;
+        }
+
+        Ok(())
+    }
+
+    /// Updates [`Connection`]'s [`ConnectionQualityScore`] by calling
+    /// [`Connection::update_quality_score()`][1].
+    ///
+    /// [`Connection`]: crate::api::Connection
+    /// [1]: crate::api::Connection::update_quality_score
+    async fn on_connection_quality_updated(
+        &self,
+        partner_member_id: MemberId,
+        quality_score: ConnectionQualityScore,
+    ) -> Self::Output {
+        if let Some(conn) = self.connections.get(&partner_member_id) {
+            conn.update_quality_score(quality_score);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    async fn on_room_joined(&self, _: MemberId) -> Self::Output {
+        unreachable!("Room can't receive Event::RoomJoined")
+    }
+
+    #[inline]
+    async fn on_room_left(
+        &self,
+        _: medea_client_api_proto::CloseReason,
+    ) -> Self::Output {
+        unreachable!("Room can't receive Event::RoomLeft")
+    }
+
+    /// Updates [`peer::repo::State`] with the provided [`proto::state::Room`].
+    #[inline]
+    async fn on_state_synchronized(
+        &self,
+        state: proto::state::Room,
+    ) -> Self::Output {
+        self.peers.apply(state);
         Ok(())
     }
 }
@@ -939,8 +1590,8 @@ impl PeerEventHandler for InnerRoom {
         peer_id: PeerId,
         candidate: String,
         sdp_m_line_index: Option<u16>,
-        sdp_mid: Option<Mid>,
-    ) -> Result<(), Traced<RoomError>> {
+        sdp_mid: Option<String>,
+    ) -> Self::Output {
         self.rpc.send_command(Command::SetIceCandidate {
             peer_id,
             candidate: IceCandidate {
@@ -953,29 +1604,30 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Handles [`PeerEvent::NewRemoteTrack`] event and passes received
-    /// [`MediaStreamTrack`] to the related [`Connection`].
+    /// [`remote::Track`] to the related [`Connection`].
+    ///
+    /// [`Connection`]: crate::api::Connection
+    /// [`Stream`]: futures::Stream
     async fn on_new_remote_track(
         &self,
-        _: PeerId,
-        sender_id: PeerId,
-        track_id: TrackId,
-        track: MediaStreamTrack,
+        sender_id: MemberId,
+        track: remote::Track,
     ) -> Self::Output {
         let conn = self
             .connections
-            .get(sender_id)
-            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemotePeer))?;
-        conn.add_remote_track(track_id, track);
+            .get(&sender_id)
+            .ok_or_else(|| tracerr::new!(RoomError::UnknownRemoteMember))?;
+        conn.add_remote_track(track);
+
         Ok(())
     }
 
-    /// Invokes `on_local_stream` [`Room`]'s callback.
-    async fn on_new_local_stream(
+    /// Invokes `on_local_track` [`Room`]'s callback.
+    async fn on_new_local_track(
         &self,
-        _: PeerId,
-        stream: MediaStream,
+        track: Rc<local::Track>,
     ) -> Self::Output {
-        self.on_local_stream.call(stream);
+        self.on_local_track.call(local::JsTrack::new(track));
         Ok(())
     }
 
@@ -1027,23 +1679,54 @@ impl PeerEventHandler for InnerRoom {
         Ok(())
     }
 
-    /// Handles [`PeerEvent::NewLocalStreamRequired`] event and updates local
-    /// stream of [`PeerConnection`] that sent request.
-    async fn on_new_local_stream_required(
+    /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
+    /// `on_failed_local_media` [`Room`]'s callback.
+    async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
+        self.on_failed_local_media.call(error);
+        Ok(())
+    }
+
+    /// Handles [`PeerEvent::NewSdpOffer`] event by sending
+    /// [`Command::MakeSdpOffer`] to the Media Server.
+    async fn on_new_sdp_offer(
         &self,
         peer_id: PeerId,
+        sdp_offer: String,
+        mids: HashMap<TrackId, String>,
+        transceivers_statuses: HashMap<TrackId, bool>,
     ) -> Self::Output {
-        let peer = self
-            .peers
-            .get(peer_id)
-            .ok_or_else(|| tracerr::new!(RoomError::NoSuchPeer(peer_id)))?;
-        if let Err(err) = peer
-            .update_local_stream()
-            .await
-            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-        {
-            self.on_failed_local_stream.call(JasonError::from(err));
-        };
+        self.rpc.send_command(Command::MakeSdpOffer {
+            peer_id,
+            sdp_offer,
+            mids,
+            transceivers_statuses,
+        });
+        Ok(())
+    }
+
+    /// Handles [`PeerEvent::NewSdpAnswer`] event by sending
+    /// [`Command::MakeSdpAnswer`] to the Media Server.
+    async fn on_new_sdp_answer(
+        &self,
+        peer_id: PeerId,
+        sdp_answer: String,
+        transceivers_statuses: HashMap<TrackId, bool>,
+    ) -> Self::Output {
+        self.rpc.send_command(Command::MakeSdpAnswer {
+            peer_id,
+            sdp_answer,
+            transceivers_statuses,
+        });
+        Ok(())
+    }
+
+    /// Handles [`PeerEvent::SendIntention`] event by sending the provided
+    /// [`Command`] to Media Server.
+    async fn on_media_update_command(
+        &self,
+        intention: Command,
+    ) -> Self::Output {
+        self.rpc.send_command(intention);
         Ok(())
     }
 }
@@ -1051,16 +1734,46 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
-        self.rpc.unsub();
-
         if let CloseReason::ByClient { reason, .. } =
             *self.close_reason.borrow()
         {
-            self.rpc.set_close_reason(reason);
+            self.rpc.close_with_reason(reason);
         };
 
-        self.on_close
+        if let Some(Err(e)) = self
+            .on_close
             .call(RoomCloseReason::new(*self.close_reason.borrow()))
-            .map(|result| result.map_err(console_error));
+        {
+            log::error!("Failed to call Room::on_close callback: {:?}", e);
+        }
+    }
+}
+
+#[cfg(feature = "mockable")]
+impl Room {
+    /// Returns [`PeerConnection`] stored in repository by its ID.
+    ///
+    /// Used to inspect [`Room`]'s inner state in integration tests.
+    #[inline]
+    pub fn get_peer_by_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<Rc<PeerConnection>> {
+        self.0.peers.get(peer_id)
+    }
+
+    /// Returns reference to the [`peer::repo::State`] of this [`Room`].
+    #[inline]
+    pub fn peers_state(&self) -> Rc<peer::repo::State> {
+        self.0.peers.state()
+    }
+
+    /// Lookups [`peer::State`] by the provided [`PeerId`].
+    #[inline]
+    pub fn get_peer_state_by_id(
+        &self,
+        peer_id: PeerId,
+    ) -> Option<Rc<peer::State>> {
+        self.0.peers.state().get(peer_id)
     }
 }

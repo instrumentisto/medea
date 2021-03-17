@@ -43,6 +43,8 @@ struct WebRtcPlayEndpointInner {
     ///
     /// In future this may be used for removing [`WebRtcPlayEndpoint`]
     /// and related peer.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     peer_id: Option<PeerId>,
 
     /// Indicator whether only `relay` ICE candidates are allowed for this
@@ -96,6 +98,8 @@ pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
     /// Creates new [`WebRtcPlayEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn new(
         id: Id,
         src_uri: SrcUri,
@@ -114,6 +118,8 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn src_uri(&self) -> SrcUri {
         self.0.borrow().src_uri()
     }
@@ -121,12 +127,16 @@ impl WebRtcPlayEndpoint {
     /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
     ///
     /// __This function will panic if pointer to [`Member`] was dropped.__
+    #[inline]
+    #[must_use]
     pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
 
     /// Returns weak pointer to owner [`Member`] of this
     /// [`WebRtcPlayEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn weak_owner(&self) -> WeakMember {
         self.0.borrow().weak_owner()
     }
@@ -134,11 +144,14 @@ impl WebRtcPlayEndpoint {
     /// Returns srcs's [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if weak pointer was dropped.__
+    #[inline]
+    #[must_use]
     pub fn src(&self) -> WebRtcPublishEndpoint {
         self.0.borrow().src()
     }
 
     /// Saves [`PeerId`] of this [`WebRtcPlayEndpoint`].
+    #[inline]
     pub fn set_peer_id(&self, peer_id: PeerId) {
         self.0.borrow_mut().set_peer_id(peer_id);
     }
@@ -146,6 +159,8 @@ impl WebRtcPlayEndpoint {
     /// Returns [`PeerId`] of this [`WebRtcPlayEndpoint`]'s [`Peer`].
     ///
     /// [`Peer`]: crate::media::peer::Peer
+    #[inline]
+    #[must_use]
     pub fn peer_id(&self) -> Option<PeerId> {
         self.0.borrow().peer_id()
     }
@@ -153,17 +168,22 @@ impl WebRtcPlayEndpoint {
     /// Resets state of this [`WebRtcPlayEndpoint`].
     ///
     /// _Atm this only resets [`PeerId`]._
+    #[inline]
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }
 
     /// Returns [`Id`] of this [`WebRtcPlayEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
     }
 
     /// Indicates whether only `relay` ICE candidates are allowed for this
     /// [`WebRtcPlayEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn is_force_relayed(&self) -> bool {
         self.0.borrow().is_force_relayed
     }
@@ -171,6 +191,7 @@ impl WebRtcPlayEndpoint {
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     #[allow(clippy::unused_self)]
     #[inline]
+    #[must_use]
     pub fn has_traffic_callback(&self) -> bool {
         // TODO: Must depend on on_start/on_stop endpoint callbacks, when those
         //       will be added (#91).
@@ -179,6 +200,8 @@ impl WebRtcPlayEndpoint {
 
     /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
     /// pointer.
+    #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
         WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
     }
@@ -186,6 +209,7 @@ impl WebRtcPlayEndpoint {
     /// Compares [`WebRtcPlayEndpoint`]'s inner pointers. If both pointers
     /// points to the same address, then returns `true`.
     #[cfg(test)]
+    #[must_use]
     pub fn ptr_eq(&self, another_play: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_play.0)
     }
@@ -201,13 +225,16 @@ impl WeakWebRtcPlayEndpoint {
     /// # Panics
     ///
     /// If weak pointer has been dropped.
+    #[inline]
+    #[must_use]
     pub fn upgrade(&self) -> WebRtcPlayEndpoint {
         WebRtcPlayEndpoint(self.0.upgrade().unwrap())
     }
 
     /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
-    /// Returns `None` if weak pointer has been dropped.
+    /// Returns [`None`] if weak pointer has been dropped.
+    #[inline]
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
         self.0.upgrade().map(WebRtcPlayEndpoint)
     }

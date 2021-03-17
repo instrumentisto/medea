@@ -141,17 +141,30 @@ message Member {
   // with a media server via Client API.
   string on_leave = 3;
   // Credentials of the Member to authorize via Client API with.
-  string credentials = 4;
+  //
+  // Plain and hashed credentials are supported. If no credentials provided,
+  // then random plain string will be generated. If no authentication is
+  // required then empty plain string can be used.
+  //
+  // Hashed variant only supports Argon2 hash at the moment.
+  // Member sid won't contain token if hashed credentials are used, so token
+  // query parameter should be appended manually.
+  oneof credentials {
+    // Argon2 hash of credentials.
+    string hash = 4;
+    // Plain text credentials.
+    string plain = 5;
+  }
   // Timeout of receiving heartbeat messages from the Member via Client API.
   // Once reached, the Member is considered being idle.
-  google.protobuf.Duration idle_timeout = 5;
+  google.protobuf.Duration idle_timeout = 6;
   // Timeout of the Member reconnecting via Client API.
   // Once reached, the Member is considered disconnected.
-  google.protobuf.Duration reconnect_timeout = 6;
+  google.protobuf.Duration reconnect_timeout = 7;
   // Interval of sending pings from a media server to the Member via Client API.
-  google.protobuf.Duration ping_interval = 7;
+  google.protobuf.Duration ping_interval = 8;
   // Pipeline of this Member.
-  map<string, Member.Element> pipeline = 8;
+  map<string, Member.Element> pipeline = 9;
 
   // Elements which Member's pipeline can contain.
   message Element {

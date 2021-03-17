@@ -8,6 +8,7 @@ pub mod vec;
 
 #[doc(inline)]
 pub use {
-    hash_map::ObservableHashMap, hash_set::ObservableHashSet,
-    vec::ObservableVec,
+    hash_map::{ObservableHashMap, ProgressableHashMap},
+    hash_set::{ObservableHashSet, ProgressableHashSet},
+    vec::{ObservableVec, ProgressableVec},
 };

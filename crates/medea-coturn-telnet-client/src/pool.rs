@@ -23,8 +23,6 @@
 //!
 //! [deadpool]: https://crates.io/crates/deadpool
 
-#![allow(clippy::needless_doctest_main)]
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use deadpool::managed;

@@ -16,7 +16,7 @@ Prepares [<paste release version>](<paste milestone link>) release.
 
 - Created PR:
     - [ ] In [draft mode][l:1]
-    - [ ] Name contains `WIP: ` prefix
+    - [ ] Name contains `Draft: ` prefix
     - [ ] Name contains issue reference
     - [ ] Has `k::` labels applied
     - [ ] Has assignee
@@ -30,7 +30,7 @@ Prepares [<paste release version>](<paste milestone link>) release.
 - Before merge:
     - [ ] Milestone is set
     - [ ] PR's name and description are correct and up-to-date
-    - [ ] `WIP: ` prefix is removed
+    - [ ] `Draft: ` prefix is removed
     - [ ] All temporary labels are removed
 
 

@@ -1,7 +1,7 @@
 //! [`TryJoinAll`] for [`ActorFuture`].
 //!
-//! [`actix::ActorFuture`]: actix::ActorFuture
-//! [`futures::future::TryJoinAll`]: futures::future::TryJoinAll
+//! [`ActorFuture`]: actix::ActorFuture
+//! [`TryJoinAll`]: futures::future::TryJoinAll
 
 use std::{
     mem,
@@ -25,8 +25,9 @@ use actix::{fut::ActorFuture, Actor};
 /// This function is analog for the [`try_join_all`], but for
 /// the [`ActorFuture`].
 ///
-/// [`actix::ActorFuture`]: actix::ActorFuture
-/// [`futures::future::TryJoinAll`]: futures::future::TryJoinAll
+/// [`ActorFuture`]: actix::ActorFuture
+/// [`TryJoinAll`]: futures::future::TryJoinAll
+/// [`try_join_all`]: futures::future::try_join_all
 pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
 where
     I: IntoIterator<Item = F>,
@@ -86,7 +87,7 @@ where
                 Poll::Ready(Ok(results))
             }
             FinalState::Error(e) => {
-                let _ = mem::replace(&mut self.elems, Box::pin([]));
+                drop(mem::replace(&mut self.elems, Box::pin([])));
                 Poll::Ready(Err(e))
             }
         }

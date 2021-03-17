@@ -1,4 +1,4 @@
-//! Reconnection for [`RpcClient`].
+//! Reconnection for [`RpcSession`].
 
 use std::{rc::Weak, time::Duration};
 
@@ -8,11 +8,11 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    rpc::{BackoffDelayer, RpcClient},
+    rpc::{BackoffDelayer, RpcSession},
     utils::{delay_for, HandlerDetachedError, JasonError, JsCaused, JsError},
 };
 
-/// Error which indicates that [`RpcClient`]'s (which this [`ReconnectHandle`]
+/// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]
 /// tries to reconnect) token is `None`.
 #[derive(Debug, Display, JsCaused)]
 struct NoTokenError;
@@ -23,12 +23,14 @@ struct NoTokenError;
 /// This handle will be provided into `Room.on_connection_loss` callback.
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ReconnectHandle(Weak<dyn RpcClient>);
+pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
 impl ReconnectHandle {
-    /// Instantiates new [`ReconnectHandle`] from the given [`RpcClient`]
+    /// Instantiates new [`ReconnectHandle`] from the given [`RpcSession`]
     /// reference.
-    pub fn new(rpc: Weak<dyn RpcClient>) -> Self {
+    #[inline]
+    #[must_use]
+    pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
     }
 }
@@ -37,7 +39,7 @@ impl ReconnectHandle {
 impl ReconnectHandle {
     /// Tries to reconnect after the provided delay in milliseconds.
     ///
-    /// If [`RpcClient`] is already reconnecting then new reconnection attempt
+    /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
@@ -46,10 +48,7 @@ impl ReconnectHandle {
             delay_for(Duration::from_millis(u64::from(delay_ms)).into()).await;
 
             let rpc = upgrade_or_detached!(rpc, JsValue)?;
-            let token = rpc
-                .get_token()
-                .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
-            rpc.connect(token)
+            rpc.reconnect()
                 .await
                 .map_err(|e| JsValue::from(JasonError::from(e)))?;
 
@@ -57,7 +56,8 @@ impl ReconnectHandle {
         })
     }
 
-    /// Tries to reconnect [`RpcClient`] in a loop with a growing backoff delay.
+    /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
+    /// delay.
     ///
     /// The first attempt to reconnect is guaranteed to happen no earlier than
     /// `starting_delay_ms`.
@@ -68,7 +68,7 @@ impl ReconnectHandle {
     /// After each reconnection attempt, delay between reconnections will be
     /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
     ///
-    /// If [`RpcClient`] is already reconnecting then new reconnection attempt
+    /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
     ///
@@ -82,18 +82,14 @@ impl ReconnectHandle {
     ) -> Promise {
         let rpc = self.0.clone();
         future_to_promise(async move {
-            let token = upgrade_or_detached!(rpc, JsValue)?
-                .get_token()
-                .ok_or_else(|| new_js_error!(NoTokenError => JsValue))?;
-
             let mut backoff_delayer = BackoffDelayer::new(
                 Duration::from_millis(u64::from(starting_delay_ms)).into(),
                 multiplier,
                 Duration::from_millis(u64::from(max_delay)).into(),
             );
             backoff_delayer.delay().await;
-            if upgrade_or_detached!(rpc, JsValue)?
-                .connect(token.clone())
+            while upgrade_or_detached!(rpc, JsValue)?
+                .reconnect()
                 .await
                 .is_err()
             {

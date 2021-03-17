@@ -11,7 +11,7 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{self, BoxFuture, FutureExt as _, TryFutureExt as _};
+use medea_client_api_proto::MemberId;
 use medea_control_api_proto::grpc::{
     api as proto,
     api::control_api_server::{
@@ -29,8 +29,7 @@ use crate::{
             ErrorResponse,
         },
         refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomSpec,
-        TryFromProtobufError,
+        EndpointId, EndpointSpec, MemberSpec, RoomSpec, TryFromProtobufError,
     },
     log::prelude::*,
     shutdown::ShutdownGracefully,
@@ -65,213 +64,146 @@ pub enum GrpcControlApiError {
 }
 
 /// Service which provides gRPC [Control API] implementation.
-#[derive(Clone)]
-struct ControlApiService {
-    /// [`Addr`] of [`RoomService`].
-    room_service: Addr<RoomService>,
-
-    /// Public URL of server. Address for exposed [Client API].
-    ///
-    /// [Client API]: https://tinyurl.com/yx9thsnr
-    public_url: String,
-}
+struct ControlApiService(Addr<RoomService>);
 
 impl ControlApiService {
     /// Implementation of `Create` method for [`Room`].
-    fn create_room(
+    ///
+    /// [`Room`]: crate::signalling::room::Room
+    async fn create_room(
         &self,
         spec: RoomSpec,
-    ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
-        let send_result = self.room_service.send(CreateRoom { spec });
-        async {
-            Ok(send_result
-                .await
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)??)
-        }
-        .boxed()
+    ) -> Result<Sids, GrpcControlApiError> {
+        Ok(self.0.send(CreateRoom { spec }).await??)
     }
 
     /// Implementation of `Create` method for [`Member`] element.
-    fn create_member(
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    async fn create_member(
         &self,
         id: MemberId,
         parent_fid: Fid<ToRoom>,
         spec: MemberSpec,
-    ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
-        let send_result = self.room_service.send(CreateMemberInRoom {
-            id,
-            parent_fid,
-            spec,
-        });
-        async {
-            Ok(send_result
-                .await
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)??)
-        }
-        .boxed()
+    ) -> Result<Sids, GrpcControlApiError> {
+        Ok(self
+            .0
+            .send(CreateMemberInRoom {
+                id,
+                parent_fid,
+                spec,
+            })
+            .await??)
     }
 
-    /// Implementation of `Create` method for [`Endpoint`] element.
-    fn create_endpoint(
+    /// Implementation of `Create` method for `Endpoint` element.
+    async fn create_endpoint(
         &self,
         id: EndpointId,
         parent_fid: Fid<ToMember>,
         spec: EndpointSpec,
-    ) -> BoxFuture<'static, Result<Sids, GrpcControlApiError>> {
-        let send_result = self.room_service.send(CreateEndpointInRoom {
-            id,
-            parent_fid,
-            spec,
-        });
-        async {
-            Ok(send_result
-                .await
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)??)
-        }
-        .boxed()
+    ) -> Result<Sids, GrpcControlApiError> {
+        Ok(self
+            .0
+            .send(CreateEndpointInRoom {
+                id,
+                parent_fid,
+                spec,
+            })
+            .await??)
     }
 
     /// Creates element based on provided [`proto::CreateRequest`].
-    pub fn create_element(
+    async fn create_element(
         &self,
         req: proto::CreateRequest,
-    ) -> BoxFuture<'static, Result<Sids, ErrorResponse>> {
+    ) -> Result<Sids, ErrorResponse> {
         let unparsed_parent_fid = req.parent_fid;
         let elem = if let Some(elem) = req.el {
             elem
         } else {
-            return future::err(ErrorResponse::new(
+            return Err(ErrorResponse::new(
                 ErrorCode::NoElement,
                 &unparsed_parent_fid,
-            ))
-            .boxed();
+            ));
         };
 
         if unparsed_parent_fid.is_empty() {
-            return match RoomSpec::try_from(elem).map_err(ErrorResponse::from) {
-                Ok(spec) => self.create_room(spec).err_into().boxed(),
-                Err(e) => future::err(e).boxed(),
-            };
+            return Ok(self.create_room(RoomSpec::try_from(elem)?).await?);
         }
 
-        let parent_fid = match StatefulFid::try_from(unparsed_parent_fid) {
-            Ok(parent_fid) => parent_fid,
-            Err(e) => {
-                return future::err(e.into()).boxed();
-            }
-        };
-
+        let parent_fid = StatefulFid::try_from(unparsed_parent_fid)?;
         match parent_fid {
             StatefulFid::Room(parent_fid) => match elem {
                 proto::create_request::El::Member(member) => {
                     let id: MemberId = member.id.clone().into();
-                    match MemberSpec::try_from(member)
-                        .map_err(ErrorResponse::from)
-                    {
-                        Ok(spec) => self
-                            .create_member(id, parent_fid, spec)
-                            .err_into()
-                            .boxed(),
-                        Err(e) => future::err(e).boxed(),
-                    }
+                    let member_spec = MemberSpec::try_from(member)?;
+                    Ok(self.create_member(id, parent_fid, member_spec).await?)
                 }
-                _ => future::err(ErrorResponse::new(
-                    ElementIdMismatch,
-                    &parent_fid,
-                ))
-                .boxed(),
+                _ => Err(ErrorResponse::new(ElementIdMismatch, &parent_fid)),
             },
             StatefulFid::Member(parent_fid) => {
-                let (endpoint, id) = match elem {
+                let (endpoint_spec, id) = match elem {
                     proto::create_request::El::WebrtcPlay(play) => (
-                        WebRtcPlayEndpoint::try_from(&play)
-                            .map(EndpointSpec::from),
+                        EndpointSpec::from(WebRtcPlayEndpoint::try_from(
+                            &play,
+                        )?),
                         play.id.into(),
                     ),
                     proto::create_request::El::WebrtcPub(publish) => (
-                        Ok(WebRtcPublishEndpoint::from(&publish))
-                            .map(EndpointSpec::from),
+                        EndpointSpec::from(WebRtcPublishEndpoint::from(
+                            &publish,
+                        )),
                         publish.id.into(),
                     ),
                     _ => {
-                        return future::err(ErrorResponse::new(
+                        return Err(ErrorResponse::new(
                             ElementIdMismatch,
                             &parent_fid,
                         ))
-                        .boxed()
                     }
                 };
 
-                match endpoint.map_err(ErrorResponse::from) {
-                    Ok(spec) => self
-                        .create_endpoint(id, parent_fid, spec)
-                        .err_into()
-                        .boxed(),
-                    Err(e) => future::err(e).boxed(),
-                }
+                Ok(self.create_endpoint(id, parent_fid, endpoint_spec).await?)
             }
             StatefulFid::Endpoint(_) => {
-                future::err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid))
-                    .boxed()
+                Err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid))
             }
         }
     }
 
     /// Deletes element by [`proto::IdRequest`].
-    pub fn delete_element(
+    async fn delete_element(
         &self,
         req: proto::IdRequest,
-    ) -> BoxFuture<'static, Result<(), ErrorResponse>> {
-        let room_service = self.room_service.clone();
-        async move {
-            let mut delete_elements_msg = DeleteElements::new();
-            for id in req.fid {
-                let fid = StatefulFid::try_from(id)?;
-                delete_elements_msg.add_fid(fid);
-            }
-            room_service
-                .send(delete_elements_msg.validate()?)
-                .await
-                .map_err(|e| {
-                    ErrorResponse::from(
-                        GrpcControlApiError::RoomServiceMailboxError(e),
-                    )
-                })??;
-            Ok(())
+    ) -> Result<(), GrpcControlApiError> {
+        let mut delete_elements_msg = DeleteElements::new();
+        for id in req.fid {
+            let fid = StatefulFid::try_from(id)?;
+            delete_elements_msg.add_fid(fid);
         }
-        .boxed()
+        self.0.send(delete_elements_msg.validate()?).await??;
+        Ok(())
     }
 
     /// Returns requested by [`proto::IdRequest`] [`proto::Element`]s serialized
     /// to protobuf.
-    pub fn get_element(
+    async fn get_element(
         &self,
         req: proto::IdRequest,
-    ) -> BoxFuture<
-        'static,
-        Result<HashMap<String, proto::Element>, ErrorResponse>,
-    > {
-        let room_service = self.room_service.clone();
-        async move {
-            let mut fids = Vec::new();
-            for id in req.fid {
-                let fid = StatefulFid::try_from(id)?;
-                fids.push(fid);
-            }
-
-            let elements =
-                room_service.send(Get(fids)).await.map_err(|err| {
-                    ErrorResponse::from(
-                        GrpcControlApiError::RoomServiceMailboxError(err),
-                    )
-                })??;
-
-            Ok(elements
-                .into_iter()
-                .map(|(id, value)| (id.to_string(), value))
-                .collect())
+    ) -> Result<HashMap<String, proto::Element>, GrpcControlApiError> {
+        let mut fids = Vec::new();
+        for id in req.fid {
+            let fid = StatefulFid::try_from(id)?;
+            fids.push(fid);
         }
-        .boxed()
+
+        let elements = self.0.send(Get(fids)).await??;
+
+        Ok(elements
+            .into_iter()
+            .map(|(id, value)| (id.to_string(), value))
+            .collect())
     }
 }
 
@@ -301,7 +233,7 @@ impl ControlApi for ControlApiService {
         let response = match self.delete_element(request.into_inner()).await {
             Ok(_) => proto::Response { error: None },
             Err(e) => proto::Response {
-                error: Some(e.into()),
+                error: Some(ErrorResponse::from(e).into()),
             },
         };
         Ok(tonic::Response::new(response))
@@ -319,7 +251,7 @@ impl ControlApi for ControlApiService {
             },
             Err(e) => proto::GetResponse {
                 elements: HashMap::new(),
-                error: Some(e.into()),
+                error: Some(ErrorResponse::from(e).into()),
             },
         };
         Ok(tonic::Response::new(response))
@@ -362,16 +294,11 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 pub async fn run(
-    room_repo: Addr<RoomService>,
+    room_service: Addr<RoomService>,
     app: &AppContext,
 ) -> Addr<GrpcServer> {
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;
-
-    let service = TonicControlApiServer::new(ControlApiService {
-        public_url: app.config.server.client.http.public_url.clone(),
-        room_service: room_repo,
-    });
 
     info!("Starting gRPC server on {}:{}", bind_ip, bind_port);
 
@@ -381,7 +308,9 @@ pub async fn run(
     let addr = format!("{}:{}", bind_ip, bind_port).parse().unwrap();
     Arbiter::spawn(async move {
         Server::builder()
-            .add_service(service)
+            .add_service(TonicControlApiServer::new(ControlApiService(
+                room_service,
+            )))
             .serve_with_shutdown(addr, async move {
                 grpc_shutdown_rx.await.ok();
             })

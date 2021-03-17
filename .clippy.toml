@@ -9,6 +9,7 @@ doc-valid-idents = [
     "OAuth", "OpenGL", "OpenSSH", "OpenSSL", "OpenStreetMap", "TrueType",
     "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
     "BigInt64Array", "BigUint64Array",
+    "ConstrainDOMString", "ConstrainULong",
     "DOMHighResTimeStamp",
     "getDisplayMedia", "getUserMedia", "gRPC",
     "MediaDeviceKind", "MediaDeviceInfo",
@@ -29,5 +30,5 @@ doc-valid-idents = [
     "RTCStats", "RTCStatsReport",
     "RTCTrackEvent",
     "RTCVideoSenderStats",
-    "WebRTC", "WebSocket",
+    "WebDriver", "WebRTC", "WebSocket",
 ]

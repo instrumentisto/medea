@@ -4,7 +4,7 @@
 
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     convert::TryFrom as _,
     rc::{Rc, Weak},
     time::Duration,
@@ -12,18 +12,19 @@ use std::{
 
 use derive_more::Display;
 use failure::Fail;
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{self as client_proto, MemberId, PeerId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+        member::Credential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
-        EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
-        TryFromElementError, WebRtcPlayId, WebRtcPublishId,
+        EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
+        WebRtcPublishId,
     },
-    conf::Rpc as RpcConf,
+    conf,
     log::prelude::*,
 };
 
@@ -69,6 +70,8 @@ pub struct Member(Rc<RefCell<MemberInner>>);
 #[derive(Debug)]
 struct MemberInner {
     /// [`RoomId`] of [`Room`] to which this [`Member`] relates.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     room_id: RoomId,
 
     /// ID of this [`Member`].
@@ -81,7 +84,7 @@ struct MemberInner {
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
-    credentials: String,
+    credentials: Credential,
 
     /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -109,9 +112,11 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
+    #[inline]
+    #[must_use]
     pub fn new(
         id: MemberId,
-        credentials: String,
+        credentials: Credential,
         room_id: RoomId,
         idle_timeout: Duration,
         reconnect_timeout: Duration,
@@ -142,13 +147,12 @@ impl Member {
         room_spec: &RoomSpec,
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
-        let element = room_spec.pipeline.get(member_id).map_or(
-            Err(MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
+        let element = room_spec.pipeline.get(member_id).ok_or_else(|| {
+            MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
                 self.room_id(),
                 member_id.clone(),
-            ))),
-            Ok,
-        )?;
+            ))
+        })?;
 
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
@@ -263,6 +267,8 @@ impl Member {
     }
 
     /// Returns [`Fid`] to this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn get_fid(&self) -> Fid<ToMember> {
         Fid::<ToMember>::new(self.room_id(), self.id())
     }
@@ -271,6 +277,8 @@ impl Member {
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
+    #[inline]
+    #[must_use]
     pub fn get_fid_to_endpoint(
         &self,
         endpoint_id: EndpointId,
@@ -283,7 +291,7 @@ impl Member {
     /// All [`PeerId`]s related to this [`Member`] will be removed.
     ///
     /// [`Peer`]: crate::media::peer::Peer
-    pub fn peers_removed(&self, peer_ids: &HashSet<PeerId>) {
+    pub fn peers_removed(&self, peer_ids: &[PeerId]) {
         self.srcs()
             .values()
             .for_each(|p| p.remove_peer_ids(peer_ids));
@@ -296,26 +304,45 @@ impl Member {
     }
 
     /// Returns [`MemberId`] of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> MemberId {
         self.0.borrow().id.clone()
     }
 
     /// Returns credentials of this [`Member`].
-    pub fn credentials(&self) -> String {
+    #[inline]
+    #[must_use]
+    pub fn credentials(&self) -> Credential {
         self.0.borrow().credentials.clone()
     }
 
+    /// Verifies provided [`client_proto::Credential`].
+    #[inline]
+    #[must_use]
+    pub fn verify_credentials(
+        &self,
+        credentials: &client_proto::Credential,
+    ) -> bool {
+        self.0.borrow().credentials.verify(&credentials)
+    }
+
     /// Returns all srcs of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
     }
 
     /// Returns all sinks endpoints of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn sinks(&self) -> HashMap<WebRtcPlayId, WebRtcPlayEndpoint> {
         self.0.borrow().sinks.clone()
     }
 
     /// Returns partner [`Member`]s of this [`Member`].
+    #[must_use]
     pub fn partners(&self) -> Vec<Member> {
         let this = self.0.borrow();
         this.srcs
@@ -341,6 +368,8 @@ impl Member {
 
     /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
     /// [`WebRtcPublishId`].
+    #[inline]
+    #[must_use]
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -349,6 +378,8 @@ impl Member {
     }
 
     /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
+    #[inline]
+    #[must_use]
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
@@ -357,21 +388,27 @@ impl Member {
     }
 
     /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
+    #[inline]
     pub fn remove_sink(&self, id: &WebRtcPlayId) {
         self.0.borrow_mut().sinks.remove(id);
     }
 
     /// Removes source [`WebRtcPublishEndpoint`] from this [`Member`].
+    #[inline]
     pub fn remove_src(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().srcs.remove(id);
     }
 
     /// Takes sink from [`Member`]'s `sinks`.
+    #[inline]
+    #[must_use]
     pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
     /// Takes src from [`Member`]'s `srsc`.
+    #[inline]
+    #[must_use]
     pub fn take_src(
         &self,
         id: &WebRtcPublishId,
@@ -380,6 +417,8 @@ impl Member {
     }
 
     /// Returns [`RoomId`] of this [`Member`].
+    #[inline]
+    #[must_use]
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
     }
@@ -435,6 +474,8 @@ impl Member {
     }
 
     /// Downgrades strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
+    #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
     }
@@ -442,16 +483,22 @@ impl Member {
     /// Compares pointers. If both pointers point to the same address, then
     /// returns `true`.
     #[cfg(test)]
+    #[inline]
+    #[must_use]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnJoin` callback.
+    #[inline]
+    #[must_use]
     pub fn get_on_join(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_join.clone()
     }
 
     /// Returns [`CallbackUrl`] to which Medea should send `OnLeave` callback.
+    #[inline]
+    #[must_use]
     pub fn get_on_leave(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_leave.clone()
     }
@@ -460,6 +507,8 @@ impl Member {
     /// Client API.
     ///
     /// Once reached, the [`Member`] is considered being idle.
+    #[inline]
+    #[must_use]
     pub fn get_idle_timeout(&self) -> Duration {
         self.0.borrow().idle_timeout
     }
@@ -467,12 +516,16 @@ impl Member {
     /// Returns timeout of the [`Member`] reconnecting via Client API.
     ///
     /// Once reached, the [`Member`] is considered disconnected.
+    #[inline]
+    #[must_use]
     pub fn get_reconnect_timeout(&self) -> Duration {
         self.0.borrow().reconnect_timeout
     }
 
     /// Returns interval of sending heartbeat `Ping`s to the [`Member`] via
     /// Client API.
+    #[inline]
+    #[must_use]
     pub fn get_ping_interval(&self) -> Duration {
         self.0.borrow().ping_interval
     }
@@ -492,11 +545,15 @@ impl WeakMember {
     /// Upgrades weak pointer to strong pointer.
     ///
     /// This function will __panic__ if weak pointer was dropped.
+    #[inline]
+    #[must_use]
     pub fn upgrade(&self) -> Member {
         Member(Weak::upgrade(&self.0).unwrap())
     }
 
     /// Safely upgrades to [`Member`].
+    #[inline]
+    #[must_use]
     pub fn safe_upgrade(&self) -> Option<Member> {
         Weak::upgrade(&self.0).map(Member)
     }
@@ -515,7 +572,7 @@ impl WeakMember {
 /// Errors with [`MembersLoadError`] if loading [`Member`] fails.
 pub fn parse_members(
     room_spec: &RoomSpec,
-    rpc_conf: RpcConf,
+    rpc_conf: conf::Rpc,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
@@ -529,7 +586,7 @@ pub fn parse_members(
         .map(|(id, member)| {
             let new_member = Member::new(
                 id.clone(),
-                member.credentials().to_string(),
+                member.credentials().clone(),
                 room_spec.id.clone(),
                 member.idle_timeout().unwrap_or(rpc_conf.idle_timeout),
                 member
@@ -584,7 +641,7 @@ impl Into<proto::Member> for Member {
 
         proto::Member {
             id: self.id().to_string(),
-            credentials: self.credentials(),
+            credentials: Some(self.credentials().into()),
             on_leave: self
                 .get_on_leave()
                 .map(|c| c.to_string())
@@ -619,7 +676,9 @@ impl Into<proto::Element> for Member {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::control::{MemberId, RootElement};
+    use medea_client_api_proto::MemberId;
+
+    use crate::api::control::RootElement;
 
     use super::*;
 
@@ -630,7 +689,8 @@ mod tests {
               pipeline:
                 caller:
                   kind: Member
-                  credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       publish:
@@ -639,7 +699,8 @@ mod tests {
                           p2p: Always
                 some-member:
                   kind: Member
-                  credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       publish:
@@ -648,7 +709,8 @@ mod tests {
                           p2p: Always
                 responder:
                   kind: Member
-                  credentials: test
+                  credentials:
+                    plain: test
                   spec:
                     pipeline:
                       play:
@@ -670,7 +732,7 @@ mod tests {
         let room_element: RootElement =
             serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        parse_members(&room_spec, RpcConf::default()).unwrap()
+        parse_members(&room_spec, conf::Rpc::default()).unwrap()
     }
 
     #[test]

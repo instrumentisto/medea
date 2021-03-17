@@ -5,6 +5,7 @@
 
 server:
   image:
+    image: instrumentisto/medea
     tag: dev
     pullPolicy: IfNotPresent
   conf:
@@ -17,22 +18,14 @@ server:
 
   control-mock:
     image:
+      image: instrumentisto/medea-control-api-mock
       tag: dev
       pullPolicy: IfNotPresent
-
-  coturn:
-    image:
-      tag: "4.5"
-      pullPolicy: Always
-
-  coturn-db:
-    image:
-      tag: alpine
-      pullPolicy: Always
 
 
 web-client:
   image:
+    repository: instrumentisto/medea-demo
     tag: dev
     pullPolicy: IfNotPresent
 

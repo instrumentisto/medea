@@ -1,6 +1,12 @@
 Medea's Control API mock server
 ===============================
 
+[Docker Hub](https://hub.docker.com/r/instrumentisto/medea-control-api-mock)
+| [GitHub Container Registry](https://github.com/orgs/instrumentisto/packages/container/package/medea-control-api-mock)
+| [Quay.io](https://quay.io/repository/instrumentisto/medea-control-api-mock)
+
+[Changelog](https://github.com/instrumentisto/medea/blob/master/mock/control-api/CHANGELOG.md)
+
 This app is used for E2E tests and for debugging purposes of [Medea]'s [Control API].
 
 
@@ -89,6 +95,29 @@ Currently, it supports two kinds of events (`Created` and `Deleted`) with the fo
   "fid": "room_id/member_id"
 }
 ```
+
+#### 3. `Broadcast` event
+
+Additionally, [WebSocket] clients can send arbitrary messages, and those will be broadcast to other [WebSocket] clients that subscribed to the same `room_id`. The only validation that app performs is that message is a valid JSON.
+
+```json
+{
+    "method": "Broadcast",
+    "payload": {
+        "anything": "that other user sent",
+        "asd": 123 
+    }
+}
+```
+
+
+
+
+## License
+
+Copyright © 2021 Instrumentisto Team, <https://github.com/instrumentisto>
+
+This software is subject to the terms of the [Blue Oak Model License 1.0.0](https://github.com/instrumentisto/medea/blob/master/mock/control-api/LICENSE.md). If a copy of the [BlueOak-1.0.0](https://spdx.org/licenses/BlueOak-1.0.0.html) license was not distributed with this file, You can obtain one at <https://blueoakcouncil.org/license/1.0.0>.
 
 
 

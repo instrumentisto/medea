@@ -23,18 +23,34 @@
 //! [2]: https://tinyurl.com/y8bacb93
 //! [3]: https://tinyurl.com/y4j3b4cs
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![deny(broken_intra_doc_links)]
+#![forbid(unsafe_code)]
+
+pub mod state;
 pub mod stats;
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryInto as _,
-};
+use std::collections::HashMap;
 
-use derive_more::{Constructor, Display, From, Into};
+use derive_more::{Constructor, Display, From};
 use medea_macro::dispatchable;
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use self::stats::RtcStat;
+
+/// ID of `Room`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct RoomId(pub String);
+
+/// ID of `Member`.
+#[derive(
+    Clone, Debug, Serialize, Deserialize, Eq, Hash, PartialEq, From, Display,
+)]
+#[from(forward)]
+pub struct MemberId(pub String);
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -54,17 +70,12 @@ pub struct PeerId(pub u32);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u32);
 
-/// A [`String`] which uniquely identifies the pairing of source and destination
-/// of the transceiver's stream. Its value is taken from the media ID of the SDP
-/// m-line.
-///
-/// [Web API doc][1]
-///
-/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpTransceiver/mid
-#[cfg_attr(feature = "medea", derive(Deserialize, Debug, Hash, Default))]
-#[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Display, From, Into, PartialEq, Eq)]
-pub struct Mid(pub String);
+/// Credential used for `Member` authentication.
+#[derive(
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
+)]
+#[from(forward)]
+pub struct Credential(pub String);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
@@ -78,10 +89,6 @@ pub trait Incrementable {
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {
-            // TODO: Remove `clippy::must_use_candidate` once the issue below is
-            //       resolved:
-            //       https://github.com/rust-lang/rust-clippy/issues/4779
-            #[allow(clippy::must_use_candidate)]
             #[inline]
             fn incr(&self) -> Self {
                 Self(self.0 + 1)
@@ -95,8 +102,10 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-// TODO: should be properly shared between medea and jason
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(tag = "msg", content = "data")]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `ping` message that `Media Server` is expected to send to `Client`
@@ -105,11 +114,36 @@ pub enum ServerMsg {
 
     /// `Media Server` notifies `Client` about happened facts and it reacts on
     /// them to reach the proper state.
-    Event(Event),
+    Event {
+        /// ID of `Room` that this [`Event`] is associated with.
+        room_id: RoomId,
+
+        /// Actual [`Event`] sent to `Client`.
+        event: Event,
+    },
 
     /// `Media Server` notifies `Client` about necessity to update its RPC
     /// settings.
     RpcSettings(RpcSettings),
+}
+
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Debug, PartialEq)]
+/// Message from 'Client' to 'Media Server'.
+pub enum ClientMsg {
+    /// `pong` message that `Client` answers with to `Media Server` in response
+    /// to received [`ServerMsg::Ping`].
+    Pong(u32),
+
+    /// Request of `Client` to change the state on `Media Server`.
+    Command {
+        /// ID of `Room` that this [`Command`] is associated with.
+        room_id: RoomId,
+
+        /// Actual [`Command`] sent to `Media Server`.
+        command: Command,
+    },
 }
 
 /// RPC settings of `Client` received from `Media Server`.
@@ -127,18 +161,6 @@ pub struct RpcSettings {
     pub ping_interval_ms: u32,
 }
 
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
-/// Message from 'Client' to 'Media Server'.
-pub enum ClientMsg {
-    /// `pong` message that `Client` answers with to `Media Server` in response
-    /// to received [`ServerMsg::Ping`].
-    Pong(u32),
-
-    /// Request of `Client` to change the state on `Media Server`.
-    Command(Command),
-}
-
 /// WebSocket message from Web Client to Media Server.
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
@@ -146,28 +168,51 @@ pub enum ClientMsg {
 #[serde(tag = "command", content = "data")]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    /// Request of `Client` to join `Room`.
+    JoinRoom {
+        /// ID of `Member` with which [`Credential`] `Client` want to join.
+        member_id: MemberId,
+
+        /// [`Credential`] of `Client`'s `Member`.
+        credential: Credential,
+    },
+
+    /// Request of `Client` to leave `Room`.
+    LeaveRoom {
+        /// ID of leaving `Member`.
+        member_id: MemberId,
+    },
+
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
+        /// ID of the `Peer` for which Web Client sends SDP Offer.
         peer_id: PeerId,
+
+        /// SDP Offer of the `Peer`.
         sdp_offer: String,
+
         /// Associations between [`Track`] and transceiver's
         /// [media description][1].
         ///
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-        mids: HashMap<TrackId, Mid>,
+        mids: HashMap<TrackId, String>,
 
-        /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
+        /// ID of the `Peer` for which Web Client sends SDP Answer.
         peer_id: PeerId,
+
+        /// SDP Answer of the `Peer`.
         sdp_answer: String,
-        /// Publishing statuses of the senders from this Peer.
-        senders_statuses: HashMap<TrackId, bool>,
+
+        /// Statuses of `Peer` transceivers.
+        transceivers_statuses: HashMap<TrackId, bool>,
     },
 
     /// Web Client sends Ice Candidate.
@@ -186,8 +231,12 @@ pub enum Command {
     /// Media Server gives permission by sending [`Event::TracksApplied`].
     UpdateTracks {
         peer_id: PeerId,
-        tracks_patches: Vec<TrackPatch>,
+        tracks_patches: Vec<TrackPatchCommand>,
     },
+
+    /// Web Client asks Media Server to synchronize Client State with a Server
+    /// State.
+    SynchronizeMe { state: state::Room },
 }
 
 /// Web Client's Peer Connection metrics.
@@ -210,12 +259,44 @@ pub enum PeerMetrics {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Debug, PartialEq)]
 pub enum IceConnectionState {
+    /// ICE agent is gathering addresses or is waiting to be given remote
+    /// candidates.
     New,
+
+    /// ICE agent has been given one or more remote candidates and is checking
+    /// pairs of local and remote candidates against one another to try to find
+    /// a compatible match, but hasn't yet found a pair which will allow the
+    /// `PeerConnection` to be made. It's possible that gathering of candidates
+    /// is also still underway.
     Checking,
+
+    /// Usable pairing of local and remote candidates has been found for all
+    /// components of the connection, and the connection has been established.
+    /// It's possible that gathering is still underway, and it's also possible
+    /// that the ICE agent is still checking candidates against one another
+    /// looking for a better connection to use.
     Connected,
+
+    /// ICE agent has finished gathering candidates, has checked all pairs
+    /// against one another, and has found a connection for all components.
     Completed,
+
+    /// ICE candidate has checked all candidates pairs against one another and
+    /// has failed to find compatible matches for all components of the
+    /// connection. It is, however, possible that the ICE agent did find
+    /// compatible connections for some components.
     Failed,
+
+    /// Checks to ensure that components are still connected failed for at
+    /// least one component of the `PeerConnection`. This is a less stringent
+    /// test than [`IceConnectionState::Failed`] and may trigger intermittently
+    /// and resolve just as spontaneously on less reliable networks, or during
+    /// temporary disconnections. When the problem resolves, the connection may
+    /// return to the [`IceConnectionState::Connected`] state.
     Disconnected,
+
+    /// ICE agent for this `PeerConnection` has shut down and is no longer
+    /// handling requests.
     Closed,
 }
 
@@ -224,16 +305,61 @@ pub enum IceConnectionState {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PeerConnectionState {
-    Closed,
-    Failed,
-    Disconnected,
+    /// At least one of the connection's ICE transports are in the
+    /// [`IceConnectionState::New`] state, and none of them are in one
+    /// of the following states: [`IceConnectionState::Checking`],
+    /// [`IceConnectionState::Failed`], or
+    /// [`IceConnectionState::Disconnected`], or all of the connection's
+    /// transports are in the [`IceConnectionState::Closed`] state.
     New,
+
+    /// One or more of the ICE transports are currently in the process of
+    /// establishing a connection; that is, their [`IceConnectionState`] is
+    /// either [`IceConnectionState::Checking`] or
+    /// [`IceConnectionState::Connected`], and no transports are in the
+    /// [`IceConnectionState::Failed`] state.
     Connecting,
+
+    /// Every ICE transport used by the connection is either in use (state
+    /// [`IceConnectionState::Connected`] or [`IceConnectionState::Completed`])
+    /// or is closed ([`IceConnectionState::Closed`]); in addition,
+    /// at least one transport is either [`IceConnectionState::Connected`] or
+    /// [`IceConnectionState::Completed`].
     Connected,
+
+    /// At least one of the ICE transports for the connection is in the
+    /// [`IceConnectionState::Disconnected`] state and none of the other
+    /// transports are in the state [`IceConnectionState::Failed`] or
+    /// [`IceConnectionState::Checking`].
+    Disconnected,
+
+    /// One or more of the ICE transports on the connection is in the
+    /// [`IceConnectionState::Failed`] state.
+    Failed,
+
+    /// The `PeerConnection` is closed.
+    Closed,
+}
+
+impl From<IceConnectionState> for PeerConnectionState {
+    fn from(ice_con_state: IceConnectionState) -> Self {
+        use IceConnectionState as IceState;
+
+        match ice_con_state {
+            IceState::New => Self::New,
+            IceState::Checking => Self::Connecting,
+            IceState::Connected | IceState::Completed => Self::Connected,
+            IceState::Failed => Self::Failed,
+            IceState::Disconnected => Self::Disconnected,
+            IceState::Closed => Self::Closed,
+        }
+    }
 }
 
 /// Reason of disconnecting Web Client from Media Server.
-#[derive(Copy, Clone, Debug, Deserialize, Display, Serialize, Eq, PartialEq)]
+#[derive(
+    Copy, Clone, Debug, Deserialize, Display, Serialize, Eq, PartialEq,
+)]
 pub enum CloseReason {
     /// Client session was finished on a server side.
     Finished,
@@ -263,7 +389,7 @@ pub enum CloseReason {
 /// to Web Client.
 ///
 /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
-#[derive(Constructor, Debug, Deserialize, Serialize)]
+#[derive(Constructor, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CloseDescription {
     /// Reason of why WebSocket connection has been closed.
     pub reason: CloseReason,
@@ -275,6 +401,18 @@ pub struct CloseDescription {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
+    /// `Media Server` notifies `Client` that he joined `Room`.
+    RoomJoined {
+        /// ID of `Member` which joined `Room`.
+        member_id: MemberId,
+    },
+
+    /// `Media Server` notifies `Client` that he left `Room`.
+    RoomLeft {
+        /// [`CloseReason`] with which `Client` was left.
+        close_reason: CloseReason,
+    },
+
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
@@ -289,6 +427,9 @@ pub enum Event {
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
+    /// Media Server notifies Web Client that his SDP offer was applied.
+    LocalDescriptionApplied { peer_id: PeerId, sdp_offer: String },
+
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
     IceCandidateDiscovered {
@@ -298,7 +439,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: HashSet<PeerId> },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// `Peer`.
@@ -315,6 +456,18 @@ pub enum Event {
         /// If `None` then no (re)negotiation should be done.
         negotiation_role: Option<NegotiationRole>,
     },
+
+    /// Media Server notifies about connection quality score update.
+    ConnectionQualityUpdated {
+        /// Partner [`MemberId`] of the `Peer`.
+        partner_member_id: MemberId,
+
+        /// Estimated connection quality.
+        quality_score: ConnectionQualityScore,
+    },
+
+    /// Media Server synchronizes Web Client about State synchronization.
+    StateSynchronized { state: state::Room },
 }
 
 /// `Peer`'s negotiation role.
@@ -325,8 +478,9 @@ pub enum Event {
 /// - If [`Event`] contains [`NegotiationRole::Answerer`], then `Peer` is
 ///   expected to apply provided SDP Offer and provide its SDP Answer in a
 ///   [`Command::MakeSdpAnswer`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Clone, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Debug)]
 pub enum NegotiationRole {
     /// [`Command::MakeSdpOffer`] should be sent by client.
     Offerer,
@@ -342,25 +496,27 @@ pub enum TrackUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
 
-    /// [`Track`] should be updated by this [`TrackPatch`] in the `Peer`.
-    ///
-    /// Can only refer tracks already known to the `Peer`.
-    Updated(TrackPatch),
-
     /// `Track` with a provided [`TrackId`] should be removed from the `Peer`.
     ///
     /// Can only refer tracks already known to the `Peer`.
     Removed(TrackId),
+
+    /// [`Track`] should be updated by this [`TrackPatchEvent`] in the `Peer`.
+    /// Can only refer tracks already known to the `Peer`.
+    Updated(TrackPatchEvent),
+
+    /// `Peer` should start ICE restart process on the next renegotiation.
+    IceRestart,
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
-    pub sdp_mid: Option<Mid>,
+    pub sdp_mid: Option<String>,
 }
 
 /// [`Track`] with specified direction.
@@ -373,19 +529,98 @@ pub struct Track {
 }
 
 impl Track {
-    /// Returns `true` if this [`Track`] is required to call starting.
+    /// Indicates whether this [`Track`] is required to call starting.
     #[must_use]
-    pub fn is_required(&self) -> bool {
-        self.media_type.is_required()
+    pub fn required(&self) -> bool {
+        self.media_type.required()
     }
 }
 
-/// Path to existing [`Track`] and field which can be updated.
+/// Patch of the [`Track`] which Web Client can request with
+/// [`Command::UpdateTracks`].
+#[cfg_attr(feature = "medea", derive(Clone, Debug, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Eq, PartialEq)]
+pub struct TrackPatchCommand {
+    pub id: TrackId,
+    pub enabled: Option<bool>,
+    pub muted: Option<bool>,
+}
+
+/// Patch of the [`Track`] which Media Server can send with
+/// [`Event::TracksApplied`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub struct TrackPatch {
+pub struct TrackPatchEvent {
+    /// ID of the [`Track`] which should be patched.
     pub id: TrackId,
-    pub is_muted: Option<bool>,
+
+    /// Media exchange state of the concrete `Member`.
+    ///
+    /// This state doesn't indicates that connection between two `Member`s are
+    /// really disabled. This is intention of this `Member`.
+    pub enabled_individual: Option<bool>,
+
+    /// Media exchange state of the connection between `Member`s.
+    ///
+    /// This state indicates real media exchange state between `Member`s. But
+    /// this state doesn't changes intention of this `Member`.
+    ///
+    /// So intention of this `Member` (`enabled_individual`) can be
+    /// `false`, but real media exchange state can be `true`.
+    pub enabled_general: Option<bool>,
+
+    /// `Track` mute state. Muting and unmuting can be performed without adding
+    /// / removing tracks from transceivers, hence renegotiation is not
+    /// required.
+    pub muted: Option<bool>,
+}
+
+impl From<TrackPatchCommand> for TrackPatchEvent {
+    fn from(from: TrackPatchCommand) -> Self {
+        Self {
+            id: from.id,
+            enabled_individual: from.enabled,
+            enabled_general: None,
+            muted: from.muted,
+        }
+    }
+}
+
+impl TrackPatchEvent {
+    /// Returns new empty [`TrackPatchEvent`] with a provided [`TrackId`].
+    #[inline]
+    #[must_use]
+    pub fn new(id: TrackId) -> Self {
+        Self {
+            id,
+            enabled_general: None,
+            enabled_individual: None,
+            muted: None,
+        }
+    }
+
+    /// Merges this [`TrackPatchEvent`] with a provided [`TrackPatchEvent`].
+    ///
+    /// Does nothing if [`TrackId`] of this [`TrackPatchEvent`] and the
+    /// provided [`TrackPatchEvent`] are different.
+    pub fn merge(&mut self, another: &Self) {
+        if self.id != another.id {
+            return;
+        }
+
+        if let Some(enabled_general) = another.enabled_general {
+            self.enabled_general = Some(enabled_general);
+        }
+
+        if let Some(enabled_individual) = another.enabled_individual {
+            self.enabled_individual = Some(enabled_individual);
+        }
+
+        if let Some(muted) = another.muted {
+            self.muted = Some(muted);
+        }
+    }
 }
 
 /// Representation of [RTCIceServer][1] (item of `iceServers` field
@@ -405,23 +640,25 @@ pub struct IceServer {
 }
 
 /// Direction of [`Track`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
-        receivers: Vec<PeerId>,
-        mid: Option<Mid>,
+        receivers: Vec<MemberId>,
+        mid: Option<String>,
     },
     Recv {
-        sender: PeerId,
-        mid: Option<Mid>,
+        sender: MemberId,
+        mid: Option<String>,
     },
 }
 
 /// Type of [`Track`].
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
@@ -430,170 +667,68 @@ pub enum MediaType {
 impl MediaType {
     /// Returns `true` if this [`MediaType`] is required to call starting.
     #[must_use]
-    pub fn is_required(&self) -> bool {
+    pub fn required(&self) -> bool {
         match self {
-            MediaType::Audio(audio) => audio.is_required,
-            MediaType::Video(video) => video.is_required,
+            MediaType::Audio(audio) => audio.required,
+            MediaType::Video(video) => video.required,
         }
     }
 }
 
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub struct AudioSettings {
     /// Importance of the audio media type.
     ///
     /// If `false` then audio may be not published.
-    pub is_required: bool,
+    pub required: bool,
 }
 
-#[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub struct VideoSettings {
     /// Importance of the video media type.
     ///
     /// If `false` then video may be not published.
-    pub is_required: bool,
+    pub required: bool,
+
+    /// Source kind of this [`VideoSettings`] media.
+    pub source_kind: MediaSourceKind,
 }
 
-#[cfg(feature = "jason")]
-impl Serialize for ClientMsg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
+/// Media source kind.
+#[cfg_attr(feature = "medea", derive(Debug, Eq, PartialEq, Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Copy)]
+pub enum MediaSourceKind {
+    /// Media is sourced by some media device (webcam or microphone).
+    Device,
 
-        match self {
-            Self::Pong(n) => {
-                let mut ping = serializer.serialize_struct("pong", 1)?;
-                ping.serialize_field("pong", n)?;
-                ping.end()
-            }
-            Self::Command(command) => command.serialize(serializer),
-        }
-    }
+    /// Media is obtained with screen-capture.
+    Display,
 }
 
-#[cfg(feature = "medea")]
-impl<'de> Deserialize<'de> for ClientMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
+/// Estimated connection quality.
+#[cfg_attr(
+    feature = "medea",
+    derive(Serialize, Display, Eq, Ord, PartialEq, PartialOrd)
+)]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Copy, Debug)]
+pub enum ConnectionQualityScore {
+    /// Nearly all users dissatisfied.
+    Poor = 1,
 
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ClientMsg [{:?}]",
-                &ev,
-            ))
-        })?;
+    /// Many users dissatisfied.
+    Low = 2,
 
-        if let Some(v) = map.get("pong") {
-            let n = v
-                .as_u64()
-                .ok_or_else(|| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ClientMsg::Pong [{:?}]",
-                        &ev,
-                    ))
-                })?
-                .try_into()
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "ClientMsg::Pong overflows 32 bits: {}",
-                        e,
-                    ))
-                })?;
+    /// Some users dissatisfied.
+    Medium = 3,
 
-            Ok(Self::Pong(n))
-        } else {
-            let command =
-                serde_json::from_value::<Command>(ev).map_err(|e| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ClientMsg::Command [{:?}]",
-                        e,
-                    ))
-                })?;
-            Ok(Self::Command(command))
-        }
-    }
-}
-
-#[cfg(feature = "medea")]
-impl Serialize for ServerMsg {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        match self {
-            Self::Ping(n) => {
-                let mut ping = serializer.serialize_struct("ping", 1)?;
-                ping.serialize_field("ping", n)?;
-                ping.end()
-            }
-            Self::Event(command) => command.serialize(serializer),
-            Self::RpcSettings(rpc_settings) => {
-                rpc_settings.serialize(serializer)
-            }
-        }
-    }
-}
-
-#[cfg(feature = "jason")]
-impl<'de> Deserialize<'de> for ServerMsg {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use serde::de::Error as _;
-
-        let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or_else(|| {
-            D::Error::custom(format!(
-                "unable to deserialize ServerMsg [{:?}]",
-                &ev,
-            ))
-        })?;
-
-        if let Some(v) = map.get("ping") {
-            let n = v
-                .as_u64()
-                .ok_or_else(|| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ServerMsg::Ping [{:?}]",
-                        &ev
-                    ))
-                })?
-                .try_into()
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "ServerMsg::Ping overflows 32 bits: {}",
-                        e,
-                    ))
-                })?;
-
-            Ok(Self::Ping(n))
-        } else {
-            let msg = serde_json::from_value::<Event>(ev.clone())
-                .map(Self::Event)
-                .or_else(move |_| {
-                    serde_json::from_value::<RpcSettings>(ev)
-                        .map(Self::RpcSettings)
-                })
-                .map_err(|e| {
-                    D::Error::custom(format!(
-                        "unable to deserialize ServerMsg [{:?}]",
-                        e,
-                    ))
-                })?;
-            Ok(msg)
-        }
-    }
+    /// Satisfied.
+    High = 4,
 }
 
 #[cfg(test)]
@@ -601,83 +736,125 @@ mod test {
     use super::*;
 
     #[test]
-    fn command() {
-        let mut mids = HashMap::new();
-        mids.insert(TrackId(0), Mid("1".to_string()));
+    fn track_patch_merge() {
+        for (track_patches, result) in vec![
+            (
+                vec![
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: Some(false),
+                        enabled_individual: Some(false),
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
+                    },
+                ],
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
+                    muted: None,
+                },
+            ),
+            (
+                vec![
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
+                    },
+                ],
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
+                    muted: None,
+                },
+            ),
+            (
+                vec![
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
+                    },
+                ],
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_general: Some(true),
+                    enabled_individual: Some(true),
+                    muted: None,
+                },
+            ),
+            (
+                vec![
+                    TrackPatchEvent {
+                        id: TrackId(1),
+                        enabled_general: None,
+                        enabled_individual: None,
+                        muted: None,
+                    },
+                    TrackPatchEvent {
+                        id: TrackId(2),
+                        enabled_general: Some(true),
+                        enabled_individual: Some(true),
+                        muted: None,
+                    },
+                ],
+                TrackPatchEvent {
+                    id: TrackId(1),
+                    enabled_general: None,
+                    enabled_individual: None,
+                    muted: None,
+                },
+            ),
+        ] {
+            let mut merge_track_patch = TrackPatchEvent::new(TrackId(1));
+            for track_patch in &track_patches {
+                merge_track_patch.merge(track_patch);
+            }
 
-        let command = ClientMsg::Command(Command::MakeSdpOffer {
-            peer_id: PeerId(77),
-            sdp_offer: "offer".to_owned(),
-            mids,
-            senders_statuses: HashMap::new(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let command_str =
-            "{\
-                \"command\":\"MakeSdpOffer\",\
-                \"data\":{\
-                    \"peer_id\":77,\
-                    \"sdp_offer\":\"offer\",\
-                    \"mids\":{\"0\":\"1\"},\
-                    \"senders_statuses\":{}\
-                }\
-            }";
-
-        assert_eq!(command_str, serde_json::to_string(&command).unwrap());
-        assert_eq!(
-            command,
-            serde_json::from_str(&serde_json::to_string(&command).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn ping() {
-        let ping = ServerMsg::Ping(15);
-        let ping_str = "{\"ping\":15}";
-
-        assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
-        assert_eq!(
-            ping,
-            serde_json::from_str(&serde_json::to_string(&ping).unwrap())
-                .unwrap()
-        )
-    }
-
-    #[test]
-    fn event() {
-        let event = ServerMsg::Event(Event::SdpAnswerMade {
-            peer_id: PeerId(45),
-            sdp_answer: "answer".to_owned(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-            let event_str =
-            "{\
-                \"event\":\"SdpAnswerMade\",\
-                \"data\":{\
-                    \"peer_id\":45,\
-                    \"sdp_answer\":\"answer\"\
-                }\
-            }";
-
-        assert_eq!(event_str, serde_json::to_string(&event).unwrap());
-        assert_eq!(
-            event,
-            serde_json::from_str(&serde_json::to_string(&event).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn pong() {
-        let pong = ClientMsg::Pong(5);
-        let pong_str = "{\"pong\":5}";
-
-        assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
-        assert_eq!(
-            pong,
-            serde_json::from_str(&serde_json::to_string(&pong).unwrap())
-                .unwrap()
-        )
+            assert_eq!(
+                result, merge_track_patch,
+                "track patches: {:?}",
+                track_patches
+            );
+        }
     }
 }

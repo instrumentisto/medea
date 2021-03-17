@@ -56,12 +56,14 @@ pub struct Notification(Value);
 #[derive(Serialize)]
 #[serde(tag = "method")]
 enum NotificationVariants<'a> {
+    Broadcast { payload: Value },
     Created { fid: &'a str, element: &'a Element },
     Deleted { fid: &'a str },
 }
 
 impl Notification {
     /// Builds `method: Created` [`Notification`].
+    #[must_use]
     pub fn created(fid: &Fid, element: &Element) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Created {
@@ -73,12 +75,22 @@ impl Notification {
     }
 
     /// Builds `method: Deleted` [`Notification`].
+    #[must_use]
     pub fn deleted(fid: &Fid) -> Notification {
         Self(
             serde_json::to_value(NotificationVariants::Deleted {
                 fid: fid.as_ref(),
             })
             .unwrap(),
+        )
+    }
+
+    /// Builds `method: Broadcast` [`Notification`].
+    #[must_use]
+    pub fn broadcast(payload: Value) -> Notification {
+        Self(
+            serde_json::to_value(NotificationVariants::Broadcast { payload })
+                .unwrap(),
         )
     }
 }
@@ -121,11 +133,11 @@ impl Actor for WsSession {
 
     /// Removes [`WsSession`] from [`WsSession`]s map.
     fn stopped(&mut self, ctx: &mut Self::Context) {
-        let recipient = ctx.address().recipient();
+        let this = ctx.address().recipient();
         if let Some(subs) =
             self.subscribers.lock().unwrap().get_mut(&self.room_id)
         {
-            subs.retain(|sub| *sub != recipient)
+            subs.retain(|sub| *sub != this)
         }
     }
 }
@@ -154,6 +166,34 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                     ctx.stop();
                 }
                 ws::Message::Pong(_) => {}
+                ws::Message::Text(text) => {
+                    match serde_json::from_str::<Value>(&text) {
+                        Ok(msg) => {
+                            let this = ctx.address().recipient();
+                            if let Some(subs) = self
+                                .subscribers
+                                .lock()
+                                .unwrap()
+                                .get(&self.room_id)
+                            {
+                                subs.iter()
+                                    .filter(|sub| **sub != this)
+                                    .for_each(|sub| {
+                                        let _ = sub.do_send(
+                                            Notification::broadcast(
+                                                msg.clone(),
+                                            ),
+                                        );
+                                    })
+                            }
+                        }
+                        Err(err) => error!(
+                            "Received broadcast message but it is not a valid \
+                             JSON: {:?}",
+                            err,
+                        ),
+                    }
+                }
                 _ => error!("Unsupported client message: {:?}", msg),
             },
             Err(err) => {

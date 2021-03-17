@@ -1,8 +1,7 @@
 //! Medea media server.
 
-// TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
-//       https://github.com/rust-lang/rust-clippy/issues/4779
-#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
+#![allow(clippy::module_name_repetitions)]
+#![deny(broken_intra_doc_links)]
 
 #[macro_use]
 pub mod utils;
@@ -35,15 +34,14 @@ pub struct AppContext {
     /// Reference to [`TurnAuthService`].
     pub turn_service: Arc<dyn TurnAuthService>,
 
-    /// Service for sending [`CallbackEvent`]s.
-    ///
-    /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
+    /// Service for sending Control API Callbacks.
     pub callbacks: CallbackService<CallbackClientFactoryImpl>,
 }
 
 impl AppContext {
     /// Creates new [`AppContext`].
     #[inline]
+    #[must_use]
     pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
         Self {
             config: Arc::new(config),

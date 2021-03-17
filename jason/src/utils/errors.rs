@@ -12,7 +12,12 @@ pub use medea_macro::JsCaused;
 
 /// Prints provided message with [`Console.error()`].
 ///
+/// May be useful during development.
+///
+/// __Unavailable in the release builds.__
+///
 /// [`Console.error()`]: https://tinyurl.com/psv3wqw
+#[cfg(debug_assertions)]
 pub fn console_error<M>(msg: M)
 where
     M: Into<JsValue>,
@@ -77,7 +82,7 @@ impl From<JsError> for js_sys::Error {
 ///
 /// Contains JS side error if it the cause and trace information.
 #[wasm_bindgen]
-#[derive(Debug, Display)]
+#[derive(Clone, Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
     name: &'static str,
@@ -89,28 +94,32 @@ pub struct JasonError {
 impl JasonError {
     /// Prints error information to `console.error()`.
     pub fn print(&self) {
-        console_error(self.to_string());
+        log::error!("{}", self);
     }
 }
 
 #[wasm_bindgen]
 impl JasonError {
     /// Returns name of error.
+    #[must_use]
     pub fn name(&self) -> String {
         String::from(self.name)
     }
 
     /// Returns message of errors.
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.clone()
     }
 
     /// Returns trace information of error.
+    #[must_use]
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
 
     /// Returns JS side error if it the cause.
+    #[must_use]
     pub fn source(&self) -> Option<js_sys::Error> {
         Clone::clone(&self.source)
     }

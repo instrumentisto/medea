@@ -1,6 +1,8 @@
 //! Deserialization of the [`RtcStats`] from the [`SysRtcStats`].
+//!
+//! [`SysRtcStats`]: web_sys::RtcStats
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
 use js_sys::{
@@ -12,7 +14,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::utils::{get_property_by_name, JsCaused, JsError};
 
-/// Entry of the [`SysRtcStats`] dictionary.
+/// Entry of the JS RTC stats dictionary.
 struct RtcStatsReportEntry(JsString, JsValue);
 
 impl TryFrom<JsArray> for RtcStatsReportEntry {
@@ -46,7 +48,7 @@ impl TryFrom<JsArray> for RtcStatsReportEntry {
 /// All available [`RtcStatsType`] of [`PeerConnection`].
 ///
 /// [`PeerConnection`]: crate::peer::PeerConnection
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RtcStats(pub Vec<RtcStat>);
 
 impl TryFrom<&JsValue> for RtcStats {
@@ -75,6 +77,7 @@ impl TryFrom<&JsValue> for RtcStats {
                 .map_err(tracerr::map_from_and_wrap!())?;
             let stat: RtcStat = JsValue::from(&stat.1)
                 .into_serde()
+                .map_err(Rc::new)
                 .map_err(tracerr::from_and_wrap!())?;
 
             if let RtcStatsType::Other = &stat.stats {
@@ -89,7 +92,7 @@ impl TryFrom<&JsValue> for RtcStats {
 }
 
 /// Errors which can occur during deserialization of the [`RtcStatsType`].
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum RtcStatsError {
     /// [RTCStats.id][1] is undefined.
     ///
@@ -113,5 +116,5 @@ pub enum RtcStatsError {
 
     /// Error of [`RtcStats`] deserialization.
     #[display(fmt = "Failed to deserialize into RtcStats: {}", _0)]
-    ParseError(serde_json::Error),
+    ParseError(Rc<serde_json::Error>),
 }

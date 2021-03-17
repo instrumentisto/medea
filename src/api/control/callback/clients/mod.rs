@@ -4,7 +4,8 @@ pub mod grpc;
 
 use std::{fmt, sync::Arc};
 
-use derive_more::From;
+use async_trait::async_trait;
+use derive_more::{Display, From};
 use futures::future::{FutureExt, LocalBoxFuture};
 
 use crate::{
@@ -12,25 +13,26 @@ use crate::{
     log::prelude::*,
 };
 
-type Result<T> = std::result::Result<T, CallbackClientError>;
+/// Shortcut for [`Result`] of methods in this module.
+type CallbackResult<T = ()> = Result<T, CallbackClientError>;
 
 /// Error of sending [`CallbackRequest`] by [`CallbackClient`].
-#[derive(Debug, From)]
+#[derive(Debug, Display, From)]
 pub enum CallbackClientError {
     /// [`tonic`] failed to send [`CallbackRequest`].
+    #[display(fmt = "gRPC request failed: {}", _0)]
     Tonic(tonic::Status),
 
     /// Error while creating new [`CallbackClient`].
+    #[display(fmt = "CallbackClientError: {}", _0)]
     TonicTransport(tonic::transport::Error),
 }
 
+#[async_trait(?Send)]
 #[cfg_attr(test, mockall::automock)]
 pub trait CallbackClient: fmt::Debug + Send + Sync {
     /// Sends provided [`CallbackRequest`].
-    fn send(
-        &self,
-        request: CallbackRequest,
-    ) -> LocalBoxFuture<'static, Result<()>>;
+    async fn send(&self, request: CallbackRequest) -> CallbackResult;
 }
 
 #[cfg(test)]
@@ -42,7 +44,7 @@ pub trait CallbackClientFactory {
     /// Creates [`CallbackClient`] basing on provided [`CallbackUrl`].
     fn build(
         url: CallbackUrl,
-    ) -> LocalBoxFuture<'static, Result<Arc<dyn CallbackClient>>>;
+    ) -> LocalBoxFuture<'static, CallbackResult<Arc<dyn CallbackClient>>>;
 }
 
 #[cfg(test)]
@@ -56,7 +58,7 @@ impl CallbackClientFactory for CallbackClientFactoryImpl {
     #[inline]
     fn build(
         url: CallbackUrl,
-    ) -> LocalBoxFuture<'static, Result<Arc<dyn CallbackClient>>> {
+    ) -> LocalBoxFuture<'static, CallbackResult<Arc<dyn CallbackClient>>> {
         info!("Creating CallbackClient for URL: {}", url);
         match url {
             CallbackUrl::Grpc(grpc_url) => async move {

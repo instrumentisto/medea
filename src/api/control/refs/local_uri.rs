@@ -7,12 +7,8 @@ use std::{convert::TryFrom, fmt, string::ToString};
 
 use derive_more::{Display, From};
 use failure::Fail;
+use medea_client_api_proto::{MemberId, RoomId};
 use url::Url;
-
-use crate::{
-    api::control::{MemberId, RoomId},
-    impls_for_stateful_refs,
-};
 
 use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 
@@ -68,7 +64,7 @@ use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 /// This is necessary so that it is not possible to get the address in the
 /// wrong state (`local://room_id//endpoint_id` for example).
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 /// [`Room`]: crate::signalling::room::Room
 /// [`WebRtcPlayEndpoint`]:
 /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
@@ -176,6 +172,8 @@ impl StatefulLocalUri {
     /// Returns reference to [`RoomId`].
     ///
     /// This is possible in any [`LocalUri`] state.
+    #[inline]
+    #[must_use]
     pub fn room_id(&self) -> &RoomId {
         match self {
             StatefulLocalUri::Room(uri) => uri.room_id(),
@@ -188,6 +186,7 @@ impl StatefulLocalUri {
 impl TryFrom<String> for StatefulLocalUri {
     type Error = LocalUriParseError;
 
+    #[allow(clippy::option_if_let_else)]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);
@@ -209,9 +208,8 @@ impl TryFrom<String> for StatefulLocalUri {
                 let host = host.to_string();
                 if host.is_empty() {
                     return Err(LocalUriParseError::MissingPaths(value));
-                } else {
-                    LocalUri::<ToRoom>::new(host.into())
                 }
+                LocalUri::<ToRoom>::new(host.into())
             }
             None => return Err(LocalUriParseError::MissingPaths(value)),
         };
@@ -300,7 +298,7 @@ mod specs {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
             assert_eq!(endpoint_id, String::from("endpoint_id").into());
             let (member_id, room_uri) = member_uri.take_member_id();
-            assert_eq!(member_id, MemberId("room_element_id".to_string()));
+            assert_eq!(member_id, MemberId::from("room_element_id"));
             let room_id = room_uri.take_room_id();
             assert_eq!(room_id, RoomId::from("room_id"));
         } else {

@@ -9,6 +9,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 
 /// Enum with which you can try to deserialize some known enum and if it
@@ -32,7 +33,10 @@ pub enum NonExhaustive<T> {
 /// underlying object.
 ///
 /// [RTCStatsReport]: https://w3.org/TR/webrtc/#dom-rtcstatsreport
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
+)]
+#[from(forward)]
 pub struct StatId(pub String);
 
 /// Represents the [stats object] constructed by inspecting a specific
@@ -121,7 +125,7 @@ pub enum RtcStatsType {
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
     /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    RemoteInboundRtp(Box<RemoteInboundRtpStreamStat>),
+    RemoteInboundRtp(Box<RtcRemoteInboundRtpStreamStats>),
 
     /// Statistics for the remote endpoint's outbound [RTP] stream
     /// corresponding to an inbound stream that is currently received with
@@ -132,7 +136,7 @@ pub enum RtcStatsType {
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
     /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    RemoteOutboundRtp(Box<RemoteOutboundRtpStreamStat>),
+    RemoteOutboundRtp(Box<RtcRemoteOutboundRtpStreamStats>),
 
     /// Statistics for the media produced by a [MediaStreamTrack][1] that is
     /// currently attached to an [RTCRtpSender]. This reflects the media that
@@ -142,26 +146,26 @@ pub enum RtcStatsType {
     /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
     /// [getUserMedia]: https://tinyurl.com/sngpyr6
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    MediaSource(Box<MediaSourceStat>),
+    MediaSource(Box<MediaSourceStats>),
 
     /// Statistics for a contributing source (CSRC) that contributed to an
     /// inbound [RTP] stream.
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
     #[cfg(feature = "extended-stats")]
-    Csrc(Box<RtpContributingSourceStat>),
+    Csrc(Box<RtpContributingSourceStats>),
 
     /// Statistics related to the [RTCPeerConnection] object.
     ///
     /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[cfg(feature = "extended-stats")]
-    PeerConnection(Box<RtcPeerConnectionStat>),
+    PeerConnection(Box<RtcPeerConnectionStats>),
 
     /// Statistics related to each [RTCDataChannel] ID.
     ///
     /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
     #[cfg(feature = "extended-stats")]
-    DataChannel(Box<DataChannelStat>),
+    DataChannel(Box<DataChannelStats>),
 
     /// Contains statistics related to a specific [MediaStream].
     ///
@@ -169,14 +173,14 @@ pub enum RtcStatsType {
     ///
     /// [MediaStream]: https://w3.org/TR/mediacapture-streams/#mediastream
     #[cfg(feature = "extended-stats")]
-    Stream(Box<MediaStreamStat>),
+    Stream(Box<MediaStreamStats>),
 
     /// Statistics related to a specific [MediaStreamTrack][1]'s attachment to
     /// an [RTCRtpSender] and the corresponding media-level metrics.
     ///
     /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    Track(Box<TrackStat>),
+    Track(Box<TrackStats>),
 
     /// Statistics related to a specific [RTCRtpTransceiver].
     ///
@@ -262,6 +266,7 @@ pub enum RtcStatsType {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Contains statistics related to a specific [MediaStream].
 ///
 /// This is now obsolete.
@@ -275,7 +280,7 @@ pub enum RtcStatsType {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MediaStreamStat {
+pub struct MediaStreamStats {
     /// [`stream.id`][1] property.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastream-id
@@ -297,7 +302,7 @@ pub struct MediaStreamStat {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DataChannelStat {
+pub struct DataChannelStats {
     /// [`label`][1] value of the [RTCDataChannel] object.
     ///
     /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
@@ -389,6 +394,7 @@ pub enum KnownDataChannelState {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Stats for the [RTCPeerConnection] object.
 ///
 /// [`RtcStatsType::PeerConnection`] variant.
@@ -400,7 +406,7 @@ pub enum KnownDataChannelState {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RtcPeerConnectionStat {
+pub struct RtcPeerConnectionStats {
     /// Number of unique `DataChannel`s that have entered the `open` state
     /// during their lifetime.
     pub data_channels_opened: Option<u64>,
@@ -429,6 +435,7 @@ pub struct RtcPeerConnectionStat {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics for a contributing source (CSRC) that contributed to an inbound
 /// [RTP] stream.
 ///
@@ -441,7 +448,7 @@ pub struct RtcPeerConnectionStat {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RtpContributingSourceStat {
+pub struct RtpContributingSourceStats {
     /// SSRC identifier of the contributing source represented by the stats
     /// object, as defined by [RFC 3550]. It is a 32-bit unsigned integer that
     /// appears in the CSRC list of any packets the relevant source contributed
@@ -508,7 +515,7 @@ pub struct RtpContributingSourceStat {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RemoteOutboundRtpStreamStat {
+pub struct RtcRemoteOutboundRtpStreamStats {
     /// [`localId`] is used for looking up the local
     /// [RTCInboundRtpStreamStats][1] object for the same SSRC.
     ///
@@ -550,13 +557,18 @@ pub struct RemoteOutboundRtpStreamStat {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RemoteInboundRtpStreamStat {
+pub struct RtcRemoteInboundRtpStreamStats {
     /// [`localId`] is used for looking up the local
     /// [RTCOutboundRtpStreamStats] object for the same SSRC.
     ///
     /// [`localId`]: https://tinyurl.com/r8uhbo9
     /// [RTCOutBoundRtpStreamStats]: https://tinyurl.com/r6f5vqg
     pub local_id: Option<String>,
+
+    /// Packet [jitter] measured in seconds for this SSRC.
+    ///
+    /// [jitter]: https://en.wikipedia.org/wiki/Jitter
+    pub jitter: Option<Float>,
 
     /// Estimated round trip time for this SSRC based on the RTCP timestamps in
     /// the RTCP Receiver Report (RR) and measured in seconds. Calculated as
@@ -565,7 +577,7 @@ pub struct RemoteInboundRtpStreamStat {
     /// left undefined.
     ///
     /// [1]: https://tools.ietf.org/html/rfc3550#section-6.4.1
-    pub round_trip_time: Option<HighResTimeStamp>,
+    pub round_trip_time: Option<Float>,
 
     /// Fraction packet loss reported for this SSRC. Calculated as defined in
     /// [Section 6.4.1 of RFC 3550][1] and [Appendix A.3][2].
@@ -586,6 +598,7 @@ pub struct RemoteInboundRtpStreamStat {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// [RTCRtpTransceiverStats][1] object representing an [RTCRtpTransceiver] of an
 /// [RTCPeerConnection].
 ///
@@ -732,6 +745,7 @@ pub enum IceRole {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics related to a specific [RTCRtpSender] and the corresponding
 /// media-level metrics.
 ///
@@ -757,6 +771,7 @@ pub enum SenderStatsKind {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics related to a specific [RTCRtpReceiver] and the corresponding
 /// media-level metrics.
 ///
@@ -1107,11 +1122,18 @@ pub struct RtcInboundRtpStreamStats {
     /// Total number of bytes received for this SSRC.
     pub bytes_received: u64,
 
-    /// Total number of RTP packets received for this SSRC.
+    /// Total number of RTP data packets received for this SSRC.
     pub packets_received: u64,
 
-    /// Total number of RTP packets lost for this SSRC.
-    pub packets_lost: Option<u64>,
+    /// Total number of RTP data packets for this SSRC that have been lost
+    /// since the beginning of reception.
+    ///
+    /// This number is defined to be the number of packets expected less the
+    /// number of packets actually received, where the number of packets
+    /// received includes any which are late or duplicates. Thus, packets that
+    /// arrive late are not counted as lost, and the loss __may be negative__
+    /// if there are duplicates.
+    pub packets_lost: Option<i64>,
 
     /// Packet jitter measured in seconds for this SSRC.
     pub jitter: Option<Float>,
@@ -1147,7 +1169,7 @@ pub struct RtcInboundRtpStreamStats {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TrackStat {
+pub struct TrackStats {
     /// [`id` property][1] of the track.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
@@ -1168,7 +1190,7 @@ pub struct TrackStat {
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-    pub kind: Option<TrackStatKind>,
+    pub kind: Option<TrackStatsKind>,
 }
 
 /// [`kind` attribute] values of the [MediaStreamTrack][1].
@@ -1177,7 +1199,7 @@ pub struct TrackStat {
 /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum TrackStatKind {
+pub enum TrackStatsKind {
     /// Track is used for the audio content.
     Audio,
 
@@ -1338,7 +1360,7 @@ pub struct RtcIceCandidateStats {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
-pub enum MediaSourceKind {
+pub enum MediaKind {
     /// Fields when `kind` is `video`.
     Video {
         /// Width (in pixels) of the last frame originating from the source.
@@ -1384,7 +1406,7 @@ pub enum MediaSourceKind {
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MediaSourceStat {
+pub struct MediaSourceStats {
     /// Value of the [MediaStreamTrack][1]'s ID attribute.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
@@ -1392,10 +1414,11 @@ pub struct MediaSourceStat {
 
     /// Fields which should be in the [`RtcStat`] based on `kind`.
     #[serde(flatten)]
-    pub kind: MediaSourceKind,
+    pub kind: MediaKind,
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Statistics for a codec that is currently used by [RTP] streams being sent or
 /// received by [RTCPeerConnection] object.
 ///
@@ -1424,6 +1447,7 @@ pub struct RtcCodecStats {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Information about a certificate used by [RTCIceTransport].
 ///
 /// [`RtcStatsType::Certificate`] variant.
@@ -1549,6 +1573,7 @@ impl PartialEq for Float {
 }
 
 #[cfg(feature = "extended-stats")]
+#[cfg_attr(docsrs, doc(cfg(feature = "extended-stats")))]
 /// Information about the connection to an ICE server (e.g. STUN or TURN).
 ///
 /// [`RtcStatsType::IceServer`] variant.

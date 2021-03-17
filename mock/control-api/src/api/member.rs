@@ -7,46 +7,46 @@ use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
 
-/// Entity that represents [Control API] `Member`.
+/// Entity that represents a [Control API] [`Member`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
-    /// ID of `Member`.
+    /// ID of this [`Member`].
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
 
-    /// Pipeline of [Control API] `Member`.
+    /// [Control API] pipeline of this [`Member`].
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
-    pipeline: HashMap<String, Endpoint>,
+    pub pipeline: HashMap<String, Endpoint>,
 
-    /// Optional `Member` credentials.
+    /// Optional credentials of this [`Member`].
     ///
-    /// If `None` then random credentials will be generated on Medea side.
-    credentials: Option<String>,
+    /// If [`None`] then random credentials will be generated on Medea side.
+    pub credentials: Option<Credentials>,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_join: Option<String>,
+    pub on_join: Option<String>,
 
     /// URL to which `OnLeave` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
-    on_leave: Option<String>,
+    pub on_leave: Option<String>,
 
-    /// Timeout of receiving heartbeat messages from the `Member` via Client
-    /// API. Once reached, the `Member` is considered being idle.
+    /// Timeout of receiving heartbeat messages from this [`Member`] via Client
+    /// API. Once reached, the [`Member`] is considered being idle.
     #[serde(default, with = "humantime_serde")]
-    idle_timeout: Option<Duration>,
+    pub idle_timeout: Option<Duration>,
 
-    /// Timeout of the `Member` reconnecting via Client API.
-    /// Once reached, the `Member` is considered disconnected.
+    /// Timeout of this [`Member`] reconnecting via Client API.
+    /// Once reached, the [`Member`] is considered disconnected.
     #[serde(default, with = "humantime_serde")]
-    reconnect_timeout: Option<Duration>,
+    pub reconnect_timeout: Option<Duration>,
 
-    /// Interval of sending pings from Medea to the `Member` via Client API.
+    /// Interval of sending pings from Medea to this [`Member`] via Client API.
     #[serde(default, with = "humantime_serde")]
-    ping_interval: Option<Duration>,
+    pub ping_interval: Option<Duration>,
 }
 
 impl Member {
@@ -62,7 +62,7 @@ impl Member {
         proto::Member {
             pipeline: member_elements,
             id,
-            credentials: self.credentials.unwrap_or_default(),
+            credentials: self.credentials.map(Into::into),
             on_join: self.on_join.unwrap_or_default(),
             on_leave: self.on_leave.unwrap_or_default(),
             idle_timeout: self.idle_timeout.map(Into::into),
@@ -91,7 +91,7 @@ impl From<proto::Member> for Member {
         Self {
             id: proto.id,
             pipeline: member_pipeline,
-            credentials: Some(proto.credentials),
+            credentials: proto.credentials.map(Into::into),
             on_join: Some(proto.on_join).filter(|s| !s.is_empty()),
             on_leave: Some(proto.on_leave).filter(|s| !s.is_empty()),
             idle_timeout: proto.idle_timeout.map(|dur| dur.try_into().unwrap()),
@@ -101,6 +101,41 @@ impl From<proto::Member> for Member {
             ping_interval: proto
                 .ping_interval
                 .map(|dur| dur.try_into().unwrap()),
+        }
+    }
+}
+
+/// Credentials of the [`Member`].
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Credentials {
+    /// [Argon2] hash of the [`Member`] credentials.
+    ///
+    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
+    Hash(String),
+
+    /// Plain text [`Member`] credentials.
+    Plain(String),
+}
+
+impl From<proto::member::Credentials> for Credentials {
+    #[inline]
+    fn from(from: proto::member::Credentials) -> Self {
+        use proto::member::Credentials as C;
+        match from {
+            C::Plain(plain) => Self::Plain(plain),
+            C::Hash(hash) => Self::Hash(hash),
+        }
+    }
+}
+
+impl From<Credentials> for proto::member::Credentials {
+    #[inline]
+    fn from(from: Credentials) -> Self {
+        use Credentials as C;
+        match from {
+            C::Hash(hash) => Self::Hash(hash),
+            C::Plain(plain) => Self::Plain(plain),
         }
     }
 }

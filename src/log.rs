@@ -23,13 +23,15 @@ pub mod prelude {
 /// Builds JSON [`Logger`] which prints all its log records to `w_out` writer,
 /// but WARN level (and higher) to `w_err` writer. Logger will use [`Async`]
 /// drain with channel size of 2048 entries and
-/// [`OverflowStrategy::DropAndReport`].
+/// [`OverflowStrategy::DropAndReport`][1].
 ///
 /// Created [`Logger`] produces log records with `fqn`, `lvl`, `time` and `msg`
 /// fields by default.
 ///
 /// __Note:__ You may encounter log drops when running in debug mode, which
 /// should not be the case for release mode.
+///
+/// [1]: slog_async::OverflowStrategy::DropAndReport
 pub fn new_dual_logger<W1, W2>(w_out: W1, w_err: W2) -> Logger
 where
     W1: io::Write + Send + 'static,

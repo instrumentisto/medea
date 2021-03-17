@@ -9,7 +9,7 @@
 
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
-FROM rust:${rust_ver} AS dist
+FROM ghcr.io/instrumentisto/rust:${rust_ver} AS dist
 ARG rustc_mode=release
 ARG rustc_opts=--release
 
@@ -95,5 +95,8 @@ FROM scratch AS runtime
 COPY --from=dist /out/ /
 
 USER nobody:nobody
+
+LABEL org.opencontainers.image.source="\
+    https://github.com/instrumentisto/medea/tree/master/mock/control-api"
 
 ENTRYPOINT ["/medea-control-api-mock"]

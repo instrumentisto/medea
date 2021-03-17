@@ -2,6 +2,9 @@
 
 #![allow(clippy::module_name_repetitions)]
 
+pub mod cell;
+pub mod progressable_cell;
+
 use std::{
     cell::RefCell,
     fmt,
@@ -10,14 +13,16 @@ use std::{
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, LocalBoxFuture},
+    future::LocalBoxFuture,
     stream::{self, LocalBoxStream, StreamExt as _},
 };
 
-pub mod cell;
+use crate::subscribers_store::{
+    progressable, progressable::Processed, SubscribersStore,
+};
 
 #[doc(inline)]
-pub use self::cell::ObservableCell;
+pub use self::{cell::ObservableCell, progressable_cell::ProgressableCell};
 
 /// Default type of [`ObservableField`] subscribers.
 type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
@@ -26,6 +31,13 @@ type DefaultSubscribers<D> = RefCell<Vec<UniversalSubscriber<D>>>;
 /// ([`ObservableField::subscribe`]) and to concrete changes
 /// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
 pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
+
+/// [`ObservableField`] that allows to subscribe to all changes
+/// ([`ObservableField::subscribe`]) and to concrete changes
+/// ([`ObservableField::when`] and [`ObservableField::when_eq`]).
+///
+/// Can recognise when all updates was processed by subscribers.
+pub type Progressable<D> = ObservableField<D, progressable::SubStore<D>>;
 
 /// Reactive cell which emits all modifications to its subscribers.
 ///
@@ -37,6 +49,7 @@ pub type Observable<D> = ObservableField<D, DefaultSubscribers<D>>;
 /// [`ObservableField::when`] or [`ObservableField::when_eq`] methods.
 ///
 /// [`Future`]: std::future::Future
+#[derive(Debug)]
 pub struct ObservableField<D, S> {
     /// Data which is stored by this [`ObservableField`].
     data: D,
@@ -65,19 +78,6 @@ where
 impl<D, S> ObservableField<D, S>
 where
     D: 'static,
-    S: Subscribable<D>,
-{
-    /// Creates new [`ObservableField`] with custom [`Subscribable`]
-    /// implementation.
-    #[inline]
-    pub fn new_with_custom(data: D, subs: S) -> Self {
-        Self { data, subs }
-    }
-}
-
-impl<D, S> ObservableField<D, S>
-where
-    D: 'static,
     S: Whenable<D>,
 {
     /// Returns [`Future`] which will resolve only on modifications that
@@ -91,17 +91,56 @@ where
     where
         F: Fn(&D) -> bool + 'static,
     {
+        // TODO: This is kinda broken.
+        //       See https://github.com/instrumentisto/medea/issues/163 issue.
         if (assert_fn)(&self.data) {
-            Box::pin(future::ok(()))
+            Box::pin(futures::future::ok(()))
         } else {
             self.subs.when(Box::new(assert_fn))
         }
     }
 }
 
-impl<D, S> ObservableField<D, S>
+impl<D: 'static> Progressable<D> {
+    /// Returns new [`ObservableField`] with subscribable mutations.
+    ///
+    /// Also, you can wait for all updates processing by awaiting on
+    /// [`ObservableField::when_all_processed()`].
+    #[inline]
+    pub fn new(data: D) -> Self {
+        Self {
+            data,
+            subs: progressable::SubStore::default(),
+        }
+    }
+}
+
+impl<D> Progressable<D>
 where
-    S: Subscribable<D>,
+    D: Clone + 'static,
+{
+    /// Returns [`Stream`] into which underlying data updates (wrapped in the
+    /// [`progressable::Guarded`]) will be emitted.
+    ///
+    /// [`Stream`]: futures::Stream
+    pub fn subscribe(
+        &self,
+    ) -> LocalBoxStream<'static, progressable::Guarded<D>> {
+        let data = self.subs.wrap(self.data.clone());
+        Box::pin(stream::once(async move { data }).chain(self.subs.subscribe()))
+    }
+
+    /// Returns [`Future`] resolving when all data updates will be processed by
+    /// subscribers.
+    ///
+    /// [`Future`]: std::future::Future
+    pub fn when_all_processed(&self) -> Processed<'static> {
+        self.subs.when_all_processed()
+    }
+}
+
+impl<D> Observable<D>
+where
     D: Clone + 'static,
 {
     /// Returns [`Stream`] into which underlying data updates will be emitted.
@@ -109,9 +148,12 @@ where
     /// [`Stream`]: futures::Stream
     pub fn subscribe(&self) -> LocalBoxStream<'static, D> {
         let data = self.data.clone();
-        let subscription = self.subs.subscribe();
+        let (tx, rx) = mpsc::unbounded();
+        self.subs
+            .borrow_mut()
+            .push(UniversalSubscriber::Subscribe(tx));
 
-        Box::pin(stream::once(async move { data }).chain(subscription))
+        Box::pin(stream::once(async move { data }).chain(Box::pin(rx)))
     }
 }
 
@@ -125,6 +167,8 @@ where
     /// value.
     ///
     /// [`Future`]: std::future::Future
+    // TODO: This is kinda broken.
+    //       See https://github.com/instrumentisto/medea/issues/163 issue.
     #[inline]
     pub fn when_eq(
         &self,
@@ -174,16 +218,7 @@ pub trait OnObservableFieldModification<D> {
     fn on_modify(&mut self, data: &D);
 }
 
-/// Abstraction of [`ObservableField::subscribe`] implementation for some
-/// custom type.
-pub trait Subscribable<D: 'static> {
-    /// This function will be called on [`ObservableField::subscribe`].
-    ///
-    /// Should return [`LocalBoxStream`] to which data updates will be sent.
-    fn subscribe(&self) -> LocalBoxStream<'static, D>;
-}
-
-/// Subscriber that implements [`Subscribable`] and [`Whenable`] in [`Vec`].
+/// Subscriber that implements subscribing and [`Whenable`] in [`Vec`].
 ///
 /// This structure should be wrapped into [`Vec`].
 pub enum UniversalSubscriber<D> {
@@ -202,7 +237,7 @@ pub enum UniversalSubscriber<D> {
         assert_fn: Box<dyn Fn(&D) -> bool>,
     },
 
-    /// Subscriber for [`Subscribable`].
+    /// Subscriber for data updates.
     Subscribe(mpsc::UnboundedSender<D>),
 }
 
@@ -266,11 +301,11 @@ impl<D: 'static> Whenable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
     }
 }
 
-impl<D: 'static> Subscribable<D> for RefCell<Vec<UniversalSubscriber<D>>> {
-    fn subscribe(&self) -> LocalBoxStream<'static, D> {
-        let (tx, rx) = mpsc::unbounded();
-        self.borrow_mut().push(UniversalSubscriber::Subscribe(tx));
-        Box::pin(rx)
+impl<D: Clone + 'static> OnObservableFieldModification<D>
+    for progressable::SubStore<D>
+{
+    fn on_modify(&mut self, data: &D) {
+        self.send_update(data.clone());
     }
 }
 
@@ -300,17 +335,6 @@ impl<D, S> Deref for ObservableField<D, S> {
     #[inline]
     fn deref(&self) -> &Self::Target {
         &self.data
-    }
-}
-
-impl<D, S> fmt::Debug for ObservableField<D, S>
-where
-    D: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ObservableField")
-            .field("data", &self.data)
-            .finish()
     }
 }
 
@@ -387,10 +411,10 @@ where
 mod tests {
     use std::{cell::RefCell, time::Duration};
 
-    use futures::StreamExt as _;
+    use futures::{poll, task::Poll, StreamExt as _};
     use tokio::time::timeout;
 
-    use crate::Observable;
+    use crate::{Observable, Progressable};
 
     #[tokio::test]
     async fn subscriber_receives_current_data() {
@@ -530,5 +554,22 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn when_all_processed_works() {
+        let mut field = Progressable::new(1);
+        assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
+        *field.borrow_mut() = 2;
+        assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
+
+        let mut subscribe = field.subscribe();
+        assert_eq!(poll!(field.when_all_processed()), Poll::Pending);
+
+        assert_eq!(subscribe.next().await.unwrap().into_inner(), 2);
+        *field.borrow_mut() = 3;
+        assert_eq!(poll!(field.when_all_processed()), Poll::Pending);
+        assert_eq!(subscribe.next().await.unwrap().into_inner(), 3);
+        assert_eq!(poll!(field.when_all_processed()), Poll::Ready(()));
     }
 }

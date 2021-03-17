@@ -9,6 +9,7 @@ use std::{convert::TryFrom, fmt};
 
 use derive_more::Display;
 use failure::Fail;
+use medea_client_api_proto::{MemberId, RoomId};
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
@@ -20,7 +21,6 @@ use crate::api::control::{
         local_uri::{LocalUriParseError, StatefulLocalUri},
         LocalUri, ToEndpoint,
     },
-    MemberId, RoomId,
 };
 
 /// Errors which can happen while parsing [`SrcUri`] from [Control API] specs.

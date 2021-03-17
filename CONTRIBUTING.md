@@ -6,19 +6,15 @@ Contribution Guide
 
 ## Prerequisites
 
-In addition to default stable [Rust] toolchain you will need [rustfmt] and [Clippy] components, and a nightly [Rust] toolchain (for better tooling).
+In addition to default stable [Rust] toolchain you will a nightly [Rust] toolchain for [rustfmt].
 ```bash
 $ rustup toolchain install nightly
-$ rustup component add rustfmt
-$ rustup component add clippy
 ```
 
 Also, you need install [wasm-pack] for [Jason] building and testing:
 ```bash
 $ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sudo sh
 ```
-
-Also, you need install `protoc` if you want to rebuild [protobuf] specs for [Medea] gRPC Control API.
 
 
 
@@ -39,8 +35,6 @@ Boot up only [Medea] without [Jason]:
 ```bash
 $ make up.medea
 ```
-
-
 
 
 ### Building
@@ -99,6 +93,11 @@ $ make test.unit crate=medea
 $ make test.unit crate=medea-jason
 ```
 
+To run integration tests use docker-wrapped commands from [`Makefile`]:
+```bash
+$ make test.integration
+```
+
 To run E2E tests use docker-wrapped commands from [`Makefile`]:
 ```bash
 $ make test.e2e
@@ -123,14 +122,13 @@ $ make docs.rust crate=medea-jason
 
 ## CI integration
 
-Add `[run ci]` mark to your commit message for triggering CI build.
+Add `[skip ci]` mark to commit message to omit triggering a CI build.
 
 
 
 
 
 [`Makefile`]: Makefile
-[Clippy]: https://github.com/rust-lang/rust-clippy
 [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
 [Medea]: https://github.com/instrumentisto/medea
 [protobuf]: https://github.com/protocolbuffers/protobuf

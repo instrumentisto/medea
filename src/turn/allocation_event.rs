@@ -1,11 +1,12 @@
 //! Implementation of the Coturn events deserialization.
 
-use std::{borrow::Cow, collections::HashMap, time::Duration};
+use std::{
+    borrow::Cow, collections::HashMap, num::ParseIntError, time::Duration,
+};
 
 use derive_more::Display;
-use medea_client_api_proto::PeerId;
-
-use crate::api::control::RoomId;
+use medea_client_api_proto::{PeerId, RoomId};
+use redis::RedisError;
 
 /// Errors of [`CoturnEvent`] parsing.
 #[derive(Debug, Display)]
@@ -24,10 +25,19 @@ pub enum CoturnEventParseError {
 
     /// Failed to parse traffic event stat metadata.
     #[display(
-        fmt = "Failed to parse traffic stat '{}' from traffic event",
+        fmt = "Failed to parse traffic stat '{}' from traffic event: {:?}",
+        _0,
+        _1
+    )]
+    FailedToParseTrafficMap(String, ParseIntError),
+
+    /// Traffic stat map from traffic event has incorrect formatting.
+    #[display(
+        fmt = "Traffic stat '{}' map from traffic event has incorrect \
+               formatting",
         _0
     )]
-    FailedToParseTrafficMap(String),
+    IncorrectTrafficMapFormat(String),
 
     /// Status is empty.
     #[display(fmt = "Status is empty")]
@@ -38,12 +48,12 @@ pub enum CoturnEventParseError {
     NoMetadataInStatus,
 
     /// Allocation lifetime parsing failed.
-    #[display(fmt = "Allocation lifetime parsing failed")]
-    FailedLifetimeParsing,
+    #[display(fmt = "Allocation lifetime parsing failed: {:?}", _0)]
+    FailedLifetimeParsing(ParseIntError),
 
     /// Redis channel info is empty.
-    #[display(fmt = "Redis channel info is empty")]
-    NoChannelInfo,
+    #[display(fmt = "Redis channel info is empty: {:?}", _0)]
+    NoChannelInfo(RedisError),
 
     /// No user metadata.
     #[display(fmt = "No user metadata")]
@@ -51,7 +61,7 @@ pub enum CoturnEventParseError {
 
     /// No [`MemberId`] metadata.
     ///
-    /// [`MemberId`]: crate::api::control::MemberId
+    /// [`MemberId`]: medea_client_api_proto::MemberId
     #[display(fmt = "No MemberId metadata")]
     NoMemberId,
 
@@ -59,17 +69,25 @@ pub enum CoturnEventParseError {
     #[display(fmt = "No PeerId metadata")]
     NoPeerId,
 
+    /// Failed to parse [`PeerId`] metadata.
+    #[display(fmt = "Failed to parse PeerId metadata: {:?}", _0)]
+    FailedPeerIdParsing(ParseIntError),
+
     /// No allocation ID metadata.
     #[display(fmt = "No allocation ID metadata")]
     NoAllocationId,
+
+    /// Failed to parse allocation ID metadata.
+    #[display(fmt = "Failed to parse allocation ID: {:?}", _0)]
+    FailedAllocationIdParsing(ParseIntError),
 
     /// Event type is not provided.
     #[display(fmt = "No event type")]
     NoEventType,
 
     /// Wrong Redis payload type.
-    #[display(fmt = "Wrong Redis payload type")]
-    WrongPayloadType,
+    #[display(fmt = "Wrong Redis payload type: {:?}", _0)]
+    WrongPayloadType(RedisError),
 }
 
 /// Allocation event received from Coturn.
@@ -101,8 +119,7 @@ impl CoturnEvent {
     pub fn parse(msg: &redis::Msg) -> Result<Self, CoturnEventParseError> {
         use CoturnEventParseError as E;
 
-        let channel: String =
-            msg.get_channel().map_err(|_| E::NoChannelInfo)?;
+        let channel: String = msg.get_channel().map_err(E::NoChannelInfo)?;
         let mut channel_splitted = channel.split('/').skip(4);
 
         let (room_id, peer_id) = {
@@ -116,7 +133,7 @@ impl CoturnEvent {
                     .next()
                     .ok_or(E::NoPeerId)?
                     .parse()
-                    .map_err(|_| E::NoPeerId)?,
+                    .map_err(E::FailedPeerIdParsing)?,
             );
 
             (room_id, peer_id)
@@ -128,13 +145,13 @@ impl CoturnEvent {
             .next()
             .ok_or(E::NoAllocationId)?
             .parse()
-            .map_err(|_| E::NoAllocationId)?;
+            .map_err(E::FailedAllocationIdParsing)?;
         let event_type = channel_splitted.next().ok_or(E::NoEventType)?;
 
         let event = CoturnAllocationEvent::parse(
             event_type,
             msg.get_payload::<String>()
-                .map_err(|_| E::WrongPayloadType)?
+                .map_err(E::WrongPayloadType)?
                 .as_str(),
         )?;
 
@@ -216,7 +233,7 @@ impl CoturnAllocationEvent {
                             .ok_or(NoMetadataInStatus)?
                             .replace("lifetime=", "")
                             .parse()
-                            .map_err(|_| FailedLifetimeParsing)?;
+                            .map_err(FailedLifetimeParsing)?;
                         Ok(CoturnAllocationEvent::New {
                             lifetime: Duration::from_secs(lifetime),
                         })
@@ -227,7 +244,7 @@ impl CoturnAllocationEvent {
                             .ok_or(NoMetadataInStatus)?
                             .replace("lifetime=", "")
                             .parse()
-                            .map_err(|_| FailedLifetimeParsing)?;
+                            .map_err(FailedLifetimeParsing)?;
                         Ok(CoturnAllocationEvent::Refreshed {
                             lifetime: Duration::from_secs(lifetime),
                         })
@@ -266,6 +283,7 @@ impl Traffic {
     pub fn parse(body: &str) -> Result<Self, CoturnEventParseError> {
         use CoturnEventParseError::{
             FailedToParseTrafficMap, FieldNotFoundInTrafficUpdate,
+            IncorrectTrafficMapFormat,
         };
 
         let mut items: HashMap<&str, u64> = body
@@ -274,12 +292,12 @@ impl Traffic {
                 let mut splitted_item = i.split('=');
                 let key = splitted_item
                     .next()
-                    .ok_or_else(|| FailedToParseTrafficMap(body.into()))?;
+                    .ok_or_else(|| IncorrectTrafficMapFormat(body.into()))?;
                 let value: u64 = splitted_item
                     .next()
-                    .ok_or_else(|| FailedToParseTrafficMap(body.into()))?
+                    .ok_or_else(|| IncorrectTrafficMapFormat(body.into()))?
                     .parse()
-                    .map_err(|_| FailedToParseTrafficMap(body.into()))?;
+                    .map_err(|e| FailedToParseTrafficMap(body.into(), e))?;
 
                 Ok((key, value))
             })

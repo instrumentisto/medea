@@ -9,25 +9,22 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{
-        console_error, delay_for, JasonError, JsCaused, JsDuration, JsError,
-        TaskHandle,
-    },
+    utils::{delay_for, JsCaused, JsDuration, JsError, TaskHandle},
 };
 
 /// Errors that may occur in [`Heartbeat`].
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub struct HeartbeatError(TransportError);
 
-/// Idle timeout of [`RpcClient`].
+/// Idle timeout of [`WebSocketRpcClient`].
 ///
-/// [`RpcClient`]: super::RpcClient
+/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Debug, Copy, Clone)]
 pub struct IdleTimeout(pub JsDuration);
 
-/// Ping interval of [`RpcClient`].
+/// Ping interval of [`WebSocketRpcClient`].
 ///
-/// [`RpcClient`]: super::RpcClient
+/// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Debug, Copy, Clone, Mul)]
 pub struct PingInterval(pub JsDuration);
 
@@ -36,17 +33,19 @@ struct Inner {
     /// [`RpcTransport`] which heartbeats.
     transport: Rc<dyn RpcTransport>,
 
-    /// Idle timeout of [`RpcClient`].
+    /// Idle timeout of [`RpcTransport`].
     idle_timeout: IdleTimeout,
 
-    /// Ping interval of [`RpcClient`].
+    /// Ping interval of [`RpcTransport`].
     ping_interval: PingInterval,
 
-    /// [`Abort`] for [`Future`] which sends [`ClientMsg::Pong`] on
+    /// [`TaskHandle`] for [`Future`] which sends [`ClientMsg::Pong`] on
     /// [`ServerMsg::Ping`].
+    ///
+    /// [`Future`]: std::future::Future
     handle_ping_task: Option<TaskHandle>,
 
-    /// [`Abort`] for idle watchdog.
+    /// [`TaskHandle`] for idle watchdog.
     idle_watchdog_task: Option<TaskHandle>,
 
     /// Number of last received [`ServerMsg::Ping`].
@@ -59,13 +58,12 @@ struct Inner {
 impl Inner {
     /// Sends [`ClientMsg::Pong`] to a server.
     ///
-    /// If some error happen then it will be printed with [`console_error`].
+    /// If some error happen then it will be printed with [`log::error`].
     fn send_pong(&self, n: u32) {
         self.transport
             .send(&ClientMsg::Pong(n))
             .map_err(tracerr::wrap!(=> TransportError))
-            .map_err(JasonError::from)
-            .map_err(console_error)
+            .map_err(|e| log::error!("Failed to send pong: {}", e))
             .ok();
     }
 }
@@ -112,6 +110,7 @@ impl Heartbeat {
 
     /// Returns [`LocalBoxStream`] to which will sent `()` when [`Heartbeat`]
     /// considers that [`RpcTransport`] is idle.
+    #[must_use]
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().on_idle_subs.push(on_idle_tx);
@@ -140,18 +139,7 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
             delay_for(idle_timeout.0 - wait_for_ping.0).await;
             this.borrow_mut()
                 .on_idle_subs
-                .retain(|sub| !sub.is_closed());
-            this.borrow()
-                .on_idle_subs
-                .iter()
-                .filter_map(|sub| sub.unbounded_send(()).err())
-                .for_each(|err| {
-                    console_error(format!(
-                        "Heartbeat::on_idle subscriber has gone unexpectedly: \
-                         {:?}",
-                        err,
-                    ))
-                });
+                .retain(|sub| sub.unbounded_send(()).is_ok());
         });
 
     spawn_local(async move {

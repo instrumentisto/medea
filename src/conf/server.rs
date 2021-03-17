@@ -53,6 +53,7 @@ pub struct ClientApiHttpServer {
 impl ClientApiHttpServer {
     /// Builds [`SocketAddr`] from `bind_ip` and `bind_port`.
     #[inline]
+    #[must_use]
     pub fn bind_addr(&self) -> SocketAddr {
         (self.bind_ip, self.bind_port)
             .to_socket_addrs()
@@ -112,7 +113,7 @@ pub struct Server {
 mod client_http_spec {
     use std::net::Ipv4Addr;
 
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 
@@ -151,7 +152,7 @@ mod client_http_spec {
 mod control_grpc_spec {
     use std::net::Ipv4Addr;
 
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 

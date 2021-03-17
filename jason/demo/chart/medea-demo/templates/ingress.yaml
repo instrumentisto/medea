@@ -2,7 +2,7 @@
 {{- range $host := .Values.ingress.hosts }}
 ---
 kind: Ingress
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 metadata:
   name: {{ printf "%s.%s" (include "medea-demo.fullname" $) $host | quote }}
   namespace: {{ $.Release.Namespace | quote }}
@@ -31,17 +31,26 @@ spec:
       http:
         paths:
           - path: /control-api
+            pathType: ImplementationSpecific
             backend:
-              serviceName: {{ printf "%s-server" (include "medea-demo.fullname" $) | quote }}
-              servicePort: control-http
+              service:
+                name: {{ printf "%s-server" (include "medea-demo.fullname" $) | quote }}
+                port:
+                  name: control-http
           - path: /ws
+            pathType: ImplementationSpecific
             backend:
-              serviceName: {{ printf "%s-server" (include "medea-demo.fullname" $) | quote }}
-              servicePort: http
+              service:
+                name: {{ printf "%s-server" (include "medea-demo.fullname" $) | quote }}
+                port:
+                  name: http
           - path: /
+            pathType: ImplementationSpecific
             backend:
-              serviceName: {{ printf "%s-web-client" (include "medea-demo.fullname" $) | quote }}
-              servicePort: http
+              service:
+                name: {{ printf "%s-web-client" (include "medea-demo.fullname" $) | quote }}
+                port:
+                  name: http
 {{- if $.Values.ingress.tls.enabled }}
   tls:
     - secretName: {{ if $.Values.ingress.tls.auto -}}

@@ -6,17 +6,17 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2019-??-??
-[0.2.0]: /../../tree/medea-jason-0.2.0/jason
+## [0.2.0-rc.1] · 2021-02-01
+[0.2.0-rc.1]: /../../tree/medea-jason-0.2.0-rc.1/jason
 
-[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Diff](/../../compare/medea-jason-0.1.0...medea-jason-0.2.0-rc.1) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### BC Breaks
 
 - Library API:
-    - Replace `MediaStreamHandle` with `LocalMediaStream` and `RemoteMediaStream` ([#97]);
-    - Expose `on_local_stream` callback in `Room` instead of `Jason` ([#54]);
-    - Remove error argument from `on_local_stream` callback ([#54]);
+    - Remove `MediaStreamHandle` ([#143]);
+    - Expose `on_local_track` callback in `Room` instead of `Jason` ([#54], [#143]);
+    - Replace `on_local_stream` callback with `on_local_track` ([#143]);
     - Room initialization ([#46]):
         - Remove `Jason.join_room()`.
 - Transport and messaging:
@@ -26,45 +26,76 @@ All user visible changes to this project will be documented in this file. This p
 
 - Media management:
     - Library API:
-        - Mute/unmute local video/audio ([#40], [#81], [#97]):
-            - `Room.mute_audio()`;
-            - `Room.unmute_audio()`;
-            - `Room.mute_video()`;
-            - `Room.unmute_video()`.
+        - Disable/Enable local video/audio ([#40], [#81], [#97], [#144], [#155]):
+            - `Room.disable_audio()`;
+            - `Room.enable_audio()`;
+            - `Room.disable_video()`;
+            - `Room.enable_video()`.
         - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46]);
         - `MediaManager` class obtainable via `Jason.media_manager()` ([#46]):
             - `MediaManager.enumerate_devices()`;
-            - `MediaManager.init_local_stream()`.
+            - `MediaManager.init_local_tracks()` ([#46], [#143]).
         - Local media stream constraints:
             - `MediaStreamSettings`, `AudioTrackConstraints` classes ([#46], [#97]);
-            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]).
-        - Room initialization ([#46]):
-            - `Jason.init_room()`;
-            - `Room.join()`;
-        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97]);
-        - `Room.on_failed_local_stream` callback ([#54]);
+            - `DeviceVideoTrackConstraints`, `DisplayVideoTrackConstraints` classes ([#78]);
+            - `DeviceVideoTrackConstraints.ideal_facing_mode` and `DeviceVideoTrackConstraints.exact_facing_mode` functions ([#137]);
+            - `DeviceVideoTrackConstraints` width and height configuration ([#158]):
+                - `DeviceVideoTrackConstraints.ideal_width`;
+                - `DeviceVideoTrackConstraints.exact_width`;
+                - `DeviceVideoTrackConstraints.width_in_range`;
+                - `DeviceVideoTrackConstraints.ideal_height`;
+                - `DeviceVideoTrackConstraints.exact_height`;
+                - `DeviceVideoTrackConstraints.height_in_range`.
+            - `FacingMode` enum ([#137]).
+        - `MediaKind` enum that provides `LocalMediaTrack`/`RemoteMediaTrack` and `InputDeviceInfo` kind ([#146]);
+        - `MediaSourceKind` enum that provides `MediaTrack` media source kind (`Device` or `Display`) ([#146], [#156]);
+        - Room management:
+            - `Jason.init_room()` ([#46]);
+            - `Room.join()` ([#46]);
+            - `Jason.close_room()` ([#147]).
+        - Ability to configure local media stream used by `Room` via `Room.set_local_media_settings()` ([#54], [#97], [#145], [#160]):
+            - `Room.set_local_media_settings()` can be configured to stop used tracks before trying to acquire new tracks ([#160]);
+            - `Room.set_local_media_settings()` can be configured to rollback to previous settings if fail to set new settings ([#160]).
+        - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `RemoteMediaStream.on_track_enabled` and `RemoteMediaStream.on_track_disabled` callbacks being called when `MediaTrack` is enabled or disabled ([#123]);
-        - `RemoteMediaStream.on_track_added` callback being called when new receiver `MediaTrack` is added ([#123]);
-        - `RemoteMediaStream.has_active_audio` and `RemoteMediaStream.has_active_video` methods returning current state of the receivers ([#123]).
+        - `RemoteMediaTrack.on_enabled` and `RemoteMediaTrack.on_disabled` callbacks being called when `RemoteMediaTrack` is enabled or disabled ([#123], [#143], [#156]);
+        - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `RemoteMediaTrack` is added ([#123], [#143], [#156]);
+        - Enabling/disabling remote video/audio ([#127], [#155]):
+            - `Room.disable_remote_audio`;
+            - `Room.enable_remote_audio`;
+            - `Room.disable_remote_video`;
+            - `Room.enable_remote_video`.
+        - Muting/unmuting audio/video send ([#156]):
+            - `Room.mute_audio`;
+            - `Room.unmute_audio`;
+            - `Room.mute_video`;
+            - `Room.unmute_video`.
+        - `RemoteMediaTrack`/`LocalMediaTrack` `media_source_kind` function ([#145], [#146], [#156]);
+        - `RemoteMediaTrack` class ([#156]);
+        - `LocalMediaTrack` class ([#156]).
     - Optional tracks support ([#106]);
+    - Simultaneous device and display video tracks publishing and receiving ([#144]);
     - `RtcIceTransportPolicy` configuration ([#79]).
 - Room management:
     - Library API:
         - `Room.on_connection_loss` callback that JS side can start Jason reconnection on connection loss with ([#75]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
-        - `ConnectionHandle.get_remote_id` method ([#120]);
-        - `ConnectionHandle.on_close` callback ([#120]).
+        - `ConnectionHandle.on_close` callback ([#120]);
+        - `ConnectionHandle.get_remote_member_id` method ([#124]);
+        - `ConnectionHandle.on_quality_score_update` callback for quality score updates received from server ([#132]).
 - RPC messaging:
     - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
-    - `RpcClient` and `RpcTransport` reconnection ([#75]).
+    - `RpcClient` and `RpcTransport` reconnection ([#75]);
+    - State synchronization on a RPC reconnection ([#167]).
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` and `PeerConnectionState` ([#71], [#87]);
-        - `ApplyTracks` for muting/unmuting ([#81]);
         - `AddPeerConnectionStats` with `RtcStats` ([#90]);
+        - Enabling/disabling audio/video send/receive via `UpdateTracks` command ([#81], [#155]);
+        - Muting/unmuting audio/video send via `UpdateTracks` ([#156]).
     - Handling of RPC events:
-        - `TracksApplied` ([#105], [#109]).
+        - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated`, `TrackUpdate::IceRestart` and `TrackUpdate::Removed` ([#105], [#138], [#109]);
+        - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:
         - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
@@ -92,6 +123,21 @@ All user visible changes to this project will be documented in this file. This p
 [#109]: /../../pull/109
 [#120]: /../../pull/120
 [#123]: /../../pull/123
+[#124]: /../../pull/124
+[#127]: /../../pull/127
+[#132]: /../../pull/132
+[#137]: /../../pull/137
+[#138]: /../../pull/138
+[#143]: /../../pull/143
+[#144]: /../../pull/144
+[#145]: /../../pull/145
+[#146]: /../../pull/146
+[#147]: /../../pull/147
+[#155]: /../../pull/155
+[#156]: /../../pull/156
+[#158]: /../../pull/158
+[#160]: /../../pull/160
+[#167]: /../../pull/167
 
 
 

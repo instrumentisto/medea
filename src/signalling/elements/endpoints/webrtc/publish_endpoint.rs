@@ -54,6 +54,8 @@ struct WebRtcPublishEndpointInner {
     /// Currently this field used for nothing but in future this may be used
     /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
     /// this [`WebRtcPublishEndpoint`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     peer_ids: HashSet<PeerId>,
 }
 
@@ -104,7 +106,7 @@ impl WebRtcPublishEndpointInner {
         self.peer_ids.remove(peer_id);
     }
 
-    fn remove_peer_ids(&mut self, peer_ids: &HashSet<PeerId>) {
+    fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
         for peer_id in peer_ids {
             self.remove_peer_id(peer_id)
         }
@@ -120,6 +122,8 @@ pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
     /// Creates new [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn new(
         id: Id,
         p2p: P2pMode,
@@ -142,6 +146,7 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Adds [`WebRtcPlayEndpoint`] (sink) to this [`WebRtcPublishEndpoint`].
+    #[inline]
     pub fn add_sink(&self, sink: WeakWebRtcPlayEndpoint) {
         self.0.borrow_mut().add_sinks(sink)
     }
@@ -152,6 +157,8 @@ impl WebRtcPublishEndpoint {
     /// # Panics
     ///
     /// If meets empty pointer.
+    #[inline]
+    #[must_use]
     pub fn sinks(&self) -> Vec<WebRtcPlayEndpoint> {
         self.0.borrow().sinks()
     }
@@ -161,16 +168,21 @@ impl WebRtcPublishEndpoint {
     /// # Panics
     ///
     /// If pointer to [`Member`] has been dropped.
+    #[inline]
+    #[must_use]
     pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
 
     /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
+    #[inline]
     pub fn add_peer_id(&self, peer_id: PeerId) {
         self.0.borrow_mut().add_peer_id(peer_id)
     }
 
     /// Returns all [`PeerId`]s of this [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn peer_ids(&self) -> HashSet<PeerId> {
         self.0.borrow().peer_ids()
     }
@@ -178,28 +190,34 @@ impl WebRtcPublishEndpoint {
     /// Resets state of this [`WebRtcPublishEndpoint`].
     ///
     /// _Atm this only resets `peer_ids`._
+    #[inline]
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }
 
     /// Removes [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
     #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[inline]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
         self.0.borrow_mut().remove_peer_id(peer_id)
     }
 
     /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
-    pub fn remove_peer_ids(&self, peer_ids: &HashSet<PeerId>) {
+    #[inline]
+    pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
         self.0.borrow_mut().remove_peer_ids(peer_ids)
     }
 
     /// Returns [`Id`] of this [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
     }
 
     /// Removes all dropped [`Weak`] pointers from sinks of this
     /// [`WebRtcPublishEndpoint`].
+    #[inline]
     pub fn remove_empty_weaks_from_sinks(&self) {
         self.0
             .borrow_mut()
@@ -208,12 +226,16 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn p2p(&self) -> P2pMode {
         self.0.borrow().p2p
     }
 
     /// Indicates whether only `relay` ICE candidates are allowed for this
     /// [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn is_force_relayed(&self) -> bool {
         self.0.borrow().is_force_relayed
     }
@@ -242,6 +264,7 @@ impl WebRtcPublishEndpoint {
     /// Returns `true` if `on_start` or `on_stop` callback is set.
     #[allow(clippy::unused_self)]
     #[inline]
+    #[must_use]
     pub fn has_traffic_callback(&self) -> bool {
         // TODO: Must depend on on_start/on_stop endpoint callbacks, when those
         //       will be added (#91).
@@ -249,17 +272,23 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns [`AudioSettings`] of this [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn audio_settings(&self) -> AudioSettings {
         self.0.borrow().audio_settings
     }
 
     /// Returns [`VideoSettings`] of this [`WebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn video_settings(&self) -> VideoSettings {
         self.0.borrow().video_settings
     }
 
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
         WeakWebRtcPublishEndpoint(Rc::downgrade(&self.0))
     }
@@ -267,6 +296,7 @@ impl WebRtcPublishEndpoint {
     /// Compares [`WebRtcPublishEndpoint`]'s inner pointers. If both pointers
     /// points to the same address, then returns `true`.
     #[cfg(test)]
+    #[inline]
     pub fn ptr_eq(&self, another_publish: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_publish.0)
     }
@@ -282,13 +312,17 @@ impl WeakWebRtcPublishEndpoint {
     /// # Panics
     ///
     /// If weak pointer was dropped.
+    #[inline]
+    #[must_use]
     pub fn upgrade(&self) -> WebRtcPublishEndpoint {
         WebRtcPublishEndpoint(self.0.upgrade().unwrap())
     }
 
     /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
-    /// Returns `None` if weak pointer was dropped.
+    /// Returns [`None`] if weak pointer was dropped.
+    #[inline]
+    #[must_use]
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
         self.0.upgrade().map(WebRtcPublishEndpoint)
     }

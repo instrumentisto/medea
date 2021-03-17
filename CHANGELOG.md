@@ -6,10 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2020-??-??
-[0.2.0]: /../../tree/medea-0.2.0
+## [0.2.0-rc.1] · 2021-02-01
+[0.2.0-rc.1]: /../../tree/medea-0.2.0-rc.1
 
-[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Diff](/../../compare/medea-0.1.0...medea-0.2.0-rc.1) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### BC Breaks
 
@@ -26,10 +26,11 @@ All user visible changes to this project will be documented in this file. This p
         - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
         - `Delete` method for `Room`, `Member`, `Endpoint`.
-    - gRPC Control API callbacks ([#63]):
-        - `on_join`;
-        - `on_leave`.
-    - Configuration of `Member`'s Client API RPC settings ([#95]).
+    - gRPC Control API callbacks:
+        - `on_join` ([#63], [#153]);
+        - `on_leave` ([#63]).
+    - Configuration of `Member`'s Client API RPC settings ([#95]);
+    - Hashed `Member` credentials support ([#168]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
@@ -39,6 +40,12 @@ All user visible changes to this project will be documented in this file. This p
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Emit `TracksApplied` event to create new and update existing tracks ([#105]);
     - `PeerConnection` renegotiation functionality ([#105]);
+    - Calculate and send call quality score based on RTC stats ([#132]);
+    - Enabling/disabling `MediaTrack`s by receiver ([#127], [#155]);
+    - Send `TrackUpdate::IceRestart` based on RTC stats analysis ([#138]);
+    - Multiple `Room`s served by one RPC connection support ([#147]);
+    - Muting/unmuting `MediaTrack`s ([#156]);
+    - State synchronization on a RPC reconnection ([#167]).
     - Emit `TracksApplied`'s event to remove existing on client tracks ([#109]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
@@ -47,10 +54,11 @@ All user visible changes to this project will be documented in this file. This p
     - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
     - `[turn.cli]` and `[turn.cli.pool]` sections to configure access to [Coturn] admin interface ([#84]);
     - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]);
-    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]).
+    - `rpc.ping_interval` option to configure `Ping`s sending interval ([#75]);
     - `[media]` section to configure timeouts involved for determining media flow liveness ([#98]):
         - `max_lag`;
         - `init_timeout`.
+    - `turn.db.redis.user` option to configure user to authenticate on [Coturn]'s [Redis] database server as ([#135]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -75,6 +83,16 @@ All user visible changes to this project will be documented in this file. This p
 [#98]: /../../pull/98
 [#105]: /../../pull/105
 [#109]: /../../pull/109
+[#127]: /../../pull/127
+[#132]: /../../pull/132
+[#135]: /../../pull/135
+[#138]: /../../pull/138
+[#147]: /../../pull/147
+[#153]: /../../pull/153
+[#155]: /../../pull/155
+[#156]: /../../pull/156
+[#167]: /../../pull/167
+[#168]: /../../pull/168
 
 
 
@@ -102,4 +120,5 @@ All user visible changes to this project will be documented in this file. This p
 
 
 [Coturn]: https://github.com/coturn/coturn
+[Redis]: https://redis.io
 [Semantic Versioning 2.0.0]: https://semver.org

@@ -16,7 +16,9 @@ pub struct Log {
 }
 
 impl Log {
-    /// Returns configured application logging level. `None` if disabled.
+    /// Returns configured application logging level, or [`None`] if disabled.
+    #[inline]
+    #[must_use]
     pub fn level(&self) -> Option<slog::Level> {
         slog::Level::from_str(&self.level).ok()
     }
@@ -24,7 +26,7 @@ impl Log {
 
 #[cfg(test)]
 mod log_conf_specs {
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 

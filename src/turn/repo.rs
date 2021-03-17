@@ -10,7 +10,13 @@ use derive_more::{Display, From};
 use failure::Fail;
 use redis::{IntoConnectionInfo, RedisError};
 
-use crate::{log::prelude::*, media::IceUser};
+use crate::{
+    log::prelude as log,
+    turn::{IceUser, IceUsername},
+};
+
+/// Medea's [Coturn] realm name.
+const COTURN_REALM: &str = "medea";
 
 #[derive(Debug, Display, Fail, From)]
 pub enum TurnDatabaseErr {
@@ -26,9 +32,7 @@ pub enum TurnDatabaseErr {
 ///
 /// This struct can be cloned and transferred across thread boundaries.
 #[derive(Clone)]
-pub struct TurnDatabase {
-    pool: Pool,
-}
+pub struct TurnDatabase(Pool);
 
 impl TurnDatabase {
     /// Creates new [`TurnDatabase`].
@@ -49,9 +53,7 @@ impl TurnDatabase {
                 recycle: None,
             },
         };
-        Ok(Self {
-            pool: Pool::from_config(manager, config),
-        })
+        Ok(Self(Pool::from_config(manager, config)))
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.
@@ -61,19 +63,15 @@ impl TurnDatabase {
     /// Errors if unable to establish connection with database, or database
     /// request fails.
     pub async fn insert(&self, user: &IceUser) -> Result<(), TurnDatabaseErr> {
-        debug!("Store ICE user: {:?}", user);
+        log::debug!("Store ICE user: {:?}", user);
 
-        let key = format!("turn/realm/medea/user/{}/key", user.user());
-        let value = format!("{}:medea:{}", user.user(), user.pass());
+        let key = user.user().redis_key();
+        let value = user.redis_hmac_key();
 
-        let mut hasher = Md5::new();
-        hasher.input_str(&value);
-        let result = hasher.result_str();
-
-        let mut conn = self.pool.get().await?;
+        let mut conn = self.0.get().await?;
         Ok(cmd("SET")
             .arg(key)
-            .arg(result)
+            .arg(value)
             .query_async(&mut conn)
             .await?)
     }
@@ -88,28 +86,51 @@ impl TurnDatabase {
     /// request fails.
     pub async fn remove(
         &self,
-        users: &[&IceUser],
+        users: &[IceUsername],
     ) -> Result<(), TurnDatabaseErr> {
-        debug!("Remove ICE users: {:?}", users);
+        log::debug!("Remove ICE users: {:?}", users);
 
         if users.is_empty() {
             return Ok(());
         }
 
-        let keys: Vec<_> = users
-            .iter()
-            .map(|u| format!("turn/realm/medea/user/{}/key", u.user()))
-            .collect();
+        let keys: Vec<_> = users.iter().map(IceUsername::redis_key).collect();
 
-        let mut conn = self.pool.get().await?;
+        let mut conn = self.0.get().await?;
         Ok(cmd("DEL").arg(keys).query_async(&mut conn).await?)
     }
 }
 
+impl IceUsername {
+    /// Forms a Redis key of this [`IceUsername`].
+    #[must_use]
+    fn redis_key(&self) -> String {
+        format!("turn/realm/{}/user/{}/key", COTURN_REALM, self)
+    }
+}
+
+impl IceUser {
+    /// Forms a [Coturn]'s [HMAC key] of this [`IceUser`].
+    ///
+    /// [HMAC key]: https://tinyurl.com/y33qa86c
+    #[must_use]
+    fn redis_hmac_key(&self) -> String {
+        let mut hasher = Md5::new();
+        hasher.input_str(&format!(
+            "{}:{}:{}",
+            self.user(),
+            COTURN_REALM,
+            self.pass()
+        ));
+        hasher.result_str()
+    }
+}
+
 impl fmt::Debug for TurnDatabase {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TurnDatabase")
-            .field("pool", &self.pool.status())
+            .field("pool", &self.0.status())
             .finish()
     }
 }

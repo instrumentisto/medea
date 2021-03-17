@@ -7,8 +7,7 @@ use std::{
 
 use derive_more::{Display, From};
 use failure::Fail;
-
-use crate::{api::control::RoomId, impls_for_stateful_refs};
+use medea_client_api_proto::RoomId;
 
 use super::{ToEndpoint, ToMember, ToRoom};
 
@@ -82,6 +81,8 @@ impl StatefulFid {
     /// Returns reference to [`RoomId`].
     ///
     /// This is possible in any [`StatefulFid`] state.
+    #[inline]
+    #[must_use]
     pub fn room_id(&self) -> &RoomId {
         match self {
             StatefulFid::Room(uri) => uri.room_id(),
@@ -103,9 +104,8 @@ impl TryFrom<String> for StatefulFid {
         let room_id = if let Some(room_id) = splitted.next() {
             if room_id.is_empty() {
                 return Err(ParseFidError::MissingPath(value));
-            } else {
-                room_id
             }
+            room_id
         } else {
             return Err(ParseFidError::Empty);
         };
@@ -113,9 +113,8 @@ impl TryFrom<String> for StatefulFid {
         let member_id = if let Some(member_id) = splitted.next() {
             if member_id.is_empty() {
                 return Err(ParseFidError::MissingPath(value));
-            } else {
-                member_id
             }
+            member_id
         } else {
             return Ok(Fid::<ToRoom>::new(room_id.into()).into());
         };
@@ -123,9 +122,8 @@ impl TryFrom<String> for StatefulFid {
         let endpoint_id = if let Some(endpoint_id) = splitted.next() {
             if endpoint_id.is_empty() {
                 return Err(ParseFidError::MissingPath(value));
-            } else {
-                endpoint_id
             }
+            endpoint_id
         } else {
             return Ok(Fid::<ToMember>::new(
                 room_id.to_string().into(),

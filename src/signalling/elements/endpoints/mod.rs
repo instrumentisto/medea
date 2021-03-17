@@ -25,7 +25,9 @@ pub enum Endpoint {
 }
 
 impl Endpoint {
-    /// Returns [`Weak`] reference to this [`Endpoint`].
+    /// Downgrades this [`Endpoint`] to [`WeakEndpoint`].
+    #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakEndpoint {
         match self {
             Self::WebRtcPublishEndpoint(publish) => publish.downgrade().into(),
@@ -35,6 +37,7 @@ impl Endpoint {
 }
 
 impl Into<proto::Element> for Endpoint {
+    #[inline]
     fn into(self) -> proto::Element {
         match self {
             Self::WebRtcPublishEndpoint(play) => play.into(),
@@ -48,15 +51,17 @@ impl Into<proto::Element> for Endpoint {
 /// Can be upgraded to an [`Endpoint`] by calling [`WeakEndpoint::upgrade`].
 #[derive(Clone, Debug, From)]
 pub enum WeakEndpoint {
-    /// [`Weak`] pointer to the [`WebRtcPublishEndpoint`].
+    /// Concrete type of this [`WeakEndpoint`] is
+    /// [`WeakWebRtcPublishEndpoint`].
     WebRtcPublishEndpoint(WeakWebRtcPublishEndpoint),
 
-    /// [`Weak`] pointer to the [`WebRtcPlayEndpoint`].
+    /// Concrete type of this [`WeakEndpoint`] is [`WeakWebRtcPlayEndpoint`].
     WebRtcPlayEndpoint(WeakWebRtcPlayEndpoint),
 }
 
 impl WeakEndpoint {
     /// Upgrades this weak pointer to a strong [`Endpoint`] pointer.
+    #[must_use]
     pub fn upgrade(&self) -> Option<Endpoint> {
         match self {
             WeakEndpoint::WebRtcPublishEndpoint(ep) => {

@@ -16,10 +16,9 @@
       background: #f5f5f5;
     }
 
-    .remote-videos {
-      display: flex;
-      width: 100%;
-      justify-content: space-around;
+    .video video {
+      max-width: 600px;
+      margin-top: 10px;
     }
 
     .video {
@@ -35,33 +34,14 @@
       border-radius: 3px;
     }
 
-    .connect {
-      float: left;
-    }
-
     .local-video {
       float: left;
       width: auto;
+    }
+
+    .local-video video {
       height: 150px;
       max-width: 225px;
-    }
-
-    .connect__username {
-      font-size: 16px;
-      padding: 5px;
-    }
-
-    .bottom-btns {
-      position: absolute;
-      bottom: 100px;
-      left: 0;
-      right: 0;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .control {
-      display: none;
     }
 
     .json__key {
@@ -94,7 +74,7 @@
     }
   </style>
 </head>
-<body >
+<body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <a class="navbar-brand">Medea</a>
     <button class="navbar-toggler"
@@ -167,7 +147,7 @@
           </a>
         </li>
       </ul>
-      <div class="dropdown ">
+      <div class="dropdown">
         <button class="btn btn-light dropdown-toggle" type="button"
                 id="username-menu-button"
                 data-toggle="dropdown"
@@ -182,25 +162,31 @@
     </div>
   </nav>
 
-  <div class="remote-videos">
+  <div class="remote-videos d-flex flex-row justify-content-center">
   </div>
 
-  <div class="footer">
-    <div class="local-video video">
-      <video muted autoplay width="100%" height="100%"></video>
+  <div class="footer m-3">
+    <div id="local-video" class="local-video video">
     </div>
-  </div>
-
-  <div class="bottom-btns control text-center">
-    <button class="control__mute_audio btn btn-secondary">Mute audio</button>
-    <button class="control__mute_video btn btn-secondary">Mute video</button>
-     <button type="button"
-             class="btn btn-secondary"
-             data-toggle="modal"
-             data-target="#devices-settings">
-       Devices
-     </button>
-    <button class="control__close_app btn btn-danger">Dispose</button>
+    <div class="mb-3">
+      <button id="control__disable_audio_send" class="btn btn-secondary">Disable audio send</button>
+      <button id="control__disable_video_send" class="btn btn-secondary">Disable video send</button>
+    </div>
+    <div class="mb-3">
+      <button id="control__disable_audio_recv" class="btn btn-secondary">Disable audio recv</button>
+      <button id="control__disable_video_recv" class="btn btn-secondary">Disable video recv</button>
+    </div>
+    <div class="mb-3">
+      <button id="control__mute_audio_send" class="btn btn-secondary">Mute audio send</button>
+      <button id="control__mute_video_send" class="btn btn-secondary">Mute video send</button>
+    </div>
+    <button type="button"
+            class="btn btn-secondary"
+            data-toggle="modal"
+            data-target="#devices-settings">
+      Devices
+    </button>
+    <button id="control__close_app" class="btn btn-danger">Dispose</button>
   </div>
 
   <div class="modal fade"
@@ -216,6 +202,7 @@
                   class="close"
                   data-dismiss="modal"
                   aria-label="Close">
+          </button>
           <span aria-hidden="true">&times;</span>
         </div>
 
@@ -605,7 +592,7 @@
     </div>
     <div class="toast-body">
       <span class="connection-loss-notification__msg">Trying to reconnect with backoff...</span>
-      <button class="btn btn-success btn-sm connection-loss-notification__manual-reconnect">Reconnect now</a>
+      <button class="btn btn-success btn-sm connection-loss-notification__manual-reconnect">Reconnect now</button>
     </div>
   </div>
 
@@ -629,7 +616,7 @@
           <form>
             <div class="form-group">
               <h5>Username</h5>
-              <input class="form-control connection-settings__username">
+              <input id="connection-settings__username" class="form-control"/>
               <br>
 
               <h5>Publishing</h5>
@@ -676,13 +663,16 @@
                    data-target="#devices-settings">
              Configure devices
            </button>
-          <button type="button" class="btn btn-success
-            connection-settings__connect">Connect</button>
+          <button type="button"
+                  id="connection-settings__connect"
+                  class="btn btn-success">
+            Connect
+          </button>
         </div>
       </div>
     </div>
   </div>
-  <div class="bottom-btns text-center">
+  <div class="text-center">
    <button type="button"
            class="btn btn-success btn-lg"
            id="connect-btn"
@@ -711,12 +701,23 @@
 
         <div class="modal-body">
           <label for="connect__select-device_audio">Audio</label>
-          <select class="connect__select-device_audio custom-select">
+          <select id="connect__select-device_audio" class="custom-select">
           </select><br><br>
 
           <label for="connect__select-device_video">Video</label>
-          <select class="connect__select-device_video custom-select">
+          <select id="connect__select-device_video" class="custom-select">
           </select>
+
+          <div class="custom-control custom-switch" style="margin-top: 10px">
+            <input type="checkbox"
+                   id="connection-settings__screenshare"
+                   class="custom-control-input"
+                   autocomplete="off">
+            <label for="connection-settings__screenshare"
+                   class="custom-control-label">
+              Screenshare
+            </label>
+          </div>
         </div>
 
       </div>

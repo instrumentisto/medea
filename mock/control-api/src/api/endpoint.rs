@@ -38,7 +38,7 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
 
 /// Publishing policy of the video or audio media type in the
 /// [`WebRtcPublishEndpoint`].
-#[derive(Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, SmartDefault)]
 pub enum PublishPolicy {
     /// Publish this media type if it possible.
     #[default]
@@ -78,12 +78,12 @@ impl From<PublishPolicy> for proto::web_rtc_publish_endpoint::PublishPolicy {
 }
 
 /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct AudioSettings {
     /// Publishing policy of the audio media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
-    publish_policy: PublishPolicy,
+    pub publish_policy: PublishPolicy,
 }
 
 impl From<proto::web_rtc_publish_endpoint::AudioSettings> for AudioSettings {
@@ -109,12 +109,12 @@ impl From<AudioSettings> for proto::web_rtc_publish_endpoint::AudioSettings {
 }
 
 /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct VideoSettings {
     /// Publishing policy of the video media type in the
     /// [`WebRtcPublishEndpoint`].
     #[serde(default)]
-    publish_policy: PublishPolicy,
+    pub publish_policy: PublishPolicy,
 }
 
 impl From<VideoSettings> for proto::web_rtc_publish_endpoint::VideoSettings {
@@ -146,22 +146,22 @@ impl From<proto::web_rtc_publish_endpoint::VideoSettings> for VideoSettings {
 pub struct WebRtcPublishEndpoint {
     /// ID of [`WebRtcPublishEndpoint`].
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
 
     /// Mode of connection for this [`WebRtcPublishEndpoint`].
-    p2p: P2pMode,
+    pub p2p: P2pMode,
 
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
-    force_relay: bool,
+    pub force_relay: bool,
 
     /// Settings for the audio media type of the [`WebRtcPublishEndpoint`].
     #[serde(default)]
-    audio_settings: AudioSettings,
+    pub audio_settings: AudioSettings,
 
     /// Settings for the video media type of the [`WebRtcPublishEndpoint`].
     #[serde(default)]
-    video_settings: VideoSettings,
+    pub video_settings: VideoSettings,
 }
 
 impl WebRtcPublishEndpoint {
@@ -207,17 +207,17 @@ impl From<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPlayEndpoint {
-    /// ID of `WebRtcPlayEndpoint`.
+    /// ID of this [`WebRtcPlayEndpoint`].
     #[serde(skip_deserializing)]
-    id: String,
+    pub id: String,
 
     /// URI in format `local://{room_id}/{member_id}/{endpoint_id}` pointing to
     /// [`WebRtcPublishEndpoint`] which this [`WebRtcPlayEndpoint`] plays.
-    src: String,
+    pub src: String,
 
     /// Option to relay all media through a TURN server forcibly.
     #[serde(default)]
-    force_relay: bool,
+    pub force_relay: bool,
 }
 
 impl WebRtcPlayEndpoint {

@@ -3,24 +3,13 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-// TODO: Remove `clippy::must_use_candidate` once the issue below is resolved:
-//       https://github.com/rust-lang/rust-clippy/issues/4779
-#![allow(clippy::module_name_repetitions, clippy::must_use_candidate)]
-
-pub mod api;
-pub mod callback;
-pub mod client;
-pub mod prelude;
-
 use clap::{
     app_from_crate, crate_authors, crate_description, crate_name,
     crate_version, Arg,
 };
-use slog::{o, Drain};
-use slog_scope::GlobalLoggerGuard;
+use medea_control_api_mock::{api, callback, init_logger};
 
-#[actix_rt::main]
-async fn main() {
+fn main() {
     dotenv::dotenv().ok();
 
     let opts = app_from_crate!()
@@ -56,20 +45,8 @@ async fn main() {
 
     let _log_guard = init_logger();
 
-    let callback_server = callback::server::run(&opts).await;
-    api::run(&opts, callback_server).await;
-}
-
-/// Initializes [`slog`] logger which will output logs with [`slog_term`]'s
-/// decorator.
-fn init_logger() -> GlobalLoggerGuard {
-    let decorator = slog_term::TermDecorator::new().build();
-    let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let drain = slog_envlogger::new(drain).fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
-    let logger = slog::Logger::root(drain, o!());
-    let scope_guard = slog_scope::set_global_logger(logger);
-    slog_stdlog::init().unwrap();
-
-    scope_guard
+    actix_web::rt::System::new("mock-control-api").block_on(async move {
+        let callback_server = callback::server::run(&opts).await;
+        api::run(&opts, callback_server).await;
+    });
 }

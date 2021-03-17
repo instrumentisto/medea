@@ -20,6 +20,7 @@ use actix_web::{
     App, HttpResponse, HttpServer,
 };
 use clap::ArgMatches;
+use derive_more::From;
 use medea_control_api_proto::grpc::api as proto;
 use serde::{Deserialize, Serialize};
 
@@ -70,7 +71,7 @@ pub async fn run(
     HttpServer::new(move || {
         debug!("Running HTTP server...");
         App::new()
-            .wrap(Cors::new().finish())
+            .wrap(Cors::permissive())
             .data(AppContext {
                 client: client.clone(),
                 subscribers: Arc::clone(&subscribers),
@@ -142,8 +143,8 @@ macro_rules! gen_request_macro {
     };
 }
 
-/// [`actix_web`] REST API endpoint which returns all
-/// [`Callback`]s received by this mock server.
+/// [`actix_web`] REST API endpoint which returns all Control API Callbacks
+/// received by this mock server.
 ///
 /// # Errors
 ///
@@ -243,7 +244,7 @@ mod create {
 /// Error object. Returns when some error happened on [Control API]'s side.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ErrorResponse {
     /// Medea's Control API error code.
     pub code: u32,
@@ -268,7 +269,7 @@ impl Into<ErrorResponse> for proto::Error {
 /// Response which returns sids.
 ///
 /// Used for create methods.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CreateResponse {
     /// URIs with which [Jason] can connect `Member`s.
     ///
@@ -286,7 +287,7 @@ pub struct CreateResponse {
 /// Response which can return only error (if any).
 ///
 /// Used for delete methods.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
     /// Error if something happened on [Control API]'s side.
     ///
@@ -329,24 +330,23 @@ impl From<proto::Response> for Response {
 
 impl From<proto::CreateResponse> for CreateResponse {
     fn from(resp: proto::CreateResponse) -> Self {
-        if let Some(error) = resp.error {
-            Self {
-                sids: None,
-                error: Some(error.into()),
-            }
-        } else {
+        resp.error.map_or(
             Self {
                 sids: Some(resp.sid),
                 error: None,
-            }
-        }
+            },
+            |error| Self {
+                sids: None,
+                error: Some(error.into()),
+            },
+        )
     }
 }
 
 /// Union of all elements which exists in [Medea].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug, Deserialize, From, Serialize)]
 #[serde(tag = "kind")]
 pub enum Element {
     Member(Member),
@@ -400,7 +400,7 @@ impl From<proto::room::Element> for Element {
 }
 
 /// Response on request for get `Element` request.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SingleGetResponse {
     /// Requested element.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -416,12 +416,7 @@ pub struct SingleGetResponse {
 
 impl From<proto::GetResponse> for SingleGetResponse {
     fn from(proto: proto::GetResponse) -> Self {
-        if let Some(error) = proto.error {
-            Self {
-                element: None,
-                error: Some(error.into()),
-            }
-        } else {
+        proto.error.map_or(
             Self {
                 error: None,
                 element: proto
@@ -429,7 +424,11 @@ impl From<proto::GetResponse> for SingleGetResponse {
                     .into_iter()
                     .map(|(_, e)| e.into())
                     .next(),
-            }
-        }
+            },
+            |error| Self {
+                element: None,
+                error: Some(error.into()),
+            },
+        )
     }
 }

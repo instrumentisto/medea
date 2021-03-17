@@ -122,19 +122,14 @@ where
 
 impl<D> ObservableCell<D>
 where
-    D: Copy + 'static,
+    D: Clone + 'static,
 {
     /// Returns copy of an underlying data.
     #[inline]
     pub fn get(&self) -> D {
-        **self.0.borrow()
+        self.0.borrow().data.clone()
     }
-}
 
-impl<D> ObservableCell<D>
-where
-    D: Clone + 'static,
-{
     /// Returns [`Stream`] into which underlying data updates will be emitted.
     ///
     /// [`Stream`]: futures::Stream

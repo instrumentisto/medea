@@ -126,17 +126,15 @@ fn is_caused(bi: &synstructure::BindingInfo) -> bool {
         if let Ok(meta) = attr.parse_meta() {
             if meta.path().is_ident("js") {
                 if let syn::Meta::List(ref list) = meta {
-                    if let Some(pair) = list.nested.first() {
-                        if let syn::NestedMeta::Meta(syn::Meta::Path(
-                            ref path,
-                        )) = pair
-                        {
-                            if path.is_ident("cause") {
-                                if found_cause {
-                                    panic!("Cannot have two cause attributes");
-                                }
-                                found_cause = true;
+                    if let Some(syn::NestedMeta::Meta(syn::Meta::Path(
+                        ref path,
+                    ))) = list.nested.first()
+                    {
+                        if path.is_ident("cause") {
+                            if found_cause {
+                                panic!("Cannot have two cause attributes");
                             }
+                            found_cause = true;
                         }
                     }
                 }

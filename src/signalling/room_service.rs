@@ -10,6 +10,7 @@ use failure::Fail;
 use futures::future::{
     self, FutureExt as _, LocalBoxFuture, TryFutureExt as _,
 };
+use medea_client_api_proto::{MemberId, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use redis::RedisError;
 
@@ -17,9 +18,10 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
+        member::Credential,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId,
-        RoomSpec, TryFromElementError,
+        EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomSpec,
+        TryFromElementError,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
@@ -32,7 +34,6 @@ use crate::{
         room_repo::RoomRepository,
         Room,
     },
-    turn::coturn_metrics::CoturnMetricsService,
     AppContext,
 };
 
@@ -125,10 +126,12 @@ pub struct RoomService {
 
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
-
-    /// Service which is responsible for processing [`PeerConnection`]'s
-    /// metrics received from the Coturn.
-    _coturn_metrics: Addr<CoturnMetricsService>,
+    /* TODO: Enable in https://github.com/instrumentisto/medea/pull/91
+     * /// Service which is responsible for processing [`Peer`]'s metrics
+     * received /// from Coturn.
+     * ///
+     * /// [`Peer`]: crate::media::peer::Peer
+     * _coturn_metrics: Addr<CoturnMetricsService>, */
 }
 
 impl RoomService {
@@ -136,8 +139,7 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// Returns [`RedisError`] if [`CoturnMetricsService`] fails to connect to
-    /// Redis stats server.
+    /// Returns [`RedisError`] if fails to connect to Redis stats server.
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -146,11 +148,12 @@ impl RoomService {
         let peer_traffic_watcher =
             build_peers_traffic_watcher(&app.config.media);
         Ok(Self {
-            _coturn_metrics: CoturnMetricsService::new(
-                &app.config.turn,
-                peer_traffic_watcher.clone(),
-            )?
-            .start(),
+            // TODO: Enable in https://github.com/instrumentisto/medea/pull/91
+            // _coturn_metrics: CoturnMetricsService::new(
+            //     &app.config.turn,
+            //     peer_traffic_watcher.clone(),
+            // )?
+            // .start(),
             static_specs_dir: app.config.control.static_specs_dir.clone(),
             public_url: app.config.server.client.http.public_url.clone(),
             peer_traffic_watcher,
@@ -167,40 +170,47 @@ impl RoomService {
         &self,
         id: RoomId,
     ) -> LocalBoxFuture<'static, Result<(), MailboxError>> {
-        if let Some(room) = self.room_repo.get(&id) {
-            shutdown::unsubscribe(
-                &self.graceful_shutdown,
-                room.clone().recipient(),
-                shutdown::Priority(2),
-            );
+        self.room_repo
+            .get(&id)
+            .map_or(future::ok(()).boxed_local(), |room| {
+                shutdown::unsubscribe(
+                    &self.graceful_shutdown,
+                    room.clone().recipient(),
+                    shutdown::Priority(2),
+                );
 
-            let room_repo = self.room_repo.clone();
-            let sending = room.send(Close);
-            async move {
-                let res = sending.await;
-                if res.is_ok() {
-                    room_repo.remove(&id);
-                }
-                res
-            }
-            .boxed_local()
-        } else {
-            async { Ok(()) }.boxed_local()
-        }
+                let room_repo = self.room_repo.clone();
+                room.send(Close)
+                    .inspect_ok(move |_| room_repo.remove(&id))
+                    .boxed_local()
+            })
     }
 
     /// Returns [Control API] sid based on provided arguments and
     /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
+    ///
+    /// Returns sid with a token (`?token=<token>`) if [`ControlCredential`] is
+    /// [`ControlCredential::Plain`].
+    ///
+    /// Returns sid without token if [`ControlCredential`] is
+    /// [`ControlCredential::Hash`].
     fn get_sid(
         &self,
         room_id: &RoomId,
         member_id: &MemberId,
-        credentials: &str,
+        credentials: &Credential,
     ) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.public_url, room_id, member_id, credentials
-        )
+        match credentials {
+            Credential::Hash(_) => {
+                format!("{}/{}/{}", self.public_url, room_id, member_id)
+            }
+            Credential::Plain(plain) => {
+                format!(
+                    "{}/{}/{}?token={}",
+                    self.public_url, room_id, member_id, plain,
+                )
+            }
+        }
     }
 }
 
@@ -251,6 +261,8 @@ impl Handler<StartStaticRooms> for RoomService {
 }
 
 /// Type alias for success [`CreateResponse`]'s sids.
+///
+/// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<String, String>;
 
 /// Signal for creating new [`Room`].
@@ -314,7 +326,7 @@ impl Handler<CreateRoom> for RoomService {
 
 /// Signal for create new [`Member`] in [`Room`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct CreateMemberInRoom {
@@ -332,23 +344,28 @@ impl Handler<CreateMemberInRoom> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.parent_fid.take_room_id();
-        let sid = self.get_sid(&room_id, &msg.id, msg.spec.credentials());
-        let mut sids = HashMap::new();
-        sids.insert(msg.id.to_string(), sid);
+        let id = msg.id;
+        let spec = msg.spec;
+        let sid = self.get_sid(&room_id, &id, spec.credentials());
 
-        if let Some(room) = self.room_repo.get(&room_id) {
-            let sending = room.send(CreateMember(msg.id, msg.spec));
-            async {
-                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(sids)
-            }
-            .boxed_local()
-        } else {
-            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
-                room_id,
-            )))
-            .boxed_local()
-        }
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
+            |room| {
+                async move {
+                    let id_str = id.to_string();
+                    room.send(CreateMember(id, spec))
+                        .await
+                        .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(hashmap! {id_str => sid})
+                }
+                .boxed_local()
+            },
+        )
     }
 }
 
@@ -373,24 +390,29 @@ impl Handler<CreateEndpointInRoom> for RoomService {
     ) -> Self::Result {
         let (room_id, member_id) = msg.parent_fid.take_all();
         let endpoint_id = msg.id;
+        let spec = msg.spec;
 
-        if let Some(room) = self.room_repo.get(&room_id) {
-            let sending = room.send(CreateEndpoint {
-                member_id,
-                endpoint_id,
-                spec: msg.spec,
-            });
-            async {
-                sending.await.map_err(RoomServiceError::RoomMailboxErr)??;
-                Ok(HashMap::new())
-            }
-            .boxed_local()
-        } else {
-            future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
-                room_id,
-            )))
-            .boxed_local()
-        }
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
+            |room| {
+                async move {
+                    room.send(CreateEndpoint {
+                        member_id,
+                        endpoint_id,
+                        spec,
+                    })
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(HashMap::new())
+                }
+                .boxed_local()
+            },
+        )
     }
 }
 
@@ -405,9 +427,10 @@ pub struct Unvalidated;
 
 // Clippy lint show use_self errors for DeleteElements with generic state. This
 // is fix for it. This allow not works on function.
-#[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
     /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fids: Vec::new(),
@@ -416,6 +439,7 @@ impl DeleteElements<Unvalidated> {
     }
 
     /// Adds [`StatefulFid`] to request.
+    #[inline]
     pub fn add_fid(&mut self, fid: StatefulFid) {
         self.fids.push(fid)
     }
@@ -508,16 +532,16 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
 
-            if let Some(room) = self.room_repo.get(&room_id) {
-                let sending = room.send(Delete(deletes_from_room));
-                async {
-                    sending.await.map_err(RoomServiceError::RoomMailboxErr)?;
-                    Ok(())
-                }
-                .boxed_local()
-            } else {
-                future::ok(()).boxed_local()
-            }
+            self.room_repo.get(&room_id).map_or_else(
+                || future::ok(()).boxed_local(),
+                |room| {
+                    room.send(Delete(deletes_from_room))
+                        .map_ok(|_| ())
+                        .map_err(RoomServiceError::RoomMailboxErr)
+                        .err_into()
+                        .boxed_local()
+                },
+            )
         } else {
             future::err(RoomServiceError::EmptyUrisList).boxed_local()
         }
@@ -724,7 +748,7 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn create_room() {
-        let room_service = room_service(RoomRepository::new(HashMap::new()));
+        let room_service = room_service(RoomRepository::new());
         let spec = room_spec();
         let caller_fid =
             StatefulFid::try_from("pub-sub-video-call/caller".to_string())
@@ -758,7 +782,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id.clone() => room,
         )));
 
@@ -806,7 +830,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id.clone() => room,
         )));
 
@@ -873,7 +897,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 
@@ -894,7 +918,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 
@@ -916,7 +940,7 @@ mod room_service_specs {
             build_peers_traffic_watcher(&conf::Media::default()),
         )
         .unwrap();
-        let room_service = room_service(RoomRepository::new(hashmap!(
+        let room_service = room_service(RoomRepository::from(hashmap!(
             room_id => room,
         )));
 

@@ -61,6 +61,8 @@ impl ErrorResponse {
     }
 
     /// New [`ErrorResponse`] only with [`ErrorCode`].
+    #[inline]
+    #[must_use]
     pub fn without_id(error_code: ErrorCode) -> Self {
         Self {
             error_code,
@@ -88,6 +90,8 @@ impl ErrorResponse {
     ///
     /// With this method you can add additional text to error message of
     /// [`ErrorCode`].
+    #[inline]
+    #[must_use]
     pub fn with_explanation(
         error_code: ErrorCode,
         explanation: String,
@@ -425,12 +429,13 @@ impl From<RoomError> for ErrorResponse {
             }
             E::WrongRoomId(_, _)
             | E::PeerNotFound(_)
+            | E::CallbackClientError(_)
             | E::NoTurnCredentials(_)
             | E::ConnectionNotExists(_)
-            | E::UnableToSendEvent(_)
             | E::PeerError(_)
             | E::BadRoomSpec(_)
             | E::PeerTrafficWatcherMailbox(_)
+            | E::AuthorizationError
             | E::TurnServiceErr(_) => Self::unexpected(&err),
         }
     }

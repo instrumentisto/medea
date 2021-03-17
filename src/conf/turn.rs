@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, time::Duration};
 
+use redis::ConnectionInfo;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
@@ -43,6 +44,7 @@ pub struct Turn {
 impl Turn {
     /// Builds [`String`] addr from `host` and `port`.
     #[inline]
+    #[must_use]
     pub fn addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }
@@ -76,6 +78,12 @@ pub struct Redis {
     #[default = 6379]
     pub port: u16,
 
+    /// User to authenticate on Redis database server as.
+    ///
+    /// Defaults to empty value.
+    #[default = ""]
+    pub user: Cow<'static, str>,
+
     /// Password to authenticate on Redis database server with.
     ///
     /// Defaults to `turn`.
@@ -93,6 +101,20 @@ pub struct Redis {
     #[default(Duration::from_secs(5))]
     #[serde(with = "humantime_serde")]
     pub connect_timeout: Duration,
+}
+
+impl From<&Redis> for ConnectionInfo {
+    fn from(cf: &Redis) -> Self {
+        Self {
+            username: Some(cf.user.to_string()).filter(|u| !u.is_empty()),
+            addr: Box::new(redis::ConnectionAddr::Tcp(
+                cf.host.to_string(),
+                cf.port,
+            )),
+            db: cf.db_number,
+            passwd: Some(cf.pass.to_string()).filter(|p| !p.is_empty()),
+        }
+    }
 }
 
 /// Settings of [Coturn]'s admin interface.
@@ -186,7 +208,7 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
 
 #[cfg(test)]
 mod spec {
-    use serial_test_derive::serial;
+    use serial_test::serial;
 
     use crate::{conf::Conf, overrided_by_env_conf};
 

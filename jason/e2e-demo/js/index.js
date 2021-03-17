@@ -2,11 +2,24 @@ const controlDomain = 'http://127.0.0.1:8000';
 const controlUrl = controlDomain + '/control-api/';
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
-let roomId = window.location.hash.replace("#", "");
-let remote_videos = {};
+let rust;
+let roomId = window.location.hash.replace('#', '');
 
-let usernameInput = document.getElementsByClassName('connection-settings__username')[0];
+let remote_videos = {};
+let joinCallerButton = document.getElementById('connection-settings__connect');
+let usernameInput = document.getElementById('connection-settings__username');
 let usernameMenuButton = document.getElementById('username-menu-button');
+let disableAudioSend = document.getElementById('control__disable_audio_send');
+let disableVideoSend = document.getElementById('control__disable_video_send');
+let disableAudioRecv = document.getElementById('control__disable_audio_recv');
+let disableVideoRecv = document.getElementById('control__disable_video_recv');
+let muteAudioSend = document.getElementById('control__mute_audio_send');
+let muteVideoSend = document.getElementById('control__mute_video_send');
+let closeApp = document.getElementById('control__close_app');
+let audioSelect = document.getElementById('connect__select-device_audio');
+let videoSelect = document.getElementById('connect__select-device_video');
+let screenshareSwitchEl = document.getElementById('connection-settings__screenshare');
+let localVideo = document.getElementById('local-video');
 
 function getMemberId() {
   return usernameInput.value;
@@ -31,7 +44,7 @@ async function createRoom(roomId, memberId) {
 
   let pipeline = {};
   if (isPublish) {
-    pipeline["publish"] = {
+    pipeline['publish'] = {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
       force_relay: false,
@@ -52,10 +65,10 @@ async function createRoom(roomId, memberId) {
       pipeline: {
         [memberId]: {
           kind: 'Member',
-          credentials: 'test',
+          credentials: { plain: 'test' },
           pipeline: pipeline,
-          on_join: "grpc://127.0.0.1:9099",
-          on_leave: "grpc://127.0.0.1:9099"
+          on_join: 'grpc://127.0.0.1:9099',
+          on_leave: 'grpc://127.0.0.1:9099'
         }
       }
     }
@@ -87,7 +100,7 @@ async function createMember(roomId, memberId) {
 
   let memberIds = [];
   if (isPublish) {
-    pipeline["publish"] = {
+    pipeline['publish'] = {
       kind: 'WebRtcPublishEndpoint',
       p2p: 'Always',
       force_relay: false,
@@ -104,9 +117,9 @@ async function createMember(roomId, memberId) {
     let memberId = anotherMember.id;
     memberIds.push(memberId);
     if (anotherMember.pipeline.hasOwnProperty('publish')) {
-      pipeline["play-" + memberId] = {
+      pipeline['play-' + memberId] = {
         kind: 'WebRtcPlayEndpoint',
-        src: 'local://' + roomId + '/' + memberId + "/publish",
+        src: 'local://' + roomId + '/' + memberId + '/publish',
         force_relay: false
       }
     }
@@ -117,10 +130,10 @@ async function createMember(roomId, memberId) {
     url: controlUrl + roomId + '/' + memberId,
     data: {
       kind: 'Member',
-      credentials: 'test',
+      credentials: { plain: 'test' },
       pipeline: pipeline,
-      on_join: "grpc://127.0.0.1:9099",
-      on_leave: "grpc://127.0.0.1:9099"
+      on_join: 'grpc://127.0.0.1:9099',
+      on_leave: 'grpc://127.0.0.1:9099'
     }
   });
 
@@ -130,7 +143,7 @@ async function createMember(roomId, memberId) {
         let id = memberIds[i];
         await axios({
           method: 'post',
-          url: controlUrl + roomId + "/" + id + '/' + 'play-' + memberId,
+          url: controlUrl + roomId + '/' + id + '/' + 'play-' + memberId,
           data: {
             kind: 'WebRtcPlayEndpoint',
             src: 'local://' + roomId + '/' + memberId + '/publish',
@@ -154,7 +167,7 @@ const colorizedJson = {
     let str = '<span class="json__string">';
     let r = pIndent || '';
     if (pKey)
-      r = r + key + pKey.replace(/[": ]/g, '') + '</span>: ';
+      r = r + key + pKey.replace(/[': ]/g, '') + '</span>: ';
     if (pVal)
       r = r + (pVal[0] === '"' ? str : val) + pVal + '</span>';
     return r + (pEnd || '');
@@ -306,16 +319,16 @@ const controlDebugWindows = {
 
       let callbacks = await controlApi.getCallbacks();
 
-      let table = document.createElement("table");
-      table.className = "table";
+      let table = document.createElement('table');
+      table.className = 'table';
 
-      let thead = document.createElement("thead");
-      let header = document.createElement("tr");
-      let eventHeader = document.createElement("th");
+      let thead = document.createElement('thead');
+      let header = document.createElement('tr');
+      let eventHeader = document.createElement('th');
       eventHeader.innerHTML = 'Event';
       eventHeader.scope = 'col';
       header.appendChild(eventHeader);
-      let timeHeader = document.createElement("th");
+      let timeHeader = document.createElement('th');
       timeHeader.innerHTML = 'Time';
       timeHeader.scope = 'col';
       header.appendChild(timeHeader);
@@ -378,8 +391,39 @@ async function startPublishing() {
   });
 }
 
+async function updateLocalVideo(stream) {
+  for (const track of stream) {
+    if (track.kind() === rust.MediaKind.Audio) {
+      continue;
+    }
+    let mediaStream = new MediaStream();
+    mediaStream.addTrack(track.get_track());
+    if (track.media_source_kind() === rust.MediaSourceKind.Display) {
+      let displayVideoEl = localVideo.getElementsByClassName('local-display-video')[0];
+      if (displayVideoEl === undefined) {
+        displayVideoEl = document.createElement('video');
+        displayVideoEl.className = 'local-display-video';
+        displayVideoEl.width = 200;
+        displayVideoEl.autoplay = 'true';
+        localVideo.appendChild(displayVideoEl);
+      }
+      displayVideoEl.srcObject = mediaStream;
+    } else {
+      let deviceVideoEl = localVideo.getElementsByClassName('local-device-video')[0];
+      if (deviceVideoEl === undefined) {
+        deviceVideoEl = document.createElement('video');
+        deviceVideoEl.className = 'local-device-video';
+        deviceVideoEl.width = 200;
+        deviceVideoEl.autoplay = 'true';
+        localVideo.appendChild(deviceVideoEl);
+      }
+      deviceVideoEl.srcObject = mediaStream;
+    }
+  }
+}
+
 window.onload = async function() {
-  let rust = await import("../../pkg");
+  rust = await import('../../pkg');
   let jason = new rust.Jason();
   console.log(baseUrl);
   usernameInput.addEventListener('change', (e) => {
@@ -403,37 +447,36 @@ window.onload = async function() {
     await startPublishing();
   });
 
-
-
   Object.values(controlDebugWindows).forEach(s => s());
 
-  let room = newRoom();
   let isCallStarted = false;
-  let localStream = null;
+  let localTracks = [];
+  let isAudioSendEnabled = true;
+  let isVideoSendEnabled = true;
+  let isAudioRecvEnabled = true;
+  let isVideoRecvEnabled = true;
   let isAudioMuted = false;
   let isVideoMuted = false;
-  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-  let localVideo = document.querySelector('.local-video > video');
+  let room = await newRoom();
 
   async function initLocalStream() {
       let constraints = await build_constraints(
-        isAudioMuted ? null : audioSelect,
-        isVideoMuted ? null : videoSelect
+        isAudioSendEnabled ? audioSelect : null,
+        isVideoSendEnabled ? videoSelect : null
       );
       try {
-        localStream = await jason.media_manager().init_local_stream(constraints)
+        localTracks = await jason.media_manager().init_local_tracks(constraints)
       } catch (e) {
         let origError = e.source();
-        if (origError && (origError.name === "NotReadableError" || origError.name === "AbortError")) {
-          if (origError.message.includes("audio")) {
+        if (origError && (origError.name === 'NotReadableError' || origError.name === 'AbortError')) {
+          if (origError.message.includes('audio')) {
             constraints = await build_constraints(null, videoSelect);
-            localStream = await jason.media_manager().init_local_stream(constraints);
-            alert("unable to get audio, will try to enter room with video only");
-          } else if (origError.message.includes("video")) {
+            localTracks = await jason.media_manager().init_local_tracks(constraints);
+            alert('unable to get audio, will try to enter room with video only');
+          } else if (origError.message.includes('video')) {
             constraints = await build_constraints(audioSelect, null);
-            localStream = await jason.media_manager().init_local_stream(constraints);
-            alert("unable to get video, will try to enter room with audio only");
+            localTracks = await jason.media_manager().init_local_tracks(constraints);
+            alert('unable to get video, will try to enter room with audio only');
           } else {
             throw e;
           }
@@ -441,33 +484,51 @@ window.onload = async function() {
           throw e;
         }
       }
-      await updateLocalVideo(localStream);
+      await updateLocalVideo(localTracks);
 
       return constraints;
   }
 
   async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
-    const current_audio = (current_stream.getAudioTracks().pop() || { label: "disable" }).label || "disable";
-    const current_video = (current_stream.getVideoTracks().pop() || { label: "disable" }).label || "disable";
+    let currentAudio = 'disable';
+    let currentVideo = 'disable';
+    for (const track of localTracks) {
+      if (track.kind() === rust.MediaKind.Video) {
+        currentVideo = track.get_track().label || 'disable';
+      } else {
+        currentAudio = track.get_track().label || 'disable';
+      }
+    }
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
       const option = document.createElement('option');
       option.value = device_info.device_id();
-      if (device_info.kind() === 'audio') {
+      if (device_info.kind() === rust.MediaKind.Audio) {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
-        option.selected = option.text === current_audio;
+        option.selected = option.text === currentAudio;
         audio_select.append(option);
-      } else if (device_info.kind() === 'video') {
+      } else if (device_info.kind() === rust.MediaKind.Video) {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
-        option.selected = option.text === current_video;
+        option.selected = option.text === currentVideo;
         video_select.append(option);
       }
     }
-    const option = document.createElement('option');
-    option.value = "screen";
-    option.text = "screen";
-    video_select.append(option);
+
+    const screen = document.createElement('option');
+    screen.value = 'screen';
+    screen.text = 'screen';
+    video_select.append(screen);
+
+    const facingModeUser = document.createElement('option');
+    facingModeUser.value = 'facingModeUser';
+    facingModeUser.text = 'Facing user';
+    video_select.append(facingModeUser);
+
+    const facingModeEnvironment = document.createElement('option');
+    facingModeEnvironment.value = 'facingModeEnvironment';
+    facingModeEnvironment.text = 'Facing environment';
+    video_select.append(facingModeEnvironment);
   }
 
   async function build_constraints(audio_select, video_select) {
@@ -484,13 +545,22 @@ window.onload = async function() {
     if (video_select != null) {
       let videoSource = video_select.options[video_select.selectedIndex];
       if (videoSource) {
-        if (videoSource.value === "screen") {
+        if (videoSource.value === 'screen') {
           let video = new rust.DisplayVideoTrackConstraints();
           constraints.display_video(video);
         } else {
           let video = new rust.DeviceVideoTrackConstraints();
-          video.device_id(videoSource.value);
+          if (videoSource.value === 'facingModeUser') {
+            video.exact_facing_mode(rust.FacingMode.User);
+          } else if (videoSource.value === 'facingModeEnvironment') {
+            video.exact_facing_mode(rust.FacingMode.Environment);
+          } else {
+            video.device_id(videoSource.value);
+          }
           constraints.device_video(video);
+          if (screenshareSwitchEl.checked) {
+            constraints.display_video(new rust.DisplayVideoTrackConstraints());
+          }
         }
       } else {
         constraints.device_video(new rust.DeviceVideoTrackConstraints());
@@ -500,74 +570,120 @@ window.onload = async function() {
     return constraints;
   }
 
-  const updateLocalVideo = async (stream) => {
-    localVideo.srcObject = stream.get_media_stream();
-    await localVideo.play();
-  };
-
   async function newRoom() {
-    jason = new rust.Jason();
-    room = await jason.init_room();
+    let room = jason.init_room();
 
     try {
       const constraints = await initLocalStream();
-      await fillMediaDevicesInputs(audioSelect, videoSelect, localStream.get_media_stream());
-      await room.set_local_media_settings(constraints);
+      await fillMediaDevicesInputs(audioSelect, videoSelect, null);
+      await room.set_local_media_settings(constraints, false, false);
     } catch (e) {
-      console.error("Init local video failed: " + e);
+      console.error('Init local video failed: ' + e);
     }
 
     room.on_new_connection( (connection) => {
+      let remoteMemberId = connection.get_remote_member_id();
       isCallStarted = true;
-      connection.on_remote_stream( async (stream) => {
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-        let video = document.createElement("video");
-        video.controls = "true";
-        video.srcObject = stream.get_media_stream();
-        let innerVideoDiv = document.createElement("div");
-        innerVideoDiv.className = "video";
-        innerVideoDiv.appendChild(video);
-        remote_videos[connection.get_remote_id()] = innerVideoDiv;
-        videoDiv.appendChild(innerVideoDiv);
 
-        video.oncanplay = async () => {
-          await video.play();
-        };
-        stream.on_track_added( (track) => {
-          // switch controls off and on, cause controls are not updated
-          // automatically
-          let video = remote_videos[connection.get_remote_id()]
-            .getElementsByTagName("video")[0];
-          video.controls = false;
-          video.controls = true;
-          console.log(`Track added: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
+      let memberVideoDiv = remote_videos[remoteMemberId];
+      let remoteVideos = document.getElementsByClassName('remote-videos')[0];
+      if (memberVideoDiv === undefined) {
+        memberVideoDiv = document.createElement('div');
+        memberVideoDiv.classList.add('video');
+        memberVideoDiv.classList.add('d-flex');
+        memberVideoDiv.classList.add('flex-column');
+        memberVideoDiv.classList.add('align-items-center');
+        memberVideoDiv.style = 'margin: 10px';
+        remoteVideos.appendChild(memberVideoDiv);
+        remote_videos[remoteMemberId] = memberVideoDiv;
+      }
+
+      let memberIdEl = document.createElement('span');
+      memberIdEl.innerHTML = remoteMemberId;
+      memberIdEl.classList.add('member-id');
+      memberIdEl.classList.add('order-4');
+      memberVideoDiv.appendChild(memberIdEl);
+
+      connection.on_quality_score_update((score) => {
+        let qualityScoreEl = memberVideoDiv.getElementsByClassName('quality-score')[0];
+        if (qualityScoreEl === undefined) {
+          qualityScoreEl = document.createElement('span');
+          qualityScoreEl.classList.add('quality-score');
+          qualityScoreEl.classList.add('order-5');
+          memberVideoDiv.appendChild(qualityScoreEl);
+        }
+        qualityScoreEl.innerHTML = score;
+      });
+
+      connection.on_remote_track_added((track) => {
+        if (track.kind() === rust.MediaKind.Video) {
+          if (track.media_source_kind() === rust.MediaSourceKind.Display) {
+            let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
+            if (displayVideoEl === undefined) {
+              displayVideoEl = document.createElement('video');
+              displayVideoEl.classList.add('display-video');
+              displayVideoEl.classList.add('order-2');
+              displayVideoEl.playsinline = 'true';
+              displayVideoEl.controls = 'true';
+              displayVideoEl.autoplay = 'true';
+              memberVideoDiv.appendChild(displayVideoEl);
+            }
+            let mediaStream = new MediaStream();
+            mediaStream.addTrack(track.get_track());
+            displayVideoEl.srcObject = mediaStream;
+          } else {
+            let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
+            if (cameraVideoEl === undefined) {
+              cameraVideoEl = document.createElement('video');
+              cameraVideoEl.className = 'camera-video';
+              cameraVideoEl.classList.add('camera-video');
+              cameraVideoEl.classList.add('order-1');
+              cameraVideoEl.playsinline = 'true';
+              cameraVideoEl.controls = 'true';
+              cameraVideoEl.autoplay = 'true';
+              memberVideoDiv.appendChild(cameraVideoEl);
+            }
+            let mediaStream = new MediaStream();
+            mediaStream.addTrack(track.get_track());
+            cameraVideoEl.srcObject = mediaStream;
+          }
+        } else {
+          let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
+          if (audioEl === undefined) {
+            audioEl = document.createElement('audio');
+            audioEl.className = 'audio';
+            audioEl.classList.add('audio');
+            audioEl.classList.add('order-3');
+            audioEl.controls = 'true';
+            audioEl.autoplay = 'true';
+            memberVideoDiv.appendChild(audioEl);
+          }
+          let mediaStream = new MediaStream();
+          mediaStream.addTrack(track.get_track());
+          audioEl.srcObject = mediaStream;
+        }
+
+        track.on_enabled( () => {
+          console.log(`Track enabled: ${track.kind()}`);
         });
-        stream.on_track_enabled( (track) => {
-          console.log(`Track enabled: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
-        });
-        stream.on_track_disabled( (track) => {
-          console.log(`Track disabled: ${track.kind}`);
-          console.log(`Has active audio: ${stream.has_active_audio()}`);
-          console.log(`Has active video: ${stream.has_active_video()}`);
+        track.on_disabled( () => {
+          console.log(`Track disabled: ${track.kind()}`);
         });
       });
 
       connection.on_close(() => {
-        remote_videos[connection.get_remote_id()].remove();
-        delete remote_videos[connection.get_remote_id()];
+        remote_videos[remoteMemberId].remove();
+        delete remote_videos[remoteMemberId];
       });
     });
 
-    room.on_local_stream((stream) => {
-      updateLocalVideo(stream);
-      stream.free();
-    });
+    room.on_local_track((track) => {
+      console.log('New local track');
+      updateLocalVideo([track]);
+      track.free();
+    })
 
-    room.on_failed_local_stream((error) => {
+    room.on_failed_local_media((error) => {
       console.error(error.message());
     });
 
@@ -584,9 +700,9 @@ window.onload = async function() {
           connectionLossMsg.textContent = 'Trying to manually reconnect...';
           await reconnectHandle.reconnect_with_delay(0);
           $( connectionLossNotification ).toast('hide');
-          console.log("Reconnected!");
+          console.log('Reconnected!');
         } catch (e) {
-          console.error("Failed to manually reconnect: " + e.message());
+          console.error('Failed to manually reconnect: ' + e.message());
         } finally {
           connectionLossMsg.textContent = connectionLossDefaultText;
         }
@@ -599,12 +715,12 @@ window.onload = async function() {
       $( connectionLossNotification ).toast('hide');
     });
 
-    room.on_close(function (on_closed) {
+    room.on_close(async function (on_closed) {
       let videos = document.getElementsByClassName('remote-videos')[0];
       while (videos.firstChild) {
         videos.firstChild.remove();
       }
-      room = newRoom();
+
       $('#connection-settings').modal('show');
       $('#connect-btn').show();
       $('.control').hide();
@@ -615,85 +731,162 @@ window.onload = async function() {
         Is error: ${on_closed.is_err()}.`
       );
     });
+
+    return room;
   }
 
   try {
-    let joinCallerButton = document.getElementsByClassName('connection-settings__connect')[0];
-
     audioSelect.addEventListener('change', async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0 ){
-          localStream.free();
+        for (const track of localTracks) {
+          if (track.ptr > 0) {
+            track.free();
+          }
         }
-        if (!isAudioMuted) {
+        if (!isAudioSendEnabled) {
           constraints = await initLocalStream();
         }
-        await room.set_local_media_settings(constraints);
+        await room.set_local_media_settings(constraints, false, true);
       } catch (e) {
-        console.error("Changing audio source failed: " + e);
+        console.error('Changing audio source failed: ' + e);
       }
     });
 
-    videoSelect.addEventListener('change', async () => {
+    let videoSwitch = async () => {
       try {
         let constraints = await build_constraints(audioSelect, videoSelect);
-        if (localStream && localStream.ptr > 0 ){
-          localStream.free();
+        for (const track of localTracks) {
+          if (track.ptr > 0) {
+            track.free();
+          }
         }
-        if (!isVideoMuted) {
-          constraints = await initLocalStream();
+        try {
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
+          await room.set_local_media_settings(constraints, true, true);
+        } catch (e) {
+          let name = e.name();
+          if (name === 'RecoveredException') {
+            alert('MediaStreamSettings set failed and current MediaStreamSettings was successfully recovered.');
+          } else if (name === 'RecoverFailedException') {
+            alert('MediaStreamSettings set failed and MediaStreamSettings recovery failed.');
+            for (const err of e.recover_fail_reasons()) {
+              console.error('Name: "' + err.name() + '";\nMessage: "' + err.message() + '";');
+            }
+          } else if (name === 'ErroredException') {
+            alert('Fatal error occured while MediaStreamSettings update.');
+          }
+          console.error("Changing video source failed: " + name);
         }
-        await room.set_local_media_settings(constraints);
       } catch (e) {
-        console.error("Changing video source failed: " + e);
+        console.error('Changing video source failed: ' + e.message());
+      }
+    };
+    videoSelect.addEventListener('change', videoSwitch);
+    screenshareSwitchEl.addEventListener('change', videoSwitch);
+
+    disableAudioSend.addEventListener('click', async () => {
+      try {
+        if (isAudioSendEnabled) {
+          await room.disable_audio();
+          for (const track of localTracks) {
+            if (track.ptr > 0) {
+              if (track.kind() === rust.MediaKind.Audio && track.ptr > 0) {
+                track.free();
+              }
+            }
+          }
+          isAudioSendEnabled = false;
+          disableAudioSend.textContent = 'Enable audio send';
+        } else {
+          await room.enable_audio();
+          isAudioSendEnabled = true;
+          disableAudioSend.textContent = 'Disable audio send';
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
+        }
+      } catch (e) {
+        console.error(e.message());
       }
     });
-
-    let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
-    let muteVideo = document.getElementsByClassName('control__mute_video')[0];
-    let closeApp = document.getElementsByClassName('control__close_app')[0];
-
-    muteAudio.addEventListener('click', async () => {
+    disableVideoSend.addEventListener('click', async () => {
+      try {
+        if (isVideoSendEnabled) {
+          await room.disable_video();
+          for (const track of localTracks) {
+            if (track.ptr > 0) {
+              if (track.kind() === rust.MediaKind.Video && track.ptr > 0) {
+                track.free();
+              }
+            }
+          }
+          isVideoSendEnabled = false;
+          disableVideoSend.textContent = 'Enable video send';
+        } else {
+          await room.enable_video();
+          isVideoSendEnabled = true;
+          disableVideoSend.textContent = 'Disable video send';
+          if (!isCallStarted) {
+            await initLocalStream();
+          }
+        }
+      } catch (e) {
+        console.error(e.trace());
+      }
+    });
+    muteAudioSend.addEventListener('click', async () => {
       try {
         if (isAudioMuted) {
           await room.unmute_audio();
           isAudioMuted = false;
-          muteAudio.textContent = "Mute audio";
-          if (!isCallStarted) {
-            await initLocalStream();
-          }
+          muteAudioSend.textContent = 'Mute audio send';
         } else {
           await room.mute_audio();
-          if (localStream && localStream.ptr > 0 ){
-            localStream.free_audio();
-          }
           isAudioMuted = true;
-          muteAudio.textContent = "Unmute audio";
+          muteAudioSend.textContent = 'Unmute audio send';
         }
       } catch (e) {
-        console.error(e.message());
+        console.error(e.trace());
       }
     });
-    muteVideo.addEventListener('click', async () => {
+    muteVideoSend.addEventListener('click', async () => {
       try {
         if (isVideoMuted) {
           await room.unmute_video();
           isVideoMuted = false;
-          muteVideo.textContent = "Mute video";
-          if (!isCallStarted) {
-            await initLocalStream();
-          }
+          muteVideoSend.textContent = 'Mute video send';
         } else {
           await room.mute_video();
-          if (localStream && localStream.ptr > 0 ){
-            localStream.free_video();
-          }
           isVideoMuted = true;
-          muteVideo.textContent = "Unmute video";
+          muteVideoSend.textContent = 'Unmute video send';
         }
       } catch (e) {
-        console.error(e.message());
+        console.error(e.trace());
+      }
+    });
+    disableAudioRecv.addEventListener('click', async () => {
+      if (isAudioRecvEnabled) {
+        await room.disable_remote_audio();
+        isAudioRecvEnabled = false;
+        disableAudioRecv.textContent = 'Enable audio recv'
+      } else {
+        await room.enable_remote_audio();
+        isAudioRecvEnabled = true;
+        disableAudioRecv.textContent = 'Disable audio recv'
+      }
+    });
+    disableVideoRecv.addEventListener('click', async () => {
+      if (isVideoRecvEnabled) {
+        await room.disable_remote_video();
+        isVideoRecvEnabled = false;
+        disableVideoRecv.textContent = 'Enable video recv'
+      } else {
+        await room.enable_remote_video();
+        isVideoRecvEnabled = true;
+        disableVideoRecv.textContent = 'Disable video recv'
       }
     });
     closeApp.addEventListener('click', () => {
@@ -706,7 +899,7 @@ window.onload = async function() {
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
         $('#connection-settings').modal('hide');
-        $('.control').show();
+        $('.control').css('display', 'flex');
         $('#connect-btn').hide();
 
         try {
@@ -715,7 +908,7 @@ window.onload = async function() {
             await axios.get(controlUrl + roomId);
           } catch (e) {
             if (e.response.status === 400) {
-              console.log("Room not found. Creating new room...");
+              console.log('Room not found. Creating new room...');
               await room.join(await createRoom(roomId, username));
               return;
             } else {
@@ -725,7 +918,7 @@ window.onload = async function() {
           try {
             await axios.get(controlUrl + roomId + '/' + username);
           } catch (e) {
-            console.log("Member not found. Creating new member...");
+            console.log('Member not found. Creating new member...');
             await room.join(await createMember(roomId, username));
             return;
           }
@@ -733,8 +926,8 @@ window.onload = async function() {
         } catch (e) {
           console.error(e);
           console.error(
-            "Join to room failed: Error[name:[", e.name(), "], ",
-            "[msg:", e.message(), "], [source", e.source(), "]]",
+            'Join to room failed: Error[name:[', e.name(), '], ',
+            '[msg:', e.message(), '], [source', e.source(), ']]',
           );
           console.error(e.trace());
         }

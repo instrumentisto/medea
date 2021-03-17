@@ -2,14 +2,12 @@
 
 mod actix_try_join_all;
 
-use std::{future::Future, pin::Pin, time::Instant};
+use std::time::Instant;
 
-use actix::prelude::dev::{
-    Actor, ActorFuture, Arbiter, AsyncContext, ContextFutureSpawner as _,
-    Message, MessageResponse, ResponseChannel, WrapFuture as _,
-};
 use chrono::{DateTime, Utc};
-use futures::future;
+use derive_more::From;
+use futures::channel::mpsc::{TrySendError, UnboundedSender};
+use rand::{distributions::Alphanumeric, Rng};
 
 pub use self::actix_try_join_all::actix_try_join_all;
 
@@ -110,73 +108,49 @@ macro_rules! impl_debug_by_struct_name {
 }
 
 /// `?` analog but for the functions which will return boxed [`ActorFuture`].
+///
+/// [`ActorFuture`]: actix::ActorFuture
 #[macro_export]
 macro_rules! actix_try {
     ($e:expr) => {
         match $e {
             Ok(p) => p,
             Err(e) => {
-                return Box::new(actix::fut::err(e.into()))
-                    as Box<dyn actix::fut::ActorFuture<Actor = _, Output = _>>;
+                return Box::pin(actix::fut::err(e.into()));
             }
         };
     };
 }
 
-// TODO: remove after https://github.com/actix/actix/pull/313
-/// Specialized future for asynchronous message handling. Exists because
-/// [`actix::ResponseFuture`] implements [`actix::dev::MessageResponse`] only
-/// for `Output = Result<_, _>`.
-pub struct ResponseAnyFuture<T>(pub Pin<Box<dyn Future<Output = T>>>);
-
-// TODO: remove after https://github.com/actix/actix/pull/310
-/// Specialized actor future for asynchronous message handling. Exists because
-/// [`actix::ResponseActFuture`] implements [`actix::dev::MessageResponse`] only
-/// for `Output = Result<_, _>`.
-pub struct ResponseActAnyFuture<A, O>(
-    pub Box<dyn ActorFuture<Output = O, Actor = A>>,
-);
-
-impl<A, M, T: 'static> MessageResponse<A, M> for ResponseAnyFuture<T>
-where
-    A: Actor,
-    M::Result: Send,
-    M: Message<Result = T>,
-    A::Context: AsyncContext<A>,
-{
-    fn handle<R: ResponseChannel<M>>(self, _: &mut A::Context, tx: Option<R>) {
-        Arbiter::spawn(async move {
-            if let Some(tx) = tx {
-                tx.send(self.0.await)
-            }
-        });
-    }
-}
-
-impl<A, M, O: 'static> MessageResponse<A, M> for ResponseActAnyFuture<A, O>
-where
-    A: Actor,
-    M: Message<Result = O>,
-    A::Context: AsyncContext<A>,
-{
-    fn handle<R: ResponseChannel<M>>(
-        self,
-        ctx: &mut A::Context,
-        tx: Option<R>,
-    ) {
-        self.0
-            .then(move |res, this, _| {
-                if let Some(tx) = tx {
-                    tx.send(res);
-                }
-                future::ready(()).into_actor(this)
-            })
-            .spawn(ctx);
-    }
-}
-
 /// Converts provided [`Instant`] into [`chrono::DateTime`].
+#[inline]
+#[must_use]
 pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
     chrono::Duration::from_std(instant.elapsed())
         .map_or_else(|_| Utc::now(), |dur| Utc::now() - dur)
+}
+
+/// Generates random alphanumeric string of the specified `length`.
+#[must_use]
+pub fn generate_token(length: usize) -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(length)
+        .map(char::from)
+        .collect()
+}
+
+/// Cloneable oneshot sender backed by [`UnboundedSender`].
+#[derive(Clone, Debug, From)]
+pub struct MpscOneshotSender<T>(UnboundedSender<T>);
+
+impl<T> MpscOneshotSender<T> {
+    /// Sends the given `message` consuming `self`.
+    ///
+    /// # Errors
+    ///
+    /// If receiving side was dropped.
+    pub fn send(self, message: T) -> Result<(), TrySendError<T>> {
+        self.0.unbounded_send(message)
+    }
 }

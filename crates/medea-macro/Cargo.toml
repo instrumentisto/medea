@@ -1,15 +1,15 @@
 [package]
 name = "medea-macro"
-version = "0.2.0-dev"
+version = "0.2.0"
 edition = "2018"
-description = "Internal macros for Medea media server project"
+description = "Internal macros and codegen for Medea media server project"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-license = "MIT/Apache-2.0"
+license = "BlueOak-1.0.0"
 documentation = "https://docs.rs/medea-macro"
 homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-macro"
 repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-macro"
 readme = "README.md"
-keywords = ["medea", "macro", "derive"]
+keywords = ["medea", "macro", "derive", "codegen"]
 categories = ["development-tools::build-utils"]
 
 [lib]

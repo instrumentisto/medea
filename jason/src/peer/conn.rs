@@ -1,30 +1,31 @@
-use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    convert::TryFrom as _,
+    rc::Rc,
+};
 
 use derive_more::{Display, From};
-use medea_client_api_proto::{
-    Direction as DirectionProto, IceServer, Mid, PeerConnectionState,
-};
+use medea_client_api_proto::{IceServer, PeerConnectionState};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
-    RtcIceConnectionState, RtcIceTransportPolicy,
+    RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
-    RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
-    RtcTrackEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverInit, RtcSdpType,
+    RtcSessionDescription, RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
-    media::TrackConstraints,
+    media::{MediaKind, TrackConstraints},
     peer::stats::{RtcStats, RtcStatsError},
     utils::{
-        console_error, get_property_by_name, EventListener,
-        EventListenerBindError, JsCaused, JsError,
+        get_property_by_name, EventListener, EventListenerBindError, JsCaused,
+        JsError,
     },
 };
 
-use super::ice_server::RtcIceServers;
+use super::{ice_server::RtcIceServers, TransceiverDirection};
 
 /// [RTCIceCandidate][1] representation.
 ///
@@ -46,82 +47,14 @@ pub struct IceCandidate {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
-    pub sdp_mid: Option<Mid>,
+    pub sdp_mid: Option<String>,
 }
 
-/// Representation of [RTCRtpTransceiver][1]'s [kind][2].
-///
-/// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
-/// [2]: https://w3.org/TR/webrtc/#dfn-transceiver-kind
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum TransceiverKind {
-    /// Audio transceiver.
-    Audio,
-
-    /// Video transceiver.
-    Video,
-}
-
-impl From<&TrackConstraints> for TransceiverKind {
+impl From<&TrackConstraints> for MediaKind {
     fn from(media_type: &TrackConstraints) -> Self {
         match media_type {
             TrackConstraints::Audio(_) => Self::Audio,
             TrackConstraints::Video(_) => Self::Video,
-        }
-    }
-}
-
-impl TransceiverKind {
-    /// Returns string representation of a [`TransceiverKind`].
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Audio => "audio",
-            Self::Video => "video",
-        }
-    }
-}
-
-/// Representation of [RTCRtpTransceiverDirection][1].
-///
-/// [1]:https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
-#[derive(Clone, Copy)]
-// TODO: sendrecv optimization
-pub enum TransceiverDirection {
-    /// [`sendonly` direction][1] of transceiver.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendonly
-    Sendonly,
-
-    /// [`recvonly` direction][1] of transceiver.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-recvonly
-    Recvonly,
-
-    /// [`inactive` direction][1] of transceiver.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-inactive
-    Inactive,
-}
-
-impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
-    #[inline]
-    fn from(direction: TransceiverDirection) -> Self {
-        use TransceiverDirection as D;
-
-        match direction {
-            D::Sendonly => Self::Sendonly,
-            D::Recvonly => Self::Recvonly,
-            D::Inactive => Self::Inactive,
-        }
-    }
-}
-
-impl From<&DirectionProto> for TransceiverDirection {
-    #[inline]
-    fn from(proto: &DirectionProto) -> Self {
-        match proto {
-            DirectionProto::Recv { .. } => Self::Recvonly,
-            DirectionProto::Send { .. } => Self::Sendonly,
         }
     }
 }
@@ -145,7 +78,7 @@ pub enum SdpType {
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Clone, Debug, Display, From, JsCaused)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
@@ -177,7 +110,9 @@ pub enum RTCPeerConnectionError {
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
     PeerConnectionEventBindFailed(EventListenerBindError),
 
-    /// Occurs while getting and parsing [`RpcStats`] of [`PeerConnection`].
+    /// Occurs while getting and parsing [`RtcStats`] of [`PeerConnection`].
+    ///
+    /// [`PeerConnection`]: super::PeerConnection
     #[display(fmt = "Failed to get RTCStats: {}", _0)]
     RtcStatsError(#[js(cause)] RtcStatsError),
 
@@ -211,6 +146,10 @@ pub struct RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
+
+    /// Flag which indicates that ICE restart will be performed on next
+    /// [`RtcPeerConnection::create_offer`] call.
+    ice_restart: Cell<bool>,
 
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
     /// [`icecandidate`][3] event. It fires when [RTCPeerConnection][1]
@@ -286,6 +225,7 @@ impl RtcPeerConnection {
 
         Ok(Self {
             peer: Rc::new(peer),
+            ice_restart: Cell::new(false),
             on_ice_candidate: RefCell::new(None),
             on_ice_connection_state_changed: RefCell::new(None),
             on_connection_state_changed: RefCell::new(None),
@@ -297,12 +237,13 @@ impl RtcPeerConnection {
     ///
     /// # Errors
     ///
-    /// Errors with [`RTCPeerConnectionError::RtcStats`] if getting or parsing
-    /// of [`RtcStats`] fails.
+    /// Errors with [`RTCPeerConnectionError::RtcStatsError`] if getting or
+    /// parsing of [`RtcStats`] fails.
     ///
     /// Errors with [`RTCPeerConnectionError::GetStatsException`] when
     /// [PeerConnection.getStats][1] promise throws exception.
     ///
+    /// [`PeerConnection`]: super::PeerConnection
     /// [1]: https://tinyurl.com/w6hmt5f
     pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats =
@@ -383,7 +324,7 @@ impl RtcPeerConnection {
                                 f(IceCandidate {
                                     candidate: c.candidate(),
                                     sdp_m_line_index: c.sdp_m_line_index(),
-                                    sdp_mid: c.sdp_mid().map(Into::into),
+                                    sdp_mid: c.sdp_mid(),
                                 });
                             }
                         },
@@ -393,6 +334,22 @@ impl RtcPeerConnection {
             }
         }
         Ok(())
+    }
+
+    /// Returns [`RtcIceConnectionState`] of this [`RtcPeerConnection`].
+    #[inline]
+    #[must_use]
+    pub fn ice_connection_state(&self) -> RtcIceConnectionState {
+        self.peer.ice_connection_state()
+    }
+
+    /// Returns [`PeerConnectionState`] of this [`RtcPeerConnection`].
+    ///
+    /// Returns [`None`] if failed to parse a [`PeerConnectionState`].
+    #[inline]
+    #[must_use]
+    pub fn connection_state(&self) -> Option<PeerConnectionState> {
+        get_peer_connection_state(&self.peer)?.ok()
     }
 
     /// Sets handler for [`iceconnectionstatechange`][1] event.
@@ -461,37 +418,23 @@ impl RtcPeerConnection {
                             // browser does not support the functionality of
                             // `RTCPeerConnection.connectionState`, then this
                             // callback won't fire.
-                            if let Some(state) =
-                                get_peer_connection_state(&peer)
-                            {
-                                let state = match state.as_ref() {
-                                    "new" => PeerConnectionState::New,
-                                    "connecting" => {
-                                        PeerConnectionState::Connecting
-                                    }
-                                    "connected" => {
-                                        PeerConnectionState::Connected
-                                    }
-                                    "disconnected" => {
-                                        PeerConnectionState::Disconnected
-                                    }
-                                    "failed" => PeerConnectionState::Failed,
-                                    "closed" => PeerConnectionState::Closed,
-                                    _ => {
-                                        console_error(format!(
-                                            "Unknown RTCPeerConnection \
-                                             connection state: {}.",
-                                            state,
-                                        ));
-                                        return;
-                                    }
-                                };
-                                f(state);
-                            } else {
-                                console_error(
-                                    "Could not receive RTCPeerConnection \
-                                     connection state",
-                                );
+                            match get_peer_connection_state(&peer) {
+                                Some(Ok(state)) => {
+                                    f(state);
+                                }
+                                Some(Err(state)) => {
+                                    log::error!(
+                                        "Unknown RTCPeerConnection connection \
+                                         state: {}.",
+                                        state,
+                                    );
+                                }
+                                None => {
+                                    log::error!(
+                                        "Could not receive RTCPeerConnection \
+                                         connection state",
+                                    );
+                                }
                             }
                         },
                     )
@@ -517,12 +460,12 @@ impl RtcPeerConnection {
         &self,
         candidate: &str,
         sdp_m_line_index: Option<u16>,
-        sdp_mid: &Option<Mid>,
+        sdp_mid: &Option<String>,
     ) -> Result<()> {
         let mut cand_init = RtcIceCandidateInit::new(&candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
-            .sdp_mid(sdp_mid.as_ref().map(|a| a.0.as_str()));
+            .sdp_mid(sdp_mid.as_ref().map(String::as_ref));
         JsFuture::from(
             self.peer.add_ice_candidate_with_opt_rtc_ice_candidate_init(
                 Some(cand_init).as_ref(),
@@ -535,9 +478,72 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Marks [`RtcPeerConnection`] to trigger ICE restart.
+    ///
+    /// After this function returns, the offer returned by the next call to
+    /// [`RtcPeerConnection::create_offer`] is automatically configured
+    /// to trigger ICE restart.
+    pub fn restart_ice(&self) {
+        self.ice_restart.set(true);
+    }
+
+    /// Sets local description to the provided one [`RtcSdpType`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    async fn set_local_description(
+        &self,
+        sdp_type: RtcSdpType,
+        offer: &str,
+    ) -> Result<()> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
+
+        let mut desc = RtcSessionDescriptionInit::new(sdp_type);
+        desc.sdp(offer);
+
+        JsFuture::from(peer.set_local_description(&desc))
+            .await
+            .map_err(Into::into)
+            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+            .map_err(tracerr::wrap!())?;
+
+        Ok(())
+    }
+
+    /// Sets provided [SDP offer][`SdpType::Offer`] as local description.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    pub async fn set_offer(&self, offer: &str) -> Result<()> {
+        self.set_local_description(RtcSdpType::Offer, offer)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
+    /// Sets provided [SDP answer][`SdpType::Answer`] as local description.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    pub async fn set_answer(&self, answer: &str) -> Result<()> {
+        self.set_local_description(RtcSdpType::Answer, answer)
+            .await
+            .map_err(tracerr::map_from_and_wrap!())
+    }
+
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
-    /// description.
+    /// [RTCPeerConnection][`SysRtcPeerConnection`].
     ///
     /// Should be called whenever remote description has been changed.
     ///
@@ -546,14 +552,8 @@ impl RtcPeerConnection {
     /// With [`RTCPeerConnectionError::CreateAnswerFailed`] if
     /// [RtcPeerConnection.createAnswer()][1] fails.
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createanswer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_and_set_answer(&self) -> Result<String> {
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
-
+    pub async fn create_answer(&self) -> Result<String> {
         let answer = JsFuture::from(self.peer.create_answer())
             .await
             .map_err(Into::into)
@@ -561,21 +561,34 @@ impl RtcPeerConnection {
             .map_err(tracerr::wrap!())?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
-        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-        desc.sdp(&answer);
-
-        JsFuture::from(peer.set_local_description(&desc))
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
-            .map_err(tracerr::wrap!())?;
-
         Ok(answer)
     }
 
+    /// Rollbacks the underlying [RTCPeerConnection][`SysRtcPeerConnection`] to
+    /// the previous stable state.
+    ///
+    /// # Errors
+    ///
+    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
+    /// [RtcPeerConnection.setLocalDescription()][1] fails.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
+    pub async fn rollback(&self) -> Result<()> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
+
+        JsFuture::from(peer.set_local_description(
+            &RtcSessionDescriptionInit::new(RtcSdpType::Rollback),
+        ))
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+        .map_err(tracerr::wrap!())?;
+
+        Ok(())
+    }
+
     /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as local
-    /// description.
+    /// [RTCPeerConnection][`SysRtcPeerConnection`].
     ///
     /// Should be called after local tracks changes, which require
     /// (re)negotiation.
@@ -585,29 +598,22 @@ impl RtcPeerConnection {
     /// With [`RTCPeerConnectionError::CreateOfferFailed`] if
     /// [RtcPeerConnection.createOffer()][1] fails.
     ///
-    /// With [`RTCPeerConnectionError::SetLocalDescriptionFailed`] if
-    /// [RtcPeerConnection.setLocalDescription()][2] fails.
-    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-createoffer
-    /// [2]: https://w3.org/TR/webrtc/#dom-peerconnection-setlocaldescription
-    pub async fn create_and_set_offer(&self) -> Result<String> {
+    pub async fn create_offer(&self) -> Result<String> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(peer.create_offer())
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateOfferFailed)
-            .map_err(tracerr::wrap!())?;
+        let mut offer_options = RtcOfferOptions::new();
+        if self.ice_restart.take() {
+            offer_options.ice_restart(true);
+        }
+        let create_offer = JsFuture::from(
+            peer.create_offer_with_rtc_offer_options(&offer_options),
+        )
+        .await
+        .map_err(Into::into)
+        .map_err(RTCPeerConnectionError::CreateOfferFailed)
+        .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
-
-        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-        desc.sdp(&offer);
-
-        JsFuture::from(peer.set_local_description(&desc))
-            .await
-            .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
-            .map_err(tracerr::wrap!())?;
 
         Ok(offer)
     }
@@ -656,7 +662,7 @@ impl RtcPeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn add_transceiver(
         &self,
-        kind: TransceiverKind,
+        kind: MediaKind,
         direction: TransceiverDirection,
     ) -> RtcRtpTransceiver {
         let mut init = RtcRtpTransceiverInit::new();
@@ -672,7 +678,7 @@ impl RtcPeerConnection {
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn get_transceiver_by_mid(
         &self,
-        mid: &Mid,
+        mid: &str,
     ) -> Option<RtcRtpTransceiver> {
         let mut transceiver = None;
 
@@ -682,7 +688,7 @@ impl RtcPeerConnection {
         for tr in transceivers {
             let tr = RtcRtpTransceiver::from(tr.unwrap());
             if let Some(tr_mid) = tr.mid() {
-                if mid.0 == tr_mid {
+                if mid.eq(&tr_mid) {
                     transceiver = Some(tr);
                     break;
                 }
@@ -713,6 +719,20 @@ impl Drop for RtcPeerConnection {
 /// [`SysRtcPeerConnection`] using reflection.
 ///
 /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-connection-state
-fn get_peer_connection_state(peer: &SysRtcPeerConnection) -> Option<String> {
-    get_property_by_name(peer, "connectionState", |v| v.as_string())
+fn get_peer_connection_state(
+    peer: &SysRtcPeerConnection,
+) -> Option<std::result::Result<PeerConnectionState, String>> {
+    let state =
+        get_property_by_name(peer, "connectionState", |v| v.as_string())?;
+    Some(Ok(match state.as_str() {
+        "new" => PeerConnectionState::New,
+        "connecting" => PeerConnectionState::Connecting,
+        "connected" => PeerConnectionState::Connected,
+        "disconnected" => PeerConnectionState::Disconnected,
+        "failed" => PeerConnectionState::Failed,
+        "closed" => PeerConnectionState::Closed,
+        _ => {
+            return Some(Err(state));
+        }
+    }))
 }

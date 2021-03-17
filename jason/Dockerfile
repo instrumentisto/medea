@@ -9,7 +9,8 @@
 
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
-FROM rust:${rust_ver} AS dist
+FROM ghcr.io/instrumentisto/rust:${rust_ver} AS dist
+ARG debug=no
 
 RUN cargo install wasm-pack \
  && rustup target add wasm32-unknown-unknown
@@ -17,7 +18,7 @@ RUN cargo install wasm-pack \
 COPY / /src/
 
 RUN cd /src/ \
- && make cargo.build crate=medea-jason debug=no dockerized=no
+ && make cargo.build crate=medea-jason debug=${debug} dockerized=no
 
 
 
@@ -36,3 +37,6 @@ COPY jason/demo/index.html /app/
 COPY --from=dist /src/jason/pkg/ /app/js/
 
 WORKDIR /app
+
+LABEL org.opencontainers.image.source="\
+    https://github.com/instrumentisto/medea/tree/master/jason/demo"

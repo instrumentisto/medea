@@ -45,10 +45,11 @@ indent_size = 4
 indent_style = space
 indent_size = 4
 
-[hooks/*]
+[*.feature]
 indent_style = space
 indent_size = 2
+max_line_length = off
 
-[**/nginx{/*,.*}.conf]
+[**/ngin{x,x/*,x.*}.conf]
 indent_style = space
 indent_size = 2

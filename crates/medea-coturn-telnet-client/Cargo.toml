@@ -1,6 +1,6 @@
 [package]
 name = "medea-coturn-telnet-client"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2018"
 description = "Coturn TURN server telnet client"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]

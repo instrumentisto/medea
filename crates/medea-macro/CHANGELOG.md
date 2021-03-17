@@ -6,8 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.2.0] · 2019-??-??
+## [0.2.0] · 2021-02-01
 [0.2.0]: /../../tree/medea-macro-0.2.0/crates/medea-macro
+
+[Diff](/../../compare/medea-macro-0.1.0...medea-macro-0.2.0)
 
 ### BC Breaks
 
@@ -20,15 +22,19 @@ All user visible changes to this project will be documented in this file. This p
 - `#[dispatchable]` macro:
     - Optional argument to specify `self` type for methods of `*Handler` trait (e.g. `#[dispatchable(self: &Self)]`) ([#112]);
     - Optional argument that enables [async-trait] integration (e.g. `#[dispatchable(async_trait(?Send))]`) ([#112]).
+- `#[watchers]` macro for generating `Component::spawn` method in `medea-jason` crate ([#169]).
 
 ### Fixed
 
-- `#[enum_delegate]` macro now works fine on functions with multiple arguments ([#91]).
+- `#[enum_delegate]` macro now works fine on functions with multiple arguments ([#91]);
+- `#[dispatchable]` handler trait visibility now corresponds to original enum visibility ([#147]).
 
 [#66]: /../../pull/66
 [#68]: /../../pull/68
 [#91]: /../../pull/91
 [#112]: /../../pull/112
+[#147]: /../../pull/147
+[#169]: /../../pull/169
 
 
 

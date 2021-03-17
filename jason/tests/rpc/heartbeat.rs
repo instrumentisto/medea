@@ -47,11 +47,10 @@ async fn sends_pong_on_received_ping() {
 
     on_message_tx.unbounded_send(ServerMsg::Ping(2)).unwrap();
     timeout(100, async move {
-        match test_rx.await.unwrap() {
+        let msg = test_rx.await.unwrap();
+        match msg {
             ClientMsg::Pong(_) => (),
-            ClientMsg::Command(cmd) => {
-                panic!("Received not pong message! Command: {:?}", cmd)
-            }
+            _ => panic!("Received not pong message! Message: {:?}", msg),
         }
     })
     .await
@@ -111,12 +110,13 @@ async fn pre_sends_pong() {
         IdleTimeout(Duration::from_millis(100).into()),
     );
 
-    match timeout(25, on_message_rx.next()).await.unwrap().unwrap() {
+    let msg = timeout(25, on_message_rx.next()).await.unwrap().unwrap();
+    match msg {
         ClientMsg::Pong(n) => {
             assert_eq!(n, 1);
         }
-        ClientMsg::Command(cmd) => {
-            panic!("Received not pong message! Command: {:?}", cmd);
+        _ => {
+            panic!("Received not pong message! Message: {:?}", msg);
         }
     }
 }

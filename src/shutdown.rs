@@ -10,8 +10,7 @@ use std::{
 use actix::AsyncContext;
 use actix::{
     prelude::{Actor, Context},
-    Addr, ContextFutureSpawner as _, Handler, Message, Recipient, System,
-    WrapFuture as _,
+    Addr, Handler, Message, Recipient, ResponseFuture, System,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -53,6 +52,7 @@ enum State {
 impl GracefulShutdown {
     /// Creates new [`GracefulShutdown`] service.
     #[inline]
+    #[must_use]
     pub fn new(timeout: Duration) -> Self {
         Self {
             subs: BTreeMap::new(),
@@ -104,14 +104,14 @@ impl Actor for GracefulShutdown {
 struct OsSignal(i32);
 
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ();
+    type Result = ResponseFuture<()>;
 
-    fn handle(&mut self, sig: OsSignal, ctx: &mut Context<Self>) {
+    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
             State::ShuttingDown => {
-                return;
+                return future::ready(()).boxed_local();
             }
             State::Listening => {
                 self.state = State::ShuttingDown;
@@ -122,7 +122,7 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return;
+            return future::ready(()).boxed_local();
         }
 
         let subs = mem::replace(&mut self.subs, BTreeMap::new());
@@ -156,8 +156,7 @@ impl Handler<OsSignal> for GracefulShutdown {
             }
             System::current().stop()
         }
-        .into_actor(self)
-        .wait(ctx);
+        .boxed_local()
     }
 }
 

@@ -4,26 +4,20 @@
 
 use std::{collections::HashMap, convert::TryFrom, time::Duration};
 
-use derive_more::{Display, From};
+use medea_client_api_proto::{MemberId, RoomId as Id};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::url::CallbackUrl, EndpointId, TryFromProtobufError,
+    callback::url::CallbackUrl, member::Credential, EndpointId,
+    TryFromProtobufError,
 };
 
 use super::{
     member::{MemberElement, MemberSpec},
     pipeline::Pipeline,
-    MemberId, RootElement, TryFromElementError,
+    RootElement, TryFromElementError,
 };
-
-/// ID of [`Room`].
-///
-/// [`Room`]: crate::signalling::room::Room
-#[derive(Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq)]
-#[from(forward)]
-pub struct Id(String);
 
 /// Element of [`Room`]'s [`Pipeline`].
 ///
@@ -35,7 +29,7 @@ pub enum RoomElement {
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
-        credentials: String,
+        credentials: Credential,
         on_leave: Option<CallbackUrl>,
         on_join: Option<CallbackUrl>,
         #[serde(default, with = "humantime_serde")]
@@ -116,6 +110,8 @@ impl RoomSpec {
     }
 
     /// Returns ID of this [`RoomSpec`]
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> &Id {
         &self.id
     }

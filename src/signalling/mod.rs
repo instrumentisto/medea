@@ -11,4 +11,6 @@ pub mod room_repo;
 pub mod room_service;
 
 #[doc(inline)]
-pub use self::room::Room;
+pub use self::{
+    room::Room, room_repo::RoomRepository, room_service::RoomService,
+};

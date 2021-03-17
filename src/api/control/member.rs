@@ -8,33 +8,89 @@ use std::{
     time::Duration,
 };
 
-use derive_more::{Display, From};
+use medea_client_api_proto::{self as client_proto, MemberId as Id};
 use medea_control_api_proto::grpc::api as proto;
-use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
-use crate::api::control::{
-    callback::url::CallbackUrl,
-    endpoints::{
-        webrtc_play_endpoint::WebRtcPlayEndpoint,
-        webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+use crate::{
+    api::control::{
+        callback::url::CallbackUrl,
+        endpoints::{
+            webrtc_play_endpoint::WebRtcPlayEndpoint,
+            webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+        },
+        pipeline::Pipeline,
+        room::RoomElement,
+        EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
+        WebRtcPlayId,
     },
-    pipeline::Pipeline,
-    room::RoomElement,
-    EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
-    WebRtcPlayId,
+    utils,
 };
 
-const CREDENTIALS_LEN: usize = 32;
+/// Credentials of the `Member` element.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Credential {
+    /// [Argon2] hash of the `Member` credential.
+    ///
+    /// [Argon2]: https://en.wikipedia.org/wiki/Argon2
+    Hash(String),
 
-/// ID of `Member`.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
-#[from(forward)]
-pub struct Id(pub String);
+    /// Plain text `Member` credentials.
+    Plain(String),
+}
+
+impl Credential {
+    /// Length of [`Credential`]s.
+    const LEN: usize = 32;
+
+    /// Verifies provided [`client_proto::Credential`].
+    #[must_use]
+    pub fn verify(&self, other: &client_proto::Credential) -> bool {
+        use subtle::ConstantTimeEq as _;
+        match self {
+            Self::Hash(hash) => {
+                argon2::verify_encoded(hash, other.0.as_bytes())
+                    .unwrap_or(false)
+            }
+            Self::Plain(plain) => {
+                plain.as_bytes().ct_eq(other.0.as_bytes()).into()
+            }
+        }
+    }
+}
+
+impl Default for Credential {
+    #[inline]
+    fn default() -> Self {
+        Self::Plain(utils::generate_token(Self::LEN))
+    }
+}
+
+impl From<proto::member::Credentials> for Credential {
+    #[inline]
+    fn from(from: proto::member::Credentials) -> Self {
+        use proto::member::Credentials as C;
+        match from {
+            C::Hash(hash) => Self::Hash(hash),
+            C::Plain(plain) => Self::Plain(plain),
+        }
+    }
+}
+
+impl From<Credential> for proto::member::Credentials {
+    #[inline]
+    fn from(from: Credential) -> Self {
+        match from {
+            Credential::Plain(plain) => Self::Plain(plain),
+            Credential::Hash(hash) => Self::Hash(hash),
+        }
+    }
+}
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
-/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum MemberElement {
@@ -58,7 +114,7 @@ pub struct MemberSpec {
     pipeline: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
-    credentials: String,
+    credentials: Credential,
 
     /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
@@ -98,9 +154,10 @@ impl Into<RoomElement> for MemberSpec {
 impl MemberSpec {
     /// Creates new [`MemberSpec`] with the given parameters.
     #[inline]
+    #[must_use]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
-        credentials: String,
+        credentials: Credential,
         on_join: Option<CallbackUrl>,
         on_leave: Option<CallbackUrl>,
         idle_timeout: Option<Duration>,
@@ -131,6 +188,7 @@ impl MemberSpec {
     }
 
     /// Lookups [`WebRtcPublishEndpoint`] by ID.
+    #[must_use]
     pub fn get_publish_endpoint_by_id(
         &self,
         id: WebRtcPublishId,
@@ -156,16 +214,22 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
-    pub fn credentials(&self) -> &str {
+    #[inline]
+    #[must_use]
+    pub fn credentials(&self) -> &Credential {
         &self.credentials
     }
 
     /// Returns reference to `on_join` [`CallbackUrl`].
+    #[inline]
+    #[must_use]
     pub fn on_join(&self) -> &Option<CallbackUrl> {
         &self.on_join
     }
 
     /// Returns reference to `on_leave` [`CallbackUrl`].
+    #[inline]
+    #[must_use]
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
     }
@@ -174,6 +238,8 @@ impl MemberSpec {
     /// Client API.
     ///
     /// Once reached, the `Member` is considered being idle.
+    #[inline]
+    #[must_use]
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
@@ -181,29 +247,18 @@ impl MemberSpec {
     /// Returns timeout of the `Member` reconnecting via Client API.
     ///
     /// Once reached, the `Member` is considered disconnected.
+    #[inline]
+    #[must_use]
     pub fn reconnect_timeout(&self) -> Option<Duration> {
         self.reconnect_timeout
     }
 
     /// Returns interval of sending `Ping`s to the `Member` via Client API.
+    #[inline]
+    #[must_use]
     pub fn ping_interval(&self) -> Option<Duration> {
         self.ping_interval
     }
-}
-
-/// Generates alphanumeric credentials for [`Member`] with
-/// [`CREDENTIALS_LEN`] length.
-///
-/// This credentials will be generated if in dynamic [Control API] spec not
-/// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
-/// [`MemberProto`] implemented for [`MemberSpec`].
-///
-/// [Control API]: https://tinyurl.com/yxsqplq7
-fn generate_member_credentials() -> String {
-    rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(CREDENTIALS_LEN)
-        .collect()
 }
 
 impl TryFrom<proto::Member> for MemberSpec {
@@ -215,6 +270,7 @@ impl TryFrom<proto::Member> for MemberSpec {
             member_id: &str,
             field: &'static str,
         ) -> Result<Option<Duration>, TryFromProtobufError> {
+            #[allow(clippy::map_err_ignore)]
             duration.map(TryInto::try_into).transpose().map_err(|_| {
                 TryFromProtobufError::NegativeDuration(member_id.into(), field)
             })
@@ -231,10 +287,9 @@ impl TryFrom<proto::Member> for MemberSpec {
             }
         }
 
-        let mut credentials = member.credentials;
-        if credentials.is_empty() {
-            credentials = generate_member_credentials();
-        }
+        let credentials = member
+            .credentials
+            .map_or_else(Credential::default, Credential::from);
 
         let on_leave = {
             let on_leave = member.on_leave;

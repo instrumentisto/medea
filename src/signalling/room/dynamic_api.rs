@@ -6,21 +6,21 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::{
-    fut, ActorFuture as _, AsyncContext as _, Context,
-    ContextFutureSpawner as _, Handler, Message, WrapFuture as _,
+    fut, ActorFuture as _, AsyncContext as _, AtomicResponse, Context, Handler,
+    Message, WrapFuture as _,
 };
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{CloseReason, MemberId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
     api::control::{
+        callback::OnLeaveReason,
         endpoints::{
             WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
             WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
         },
         refs::StatefulFid,
-        EndpointId, EndpointSpec, MemberId, MemberSpec, WebRtcPlayId,
-        WebRtcPublishId,
+        EndpointId, EndpointSpec, MemberSpec, WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
     signalling::{
@@ -31,37 +31,28 @@ use crate::{
         peers::PeerChange,
         room::ActFuture,
     },
-    utils::actix_try_join_all,
 };
 
 use super::{Room, RoomError};
 
 impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
             "Deleting Member [id = {}] in Room [id = {}].",
             member_id, self.id
         );
-        if let Some(member) = self.members.get_member_by_id(member_id) {
-            let peers: HashSet<PeerId> = member
-                .sinks()
-                .values()
-                .filter_map(WebRtcPlayEndpoint::peer_id)
-                .chain(
-                    member
-                        .srcs()
-                        .values()
-                        .flat_map(WebRtcPublishEndpoint::peer_ids),
-                )
-                .collect();
-
-            // Send PeersRemoved to `Member`s which have related to this
-            // `Member` `Peer`s.
-            self.remove_peers(&member.id(), &peers, ctx);
-
-            self.members.delete_member(member_id, ctx);
-
+        if self.members.get_member_by_id(member_id).is_ok() {
+            self.disconnect_member(
+                member_id,
+                CloseReason::Evicted,
+                None, /* No need to callback, since delete is initiated by
+                       * Control Service. */
+                ctx,
+            );
+            self.members.delete_member(member_id);
             debug!(
                 "Member [id = {}] deleted from Room [id = {}].",
                 member_id, self.id
@@ -78,9 +69,9 @@ impl Room {
         &mut self,
         member_id: &MemberId,
         endpoint_id: EndpointId,
-        ctx: &mut Context<Self>,
+        _: &mut Context<Self>,
     ) -> Result<(), RoomError> {
-        if let Some(member) = self.members.get_member_by_id(member_id) {
+        if let Ok(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
             let changeset =
                 if let Some(sink_endpoint) = member.take_sink(&play_id) {
@@ -95,8 +86,8 @@ impl Room {
                     }
                 };
 
-            let futs = {
-                let mut removed_peers: HashMap<_, HashSet<_>> = HashMap::new();
+            {
+                let mut removed_peers: HashMap<_, Vec<_>> = HashMap::new();
                 let mut discard_updates = HashSet::new();
                 let mut updated_peers = HashSet::new();
                 for change in changeset {
@@ -105,7 +96,7 @@ impl Room {
                             removed_peers
                                 .entry(member_id)
                                 .or_default()
-                                .insert(peer_id);
+                                .push(peer_id);
                             discard_updates.insert(peer_id);
                         }
                         PeerChange::Updated(peer_id) => {
@@ -117,26 +108,10 @@ impl Room {
                     self.peers.commit_scheduled_changes(updated_peer_id)?;
                 }
 
-                let futs: Vec<_> = removed_peers
-                    .into_iter()
-                    .map(|(member_id, peer_ids)| {
-                        self.send_peers_removed(member_id, peer_ids)
-                    })
-                    .collect();
-
-                futs
-            };
-
-            ctx.spawn(actix_try_join_all(futs).map(|res, this, ctx| {
-                if let Err(e) = res {
-                    error!(
-                        "Unexpected error while deleting Endpoint: {:?}. Room \
-                         will be stopped",
-                        e
-                    );
-                    this.close_gracefully(ctx);
+                for (member_id, peer_ids) in removed_peers {
+                    self.send_peers_removed(member_id, peer_ids).unwrap();
                 }
-            }));
+            };
         }
 
         Ok(())
@@ -145,7 +120,7 @@ impl Room {
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
     ///
     /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
-    /// present in [`ParticipantService`].
+    /// present in [`ParticipantService`][1].
     ///
     /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
@@ -153,7 +128,10 @@ impl Room {
     /// # Errors
     ///
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
-    /// provided [`MemberId`] was not found in [`ParticipantService`].
+    /// provided [`MemberId`] was not found in [`ParticipantService`][1].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [1]: crate::signalling::participants::ParticipantService
     fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -200,7 +178,7 @@ impl Room {
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
     ///
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
-    /// present in [`ParticipantService`].
+    /// present in [`ParticipantService`][1].
     ///
     /// # Errors
     ///
@@ -209,6 +187,9 @@ impl Room {
     ///
     /// Errors with [`RoomError::ParticipantServiceErr`] if [`Member`] with
     /// provided [`MemberId`] doesn't exist.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [1]: crate::signalling::participants::ParticipantService
     fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -260,53 +241,31 @@ impl Room {
 
         member.insert_sink(sink);
 
-        let fut = fut::ready(()).map(move |_, this: &mut Self, ctx| {
-            let member_id = member.id();
-            if this.members.member_has_connection(&member_id) {
-                ctx.spawn(this.init_member_connections(&member).map(
-                    move |res, this, ctx| {
-                        if let Err(e) = res {
-                            error!(
-                                "Failed to interconnect Members, because {}. \
-                                 Connection with Member [id = {}, room_id: \
-                                 {}] will be stopped.",
-                                e, member_id, this.id,
-                            );
-                            this.members
-                                .close_member_connection(&member_id, ctx);
-                        }
-                    },
-                ));
-            }
-            Ok(())
-        });
-        Ok(Box::new(fut))
-    }
-
-    /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
-    /// [`Member`].
-    ///
-    /// This will delete [`Peer`]s from [`PeerRepository`] and send
-    /// [`Event::PeersRemoved`] event to [`Member`].
-    fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
-        &mut self,
-        member_id: &MemberId,
-        peer_ids_to_remove: Peers,
-        ctx: &mut Context<Self>,
-    ) {
-        debug!("Remove peers.");
-        self.peers
-            .remove_peers(&member_id, peer_ids_to_remove)
-            .into_iter()
-            .for_each(|(member_id, peers)| {
-                self.member_peers_removed(
-                    peers.into_iter().map(|p| p.id()).collect(),
-                    member_id,
-                    ctx,
-                )
-                .map(|_, _, _| ())
-                .spawn(ctx);
-            });
+        Ok(Box::pin(fut::ready(()).map(
+            move |_, this: &mut Self, ctx| {
+                let member_id = member.id();
+                if this.members.member_has_connection(&member_id) {
+                    ctx.spawn(this.init_member_connections(&member).map(
+                        move |res, this, ctx| {
+                            if let Err(e) = res {
+                                error!(
+                                    "Failed to interconnect Members, because \
+                                     {}",
+                                    e,
+                                );
+                                this.disconnect_member(
+                                    &member_id,
+                                    CloseReason::InternalError,
+                                    Some(OnLeaveReason::Kicked),
+                                    ctx,
+                                );
+                            }
+                        },
+                    ));
+                }
+                Ok(())
+            },
+        )))
     }
 }
 
@@ -416,13 +375,7 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            if let Err(e) = self.delete_endpoint(&member_id, endpoint_id, ctx) {
-                error!(
-                    "Failed to remove Endpoint: {:?}. Closing Room [id = {}].",
-                    e, self.id
-                );
-                self.close_gracefully(ctx);
-            }
+            self.delete_endpoint(&member_id, endpoint_id, ctx).unwrap();
         });
     }
 }
@@ -473,8 +426,8 @@ impl Handler<CreateEndpoint> for Room {
                     msg.endpoint_id.into(),
                     endpoint,
                 ) {
-                    Ok(fut) => Box::new(fut),
-                    Err(e) => Box::new(fut::err(e)),
+                    Ok(fut) => Box::pin(fut),
+                    Err(e) => Box::pin(fut::err(e)),
                 }
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
@@ -483,9 +436,9 @@ impl Handler<CreateEndpoint> for Room {
                     msg.endpoint_id.into(),
                     &endpoint,
                 ) {
-                    Box::new(fut::err(e))
+                    Box::pin(fut::err(e))
                 } else {
-                    Box::new(fut::ok(()))
+                    Box::pin(fut::ok(()))
                 }
             }
         }
@@ -498,15 +451,14 @@ impl Handler<CreateEndpoint> for Room {
 pub struct Close;
 
 impl Handler<Close> for Room {
-    type Result = ();
+    type Result = AtomicResponse<Self, ()>;
 
-    fn handle(&mut self, _: Close, ctx: &mut Self::Context) {
+    fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
         for id in self.members.members().keys() {
             self.delete_member(id, ctx);
         }
-        self.members
-            .drop_connections(ctx)
-            .into_actor(self)
-            .wait(ctx);
+        AtomicResponse::new(Box::pin(
+            self.members.drop_connections(ctx).into_actor(self),
+        ))
     }
 }

@@ -1,4 +1,7 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
+//!
+//! [`Peer`]: crate::media::peer::Peer
+//! [`Room`]: crate::signalling::room::Room
 
 mod media_traffic_state;
 mod metrics;
@@ -10,29 +13,29 @@ use std::{
     convert::{TryFrom, TryInto},
     rc::Rc,
     sync::Arc,
-    time::Duration,
 };
 
 use derive_more::Display;
-use futures::future;
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use futures::{future, Stream};
+use medea_client_api_proto::{
+    state, stats::RtcStat, Incrementable, MemberId, PeerConnectionState,
+    PeerId, RoomId, TrackId,
+};
 
 use crate::{
-    api::control::{MemberId, RoomId},
     conf,
     log::prelude::*,
-    media::{peer::NegotiationSubscriber, Peer, PeerError, PeerStateMachine},
+    media::{peer::PeerUpdatesSubscriber, Peer, PeerError, PeerStateMachine},
     signalling::{
         elements::endpoints::{
             webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Endpoint,
         },
+        peers::metrics::{PeerMetricsService, RtcStatsHandler},
         room::RoomError,
     },
     turn::{TurnAuthService, UnreachablePolicy},
 };
-
-use self::metrics::PeersMetricsService;
 
 pub use self::{
     metrics::{PeersMetricsEvent, PeersMetricsEventHandler},
@@ -45,20 +48,27 @@ pub use self::{
 #[derive(Debug)]
 pub struct PeersService {
     /// [`RoomId`] of the [`Room`] which owns this [`PeerRepository`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     room_id: RoomId,
 
-    /// [`TurnAuthService`] that [`IceUser`]s for the [`PeerConnection`]s from
+    /// [`TurnAuthService`] that [`IceUser`]s for the [`Peer`]s from
     /// this [`PeerRepository`] will be created with.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     turn_service: Arc<dyn TurnAuthService>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     ///
-    /// [`Member`]: crate::signalling::elements::member::Member
+    /// [`Member`]: crate::signalling::elements::Member
+    /// [`Peer`]: crate::media::peer::Peer
     /// [`Room`]: crate::signalling::Room
     peers: PeerRepository,
 
     /// Count of [`Peer`]s in this [`Room`].
     ///
+    /// [`Peer`]: crate::media::peer::Peer
     /// [`Room`]: crate::signalling::room::Room
     peers_count: Counter<PeerId>,
 
@@ -69,18 +79,17 @@ pub struct PeersService {
     tracks_count: Counter<TrackId>,
 
     /// [`PeerTrafficWatcher`] which analyzes [`Peer`]s traffic metrics.
+    /// [`Peer`]: crate::media::peer::Peer
     peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
 
     /// Service which responsible for this [`Room`]'s [`RtcStat`]s processing.
-    peer_metrics_service: RefCell<PeersMetricsService>,
-
-    /// Duration, after which [`Peer`]s stats will be considered as stale.
-    /// Passed to [`PeersMetricsService`] when registering new [`Peer`]s.
-    peer_stats_ttl: Duration,
+    ///
+    /// [`Room`]: crate::signalling::room::Room
+    peer_metrics_service: RefCell<Box<dyn RtcStatsHandler>>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for a some [`Peer`].
-    negotiation_sub: Rc<dyn NegotiationSubscriber>,
+    negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
 }
 
 /// Simple ID counter.
@@ -133,25 +142,29 @@ pub enum PeerChange {
 impl PeersService {
     /// Returns new [`PeerRepository`] for a [`Room`] with the provided
     /// [`RoomId`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     pub fn new(
         room_id: RoomId,
         turn_service: Arc<dyn TurnAuthService>,
         peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
         media_conf: &conf::Media,
-        negotiation_sub: Rc<dyn NegotiationSubscriber>,
+        negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
     ) -> Rc<Self> {
         Rc::new(Self {
             room_id: room_id.clone(),
             turn_service,
-            peers: PeerRepository::new(),
+            peers: PeerRepository::default(),
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
-            peers_traffic_watcher: peers_traffic_watcher.clone(),
-            peer_metrics_service: RefCell::new(PeersMetricsService::new(
-                room_id,
-                peers_traffic_watcher,
+            peers_traffic_watcher: Arc::clone(&peers_traffic_watcher),
+            peer_metrics_service: RefCell::new(Box::new(
+                PeerMetricsService::new(
+                    room_id,
+                    peers_traffic_watcher,
+                    media_conf.max_lag,
+                ),
             )),
-            peer_stats_ttl: media_conf.max_lag,
             negotiation_sub,
         })
     }
@@ -197,7 +210,7 @@ impl PeersService {
     }
 
     /// Creates interconnected [`Peer`]s for provided endpoints and saves them
-    /// in [`PeerService`].
+    /// in [`PeersService`].
     ///
     /// Returns [`PeerId`]s of the created [`Peer`]s.
     fn create_peers(
@@ -244,10 +257,10 @@ impl PeersService {
 
         self.peer_metrics_service
             .borrow_mut()
-            .register_peer(&src_peer, self.peer_stats_ttl);
+            .register_peer(&src_peer);
         self.peer_metrics_service
             .borrow_mut()
-            .register_peer(&sink_peer, self.peer_stats_ttl);
+            .register_peer(&sink_peer);
 
         self.add_peer(src_peer);
         self.add_peer(sink_peer);
@@ -260,6 +273,8 @@ impl PeersService {
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     #[inline]
     pub fn get_peers_between_members(
         &self,
@@ -297,6 +312,7 @@ impl PeersService {
     /// __Note:__ this also deletes partner peers.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
+    /// [`Member`]: crate::signalling::elements::Member
     pub fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
         &self,
         member_id: &MemberId,
@@ -366,10 +382,10 @@ impl PeersService {
     }
 
     /// Returns already created [`Peer`] pair's [`PeerId`]s as
-    /// [`CreatedOrGottenPeer::Gotten`] variant.
+    /// [`GetOrCreatePeersResult::AlreadyExisted`] variant.
     ///
     /// Returns newly created [`Peer`] pair's [`PeerId`]s as
-    /// [`CreatedOrGottenPeer::Created`] variant.
+    /// [`GetOrCreatePeersResult::Created`] variant.
     async fn get_or_create_peers(
         &self,
         src: &WebRtcPublishEndpoint,
@@ -430,6 +446,8 @@ impl PeersService {
     /// # Errors
     ///
     /// Errors if could not save [`IceUser`] in [`TurnAuthService`].
+    ///
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     pub async fn connect_endpoints(
         self: Rc<Self>,
         src: WebRtcPublishEndpoint,
@@ -501,6 +519,8 @@ impl PeersService {
 
     /// Creates and sets [`IceUser`], registers [`Peer`] in
     /// [`PeerTrafficWatcher`].
+    ///
+    /// [`IceUser`]: crate::turn::ice_user::IceUser
     async fn peer_post_construct(
         &self,
         peer_id: PeerId,
@@ -511,8 +531,10 @@ impl PeersService {
             .create(self.room_id.clone(), peer_id, UnreachablePolicy::ReturnErr)
             .await?;
 
-        self.peers
-            .map_peer_by_id_mut(peer_id, move |p| p.set_ice_user(ice_user))?;
+        self.peers.map_peer_by_id_mut(peer_id, move |p| {
+            p.set_ice_user(ice_user);
+            p.set_initialized();
+        })?;
 
         if endpoint.has_traffic_callback() {
             self.peers_traffic_watcher
@@ -535,11 +557,12 @@ impl PeersService {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn update_peer_tracks(&self, peer_id: PeerId) -> Result<(), RoomError> {
+    pub(super) fn update_peer_tracks(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
-            self.peer_metrics_service
-                .borrow_mut()
-                .update_peer_tracks(peer);
+            self.peer_metrics_service.borrow_mut().update_peer(peer);
         })?;
 
         Ok(())
@@ -551,27 +574,41 @@ impl PeersService {
     /// Returns [`HashMap`] with all removed [`Peer`]s:
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
-    #[inline]
-    pub fn remove_peers_related_to_member(
+    pub(super) fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,
-    ) -> HashMap<MemberId, HashSet<PeerId>> {
-        self.peers.remove_peers_related_to_member(member_id)
+    ) -> HashMap<MemberId, Vec<PeerId>> {
+        let peers = self.peers.remove_peers_related_to_member(member_id);
+
+        if !peers.is_empty() {
+            let all_peers: Vec<PeerId> =
+                peers.values().flatten().copied().collect();
+            self.peer_metrics_service
+                .borrow_mut()
+                .unregister_peers(&all_peers);
+            self.peers_traffic_watcher
+                .unregister_peers(self.room_id.clone(), all_peers);
+        }
+
+        peers
     }
 
-    /// Updates [`PeerTracks`] of the [`Peer`] with provided [`PeerId`] in the
-    /// [`PeerMetricsService`].
+    /// Updates tracks information of the [`Peer`] with provided [`PeerId`] in
+    /// the [`RtcStatsHandler`].
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn sync_peer_spec(&self, peer_id: PeerId) -> Result<(), RoomError> {
+    pub(super) fn sync_peer_spec(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<(), RoomError> {
         self.peers.map_peer_by_id(peer_id, |peer| {
-            self.peer_metrics_service
-                .borrow_mut()
-                .update_peer_tracks(&peer);
+            self.peer_metrics_service.borrow_mut().update_peer(&peer);
         })?;
         Ok(())
     }
@@ -582,18 +619,55 @@ impl PeersService {
     pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
         self.peers.is_peer_exists(peer_id)
     }
+
+    /// Returns [`Stream`] of [`PeersMetricsEvent`]s from underlying
+    /// [`RtcStatsHandler`].
+    pub(super) fn subscribe_to_metrics_events(
+        &self,
+    ) -> impl Stream<Item = PeersMetricsEvent> {
+        self.peer_metrics_service.borrow_mut().subscribe()
+    }
+
+    /// Propagates stats to [`RtcStatsHandler`].
+    pub(super) fn add_stats(&self, peer_id: PeerId, stats: &[RtcStat]) {
+        self.peer_metrics_service
+            .borrow_mut()
+            .add_stats(peer_id, stats);
+    }
+
+    /// Propagates [`PeerConnectionState`] to [`RtcStatsHandler`].
+    pub(super) fn update_peer_connection_state(
+        &self,
+        peer_id: PeerId,
+        state: PeerConnectionState,
+    ) {
+        self.peer_metrics_service
+            .borrow_mut()
+            .update_peer_connection_state(peer_id, state);
+    }
+
+    /// Runs [`Peer`]s stats checking in the underlying [`PeersMetricsEvent`]s.
+    pub(super) fn check_peers(&self) {
+        self.peer_metrics_service.borrow_mut().check();
+    }
+
+    /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
+    /// [`MemberId`].
+    #[inline]
+    #[must_use]
+    pub(super) fn get_peers_states(
+        &self,
+        member_id: &MemberId,
+    ) -> HashMap<PeerId, state::Peer> {
+        self.peers.get_peers_states(member_id)
+    }
 }
 
 /// Repository which stores all [`PeerStateMachine`]s of the [`PeersService`].
-#[derive(Debug)]
-struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
+#[derive(Debug, Default)]
+pub struct PeerRepository(RefCell<HashMap<PeerId, PeerStateMachine>>);
 
 impl PeerRepository {
-    /// Returns empty [`PeerRepository`].
-    pub fn new() -> Self {
-        Self(RefCell::new(HashMap::new()))
-    }
-
     /// Applies a function to the [`PeerStateMachine`] reference with provided
     /// [`PeerId`] (if any found).
     ///
@@ -601,7 +675,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn map_peer_by_id<T>(
+    fn map_peer_by_id<T>(
         &self,
         peer_id: PeerId,
         f: impl FnOnce(&PeerStateMachine) -> T,
@@ -610,7 +684,7 @@ impl PeerRepository {
             .0
             .borrow()
             .get(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
+            .ok_or(RoomError::PeerNotFound(peer_id))?))
     }
 
     /// Applies a function to the mutable [`PeerStateMachine`] reference with
@@ -620,7 +694,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn map_peer_by_id_mut<T>(
+    fn map_peer_by_id_mut<T>(
         &self,
         peer_id: PeerId,
         f: impl FnOnce(&mut PeerStateMachine) -> T,
@@ -629,13 +703,13 @@ impl PeerRepository {
             .0
             .borrow_mut()
             .get_mut(&peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))?))
+            .ok_or(RoomError::PeerNotFound(peer_id))?))
     }
 
     /// Removes [`PeerStateMachine`] with a provided [`PeerId`].
     ///
     /// Returns removed [`PeerStateMachine`] if it existed.
-    pub fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
+    fn remove(&self, peer_id: PeerId) -> Option<PeerStateMachine> {
         self.0.borrow_mut().remove(&peer_id)
     }
 
@@ -646,9 +720,8 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
     /// exist in [`PeerRepository`].
-    pub fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
-        self.remove(peer_id)
-            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+    fn take(&self, peer_id: PeerId) -> Result<PeerStateMachine, RoomError> {
+        self.remove(peer_id).ok_or(RoomError::PeerNotFound(peer_id))
     }
 
     /// Returns owned [`Peer`] by its ID.
@@ -660,10 +733,7 @@ impl PeerRepository {
     ///
     /// Errors with [`RoomError::PeerError`] if [`Peer`] is found, but not in
     /// requested state.
-    pub fn take_inner_peer<S>(
-        &self,
-        peer_id: PeerId,
-    ) -> Result<Peer<S>, RoomError>
+    fn take_inner_peer<S>(&self, peer_id: PeerId) -> Result<Peer<S>, RoomError>
     where
         Peer<S>: TryFrom<PeerStateMachine>,
         <Peer<S> as TryFrom<PeerStateMachine>>::Error:
@@ -681,7 +751,7 @@ impl PeerRepository {
     /// Stores [`Peer`] in [`Room`].
     ///
     /// [`Room`]: crate::signalling::Room
-    pub fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
+    fn add_peer<S: Into<PeerStateMachine>>(&self, peer: S) {
         let peer = peer.into();
         self.0.borrow_mut().insert(peer.id(), peer);
     }
@@ -691,7 +761,9 @@ impl PeerRepository {
     ///
     /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
     /// otherwise returns `None`.
-    pub fn get_peers_between_members(
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
+    fn get_peers_between_members(
         &self,
         member_id: &MemberId,
         partner_member_id: &MemberId,
@@ -767,7 +839,7 @@ impl PeerRepository {
 
             if is_sink_peer_empty && is_src_peer_empty {
                 let member = sink_endpoint.owner();
-                member.peers_removed(&hashset![sink_peer_id]);
+                member.peers_removed(&vec![sink_peer_id]);
 
                 self.remove(sink_peer_id);
                 self.remove(src_peer_id);
@@ -791,12 +863,14 @@ impl PeerRepository {
     /// Returns [`HashMap`] with all removed [`Peer`]s:
     /// key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     // TODO: remove in #91.
-    pub fn remove_peers_related_to_member(
+    fn remove_peers_related_to_member(
         &self,
         member_id: &MemberId,
-    ) -> HashMap<MemberId, HashSet<PeerId>> {
-        let mut peers_to_remove: HashMap<MemberId, HashSet<PeerId>> =
+    ) -> HashMap<MemberId, Vec<PeerId>> {
+        let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
             HashMap::new();
 
         self.0
@@ -814,19 +888,19 @@ impl PeerRepository {
                     .for_each(|partner_peer| {
                         peers_to_remove
                             .entry(partner_peer.member_id())
-                            .or_insert_with(HashSet::new)
-                            .insert(partner_peer.id());
+                            .or_default()
+                            .push(partner_peer.id());
                     });
 
                 peers_to_remove
                     .entry(peer.member_id())
-                    .or_insert_with(HashSet::new)
-                    .insert(peer.id());
+                    .or_default()
+                    .push(peer.id());
             });
 
         peers_to_remove
             .values()
-            .flat_map(HashSet::iter)
+            .flat_map(|p| p.iter())
             .for_each(|id| {
                 self.0.borrow_mut().remove(id);
             });
@@ -840,13 +914,37 @@ impl PeerRepository {
     pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
         self.0.borrow().contains_key(&peer_id)
     }
+
+    /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
+    /// [`MemberId`].
+    #[must_use]
+    pub fn get_peers_states(
+        &self,
+        member_id: &MemberId,
+    ) -> HashMap<PeerId, state::Peer> {
+        self.0
+            .borrow()
+            .iter()
+            .filter_map(|(id, p)| {
+                if &p.member_id() == member_id
+                    && (p.is_known_to_remote()
+                        || p.negotiation_role().is_some())
+                {
+                    Some((*id, p.get_state()))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, time::Duration};
 
     use futures::{channel::mpsc, future, Stream, StreamExt as _};
+    use medea_client_api_proto::TrackUpdate;
     use tokio::time::timeout;
 
     use crate::{
@@ -854,6 +952,7 @@ mod tests {
             endpoints::webrtc_publish_endpoint::{
                 AudioSettings, P2pMode, VideoSettings,
             },
+            member::Credential,
             refs::SrcUri,
         },
         signalling::{
@@ -862,44 +961,92 @@ mod tests {
         turn::service::test::new_turn_auth_service_mock,
     };
 
-    use super::*;
+    use super::{metrics::MockRtcStatsHandler, *};
 
-    /// Mock for the [`NegotiationSubscriber`] trait.
+    impl PeersService {
+        fn with_metrics_service(
+            room_id: RoomId,
+            turn_service: Arc<dyn TurnAuthService>,
+            peers_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
+            negotiation_sub: Rc<dyn PeerUpdatesSubscriber>,
+            peer_metrics_service: Box<dyn RtcStatsHandler>,
+        ) -> Rc<Self> {
+            Rc::new(Self {
+                room_id,
+                turn_service,
+                peers: PeerRepository::default(),
+                peers_count: Counter::default(),
+                tracks_count: Counter::default(),
+                peers_traffic_watcher,
+                peer_metrics_service: RefCell::new(peer_metrics_service),
+                negotiation_sub,
+            })
+        }
+    }
+
+    /// Mock for the [`PeerUpdatesSubscriber`] trait.
     ///
     /// You can subscribe to the [`Stream`] into which will be sent all
     /// [`PeerId`]s of [`Peer`] which are should be renegotiated.
     #[derive(Debug, Clone)]
-    struct NegotiationSubMock(Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>);
+    struct NegotiationSubMock(
+        Rc<RefCell<Vec<mpsc::UnboundedSender<PeerId>>>>,
+        Rc<RefCell<Vec<mpsc::UnboundedSender<(PeerId, Vec<TrackUpdate>)>>>>,
+    );
 
     impl NegotiationSubMock {
         /// Returns new empty [`NegotiationSubMock`].
         pub fn new() -> Self {
-            Self(Rc::new(RefCell::new(Vec::new())))
+            Self(Rc::default(), Rc::default())
         }
 
         /// Returns [`Stream`] into which will be sent all [`PeerId`]s of
         /// [`Peer`] which are should be renegotiated.
-        pub fn subscribe(&self) -> impl Stream<Item = PeerId> {
+        pub fn on_negotiation_needed(&self) -> impl Stream<Item = PeerId> {
             let (tx, rx) = mpsc::unbounded();
-
             self.0.borrow_mut().push(tx);
+            rx
+        }
 
+        /// Returns [`Stream`] into which will be sent all [`PeerId`]s and
+        /// [`TrackUpdate`]s of [`Peer`] which are should be forcibly updated.
+        #[allow(dead_code)]
+        pub fn on_force_update(
+            &self,
+        ) -> impl Stream<Item = (PeerId, Vec<TrackUpdate>)> {
+            let (tx, rx) = mpsc::unbounded();
+            self.1.borrow_mut().push(tx);
             rx
         }
     }
 
-    impl NegotiationSubscriber for NegotiationSubMock {
-        /// Sends [`PeerId`] to the [`NegotiationSubMock::subscribe`]
-        /// [`Stream`].
+    impl PeerUpdatesSubscriber for NegotiationSubMock {
+        /// Sends [`PeerId`] to the
+        /// [`NegotiationSubMock::on_negotiation_needed`] [`Stream`].
         fn negotiation_needed(&self, peer_id: PeerId) {
             self.0.borrow().iter().for_each(|sender| {
                 let _ = sender.unbounded_send(peer_id);
             });
         }
+
+        /// Sends [`PeerId`] to the [`NegotiationSubMock::on_force_update`]
+        /// [`Stream`].
+        fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
+            self.1.borrow().iter().for_each(|sender| {
+                let _ = sender.unbounded_send((peer_id, changes.clone()));
+            })
+        }
+    }
+
+    /// Returns [`Fn`] which will return `true` if provided
+    /// [`PeerStateMachine`]'s [`PeerId`] will be equal to the provided into
+    /// [`peer_id_eq`] [`PeerId`].
+    fn peer_id_eq(peer_id: u32) -> impl Fn(&PeerStateMachine) -> bool {
+        move |peer| peer.id() == PeerId(peer_id)
     }
 
     /// Checks that newly created [`Peer`] will be created in the
-    /// [`PeerMetricsService`] and [`PeerTrafficWatcher`].
+    /// [`RtcStatsHandler`] and [`PeerTrafficWatcher`].
     #[actix_rt::test]
     async fn peer_is_registered_in_metrics_service() {
         let mut mock = MockPeerTrafficWatcher::new();
@@ -917,19 +1064,41 @@ mod tests {
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
         let negotiation_sub = NegotiationSubMock::new();
-        let negotiations = negotiation_sub.subscribe();
+        let negotiations = negotiation_sub.on_negotiation_needed();
 
-        let peers_service = PeersService::new(
+        let mut metrics_service = MockRtcStatsHandler::new();
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(0))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(1))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(0))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(1))
+            .times(1)
+            .return_const(());
+
+        let peers_service = PeersService::with_metrics_service(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
-            &conf::Media::default(),
             Rc::new(negotiation_sub),
+            Box::new(metrics_service),
         );
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".to_string(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -937,7 +1106,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".to_string(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -973,15 +1142,6 @@ mod tests {
 
         register_peer_done.await.unwrap().unwrap();
 
-        assert!(peers_service
-            .peer_metrics_service
-            .borrow()
-            .is_peer_registered(PeerId(0)));
-        assert!(peers_service
-            .peer_metrics_service
-            .borrow()
-            .is_peer_registered(PeerId(1)));
-
         let negotiate_peer_ids: HashSet<_> =
             negotiations.take(2).collect().await;
         assert!(negotiate_peer_ids.contains(&PeerId(0)));
@@ -989,7 +1149,7 @@ mod tests {
     }
 
     /// Check that when new `Endpoint`s added to the [`PeerService`], tracks
-    /// count will be updated in the [`PeerMetricsService`].
+    /// count will be updated in the [`RtcStatsHandler`].
     #[actix_rt::test]
     async fn adding_new_endpoint_updates_peer_metrics() {
         let mut mock = MockPeerTrafficWatcher::new();
@@ -1009,19 +1169,41 @@ mod tests {
         mock.expect_traffic_stopped().returning(|_, _, _| {});
 
         let negotiation_sub = NegotiationSubMock::new();
-        let negotiations = negotiation_sub.subscribe();
+        let negotiations = negotiation_sub.on_negotiation_needed();
 
-        let peers_service = PeersService::new(
+        let mut metrics_service = MockRtcStatsHandler::new();
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(0))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_register_peer()
+            .withf(peer_id_eq(1))
+            .times(1)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(0))
+            .times(2)
+            .return_const(());
+        metrics_service
+            .expect_update_peer()
+            .withf(peer_id_eq(1))
+            .times(2)
+            .return_const(());
+
+        let peers_service = PeersService::with_metrics_service(
             "test".into(),
             new_turn_auth_service_mock(),
             Arc::new(mock),
-            &conf::Media::default(),
             Rc::new(negotiation_sub),
+            Box::new(metrics_service),
         );
 
         let publisher = Member::new(
             "publisher".into(),
-            "test".to_string(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1029,7 +1211,7 @@ mod tests {
         );
         let receiver = Member::new(
             "receiver".into(),
-            "test".to_string(),
+            Credential::Plain("test".into()),
             "test".into(),
             Duration::from_secs(10),
             Duration::from_secs(10),
@@ -1063,17 +1245,6 @@ mod tests {
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
 
-        let first_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(0));
-        assert_eq!(first_peer_tracks_count, 2);
-        let second_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(1));
-        assert_eq!(second_peer_tracks_count, 2);
-
         let publish = WebRtcPublishEndpoint::new(
             "publish".to_string().into(),
             P2pMode::Always,
@@ -1101,17 +1272,6 @@ mod tests {
         peers_service.commit_scheduled_changes(src_peer_id).unwrap();
         peers_service.update_peer_tracks(src_peer_id).unwrap();
         peers_service.update_peer_tracks(sink_peer_id).unwrap();
-
-        let first_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(0));
-        assert_eq!(first_peer_tracks_count, 4);
-        let second_peer_tracks_count = peers_service
-            .peer_metrics_service
-            .borrow()
-            .peer_tracks_count(PeerId(1));
-        assert_eq!(second_peer_tracks_count, 4);
 
         register_peer_done.await.unwrap();
 

@@ -1,0 +1,681 @@
+name: CI
+
+on: push
+
+env:
+  RUST_BACKTRACE: 1
+
+jobs:
+
+  ##########################
+  # Linting and formatting #
+  ##########################
+
+  clippy:
+    name: Clippy
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - run: make lint
+
+  rustfmt:
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt
+      - run: make fmt check=yes
+
+  helm-lint:
+    name: Lint Helm chart
+    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
+    strategy:
+      matrix:
+        chart:
+          - medea-demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: azure/setup-helm@v1
+      - run: make helm.lint chart=${{ matrix.chart }}
+
+
+
+
+  ###########
+  # Testing #
+  ###########
+
+  test-unit:
+    name: Unit tests
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    strategy:
+      matrix:
+        include:
+          - crate: medea-macro
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-macro-')
+                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+          - crate: medea-reactive
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-reactive-')
+                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+          - crate: medea-coturn-telnet-client
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-coturn-telnet-client-')
+                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+          - crate: medea-client-api-proto
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-client-api-proto-')
+                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+          - crate: medea
+            if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+                    || startsWith(github.ref, 'refs/tags/medea-0')
+                    || startsWith(github.ref, 'refs/tags/medea-1')
+                    || startsWith(github.ref, 'refs/tags/medea-2')
+                    || startsWith(github.ref, 'refs/tags/medea-3')
+                    || startsWith(github.ref, 'refs/tags/medea-4')
+                    || startsWith(github.ref, 'refs/tags/medea-5')
+                    || startsWith(github.ref, 'refs/tags/medea-6')
+                    || startsWith(github.ref, 'refs/tags/medea-7')
+                    || startsWith(github.ref, 'refs/tags/medea-8')
+                    || startsWith(github.ref, 'refs/tags/medea-9') }}
+                    # don't ask, pass through...
+          - crate: medea-jason
+            wasm: true
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-')
+                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        if: ${{ matrix.if }}
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+        if: ${{ matrix.if && !matrix.wasm }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+        if: ${{ matrix.if && matrix.wasm }}
+
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ matrix.if
+                && !contains(github.event.head_commit.message, '[fresh ci]') }}
+
+      - name: Parse wasm-bindgen-cli version from Cargo.lock
+        id: wasm-cli
+        run: echo ::set-output
+                  name=VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*'
+                                                           | grep -o '[0-9\.]*')
+        if: ${{ matrix.if && matrix.wasm }}
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: wasm-bindgen-cli
+          version: ${{ steps.wasm-cli.outputs.VERSION }}
+          use-tool-cache: true
+        if: ${{ matrix.if && matrix.wasm }}
+
+      - name: Chrome
+        run: make test.unit crate=${{ matrix.crate }} browser=chrome
+        if: ${{ matrix.if && matrix.crate == 'medea-jason' }}
+      - name: Firefox
+        run: make test.unit crate=${{ matrix.crate }} browser=firefox
+        if: ${{ matrix.if && matrix.crate == 'medea-jason' }}
+
+      - run: make test.unit crate=${{ matrix.crate }}
+        if: ${{ matrix.if && matrix.crate != 'medea-jason' }}
+
+  test-e2e:
+    name: E2E tests
+    needs: ['docker']
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        with:
+          key: test-e2e-{hash}
+          restore-keys: test-e2e-
+        continue-on-error: true
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: wasm-pack
+          use-tool-cache: true
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: docker-medea-${{ github.run_number }}
+      - name: Unpack `medea` Docker image
+        run: make docker.untar from-file=image.tar
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: docker-medea-control-api-mock-${{ github.run_number }}
+      - name: Unpack `medea-control-api-mock` Docker image
+        run: make docker.untar from-file=image.tar
+
+      - name: Chrome
+        run: make test.e2e browser=chrome up=yes dockerized=yes
+                           tag=build-${{ github.run_number }}
+      - name: Firefox
+        run: make test.e2e browser=firefox up=yes dockerized=yes
+                           tag=build-${{ github.run_number }}
+
+  test-integration:
+    name: Integration tests
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        with:
+          key: test-integration-{hash}
+          restore-keys: test-integration-
+        continue-on-error: true
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+
+      - run: make test.integration up=yes dockerized=no
+
+
+
+
+  ############
+  # Building #
+  ############
+
+  crate-jason:
+    name: Build medea-jason
+    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - uses: jetli/wasm-pack-action@v0.3.0
+      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
+
+  crate-medea:
+    name: Build medea
+    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - run: make cargo.build crate=medea dockerized=no debug=yes
+
+  rustdoc:
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+
+      # Run all task sequentially to not flood the jobs list.
+      - run: make docs.rust crate=medea-macro open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-macro-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea-reactive open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-reactive-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea-coturn-telnet-client open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-coturn-telnet-client-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea-client-api-proto open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-client-api-proto-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea-control-api-proto open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-control-api-proto-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea-jason open=no
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-')
+                || !startsWith(github.ref, 'refs/tags/medea-') }}
+
+      - run: make docs.rust crate=medea open=no
+        if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+                || startsWith(github.ref, 'refs/tags/medea-0')
+                || startsWith(github.ref, 'refs/tags/medea-1')
+                || startsWith(github.ref, 'refs/tags/medea-2')
+                || startsWith(github.ref, 'refs/tags/medea-3')
+                || startsWith(github.ref, 'refs/tags/medea-4')
+                || startsWith(github.ref, 'refs/tags/medea-5')
+                || startsWith(github.ref, 'refs/tags/medea-6')
+                || startsWith(github.ref, 'refs/tags/medea-7')
+                || startsWith(github.ref, 'refs/tags/medea-8')
+                || startsWith(github.ref, 'refs/tags/medea-9') }}
+                # nope, that's OK...
+
+  docker:
+    name: Docker image
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
+    strategy:
+      matrix:
+        include:
+          - image: medea
+            cache: false  # temporary disable caching due to CI issues
+            #cache: ${{ github.ref != 'refs/heads/master'
+            #           && !startsWith(github.ref, 'refs/tags/medea-')
+            #           && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            export: true
+            if: true
+
+          - image: medea-control-api-mock
+            cache: ${{ github.ref != 'refs/heads/master'
+                       && !startsWith(github.ref, 'refs/tags/medea-control-api-mock-')
+                       && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            export: true
+            if: true
+
+          - image: medea-demo
+            cache: ${{ github.ref != 'refs/heads/master'
+                       && !startsWith(github.ref, 'refs/tags/medea-demo-')
+                       && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            export: ${{ startsWith(github.ref, 'refs/tags/medea-demo-') }}
+            if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+                    || startsWith(github.ref, 'refs/tags/medea-demo-')}}
+          - image: medea-demo-edge
+            cache: false  # temporary disable caching due to CI issues
+            #cache: ${{ github.ref != 'refs/heads/master'
+            #           && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            export: ${{ github.ref == 'refs/heads/master' }}
+            if: ${{ !startsWith(github.ref, 'refs/tags/medea-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        if: ${{ matrix.if }}
+      - uses: docker/setup-buildx-action@v1
+        if: ${{ matrix.if }}
+
+      - run: make docker.build debug=no no-cache=yes
+                  image=${{ matrix.image }} tag=build-${{ github.run_number }}
+        if: ${{ matrix.if && !matrix.cache }}
+
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        with:
+          key: docker-${{ matrix.image }}-build-{hash}
+          restore-keys: docker-${{ matrix.image }}-build-
+        continue-on-error: true
+        timeout-minutes: 10
+        if: ${{ matrix.if && matrix.cache }}
+      - run: make docker.build debug=yes no-cache=no
+                  image=${{ matrix.image }} tag=build-${{ github.run_number }}
+        if: ${{ matrix.if && matrix.cache }}
+
+      - run: make docker.tar to-file=image.tar
+                  image=${{ matrix.image }} tags=build-${{ github.run_number }}
+        if: ${{ matrix.if && matrix.export }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: docker-${{ matrix.image }}-${{ github.run_number }}
+          path: image.tar
+          retention-days: 1
+        if: ${{ matrix.if && matrix.export }}
+
+
+
+
+  #############
+  # Releasing #
+  #############
+
+  release-github:
+    name: Release on GitHub
+    needs: ['clippy', 'rustfmt', 'rustdoc', 'test-e2e', 'test-integration', 'test-unit']
+    if: ${{ startsWith(github.ref, 'refs/tags/medea-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Parse crate/package name and version
+        id: release
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs/tags/(medea[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+-?.*)$'
+
+      - name: Verify release version matches Cargo manifest
+        run: >-
+          test "${{ steps.release.outputs.group2 }}" \
+               == $(make cargo.version crate=${{ steps.release.outputs.group1 }})
+        if: ${{ !startsWith(github.ref, 'refs/tags/medea-demo-') }}
+      - name: Verify release version matches Yarn manifest
+        run: >-
+          test "${{ steps.release.outputs.group2 }}" \
+               == $(make yarn.version pkg=${{ steps.release.outputs.group1 }})
+        if: ${{ startsWith(github.ref, 'refs/tags/medea-demo-') }}
+
+      - name: Parse CHANGELOG link
+        id: changelog
+        run: echo ::set-output
+                  name=LINK::$(make cargo.changelog.link
+                                    crate=${{ steps.release.outputs.group1 }}
+                                    ver=${{ steps.release.outputs.group2 }})
+
+      - uses: actions/create-release@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.release.outputs.group1 }}-${{ steps.release.outputs.group2 }}
+          release_name: ${{ steps.release.outputs.group1 }}-${{ steps.release.outputs.group2 }}
+          body: |
+            [API docs](https://docs.rs/${{ steps.release.outputs.group1 }}/${{ steps.release.outputs.group2 }})
+            [Changelog](${{ steps.changelog.outputs.LINK }})
+          prerelease: ${{ contains(steps.release.outputs.group2, '-') }}
+
+  release-cargo:
+    name: Release on crates.io
+    needs: ['release-github']
+    if: ${{ startsWith(github.ref, 'refs/tags/medea-')
+            && !startsWith(github.ref, 'refs/tags/medea-control-api-mock-')
+            && !startsWith(github.ref, 'refs/tags/medea-demo-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Parse crate name and version
+        id: crate
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs/tags/(medea[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+-?.*)$'
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Release ${{ steps.crate.outputs.group2 }} version
+              of '${{ steps.crate.outputs.group1 }}' crate
+        env:
+          CARGO_TOKEN: ${{ secrets.CRATESIO_TOKEN }}
+        run: make release.crates crate=${{ steps.crate.outputs.group1 }}
+                                 publish=yes
+
+  release-npm:
+    name: Release on NPM
+    needs: ['release-github']
+    if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Parse package name and version
+        id: package
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs/tags/(medea[a-z-]*)-([0-9]+\.[0-9]+\.[0-9]+(-.+)?)$'
+
+      - uses: actions/setup-node@v2-beta
+        with:
+          node-version: '15'
+      - name: Create NPM authorization
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPMJS_TOKEN }}"
+             > ~/.npmrc
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.3.0
+
+      - name: Release ${{ steps.package.outputs.group2 }} version
+              of '${{ steps.package.outputs.group1 }}' package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
+        run: make release.npm crate=${{ steps.package.outputs.group1 }}
+                              publish=yes
+
+  release-helm:
+    name: Release Helm chart
+    needs: ['helm-lint']
+    if: ${{ github.ref == 'refs/heads/master' }}
+    strategy:
+      matrix:
+        chart:
+          - medea-demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: trilom/file-changes-action@v1.2.4
+        id: changed
+      - id: chart
+        run: echo ::set-output
+                  name=MANIFEST::$(make helm.dir
+                                        chart=${{ matrix.chart }})/Chart.yaml
+
+      - uses: azure/setup-helm@v1
+        if: ${{ contains(steps.changed.outputs.files,
+                         steps.chart.outputs.MANIFEST) }}
+
+      - name: Prepare Git author for push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Actions"
+        if: ${{ contains(steps.changed.outputs.files,
+                         steps.chart.outputs.MANIFEST) }}
+
+      - run: make helm.package.release chart=${{ matrix.chart }} build=yes
+        if: ${{ contains(steps.changed.outputs.files,
+                         steps.chart.outputs.MANIFEST) }}
+
+  release-docker:
+    name: Release Docker image
+    needs: ['docker']
+    if: ${{ github.ref == 'refs/heads/master'
+            || startsWith(github.ref, 'refs/tags/medea-') }}
+    strategy:
+      matrix:
+        include:
+          - image: medea
+            tags: latest,@versions
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: README.md
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-0')
+                    || startsWith(github.ref, 'refs/tags/medea-1')
+                    || startsWith(github.ref, 'refs/tags/medea-2')
+                    || startsWith(github.ref, 'refs/tags/medea-3')
+                    || startsWith(github.ref, 'refs/tags/medea-4')
+                    || startsWith(github.ref, 'refs/tags/medea-5')
+                    || startsWith(github.ref, 'refs/tags/medea-6')
+                    || startsWith(github.ref, 'refs/tags/medea-7')
+                    || startsWith(github.ref, 'refs/tags/medea-8')
+                    || startsWith(github.ref, 'refs/tags/medea-9') }}
+                    # this is last time, really!
+          - image: medea
+            tags: edge
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: README.md
+            if: ${{ github.ref == 'refs/heads/master' }}
+
+          - image: medea-control-api-mock
+            tags: latest,@versions
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: mock/control-api/README.md
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-control-api-mock-') }}
+          - image: medea-control-api-mock
+            tags: edge
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: mock/control-api/README.md
+            if: ${{ github.ref == 'refs/heads/master' }}
+
+          - image: medea-demo
+            tags: latest,@versions
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: jason/demo/README.md
+            if: ${{ startsWith(github.ref, 'refs/tags/medea-demo-') }}
+          - image: medea-demo-edge
+            tags: edge
+            repos: instrumentisto,ghcr.io/instrumentisto,quay.io/instrumentisto
+            readme_file: jason/demo/README.md
+            if: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        if: ${{ matrix.if }}
+      - uses: docker/setup-buildx-action@v1
+        if: ${{ matrix.if }}
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: docker-${{ matrix.image }}-${{ github.run_number }}
+        if: ${{ matrix.if }}
+      - run: make docker.untar from-file=image.tar
+        if: ${{ matrix.if }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GCR_BOT_PAT }}
+        if: ${{ matrix.if && contains(matrix.repos, 'ghcr.io') }}
+      - name: Login to Quay.io
+        uses: docker/login-action@v1
+        with:
+          registry: quay.io
+          username: instrumentisto+bot
+          password: ${{ secrets.QUAYIO_ROBOT_TOKEN }}
+        if: ${{ matrix.if && contains(matrix.repos, 'quay.io') }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          username: instrumentistobot
+          password: ${{ secrets.DOCKERHUB_BOT_PASS }}
+        if: ${{ matrix.if }}
+
+      - name: Parse semver versions
+        id: parsed
+        uses: actions-ecosystem/action-regex-match@v2
+        with:
+          text: ${{ github.ref }}
+          regex: '^refs/tags/medea[a-z-]*-((([0-9]+)\.[0-9]+)\.[0-9]+(-.+)?)$'
+        if: ${{ matrix.if && contains(matrix.tags, '@versions')
+                && startsWith(github.ref, 'refs/tags/medea-') }}
+      - name: Form Docker version tags
+        id: versions
+        uses: actions/github-script@v3
+        with:
+          result-encoding: string
+          script: |
+            let versions = '${{ steps.parsed.outputs.group1 }}';
+            if ('${{ steps.parsed.outputs.group4 }}' === '') {
+              versions += ',${{ steps.parsed.outputs.group2 }}';
+              if ('${{ steps.parsed.outputs.group3 }}' !== '0') {
+                versions += ',${{ steps.parsed.outputs.group3 }}';
+              }
+            }
+            return versions;
+        if: ${{ matrix.if && contains(matrix.tags, '@versions')
+                && startsWith(github.ref, 'refs/tags/medea-') }}
+      - name: Prepare final image tags
+        id: tags
+        uses: bluwy/substitute-string-action@v1
+        with:
+          _input-text: ${{ matrix.tags }}
+          "@versions": ${{ steps.versions.outputs.result }}
+        if: ${{ matrix.if }}
+
+      - run: make docker.tag tags=${{ steps.tags.outputs.result }}
+                  image=${{ matrix.image }} of=build-${{ github.run_number }}
+                  repos=${{ matrix.repos }}
+        if: ${{ matrix.if }}
+      - run: make docker.push tags=${{ steps.tags.outputs.result }}
+                  image=${{ matrix.image }} repos=${{ matrix.repos }}
+        if: ${{ matrix.if }}
+
+      - name: Prepare real image name
+        id: image
+        uses: bluwy/substitute-string-action@v1
+        with:
+          _input-text: ${{ matrix.image }}
+          -edge: ''
+        if: ${{ matrix.if }}
+      # On GitHub Container Registry README is automatically updated on pushes.
+      - name: Update README on Quay.io
+        uses: christian-korneck/update-container-description-action@v1
+        env:
+          DOCKER_APIKEY: ${{ secrets.QUAYIO_API_TOKEN }}
+        with:
+          provider: quay
+          destination_container_repo: >-
+            quay.io/instrumentisto/${{ steps.image.outputs.result }}
+          readme_file: ${{ matrix.readme_file }}
+        if: ${{ matrix.if && contains(matrix.repos, 'quay.io') }}
+      - name: Update README on Docker Hub
+        uses: christian-korneck/update-container-description-action@v1
+        env:
+          DOCKER_USER: instrumentistobot
+          DOCKER_PASS: ${{ secrets.DOCKERHUB_BOT_PASS }}
+        with:
+          provider: dockerhub
+          destination_container_repo: >-
+            instrumentisto/${{ steps.image.outputs.result }}
+          readme_file: ${{ matrix.readme_file }}
+        if: ${{ matrix.if }}

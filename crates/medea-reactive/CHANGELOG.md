@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.1.0] · 2020-??-??
+## [0.1.0] · 2021-02-01
 [0.1.0]: /../../tree/medea-reactive-0.1.0/crates/medea-reactive
 
 ### Added
@@ -18,9 +18,18 @@ All user visible changes to this project will be documented in this file. This p
     - `ObservableVec`;
     - `ObservableHashMap`;
     - `ObservableHashSet`.
+- `Progressable` container ([#159]);
+- Progressable collections ([#159]):
+    - `ProgressableVec`;
+    - `ProgressableHashMap`;
+    - `ProgressableHashSet`.
+- `ProgressableCell` container ([#170]);
+- `Processed` and `AllProcessed` futures ([#170]).
 
 [#81]: /../../pull/81
 [#103]: /../../pull/103
+[#159]: /../../pull/159
+[#170]: /../../pull/170
 
 
 

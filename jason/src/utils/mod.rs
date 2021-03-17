@@ -4,24 +4,28 @@
 mod errors;
 
 mod callback;
+pub mod component;
 mod event_listener;
 mod resettable_delay;
 
-use std::{convert::TryInto as _, ops::Mul, time::Duration};
+use std::{convert::TryInto as _, future::Future, ops::Mul, time::Duration};
 
 use derive_more::{From, Sub};
-use futures::future::AbortHandle;
+use futures::future::{self, AbortHandle};
 use js_sys::{Promise, Reflect};
+use medea_reactive::Guarded;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Window;
 
+#[cfg(debug_assertions)]
+pub use self::errors::console_error;
 #[doc(inline)]
 pub use self::{
     callback::{Callback0, Callback1, Callback2},
+    component::{AsProtoState, Component, SynchronizableState, Updatable},
     errors::{
-        console_error, HandlerDetachedError, JasonError, JsCaused, JsError,
-        JsonParseError,
+        HandlerDetachedError, JasonError, JsCaused, JsError, JsonParseError,
     },
     event_listener::{EventListener, EventListenerBindError},
     resettable_delay::{resettable_delay_for, ResettableDelayHandle},
@@ -32,6 +36,8 @@ pub use self::{
 /// # Panics
 ///
 /// When global [`Window`] object is inaccessible.
+#[inline]
+#[must_use]
 pub fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.
     // Safe to unwrap.
@@ -54,6 +60,7 @@ impl JsDuration {
     /// will need a longer duration in the future, then we can implement this
     /// with a few `setTimeout`s.
     #[inline]
+    #[must_use]
     pub fn into_js_duration(self) -> i32 {
         self.0.as_millis().try_into().unwrap_or(i32::max_value())
     }
@@ -159,6 +166,8 @@ pub async fn delay_for(delay_ms: JsDuration) {
 }
 
 /// Wrapper around [`AbortHandle`] which aborts [`Future`] on [`Drop`].
+///
+/// [`Future`]: std::future::Future
 #[derive(Debug, From)]
 pub struct TaskHandle(AbortHandle);
 
@@ -166,4 +175,28 @@ impl Drop for TaskHandle {
     fn drop(&mut self) {
         self.0.abort();
     }
+}
+
+/// Tries to upgrade [`Weak`] reference breaks cycle if upgrade fails.
+macro_rules! upgrade_or_break {
+    ($weak:tt) => {
+        if let Some(this) = $weak.upgrade() {
+            this
+        } else {
+            break;
+        }
+    };
+}
+
+/// Returns [`Future`] which will return the provided value being
+/// [`Guarded::transpose()`]d.
+///
+/// Intended for use in [`StreamExt::filter_map()`].
+///
+/// [`StreamExt::filter_map()`]: futures::StreamExt::filter_map
+#[inline]
+pub fn transpose_guarded<T>(
+    val: Guarded<Option<T>>,
+) -> impl Future<Output = Option<Guarded<T>>> {
+    future::ready(val.transpose())
 }

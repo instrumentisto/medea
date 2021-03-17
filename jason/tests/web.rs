@@ -8,7 +8,7 @@
 macro_rules! cb_assert_eq {
     ($a:expr, $b:expr) => {
         if $a != $b {
-            return Err(format!("{} != {}", $a, $b));
+            return Err(format!("{:?} != {:?}", $a, $b));
         }
     };
 }
@@ -83,17 +83,19 @@ mod utils;
 use futures::{channel::oneshot, future::Either, Future};
 use js_sys::Promise;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
+    AudioSettings, Direction, MediaSourceKind, MediaType, MemberId, Track,
+    TrackId, VideoSettings,
 };
 use medea_jason::{
-    media::{
-        LocalStreamConstraints, MediaManager, MediaStreamTrack,
-        VideoTrackConstraints,
-    },
-    peer::TransceiverKind,
+    api::ConstraintsUpdateException,
+    media::{track::remote, LocalTracksConstraints, MediaKind, MediaManager},
+    peer::media_exchange_state,
+    rpc::ApiUrl,
     utils::{window, JasonError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints, MediaStreamSettings,
+    AudioTrackConstraints, DeviceVideoTrackConstraints,
+    DisplayVideoTrackConstraints, MediaStreamSettings,
 };
+use url::Url;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -122,6 +124,15 @@ extern "C" {
     #[wasm_bindgen(method, getter = getDisplayMediaRequestsCount)]
     fn get_display_media_requests_count(this: &MockNavigator) -> i32;
 
+    #[wasm_bindgen(method, setter = setUserMediaReturns)]
+    fn setUserMediaReturns(this: &MockNavigator, stream: web_sys::MediaStream);
+
+    #[wasm_bindgen(method, setter = setDisplayMediaReturns)]
+    fn setDisplayMediaReturns(
+        this: &MockNavigator,
+        stream: web_sys::MediaStream,
+    );
+
     #[wasm_bindgen(method)]
     fn stop(this: &MockNavigator);
 }
@@ -129,6 +140,15 @@ extern "C" {
 #[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
+}
+
+#[wasm_bindgen(
+    inline_js = "export const get_constraints_update_exception = (e) => e;"
+)]
+extern "C" {
+    fn get_constraints_update_exception(
+        err: JsValue,
+    ) -> ConstraintsUpdateException;
 }
 
 pub fn get_test_required_tracks() -> (Track, Track) {
@@ -140,12 +160,20 @@ pub fn get_test_unrequired_tracks() -> (Track, Track) {
 }
 
 pub fn get_media_stream_settings(
-    is_audio_muted: bool,
-    is_video_muted: bool,
+    audio_enabled: bool,
+    video_enabled: bool,
 ) -> MediaStreamSettings {
     let mut settings = MediaStreamSettings::default();
-    settings.toggle_enable(!is_audio_muted, TransceiverKind::Audio);
-    settings.toggle_enable(!is_video_muted, TransceiverKind::Video);
+    settings.set_track_media_state(
+        media_exchange_state::Stable::from(audio_enabled).into(),
+        MediaKind::Audio,
+        None,
+    );
+    settings.set_track_media_state(
+        media_exchange_state::Stable::from(video_enabled).into(),
+        MediaKind::Video,
+        None,
+    );
 
     settings
 }
@@ -158,24 +186,59 @@ pub fn get_test_tracks(
         Track {
             id: TrackId(1),
             direction: Direction::Send {
-                receivers: vec![PeerId(2)],
+                receivers: vec![MemberId::from("bob")],
                 mid: None,
             },
             media_type: MediaType::Audio(AudioSettings {
-                is_required: is_audio_required,
+                required: is_audio_required,
             }),
         },
         Track {
             id: TrackId(2),
             direction: Direction::Send {
-                receivers: vec![PeerId(2)],
+                receivers: vec![MemberId::from("bob")],
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {
-                is_required: is_video_required,
+                required: is_video_required,
+                source_kind: MediaSourceKind::Device,
             }),
         },
     )
+}
+
+/// Returns [`Track`]s with a [`Direction::Recv`].
+///
+/// First [`Track`] will be [`MediaType::Audio`] and second will be
+/// [`MediaType::Video`].
+pub fn get_test_recv_tracks() -> (Track, Track) {
+    (
+        Track {
+            id: TrackId(0),
+            direction: Direction::Recv {
+                sender: "bob".into(),
+                mid: Some("mid0".to_string()),
+            },
+            media_type: MediaType::Audio(AudioSettings { required: false }),
+        },
+        Track {
+            id: TrackId(1),
+            direction: Direction::Recv {
+                sender: "bob".into(),
+                mid: Some("mid1".to_string()),
+            },
+            media_type: MediaType::Video(VideoSettings {
+                required: false,
+                source_kind: MediaSourceKind::Device,
+            }),
+        },
+    )
+}
+
+const TEST_ROOM_URL: &str = "ws://example.com/room_id/member_id?token=token";
+
+pub fn join_room_url() -> ApiUrl {
+    Url::parse("ws://example.com/ws").unwrap().into()
 }
 
 /// Resolves after provided number of milliseconds.
@@ -200,7 +263,8 @@ fn media_stream_settings(
         settings.audio(AudioTrackConstraints::default());
     }
     if is_video_enabled {
-        settings.video(VideoTrackConstraints::default());
+        settings.device_video(DeviceVideoTrackConstraints::default());
+        settings.display_video(DisplayVideoTrackConstraints::default());
     }
 
     settings
@@ -209,8 +273,8 @@ fn media_stream_settings(
 fn local_constraints(
     is_audio_enabled: bool,
     is_video_enabled: bool,
-) -> LocalStreamConstraints {
-    let constraints = LocalStreamConstraints::new();
+) -> LocalTracksConstraints {
+    let constraints = LocalTracksConstraints::default();
     constraints
         .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
 
@@ -239,33 +303,35 @@ async fn wait_and_check_test_result(
     };
 }
 
-async fn get_video_track() -> MediaStreamTrack {
+async fn get_video_track() -> remote::Track {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
+    let stream = manager.get_tracks(settings).await.unwrap();
+    let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
+    remote::Track::new(track, MediaSourceKind::Device)
 }
 
-async fn get_audio_track() -> MediaStreamTrack {
+async fn get_audio_track() -> remote::Track {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
-    let (stream, _) = manager.get_stream(settings).await.unwrap();
-    stream.into_tracks().into_iter().next().unwrap()
+    let stream = manager.get_tracks(settings).await.unwrap();
+    let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
+    remote::Track::new(track, MediaSourceKind::Device)
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
 /// provided `timeout` time this [`LocalBoxFuture`] won'tbe resolved, then
 /// `Err(String)` will be returned, otherwise a result of the provided
 /// [`LocalBoxFuture`] will be returned.
-async fn timeout<T>(timeout: i32, future: T) -> Result<T::Output, String>
+async fn timeout<T>(timeout_ms: i32, future: T) -> Result<T::Output, String>
 where
     T: Future,
 {
     match futures::future::select(
         Box::pin(future),
-        Box::pin(delay_for(timeout)),
+        Box::pin(delay_for(timeout_ms)),
     )
     .await
     {

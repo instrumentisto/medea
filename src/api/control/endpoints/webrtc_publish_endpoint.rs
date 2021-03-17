@@ -98,12 +98,11 @@ pub enum PublishPolicy {
 }
 
 impl PublishPolicy {
-    /// Returns `true` if publishing policy prescribes that media __should__ be
+    /// Indicates whether publishing policy prescribes that media __should__ be
     /// published.
-    ///
-    /// If `false` then media may be not published.
     #[inline]
-    pub fn is_required(self) -> bool {
+    #[must_use]
+    pub fn required(self) -> bool {
         match self {
             Self::Optional | Self::Disabled => false,
             Self::Required => true,

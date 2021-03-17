@@ -6,11 +6,17 @@ pub mod url;
 
 use actix::Message;
 use chrono::{DateTime, Utc};
-use clients::CallbackClientError;
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::callback as proto;
 
 use crate::api::control::refs::StatefulFid;
+
+#[doc(inline)]
+pub use self::{
+    clients::{CallbackClientError, CallbackClientFactoryImpl},
+    service::CallbackService,
+    url::CallbackUrl,
+};
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -21,6 +27,7 @@ pub struct OnLeaveEvent {
 
 impl OnLeaveEvent {
     #[inline]
+    #[must_use]
     pub fn new(reason: OnLeaveReason) -> Self {
         Self { reason }
     }
@@ -44,6 +51,9 @@ pub enum OnLeaveReason {
     /// Connection with `Member` was lost.
     LostConnection,
 
+    /// `Member` was forcibly disconnected by server.
+    Kicked,
+
     /// Server is shutting down.
     ServerShutdown,
 }
@@ -54,6 +64,7 @@ impl Into<proto::on_leave::Reason> for OnLeaveReason {
             Self::LostConnection => proto::on_leave::Reason::LostConnection,
             Self::ServerShutdown => proto::on_leave::Reason::ServerShutdown,
             Self::Disconnected => proto::on_leave::Reason::Disconnected,
+            Self::Kicked => proto::on_leave::Reason::Kicked,
         }
     }
 }
@@ -89,9 +100,6 @@ impl Into<proto::request::Event> for CallbackEvent {
 }
 
 /// Media type of the traffic which starts/stops flowing in some `Endpoint`.
-///
-/// This enum is used in [`MuteState`] of `Endpoint`s. That's why it represents
-/// a bitflag enum.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Display)]
 pub enum MediaType {
     /// Started/stopped audio traffic.
@@ -113,6 +121,7 @@ impl MediaType {
     ///
     /// This [`MediaType`] should be what was before `RTCStat` update and
     /// as argument is [`MediaType`] which was got after `RTCStat` update.
+    #[must_use]
     pub fn get_started(self, after: Self) -> Option<Self> {
         match self {
             MediaType::Audio => match after {
@@ -176,6 +185,8 @@ pub struct CallbackRequest {
 impl CallbackRequest {
     /// Returns [`CallbackRequest`] with provided fields and current time as
     /// `at`.
+    #[inline]
+    #[must_use]
     pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
         Self {
             fid: element,

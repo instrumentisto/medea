@@ -1,20 +1,17 @@
-#![allow(clippy::module_name_repetitions)]
+mod browser;
+mod conf;
+mod control;
+mod object;
+mod steps;
+mod world;
 
-mod callbacks;
-mod grpc_control_api;
-pub mod signalling;
+use cucumber_rust::WorldInit as _;
+use tokio_1 as tokio;
 
-/// Equality comparisons for the enum variants.
-///
-/// This macro will ignore all content of the enum, it just compare
-/// enum variants not they data.
-#[macro_export]
-macro_rules! enum_eq {
-    ($e:path, $val:ident) => {
-        if let $e { .. } = $val {
-            true
-        } else {
-            false
-        }
-    };
+use self::world::World;
+
+#[tokio::main]
+async fn main() {
+    let runner = World::init(&[conf::FEATURES_PATH.as_str()]);
+    runner.run_and_exit().await;
 }
