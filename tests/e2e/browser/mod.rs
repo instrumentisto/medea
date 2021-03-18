@@ -99,9 +99,7 @@ impl Window {
             window,
             rc: Arc::new(AtomicUsize::new(1)),
         };
-
         mock::instantiate_mocks(&this).await;
-
         this
     }
 

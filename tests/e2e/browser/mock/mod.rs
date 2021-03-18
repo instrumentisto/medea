@@ -1,21 +1,22 @@
-//! Implementations of the WebAPI objects mocks.
+//! WebAPI objects mocks.
 
-mod gum;
-mod websocket;
+pub mod gum;
+pub mod websocket;
 
 use super::Window;
 
 #[doc(inline)]
 pub use self::{gum::Gum, websocket::WebSocket};
 
-/// Instantiates all required mocks in the provided [`Window`].
+/// Instantiates all the required mocks in the provided [`Window`].
+#[inline]
 pub async fn instantiate_mocks(window: &Window) {
     WebSocket::instantiate(window).await;
     Gum::instantiate(window).await;
 }
 
 impl Window {
-    /// Returns `WebSocket` object mock for this [`Window`].
+    /// Returns a `WebSocket` object mock for this [`Window`].
     #[inline]
     #[must_use]
     pub fn websocket_mock(&self) -> WebSocket {
