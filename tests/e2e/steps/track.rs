@@ -207,3 +207,21 @@ async fn then_member_doesnt_have_remote_tracks_with(
     let tracks_count = tracks_store.count().await.unwrap();
     assert_eq!(tracks_count, 0);
 }
+
+#[then(regex = r"^(\S+)'s remote tracks with (\S+) are (not )?stopped$")]
+async fn then_remote_tracks_are_stopped(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+    not: String,
+) {
+    let member = world.get_member(&id).unwrap();
+    let connection =
+        member.connections().get(partner_id).await.unwrap().unwrap();
+    let tracks_store = connection.tracks_store().await.unwrap();
+    let stop_needed = not.is_empty();
+    assert_eq!(
+        tracks_store.all_tracks_are_stopped().await.unwrap(),
+        stop_needed
+    );
+}

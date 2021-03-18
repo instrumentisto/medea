@@ -68,6 +68,27 @@ impl<T> Object<TracksStore<T>> {
         .map(|_| ())
     }
 
+    /// Returns `true` if all tracks from this [`TracksStore`] are stopped.
+    pub async fn all_tracks_are_stopped(&self) -> Result<bool, Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (store) => {
+                    for (track of store.tracks) {
+                        if (!track.track.get_track().muted) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            "#,
+            [],
+        ))
+        .await?
+        .as_bool()
+        .ok_or(Error::TypeCast)
+    }
+
     /// Indicates whether this [`TracksStore`] contains a track with the
     /// provided [`MediaKind`] and [`MediaSourceKind`].
     pub async fn has_track(
