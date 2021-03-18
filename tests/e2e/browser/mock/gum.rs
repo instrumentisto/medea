@@ -13,13 +13,13 @@ impl<'a> Gum<'a> {
             .execute(Statement::new(
                 // language=JavaScript
                 r#"
-                async () => {
-                    window.gumMock = {
-                        original: navigator.mediaDevices.getUserMedia
-                    };
-                }
-            "#,
-                vec![],
+                    async () => {
+                        window.gumMock = {
+                            original: navigator.mediaDevices.getUserMedia
+                        };
+                    }
+                "#,
+                [],
             ))
             .await
             .unwrap();
@@ -34,20 +34,20 @@ impl<'a> Gum<'a> {
             .execute(Statement::new(
                 // language=JavaScript
                 r#"
-                async () => {
-                    const [isVideoBroken, isAudioBroken] = args;
-                    navigator.mediaDevices.getUserMedia = async (cons) => {
-                        if (isAudioBroken && cons.audio != null) {
-                            throw new NotFoundError();
+                    async () => {
+                        const [isVideoBroken, isAudioBroken] = args;
+                        navigator.mediaDevices.getUserMedia = async (cons) => {
+                            if (isAudioBroken && cons.audio != null) {
+                                throw new NotFoundError();
+                            }
+                            if (isVideoBroken && cons.video != null) {
+                                throw new NotFoundError();
+                            }
+                            return await window.gumMock.original(cons);
                         }
-                        if (isVideoBroken && cons.video != null) {
-                            throw new NotFoundError();
-                        }
-                        return await window.gumMock.original(cons);
                     }
-                }
-            "#,
-                vec![video.into(), audio.into()],
+                "#,
+                [video.into(), audio.into()],
             ))
             .await
             .unwrap();

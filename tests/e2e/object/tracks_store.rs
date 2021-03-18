@@ -183,6 +183,7 @@ impl<T> Object<TracksStore<T>> {
     /// `readyState`.
     pub async fn is_all_tracks_ended(&self) -> Result<bool, Error> {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (store) => {
                     for (track of store.tracks) {
@@ -193,7 +194,7 @@ impl<T> Object<TracksStore<T>> {
                     return true;
                 }
             "#,
-            vec![],
+            [],
         ))
         .await?
         .as_bool()

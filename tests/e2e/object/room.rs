@@ -473,7 +473,7 @@ impl Object<Room> {
                     );
                 }
             "#,
-            vec![video.into(), audio.into()],
+            [video.into(), audio.into()],
         ))
         .await?;
 
@@ -506,7 +506,7 @@ impl Object<Room> {
                     });
                 }
             "#,
-            vec![count.into()],
+            [count.into()],
         ))
         .await
         .unwrap();
@@ -515,12 +515,13 @@ impl Object<Room> {
     /// Removes all local `LocalMediaTrack`s from the JS side.
     pub async fn clean_all_local_tracks(&self) {
         self.execute(Statement::new(
+            // language=JavaScript
             r#"
                 async (room) => {
                     room.localTracksStore.tracks = [];
                 }
             "#,
-            vec![],
+            [],
         ))
         .await
         .unwrap();

@@ -94,6 +94,7 @@ impl Window {
     /// Creates a new [`Window`] in the provided [`WebDriverClient`].
     async fn new(client: WebDriverClient) -> Self {
         let window = client.new_window().await.unwrap();
+
         let this = Self {
             client,
             window,
