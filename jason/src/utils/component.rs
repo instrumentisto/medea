@@ -137,7 +137,7 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
                 }
             }
         });
-        spawn_local(fut.map(|_| ()));
+        spawn_local(fut.map(drop));
 
         self.spawned_watchers.push(handle.into());
     }

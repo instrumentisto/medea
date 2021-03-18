@@ -146,7 +146,7 @@ impl Handler<OsSignal> for GracefulShutdown {
         async move {
             let wait_finish = timeout(
                 deadline,
-                stream::iter(ordered_subs).for_each(|row| row.map(|_| ())),
+                stream::iter(ordered_subs).for_each(|row| row.map(drop)),
             )
             .await;
             if wait_finish.is_ok() {

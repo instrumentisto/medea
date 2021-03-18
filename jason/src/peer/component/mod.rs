@@ -328,7 +328,7 @@ impl State {
             .update_local_stream(criteria)
             .await
             .map_err(tracerr::map_from_and_wrap!())
-            .map(|_| ());
+            .map(drop);
         for s in senders {
             if let Err(err) = res.clone() {
                 s.failed_local_stream_update(err);
@@ -558,7 +558,7 @@ impl State {
         use futures::FutureExt as _;
         self.negotiation_state
             .when_eq(NegotiationState::WaitLocalSdpApprove)
-            .map(|_| ())
+            .map(drop)
     }
 
     /// Stabilizes all [`receiver::State`]s of this [`State`].

@@ -319,7 +319,7 @@ impl ParticipantService {
                 },
             ));
 
-        close_rpc_connections.map(|_| ()).boxed_local()
+        close_rpc_connections.map(drop).boxed_local()
     }
 
     /// Deletes a [`Member`] by its ID from this [`ParticipantService`].

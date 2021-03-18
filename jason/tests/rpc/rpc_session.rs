@@ -42,7 +42,7 @@ async fn could_not_auth_err() {
                     ]))
                 });
                 transport.expect_send().returning(|_| Ok(()));
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport.expect_on_state_change().return_once_st(move || {
                     Box::pin(stream::once(async { TransportState::Open }))
                 });
@@ -115,7 +115,7 @@ async fn concurrent_connect_requests() {
                     }
                     Ok(())
                 });
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport.expect_on_state_change().return_once_st(move || {
                     Box::pin(stream::once(async { TransportState::Open }))
                 });
@@ -206,7 +206,7 @@ async fn reconnect_after_transport_abnormal_close() {
                     commands_sent.borrow_mut().push(msg.clone());
                     Ok(())
                 });
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport.expect_on_state_change().return_once_st(move || {
                     Box::pin(
                         stream::once(future::ready(TransportState::Open))

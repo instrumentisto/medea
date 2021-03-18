@@ -89,7 +89,7 @@ impl ResettableDelayHandle {
                 let _ = rslvr.send(());
             }
         });
-        spawn_local(fut.map(|_| ()));
+        spawn_local(fut.map(drop));
 
         self.abort_handle.replace(abort);
     }

@@ -97,7 +97,7 @@ impl Object<Room> {
             [uri.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Disables media publishing for the provided [`MediaKind`] and
@@ -131,7 +131,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Enables media publishing for the provided [`MediaKind`] and
@@ -165,7 +165,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Disables remote media receiving for the provided [`MediaKind`] and
@@ -200,7 +200,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Enables remote media receiving for the provided [`MediaKind`] and
@@ -235,7 +235,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Mutes media publishing for the provided [`MediaKind`] and
@@ -269,7 +269,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Unmutes media publishing for the provided [`MediaKind`] and
@@ -303,7 +303,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Returns a [`ConnectionStore`] of this [`Room`].
@@ -420,6 +420,27 @@ impl Object<Room> {
         .as_str()
         .ok_or(Error::TypeCast)
         .map(ToOwned::to_owned)
+    }
+
+    /// Waits for the `Room.on_connection_loss()` callback to fire.
+    ///
+    /// Resolves instantly if WebSocket connection currently is lost.
+    pub async fn wait_for_connection_loss(&self) -> Result<(), Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    if (!room.connLossListener.isLost) {
+                        await new Promise((resolve) => {
+                            room.connLossListener.subs.push(resolve);
+                        });
+                    }
+                }
+            "#,
+            [],
+        ))
+        .await
+        .map(drop)
     }
 }
 

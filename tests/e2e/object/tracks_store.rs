@@ -65,7 +65,7 @@ impl<T> Object<TracksStore<T>> {
             [count.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Returns `true` if all tracks from this [`TracksStore`] are stopped.
