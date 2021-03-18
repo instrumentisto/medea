@@ -259,10 +259,7 @@ impl Drop for Sender {
     fn drop(&mut self) {
         if !self.transceiver.is_stopped() {
             self.transceiver.sub_direction(TransceiverDirection::SEND);
-            let fut = self.transceiver.drop_send_track();
-            spawn_local(async move {
-                fut.await;
-            });
+            spawn_local(self.transceiver.drop_send_track());
         }
     }
 }

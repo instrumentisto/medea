@@ -763,7 +763,7 @@ impl PeerRepository {
 
     /// Deletes provided [`WebRtcPublishEndpoint`].
     ///
-    /// Returns [`PeerId`] which was affected by this action.
+    /// Returns [`PeerChange`] which was performed by this action.
     ///
     /// # Errors
     ///
@@ -783,7 +783,7 @@ impl PeerRepository {
 
     /// Deletes provided [`WebRtcPlayEndpoint`].
     ///
-    /// Returns [`PeerId`] which was affected by this action.
+    /// Returns [`PeerChange`] which was performed by this action.
     ///
     /// # Errors
     ///

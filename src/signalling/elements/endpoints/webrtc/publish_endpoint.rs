@@ -244,6 +244,7 @@ impl WebRtcPublishEndpoint {
     /// [`WebRtcPublishEndpoint`].
     ///
     /// [`MediaTrack`]: crate::media::track::MediaTrack
+    #[inline]
     pub fn add_track_id(&self, peer_id: PeerId, track_id: TrackId) {
         let mut inner = self.0.borrow_mut();
         inner.tracks_ids.entry(peer_id).or_default().push(track_id);
