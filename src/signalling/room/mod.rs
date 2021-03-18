@@ -270,7 +270,7 @@ impl Room {
 
         Box::pin(
             actix_try_join_all(connect_members_tasks)
-                .map(|result, _, _| result.map(|_| ())),
+                .map(|result, _, _| result.map(drop)),
         )
     }
 

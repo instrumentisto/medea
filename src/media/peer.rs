@@ -1414,7 +1414,7 @@ pub mod tests {
     /// Returns dummy [`PeerUpdatesSubscriber`] mock which does nothing.
     pub fn dummy_negotiation_sub_mock() -> Rc<dyn PeerUpdatesSubscriber> {
         let mut mock = MockPeerUpdatesSubscriber::new();
-        mock.expect_negotiation_needed().returning(|_| ());
+        mock.expect_negotiation_needed().returning(drop);
 
         Rc::new(mock)
     }

@@ -44,6 +44,6 @@ impl Object<Connection> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 }

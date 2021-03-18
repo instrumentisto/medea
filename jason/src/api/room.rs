@@ -1148,10 +1148,10 @@ impl InnerRoom {
                 )
             },
         ))
-        .map(|r| r.map(|_| ()))
+        .map(|r| r.map(drop))
         .await
         .map_err(tracerr::map_from_and_wrap!())
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Returns [`local::Track`]s for the provided [`MediaKind`] and
