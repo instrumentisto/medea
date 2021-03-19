@@ -6,6 +6,20 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.3.0] · 2021-03-19 · To-be-done
+[0.3.0]: /../../tree/medea-client-api-proto-0.3.0/proto/client-api
+
+[Diff](/../../compare/medea-client-api-proto-0.2.0...medea-client-api-proto-0.3.0) | [Milestone](/../../milestone/2)
+
+### BC Breaks
+
+- `TracksApplied` event renamed as `PeerUpdated` ([#139]).
+
+[#139]: /../../pull/139
+
+
+
+
 ## [0.2.0] · 2021-02-01
 [0.2.0]: /../../tree/medea-client-api-proto-0.2.0/proto/client-api
 
