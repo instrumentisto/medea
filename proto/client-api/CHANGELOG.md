@@ -6,6 +6,20 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.3.0] · 2021-03-19 · To-be-done
+[0.3.0]: /../../tree/medea-client-api-proto-0.3.0/proto/client-api
+
+[Diff](/../../compare/medea-client-api-proto-0.2.0...medea-client-api-proto-0.3.0) | [Milestone](/../../milestone/2)
+
+### BC Breaks
+
+- `TracksApplied` event renamed as `PeerUpdated` ([#139]).
+
+[#139]: /../../pull/139
+
+
+
+
 ## [0.2.0] · 2021-02-01
 [0.2.0]: /../../tree/medea-client-api-proto-0.2.0/proto/client-api
 
@@ -55,7 +69,7 @@ All user visible changes to this project will be documented in this file. This p
     - `RtcIceServerStats`.
 - `Cancelled` state to the `KnownIceCandidatePairState` ([#102]);
 - `required` field to `AudioSettings` and `VideoSettings` ([#106], [#155]);
-- `PeerUpdated` event with `PeerUpdate::Updated` and `PeerUpdate::Added` variants ([#81], [#105], [#139]);
+- `TracksApplied` event with `TrackUpdate::Updated` and `TrackUpdate::Added` variants ([#81], [#105]);
 - `ConnectionQualityUpdated` event ([#132]);
 - `TrackPatchCommand` ([#127]):
     - `enabled` ([#127], [#155]);
@@ -64,7 +78,7 @@ All user visible changes to this project will be documented in this file. This p
     - `enabled_individual` ([#127], [#155]);
     - `enabled_general` ([#127], [#155]);
     - `muted` ([#156]).
-- `IceRestart` variant to `PeerUpdate` ([#138], [#139]);
+- `IceRestart` variant to `TrackUpdate` ([#138]);
 - `source_kind` field to `VideoSettings` type ([#145]);
 - `RoomId` and `Credential` types ([#148]);
 - `JoinRoom` and `LeaveRoom` client messages ([#147]);
@@ -92,7 +106,6 @@ All user visible changes to this project will be documented in this file. This p
 [#132]: /../../pull/132
 [#127]: /../../pull/127
 [#138]: /../../pull/138
-[#139]: /../../pull/139
 [#145]: /../../pull/145
 [#147]: /../../pull/147
 [#148]: /../../pull/148
