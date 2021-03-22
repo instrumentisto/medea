@@ -1,13 +1,18 @@
-//! Implementation of the `MediaDevices.getUserMedia` function mock.
-
+//! Implementation of the [MediaDevices][1] interface mock.
+//!
+//! [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
 use crate::browser::{Statement, Window};
 
-/// Mock for the `WebSocket` WebAPI object.
-pub struct Gum<'a>(pub(super) &'a Window);
+/// Mock for the [MediaDevices][1] interface.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
+pub struct MediaDevices<'a>(pub(super) &'a Window);
 
-impl<'a> Gum<'a> {
-    /// Instantiates `MediaDevices.getUserMedia` mock in the provided
+impl<'a> MediaDevices<'a> {
+    /// Instantiates [MediaDevices][1] interface mock in the provided
     /// [`Window`].
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
     pub(super) async fn instantiate(window: &Window) {
         window
             .execute(Statement::new(
@@ -25,11 +30,11 @@ impl<'a> Gum<'a> {
             .unwrap();
     }
 
-    /// Brokes `MediaDevice.getUserMedia` requests for the provided media types.
+    /// Makes [getUserMedia()][1] requests return error for the provided media
+    /// types.
     ///
-    /// If some media type is broken, then `NotFoundError` will be thrown on
-    /// each gUM request.
-    pub async fn broke_gum(&self, video: bool, audio: bool) {
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    pub async fn mock_gum(&self, video: bool, audio: bool) {
         self.0
             .execute(Statement::new(
                 // language=JavaScript

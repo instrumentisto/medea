@@ -348,12 +348,14 @@ impl Member {
         self.window.websocket_mock()
     }
 
-    /// Returns WebAPI `MediaDevices.getUserMedia` mock for [`Window`] of this
+    /// Returns [MediaDevices.getUserMedia()][1] mock for [`Window`] of this
     /// [`Member`].
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     #[inline]
     #[must_use]
-    pub fn gum_mock(&self) -> mock::Gum {
-        self.window.gum_mock()
+    pub fn media_devices_mock(&self) -> mock::MediaDevices {
+        self.window.media_devices_mock()
     }
 }
 

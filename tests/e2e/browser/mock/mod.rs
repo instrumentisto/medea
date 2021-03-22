@@ -1,18 +1,17 @@
 //! WebAPI objects mocks.
 
-pub mod gum;
+pub mod media_devices;
 pub mod websocket;
 
 use super::Window;
 
-#[doc(inline)]
-pub use self::{gum::Gum, websocket::WebSocket};
+pub use self::{media_devices::MediaDevices, websocket::WebSocket};
 
 /// Instantiates all the required mocks in the provided [`Window`].
 #[inline]
 pub async fn instantiate_mocks(window: &Window) {
     WebSocket::instantiate(window).await;
-    Gum::instantiate(window).await;
+    MediaDevices::instantiate(window).await;
 }
 
 impl Window {
@@ -23,10 +22,10 @@ impl Window {
         WebSocket(self)
     }
 
-    /// Returns `MediaDevices.getUserMedia` function mock for this [`Window`].
+    /// Returns `MediaDevices` interface mock for this [`Window`].
     #[inline]
     #[must_use]
-    pub fn gum_mock(&self) -> Gum {
-        Gum(self)
+    pub fn media_devices_mock(&self) -> MediaDevices {
+        MediaDevices(self)
     }
 }

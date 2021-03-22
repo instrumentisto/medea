@@ -29,20 +29,27 @@ async fn when_jason_object_disposes(world: &mut World, id: String) {
     world.dispose_jason(&id).await.unwrap();
 }
 
-#[given(regex = r"^(\S+)'s gUM (audio |video )?broken$")]
-async fn given_member_gum_broken(world: &mut World, id: String, kind: String) {
+#[given(regex = r"^(\S+)'s `getUserMedia\(\)` (audio |video )?will error$")]
+async fn given_member_gum_will_error(
+    world: &mut World,
+    id: String,
+    kind: String,
+) {
     let member = world.get_member(&id).unwrap();
-    let gum = member.gum_mock();
+    let media_devices = member.media_devices_mock();
     let (video, audio) = if kind.is_empty() {
         (true, true)
     } else {
         (kind.contains("video"), kind.contains("audio"))
     };
-    gum.broke_gum(video, audio).await;
+    media_devices.mock_gum(video, audio).await;
 }
 
-#[when(regex = r"^(\S+) enables (video|audio|video and audio) constraints$")]
-async fn when_member_switches_to_kind(
+#[when(
+    regex = "^(\\S+) enables (video|audio|video and audio) in local media \
+                settings"
+)]
+async fn when_member_enables_via_local_media_settings(
     world: &mut World,
     id: String,
     kind: String,
@@ -57,17 +64,8 @@ async fn when_member_switches_to_kind(
         .unwrap();
 }
 
-#[when(regex = r"^(\S+) disables media in constraints$")]
-async fn when_member_disabled_media_in_cons(world: &mut World, id: String) {
-    let member = world.get_member(&id).unwrap();
-    member
-        .room()
-        .set_local_media_settings(false, false)
-        .await
-        .unwrap();
-}
-
-#[then(regex = r"^(\S+)'s Room.on_failed_local_stream fires (\d+) time(:?s)?$")]
+#[then(regex = "^(\\S+)'s `Room.on_failed_local_stream\\(\\)` fires (\\d+) \
+            time(:?s)?$")]
 async fn then_room_failed_local_stream_fires(
     world: &mut World,
     id: String,
