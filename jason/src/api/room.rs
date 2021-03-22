@@ -17,8 +17,8 @@ use js_sys::Promise;
 use medea_client_api_proto::{
     self as proto, Command, ConnectionQualityScore, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MediaSourceKind,
-    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track,
-    TrackId, TrackUpdate,
+    MemberId, NegotiationRole, PeerConnectionState, PeerId, PeerMetrics,
+    PeerUpdate, Track, TrackId,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -1495,17 +1495,17 @@ impl EventHandler for InnerRoom {
     }
 
     /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
-    /// [`TrackUpdate`]s.
+    /// [`PeerUpdate`]s.
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
     ///
     /// [`Receiver`]: crate::peer::Receiver
     /// [`Sender`]: crate::peer::Sender
-    async fn on_tracks_applied(
+    async fn on_peer_updated(
         &self,
         peer_id: PeerId,
-        updates: Vec<TrackUpdate>,
+        updates: Vec<PeerUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
         let peer_state = self
@@ -1516,17 +1516,17 @@ impl EventHandler for InnerRoom {
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => peer_state
+                PeerUpdate::Added(track) => peer_state
                     .insert_track(&track, self.send_constraints.clone())
                     .map_err(|e| {
                         self.on_failed_local_media
                             .call(JasonError::from(e.clone()));
                         tracerr::map_from_and_new!(e)
                     })?,
-                TrackUpdate::Updated(track_patch) => {
+                PeerUpdate::Updated(track_patch) => {
                     peer_state.patch_track(&track_patch)
                 }
-                TrackUpdate::IceRestart => {
+                PeerUpdate::IceRestart => {
                     peer_state.restart_ice();
                 }
             }
