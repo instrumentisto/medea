@@ -65,7 +65,7 @@ async fn when_disables_mutes(
     }
 }
 
-#[when(regex = "^(\\S+) (enables|unmutes) (audio|video|all)( with error)?$")]
+#[when(regex = r"^(\S+) (enables|unmutes) (audio|video|all)( with error)?$")]
 async fn when_enables_or_mutes(
     world: &mut World,
     id: String,

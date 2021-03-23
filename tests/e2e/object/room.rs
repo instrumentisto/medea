@@ -443,13 +443,13 @@ impl Object<Room> {
         .map(drop)
     }
 
-    /// Enables or disables media type with `Room.set_local_media_settings()`
+    /// Enables or disables media type with a `Room.set_local_media_settings()`
     /// function call.
     pub async fn set_local_media_settings(
         &self,
         video: bool,
         audio: bool,
-    ) -> Result<(), super::Error> {
+    ) -> Result<(), Error> {
         self.forget_local_tracks().await;
         self.execute(Statement::new(
             // language=JavaScript
@@ -475,20 +475,19 @@ impl Object<Room> {
             "#,
             [video.into(), audio.into()],
         ))
-        .await?;
-
-        Ok(())
+        .await
+        .map(drop)
     }
 
-    /// Waits for provided count of `Room.on_failed_local_stream()` callback
-    /// fires.
+    /// Waits for the `Room.on_failed_local_stream()` callback to fire the
+    /// provided number of times.
     pub async fn when_failed_local_stream_count(&self, count: u64) {
         self.execute(Statement::new(
             // language=JavaScript
             r#"
                 async (room) => {
                     const [count] = args;
-                    return await new Promise((resolve, reject) => {
+                    return await new Promise((resolve) => {
                         if (room.onFailedLocalStreamListener.count === count) {
                             resolve();
                         } else {

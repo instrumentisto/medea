@@ -179,7 +179,7 @@ impl<T> Object<TracksStore<T>> {
         .await
     }
 
-    /// Returns `true` if all local `Track`s from this store are in `ended`
+    /// Checks whether all local `Track`s from this store are in the `ended`
     /// `readyState`.
     pub async fn is_all_tracks_ended(&self) -> Result<bool, Error> {
         self.execute(Statement::new(

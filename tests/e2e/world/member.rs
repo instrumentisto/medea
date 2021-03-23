@@ -348,7 +348,7 @@ impl Member {
         self.window.websocket_mock()
     }
 
-    /// Returns [MediaDevices.getUserMedia()][1] mock for [`Window`] of this
+    /// Returns a [MediaDevices.getUserMedia()][1] mock for [`Window`] of this
     /// [`Member`].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
