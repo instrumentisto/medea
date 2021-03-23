@@ -65,24 +65,30 @@ async fn when_disables_mutes(
     }
 }
 
-#[when(regex = r"^(\S+) (enables|unmutes) (audio|video|all)$")]
-async fn when_enables_mutes(
+#[when(regex = r"^(\S+) (enables|unmutes) (audio|video|all)( with error)?$")]
+async fn when_enables_or_mutes(
     world: &mut World,
     id: String,
     disable_or_mutes: String,
     audio_or_video: String,
+    with_error: String,
 ) {
+    let is_ok = with_error.is_empty();
     let member = world.get_member(&id).unwrap();
-    if disable_or_mutes == "enables" {
+    let result = if disable_or_mutes == "enables" {
         member
             .toggle_media(parse_media_kind(&audio_or_video), None, true)
             .await
-            .unwrap();
     } else {
         member
             .toggle_mute(parse_media_kind(&audio_or_video), None, false)
             .await
-            .unwrap();
+    };
+
+    if is_ok {
+        result.unwrap();
+    } else {
+        result.unwrap_err();
     }
 }
 
