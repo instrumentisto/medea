@@ -347,6 +347,16 @@ impl Member {
     pub fn ws_mock(&self) -> mock::WebSocket {
         self.window.websocket_mock()
     }
+
+    /// Returns a [MediaDevices.getUserMedia()][1] mock for [`Window`] of this
+    /// [`Member`].
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    #[inline]
+    #[must_use]
+    pub fn media_devices_mock(&self) -> mock::MediaDevices {
+        self.window.media_devices_mock()
+    }
 }
 
 /// Returns list of [`MediaKind`]s and [`MediaSourceKind`] based on the provided
