@@ -314,7 +314,7 @@ impl PeersService {
                 let partner_member_id = peer.partner_member_id();
                 if let Some(partner_peer) = self.peers.remove(partner_peer_id) {
                     removed_peers
-                        .entry(partner_member_id)
+                        .entry(partner_member_id.clone())
                         .or_insert_with(Vec::new)
                         .push(partner_peer);
                 }
@@ -751,8 +751,8 @@ impl PeerRepository {
         partner_member_id: &MemberId,
     ) -> Option<(PeerId, PeerId)> {
         for peer in self.0.borrow().values() {
-            if &peer.member_id() == member_id
-                && &peer.partner_member_id() == partner_member_id
+            if peer.member_id() == member_id
+                && peer.partner_member_id() == partner_member_id
             {
                 return Some((peer.id(), peer.partner_peer_id()));
             }
@@ -858,24 +858,24 @@ impl PeerRepository {
         self.0
             .borrow()
             .values()
-            .filter(|p| &p.member_id() == member_id)
+            .filter(|p| p.member_id() == member_id)
             .for_each(|peer| {
                 self.0
                     .borrow()
                     .values()
                     .filter(|p| p.member_id() == peer.partner_member_id())
                     .filter(|partner_peer| {
-                        &partner_peer.partner_member_id() == member_id
+                        partner_peer.partner_member_id() == member_id
                     })
                     .for_each(|partner_peer| {
                         peers_to_remove
-                            .entry(partner_peer.member_id())
+                            .entry(partner_peer.member_id().clone())
                             .or_default()
                             .push(partner_peer.id());
                     });
 
                 peers_to_remove
-                    .entry(peer.member_id())
+                    .entry(peer.member_id().clone())
                     .or_default()
                     .push(peer.id());
             });
@@ -909,7 +909,7 @@ impl PeerRepository {
             .borrow()
             .iter()
             .filter_map(|(id, p)| {
-                if &p.member_id() == member_id
+                if p.member_id() == member_id
                     && (p.is_known_to_remote()
                         || p.negotiation_role().is_some())
                 {

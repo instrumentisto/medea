@@ -172,9 +172,9 @@ impl PeerError {
 /// +---------------+                   +------------------+
 /// ```
 #[enum_delegate(pub fn id(&self) -> Id)]
-#[enum_delegate(pub fn member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn member_id(&self) -> &MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
-#[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn partner_member_id(&self) -> &MemberId)]
 #[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
@@ -221,7 +221,7 @@ impl PeerStateMachine {
                         id: sender.id(),
                         mid: sender.mid(),
                         media_type: sender.media_type().clone(),
-                        receivers: vec![self.partner_member_id()],
+                        receivers: vec![self.partner_member_id().clone()],
                         enabled_individual: sender
                             .send_media_state()
                             .is_enabled(),
@@ -245,7 +245,7 @@ impl PeerStateMachine {
                         id: *id,
                         mid: receiver.mid(),
                         media_type: receiver.media_type().clone(),
-                        sender_id: self.partner_member_id(),
+                        sender_id: self.partner_member_id().clone(),
                         enabled_individual: receiver
                             .recv_media_state()
                             .is_enabled(),
@@ -485,8 +485,8 @@ pub enum PeerChange {
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
 
-    /// [`TrackId`] of the removed [`MediaTrack`]. Remote [`Peer`] currently
-    /// doesn't know that this [`MediaTrack`] was removed on the server.
+    /// [`TrackId`] of the removed [`MediaTrack`]. Remote [`Peer`] is not aware
+    /// of this change.
     RemoveTrack(TrackId),
 
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
@@ -741,8 +741,8 @@ impl<T> Peer<T> {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     #[inline]
-    pub fn member_id(&self) -> MemberId {
-        self.context.member_id.clone()
+    pub fn member_id(&self) -> &MemberId {
+        &self.context.member_id
     }
 
     /// Returns ID of [`Peer`].
@@ -761,8 +761,8 @@ impl<T> Peer<T> {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     #[inline]
-    pub fn partner_member_id(&self) -> MemberId {
-        self.context.partner_member.clone()
+    pub fn partner_member_id(&self) -> &MemberId {
+        &self.context.partner_member
     }
 
     /// Returns SDP offer of this [`Peer`].
@@ -787,7 +787,7 @@ impl<T> Peer<T> {
         self.context
             .pending_peer_changes
             .iter()
-            .map(|c| c.as_peer_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect()
     }
 
@@ -796,7 +796,7 @@ impl<T> Peer<T> {
         self.context
             .pending_peer_changes
             .iter()
-            .filter_map(|c| c.as_new_track(self.partner_member_id()))
+            .filter_map(|c| c.as_new_track(self.partner_member_id().clone()))
             .collect()
     }
 
@@ -890,7 +890,7 @@ impl<T> Peer<T> {
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .map(|c| c.as_peer_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect();
 
         if !updates.is_empty() {
@@ -930,7 +930,7 @@ impl<T> Peer<T> {
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .map(|c| c.as_peer_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect();
 
         if !updates.is_empty() {
@@ -1310,7 +1310,9 @@ impl Peer<Stable> {
                     self.id(),
                     negotiationless_changes
                         .into_iter()
-                        .map(|c| c.as_peer_update(self.partner_member_id()))
+                        .map(|c| {
+                            c.as_peer_update(self.partner_member_id().clone())
+                        })
                         .collect(),
                 );
             } else {

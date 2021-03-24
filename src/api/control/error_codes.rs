@@ -431,7 +431,6 @@ impl From<RoomError> for ErrorResponse {
             | E::PeerNotFound(_)
             | E::CallbackClientError(_)
             | E::NoTurnCredentials(_)
-            | E::ConnectionNotExists(_)
             | E::PeerError(_)
             | E::BadRoomSpec(_)
             | E::PeerTrafficWatcherMailbox(_)

@@ -15,6 +15,11 @@ All user visible changes to this project will be documented in this file. This p
 
 - `TracksApplied` event renamed as `PeerUpdated` ([#139]).
 
+### Added
+
+- Add `PeerUpdate::Removed` variant to the `PeerUpdated` event ([#109]).
+
+[#109]: /../../pull/109
 [#139]: /../../pull/139
 
 
@@ -90,7 +95,6 @@ All user visible changes to this project will be documented in this file. This p
     - `Peer`;
     - `Sender`;
     - `Receiver`.
-- Add `TrackUpdate::Removed` variant to the `TracksApplied` event ([#109]).
 
 [#28]: /../../pull/28
 [#58]: /../../pull/58
@@ -103,7 +107,6 @@ All user visible changes to this project will be documented in this file. This p
 [#102]: /../../pull/102
 [#105]: /../../pull/105
 [#106]: /../../pull/106
-[#109]: /../../pull/109
 [#115]: /../../pull/115
 [#132]: /../../pull/132
 [#127]: /../../pull/127
