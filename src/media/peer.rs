@@ -548,9 +548,7 @@ impl PeerChange {
                     mid: track.mid(),
                 },
             }),
-            TrackChange::RemoveTrack(track_id) => {
-                TrackUpdate::Removed(*track_id)
-            }
+            Self::RemoveTrack(track_id) => PeerUpdate::Removed(*track_id),
             Self::TrackPatch(track_patch)
             | Self::PartnerTrackPatch(track_patch) => {
                 PeerUpdate::Updated(track_patch.clone())
@@ -650,7 +648,7 @@ impl<T> PeerChangeHandler for Peer<T> {
     fn on_remove_track(&mut self, track_id: TrackId) -> Self::Output {
         self.context.senders.remove(&track_id);
         self.context.receivers.remove(&track_id);
-        TrackChange::RemoveTrack(track_id)
+        PeerChange::RemoveTrack(track_id)
     }
 
     /// Sets [`Context::ice_restart`] flag to `true`.
@@ -968,10 +966,10 @@ impl<T> Peer<T> {
 
         let removed_tracks: HashSet<_> = self
             .context
-            .track_changes_queue
+            .peer_changes_queue
             .iter()
             .filter_map(|change| match change {
-                TrackChange::RemoveTrack(track_id) => Some(*track_id),
+                PeerChange::RemoveTrack(track_id) => Some(*track_id),
                 _ => None,
             })
             .collect();
@@ -1461,12 +1459,12 @@ impl<'a> PeerChangesScheduler<'a> {
         track_ids.iter().for_each(|id| {
             let changes_indexes_to_remove: Vec<_> = self
                 .context
-                .track_changes_queue
+                .peer_changes_queue
                 .iter()
                 .enumerate()
                 .filter_map(|(n, change)| match change {
-                    TrackChange::AddSendTrack(track)
-                    | TrackChange::AddRecvTrack(track) => {
+                    PeerChange::AddSendTrack(track)
+                    | PeerChange::AddRecvTrack(track) => {
                         if track.id() == *id {
                             Some(n)
                         } else {
@@ -1477,10 +1475,10 @@ impl<'a> PeerChangesScheduler<'a> {
                 })
                 .collect();
             if changes_indexes_to_remove.is_empty() {
-                self.schedule_change(TrackChange::RemoveTrack(*id))
+                self.schedule_change(PeerChange::RemoveTrack(*id))
             } else {
                 for remove_index in changes_indexes_to_remove {
-                    self.context.track_changes_queue.remove(remove_index);
+                    self.context.peer_changes_queue.remove(remove_index);
                 }
             }
         });

@@ -1529,7 +1529,7 @@ impl EventHandler for InnerRoom {
                 PeerUpdate::IceRestart => {
                     peer_state.restart_ice();
                 }
-                TrackUpdate::Removed(track_id) => {
+                PeerUpdate::Removed(track_id) => {
                     peer_state.remove_track(track_id);
                 }
             }
