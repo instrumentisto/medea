@@ -5,7 +5,7 @@ import 'package:ffi/ffi.dart' as ffi;
 final DynamicLibrary _dl = _open();
 final DynamicLibrary dl = _dl;
 DynamicLibrary _open() {
-  if (Platform.isAndroid) return DynamicLibrary.open('libjason_ffi.so');
+  if (Platform.isAndroid) return DynamicLibrary.open('libjason.so');
   if (Platform.isIOS) return DynamicLibrary.executable();
   throw UnsupportedError('This platform is not supported.');
 }
