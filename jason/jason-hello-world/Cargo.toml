@@ -1,0 +1,10 @@
+[package]
+name = "jason-hello-world"
+version = "0.0.1"
+edition = "2018"
+
+[lib]
+name = "jason"
+crate-type = ["staticlib"]
+
+[dependencies]

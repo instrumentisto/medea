@@ -1,0 +1,26 @@
+name: jason
+description: A new Flutter plugin.
+version: 0.0.1
+author:
+homepage:
+
+environment:
+  sdk: '>=2.12.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^1.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.example.jason
+        pluginClass: JasonPlugin
+      ios:
+        pluginClass: JasonPlugin
