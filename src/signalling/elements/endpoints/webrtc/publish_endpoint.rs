@@ -195,13 +195,6 @@ impl WebRtcPublishEndpoint {
         self.0.borrow_mut().reset()
     }
 
-    /// Removes [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    #[inline]
-    pub fn remove_peer_id(&self, peer_id: &PeerId) {
-        self.0.borrow_mut().remove_peer_id(peer_id)
-    }
-
     /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     #[inline]
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {

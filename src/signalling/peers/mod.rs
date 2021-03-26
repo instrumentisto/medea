@@ -890,14 +890,6 @@ impl PeerRepository {
         peers_to_remove
     }
 
-    /// Returns `true` if [`Peer`] with a provided [`PeerId`] exists in this
-    /// [`PeerRepository`].
-    #[inline]
-    #[must_use]
-    pub fn is_peer_exists(&self, peer_id: PeerId) -> bool {
-        self.0.borrow().contains_key(&peer_id)
-    }
-
     /// Returns [`state::Peer`]s for all [`Peer`]s owned by the provided
     /// [`MemberId`].
     #[must_use]
