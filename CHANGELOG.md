@@ -6,6 +6,21 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.2.0] · 2021-??-?? · To-be-done
+[0.2.0]: /../../tree/medea-0.2.0
+
+[Diff](/../../compare/medea-0.2.0-rc.1...medea-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+
+### Added
+
+- Signalling:
+    - Emit `TracksApplied`'s event to remove existing on client tracks ([#109]).
+
+[#109]: /../../pull/109
+
+
+
+
 ## [0.2.0-rc.1] · 2021-02-01
 [0.2.0-rc.1]: /../../tree/medea-0.2.0-rc.1
 
@@ -46,7 +61,6 @@ All user visible changes to this project will be documented in this file. This p
     - Multiple `Room`s served by one RPC connection support ([#147]);
     - Muting/unmuting `MediaTrack`s ([#156]);
     - State synchronization on a RPC reconnection ([#167]).
-    - Emit `TracksApplied`'s event to remove existing on client tracks ([#109]).
 - [Coturn] integration:
     - [Coturn] sessions destroying ([#84]);
     - [Coturn] stats processing ([#94]).
@@ -82,7 +96,6 @@ All user visible changes to this project will be documented in this file. This p
 [#95]: /../../pull/95
 [#98]: /../../pull/98
 [#105]: /../../pull/105
-[#109]: /../../pull/109
 [#127]: /../../pull/127
 [#132]: /../../pull/132
 [#135]: /../../pull/135

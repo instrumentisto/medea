@@ -12,7 +12,6 @@ use std::{
 use actix::{Arbiter, Context};
 use function_name::named;
 use futures::{channel::mpsc, StreamExt as _};
-use medea::api::control::endpoints::webrtc_publish_endpoint::P2pMode;
 use medea_client_api_proto::Event;
 use medea_control_api_proto::grpc::api::{
     member::Credentials, web_rtc_publish_endpoint::P2p,

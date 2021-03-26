@@ -3,6 +3,8 @@
 
 use std::marker::PhantomData;
 
+use derive_more::Display;
+
 use crate::{
     browser::Statement,
     object::{
@@ -14,6 +16,16 @@ use crate::{
 };
 
 use super::Error;
+
+/// [MediaStreamTrackState][1].
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrackstate
+#[derive(Clone, Copy, Debug, Eq, Display, PartialEq)]
+pub enum MediaStreamTrackState {
+    #[display(fmt = "live")]
+    Live,
+    #[display(fmt = "ended")]
+    Ended,
+}
 
 /// Shortcut for a [`TracksStore`] of [`LocalTrack`]s.
 pub type LocalTracksStore = TracksStore<LocalTrack>;
@@ -66,27 +78,6 @@ impl<T> Object<TracksStore<T>> {
         ))
         .await
         .map(drop)
-    }
-
-    /// Returns `true` if all tracks from this [`TracksStore`] are stopped.
-    pub async fn all_tracks_are_stopped(&self) -> Result<bool, Error> {
-        self.execute(Statement::new(
-            // language=JavaScript
-            r#"
-                async (store) => {
-                    for (track of store.tracks) {
-                        if (!track.track.get_track().muted) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-            "#,
-            [],
-        ))
-        .await?
-        .as_bool()
-        .ok_or(Error::TypeCast)
     }
 
     /// Indicates whether this [`TracksStore`] contains a track with the
@@ -202,19 +193,25 @@ impl<T> Object<TracksStore<T>> {
 
     /// Checks whether all local `Track`s from this store are in the `ended`
     /// `readyState`.
-    pub async fn is_all_tracks_ended(&self) -> Result<bool, Error> {
+    pub async fn all_tracks_have_ready_state(
+        &self,
+        ready_state: MediaStreamTrackState,
+    ) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
-            r#"
-                async (store) => {
-                    for (track of store.tracks) {
-                        if (track.track.get_track().readyState != 'ended') {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-            "#,
+            &format!(
+                r#"
+                    async (store) => {{
+                        for (track of store.tracks) {{
+                            if (track.track.get_track().readyState !== '{}') {{
+                                return false;
+                            }}
+                        }}
+                        return true;
+                    }}
+                "#,
+                ready_state
+            ),
             [],
         ))
         .await?

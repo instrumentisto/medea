@@ -232,12 +232,13 @@ impl State {
         self.restart_ice.set(true);
     }
 
-    /// Removes [`sender::State`] and [`receiver::State`] with a provided
+    /// Removes [`sender::State`] or [`receiver::State`] with a provided
     /// [`TrackId`].
     #[inline]
     pub fn remove_track(&self, track_id: TrackId) {
-        self.senders.remove(track_id);
-        self.receivers.remove(track_id);
+        if !self.receivers.remove(track_id) {
+            self.senders.remove(track_id);
+        }
     }
 
     /// Sets remote SDP offer to the provided value.

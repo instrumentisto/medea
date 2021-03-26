@@ -17,4 +17,4 @@ Feature: `getUserMedia()` requests
     Given room with joined member Alice and Bob
     And Alice's `getUserMedia()` errors
     When Alice enables video and audio in local media settings
-    Then Alice doesn't have live tracks
+    Then Alice doesn't have live local tracks

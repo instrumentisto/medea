@@ -3,7 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use bitflags::bitflags;
-use futures::{future::LocalBoxFuture, FutureExt};
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::Direction as DirectionProto;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
@@ -70,14 +70,11 @@ impl Transceiver {
     /// [`Transceiver`] to [`None`].
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
         self.send_track.replace(None);
-        Box::pin(
-            JsFuture::from(self.transceiver.sender().replace_track(None)).map(
-                |r| {
-                    // Cannot fail: https://tinyurl.com/yhrn483t
-                    r.unwrap();
-                },
-            ),
-        )
+        let fut = self.transceiver.sender().replace_track(None);
+        Box::pin(async move {
+            // Replacing track to None should never fail.
+            JsFuture::from(fut).await.unwrap();
+        })
     }
 
     /// Returns [`mid`] of this [`Transceiver`].

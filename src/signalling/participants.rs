@@ -198,13 +198,13 @@ impl ParticipantService {
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Sends [`Event`] to specified remote [`Member`]. Ignores all possible
-    /// errors.
+    /// Sends [`Event`] to specified remote [`Member`] if [`RpcConnection`] with
+    /// provided [`Member`] exists.
     pub fn send_event_to_member(&self, member_id: &MemberId, event: Event) {
         if let Some(conn) = self.connections.get(&member_id) {
             conn.send_event(self.room_id.clone(), event);
         } else {
-            warn!(
+            debug!(
                 "Can't send event [{:?}] cause connection with Member [{}] \
                 does not exist.",
                 event, member_id

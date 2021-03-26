@@ -1,7 +1,7 @@
 use cucumber_rust::then;
 
 use crate::{
-    object::{MediaKind, MediaSourceKind},
+    object::{tracks_store::MediaStreamTrackState, MediaKind, MediaSourceKind},
     steps::parse_media_kinds,
     world::World,
 };
@@ -208,27 +208,38 @@ async fn then_member_doesnt_have_remote_tracks_with(
     assert_eq!(tracks_count, 0);
 }
 
-#[then(regex = r"^(\S+) doesn't have live tracks$")]
-async fn then_member_doesnt_has_live_tracks(world: &mut World, id: String) {
+#[then(regex = r"^(\S+) doesn't have live local tracks$")]
+async fn then_member_doesnt_have_live_local_tracks(
+    world: &mut World,
+    id: String,
+) {
     let member = world.get_member(&id).unwrap();
     let local_tracks = member.room().local_tracks().await.unwrap();
-    assert!(local_tracks.is_all_tracks_ended().await.unwrap());
+    assert!(local_tracks
+        .all_tracks_have_ready_state(MediaStreamTrackState::Ended)
+        .await
+        .unwrap());
 }
 
-#[then(regex = r"^(\S+)'s remote tracks with (\S+) are (not )?stopped$")]
+#[then(regex = r"^(\S+)'s remote tracks from (\S+) are (live|stopped$)")]
 async fn then_remote_tracks_are_stopped(
     world: &mut World,
     id: String,
     partner_id: String,
-    not: String,
+    live_or_stopped: String,
 ) {
     let member = world.get_member(&id).unwrap();
     let connection =
         member.connections().get(partner_id).await.unwrap().unwrap();
     let tracks_store = connection.tracks_store().await.unwrap();
-    let stop_needed = not.is_empty();
-    assert_eq!(
-        tracks_store.all_tracks_are_stopped().await.unwrap(),
-        stop_needed
-    );
+    let ready_state = if live_or_stopped == "live" {
+        MediaStreamTrackState::Live
+    } else {
+        MediaStreamTrackState::Ended
+    };
+    assert!(tracks_store.count().await.unwrap() > 0);
+    assert!(tracks_store
+        .all_tracks_have_ready_state(ready_state)
+        .await
+        .unwrap());
 }

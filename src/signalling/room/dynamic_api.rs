@@ -62,9 +62,10 @@ impl Room {
 
     /// Deletes endpoint from this [`Room`] by ID.
     ///
-    /// Starts renegotiation process for the affected [`Peer`]s if it needed.
+    /// Starts renegotiation process for the affected [`Peer`]s if needed.
     ///
-    /// Will delete [`Peer`] which are no longer needed.
+    /// Will delete [`Peer`] if deleted endpoint is the last one associated with
+    /// it.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -374,8 +375,9 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            // TODO: how can this err?
-            let _ = self.delete_endpoint(&member_id, endpoint_id);
+            if let Err(err) = self.delete_endpoint(&member_id, endpoint_id) {
+                error!("Error while deleting endpoint: {:?}", err);
+            }
         });
     }
 }

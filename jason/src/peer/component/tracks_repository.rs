@@ -79,8 +79,8 @@ impl<S> TracksRepository<S> {
 
     /// Removes a track with the provided `id`.
     #[inline]
-    pub fn remove(&self, track_id: TrackId) {
-        self.0.borrow_mut().remove(&track_id);
+    pub fn remove(&self, track_id: TrackId) -> bool {
+        self.0.borrow_mut().remove(&track_id).is_some()
     }
 }
 

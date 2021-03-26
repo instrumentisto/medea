@@ -194,7 +194,9 @@ impl Receiver {
         new_track.set_enabled(self.enabled());
 
         self.transceiver.replace(Some(transceiver));
-        self.track.replace(Some(new_track));
+        if let Some(prev_track) = self.track.replace(Some(new_track)) {
+            prev_track.stop();
+        };
         self.maybe_notify_track();
     }
 
@@ -262,6 +264,9 @@ impl Drop for Receiver {
             if !transceiver.is_stopped() {
                 transceiver.sub_direction(TransceiverDirection::RECV);
             }
+        }
+        if let Some(recv_track) = self.track.borrow_mut().take() {
+            recv_track.stop();
         }
     }
 }

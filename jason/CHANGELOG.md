@@ -5,6 +5,21 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.2.0] · 2021-??-?? · To-be-done
+[0.2.0]: /../../tree/medea-jason-0.2.0/jason
+
+[Diff](/../../compare/medea-jason-0.2.0-rc.1...medea-jason-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+
+- Signalling:
+    - Handling of RPC events:
+        - `PeerUpdated` with `PeerUpdate::Removed` ([#109]).
+- Library API:
+    - `RemoteMediaTrack.on_stopped` callback that is called when `RemoteMediaTrack` is stopped ([#109]).
+
+[#109]: /../../pull/109
+
+
+
 
 ## [0.2.0-rc.1] · 2021-02-01
 [0.2.0-rc.1]: /../../tree/medea-jason-0.2.0-rc.1/jason
@@ -94,7 +109,7 @@ All user visible changes to this project will be documented in this file. This p
         - Enabling/disabling audio/video send/receive via `UpdateTracks` command ([#81], [#155]);
         - Muting/unmuting audio/video send via `UpdateTracks` ([#156]).
     - Handling of RPC events:
-        - `PeerUpdated` with `PeerUpdate::Added`, `PeerUpdate::Updated` and `PeerUpdate::IceRestart` and `TrackUpdate::Removed`  ([#105], [#138], [#139], [#109]);
+        - `PeerUpdated` with `PeerUpdate::Added`, `PeerUpdate::Updated` and `PeerUpdate::IceRestart` ([#105], [#138], [#139]);
         - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:
@@ -120,7 +135,6 @@ All user visible changes to this project will be documented in this file. This p
 [#97]: /../../pull/97
 [#105]: /../../pull/105
 [#106]: /../../pull/106
-[#109]: /../../pull/109
 [#120]: /../../pull/120
 [#123]: /../../pull/123
 [#124]: /../../pull/124
