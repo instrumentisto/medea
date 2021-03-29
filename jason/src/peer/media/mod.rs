@@ -655,8 +655,15 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
     /// could not find [`Receiver`] by transceivers `mid`.
     ///
+    /// # Panics
+    ///
+    /// If [`Transceiver`] from provided [`RtcTrackEvent`] does not have
+    /// [`mid`]. Not supposed to happen, since [`RtcTrackEvent`] is only
+    /// fired when [`Transceiver`] is negotiated thus have [`mid`].
+    ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
         let inner = self.0.borrow();
         let transceiver = Transceiver::from(track_event.transceiver());

@@ -43,6 +43,10 @@ pub struct Track {
 impl Track {
     /// Builds new [`Track`] from the provided [`sys::MediaStreamTrack`] and
     /// [`MediaSourceKind`].
+    ///
+    /// # Panics
+    ///
+    /// If inner [`sys::MediaStreamTrack`] type is not `audio` or `video`.
     #[must_use]
     pub fn new(
         track: sys::MediaStreamTrack,

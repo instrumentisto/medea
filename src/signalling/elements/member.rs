@@ -18,7 +18,6 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         member::Credential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
@@ -387,18 +386,6 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned()
     }
 
-    /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
-    #[inline]
-    pub fn remove_sink(&self, id: &WebRtcPlayId) {
-        self.0.borrow_mut().sinks.remove(id);
-    }
-
-    /// Removes source [`WebRtcPublishEndpoint`] from this [`Member`].
-    #[inline]
-    pub fn remove_src(&self, id: &WebRtcPublishId) {
-        self.0.borrow_mut().srcs.remove(id);
-    }
-
     /// Takes sink from [`Member`]'s `sinks`.
     #[inline]
     #[must_use]
@@ -421,30 +408,6 @@ impl Member {
     #[must_use]
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
-    }
-
-    /// Creates new [`WebRtcPlayEndpoint`] based on provided
-    /// [`WebRtcPlayEndpointSpec`].
-    ///
-    /// This function will add created [`WebRtcPlayEndpoint`] to `src`s of
-    /// [`WebRtcPublishEndpoint`] and to provided [`Member`].
-    pub fn create_sink(
-        member: &Rc<Self>,
-        id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec,
-    ) {
-        let src = member.get_src_by_id(&spec.src.endpoint_id).unwrap();
-
-        let sink = WebRtcPlayEndpoint::new(
-            id,
-            spec.src,
-            src.downgrade(),
-            member.downgrade(),
-            spec.force_relay,
-        );
-
-        src.add_sink(sink.downgrade());
-        member.insert_sink(sink);
     }
 
     /// Lookups [`WebRtcPublishEndpoint`] and [`WebRtcPlayEndpoint`] at one
@@ -544,7 +507,9 @@ pub struct WeakMember(Weak<RefCell<MemberInner>>);
 impl WeakMember {
     /// Upgrades weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer was dropped.
+    /// # Panics
+    ///
+    /// If inner [`Weak`] pointer upgrade fails.
     #[inline]
     #[must_use]
     pub fn upgrade(&self) -> Member {
@@ -626,50 +591,53 @@ pub fn parse_members(
     Ok(members)
 }
 
-impl Into<proto::Member> for Member {
-    fn into(self) -> proto::Member {
-        let member_pipeline = self
+impl From<Member> for proto::Member {
+    fn from(member: Member) -> Self {
+        let member_pipeline = member
             .sinks()
             .into_iter()
             .map(|(id, play)| (id.to_string(), play.into()))
             .chain(
-                self.srcs()
+                member
+                    .srcs()
                     .into_iter()
                     .map(|(id, publish)| (id.to_string(), publish.into())),
             )
             .collect();
 
-        proto::Member {
-            id: self.id().to_string(),
-            credentials: Some(self.credentials().into()),
-            on_leave: self
+        Self {
+            id: member.id().to_string(),
+            credentials: Some(member.credentials().into()),
+            on_leave: member
                 .get_on_leave()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            on_join: self
+            on_join: member
                 .get_on_join()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            reconnect_timeout: Some(self.get_reconnect_timeout().into()),
-            idle_timeout: Some(self.get_idle_timeout().into()),
-            ping_interval: Some(self.get_ping_interval().into()),
+            reconnect_timeout: Some(member.get_reconnect_timeout().into()),
+            idle_timeout: Some(member.get_idle_timeout().into()),
+            ping_interval: Some(member.get_ping_interval().into()),
             pipeline: member_pipeline,
         }
     }
 }
 
-impl Into<proto::room::Element> for Member {
-    fn into(self) -> proto::room::Element {
-        proto::room::Element {
-            el: Some(proto::room::element::El::Member(self.into())),
+impl From<Member> for proto::room::Element {
+    #[inline]
+    fn from(member: Member) -> Self {
+        Self {
+            el: Some(proto::room::element::El::Member(member.into())),
         }
     }
 }
 
-impl Into<proto::Element> for Member {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::Member(self.into())),
+impl From<Member> for proto::Element {
+    #[inline]
+    fn from(member: Member) -> Self {
+        Self {
+            el: Some(proto::element::El::Member(member.into())),
         }
     }
 }
@@ -785,10 +753,10 @@ mod tests {
         let some_member = store.get(&id("some-member")).unwrap();
         let responder = store.get(&id("responder")).unwrap();
 
-        caller.remove_src(&id("publish"));
+        drop(caller.take_src(&id("publish")));
         assert_eq!(responder.sinks().len(), 1);
 
-        some_member.remove_src(&id("publish"));
+        drop(some_member.take_src(&id("publish")));
         assert_eq!(responder.sinks().len(), 0);
     }
 
@@ -804,11 +772,11 @@ mod tests {
         let some_member_publisher =
             some_member.get_src_by_id(&id("publish")).unwrap();
 
-        responder.remove_sink(&id("play"));
+        drop(responder.take_sink(&id("play")));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 1);
 
-        responder.remove_sink(&id("play2"));
+        drop(responder.take_sink(&id("play2")));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 0);
     }

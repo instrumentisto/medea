@@ -21,8 +21,8 @@ IMAGE_NAME := $(strip \
 	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
 	$(image))))
 
-RUST_VER := 1.50
-CHROME_VERSION := 88.0
+RUST_VER := 1.51
+CHROME_VERSION := 89.0
 FIREFOX_VERSION := 86.0.1
 
 crate-dir = .

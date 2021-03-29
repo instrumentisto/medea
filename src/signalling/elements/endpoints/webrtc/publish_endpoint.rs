@@ -63,7 +63,7 @@ impl Drop for WebRtcPublishEndpointInner {
             .filter_map(WeakWebRtcPlayEndpoint::safe_upgrade)
         {
             if let Some(receiver_owner) = receiver.weak_owner().safe_upgrade() {
-                receiver_owner.remove_sink(&receiver.id())
+                drop(receiver_owner.take_sink(&receiver.id()))
             }
         }
     }
@@ -302,33 +302,35 @@ impl WeakWebRtcPublishEndpoint {
     }
 }
 
-impl Into<proto::WebRtcPublishEndpoint> for WebRtcPublishEndpoint {
-    fn into(self) -> proto::WebRtcPublishEndpoint {
-        let p2p: proto::web_rtc_publish_endpoint::P2p = self.p2p().into();
+impl From<WebRtcPublishEndpoint> for proto::WebRtcPublishEndpoint {
+    fn from(endpoint: WebRtcPublishEndpoint) -> Self {
+        let p2p = proto::web_rtc_publish_endpoint::P2p::from(endpoint.p2p());
         proto::WebRtcPublishEndpoint {
             p2p: p2p as i32,
-            id: self.id().to_string(),
-            force_relay: self.is_force_relayed(),
-            audio_settings: Some(self.audio_settings().into()),
-            video_settings: Some(self.video_settings().into()),
+            id: endpoint.id().to_string(),
+            force_relay: endpoint.is_force_relayed(),
+            audio_settings: Some(endpoint.audio_settings().into()),
+            video_settings: Some(endpoint.video_settings().into()),
             on_stop: String::new(),
             on_start: String::new(),
         }
     }
 }
 
-impl Into<proto::member::Element> for WebRtcPublishEndpoint {
-    fn into(self) -> proto::member::Element {
-        proto::member::Element {
-            el: Some(proto::member::element::El::WebrtcPub(self.into())),
+impl From<WebRtcPublishEndpoint> for proto::member::Element {
+    #[inline]
+    fn from(endpoint: WebRtcPublishEndpoint) -> Self {
+        Self {
+            el: Some(proto::member::element::El::WebrtcPub(endpoint.into())),
         }
     }
 }
 
-impl Into<proto::Element> for WebRtcPublishEndpoint {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::WebrtcPub(self.into())),
+impl From<WebRtcPublishEndpoint> for proto::Element {
+    #[inline]
+    fn from(endpoint: WebRtcPublishEndpoint) -> Self {
+        Self {
+            el: Some(proto::element::El::WebrtcPub(endpoint.into())),
         }
     }
 }

@@ -45,7 +45,7 @@ use crate::{
 #[doc(inline)]
 pub use self::{
     component::{Component, State},
-    conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
+    conn::{IceCandidate, RtcPeerConnection, RtcPeerConnectionError, SdpType},
     media::{
         media_exchange_state, mute_state, receiver, sender, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
@@ -77,7 +77,7 @@ pub enum PeerError {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
+    RtcPeerConnection(#[js(cause)] RtcPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or parsing
     /// [`local::Track`]s.

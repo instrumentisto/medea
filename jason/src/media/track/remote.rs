@@ -46,6 +46,10 @@ impl Track {
     /// Creates new [`Track`] spawning a listener for its [`enabled`][1]
     /// property changes.
     ///
+    /// # Panics
+    ///
+    /// If provided [`sys::MediaStreamTrack`] kind is not `audio` or `video`.
+    ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     #[must_use]
     pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self

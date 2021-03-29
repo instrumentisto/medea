@@ -240,30 +240,33 @@ impl WeakWebRtcPlayEndpoint {
     }
 }
 
-impl Into<proto::member::Element> for WebRtcPlayEndpoint {
-    fn into(self) -> proto::member::Element {
-        proto::member::Element {
-            el: Some(proto::member::element::El::WebrtcPlay(self.into())),
+impl From<WebRtcPlayEndpoint> for proto::member::Element {
+    #[inline]
+    fn from(endpoint: WebRtcPlayEndpoint) -> Self {
+        Self {
+            el: Some(proto::member::element::El::WebrtcPlay(endpoint.into())),
         }
     }
 }
 
-impl Into<proto::WebRtcPlayEndpoint> for WebRtcPlayEndpoint {
-    fn into(self) -> proto::WebRtcPlayEndpoint {
-        proto::WebRtcPlayEndpoint {
+impl From<WebRtcPlayEndpoint> for proto::WebRtcPlayEndpoint {
+    #[inline]
+    fn from(endpoint: WebRtcPlayEndpoint) -> Self {
+        Self {
             on_start: String::new(),
             on_stop: String::new(),
-            src: self.src_uri().to_string(),
-            id: self.id().to_string(),
-            force_relay: self.is_force_relayed(),
+            src: endpoint.src_uri().to_string(),
+            id: endpoint.id().to_string(),
+            force_relay: endpoint.is_force_relayed(),
         }
     }
 }
 
-impl Into<proto::Element> for WebRtcPlayEndpoint {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::WebrtcPlay(self.into())),
+impl From<WebRtcPlayEndpoint> for proto::Element {
+    #[inline]
+    fn from(endpoint: WebRtcPlayEndpoint) -> Self {
+        Self {
+            el: Some(proto::element::El::WebrtcPlay(endpoint.into())),
         }
     }
 }

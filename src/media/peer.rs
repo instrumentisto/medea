@@ -257,6 +257,10 @@ impl PeerStateMachine {
     }
 
     /// Returns a [`state::Peer`] of this [`PeerStateMachine`].
+    ///
+    /// # Panics
+    ///
+    /// If this [`Peer`] does not have [`IceUser`].
     #[must_use]
     pub fn get_state(&self) -> state::Peer {
         state::Peer {

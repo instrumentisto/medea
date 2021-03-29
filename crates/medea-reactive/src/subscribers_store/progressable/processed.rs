@@ -65,10 +65,10 @@ impl<'a, T> Future for Processed<'a, T> {
     }
 }
 
-impl<'a, T> Into<Factory<'a, T>> for Processed<'a, T> {
+impl<'a, T> From<Processed<'a, T>> for Factory<'a, T> {
     #[inline]
-    fn into(self) -> Factory<'a, T> {
-        self.factory
+    fn from(processed: Processed<'a, T>) -> Self {
+        processed.factory
     }
 }
 
@@ -95,10 +95,10 @@ pub struct AllProcessed<'a, T = ()> {
     fut: LocalBoxFuture<'a, T>,
 }
 
-impl<'a, T> Into<Factory<'a, T>> for AllProcessed<'a, T> {
+impl<'a, T> From<AllProcessed<'a, T>> for Factory<'a, T> {
     #[inline]
-    fn into(self) -> Box<dyn Fn() -> LocalBoxFuture<'a, T>> {
-        self.factory
+    fn from(processed: AllProcessed<'a, T>) -> Self {
+        processed.factory
     }
 }
 

@@ -79,7 +79,7 @@ pub enum SdpType {
 ///
 /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 #[derive(Clone, Debug, Display, From, JsCaused)]
-pub enum RTCPeerConnectionError {
+pub enum RtcPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
     ///
@@ -136,7 +136,7 @@ pub enum RTCPeerConnectionError {
     SetRemoteDescriptionFailed(JsError),
 }
 
-type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
+type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
 
 /// Representation of [RTCPeerConnection][1].
 ///
@@ -220,7 +220,7 @@ impl RtcPeerConnection {
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::PeerCreationError)
+            .map_err(RtcPeerConnectionError::PeerCreationError)
             .map_err(tracerr::wrap!())?;
 
         Ok(Self {
@@ -248,7 +248,7 @@ impl RtcPeerConnection {
     pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats =
             JsFuture::from(self.peer.get_stats()).await.map_err(|e| {
-                tracerr::new!(RTCPeerConnectionError::GetStatsException(
+                tracerr::new!(RtcPeerConnectionError::GetStatsException(
                     JsError::from(e)
                 ))
             })?;
@@ -473,7 +473,7 @@ impl RtcPeerConnection {
         )
         .await
         .map_err(Into::into)
-        .map_err(RTCPeerConnectionError::AddIceCandidateFailed)
+        .map_err(RtcPeerConnectionError::AddIceCandidateFailed)
         .map_err(tracerr::wrap!())?;
         Ok(())
     }
@@ -508,7 +508,7 @@ impl RtcPeerConnection {
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+            .map_err(RtcPeerConnectionError::SetLocalDescriptionFailed)
             .map_err(tracerr::wrap!())?;
 
         Ok(())
@@ -557,7 +557,7 @@ impl RtcPeerConnection {
         let answer = JsFuture::from(self.peer.create_answer())
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateAnswerFailed)
+            .map_err(RtcPeerConnectionError::CreateAnswerFailed)
             .map_err(tracerr::wrap!())?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
@@ -581,7 +581,7 @@ impl RtcPeerConnection {
         ))
         .await
         .map_err(Into::into)
-        .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+        .map_err(RtcPeerConnectionError::SetLocalDescriptionFailed)
         .map_err(tracerr::wrap!())?;
 
         Ok(())
@@ -611,7 +611,7 @@ impl RtcPeerConnection {
         )
         .await
         .map_err(Into::into)
-        .map_err(RTCPeerConnectionError::CreateOfferFailed)
+        .map_err(RtcPeerConnectionError::CreateOfferFailed)
         .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
@@ -649,7 +649,7 @@ impl RtcPeerConnection {
         JsFuture::from(self.peer.set_remote_description(&description))
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetRemoteDescriptionFailed)
+            .map_err(RtcPeerConnectionError::SetRemoteDescriptionFailed)
             .map_err(tracerr::wrap!())?;
 
         Ok(())
@@ -673,6 +673,11 @@ impl RtcPeerConnection {
 
     /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
     /// [set of this RTCPeerConnection's transceivers][2] by provided `mid`.
+    ///
+    /// # Panics
+    ///
+    /// If any unexpected error happens while iterating over inner
+    /// [`SysRtcPeerConnection`]'s transceivers. Not supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set

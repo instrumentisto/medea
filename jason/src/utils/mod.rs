@@ -8,10 +8,10 @@ pub mod component;
 mod event_listener;
 mod resettable_delay;
 
-use std::{convert::TryInto as _, future::Future, ops::Mul, time::Duration};
+use std::{convert::TryInto as _, ops::Mul, time::Duration};
 
 use derive_more::{From, Sub};
-use futures::future::{self, AbortHandle};
+use futures::future::{self, AbortHandle, Future};
 use js_sys::{Promise, Reflect};
 use medea_reactive::Guarded;
 use wasm_bindgen::prelude::*;
@@ -152,6 +152,11 @@ where
 /// [`Future`] which resolves after the provided [`JsDuration`].
 ///
 /// [`Future`]: std::future::Future
+///
+/// # Panics
+///
+/// If call to UA's `setTimeout()` returns error or [`Promise`] to [`Future`]
+/// conversion fails.
 pub async fn delay_for(delay_ms: JsDuration) {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()

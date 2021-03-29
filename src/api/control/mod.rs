@@ -252,7 +252,7 @@ pub async fn start_static_rooms(
              specs not loaded. {}",
             e,
         ),
-        Err(e) => panic!("{}", e),
+        Err(e) => return Err(Error::from(e)),
         Ok(_) => {}
     };
     Ok(())
