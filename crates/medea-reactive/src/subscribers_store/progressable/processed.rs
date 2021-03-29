@@ -27,7 +27,7 @@ where
     let futures: Vec<_> = futures.into_iter().collect();
     AllProcessed::new(Box::new(move || {
         let futures = futures.iter().map(AsRef::as_ref).map(|f| f());
-        Box::pin(future::join_all(futures).map(|_| ()))
+        Box::pin(future::join_all(futures).map(drop))
     }))
 }
 

@@ -65,7 +65,7 @@ impl<T> Object<TracksStore<T>> {
             [count.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Indicates whether this [`TracksStore`] contains a track with the
@@ -177,5 +177,27 @@ impl<T> Object<TracksStore<T>> {
             [],
         )))
         .await
+    }
+
+    /// Checks whether all local `Track`s from this store are in the `ended`
+    /// `readyState`.
+    pub async fn is_all_tracks_ended(&self) -> Result<bool, Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (store) => {
+                    for (track of store.tracks) {
+                        if (track.track.get_track().readyState != 'ended') {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            "#,
+            [],
+        ))
+        .await?
+        .as_bool()
+        .ok_or(Error::TypeCast)
     }
 }

@@ -5,6 +5,7 @@ use std::{cell::RefCell, collections::HashMap};
 use derive_more::{Display, Error, From};
 
 use crate::{
+    browser::{mock, Window},
     conf,
     object::{
         self, connections_store::ConnectionStore, MediaKind, MediaSourceKind,
@@ -38,7 +39,11 @@ pub struct Builder {
 
 impl Builder {
     /// Creates a new [`Member`] out of this [`Builder`] configuration.
-    pub async fn build(self, room: Object<Room>) -> Result<Member> {
+    pub async fn build(
+        self,
+        room: Object<Room>,
+        window: Window,
+    ) -> Result<Member> {
         let connection_store = room.connections_store().await?;
         let mut media_state = HashMap::new();
         media_state.insert((MediaKind::Audio, MediaSourceKind::Device), true);
@@ -53,6 +58,7 @@ impl Builder {
             recv_state: RefCell::new(media_state),
             room,
             connection_store,
+            window,
         })
     }
 }
@@ -91,6 +97,9 @@ pub struct Member {
     ///
     /// [`Connection`]: object::connection::Connection
     connection_store: Object<ConnectionStore>,
+
+    /// [`Window`] in which this [`Member`] is exists.
+    window: Window,
 }
 
 impl Member {
@@ -329,6 +338,24 @@ impl Member {
     #[must_use]
     pub fn room(&self) -> &Object<Room> {
         &self.room
+    }
+
+    /// Returns WebAPI `WebSocket` mock object for [`Window`] of this
+    /// [`Member`].
+    #[inline]
+    #[must_use]
+    pub fn ws_mock(&self) -> mock::WebSocket {
+        self.window.websocket_mock()
+    }
+
+    /// Returns a [MediaDevices.getUserMedia()][1] mock for [`Window`] of this
+    /// [`Member`].
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+    #[inline]
+    #[must_use]
+    pub fn media_devices_mock(&self) -> mock::MediaDevices {
+        self.window.media_devices_mock()
     }
 }
 

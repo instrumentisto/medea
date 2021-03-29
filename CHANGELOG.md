@@ -39,11 +39,11 @@ All user visible changes to this project will be documented in this file. This p
     - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58]);
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
-    - Emit `TracksApplied` event to create new and update existing tracks ([#105]);
+    - Emit `PeerUpdated` event to create new and update existing tracks ([#105], [#139]);
     - `PeerConnection` renegotiation functionality ([#105]);
     - Calculate and send call quality score based on RTC stats ([#132]);
     - Enabling/disabling `MediaTrack`s by receiver ([#127], [#155]);
-    - Send `TrackUpdate::IceRestart` based on RTC stats analysis ([#138]);
+    - Send `PeerUpdate::IceRestart` based on RTC stats analysis ([#138], [#139]);
     - Multiple `Room`s served by one RPC connection support ([#147]);
     - Muting/unmuting `MediaTrack`s ([#156]);
     - State synchronization on a RPC reconnection ([#167]).
@@ -86,6 +86,7 @@ All user visible changes to this project will be documented in this file. This p
 [#132]: /../../pull/132
 [#135]: /../../pull/135
 [#138]: /../../pull/138
+[#139]: /../../pull/139
 [#147]: /../../pull/147
 [#153]: /../../pull/153
 [#155]: /../../pull/155

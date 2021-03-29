@@ -280,7 +280,7 @@ impl Room {
 
         Box::pin(
             actix_try_join_all(connect_members_tasks)
-                .map(|result, _, _| result.map(|_| ())),
+                .map(|result, _, _| result.map(drop)),
         )
     }
 
@@ -300,7 +300,7 @@ impl Room {
         }
     }
 
-    /// Sends [`Event::TracksApplied`] with latest [`Peer`] changes to specified
+    /// Sends [`Event::PeerUpdated`] with latest [`Peer`] changes to specified
     /// [`Member`]. Starts renegotiation, marking provided [`Peer`] as
     /// [`NegotiationRole::Offerer`].
     ///
@@ -323,7 +323,7 @@ impl Room {
 
         self.members.send_event_to_member(
             member_id,
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 updates,
                 negotiation_role: Some(NegotiationRole::Offerer),
                 peer_id,

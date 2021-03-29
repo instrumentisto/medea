@@ -16,7 +16,7 @@ use futures::{
 use medea_client_api_proto::{
     state, AudioSettings, Command, Direction, Event, IceConnectionState,
     MediaSourceKind, MediaType, MemberId, NegotiationRole, PeerId, PeerMetrics,
-    Track, TrackId, TrackPatchCommand, TrackPatchEvent, TrackUpdate,
+    PeerUpdate, Track, TrackId, TrackPatchCommand, TrackPatchEvent,
     VideoSettings,
 };
 use medea_jason::{
@@ -91,11 +91,11 @@ async fn get_test_room_and_exist_peer(
                 tracks_patches,
             } => {
                 event_tx_clone
-                    .unbounded_send(Event::TracksApplied {
+                    .unbounded_send(Event::PeerUpdated {
                         peer_id,
                         updates: tracks_patches
                             .into_iter()
-                            .map(|p| TrackUpdate::Updated(p.into()))
+                            .map(|p| PeerUpdate::Updated(p.into()))
                             .collect(),
                         negotiation_role: None,
                     })
@@ -742,9 +742,9 @@ mod disable_send_tracks {
             _ => unreachable!(),
         }
         event_tx
-            .unbounded_send(Event::TracksApplied {
+            .unbounded_send(Event::PeerUpdated {
                 peer_id: PeerId(1),
-                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                     id: TrackId(1),
                     enabled_individual: Some(false),
                     enabled_general: Some(false),
@@ -822,9 +822,9 @@ mod disable_send_tracks {
             _ => unreachable!(),
         }
         event_tx
-            .unbounded_send(Event::TracksApplied {
+            .unbounded_send(Event::PeerUpdated {
                 peer_id: PeerId(1),
-                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                     id: TrackId(1),
                     enabled_individual: None,
                     enabled_general: None,
@@ -903,9 +903,9 @@ mod disable_send_tracks {
             _ => unreachable!(),
         }
         event_tx
-            .unbounded_send(Event::TracksApplied {
+            .unbounded_send(Event::PeerUpdated {
                 peer_id: PeerId(1),
-                updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                     id: TrackId(2),
                     enabled_individual: Some(false),
                     enabled_general: Some(false),
@@ -1192,7 +1192,7 @@ mod patches_generation {
         });
         rpc.expect_subscribe()
             .return_once(move || Box::pin(event_rx));
-        rpc.expect_close_with_reason().return_once(|_| ());
+        rpc.expect_close_with_reason().return_once(drop);
         rpc.expect_on_connection_loss()
             .return_once(|| stream::pending().boxed_local());
         rpc.expect_on_reconnected()
@@ -1229,9 +1229,9 @@ mod patches_generation {
             if let Some(audio_track_id) = audio_track_id {
                 let state = (audio_track_media_state_fn)(i);
                 event_tx
-                    .unbounded_send(Event::TracksApplied {
+                    .unbounded_send(Event::PeerUpdated {
                         peer_id: PeerId(i + 1),
-                        updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+                        updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                             id: audio_track_id,
                             enabled_individual: Some(matches!(
                                 state,
@@ -1679,10 +1679,10 @@ async fn disable_by_server() {
     .await;
 
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: None,
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1710,10 +1710,10 @@ async fn enable_by_server() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: None,
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1727,12 +1727,12 @@ async fn enable_by_server() {
 
     assert_eq!(mock.get_user_media_requests_count(), 1);
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: Some(NegotiationRole::Answerer(
                 "SDP".to_string(),
             )),
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(true),
                 enabled_individual: Some(true),
@@ -1765,10 +1765,10 @@ async fn only_one_gum_performed_on_enable() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: Some(NegotiationRole::Offerer),
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1784,10 +1784,10 @@ async fn only_one_gum_performed_on_enable() {
     mock.error_get_user_media("only_one_gum_performed_on_enable".into());
 
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: Some(NegotiationRole::Offerer),
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1886,7 +1886,7 @@ async fn set_media_state_return_media_error() {
 }
 
 /// Checks that only one get user media request will be performed on
-/// [`Event::TracksApplied`] with a failed get user media.
+/// [`Event::PeerUpdated`] with a failed get user media.
 #[wasm_bindgen_test]
 async fn only_one_gum_performed_on_enable_by_server() {
     let mock = MockNavigator::new();
@@ -1900,10 +1900,10 @@ async fn only_one_gum_performed_on_enable_by_server() {
     assert_eq!(mock.get_user_media_requests_count(), 1);
 
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: None,
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1918,10 +1918,10 @@ async fn only_one_gum_performed_on_enable_by_server() {
     mock.error_get_user_media("only_one_gum_performed_on_enable".into());
 
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: peer.id(),
             negotiation_role: None,
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: audio_track_id,
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1978,10 +1978,10 @@ async fn send_enabling_holds_local_tracks() {
     // wait until Event::PeerCreated is handled
     delay_for(200).await;
     event_tx
-        .unbounded_send(Event::TracksApplied {
+        .unbounded_send(Event::PeerUpdated {
             peer_id: PeerId(1),
             negotiation_role: None,
-            updates: vec![TrackUpdate::Updated(TrackPatchEvent {
+            updates: vec![PeerUpdate::Updated(TrackPatchEvent {
                 id: video_track_id,
                 enabled_individual: Some(false),
                 enabled_general: Some(false),
@@ -1989,7 +1989,7 @@ async fn send_enabling_holds_local_tracks() {
             })],
         })
         .unwrap();
-    // wait until Event::TracksApplied is handled
+    // wait until Event::PeerUpdated is handled
     delay_for(50).await;
 
     let mock = MockNavigator::new();
@@ -2110,11 +2110,11 @@ mod set_local_media_settings {
                         tracks_patches,
                     } => {
                         event_tx
-                            .unbounded_send(Event::TracksApplied {
+                            .unbounded_send(Event::PeerUpdated {
                                 peer_id,
                                 updates: tracks_patches
                                     .into_iter()
-                                    .map(|p| TrackUpdate::Updated(p.into()))
+                                    .map(|p| PeerUpdate::Updated(p.into()))
                                     .collect(),
                                 negotiation_role: None,
                             })
@@ -2303,7 +2303,7 @@ mod set_local_media_settings {
             timeout(1000, test_rx)
                 .await
                 .map(|rx| rx.unwrap())
-                .map_err(|_| ())
+                .map_err(drop)
         }
 
         // on_failed_local_media callback does not fire
@@ -2550,7 +2550,7 @@ mod state_synchronization {
         rpc_session
             .expect_on_reconnected()
             .return_once(|| Box::pin(stream::pending()));
-        rpc_session.expect_close_with_reason().returning(|_| ());
+        rpc_session.expect_close_with_reason().returning(drop);
         rpc_session.expect_send_command().returning(move |cmd| {
             let _ = command_tx.unbounded_send(cmd);
         });

@@ -97,7 +97,7 @@ impl Object<Room> {
             [uri.into()],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Disables media publishing for the provided [`MediaKind`] and
@@ -131,7 +131,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Enables media publishing for the provided [`MediaKind`] and
@@ -165,7 +165,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Disables remote media receiving for the provided [`MediaKind`] and
@@ -200,7 +200,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Enables remote media receiving for the provided [`MediaKind`] and
@@ -235,7 +235,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Mutes media publishing for the provided [`MediaKind`] and
@@ -269,7 +269,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Unmutes media publishing for the provided [`MediaKind`] and
@@ -303,7 +303,7 @@ impl Object<Room> {
             [],
         ))
         .await
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Returns a [`ConnectionStore`] of this [`Room`].
@@ -420,6 +420,110 @@ impl Object<Room> {
         .as_str()
         .ok_or(Error::TypeCast)
         .map(ToOwned::to_owned)
+    }
+
+    /// Waits for the `Room.on_connection_loss()` callback to fire.
+    ///
+    /// Resolves instantly if WebSocket connection currently is lost.
+    pub async fn wait_for_connection_loss(&self) -> Result<(), Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    if (!room.connLossListener.isLost) {
+                        await new Promise((resolve) => {
+                            room.connLossListener.subs.push(resolve);
+                        });
+                    }
+                }
+            "#,
+            [],
+        ))
+        .await
+        .map(drop)
+    }
+
+    /// Enables or disables media type with a `Room.set_local_media_settings()`
+    /// function call.
+    pub async fn set_local_media_settings(
+        &self,
+        video: bool,
+        audio: bool,
+    ) -> Result<(), Error> {
+        self.forget_local_tracks().await;
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    const [video, audio] = args;
+                    let constraints = new rust.MediaStreamSettings();
+                    if (video) {
+                        let video =
+                            new window.rust.DeviceVideoTrackConstraints();
+                        constraints.device_video(video);
+                    }
+                    if (audio) {
+                        let audio = new window.rust.AudioTrackConstraints();
+                        constraints.audio(audio);
+                    }
+                    await room.room.set_local_media_settings(
+                        constraints,
+                        true,
+                        false
+                    );
+                }
+            "#,
+            [video.into(), audio.into()],
+        ))
+        .await
+        .map(drop)
+    }
+
+    /// Waits for the `Room.on_failed_local_stream()` callback to fire the
+    /// provided number of times.
+    pub async fn when_failed_local_stream_count(&self, count: u64) {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    const [count] = args;
+                    return await new Promise((resolve) => {
+                        if (room.onFailedLocalStreamListener.count === count) {
+                            resolve();
+                        } else {
+                            room.onFailedLocalStreamListener.subs.push(() => {
+                                let failCount =
+                                    room.onFailedLocalStreamListener.count;
+                                if (failCount === count) {
+                                    resolve();
+                                    return false;
+                                } else {
+                                    return true;
+                                }
+                            });
+                        }
+                    });
+                }
+            "#,
+            [count.into()],
+        ))
+        .await
+        .unwrap();
+    }
+
+    /// Removes all local `LocalMediaTrack`s from the JS side.
+    pub async fn forget_local_tracks(&self) {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    room.localTracksStore.tracks = [];
+                }
+            "#,
+            [],
+        ))
+        .await
+        .unwrap();
     }
 }
 
