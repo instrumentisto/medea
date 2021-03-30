@@ -10,6 +10,8 @@ public class SwiftJasonPlugin: NSObject, FlutterPlugin {
     result(nil)
   }
 
+  /// This is necessary so that the Swift compiler does not remove the dynamic
+  /// library from the final application.
   public static func dummyMethodToEnforceBundling() {
     dummy_function();
   }
