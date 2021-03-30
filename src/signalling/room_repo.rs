@@ -43,6 +43,7 @@ impl RoomRepository {
     }
 
     /// Returns [`Room`] by its ID.
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
     #[must_use]
     pub fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
@@ -51,17 +52,20 @@ impl RoomRepository {
     }
 
     /// Removes [`Room`] from [`RoomRepository`] by [`RoomId`].
+    #[allow(clippy::missing_panics_doc)]
     pub fn remove(&self, id: &RoomId) {
         self.rooms.lock().unwrap().remove(id);
     }
 
     /// Adds new [`Room`] into [`RoomRepository`].
+    #[allow(clippy::missing_panics_doc)]
     pub fn add(&self, id: RoomId, room: Addr<Room>) {
         self.rooms.lock().unwrap().insert(id, room);
     }
 
     /// Checks existence of [`Room`] in [`RoomRepository`] by provided
     /// [`RoomId`].
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
     #[must_use]
     pub fn contains_room_with_id(&self, id: &RoomId) -> bool {

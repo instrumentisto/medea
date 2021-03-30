@@ -5,12 +5,14 @@
 use std::{
     collections::HashMap,
     convert::{From, TryFrom},
+    net::SocketAddr,
 };
 
-use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError};
+use actix::{Actor, Addr, Arbiter, Context, Handler, MailboxError, System};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
+use futures::channel::oneshot;
 use medea_client_api_proto::MemberId;
 use medea_control_api_proto::grpc::{
     api as proto,
@@ -18,7 +20,10 @@ use medea_control_api_proto::grpc::{
         ControlApi, ControlApiServer as TonicControlApiServer,
     },
 };
-use tonic::{transport::Server, Status};
+use tonic::{
+    transport::{self, Server},
+    Status,
+};
 
 use crate::{
     api::control::{
@@ -290,35 +295,50 @@ impl Handler<ShutdownGracefully> for GrpcServer {
     }
 }
 
-/// Run gRPC [Control API] server in actix actor.
+/// Run gRPC [Control API] server in actix actor. Returns [`Addr`] of
+/// [`GrpcServer`] [`Actor`] and [`oneshot::Receiver`] for [`transport::Error`]
+/// that may fire when initializing [`GrpcServer`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-pub async fn run(
+pub fn run(
     room_service: Addr<RoomService>,
     app: &AppContext,
-) -> Addr<GrpcServer> {
-    let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
+) -> (
+    Addr<GrpcServer>,
+    oneshot::Receiver<Result<(), transport::Error>>,
+) {
+    let bind_ip = app.config.server.control.grpc.bind_ip;
     let bind_port = app.config.server.control.grpc.bind_port;
 
     info!("Starting gRPC server on {}:{}", bind_ip, bind_port);
 
-    let (grpc_shutdown_tx, grpc_shutdown_rx) =
-        futures::channel::oneshot::channel();
+    let bind_addr = SocketAddr::from((bind_ip, bind_port));
+    let (grpc_shutdown_tx, grpc_shutdown_rx) = oneshot::channel();
+    let (tonic_server_tx, tonic_server_rx) = oneshot::channel();
+    let grpc_actor_addr =
+        GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| {
+            Arbiter::spawn(async move {
+                let result = Server::builder()
+                    .add_service(TonicControlApiServer::new(ControlApiService(
+                        room_service,
+                    )))
+                    .serve_with_shutdown(bind_addr, async move {
+                        let _ = grpc_shutdown_rx.await;
+                    })
+                    .await;
 
-    let addr = format!("{}:{}", bind_ip, bind_port).parse().unwrap();
-    Arbiter::spawn(async move {
-        Server::builder()
-            .add_service(TonicControlApiServer::new(ControlApiService(
-                room_service,
-            )))
-            .serve_with_shutdown(addr, async move {
-                grpc_shutdown_rx.await.ok();
-            })
-            .await
-            .unwrap();
-    });
+                if let Err(err) = tonic_server_tx.send(result) {
+                    error!(
+                        "gRPC server failed to start, and error could not \
+                        be propagated. Error details: {:?}",
+                        err
+                    );
+                    System::current().stop();
+                };
+            });
 
-    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| {
-        GrpcServer(Some(grpc_shutdown_tx))
-    })
+            GrpcServer(Some(grpc_shutdown_tx))
+        });
+
+    (grpc_actor_addr, tonic_server_rx)
 }

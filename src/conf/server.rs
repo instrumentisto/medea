@@ -1,6 +1,6 @@
 //! Settings for application servers.
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
@@ -51,15 +51,11 @@ pub struct ClientApiHttpServer {
 }
 
 impl ClientApiHttpServer {
-    /// Builds [`SocketAddr`] from `bind_ip` and `bind_port`.
+    /// Builds a [`SocketAddr`] from `bind_ip` and `bind_port`.
     #[inline]
     #[must_use]
     pub fn bind_addr(&self) -> SocketAddr {
-        (self.bind_ip, self.bind_port)
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap()
+        (self.bind_ip, self.bind_port).into()
     }
 }
 
