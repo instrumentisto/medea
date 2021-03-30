@@ -58,6 +58,10 @@ pub struct AppContext {
 
 /// Run REST [Control API] server mock.
 ///
+/// # Panics
+///
+/// If the given `args` don't contain an expected `medea_addr` value.
+///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 pub async fn run(
     args: &ArgMatches<'static>,
@@ -149,7 +153,7 @@ macro_rules! gen_request_macro {
 /// # Errors
 ///
 /// Errors if unable to send message to [`GrpcCallbackServer`] actor.
-#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::missing_panics_doc, clippy::needless_pass_by_value)]
 pub async fn get_callbacks(
     state: Data<AppContext>,
 ) -> Result<HttpResponse, ()> {
@@ -258,11 +262,11 @@ pub struct ErrorResponse {
 
 impl From<proto::Error> for ErrorResponse {
     #[inline]
-    fn from(err: proto::Error) -> Self {
-        ErrorResponse {
-            code: err.code,
-            text: err.text,
-            element: err.element,
+    fn from(e: proto::Error) -> Self {
+        Self {
+            code: e.code,
+            text: e.text,
+            element: e.element,
         }
     }
 }
@@ -308,9 +312,9 @@ macro_rules! impl_from_for_http_response {
         impl From<$resp> for HttpResponse {
             fn from(resp: $resp) -> Self {
                 if resp.error.is_some() {
-                    HttpResponse::BadRequest().json(resp)
+                    Self::BadRequest().json(resp)
                 } else {
-                    HttpResponse::Ok().json(resp)
+                    Self::Ok().json(resp)
                 }
             }
         }
@@ -357,6 +361,11 @@ pub enum Element {
 }
 
 impl Element {
+    /// Converts this [`Element`] into an appropriate [`proto::room::Element`].
+    ///
+    /// # Panics
+    ///
+    /// If a conversion for such an [`Element`] isn't implemented yet.
     #[must_use]
     pub fn into_proto(self, id: String) -> proto::room::Element {
         let el = match self {

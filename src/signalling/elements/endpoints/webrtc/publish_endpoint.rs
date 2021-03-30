@@ -304,8 +304,8 @@ impl WeakWebRtcPublishEndpoint {
 
 impl From<WebRtcPublishEndpoint> for proto::WebRtcPublishEndpoint {
     fn from(endpoint: WebRtcPublishEndpoint) -> Self {
-        let p2p = proto::web_rtc_publish_endpoint::P2p::from(endpoint.p2p());
-        proto::WebRtcPublishEndpoint {
+        let p2p: proto::web_rtc_publish_endpoint::P2p = endpoint.p2p().into();
+        Self {
             p2p: p2p as i32,
             id: endpoint.id().to_string(),
             force_relay: endpoint.is_force_relayed(),

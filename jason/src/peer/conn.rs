@@ -676,8 +676,8 @@ impl RtcPeerConnection {
     ///
     /// # Panics
     ///
-    /// If any unexpected error happens while iterating over inner
-    /// [`SysRtcPeerConnection`]'s transceivers. Not supposed to ever happen.
+    /// If fails to [iterate over transceivers on JS side](js_sys::try_iter).
+    /// Not supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set

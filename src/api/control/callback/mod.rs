@@ -35,9 +35,9 @@ impl OnLeaveEvent {
 
 impl From<OnLeaveEvent> for proto::OnLeave {
     #[inline]
-    fn from(event: OnLeaveEvent) -> Self {
-        proto::OnLeave {
-            reason: proto::on_leave::Reason::from(event.reason) as i32,
+    fn from(ev: OnLeaveEvent) -> Self {
+        Self {
+            reason: proto::on_leave::Reason::from(ev.reason) as i32,
         }
     }
 }
@@ -60,8 +60,8 @@ pub enum OnLeaveReason {
 
 impl From<OnLeaveReason> for proto::on_leave::Reason {
     #[inline]
-    fn from(reason: OnLeaveReason) -> Self {
-        match reason {
+    fn from(rsn: OnLeaveReason) -> Self {
+        match rsn {
             OnLeaveReason::LostConnection => Self::LostConnection,
             OnLeaveReason::ServerShutdown => Self::ServerShutdown,
             OnLeaveReason::Disconnected => Self::Disconnected,
@@ -77,7 +77,7 @@ pub struct OnJoinEvent;
 impl From<OnJoinEvent> for proto::OnJoin {
     #[inline]
     fn from(_: OnJoinEvent) -> Self {
-        proto::OnJoin {}
+        Self {}
     }
 }
 
@@ -90,8 +90,8 @@ pub enum CallbackEvent {
 
 impl From<CallbackEvent> for proto::request::Event {
     #[inline]
-    fn from(event: CallbackEvent) -> Self {
-        match event {
+    fn from(ev: CallbackEvent) -> Self {
+        match ev {
             CallbackEvent::OnJoin(on_join) => Self::OnJoin(on_join.into()),
             CallbackEvent::OnLeave(on_leave) => Self::OnLeave(on_leave.into()),
         }
@@ -196,12 +196,11 @@ impl CallbackRequest {
 }
 
 impl From<CallbackRequest> for proto::Request {
-    #[inline]
-    fn from(request: CallbackRequest) -> Self {
+    fn from(req: CallbackRequest) -> Self {
         Self {
-            event: Some(request.event.into()),
-            fid: request.fid.to_string(),
-            at: request.at.to_rfc3339(),
+            event: Some(req.event.into()),
+            fid: req.fid.to_string(),
+            at: req.at.to_rfc3339(),
         }
     }
 }

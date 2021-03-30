@@ -2,6 +2,7 @@
 name = "medea-jason"
 version = "0.2.0-rc.1"
 edition = "2018"
+resolver = "2"
 description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MPL-2.0"

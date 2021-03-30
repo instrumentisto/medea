@@ -40,8 +40,8 @@ impl From<Endpoint> for proto::Element {
     #[inline]
     fn from(endpoint: Endpoint) -> Self {
         match endpoint {
-            Endpoint::WebRtcPublishEndpoint(play) => Self::from(play),
-            Endpoint::WebRtcPlayEndpoint(publish) => Self::from(publish),
+            Endpoint::WebRtcPublishEndpoint(play) => play.into(),
+            Endpoint::WebRtcPlayEndpoint(publish) => publish.into(),
         }
     }
 }

@@ -509,7 +509,7 @@ impl WeakMember {
     ///
     /// # Panics
     ///
-    /// If inner [`Weak`] pointer upgrade fails.
+    /// If an inner [`Weak`] pointer upgrade fails.
     #[inline]
     #[must_use]
     pub fn upgrade(&self) -> Member {
@@ -592,33 +592,29 @@ pub fn parse_members(
 }
 
 impl From<Member> for proto::Member {
-    fn from(member: Member) -> Self {
-        let member_pipeline = member
+    fn from(m: Member) -> Self {
+        let member_pipeline = m
             .sinks()
             .into_iter()
             .map(|(id, play)| (id.to_string(), play.into()))
             .chain(
-                member
-                    .srcs()
+                m.srcs()
                     .into_iter()
                     .map(|(id, publish)| (id.to_string(), publish.into())),
             )
             .collect();
 
         Self {
-            id: member.id().to_string(),
-            credentials: Some(member.credentials().into()),
-            on_leave: member
+            id: m.id().to_string(),
+            credentials: Some(m.credentials().into()),
+            on_leave: m
                 .get_on_leave()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            on_join: member
-                .get_on_join()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
-            reconnect_timeout: Some(member.get_reconnect_timeout().into()),
-            idle_timeout: Some(member.get_idle_timeout().into()),
-            ping_interval: Some(member.get_ping_interval().into()),
+            on_join: m.get_on_join().map(|c| c.to_string()).unwrap_or_default(),
+            reconnect_timeout: Some(m.get_reconnect_timeout().into()),
+            idle_timeout: Some(m.get_idle_timeout().into()),
+            ping_interval: Some(m.get_ping_interval().into()),
             pipeline: member_pipeline,
         }
     }
@@ -626,18 +622,18 @@ impl From<Member> for proto::Member {
 
 impl From<Member> for proto::room::Element {
     #[inline]
-    fn from(member: Member) -> Self {
+    fn from(m: Member) -> Self {
         Self {
-            el: Some(proto::room::element::El::Member(member.into())),
+            el: Some(proto::room::element::El::Member(m.into())),
         }
     }
 }
 
 impl From<Member> for proto::Element {
     #[inline]
-    fn from(member: Member) -> Self {
+    fn from(m: Member) -> Self {
         Self {
-            el: Some(proto::element::El::Member(member.into())),
+            el: Some(proto::element::El::Member(m.into())),
         }
     }
 }

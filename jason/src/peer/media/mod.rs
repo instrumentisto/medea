@@ -657,9 +657,9 @@ impl MediaConnections {
     ///
     /// # Panics
     ///
-    /// If [`Transceiver`] from provided [`RtcTrackEvent`] does not have
-    /// [`mid`]. Not supposed to happen, since [`RtcTrackEvent`] is only
-    /// fired when [`Transceiver`] is negotiated thus have [`mid`].
+    /// If [`Transceiver`] from the provided [`RtcTrackEvent`] doesn't have a
+    /// [`mid`]. Not supposed to happen, since [`RtcTrackEvent`] is only fired
+    /// when a [`Transceiver`] is negotiated, thus have a [`mid`].
     ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver

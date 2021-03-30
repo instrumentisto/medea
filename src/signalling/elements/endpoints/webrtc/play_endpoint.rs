@@ -250,7 +250,6 @@ impl From<WebRtcPlayEndpoint> for proto::member::Element {
 }
 
 impl From<WebRtcPlayEndpoint> for proto::WebRtcPlayEndpoint {
-    #[inline]
     fn from(endpoint: WebRtcPlayEndpoint) -> Self {
         Self {
             on_start: String::new(),

@@ -151,6 +151,10 @@ where
 
 /// [`Future`] which resolves after the provided [`JsDuration`].
 ///
+/// # Panics
+///
+/// If fails to interact with JS side.
+///
 /// [`Future`]: std::future::Future
 ///
 /// # Panics

@@ -43,7 +43,7 @@ struct Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`] spawning a listener for its [`enabled`][1]
+    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1]
     /// property changes.
     ///
     /// # Panics

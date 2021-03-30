@@ -260,7 +260,7 @@ impl PeerStateMachine {
     ///
     /// # Panics
     ///
-    /// If this [`Peer`] does not have [`IceUser`].
+    /// If this [`Peer`] doesn't have an [`IceUser`].
     #[must_use]
     pub fn get_state(&self) -> state::Peer {
         state::Peer {

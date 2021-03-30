@@ -67,8 +67,8 @@ impl<'a, T> Future for Processed<'a, T> {
 
 impl<'a, T> From<Processed<'a, T>> for Factory<'a, T> {
     #[inline]
-    fn from(processed: Processed<'a, T>) -> Self {
-        processed.factory
+    fn from(p: Processed<'a, T>) -> Self {
+        p.factory
     }
 }
 
@@ -97,8 +97,8 @@ pub struct AllProcessed<'a, T = ()> {
 
 impl<'a, T> From<AllProcessed<'a, T>> for Factory<'a, T> {
     #[inline]
-    fn from(processed: AllProcessed<'a, T>) -> Self {
-        processed.factory
+    fn from(p: AllProcessed<'a, T>) -> Self {
+        p.factory
     }
 }
 

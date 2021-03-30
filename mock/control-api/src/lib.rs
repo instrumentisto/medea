@@ -3,7 +3,7 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-#![allow(clippy::module_name_repetitions, clippy::missing_panics_doc)]
+#![allow(clippy::module_name_repetitions)]
 
 pub mod api;
 pub mod callback;
@@ -27,6 +27,10 @@ pub mod proto {
 
 /// Initializes [`slog`] logger outputting logs with a [`slog_term`]'s
 /// decorator.
+///
+/// # Panics
+///
+/// If [`slog_stdlog`] fails to [initialize](slog_stdlog::init).
 pub fn init_logger() -> GlobalLoggerGuard {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();

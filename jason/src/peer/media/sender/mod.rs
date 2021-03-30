@@ -136,15 +136,14 @@ impl Sender {
     ///
     /// # Panics
     ///
-    /// If [`replaceTrack`][1] call fails. This might happen if underlying
-    /// [`RTCRtpSender`][1] is stopped. [`replaceTrack`][1] with `null` track
+    /// If [replaceTrack()][2] call fails. This might happen if an underlying
+    /// [RTCRtpSender][1] is stopped. [replaceTrack()][2] with `null` track
     /// should never fail for any other reason.
     ///
     /// [1]: https://w3c.github.io/webrtc-pc/#dom-rtcrtpsender
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     #[inline]
     pub async fn remove_track(&self) {
-        // cannot fail
         self.transceiver.set_send_track(None).await.unwrap();
     }
 
