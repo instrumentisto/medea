@@ -68,7 +68,7 @@ impl Room {
         let endpoint_id =
             if let Ok(member) = self.members.get_member_by_id(member_id) {
                 let play_id = endpoint_id.into();
-                if let Some(endpoint) = member.take_sink(&play_id) {
+                if let Some(endpoint) = member.remove_sink(&play_id) {
                     if let Some(peer_id) = endpoint.peer_id() {
                         let removed_peers =
                             self.peers.remove_peers(member_id, &[peer_id]);
@@ -82,7 +82,7 @@ impl Room {
                 }
 
                 let publish_id = String::from(play_id).into();
-                if let Some(endpoint) = member.take_src(&publish_id) {
+                if let Some(endpoint) = member.remove_src(&publish_id) {
                     let peer_ids = endpoint.peer_ids();
                     self.remove_peers(member_id, &peer_ids);
                 }
@@ -277,25 +277,26 @@ impl Room {
     }
 }
 
-impl Into<proto::Room> for &Room {
-    fn into(self) -> proto::Room {
-        let pipeline = self
+impl From<&Room> for proto::Room {
+    fn from(room: &Room) -> Self {
+        let pipeline = room
             .members
             .members()
             .into_iter()
             .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
-        proto::Room {
-            id: self.id().to_string(),
+        Self {
+            id: room.id().to_string(),
             pipeline,
         }
     }
 }
 
-impl Into<proto::Element> for &Room {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::Room(self.into())),
+impl From<&Room> for proto::Element {
+    #[inline]
+    fn from(room: &Room) -> Self {
+        Self {
+            el: Some(proto::element::El::Room(room.into())),
         }
     }
 }
