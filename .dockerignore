@@ -15,6 +15,7 @@
 !jason/src/
 !jason/demo/chart/medea-demo/conf/
 !jason/demo/index.html
+!jason/jason-hello-world
 
 # Makefile may be used in Dockerfiles.
 !.env
