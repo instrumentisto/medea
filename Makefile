@@ -71,16 +71,7 @@ build.medea:
 build.jason.wasm:
 	@make cargo.build crate=medea-jason debug=$(debug) dockerized=$(dockerized)
 
-crate.type.jason:
-ifeq ($(type),cdylib)
-	perl -pi -e "s/staticlib/cdylib/g" jason/jason-hello-world/Cargo.toml
-else ifeq ($(type),staticlib)
-	perl -pi -e "s/cdylib/staticlib/g" jason/jason-hello-world/Cargo.toml
-endif
-
-
 build.jason.android:
-	@make crate.type.jason type=cdylib
 ifeq ($(target),)
 	@make build.jason.android target=arm64-v8a
 	@make build.jason.android target=armeabi-v7a
@@ -93,10 +84,8 @@ else
 			-o ../../jason/flutter/android/src/main/jniLibs \
 			build
 endif
-	@make crate.type.jason type=staticlib
 
 build.jason.ios:
-	@make crate.type.jason type=staticlib
 	cd jason/jason-hello-world && cargo lipo
 	cp target/universal/debug/libjason.a \
 	   jason/flutter/ios
