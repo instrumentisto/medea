@@ -277,25 +277,26 @@ impl Room {
     }
 }
 
-impl Into<proto::Room> for &Room {
-    fn into(self) -> proto::Room {
-        let pipeline = self
+impl From<&Room> for proto::Room {
+    fn from(room: &Room) -> Self {
+        let pipeline = room
             .members
             .members()
             .into_iter()
             .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
-        proto::Room {
-            id: self.id().to_string(),
+        Self {
+            id: room.id().to_string(),
             pipeline,
         }
     }
 }
 
-impl Into<proto::Element> for &Room {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::Room(self.into())),
+impl From<&Room> for proto::Element {
+    #[inline]
+    fn from(room: &Room) -> Self {
+        Self {
+            el: Some(proto::element::El::Room(room.into())),
         }
     }
 }

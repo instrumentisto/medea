@@ -257,6 +257,7 @@ impl PeerStateMachine {
     }
 
     /// Returns a [`state::Peer`] of this [`PeerStateMachine`].
+    #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn get_state(&self) -> state::Peer {
         state::Peer {

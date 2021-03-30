@@ -33,10 +33,11 @@ impl OnLeaveEvent {
     }
 }
 
-impl Into<proto::OnLeave> for OnLeaveEvent {
-    fn into(self) -> proto::OnLeave {
-        let on_leave: proto::on_leave::Reason = self.reason.into();
-        proto::OnLeave {
+impl From<OnLeaveEvent> for proto::OnLeave {
+    #[inline]
+    fn from(ev: OnLeaveEvent) -> Self {
+        let on_leave: proto::on_leave::Reason = ev.reason.into();
+        Self {
             reason: on_leave as i32,
         }
     }
@@ -58,13 +59,14 @@ pub enum OnLeaveReason {
     ServerShutdown,
 }
 
-impl Into<proto::on_leave::Reason> for OnLeaveReason {
-    fn into(self) -> proto::on_leave::Reason {
-        match self {
-            Self::LostConnection => proto::on_leave::Reason::LostConnection,
-            Self::ServerShutdown => proto::on_leave::Reason::ServerShutdown,
-            Self::Disconnected => proto::on_leave::Reason::Disconnected,
-            Self::Kicked => proto::on_leave::Reason::Kicked,
+impl From<OnLeaveReason> for proto::on_leave::Reason {
+    #[inline]
+    fn from(rsn: OnLeaveReason) -> Self {
+        match rsn {
+            OnLeaveReason::LostConnection => Self::LostConnection,
+            OnLeaveReason::ServerShutdown => Self::ServerShutdown,
+            OnLeaveReason::Disconnected => Self::Disconnected,
+            OnLeaveReason::Kicked => Self::Kicked,
         }
     }
 }
@@ -73,9 +75,10 @@ impl Into<proto::on_leave::Reason> for OnLeaveReason {
 #[derive(Debug)]
 pub struct OnJoinEvent;
 
-impl Into<proto::OnJoin> for OnJoinEvent {
-    fn into(self) -> proto::OnJoin {
-        proto::OnJoin {}
+impl From<OnJoinEvent> for proto::OnJoin {
+    #[inline]
+    fn from(_: OnJoinEvent) -> Self {
+        Self {}
     }
 }
 
@@ -86,15 +89,12 @@ pub enum CallbackEvent {
     OnLeave(OnLeaveEvent),
 }
 
-impl Into<proto::request::Event> for CallbackEvent {
-    fn into(self) -> proto::request::Event {
-        match self {
-            Self::OnJoin(on_join) => {
-                proto::request::Event::OnJoin(on_join.into())
-            }
-            Self::OnLeave(on_leave) => {
-                proto::request::Event::OnLeave(on_leave.into())
-            }
+impl From<CallbackEvent> for proto::request::Event {
+    #[inline]
+    fn from(ev: CallbackEvent) -> Self {
+        match ev {
+            CallbackEvent::OnJoin(on_join) => Self::OnJoin(on_join.into()),
+            CallbackEvent::OnLeave(on_leave) => Self::OnLeave(on_leave.into()),
         }
     }
 }
@@ -196,12 +196,12 @@ impl CallbackRequest {
     }
 }
 
-impl Into<proto::Request> for CallbackRequest {
-    fn into(self) -> proto::Request {
-        proto::Request {
-            event: Some(self.event.into()),
-            fid: self.fid.to_string(),
-            at: self.at.to_rfc3339(),
+impl From<CallbackRequest> for proto::Request {
+    fn from(req: CallbackRequest) -> Self {
+        Self {
+            event: Some(req.event.into()),
+            fid: req.fid.to_string(),
+            at: req.at.to_rfc3339(),
         }
     }
 }

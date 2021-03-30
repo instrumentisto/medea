@@ -657,6 +657,7 @@ impl MediaConnections {
     ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
+    #[allow(clippy::missing_panics_doc)]
     pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
         let inner = self.0.borrow();
         let transceiver = Transceiver::from(track_event.transceiver());

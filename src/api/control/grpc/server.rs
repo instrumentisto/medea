@@ -293,6 +293,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 /// Run gRPC [Control API] server in actix actor.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
+#[allow(clippy::missing_panics_doc)]
 pub async fn run(
     room_service: Addr<RoomService>,
     app: &AppContext,

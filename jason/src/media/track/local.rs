@@ -41,8 +41,9 @@ pub struct Track {
 }
 
 impl Track {
-    /// Builds new [`Track`] from the provided [`sys::MediaStreamTrack`] and
+    /// Builds a new [`Track`] from the provided [`sys::MediaStreamTrack`] and
     /// [`MediaSourceKind`].
+    #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn new(
         track: sys::MediaStreamTrack,

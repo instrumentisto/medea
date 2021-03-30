@@ -133,9 +133,10 @@ impl Sender {
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to [`None`].
+    #[allow(clippy::missing_panics_doc)]
     #[inline]
     pub async fn remove_track(&self) {
-        // cannot fail
+        // cannot fail TODO: why? describe it properly
         self.transceiver.set_send_track(None).await.unwrap();
     }
 

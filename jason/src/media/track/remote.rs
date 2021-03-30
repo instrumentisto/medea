@@ -43,10 +43,11 @@ struct Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`] spawning a listener for its [`enabled`][1]
+    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1]
     /// property changes.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn new<T>(track: T, media_source_kind: MediaSourceKind) -> Self
     where

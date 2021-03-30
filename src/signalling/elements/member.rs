@@ -428,6 +428,7 @@ impl Member {
     ///
     /// This function will add created [`WebRtcPlayEndpoint`] to `src`s of
     /// [`WebRtcPublishEndpoint`] and to provided [`Member`].
+    #[allow(clippy::missing_panics_doc)]
     pub fn create_sink(
         member: &Rc<Self>,
         id: WebRtcPlayId,
@@ -544,7 +545,9 @@ pub struct WeakMember(Weak<RefCell<MemberInner>>);
 impl WeakMember {
     /// Upgrades weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer was dropped.
+    /// # Panics
+    ///
+    /// If a weak pointer has been dropped.
     #[inline]
     #[must_use]
     pub fn upgrade(&self) -> Member {
@@ -626,50 +629,49 @@ pub fn parse_members(
     Ok(members)
 }
 
-impl Into<proto::Member> for Member {
-    fn into(self) -> proto::Member {
-        let member_pipeline = self
+impl From<Member> for proto::Member {
+    fn from(m: Member) -> Self {
+        let member_pipeline = m
             .sinks()
             .into_iter()
             .map(|(id, play)| (id.to_string(), play.into()))
             .chain(
-                self.srcs()
+                m.srcs()
                     .into_iter()
                     .map(|(id, publish)| (id.to_string(), publish.into())),
             )
             .collect();
 
-        proto::Member {
-            id: self.id().to_string(),
-            credentials: Some(self.credentials().into()),
-            on_leave: self
+        Self {
+            id: m.id().to_string(),
+            credentials: Some(m.credentials().into()),
+            on_leave: m
                 .get_on_leave()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            on_join: self
-                .get_on_join()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
-            reconnect_timeout: Some(self.get_reconnect_timeout().into()),
-            idle_timeout: Some(self.get_idle_timeout().into()),
-            ping_interval: Some(self.get_ping_interval().into()),
+            on_join: m.get_on_join().map(|c| c.to_string()).unwrap_or_default(),
+            reconnect_timeout: Some(m.get_reconnect_timeout().into()),
+            idle_timeout: Some(m.get_idle_timeout().into()),
+            ping_interval: Some(m.get_ping_interval().into()),
             pipeline: member_pipeline,
         }
     }
 }
 
-impl Into<proto::room::Element> for Member {
-    fn into(self) -> proto::room::Element {
-        proto::room::Element {
-            el: Some(proto::room::element::El::Member(self.into())),
+impl From<Member> for proto::room::Element {
+    #[inline]
+    fn from(m: Member) -> Self {
+        Self {
+            el: Some(proto::room::element::El::Member(m.into())),
         }
     }
 }
 
-impl Into<proto::Element> for Member {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::Member(self.into())),
+impl From<Member> for proto::Element {
+    #[inline]
+    fn from(m: Member) -> Self {
+        Self {
+            el: Some(proto::element::El::Member(m.into())),
         }
     }
 }
