@@ -68,6 +68,13 @@ impl Transceiver {
 
     /// Sets [`TransceiverDirection::SEND`] [`local::Track`] of this
     /// [`Transceiver`] to [`None`].
+    ///
+    /// # Panics
+    ///
+    /// If [`local::Track`] replacement with `None` fails on JS side. But based
+    /// on [WebAPI docs] it never can happen.
+    ///
+    /// [WebAPI docs]: https://tinyurl.com/7pnszaa8
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
         self.send_track.replace(None);
         let fut = self.transceiver.sender().replace_track(None);

@@ -61,8 +61,12 @@ impl Drop for Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`] spawning a listener for its [`enabled`][1]
+    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1]
     /// property changes.
+    ///
+    /// # Panics
+    ///
+    /// If provided [`sys::MediaStreamTrack`] kind is not `audio` or `video`.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     #[must_use]

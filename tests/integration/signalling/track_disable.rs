@@ -108,7 +108,7 @@ async fn helper(
                 }
             }
         }
-    };
+    }
     wait_tracks_applied(enabled, publisher_rx, PeerId(0)).await;
     wait_tracks_applied(enabled, subscriber_rx, PeerId(1)).await;
 }

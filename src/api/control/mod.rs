@@ -239,6 +239,10 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 ///
 /// Errors if unable to send message to [`RoomService`] actor.
 ///
+/// # Panics
+///
+/// If the [`RoomService`] fails to start all static [`Room`]s.
+///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Room`]: crate::signalling::room::Room
 pub async fn start_static_rooms(
@@ -252,7 +256,7 @@ pub async fn start_static_rooms(
              specs not loaded. {}",
             e,
         ),
-        Err(e) => panic!("{}", e),
+        Err(e) => return Err(Error::from(e)),
         Ok(_) => {}
     };
     Ok(())

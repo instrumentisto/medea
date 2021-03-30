@@ -2,7 +2,10 @@
 //!
 //! [Callback service]: https://tinyurl.com/y5fajesq
 
-use std::sync::{Arc, Mutex};
+use std::{
+    convert::Infallible,
+    sync::{Arc, Mutex},
+};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use clap::ArgMatches;
@@ -63,11 +66,11 @@ impl CallbackService for GrpcCallbackService {
 /// [`Message`] which returns all [`CallbackItem`]s received by this
 /// [`GrpcCallbackServer`].
 #[derive(Message)]
-#[rtype(result = "Result<Vec<CallbackItem>, ()>")]
+#[rtype(result = "Result<Vec<CallbackItem>, Infallible>")]
 pub struct GetCallbackItems;
 
 impl Handler<GetCallbackItems> for GrpcCallbackServer {
-    type Result = Result<Vec<CallbackItem>, ()>;
+    type Result = Result<Vec<CallbackItem>, Infallible>;
 
     fn handle(
         &mut self,
@@ -79,6 +82,11 @@ impl Handler<GetCallbackItems> for GrpcCallbackServer {
 }
 
 /// Run [`GrpcCallbackServer`].
+///
+/// # Panics
+///
+/// If the given `args` don't contain expected `callback_host` and
+/// `callback_port` values.
 pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
     let host = args.value_of("callback_host").unwrap();
     let port: u32 = args.value_of("callback_port").unwrap().parse().unwrap();

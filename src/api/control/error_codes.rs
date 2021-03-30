@@ -105,18 +105,18 @@ impl ErrorResponse {
     }
 }
 
-impl Into<proto::Error> for ErrorResponse {
-    fn into(self) -> proto::Error {
-        let text = if let Some(additional_text) = &self.explanation {
-            format!("{} {}", self.error_code.to_string(), additional_text)
+impl From<ErrorResponse> for proto::Error {
+    fn from(resp: ErrorResponse) -> Self {
+        let text = if let Some(additional_text) = &resp.explanation {
+            format!("{} {}", resp.error_code.to_string(), additional_text)
         } else {
-            self.error_code.to_string()
+            resp.error_code.to_string()
         };
-        proto::Error {
+        Self {
             doc: String::new(),
             text,
-            element: self.element_id.unwrap_or_default(),
-            code: self.error_code as u32,
+            element: resp.element_id.unwrap_or_default(),
+            code: resp.error_code as u32,
         }
     }
 }

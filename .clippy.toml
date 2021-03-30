@@ -30,5 +30,5 @@ doc-valid-idents = [
     "RTCStats", "RTCStatsReport",
     "RTCTrackEvent",
     "RTCVideoSenderStats",
-    "WebDriver", "WebRTC", "WebSocket",
+    "WebAPI", "WebDriver", "WebRTC", "WebSocket",
 ]

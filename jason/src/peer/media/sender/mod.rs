@@ -134,6 +134,15 @@ impl Sender {
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
     /// sending side of inner transceiver to [`None`].
+    ///
+    /// # Panics
+    ///
+    /// If [replaceTrack()][2] call fails. This might happen if an underlying
+    /// [RTCRtpSender][1] is stopped. [replaceTrack()][2] with `null` track
+    /// should never fail for any other reason.
+    ///
+    /// [1]: https://w3c.github.io/webrtc-pc/#dom-rtcrtpsender
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     #[inline]
     pub async fn remove_track(&self) {
         self.transceiver.drop_send_track().await;
