@@ -8,3 +8,8 @@ name = "jason"
 crate-type = ["staticlib"]
 
 [dependencies]
+dart-sys = "2.0"
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"

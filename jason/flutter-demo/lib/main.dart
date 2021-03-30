@@ -51,6 +51,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Jason _jason = Jason();
 
   void _incrementCounter() {
+    var qq = _jason.foobar();
+    print(qq);
+
+    var foo = _jason.check_arr();
+    print(foo);
     setState(() {
       // This call to setState tells the Flutter framework that something has
       // changed in this State, which causes it to rerun the build method below
