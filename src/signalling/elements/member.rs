@@ -389,14 +389,14 @@ impl Member {
     /// Takes sink from [`Member`]'s `sinks`.
     #[inline]
     #[must_use]
-    pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
+    pub fn remove_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
     /// Takes src from [`Member`]'s `srsc`.
     #[inline]
     #[must_use]
-    pub fn take_src(
+    pub fn remove_src(
         &self,
         id: &WebRtcPublishId,
     ) -> Option<WebRtcPublishEndpoint> {
@@ -753,10 +753,10 @@ mod tests {
         let some_member = store.get(&id("some-member")).unwrap();
         let responder = store.get(&id("responder")).unwrap();
 
-        drop(caller.take_src(&id("publish")));
+        drop(caller.remove_src(&id("publish")));
         assert_eq!(responder.sinks().len(), 1);
 
-        drop(some_member.take_src(&id("publish")));
+        drop(some_member.remove_src(&id("publish")));
         assert_eq!(responder.sinks().len(), 0);
     }
 
@@ -772,11 +772,11 @@ mod tests {
         let some_member_publisher =
             some_member.get_src_by_id(&id("publish")).unwrap();
 
-        drop(responder.take_sink(&id("play")));
+        drop(responder.remove_sink(&id("play")));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 1);
 
-        drop(responder.take_sink(&id("play2")));
+        drop(responder.remove_sink(&id("play2")));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 0);
     }

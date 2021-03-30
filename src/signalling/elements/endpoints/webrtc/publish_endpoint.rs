@@ -63,7 +63,7 @@ impl Drop for WebRtcPublishEndpointInner {
             .filter_map(WeakWebRtcPlayEndpoint::safe_upgrade)
         {
             if let Some(receiver_owner) = receiver.weak_owner().safe_upgrade() {
-                drop(receiver_owner.take_sink(&receiver.id()))
+                drop(receiver_owner.remove_sink(&receiver.id()))
             }
         }
     }

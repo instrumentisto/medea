@@ -295,7 +295,9 @@ impl Handler<ShutdownGracefully> for GrpcServer {
     }
 }
 
-/// Run gRPC [Control API] server in actix actor.
+/// Run gRPC [Control API] server in actix actor. Returns [`Addr`] of
+/// [`GrpcServer`] [`Actor`] and [`oneshot::Receiver`] for [`transport::Error`]
+/// that may fire when initializing [`GrpcServer`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 pub fn run(
