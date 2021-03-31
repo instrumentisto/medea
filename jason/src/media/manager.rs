@@ -308,7 +308,7 @@ impl InnerMediaManager {
     /// With [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
     /// the provided [`sys::MediaStream`] is in [`ended`][1] state.
     ///
-    /// In case of error all tracks are stopped and are not saved in
+    /// In case of error all tracks are ended and are not saved in
     /// [`MediaManager`]'s tracks storage.
     ///
     /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended

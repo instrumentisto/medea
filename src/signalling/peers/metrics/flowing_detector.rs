@@ -128,7 +128,7 @@ impl RtcStatsHandler for TrafficFlowDetector {
 
         let first_peer_stat = Rc::new(RefCell::new(PeerStat {
             peer_id: peer.id(),
-            member_id: peer.member_id(),
+            member_id: peer.member_id().clone(),
             partner_peer: Weak::new(),
             last_update: Utc::now(),
             senders: HashMap::new(),

@@ -404,6 +404,36 @@ impl World {
         Ok(())
     }
 
+    /// Deletes a Control API element of a `WebRtcPublishEndpoint` with the
+    /// provided ID.
+    pub async fn delete_publish_endpoint(&mut self, member_id: &str) {
+        let resp = self
+            .control_client
+            .delete(&format!("{}/{}/publish", self.room_id, member_id))
+            .await
+            .unwrap();
+        assert!(resp.error.is_none());
+    }
+
+    /// Deletes a Control API element of a `WebRtcPlayEndpoint` with the
+    /// provided ID.
+    pub async fn delete_play_endpoint(
+        &mut self,
+        member_id: &str,
+        partner_member_id: &str,
+    ) {
+        let play_endpoint_id = format!("play-{}", partner_member_id);
+        let resp = self
+            .control_client
+            .delete(&format!(
+                "{}/{}/{}",
+                self.room_id, member_id, play_endpoint_id
+            ))
+            .await
+            .unwrap();
+        assert!(resp.error.is_none());
+    }
+
     /// Deletes a Control API element of the [`Member`] with the provided ID.
     pub async fn delete_member_element(&mut self, member_id: &str) {
         let resposne = self

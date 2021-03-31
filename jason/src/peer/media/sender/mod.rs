@@ -6,6 +6,7 @@ use std::{cell::Cell, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::TrackId;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
@@ -144,7 +145,7 @@ impl Sender {
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     #[inline]
     pub async fn remove_track(&self) {
-        self.transceiver.set_send_track(None).await.unwrap();
+        self.transceiver.drop_send_track().await;
     }
 
     /// Indicates whether this [`Sender`] has [`local::Track`].
@@ -173,7 +174,7 @@ impl Sender {
         new_track.set_enabled(!self.muted.get());
 
         self.transceiver
-            .set_send_track(Some(Rc::new(new_track)))
+            .set_send_track(Rc::new(new_track))
             .await
             .map_err(Into::into)
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
@@ -260,5 +261,14 @@ impl Sender {
     #[must_use]
     pub fn muted(&self) -> bool {
         self.muted.get()
+    }
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        if !self.transceiver.is_stopped() {
+            self.transceiver.sub_direction(TransceiverDirection::SEND);
+            spawn_local(self.transceiver.drop_send_track());
+        }
     }
 }

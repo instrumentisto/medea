@@ -496,6 +496,12 @@ pub enum PeerUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
 
+    /// [`Track`] with the provided [`TrackId`] should be removed from the
+    /// `Peer`.
+    ///
+    /// Can only refer [`Track`]s already known to the `Peer`.
+    Removed(TrackId),
+
     /// [`Track`] should be updated by this [`TrackPatchEvent`] in the `Peer`.
     /// Can only refer tracks already known to the `Peer`.
     Updated(TrackPatchEvent),

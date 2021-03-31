@@ -37,10 +37,10 @@ impl Room {
                 }
             };
 
-        let member_id = peer.member_id();
         let ice_servers = if let Some(ice_servers) = peer.ice_servers_list() {
             ice_servers
         } else {
+            let member_id = peer.member_id().clone();
             self.peers.add_peer(peer);
             self.peers.add_peer(partner_peer);
             return Err(RoomError::NoTurnCredentials(member_id));
@@ -57,10 +57,13 @@ impl Room {
             force_relay: peer.is_force_relayed(),
         };
 
+        self.members
+            .send_event_to_member(peer.member_id(), peer_created);
+
         self.peers.add_peer(peer);
         self.peers.add_peer(partner_peer);
 
-        self.members.send_event_to_member(member_id, peer_created)
+        Ok(())
     }
 }
 
@@ -124,12 +127,13 @@ impl PeersMetricsEventHandler for Room {
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
         self.members.send_event_to_member(
-            member_id,
+            &member_id,
             Event::ConnectionQualityUpdated {
                 partner_member_id,
                 quality_score,
             },
-        )
+        );
+        Ok(())
     }
 
     /// Schedules ICE restart and commits scheduled changes.
@@ -227,17 +231,16 @@ impl Handler<ForceUpdate> for Room {
         msg: ForceUpdate,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let member_id = self
-            .peers
-            .map_peer_by_id(msg.0, PeerStateMachine::member_id)?;
-        self.members.send_event_to_member(
-            member_id,
-            Event::PeerUpdated {
-                peer_id: msg.0,
-                updates: msg.1,
-                negotiation_role: None,
-            },
-        )
+        self.peers.map_peer_by_id(msg.0, |peer| {
+            self.members.send_event_to_member(
+                peer.member_id(),
+                Event::PeerUpdated {
+                    peer_id: msg.0,
+                    updates: msg.1,
+                    negotiation_role: None,
+                },
+            );
+        })
     }
 }
 

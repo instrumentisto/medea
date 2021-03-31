@@ -6,6 +6,23 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.2.0] · 2021-??-?? · To-be-done
+[0.2.0]: /../../tree/medea-0.2.0
+
+[Diff](/../../compare/medea-0.2.0-rc.1...medea-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+
+First, consider [0.2.0-rc.1] changes.
+
+### Added
+
+- Signalling:
+    - Emitting `TracksApplied` event to remove existing tracks on a client side ([#109]).
+
+[#109]: /../../pull/109
+
+
+
+
 ## [0.2.0-rc.1] · 2021-02-01
 [0.2.0-rc.1]: /../../tree/medea-0.2.0-rc.1
 

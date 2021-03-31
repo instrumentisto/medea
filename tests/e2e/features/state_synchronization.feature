@@ -73,3 +73,34 @@ Feature: State synchronization
     And Control API removes member Bob
     And Alice restores WS connection
     Then Alice's connection with Bob closes
+
+  Scenario: Control API deletes WebRtcPublishEndpoint
+    Given room with joined member Alice and Bob
+    When Alice loses WS connection
+    And Control API deletes Alice's publish endpoint
+    And Alice restores WS connection
+    Then Bob's remote tracks from Alice are ended
+
+  Scenario: Control API deletes WebRtcPlayEndpoint
+    Given room with joined member Alice and Bob
+    When Alice loses WS connection
+    And Control API deletes Alice's play endpoint with Bob
+    And Alice restores WS connection
+    Then Alice's remote tracks from Bob are ended
+
+  Scenario: Control API deletes all endpoints
+    Given room with joined member Alice and Bob
+    When Alice loses WS connection
+    And Control API deletes Alice's publish endpoint
+    And Control API deletes Alice's play endpoint with Bob
+    And Alice restores WS connection
+    Then Alice's connection with Bob closes
+    And Bob's connection with Alice closes
+
+  Scenario: Create and delete endpoints while disconnected
+    Given room with joined member Alice and Bob with no WebRTC endpoints
+    When Alice loses WS connection
+    And Control API starts Alice's audio publishing to Bob
+    And Control API deletes Alice's publish endpoint
+    And Alice restores WS connection
+    Then Alice doesn't have live local tracks

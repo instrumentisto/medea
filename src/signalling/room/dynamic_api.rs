@@ -3,13 +3,13 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use actix::{
     fut, ActorFuture as _, AsyncContext as _, AtomicResponse, Context, Handler,
     Message, WrapFuture as _,
 };
-use medea_client_api_proto::{CloseReason, MemberId, PeerId};
+use medea_client_api_proto::{CloseReason, MemberId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -28,6 +28,7 @@ use crate::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             member::MemberError,
         },
+        peers::PeerChange,
         room::ActFuture,
     },
 };
@@ -60,43 +61,60 @@ impl Room {
     }
 
     /// Deletes endpoint from this [`Room`] by ID.
+    ///
+    /// Starts a renegotiation process for the affected [`Peer`]s if required.
+    ///
+    /// Deletes its [`Peer`] if the deleted endpoint is the last one associated
+    /// with it.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
         endpoint_id: EndpointId,
-    ) {
-        let endpoint_id =
-            if let Ok(member) = self.members.get_member_by_id(member_id) {
-                let play_id = endpoint_id.into();
-                if let Some(endpoint) = member.remove_sink(&play_id) {
-                    if let Some(peer_id) = endpoint.peer_id() {
-                        let removed_peers =
-                            self.peers.remove_peers(member_id, &[peer_id]);
-                        for (member_id, peers) in removed_peers {
-                            self.member_peers_removed(
-                                peers.into_iter().map(|p| p.id()).collect(),
-                                member_id,
-                            );
+    ) -> Result<(), RoomError> {
+        if let Ok(member) = self.members.get_member_by_id(member_id) {
+            let play_id = endpoint_id.into();
+            let changeset =
+                if let Some(sink_endpoint) = member.remove_sink(&play_id) {
+                    self.peers.delete_sink_endpoint(&sink_endpoint)?
+                } else {
+                    let publish_id = String::from(play_id).into();
+
+                    if let Some(src_endpoint) = member.remove_src(&publish_id) {
+                        self.peers.delete_src_endpoint(&src_endpoint)?
+                    } else {
+                        HashSet::new()
+                    }
+                };
+
+            {
+                let mut removed_peers: HashMap<_, Vec<_>> = HashMap::new();
+                let mut discard_updates = HashSet::new();
+                let mut updated_peers = HashSet::new();
+                for change in changeset {
+                    match change {
+                        PeerChange::Removed(member_id, peer_id) => {
+                            removed_peers
+                                .entry(member_id)
+                                .or_default()
+                                .push(peer_id);
+                            discard_updates.insert(peer_id);
+                        }
+                        PeerChange::Updated(peer_id) => {
+                            updated_peers.insert(peer_id);
                         }
                     }
                 }
-
-                let publish_id = String::from(play_id).into();
-                if let Some(endpoint) = member.remove_src(&publish_id) {
-                    let peer_ids = endpoint.peer_ids();
-                    self.remove_peers(member_id, &peer_ids);
+                for updated_peer_id in updated_peers {
+                    self.peers.commit_scheduled_changes(updated_peer_id)?;
                 }
 
-                publish_id.into()
-            } else {
-                endpoint_id
+                for (member_id, peer_ids) in removed_peers {
+                    self.send_peers_removed(&member_id, peer_ids);
+                }
             };
+        }
 
-        debug!(
-            "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
-             {}].",
-            endpoint_id, member_id, self.id
-        );
+        Ok(())
     }
 
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
@@ -249,32 +267,6 @@ impl Room {
             },
         )))
     }
-
-    /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
-    /// [`Member`].
-    ///
-    /// This will delete [`Peer`]s from [`Room::peers`] and send
-    /// [`Event::PeersRemoved`] event to [`Member`].
-    ///
-    /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
-    /// [`Member`]: crate::signalling::elements::Member
-    /// [`Peer`]: crate::media::peer::Peer
-    fn remove_peers<'a, Peers: IntoIterator<Item = &'a PeerId>>(
-        &mut self,
-        member_id: &MemberId,
-        peer_ids_to_remove: Peers,
-    ) {
-        debug!("Remove peers.");
-        self.peers
-            .remove_peers(&member_id, peer_ids_to_remove)
-            .into_iter()
-            .for_each(|(member_id, peers)| {
-                self.member_peers_removed(
-                    peers.into_iter().map(|p| p.id()).collect(),
-                    member_id,
-                );
-            });
-    }
 }
 
 impl From<&Room> for proto::Room {
@@ -384,7 +376,9 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            self.delete_endpoint(&member_id, endpoint_id);
+            if let Err(e) = self.delete_endpoint(&member_id, endpoint_id) {
+                error!("Error while deleting endpoint: {:?}", e);
+            }
         });
     }
 }

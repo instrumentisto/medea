@@ -61,12 +61,27 @@ impl<S> TracksRepository<S> {
         self.0.borrow().get(&id).cloned()
     }
 
-    /// Returns a [`Stream`] streaming the all [`TracksRepository::insert`]ions.
+    /// Returns a [`Stream`] streaming all the [`TracksRepository::insert`]ions.
     #[inline]
     pub fn on_insert(
         &self,
     ) -> LocalBoxStream<'static, Guarded<(TrackId, Rc<S>)>> {
         self.0.borrow().on_insert_with_replay()
+    }
+
+    /// Returns a [`Stream`] streaming all the [`TracksRepository::remove`]s.
+    #[inline]
+    pub fn on_remove(
+        &self,
+    ) -> LocalBoxStream<'static, Guarded<(TrackId, Rc<S>)>> {
+        self.0.borrow().on_remove()
+    }
+
+    /// Removes a track with the provided [`TrackId`], reporting whether it has
+    /// been removed or it hasn't existed at all.
+    #[inline]
+    pub fn remove(&self, id: TrackId) -> bool {
+        self.0.borrow_mut().remove(&id).is_some()
     }
 }
 

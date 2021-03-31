@@ -2,11 +2,11 @@
 
 use std::{
     cell::RefCell,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{PeerId, TrackId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
@@ -25,6 +25,10 @@ use super::play_endpoint::WebRtcPlayEndpoint;
 struct WebRtcPublishEndpointInner {
     /// ID of this [`WebRtcPublishEndpoint`].
     id: Id,
+
+    /// [`TrackId`]s of the [`MediaTrack`]s related to this
+    /// [`WebRtcPublishEndpoint`].
+    tracks_ids: HashMap<PeerId, Vec<TrackId>>,
 
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
@@ -137,6 +141,7 @@ impl WebRtcPublishEndpoint {
             audio_settings,
             video_settings,
             peer_ids: HashSet::new(),
+            tracks_ids: HashMap::new(),
         })))
     }
 
@@ -190,13 +195,6 @@ impl WebRtcPublishEndpoint {
         self.0.borrow_mut().reset()
     }
 
-    /// Removes [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    #[inline]
-    pub fn remove_peer_id(&self, peer_id: &PeerId) {
-        self.0.borrow_mut().remove_peer_id(peer_id)
-    }
-
     /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     #[inline]
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
@@ -233,6 +231,28 @@ impl WebRtcPublishEndpoint {
     #[must_use]
     pub fn is_force_relayed(&self) -> bool {
         self.0.borrow().is_force_relayed
+    }
+
+    /// Adds [`TrackId`] of the [`MediaTrack`] related to this
+    /// [`WebRtcPublishEndpoint`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
+    #[inline]
+    pub fn add_track_id(&self, peer_id: PeerId, track_id: TrackId) {
+        let mut inner = self.0.borrow_mut();
+        inner.tracks_ids.entry(peer_id).or_default().push(track_id);
+    }
+
+    /// Returns [`TrackId`]s of the related to this [`WebRtcPublishEndpoint`]
+    /// [`MediaTrack`]s from the [`Peer`] with a provided [`PeerId`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
+    /// [`Peer`]: crate::media::peer::Peer
+    #[inline]
+    #[must_use]
+    pub fn get_tracks_ids_by_peer_id(&self, peer_id: PeerId) -> Vec<TrackId> {
+        let inner = self.0.borrow();
+        inner.tracks_ids.get(&peer_id).cloned().unwrap_or_default()
     }
 
     /// Returns `true` if `on_start` or `on_stop` callback is set.
