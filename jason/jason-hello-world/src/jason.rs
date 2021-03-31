@@ -1,5 +1,4 @@
-use crate::room_handle::RoomHandle;
-use crate::media_manager::MediaManager;
+use crate::{media_manager::MediaManager, room_handle::RoomHandle};
 
 pub struct Jason;
 
@@ -16,15 +15,11 @@ impl Jason {
         "foobar".to_string()
     }
 
-    pub fn close_room(&self, room_to_delete: &RoomHandle) {
-
-    }
+    pub fn close_room(&self, room_to_delete: &RoomHandle) {}
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn Jason__init_room(
-    this: *mut Jason,
-) -> *mut RoomHandle {
+pub unsafe extern "C" fn Jason__init_room(this: *mut Jason) -> *mut RoomHandle {
     let this = Box::from_raw(this);
     Box::into_raw(Box::new(this.init_room()))
 }

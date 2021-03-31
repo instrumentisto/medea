@@ -21,8 +21,14 @@ typedef _foobar_C = Pointer<Utf8> Function(Pointer);
 typedef _foobar_Dart = Pointer<Utf8> Function(Pointer);
 
 final _check_arr_Dart _check_arr = ffi.dl.lookupFunction<_check_arr_C, _check_arr_Dart>('check_arr');
-typedef _check_arr_C = Pointer<Pointer> Function();
-typedef _check_arr_Dart = Pointer<Pointer> Function();
+typedef _check_arr_C = Array Function();
+typedef _check_arr_Dart = Array Function();
+
+class Array extends Struct {
+  @Uint64()
+  external int len;
+  external Pointer<Pointer> arr;
+}
 
 class Jason {
   late Pointer _ptr;
@@ -37,12 +43,9 @@ class Jason {
 
   List<Pointer> check_arr() {
     var arr = _check_arr();
-    var lastArrAddr = arr[0];
-    List<Pointer> out = List.empty();
-
-    for (var i, addr; addr != lastArrAddr; i++) {
-      out.add(arr[i]);
-      lastArrAddr = arr[i];
+    List<Pointer> out = List.empty(growable: true);
+    for (var i = 0; i < arr.len; i++) {
+      out.add(arr.arr.elementAt(i));
     }
 
     return out;

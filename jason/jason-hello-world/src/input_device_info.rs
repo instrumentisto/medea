@@ -15,7 +15,7 @@ impl InputDeviceInfo {
 }
 
 pub enum DeviceKind {
-    Foo
+    Foo,
 }
 
 impl Into<u8> for DeviceKind {
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn InputDeviceInfo__device_id(
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__kind(
-    this: *mut InputDeviceInfo
+    this: *mut InputDeviceInfo,
 ) -> u8 {
     let this = Box::from_raw(this);
     this.kind().into()
@@ -55,8 +55,10 @@ pub unsafe extern "C" fn InputDeviceInfo__label<'a>(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId<'a>(
-    this: *mut InputDeviceInfo
+pub unsafe extern "C" fn Java_com_jason_api_InputDeviceInfo_nativeGroupId<
+    'a,
+>(
+    this: *mut InputDeviceInfo,
 ) -> *const libc::c_char {
     let this = Box::from_raw(this);
     super::into_dart_string(this.group_id())
