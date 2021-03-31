@@ -2,6 +2,7 @@
 name = "medea"
 version = "0.2.0-rc.1"
 edition = "2018"
+resolver = "2"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MPL-2.0"
@@ -30,6 +31,9 @@ codegen-units = 1
 
 [profile.release.package.medea-jason]
 opt-level = "s"  # Tell rustc to optimize for small code size.
+
+[profile.dev]
+split-debuginfo = "unpacked"
 
 [dependencies]
 actix = "0.10"

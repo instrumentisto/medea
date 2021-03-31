@@ -9,12 +9,21 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys as sys;
 
-use crate::{media::MediaKind, utils::Callback0, JsMediaSourceKind};
+use crate::{
+    media::MediaKind,
+    utils::{Callback0, EventListener},
+    JsMediaSourceKind,
+};
 
 /// Inner reference-counted data of [`Track`].
 struct Inner {
     /// Underlying JS-side [`sys::MediaStreamTrack`].
-    track: sys::MediaStreamTrack,
+    track: Rc<sys::MediaStreamTrack>,
+
+    /// Listener for an [ended][1] event.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
+    on_ended: Option<EventListener<sys::MediaStreamTrack, sys::Event>>,
 
     /// Underlying [`sys::MediaStreamTrack`] kind.
     kind: MediaKind,
@@ -28,11 +37,21 @@ struct Inner {
     /// Callback to be invoked when this [`Track`] is disabled.
     on_disabled: Callback0,
 
+    /// Callback to be invoked when this [`Track`] is stopped.
+    on_stopped: Rc<Callback0>,
+
     /// [`enabled`][1] property of [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
     enabled: ObservableCell<bool>,
+}
+
+impl Drop for Inner {
+    #[inline]
+    fn drop(&mut self) {
+        self.on_ended.take();
+    }
 }
 
 /// Wrapper around [MediaStreamTrack][1] received from the remote.
@@ -43,8 +62,12 @@ struct Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates new [`Track`] spawning a listener for its [`enabled`][1]
+    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1]
     /// property changes.
+    ///
+    /// # Panics
+    ///
+    /// If provided [`sys::MediaStreamTrack`] kind is not `audio` or `video`.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     #[must_use]
@@ -52,17 +75,34 @@ impl Track {
     where
         sys::MediaStreamTrack: From<T>,
     {
-        let track = sys::MediaStreamTrack::from(track);
+        let track = Rc::new(sys::MediaStreamTrack::from(track));
         let kind = match track.kind().as_ref() {
             "audio" => MediaKind::Audio,
             "video" => MediaKind::Video,
             _ => unreachable!(),
         };
 
+        let on_stopped = Rc::new(Callback0::default());
+        let on_ended = EventListener::new_once(Rc::clone(&track), "ended", {
+            let on_stopped = Rc::clone(&on_stopped);
+            let track = Rc::clone(&track);
+            move |_| {
+                if track.ready_state() == sys::MediaStreamTrackState::Live {
+                    // Not supposed to ever happen, but call `on_stopped` just
+                    // in case.
+                    log::error!("Unexpected track stop: {}", track.id());
+                    drop(on_stopped.call());
+                }
+            }
+        })
+        .unwrap();
+
         let track = Track(Rc::new(Inner {
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: Callback0::default(),
             on_disabled: Callback0::default(),
+            on_stopped,
+            on_ended: Some(on_ended),
             media_source_kind,
             kind,
             track,
@@ -134,6 +174,16 @@ impl Track {
     pub fn media_source_kind(&self) -> MediaSourceKind {
         self.0.media_source_kind
     }
+
+    /// Stops this [`Track`] invoking an `on_stopped` callback if it's in a
+    /// [`sys::MediaStreamTrackState::Live`] state.
+    #[inline]
+    pub fn stop(self) {
+        if self.0.track.ready_state() == sys::MediaStreamTrackState::Live {
+            self.0.track.stop();
+            self.0.on_stopped.call();
+        }
+    }
 }
 
 #[wasm_bindgen(js_class = RemoteMediaTrack)]
@@ -159,6 +209,11 @@ impl Track {
     /// Sets callback to invoke when this [`Track`] is disabled.
     pub fn on_disabled(&self, callback: js_sys::Function) {
         self.0.on_disabled.set_func(callback);
+    }
+
+    /// Sets callback to invoke when this [`Track`] is stopped.
+    pub fn on_stopped(&self, callback: js_sys::Function) {
+        self.0.on_stopped.set_func(callback);
     }
 
     /// Returns [`MediaKind::Audio`] if this [`Track`] represents an audio

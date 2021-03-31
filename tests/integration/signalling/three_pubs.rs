@@ -2,7 +2,7 @@ use std::{cell::Cell, rc::Rc};
 
 use actix::{AsyncContext as _, Context, System};
 use actix_http::ws::CloseCode;
-use medea_client_api_proto::{Direction, Event, PeerId};
+use medea_client_api_proto::{Direction, Event};
 
 use crate::signalling::{CloseSocket, TestMember};
 
@@ -49,7 +49,7 @@ fn three_members_p2p_video_call() {
                 Event::PeersRemoved { .. } => {
                     // This event should get two remaining members after closing
                     // last tested member.
-                    let peers_removed: Vec<&Vec<PeerId>> = events
+                    let peers_removed: Vec<_> = events
                         .iter()
                         .filter_map(|e| match e {
                             Event::PeersRemoved { peer_ids } => Some(peer_ids),

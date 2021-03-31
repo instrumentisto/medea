@@ -99,6 +99,7 @@ impl ControlClient {
     /// # Errors
     ///
     /// Errors if gRPC request fails.
+    #[allow(clippy::missing_panics_doc)]
     pub async fn create(
         &self,
         id: String,
@@ -192,6 +193,7 @@ impl ControlClient {
     /// # Errors
     ///
     /// Errors if gRPC request fails.
+    #[allow(clippy::missing_panics_doc)]
     pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.clone().into()]);
         let response = self.get_client().delete(tonic::Request::new(req)).await;

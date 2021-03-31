@@ -2082,9 +2082,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.91"
+version = "0.2.92"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8916b1f6ca17130ec6568feccee27c156ad12037880833a3b842a823236502e7"
+checksum = "56d855069fafbb9b344c0f962150cd2c1187975cb1c22c1522c240d8c4986714"
 
 [[package]]
 name = "linked-hash-map"
@@ -2177,9 +2177,9 @@ dependencies = [
  "humantime-serde",
  "hyper 0.14.5",
  "lazy_static",
- "medea-client-api-proto 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-client-api-proto",
  "medea-control-api-mock",
- "medea-control-api-proto",
+ "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0",
  "mockall",
@@ -2225,20 +2225,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "medea-client-api-proto"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1303db14dcbd46378f8e76ad08c48cb36f7c2b619c6fd003740956e7f22fcdcb"
-dependencies = [
- "async-trait",
- "derive_more",
- "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.125",
- "serde_json",
- "serde_with",
-]
-
-[[package]]
 name = "medea-control-api-mock"
 version = "0.1.0"
 dependencies = [
@@ -2250,7 +2236,7 @@ dependencies = [
  "derive_more",
  "dotenv",
  "humantime-serde",
- "medea-control-api-proto",
+ "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf",
  "serde 1.0.125",
  "serde_json",
@@ -2267,6 +2253,18 @@ dependencies = [
 [[package]]
 name = "medea-control-api-proto"
 version = "0.1.0"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic",
+ "tonic-build",
+]
+
+[[package]]
+name = "medea-control-api-proto"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42e72cb95f866992883b4a6d52c44646742c4211f185cc96d4d1bc57e51e2092"
 dependencies = [
  "prost",
  "prost-types",
@@ -2321,7 +2319,7 @@ dependencies = [
  "futures 0.3.13",
  "js-sys",
  "log",
- "medea-client-api-proto 0.2.0",
+ "medea-client-api-proto",
  "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-reactive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mockall",

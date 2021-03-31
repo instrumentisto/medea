@@ -45,7 +45,7 @@ use crate::{
 #[doc(inline)]
 pub use self::{
     component::{Component, State},
-    conn::{IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType},
+    conn::{IceCandidate, RtcPeerConnection, RtcPeerConnectionError, SdpType},
     media::{
         media_exchange_state, mute_state, receiver, sender, MediaConnections,
         MediaConnectionsError, MediaExchangeState,
@@ -77,7 +77,7 @@ pub enum PeerError {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
+    RtcPeerConnection(#[js(cause)] RtcPeerConnectionError),
 
     /// Errors that may occur when validating [`TracksRequest`] or parsing
     /// [`local::Track`]s.
@@ -846,7 +846,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -861,7 +861,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -877,10 +877,10 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::SetRemoteDescriptionFailed`] if
+    /// With [`RtcPeerConnectionError::SetRemoteDescriptionFailed`] if
     /// [RTCPeerConnection.setRemoteDescription()][2] fails.
     ///
-    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// With [`RtcPeerConnectionError::AddIceCandidateFailed`] if
     /// [RtcPeerConnection.addIceCandidate()][3] fails when adding buffered ICE
     /// candidates.
     ///
@@ -921,7 +921,7 @@ impl PeerConnection {
     ///
     /// # Errors
     ///
-    /// With [`RTCPeerConnectionError::AddIceCandidateFailed`] if
+    /// With [`RtcPeerConnectionError::AddIceCandidateFailed`] if
     /// [RtcPeerConnection.addIceCandidate()][2] fails to add buffered
     /// [ICE candidates][1].
     ///
@@ -946,6 +946,13 @@ impl PeerConnection {
             });
         }
         Ok(())
+    }
+
+    /// Removes a [`sender::Component`] and a [`receiver::Component`] with the
+    /// provided [`TrackId`] from this [`PeerConnection`].
+    #[inline]
+    pub fn remove_track(&self, track_id: TrackId) {
+        self.media_connections.remove_track(track_id);
     }
 }
 

@@ -45,13 +45,13 @@ fn main() -> Result<(), Error> {
 
             medea::api::control::start_static_rooms(&room_service).await?;
 
-            let grpc_server =
-                grpc::server::run(room_service, &app_context).await;
+            let (grpc_server_addr, grpc_server_fut) =
+                grpc::server::run(room_service, &app_context);
             let server = Server::run(room_repo, config)?;
 
             shutdown::subscribe(
                 &graceful_shutdown,
-                grpc_server.recipient(),
+                grpc_server_addr.recipient(),
                 shutdown::Priority(1),
             );
 
@@ -60,11 +60,17 @@ fn main() -> Result<(), Error> {
                 server.recipient(),
                 shutdown::Priority(1),
             );
+
+            grpc_server_fut.await??;
+
             Ok(())
         }
         .map(|res: Result<(), Error>| match res {
             Ok(_) => info!("Started system"),
-            Err(e) => error!("Startup error: {:?}", e),
+            Err(e) => {
+                error!("Startup error: {:?}", e);
+                System::current().stop();
+            }
         }),
     );
     sys.run().map_err(Into::into)

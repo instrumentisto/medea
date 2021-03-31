@@ -2,6 +2,7 @@
 name = "medea-control-api-mock"
 version = "0.1.0"
 edition = "2018"
+resolver = "2"
 description = "Mock server for Medea's Control API."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "BlueOak-1.0.0"

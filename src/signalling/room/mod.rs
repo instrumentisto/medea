@@ -65,10 +65,6 @@ pub enum RoomError {
     #[from(ignore)]
     NoTurnCredentials(MemberId),
 
-    #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
-    #[from(ignore)]
-    ConnectionNotExists(MemberId),
-
     #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
 
@@ -198,9 +194,9 @@ impl Room {
     #[inline]
     fn send_peers_removed(
         &self,
-        member_id: MemberId,
+        member_id: &MemberId,
         removed_peers_ids: Vec<PeerId>,
-    ) -> Result<(), RoomError> {
+    ) {
         self.members.send_event_to_member(
             member_id,
             Event::PeersRemoved {
@@ -288,7 +284,7 @@ impl Room {
     fn member_peers_removed(
         &mut self,
         peers_id: Vec<PeerId>,
-        member_id: MemberId,
+        member_id: &MemberId,
     ) {
         info!(
             "Peers {:?} removed for member [id = {}].",
@@ -296,7 +292,7 @@ impl Room {
         );
         if let Ok(member) = self.members.get_member_by_id(&member_id) {
             member.peers_removed(&peers_id);
-            let _ = self.send_peers_removed(member_id, peers_id);
+            self.send_peers_removed(member_id, peers_id);
         }
     }
 
@@ -318,9 +314,6 @@ impl Room {
         let updates = peer.get_updates();
         let member_id = peer.member_id();
 
-        self.peers.add_peer(peer);
-        self.peers.add_peer(partner_peer);
-
         self.members.send_event_to_member(
             member_id,
             Event::PeerUpdated {
@@ -328,7 +321,12 @@ impl Room {
                 negotiation_role: Some(NegotiationRole::Offerer),
                 peer_id,
             },
-        )
+        );
+
+        self.peers.add_peer(peer);
+        self.peers.add_peer(partner_peer);
+
+        Ok(())
     }
 
     /// Closes [`Member`]s [`RpcConnection`] if `ws_close_reason` is provided,
@@ -347,7 +345,7 @@ impl Room {
         let removed_peers =
             self.peers.remove_peers_related_to_member(&member_id);
         for (peer_member_id, peers_ids) in removed_peers {
-            self.member_peers_removed(peers_ids, peer_member_id);
+            self.member_peers_removed(peers_ids, &peer_member_id);
         }
 
         self.members

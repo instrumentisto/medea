@@ -211,24 +211,18 @@ impl ParticipantService {
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Sends [`Event`] to specified remote [`Member`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::ConnectionNotExists`] if unable to find
-    /// [`RpcConnection`] with specified [`Member`].
-    pub fn send_event_to_member(
-        &self,
-        member_id: MemberId,
-        event: Event,
-    ) -> Result<(), RoomError> {
-        self.connections.get(&member_id).map_or(
-            Err(RoomError::ConnectionNotExists(member_id)),
-            |conn| {
-                conn.send_event(self.room_id.clone(), event);
-                Ok(())
-            },
-        )
+    /// Sends the given [`Event`] to the specified remote [`Member`] if its
+    /// [`RpcConnection`] exists.
+    pub fn send_event_to_member(&self, member_id: &MemberId, event: Event) {
+        if let Some(conn) = self.connections.get(&member_id) {
+            conn.send_event(self.room_id.clone(), event);
+        } else {
+            debug!(
+                "Can't send event [{:?}] cause connection with Member [{}] \
+                does not exist.",
+                event, member_id
+            );
+        }
     }
 
     /// Saves provided [`RpcConnection`].

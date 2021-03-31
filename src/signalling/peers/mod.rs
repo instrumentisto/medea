@@ -9,7 +9,7 @@ mod traffic_watcher;
 
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
     rc::Rc,
     sync::Arc,
@@ -115,6 +115,17 @@ enum GetOrCreatePeersResult {
 
     /// Requested [`Peer`] pair already existed.
     AlreadyExisted(PeerId, PeerId),
+}
+
+/// All changes which can be performed on a [`Peer`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum PeerChange {
+    /// [`Peer`] was removed from a [`PeersService`].
+    Removed(MemberId, PeerId),
+
+    /// [`Peer`] was updated and renegotiation for this [`Peer`] should be
+    /// performed.
+    Updated(PeerId),
 }
 
 impl PeersService {
@@ -303,7 +314,7 @@ impl PeersService {
                 let partner_member_id = peer.partner_member_id();
                 if let Some(partner_peer) = self.peers.remove(partner_peer_id) {
                     removed_peers
-                        .entry(partner_member_id)
+                        .entry(partner_member_id.clone())
                         .or_insert_with(Vec::new)
                         .push(partner_peer);
                 }
@@ -325,6 +336,38 @@ impl PeersService {
             .unregister_peers(self.room_id.clone(), peers_to_unregister);
 
         removed_peers
+    }
+
+    /// Deletes the provided [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns [`PeerChange`]s which were performed by this function.
+    ///
+    /// # Errors
+    ///
+    /// If a [`Peer`] with the provided [`PeerId`] or a partner [`Peer`] hasn't
+    /// been found.
+    #[inline]
+    pub fn delete_sink_endpoint(
+        &self,
+        sink: &WebRtcPlayEndpoint,
+    ) -> Result<HashSet<PeerChange>, RoomError> {
+        self.peers.delete_sink_endpoint(sink)
+    }
+
+    /// Deletes the provided [`WebRtcPublishEndpoint`].
+    ///
+    /// Returns [`PeerChange`]s which were performed by this function.
+    ///
+    /// # Errors
+    ///
+    /// If a [`Peer`] with the provided [`PeerId`] or a partner [`Peer`] hasn't
+    /// been found.
+    #[inline]
+    pub fn delete_src_endpoint(
+        &self,
+        src: &WebRtcPublishEndpoint,
+    ) -> Result<HashSet<PeerChange>, RoomError> {
+        self.peers.delete_src_endpoint(src)
     }
 
     /// Returns already created [`Peer`] pair's [`PeerId`]s as
@@ -708,14 +751,92 @@ impl PeerRepository {
         partner_member_id: &MemberId,
     ) -> Option<(PeerId, PeerId)> {
         for peer in self.0.borrow().values() {
-            if &peer.member_id() == member_id
-                && &peer.partner_member_id() == partner_member_id
+            if peer.member_id() == member_id
+                && peer.partner_member_id() == partner_member_id
             {
                 return Some((peer.id(), peer.partner_peer_id()));
             }
         }
 
         None
+    }
+
+    /// Deletes the provided [`WebRtcPublishEndpoint`].
+    ///
+    /// Returns [`PeerChange`]s which were performed by this action.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::PeerNotFound`] if the requested [`PeerId`] doesn't
+    /// exist in a [`PeerRepository`].
+    pub fn delete_src_endpoint(
+        &self,
+        src: &WebRtcPublishEndpoint,
+    ) -> Result<HashSet<PeerChange>, RoomError> {
+        let mut affected_peers = HashSet::new();
+        for sink in src.sinks() {
+            affected_peers.extend(self.delete_sink_endpoint(&sink)?);
+        }
+
+        Ok(affected_peers)
+    }
+
+    /// Deletes the provided [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns [`PeerChange`]s which were performed by this action.
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomError::PeerNotFound`] if the requested [`PeerId`] doesn't
+    /// exist in a [`PeerRepository`].
+    pub fn delete_sink_endpoint(
+        &self,
+        sink_endpoint: &WebRtcPlayEndpoint,
+    ) -> Result<HashSet<PeerChange>, RoomError> {
+        let mut changes = HashSet::new();
+
+        if let Some(sink_peer_id) = sink_endpoint.peer_id() {
+            let (src_peer_id, tracks_to_remove) =
+                self.map_peer_by_id_mut(sink_peer_id, |sink_peer| {
+                    let src_peer_id = sink_peer.partner_peer_id();
+                    let src_endpoint = sink_endpoint.src();
+                    let tracks_to_remove =
+                        src_endpoint.get_tracks_ids_by_peer_id(src_peer_id);
+                    sink_peer
+                        .as_changes_scheduler()
+                        .remove_tracks(&tracks_to_remove);
+
+                    (src_peer_id, tracks_to_remove)
+                })?;
+            self.map_peer_by_id_mut(src_peer_id, |src_peer| {
+                src_peer
+                    .as_changes_scheduler()
+                    .remove_tracks(&tracks_to_remove);
+            })?;
+
+            let is_sink_peer_empty =
+                self.map_peer_by_id(sink_peer_id, PeerStateMachine::is_empty)?;
+            let is_src_peer_empty =
+                self.map_peer_by_id(src_peer_id, PeerStateMachine::is_empty)?;
+
+            if is_sink_peer_empty && is_src_peer_empty {
+                let member = sink_endpoint.owner();
+                member.peers_removed(&[sink_peer_id]);
+
+                self.remove(sink_peer_id);
+                self.remove(src_peer_id);
+
+                changes.insert(PeerChange::Removed(member.id(), sink_peer_id));
+                changes.insert(PeerChange::Removed(
+                    sink_endpoint.src().owner().id(),
+                    src_peer_id,
+                ));
+            } else {
+                changes.insert(PeerChange::Updated(sink_peer_id));
+            }
+        }
+
+        Ok(changes)
     }
 
     /// Removes all [`Peer`]s related to given [`Member`].
@@ -737,31 +858,31 @@ impl PeerRepository {
         self.0
             .borrow()
             .values()
-            .filter(|p| &p.member_id() == member_id)
+            .filter(|p| p.member_id() == member_id)
             .for_each(|peer| {
                 self.0
                     .borrow()
                     .values()
                     .filter(|p| p.member_id() == peer.partner_member_id())
                     .filter(|partner_peer| {
-                        &partner_peer.partner_member_id() == member_id
+                        partner_peer.partner_member_id() == member_id
                     })
                     .for_each(|partner_peer| {
                         peers_to_remove
-                            .entry(partner_peer.member_id())
-                            .or_insert_with(Vec::new)
+                            .entry(partner_peer.member_id().clone())
+                            .or_default()
                             .push(partner_peer.id());
                     });
 
                 peers_to_remove
-                    .entry(peer.member_id())
-                    .or_insert_with(Vec::new)
+                    .entry(peer.member_id().clone())
+                    .or_default()
                     .push(peer.id());
             });
 
         peers_to_remove
             .values()
-            .flat_map(|peer_ids| peer_ids.iter())
+            .flat_map(|p| p.iter())
             .for_each(|id| {
                 self.0.borrow_mut().remove(id);
             });
@@ -780,7 +901,7 @@ impl PeerRepository {
             .borrow()
             .iter()
             .filter_map(|(id, p)| {
-                if &p.member_id() == member_id
+                if p.member_id() == member_id
                     && (p.is_known_to_remote()
                         || p.negotiation_role().is_some())
                 {

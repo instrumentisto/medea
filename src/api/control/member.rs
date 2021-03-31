@@ -178,16 +178,17 @@ pub struct MemberSpec {
     ping_interval: Option<Duration>,
 }
 
-impl Into<RoomElement> for MemberSpec {
-    fn into(self) -> RoomElement {
-        RoomElement::Member {
-            spec: self.pipeline,
-            credentials: self.credentials,
-            on_join: self.on_join,
-            on_leave: self.on_leave,
-            idle_timeout: self.idle_timeout,
-            reconnect_timeout: self.reconnect_timeout,
-            ping_interval: self.ping_interval,
+impl From<MemberSpec> for RoomElement {
+    #[inline]
+    fn from(spec: MemberSpec) -> Self {
+        Self::Member {
+            spec: spec.pipeline,
+            credentials: spec.credentials,
+            on_join: spec.on_join,
+            on_leave: spec.on_leave,
+            idle_timeout: spec.idle_timeout,
+            reconnect_timeout: spec.reconnect_timeout,
+            ping_interval: spec.ping_interval,
         }
     }
 }

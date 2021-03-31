@@ -2,6 +2,7 @@
 name = "medea-control-api-proto"
 version = "0.1.0"
 edition = "2018"
+resolver = "2"
 description = "Control API protocol implementation for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "BlueOak-1.0.0"

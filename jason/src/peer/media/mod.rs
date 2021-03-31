@@ -655,8 +655,15 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
     /// could not find [`Receiver`] by transceivers `mid`.
     ///
+    /// # Panics
+    ///
+    /// If [`Transceiver`] from the provided [`RtcTrackEvent`] doesn't have a
+    /// [`mid`]. Not supposed to happen, since [`RtcTrackEvent`] is only fired
+    /// when a [`Transceiver`] is negotiated, thus have a [`mid`].
+    ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
+    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
     pub fn add_remote_track(&self, track_event: &RtcTrackEvent) -> Result<()> {
         let inner = self.0.borrow();
         let transceiver = Transceiver::from(track_event.transceiver());
@@ -742,6 +749,15 @@ impl MediaConnections {
             }),
         );
         remove_tracks_fut.await;
+    }
+
+    /// Removes a [`sender::Component`] or a [`receiver::Component`] with the
+    /// provided [`TrackId`] from these [`MediaConnections`].
+    pub fn remove_track(&self, track_id: TrackId) {
+        let mut inner = self.0.borrow_mut();
+        if inner.receivers.remove(&track_id).is_none() {
+            inner.senders.remove(&track_id);
+        }
     }
 }
 
