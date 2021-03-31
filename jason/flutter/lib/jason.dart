@@ -24,6 +24,14 @@ final _check_arr_Dart _check_arr = ffi.dl.lookupFunction<_check_arr_C, _check_ar
 typedef _check_arr_C = Array Function();
 typedef _check_arr_Dart = Array Function();
 
+final _device_id_Dart _device_id = ffi.dl.lookupFunction<_device_id_C, _device_id_Dart>('InputDeviceInfo__device_id');
+typedef _device_id_C = Pointer<Utf8> Function(Pointer);
+typedef _device_id_Dart = Pointer<Utf8> Function(Pointer);
+
+final _free_array_Dart _free_array = ffi.dl.lookupFunction<_free_array_C, _free_array_Dart>('free_array');
+typedef _free_array_C = Void Function(Array);
+typedef _free_array_Dart = void Function(Array);
+
 class Array extends Struct {
   @Uint64()
   external int len;
@@ -31,11 +39,7 @@ class Array extends Struct {
 }
 
 class Jason {
-  late Pointer _ptr;
-
-  Jason() {
-    _ptr  = _init();
-  }
+  final Pointer _ptr = _init();
 
   int add(int a) {
     return _add(a);
@@ -44,9 +48,15 @@ class Jason {
   List<Pointer> check_arr() {
     var arr = _check_arr();
     List<Pointer> out = List.empty(growable: true);
+
     for (var i = 0; i < arr.len; i++) {
-      out.add(arr.arr.elementAt(i));
+      var foo = _device_id(arr.arr[i]);
+      var hey = foo.toDartString();
+      print(hey);
+      out.add(arr.arr[i]);
     }
+
+    _free_array(arr);
 
     return out;
   }

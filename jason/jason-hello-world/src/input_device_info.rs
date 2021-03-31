@@ -1,4 +1,7 @@
-pub struct InputDeviceInfo;
+pub struct InputDeviceInfo {
+    pub foo: u64,
+    pub bar: u32,
+}
 
 impl InputDeviceInfo {
     pub fn kind(&self) -> DeviceKind {
@@ -26,17 +29,17 @@ impl Into<u8> for DeviceKind {
 
 impl InputDeviceInfo {
     pub fn device_id(&self) -> String {
-        "foobar".to_string()
+        format!("foo {} - bar {}", self.foo, self.bar)
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn InputDeviceInfo__device_id(
-    this: *mut InputDeviceInfo,
-) -> *const libc::c_char {
-    let this = Box::from_raw(this);
-    super::into_dart_string(this.device_id())
-}
+// #[no_mangle]
+// pub unsafe extern "C" fn InputDeviceInfo__device_id(
+//     this: *mut InputDeviceInfo,
+// ) -> *const libc::c_char {
+//     let this = Box::from_raw(this);
+//     super::into_dart_string(this.device_id())
+// }
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__kind(

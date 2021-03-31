@@ -11,10 +11,10 @@ pub mod input_device_info;
 pub mod jason;
 mod local_media_track;
 pub mod media_manager;
-mod media_stream_settings;
-mod reconnect_handle;
-mod remote_media_track;
-mod room_close_reason;
+// mod media_stream_settings;
+// mod reconnect_handle;
+// mod remote_media_track;
+// mod room_close_reason;
 pub mod room_handle;
 
 use crate::{
@@ -60,24 +60,56 @@ pub unsafe extern "C" fn Jason__foobar(
 #[repr(C)]
 pub struct Array<T> {
     pub len: u64,
-    pub arr: *const T,
+    pub arr: *const *mut T,
 }
 
 impl<T> Array<T> {
     pub fn new(arr: Vec<T>) -> Self {
-        let len = arr.len();
-        let ptr = arr.as_ptr();
-        mem::forget(ptr);
+        let out: Vec<_> = arr
+            .into_iter()
+            .map(|e| Box::into_raw(Box::new(e)))
+            .collect();
         Self {
-            len: len as u64,
-            arr: arr.as_ptr(),
+            len: out.len() as u64,
+            arr: Box::leak(out.into_boxed_slice()).as_ptr(),
         }
     }
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn InputDeviceInfo__device_id(
+    this: *mut InputDeviceInfo,
+) -> *const libc::c_char {
+    let this = Box::from_raw(this);
+    into_dart_string(this.device_id())
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn check_arr() -> Array<InputDeviceInfo> {
-    Array::new(vec![InputDeviceInfo, InputDeviceInfo])
+    let a = InputDeviceInfo { foo: 100, bar: 100 };
+    Array::new(vec![
+        a,
+        InputDeviceInfo { foo: 100, bar: 200 },
+        InputDeviceInfo { foo: 300, bar: 400 },
+        InputDeviceInfo { foo: 500, bar: 600 },
+    ])
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free_array(arr: Array<InputDeviceInfo>) {
+    drop(arr);
+}
+
+impl<T> Drop for Array<T> {
+    fn drop(&mut self) {
+        unsafe {
+            // let slice = std::slice::from_raw_parts_mut(
+            //     self.arr as *mut i64,
+            //     self.len,
+            // );
+            Box::from_raw(self.arr as *mut *mut T);
+        };
+    }
 }
 
 #[link(name = "trampoline")]
