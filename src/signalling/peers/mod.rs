@@ -117,10 +117,10 @@ enum GetOrCreatePeersResult {
     AlreadyExisted(PeerId, PeerId),
 }
 
-/// All changes which are can be performed on [`Peer`].
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+/// All changes which can be performed on a [`Peer`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PeerChange {
-    /// [`Peer`] was removed from the [`PeersService`].
+    /// [`Peer`] was removed from a [`PeersService`].
     Removed(MemberId, PeerId),
 
     /// [`Peer`] was updated and renegotiation for this [`Peer`] should be
@@ -338,14 +338,14 @@ impl PeersService {
         removed_peers
     }
 
-    /// Deletes provided [`WebRtcPlayEndpoint`].
+    /// Deletes the provided [`WebRtcPlayEndpoint`].
     ///
-    /// Returns [`PeerChange`]s which are was performed by this function.
+    /// Returns [`PeerChange`]s which were performed by this function.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Errors if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not
-    /// found.
+    /// If a [`Peer`] with the provided [`PeerId`] or a partner [`Peer`] hasn't
+    /// been found.
     #[inline]
     pub fn delete_sink_endpoint(
         &self,
@@ -354,14 +354,14 @@ impl PeersService {
         self.peers.delete_sink_endpoint(sink)
     }
 
-    /// Deletes provided [`WebRtcPublishEndpoint`].
+    /// Deletes the provided [`WebRtcPublishEndpoint`].
     ///
-    /// Returns [`PeerChange`]s which are was performed by this function.
+    /// Returns [`PeerChange`]s which were performed by this function.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Errors if [`Peer`] with provided [`PeerId`] or partner [`Peer`] not
-    /// found.
+    /// If a [`Peer`] with the provided [`PeerId`] or a partner [`Peer`] hasn't
+    /// been found.
     #[inline]
     pub fn delete_src_endpoint(
         &self,
@@ -761,14 +761,14 @@ impl PeerRepository {
         None
     }
 
-    /// Deletes provided [`WebRtcPublishEndpoint`].
+    /// Deletes the provided [`WebRtcPublishEndpoint`].
     ///
-    /// Returns [`PeerChange`] which was performed by this action.
+    /// Returns [`PeerChange`]s which were performed by this action.
     ///
     /// # Errors
     ///
-    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
-    /// exist in [`PeerRepository`].
+    /// With [`RoomError::PeerNotFound`] if the requested [`PeerId`] doesn't
+    /// exist in a [`PeerRepository`].
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
@@ -781,14 +781,14 @@ impl PeerRepository {
         Ok(affected_peers)
     }
 
-    /// Deletes provided [`WebRtcPlayEndpoint`].
+    /// Deletes the provided [`WebRtcPlayEndpoint`].
     ///
-    /// Returns [`PeerChange`] which was performed by this action.
+    /// Returns [`PeerChange`]s which were performed by this action.
     ///
     /// # Errors
     ///
-    /// Errors with [`RoomError::PeerNotFound`] if requested [`PeerId`] doesn't
-    /// exist in [`PeerRepository`].
+    /// With [`RoomError::PeerNotFound`] if the requested [`PeerId`] doesn't
+    /// exist in a [`PeerRepository`].
     pub fn delete_sink_endpoint(
         &self,
         sink_endpoint: &WebRtcPlayEndpoint,

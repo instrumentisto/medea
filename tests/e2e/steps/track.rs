@@ -221,18 +221,18 @@ async fn then_member_doesnt_have_live_local_tracks(
         .unwrap());
 }
 
-#[then(regex = r"^(\S+)'s remote tracks from (\S+) are (live|stopped$)")]
+#[then(regex = r"^(\S+)'s remote tracks from (\S+) are (live|ended$)")]
 async fn then_remote_tracks_are_stopped(
     world: &mut World,
     id: String,
     partner_id: String,
-    live_or_stopped: String,
+    live_or_ended: String,
 ) {
     let member = world.get_member(&id).unwrap();
     let connection =
         member.connections().get(partner_id).await.unwrap().unwrap();
     let tracks_store = connection.tracks_store().await.unwrap();
-    let ready_state = if live_or_stopped == "live" {
+    let ready_state = if live_or_ended == "live" {
         MediaStreamTrackState::Live
     } else {
         MediaStreamTrackState::Ended

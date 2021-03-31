@@ -751,8 +751,8 @@ impl MediaConnections {
         remove_tracks_fut.await;
     }
 
-    /// Removes [`sender::Component`] or [`receiver::Component`] with a
-    /// provided [`TrackId`] from [`MediaConnections`].
+    /// Removes a [`sender::Component`] or a [`receiver::Component`] with the
+    /// provided [`TrackId`] from these [`MediaConnections`].
     pub fn remove_track(&self, track_id: TrackId) {
         let mut inner = self.0.borrow_mut();
         if inner.receivers.remove(&track_id).is_none() {

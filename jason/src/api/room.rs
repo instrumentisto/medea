@@ -1523,14 +1523,12 @@ impl EventHandler for InnerRoom {
                             .call(JasonError::from(e.clone()));
                         tracerr::map_from_and_new!(e)
                     })?,
-                PeerUpdate::Updated(track_patch) => {
-                    peer_state.patch_track(&track_patch)
-                }
+                PeerUpdate::Updated(patch) => peer_state.patch_track(&patch),
                 PeerUpdate::IceRestart => {
                     peer_state.restart_ice();
                 }
-                PeerUpdate::Removed(track_id) => {
-                    peer_state.remove_track(track_id);
+                PeerUpdate::Removed(id) => {
+                    peer_state.remove_track(id);
                 }
             }
         }

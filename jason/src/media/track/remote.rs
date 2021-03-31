@@ -20,7 +20,7 @@ struct Inner {
     /// Underlying JS-side [`sys::MediaStreamTrack`].
     track: Rc<sys::MediaStreamTrack>,
 
-    /// Listener for [ended][1] event;
+    /// Listener for an [ended][1] event.
     ///
     /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
     on_ended: Option<EventListener<sys::MediaStreamTrack, sys::Event>>,
@@ -48,6 +48,7 @@ struct Inner {
 }
 
 impl Drop for Inner {
+    #[inline]
     fn drop(&mut self) {
         self.on_ended.take();
     }
@@ -174,7 +175,7 @@ impl Track {
         self.0.media_source_kind
     }
 
-    /// Stops track invoking `on_stopped` callback if track is in
+    /// Stops this [`Track`] invoking an `on_stopped` callback if it's in a
     /// [`sys::MediaStreamTrackState::Live`] state.
     #[inline]
     pub fn stop(self) {

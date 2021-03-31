@@ -404,7 +404,7 @@ impl World {
         Ok(())
     }
 
-    /// Deletes a Control API element of the `WebRtcPublishEndpoint` with the
+    /// Deletes a Control API element of a `WebRtcPublishEndpoint` with the
     /// provided ID.
     pub async fn delete_publish_endpoint(&mut self, member_id: &str) {
         let resp = self
@@ -415,7 +415,7 @@ impl World {
         assert!(resp.error.is_none());
     }
 
-    /// Deletes a Control API element of the `WebRtcPlayEndpoint` with the
+    /// Deletes a Control API element of a `WebRtcPlayEndpoint` with the
     /// provided ID.
     pub async fn delete_play_endpoint(
         &mut self,

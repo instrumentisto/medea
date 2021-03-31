@@ -66,13 +66,13 @@ impl Transceiver {
         Ok(())
     }
 
-    /// Sets [`TransceiverDirection::SEND`] [`local::Track`] of this
+    /// Sets a [`TransceiverDirection::SEND`] [`local::Track`] of this
     /// [`Transceiver`] to [`None`].
     ///
     /// # Panics
     ///
-    /// If [`local::Track`] replacement with `None` fails on JS side. But based
-    /// on [WebAPI docs] it never can happen.
+    /// If [`local::Track`] replacement with [`None`] fails on JS side, but
+    /// basing on [WebAPI docs] it should never happen.
     ///
     /// [WebAPI docs]: https://tinyurl.com/7pnszaa8
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
@@ -111,7 +111,7 @@ impl Transceiver {
         }
     }
 
-    /// Returns `true` if underlying [`RtcRtpTransceiver`] is stopped.
+    /// Indicates whether the underlying [`RtcRtpTransceiver`] is stopped.
     #[inline]
     #[must_use]
     pub fn is_stopped(&self) -> bool {

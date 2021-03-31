@@ -17,12 +17,19 @@ use crate::{
 
 use super::Error;
 
-/// [MediaStreamTrackState][1].
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamtrackstate
+/// Representation of a [MediaStreamTrackState][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrackstate
 #[derive(Clone, Copy, Debug, Eq, Display, PartialEq)]
 pub enum MediaStreamTrackState {
+    /// Track is active (the track's underlying media source is making a
+    /// best-effort attempt to provide data in real time).
     #[display(fmt = "live")]
     Live,
+
+    /// Track has ended (the track's underlying media source is no longer
+    /// providing data, and will never provide more data for this track). Once
+    /// a track enters this state, it never exits it.
     #[display(fmt = "ended")]
     Ended,
 }
@@ -210,7 +217,7 @@ impl<T> Object<TracksStore<T>> {
                         return true;
                     }}
                 "#,
-                ready_state
+                ready_state,
             ),
             [],
         ))

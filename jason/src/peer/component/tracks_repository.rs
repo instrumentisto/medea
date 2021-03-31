@@ -61,7 +61,7 @@ impl<S> TracksRepository<S> {
         self.0.borrow().get(&id).cloned()
     }
 
-    /// Returns a [`Stream`] streaming the all [`TracksRepository::insert`]ions.
+    /// Returns a [`Stream`] streaming all the [`TracksRepository::insert`]ions.
     #[inline]
     pub fn on_insert(
         &self,
@@ -69,7 +69,7 @@ impl<S> TracksRepository<S> {
         self.0.borrow().on_insert_with_replay()
     }
 
-    /// Returns a [`Stream`] streaming the all [`TracksRepository::remove`]s.
+    /// Returns a [`Stream`] streaming all the [`TracksRepository::remove`]s.
     #[inline]
     pub fn on_remove(
         &self,
@@ -77,10 +77,11 @@ impl<S> TracksRepository<S> {
         self.0.borrow().on_remove()
     }
 
-    /// Removes a track with the provided `id`.
+    /// Removes a track with the provided [`TrackId`], reporting whether it has
+    /// been removed or it hasn't existed at all.
     #[inline]
-    pub fn remove(&self, track_id: TrackId) -> bool {
-        self.0.borrow_mut().remove(&track_id).is_some()
+    pub fn remove(&self, id: TrackId) -> bool {
+        self.0.borrow_mut().remove(&id).is_some()
     }
 }
 

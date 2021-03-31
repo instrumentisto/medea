@@ -81,9 +81,9 @@ impl Component {
 
     /// Watcher for the [`State::senders`] remove update.
     ///
-    /// Removes [`sender::Component`] from the [`PeerConnection`].
-    #[watch(self.senders.on_remove())]
+    /// Removes a [`sender::Component`] from the [`PeerConnection`].
     #[inline]
+    #[watch(self.senders.on_remove())]
     async fn sender_removed(
         peer: Rc<PeerConnection>,
         _: Rc<State>,
@@ -96,9 +96,9 @@ impl Component {
 
     /// Watcher for the [`State::receivers`] remove update.
     ///
-    /// Removes [`receiver::Component`] from the [`PeerConnection`].
-    #[watch(self.receivers.on_remove())]
+    /// Removes a [`receiver::Component`] from the [`PeerConnection`].
     #[inline]
+    #[watch(self.receivers.on_remove())]
     async fn receiver_removed(
         peer: Rc<PeerConnection>,
         _: Rc<State>,

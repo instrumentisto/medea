@@ -11,10 +11,12 @@ All user visible changes to this project will be documented in this file. This p
 
 [Diff](/../../compare/medea-0.2.0-rc.1...medea-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
+First, consider [0.2.0-rc.1] changes.
+
 ### Added
 
 - Signalling:
-    - Emit `TracksApplied`'s event to remove existing on client tracks ([#109]).
+    - Emitting `TracksApplied` event to remove existing tracks on a client side ([#109]).
 
 [#109]: /../../pull/109
 

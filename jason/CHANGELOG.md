@@ -5,10 +5,15 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+
 ## [0.2.0] · 2021-??-?? · To-be-done
 [0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
 [Diff](/../../compare/medea-jason-0.2.0-rc.1...medea-jason-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+
+First, consider [0.2.0-rc.1] changes.
+
+### Added
 
 - Signalling:
     - Handling of RPC events:
