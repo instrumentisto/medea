@@ -331,7 +331,7 @@ impl World {
         }
     }
 
-    pub async fn interconnect_members_by_apply(&mut self, pair: MembersPair) {
+    pub async fn interconnect_members_via_apply(&mut self, pair: MembersPair) {
         let mut spec = self.get_spec().await;
         if let Some(proto::RoomElement::Member(member)) =
             spec.pipeline.get_mut(&pair.left.id)

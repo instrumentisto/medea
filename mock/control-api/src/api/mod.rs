@@ -91,14 +91,14 @@ pub async fn run(
                     .route(web::post().to(create::create1))
                     .route(web::get().to(get::get1))
                     .route(web::delete().to(delete::delete1))
-                    .route(web::patch().to(apply::apply1)),
+                    .route(web::put().to(apply::apply1)),
             )
             .service(
                 web::resource("/control-api/{a}/{b}")
                     .route(web::post().to(create::create2))
                     .route(web::get().to(get::get2))
                     .route(web::delete().to(delete::delete2))
-                    .route(web::patch().to(apply::apply2)),
+                    .route(web::put().to(apply::apply2)),
             )
             .service(
                 web::resource("/control-api/{a}/{b}/{c}")
@@ -247,7 +247,7 @@ mod create {
     }
 }
 
-/// Implementation of `Patch` requests to [Control API] mock.
+/// Implementation of `Put` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 mod apply {

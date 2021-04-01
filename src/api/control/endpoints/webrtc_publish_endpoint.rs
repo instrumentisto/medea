@@ -15,7 +15,7 @@ use medea_control_api_proto::grpc::api as proto;
 pub struct WebRtcPublishId(String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Copy, Deserialize, Debug)]
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,

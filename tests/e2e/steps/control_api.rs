@@ -139,8 +139,8 @@ async fn when_control_api_interconnects_members(
         .unwrap();
 }
 
-#[when(regex = r"^Control API removes (\S+) by apply$")]
-async fn when_control_api_removes_member_by_apply(
+#[when(regex = r"^Control API removes (\S+) with Apply method$")]
+async fn when_control_api_removes_member_via_apply(
     world: &mut World,
     id: String,
 ) {
@@ -149,14 +149,14 @@ async fn when_control_api_removes_member_by_apply(
     world.apply(spec).await;
 }
 
-#[when(regex = r"Control API interconnects (\S+) and (\S+) by apply")]
-async fn when_control_api_interconnects_by_apply(
+#[when(regex = r"Control API interconnects (\S+) and (\S+) with Apply method")]
+async fn when_control_api_interconnects_via_apply(
     world: &mut World,
     id: String,
     partner_id: String,
 ) {
     world
-        .interconnect_members_by_apply(MembersPair {
+        .interconnect_members_via_apply(MembersPair {
             left: PairedMember {
                 id,
                 recv: true,

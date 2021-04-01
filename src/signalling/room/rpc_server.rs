@@ -378,7 +378,7 @@ mod test {
         );
 
         room.members
-            .create_members(&[(&MemberId::from("member1"), member1)])
+            .create_member(MemberId::from("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(
@@ -419,7 +419,7 @@ mod test {
         );
 
         room.members
-            .create_members(&[(&MemberId::from("member1"), member1)])
+            .create_member(MemberId::from("member1"), &member1)
             .unwrap();
 
         let no_such_peer = CommandMessage::new(

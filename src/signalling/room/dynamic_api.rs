@@ -3,7 +3,10 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::{HashMap, HashSet}, convert::TryInto as _};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom as _,
+};
 
 use actix::{
     ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler, Message,
@@ -29,9 +32,7 @@ use crate::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             member::MemberError,
         },
-        room_service::Sids,
         peers::PeerChange,
-        room::ActFuture,
     },
 };
 
@@ -68,55 +69,50 @@ impl Room {
     ///
     /// Deletes its [`Peer`] if the deleted endpoint is the last one associated
     /// with it.
+    #[allow(clippy::option_if_let_else)]
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
         endpoint_id: EndpointId,
-    ) -> Result<(), RoomError> {
+    ) {
         if let Ok(member) = self.members.get_member_by_id(member_id) {
             let play_id = endpoint_id.into();
-            let changeset =
-                if let Some(sink_endpoint) = member.remove_sink(&play_id) {
-                    self.peers.delete_sink_endpoint(&sink_endpoint)?
-                } else {
-                    let publish_id = String::from(play_id).into();
-
-                    if let Some(src_endpoint) = member.remove_src(&publish_id) {
-                        self.peers.delete_src_endpoint(&src_endpoint)?
-                    } else {
-                        HashSet::new()
-                    }
-                };
-
+            let changeset = if let Some(sink) = member.remove_sink(&play_id) {
+                self.peers.delete_sink_endpoint(&sink)
+            } else if let Some(src) =
+                member.remove_src(&String::from(play_id).into())
             {
-                let mut removed_peers: HashMap<_, Vec<_>> = HashMap::new();
-                let mut discard_updates = HashSet::new();
-                let mut updated_peers = HashSet::new();
-                for change in changeset {
-                    match change {
-                        PeerChange::Removed(member_id, peer_id) => {
-                            removed_peers
-                                .entry(member_id)
-                                .or_default()
-                                .push(peer_id);
-                            discard_updates.insert(peer_id);
-                        }
-                        PeerChange::Updated(peer_id) => {
-                            updated_peers.insert(peer_id);
-                        }
+                self.peers.delete_src_endpoint(&src)
+            } else {
+                HashSet::new()
+            };
+
+            let mut removed_peers: HashMap<_, Vec<_>> = HashMap::new();
+            let mut updated_peers = HashSet::new();
+            for change in changeset {
+                match change {
+                    PeerChange::Removed(member_id, peer_id) => {
+                        removed_peers
+                            .entry(member_id)
+                            .or_default()
+                            .push(peer_id);
+                    }
+                    PeerChange::Updated(peer_id) => {
+                        updated_peers.insert(peer_id);
                     }
                 }
-                for updated_peer_id in updated_peers {
-                    self.peers.commit_scheduled_changes(updated_peer_id)?;
-                }
+            }
+            for updated_peer_id in updated_peers {
+                // we are sure that provided peer exists.
+                self.peers
+                    .commit_scheduled_changes(updated_peer_id)
+                    .unwrap();
+            }
 
-                for (member_id, peer_ids) in removed_peers {
-                    self.send_peers_removed(&member_id, peer_ids);
-                }
-            };
+            for (member_id, peer_ids) in removed_peers {
+                self.send_peers_removed(&member_id, peer_ids);
+            }
         }
-
-        Ok(())
     }
 
     /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
@@ -140,7 +136,7 @@ impl Room {
         publish_id: WebRtcPublishId,
         spec: &WebRtcPublishEndpointSpec,
     ) -> Result<(), RoomError> {
-        let member = self.members.get_member(&member_id)?;
+        let member = self.members.get_member(member_id)?;
 
         let is_member_have_this_src_id =
             member.get_src_by_id(&publish_id).is_some();
@@ -195,7 +191,7 @@ impl Room {
     fn create_sink_endpoint(
         &mut self,
         ctx: &mut Context<Self>,
-        member_id: &MemberId,
+        member_id: MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), RoomError> {
@@ -245,7 +241,6 @@ impl Room {
         member.insert_sink(sink);
 
         if self.members.member_has_connection(&member_id) {
-            let member_id = member_id.clone();
             ctx.spawn(
                 self.init_member_connections(&member).map(
                     move |res, this, ctx| {
@@ -377,75 +372,91 @@ impl Handler<Delete> for Room {
         });
         endpoint_ids.into_iter().for_each(|fid| {
             let (_, member_id, endpoint_id) = fid.take_all();
-            if let Err(e) = self.delete_endpoint(&member_id, endpoint_id) {
-                error!("Error while deleting endpoint: {:?}", e);
-            }
+            self.delete_endpoint(&member_id, endpoint_id);
         });
     }
 }
 
 /// Signal for applying [`MemberSpec`] in this [`Room`].
 #[derive(Message, Debug)]
-#[rtype(result = "Result<Sids, RoomError>")]
+#[rtype(result = "Result<(), RoomError>")]
 pub struct ApplyMember(pub MemberId, pub MemberSpec);
 
 impl Handler<ApplyMember> for Room {
-    type Result = Result<Sids, RoomError>;
+    type Result = Result<(), RoomError>;
 
     fn handle(
         &mut self,
         msg: ApplyMember,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let mut sids = Sids::new();
-        if let Ok(member) = self.members.get_member(&msg.0) {
-            for (id, endpoint) in msg.1.publish_endpoints() {
-                if member.get_src_by_id(&id).is_none() {
-                    self.create_src_endpoint(&msg.0, id, endpoint)?;
+        let ApplyMember(member_id, member_spec) = msg;
+
+        if let Ok(member) = self.members.get_member(&member_id) {
+            for id in member.srcs_ids() {
+                if member_spec.get_publish_endpoint_by_id(id.clone()).is_none()
+                {
+                    self.delete_endpoint(&member_id, id.into());
                 }
             }
-            for (id, endpoint) in msg.1.play_endpoints() {
+            for id in member.sinks_ids() {
+                if member_spec.get_play_endpoint_by_id(id.clone()).is_none() {
+                    self.delete_endpoint(&member_id, id.into());
+                }
+            }
+            for (id, endpoint) in member_spec.publish_endpoints() {
+                if member.get_src_by_id(&id).is_none() {
+                    self.create_src_endpoint(&member_id, id, endpoint)?;
+                }
+            }
+            for (id, endpoint) in member_spec.play_endpoints() {
                 if member.get_sink_by_id(&id).is_none() {
                     self.create_sink_endpoint(
                         ctx,
-                        &msg.0,
+                        member_id.clone(),
                         id,
                         endpoint.clone(),
                     )?;
                 }
             }
-            for id in member.srcs_ids() {
-                if msg.1.get_publish_endpoint_by_id(id.clone()).is_none() {
-                    self.delete_endpoint(&msg.0, id.into());
-                }
-            }
-            for id in member.sinks_ids() {
-                if msg.1.get_play_endpoint_by_id(id.clone()).is_none() {
-                    self.delete_endpoint(&msg.0, id.into());
-                }
-            }
         } else {
-            sids = self.members.create_members(&[(&msg.0, msg.1)])?;
+            self.members.create_member(member_id, &member_spec)?;
         }
-        Ok(sids)
+        Ok(())
     }
 }
 
 /// Signal for applying [`RoomSpec`] in this [`Room`].
 #[derive(Message, Debug)]
-#[rtype(result = "Result<Sids, RoomError>")]
+#[rtype(result = "Result<(), RoomError>")]
 pub struct Apply(pub RoomSpec);
 
 impl Handler<Apply> for Room {
-    type Result = Result<Sids, RoomError>;
+    type Result = Result<(), RoomError>;
 
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
+        for id in self.members.members_ids() {
+            if !msg.0.pipeline.contains_key(&id) {
+                self.delete_member(&id, ctx);
+            }
+        }
+
         let mut create_src_endpoint = Vec::new();
         let mut create_sink_endpoint = Vec::new();
-        let mut create_members = Vec::new();
         for (id, element) in &msg.0.pipeline {
-            let spec: MemberSpec = element.try_into()?;
+            let spec = MemberSpec::try_from(element)?;
             if let Ok(member) = self.members.get_member(&id) {
+                for (src_id, _) in member.srcs() {
+                    if spec.get_publish_endpoint_by_id(src_id.clone()).is_none()
+                    {
+                        self.delete_endpoint(id, src_id.into());
+                    }
+                }
+                for (sink_id, _) in member.sinks() {
+                    if spec.get_play_endpoint_by_id(sink_id.clone()).is_none() {
+                        self.delete_endpoint(id, sink_id.into());
+                    }
+                }
                 for (src_id, src) in spec.publish_endpoints() {
                     if member.get_src_by_id(&src_id).is_none() {
                         create_src_endpoint.push((
@@ -455,7 +466,6 @@ impl Handler<Apply> for Room {
                         ));
                     }
                 }
-
                 for (sink_id, sink) in spec.play_endpoints() {
                     if member.get_sink_by_id(&sink_id).is_none() {
                         create_sink_endpoint.push((
@@ -465,60 +475,41 @@ impl Handler<Apply> for Room {
                         ));
                     }
                 }
-
-                for (src_id, _) in member.srcs() {
-                    if spec.get_publish_endpoint_by_id(src_id.clone()).is_none()
-                    {
-                        self.delete_endpoint(&id, src_id.into());
-                    }
-                }
-
-                for (sink_id, _) in member.sinks() {
-                    if spec.get_play_endpoint_by_id(sink_id.clone()).is_none() {
-                        self.delete_endpoint(&id, sink_id.into());
-                    }
-                }
             } else {
-                create_members.push((id, spec));
+                self.members.create_member(id.clone(), &spec)?;
             }
         }
-
-        let sids = self.members.create_members(&create_members)?;
 
         for (id, src_id, src) in create_src_endpoint {
             self.create_src_endpoint(id, src_id, &src)?;
         }
         for (id, sink_id, sink) in create_sink_endpoint {
-            self.create_sink_endpoint(ctx, &id, sink_id, sink)?;
+            self.create_sink_endpoint(ctx, id.clone(), sink_id, sink)?;
         }
 
-        for id in self.members.members_ids() {
-            if !msg.0.pipeline.contains_key(&id) {
-                self.delete_member(&id, ctx);
-            }
-        }
-
-        Ok(sids)
+        Ok(())
     }
 }
 
 /// Signal for creating new `Member` in this [`Room`].
 #[derive(Message, Debug)]
-#[rtype(result = "Result<Sids, RoomError>")]
+#[rtype(result = "Result<(), RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);
 
 impl Handler<CreateMember> for Room {
-    type Result = Result<Sids, RoomError>;
+    type Result = Result<(), RoomError>;
 
     fn handle(
         &mut self,
         msg: CreateMember,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let CreateMember(id, spec) = msg;
-        let sids = self.members.create_members(&[(&id, spec)])?;
-        debug!("Member [id = {}] created in Room [id = {}].", id, self.id);
-        Ok(sids)
+        self.members.create_member(msg.0.clone(), &msg.1)?;
+        debug!(
+            "Member [id = {}] created in Room [id = {}].",
+            msg.0, self.id
+        );
+        Ok(())
     }
 }
 
@@ -543,7 +534,7 @@ impl Handler<CreateEndpoint> for Room {
             EndpointSpec::WebRtcPlay(endpoint) => {
                 self.create_sink_endpoint(
                     ctx,
-                    &msg.member_id,
+                    msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
                 )?;

@@ -30,7 +30,7 @@ use crate::{
             MemberSpec, RoomSpec,
         },
     },
-    conf::{server::PublicUrl, Rpc as RpcConf},
+    conf::Rpc as RpcConf,
     log::prelude::*,
     signalling::{
         elements::{
@@ -39,7 +39,6 @@ use crate::{
             parse_members, Member, MembersLoadError,
         },
         room::RoomError,
-        room_service::Sids,
         Room,
     },
     AppContext,
@@ -75,9 +74,6 @@ pub struct ParticipantService {
     /// [`Room`]s id from which this [`ParticipantService`] was created.
     room_id: RoomId,
 
-    /// Public URL of HTTP server.
-    public_url: PublicUrl,
-
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
@@ -112,7 +108,6 @@ impl ParticipantService {
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
-            public_url: context.config.server.client.http.public_url.clone(),
             members: parse_members(room_spec, context.config.rpc)?,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
@@ -365,72 +360,54 @@ impl ParticipantService {
         self.members.iter()
     }
 
-    /// Creates new [`Member`]s in this [`ParticipantService`].
+    /// Creates new [`Member`] in this [`ParticipantService`].
     ///
-    /// This function will check that new [`Member`]s IDs not present in
+    /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].
     ///
     /// # Errors
     ///
     /// Errors with [`RoomError::MemberAlreadyExists`] if [`Member`] with
     /// provided [`MemberId`] already exists in [`ParticipantService`].
-    pub fn create_members(
+    pub fn create_member(
         &mut self,
-        specs: &[(&MemberId, MemberSpec)],
-    ) -> Result<Sids, RoomError> {
-        let mut members = HashMap::new();
-        for (id, spec) in specs {
-            if self.get_member_by_id(id).is_ok() {
-                return Err(RoomError::MemberAlreadyExists(
-                    self.get_fid_to_member((*id).clone()),
-                ));
-            }
-            let signalling_member = Member::new(
-                (*id).clone(),
-                spec.credentials().clone(),
-                self.room_id.clone(),
-                spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
-                spec.reconnect_timeout()
-                    .unwrap_or(self.rpc_conf.reconnect_timeout),
-                spec.ping_interval().unwrap_or(self.rpc_conf.ping_interval),
+        id: MemberId,
+        spec: &MemberSpec,
+    ) -> Result<(), RoomError> {
+        if self.get_member_by_id(&id).is_ok() {
+            return Err(RoomError::MemberAlreadyExists(
+                self.get_fid_to_member(id),
+            ));
+        }
+        let signalling_member = Member::new(
+            id.clone(),
+            spec.credentials().clone(),
+            self.room_id.clone(),
+            spec.idle_timeout().unwrap_or(self.rpc_conf.idle_timeout),
+            spec.reconnect_timeout()
+                .unwrap_or(self.rpc_conf.reconnect_timeout),
+            spec.ping_interval().unwrap_or(self.rpc_conf.ping_interval),
+        );
+
+        signalling_member.set_callback_urls(spec);
+
+        for (id, publish) in spec.publish_endpoints() {
+            let signalling_publish = WebRtcPublishEndpoint::new(
+                id.clone(),
+                publish.p2p,
+                signalling_member.downgrade(),
+                publish.force_relay,
+                publish.audio_settings,
+                publish.video_settings,
             );
-
-            signalling_member.set_callback_urls(spec);
-            members.insert(*id, (signalling_member, spec));
+            signalling_member.insert_src(signalling_publish);
         }
 
-        for (signalling_member, spec) in members.values() {
-            for (id, publish) in spec.publish_endpoints() {
-                let signalling_publish = WebRtcPublishEndpoint::new(
-                    id.clone(),
-                    publish.p2p,
-                    signalling_member.downgrade(),
-                    publish.force_relay,
-                    publish.audio_settings,
-                    publish.video_settings,
-                );
-                signalling_member.insert_src(signalling_publish);
-            }
-        }
-
-        let mut sids = HashMap::new();
-        for (id, (signalling_member, spec)) in &members {
-            for (id, play) in spec.play_endpoints() {
-                let partner_member = if let Ok(m) =
-                    self.get_member(&play.src.member_id)
-                {
-                    m
-                } else if let Some((m, _)) = members.get(&play.src.member_id) {
-                    m.clone()
-                } else {
-                    return Err(ParticipantServiceErr::ParticipantNotFound(
-                        self.get_fid_to_member(play.src.member_id.clone()),
-                    )
-                    .into());
-                };
-                let src = partner_member
-                    .get_src_by_id(&play.src.endpoint_id)
-                    .ok_or_else(|| {
+        for (id, play) in spec.play_endpoints() {
+            let partner_member = self.get_member(&play.src.member_id)?;
+            let src = partner_member
+                .get_src_by_id(&play.src.endpoint_id)
+                .ok_or_else(|| {
                     MemberError::EndpointNotFound(
                         partner_member.get_fid_to_endpoint(
                             play.src.endpoint_id.clone().into(),
@@ -438,33 +415,26 @@ impl ParticipantService {
                     )
                 })?;
 
-                let sink = WebRtcPlayEndpoint::new(
-                    id.clone(),
-                    play.src.clone(),
-                    src.downgrade(),
-                    signalling_member.downgrade(),
-                    play.force_relay,
-                );
-
-                signalling_member.insert_sink(sink);
-            }
-
-            // This is needed for atomicity.
-            for (_, sink) in signalling_member.sinks() {
-                let src = sink.src();
-                src.add_sink(sink.downgrade());
-            }
-
-            sids.insert(
-                (*id).clone(),
-                signalling_member.get_sid(self.public_url.clone()),
+            let sink = WebRtcPlayEndpoint::new(
+                id.clone(),
+                play.src.clone(),
+                src.downgrade(),
+                signalling_member.downgrade(),
+                play.force_relay,
             );
-        }
-        for (id, (member, _)) in members {
-            self.insert_member((*id).clone(), member);
+
+            signalling_member.insert_sink(sink);
         }
 
-        Ok(sids)
+        // This is needed for atomicity.
+        for (_, sink) in signalling_member.sinks() {
+            let src = sink.src();
+            src.add_sink(sink.downgrade());
+        }
+
+        self.insert_member(id, signalling_member);
+
+        Ok(())
     }
 }
 
@@ -510,7 +480,7 @@ mod test {
 
         let test_member_id = MemberId::from("test-member");
         members
-            .create_members(&[(&test_member_id, test_member_spec)])
+            .create_member(test_member_id.clone(), &test_member_spec)
             .unwrap();
 
         let test_member = members.get_member_by_id(&test_member_id).unwrap();
@@ -552,7 +522,7 @@ mod test {
 
         let test_member_id = MemberId::from("test-member");
         members
-            .create_members(&[(&test_member_id, test_member_spec)])
+            .create_member(test_member_id.clone(), &test_member_spec)
             .unwrap();
 
         let test_member = members.get_member_by_id(&test_member_id).unwrap();

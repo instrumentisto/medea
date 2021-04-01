@@ -282,7 +282,7 @@ impl Room {
 
     /// Signals about removing [`Member`]'s [`Peer`]s.
     fn member_peers_removed(
-        &mut self,
+        &self,
         peers_id: Vec<PeerId>,
         member_id: &MemberId,
     ) {

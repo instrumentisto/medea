@@ -63,7 +63,7 @@ impl Client {
     ) -> Result<CreateResponse> {
         Ok(self
             .0
-            .patch(&get_url(path))
+            .put(&get_url(path))
             .json(&element)
             .send()
             .await?

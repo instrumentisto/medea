@@ -52,7 +52,7 @@ dotenv = "0.15"
 failure = "0.1"
 futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "1.0"
-medea-client-api-proto = { version = "0.2", features = ["medea"] }
+medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = { path = "crates/medea-macro" }
 rand = "0.8"

@@ -24,10 +24,12 @@ service ControlApi {
   // If no ID specified, returns all Elements declared.
   rpc Get (IdRequest) returns (GetResponse);
 
-  // Applies Element with a given ID.
+  // Applies given spec to Element by its ID.
   //
-  // Idempotent. If an Element with the same ID already exists, then succeeds.
-  rpc Apply(CreateRequest) returns (CreateResponse);
+  // Idempotent. If no Element with such ID exists, then it will be created,
+  // otherwise it will be reconfigured. Elements that exist, but are not
+  // specified in provided spec will be removed.
+  rpc Apply(ApplyRequest) returns (CreateResponse);
 }
 
 // Request of creating new Element with in element with a given FID (full ID).
@@ -47,6 +49,19 @@ message CreateRequest {
 message IdRequest {
   // List of Elements FIDs.
   repeated string fid = 1;
+}
+
+// Request of applying spec to element with a given FID (full ID).
+message ApplyRequest {
+  // FID (full ID) of the Element that given spec will be applied to.
+  string parent_fid = 1;
+  // Spec of the Element.
+  oneof el {
+    Member member = 2;
+    Room room = 3;
+    WebRtcPlayEndpoint webrtc_play = 4;
+    WebRtcPublishEndpoint webrtc_pub = 5;
+  }
 }
 
 // Response which doesn't return anything on successful result,

@@ -18,13 +18,12 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        member::{Credential, Sid},
+        member::Credential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
         WebRtcPublishId,
     },
     conf,
-    conf::server::PublicUrl,
     log::prelude::*,
 };
 
@@ -134,19 +133,6 @@ impl Member {
             reconnect_timeout,
             ping_interval,
         })))
-    }
-
-    /// Returns [`Sid`] for this [`Member`].
-    #[inline]
-    #[must_use]
-    pub fn get_sid(&self, public_url: PublicUrl) -> Sid {
-        let inner = self.0.borrow();
-        Sid::new(
-            public_url,
-            inner.room_id.clone(),
-            inner.id.clone(),
-            inner.credentials.clone(),
-        )
     }
 
     /// Lookups [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].

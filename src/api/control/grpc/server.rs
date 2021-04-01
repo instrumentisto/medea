@@ -30,7 +30,9 @@ use crate::{
         endpoints::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         error_codes::{
             ErrorCode,
-            ErrorCode::{ElementIdIsTooLong, ElementIdMismatch},
+            ErrorCode::{
+                ElementIdIsTooLong, ElementIdMismatch, UnimplementedCall,
+            },
             ErrorResponse,
         },
         refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
@@ -121,7 +123,7 @@ impl ControlApiService {
     /// Implementation of `Apply` method for `Endpoint` element.
     async fn apply_element(
         &self,
-        req: proto::CreateRequest,
+        req: proto::ApplyRequest,
     ) -> Result<Sids, ErrorResponse> {
         let unparsed_fid = req.parent_fid;
         let elem = if let Some(elem) = req.el {
@@ -136,10 +138,10 @@ impl ControlApiService {
         let parent_fid = StatefulFid::try_from(unparsed_fid)?;
         match parent_fid {
             StatefulFid::Room(fid) => match elem {
-                proto::create_request::El::Room(_) => Ok(self
+                proto::apply_request::El::Room(_) => Ok(self
                     .0
                     .send(ApplyRoom {
-                        id: fid.room_id().clone(),
+                        id: fid.take_room_id(),
                         spec: RoomSpec::try_from(elem)?,
                     })
                     .await
@@ -147,19 +149,24 @@ impl ControlApiService {
                 _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
             },
             StatefulFid::Member(fid) => match elem {
-                proto::create_request::El::Member(member) => Ok(self
+                proto::apply_request::El::Member(member) => Ok(self
                     .0
                     .send(ApplyMember {
                         fid,
                         spec: MemberSpec::try_from(member)?,
                     })
                     .await
-                    .map_err(GrpcControlApiError::from)??),
+                    .map(|_| Sids::new())
+                    .map_err(GrpcControlApiError::from)?),
                 _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
             },
-            StatefulFid::Endpoint(_) => {
-                Err(ErrorResponse::new(ElementIdIsTooLong, &parent_fid))
-            }
+            StatefulFid::Endpoint(_) => Err(ErrorResponse::with_explanation(
+                UnimplementedCall,
+                String::from(
+                    "Apply method for Endpoints is not currently supported.",
+                ),
+                None,
+            )),
         }
     }
 
@@ -277,9 +284,9 @@ impl ControlApi for ControlApiService {
                     sid: proto_sids(sid),
                     error: None,
                 },
-                Err(err) => proto::CreateResponse {
+                Err(e) => proto::CreateResponse {
                     sid: HashMap::new(),
-                    error: Some(err.into()),
+                    error: Some(e.into()),
                 },
             };
         Ok(tonic::Response::new(create_response))
@@ -319,20 +326,20 @@ impl ControlApi for ControlApiService {
 
     async fn apply(
         &self,
-        request: tonic::Request<proto::CreateRequest>,
+        request: tonic::Request<proto::ApplyRequest>,
     ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
-        let resp = match self.apply_element(request.into_inner()).await {
+        debug!("Apply gRPC Request: [{:?}]", request);
+        let response = match self.apply_element(request.into_inner()).await {
             Ok(sid) => proto::CreateResponse {
                 sid: proto_sids(sid),
                 error: None,
             },
-            Err(err) => proto::CreateResponse {
+            Err(e) => proto::CreateResponse {
                 sid: HashMap::new(),
-                error: Some(err.into()),
+                error: Some(e.into()),
             },
         };
-
-        Ok(tonic::Response::new(resp))
+        Ok(tonic::Response::new(response))
     }
 }
 
@@ -363,7 +370,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
              shutting down.",
         );
         if let Some(grpc_shutdown) = self.0.take() {
-            grpc_shutdown.send(()).ok();
+            let _ = grpc_shutdown.send(());
         }
     }
 }

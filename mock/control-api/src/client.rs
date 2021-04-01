@@ -154,7 +154,7 @@ impl ControlClient {
         fid: Fid,
         element: Element,
     ) -> Result<proto::CreateResponse, Status> {
-        use proto::create_request::El;
+        use proto::apply_request::El;
 
         let el = match element {
             Element::Room(room) => El::Room(room.into_proto(id)),
@@ -166,7 +166,7 @@ impl ControlClient {
                 El::WebrtcPub(webrtc_pub.into_proto(id))
             }
         };
-        let req = proto::CreateRequest {
+        let req = proto::ApplyRequest {
             parent_fid: fid.into(),
             el: Some(el),
         };
