@@ -365,6 +365,7 @@ impl InnerMediaConnections {
         kind: MediaKind,
         direction: TransceiverDirection,
     ) -> Transceiver {
+        log::debug!("New Transceiver created");
         Transceiver::from(self.peer.add_transceiver(kind, direction))
     }
 
@@ -676,6 +677,7 @@ impl MediaConnections {
             if let Some(recv_mid) = &receiver.mid() {
                 if recv_mid == &mid {
                     receiver.set_remote_track(transceiver, track);
+                    log::debug!("Set remote track for receiver");
                     return Ok(());
                 }
             }

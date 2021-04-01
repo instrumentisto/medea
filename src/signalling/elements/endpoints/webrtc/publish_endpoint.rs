@@ -10,6 +10,7 @@ use medea_client_api_proto::{PeerId, TrackId};
 use medea_control_api_proto::grpc::api as proto;
 
 use crate::{
+    log::prelude::*,
     api::control::endpoints::webrtc_publish_endpoint::{
         AudioSettings, P2pMode, VideoSettings, WebRtcPublishId as Id,
     },
@@ -90,6 +91,7 @@ impl WebRtcPublishEndpointInner {
     }
 
     fn add_peer_id(&mut self, peer_id: PeerId) {
+        debug!("Publish add peer id");
         self.peer_ids.insert(peer_id);
     }
 
@@ -199,6 +201,11 @@ impl WebRtcPublishEndpoint {
     #[inline]
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
         self.0.borrow_mut().remove_peer_ids(peer_ids)
+    }
+
+    #[inline]
+    pub fn remove_all_peer_ids(&self) {
+        self.0.borrow_mut().peer_ids = HashSet::new();
     }
 
     /// Returns [`Id`] of this [`WebRtcPublishEndpoint`].

@@ -73,6 +73,7 @@ use crate::{
         peers::Counter,
     },
     turn::IceUser,
+    log::prelude::*,
 };
 
 /// Subscriber to the events indicating that [`Peer`] was updated.
@@ -283,6 +284,7 @@ impl PeerStateMachine {
     /// Changes are applied __only if [`Peer`] is in a [`Stable`]__ state.
     #[inline]
     pub fn commit_scheduled_changes(&mut self) -> bool {
+        debug!("PeerStateMachine::commit_scheduled_changes");
         if let PeerStateMachine::Stable(this) = self {
             this.commit_scheduled_changes();
             true
@@ -295,6 +297,7 @@ impl PeerStateMachine {
     /// runs scheduled changes forcibly (not all changes can be ran forcibly).
     #[inline]
     pub fn force_commit_scheduled_changes(&mut self) {
+        debug!("PeerStateMachine::force_commit_scheduled_changes");
         if !self.commit_scheduled_changes() {
             self.inner_force_commit_scheduled_changes();
         }
@@ -836,8 +839,10 @@ impl<T> Peer<T> {
 
     /// Adds [`Endpoint`] for which this [`Peer`] was created.
     pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
+        debug!("Add endpoint");
         match endpoint {
             Endpoint::WebRtcPlayEndpoint(play) => {
+                debug!("Add play endpoint");
                 play.set_peer_id(self.id());
             }
             Endpoint::WebRtcPublishEndpoint(publish) => {
@@ -861,6 +866,7 @@ impl<T> Peer<T> {
 
     /// Forcibly commits all the [`PeerChange::PartnerTrackPatch`]es.
     pub fn force_commit_partner_changes(&mut self) {
+        debug!("Force commit changes: {}", self.context.id);
         let mut partner_patches = Vec::new();
         // TODO: use drain_filter when its stable
         let mut i = 0;
@@ -1390,6 +1396,7 @@ impl<'a> PeerChangesScheduler<'a> {
         partner_peer: &mut PeerStateMachine,
         tracks_counter: &Counter<TrackId>,
     ) {
+        debug!("Add publisher scheduled");
         let audio_settings = src.audio_settings();
         if audio_settings.publish_policy != PublishPolicy::Disabled {
             let track_audio = Rc::new(MediaTrack::new(
@@ -1447,6 +1454,7 @@ impl<'a> PeerChangesScheduler<'a> {
     /// [`PeerChange`] will be applied.
     #[inline]
     fn add_receiver(&mut self, track: Rc<MediaTrack>) {
+        debug!("Add receiver scheduled");
         self.schedule_change(PeerChange::AddRecvTrack(track));
     }
 
@@ -1457,6 +1465,7 @@ impl<'a> PeerChangesScheduler<'a> {
     /// [`PeerChange`] will be applied.
     #[inline]
     fn add_sender(&mut self, track: Rc<MediaTrack>) {
+        debug!("Add sender scheduled");
         self.schedule_change(PeerChange::AddSendTrack(track));
     }
 

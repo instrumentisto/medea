@@ -492,6 +492,7 @@ impl PeersService {
 
                     sink_peer.add_endpoint(&sink.into());
                     src_peer.add_endpoint(&src.into());
+                    debug!("Added endpoints");
 
                     self.peers.add_peer(src_peer);
                     self.peers.add_peer(sink_peer);

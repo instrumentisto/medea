@@ -8,6 +8,7 @@ use std::{
 use medea_client_api_proto::PeerId;
 use medea_control_api_proto::grpc::api as proto;
 
+use crate::log::prelude::*;
 use crate::{
     api::control::{
         endpoints::webrtc_play_endpoint::WebRtcPlayId as Id, refs::SrcUri,
@@ -70,6 +71,7 @@ impl WebRtcPlayEndpointInner {
     }
 
     fn set_peer_id(&mut self, peer_id: PeerId) {
+        debug!("set peer id");
         self.peer_id = Some(peer_id)
     }
 
@@ -85,6 +87,10 @@ impl WebRtcPlayEndpointInner {
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
         if let Some(receiver_publisher) = self.src.safe_upgrade() {
+            if let Some(peer_id) = self.peer_id {
+                // TODO: remove partner PeerId from the receiver_publisher
+                receiver_publisher.remove_all_peer_ids();
+            }
             receiver_publisher.remove_empty_weaks_from_sinks();
         }
     }

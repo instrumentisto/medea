@@ -41,6 +41,7 @@ pub struct Receiver {
     enabled_individual: Cell<bool>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     track_events_sender: mpsc::UnboundedSender<TrackEvent>,
+    has_pair: Cell<bool>,
 }
 
 impl Receiver {
@@ -69,6 +70,7 @@ impl Receiver {
             TransceiverDirection::INACTIVE
         };
 
+        let mut paired = false;
         let transceiver = if state.mid().is_none() {
             // Try to find send transceiver that can be used as sendrecv.
             let mut senders = connections.senders.values();
@@ -76,10 +78,13 @@ impl Receiver {
                 sndr.caps().media_kind() == caps.media_kind()
                     && sndr.caps().media_source_kind()
                         == caps.media_source_kind()
+                    && !sndr.has_pair()
             });
             Some(sender.map_or_else(
                 || connections.add_transceiver(kind, transceiver_direction),
                 |sender| {
+                    sender.pair();
+                    paired = true;
                     let trnsvr = sender.transceiver();
                     trnsvr.add_direction(transceiver_direction);
 
@@ -89,6 +94,8 @@ impl Receiver {
         } else {
             None
         };
+
+        log::debug!("Paired: {}", paired);
 
         let this = Self {
             track_id: state.track_id(),
@@ -102,6 +109,7 @@ impl Receiver {
             enabled_general: Cell::new(state.enabled_individual()),
             enabled_individual: Cell::new(state.enabled_general()),
             track_events_sender,
+            has_pair: Cell::new(paired),
         };
 
         let enabled_in_cons = match &state.media_type() {
@@ -115,6 +123,15 @@ impl Receiver {
         }
 
         this
+    }
+
+    pub fn pair(&self) {
+        log::debug!("Paired");
+        self.has_pair.set(true);
+    }
+
+    pub fn has_pair(&self) -> bool {
+        self.has_pair.get()
     }
 
     /// Returns [`TrackConstraints`] of this [`Receiver`].
@@ -177,11 +194,14 @@ impl Receiver {
         transceiver: Transceiver,
         new_track: sys::MediaStreamTrack,
     ) {
+        log::debug!("Impl set remote track");
         if let Some(old_track) = self.track.borrow().as_ref() {
             if old_track.id() == new_track.id() {
                 return;
             }
         }
+
+        log::debug!("New track is {}; {:?}", new_track.muted(), new_track.ready_state());
 
         let new_track =
             remote::Track::new(new_track, self.caps.media_source_kind());
@@ -198,6 +218,7 @@ impl Receiver {
             prev_track.stop();
         };
         self.maybe_notify_track();
+        log::debug!("End remote track add");
     }
 
     /// Replaces [`Receiver`]'s [`Transceiver`] with a provided [`Transceiver`].
@@ -260,6 +281,7 @@ impl Receiver {
 
 impl Drop for Receiver {
     fn drop(&mut self) {
+        log::debug!("Receiver dropped");
         if let Some(transceiver) = self.transceiver.borrow().as_ref() {
             if !transceiver.is_stopped() {
                 transceiver.sub_direction(TransceiverDirection::RECV);

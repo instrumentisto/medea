@@ -393,6 +393,7 @@ impl PeerConnection {
         let media_connections = Rc::clone(&peer.media_connections);
         peer.peer
             .on_track(Some(move |track_event| {
+                log::debug!("On remote track");
                 if let Err(err) =
                     media_connections.add_remote_track(&track_event)
                 {

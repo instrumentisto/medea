@@ -35,6 +35,7 @@ pub struct Sender {
     enabled_general: Cell<bool>,
     send_constraints: LocalTracksConstraints,
     track_events_sender: mpsc::UnboundedSender<TrackEvent>,
+    has_pair: Cell<bool>,
 }
 
 impl Sender {
@@ -71,6 +72,7 @@ impl Sender {
         let connections = media_connections.0.borrow();
         let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
+        let mut paired = false;
         let transceiver = match state.mid() {
             // Try to find rcvr transceiver that can be used as sendrecv.
             None => connections
@@ -80,19 +82,28 @@ impl Sender {
                     rcvr.caps().media_kind() == caps.media_kind()
                         && rcvr.caps().media_source_kind()
                             == caps.media_source_kind()
+                        && !rcvr.has_pair()
                 })
-                .and_then(|rcvr| rcvr.transceiver())
+                .and_then(|rcvr| {
+                    rcvr.pair();
+                    paired = true;
+                    rcvr.transceiver()
+                })
                 .unwrap_or_else(|| {
                     connections
                         .add_transceiver(kind, TransceiverDirection::INACTIVE)
                 }),
-            Some(mid) => connections
-                .get_transceiver_by_mid(mid)
-                .ok_or_else(|| {
-                    MediaConnectionsError::TransceiverNotFound(mid.to_string())
-                })
-                .map_err(tracerr::wrap!())?,
+            Some(mid) => {
+                paired = true;
+                connections
+                    .get_transceiver_by_mid(mid)
+                    .ok_or_else(|| {
+                        MediaConnectionsError::TransceiverNotFound(mid.to_string())
+                    })
+                    .map_err(tracerr::wrap!())?
+            },
         };
+        log::debug!("Paired: {}", paired);
 
         let this = Rc::new(Sender {
             track_id: state.id(),
@@ -103,6 +114,7 @@ impl Sender {
             muted: Cell::new(state.is_muted()),
             track_events_sender,
             send_constraints,
+            has_pair: Cell::new(paired),
         });
 
         if !enabled_in_cons {
@@ -117,6 +129,15 @@ impl Sender {
         }
 
         Ok(this)
+    }
+
+    pub fn has_pair(&self) -> bool {
+        self.has_pair.get()
+    }
+
+    pub fn pair(&self) {
+        log::debug!("Paired");
+        self.has_pair.set(true);
     }
 
     /// Returns [`TrackConstraints`] of this [`Sender`].
@@ -162,12 +183,15 @@ impl Sender {
         self: Rc<Self>,
         new_track: Rc<local::Track>,
     ) -> Result<()> {
+        log::debug!("Insert track");
         // no-op if we try to insert same track
         if let Some(current_track) = self.transceiver.send_track() {
             if new_track.id() == current_track.id() {
                 return Ok(());
             }
         }
+
+        log::debug!("New sender track: {}; {:?}", new_track.sys_track().muted(), new_track.sys_track().ready_state());
 
         let new_track = new_track.fork();
 
@@ -266,6 +290,7 @@ impl Sender {
 
 impl Drop for Sender {
     fn drop(&mut self) {
+        log::debug!("Sender dropped");
         if !self.transceiver.is_stopped() {
             self.transceiver.sub_direction(TransceiverDirection::SEND);
             spawn_local(self.transceiver.drop_send_track());
