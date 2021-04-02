@@ -120,31 +120,6 @@ impl<T> Object<TracksStore<T>> {
         .ok_or(Error::TypeCast)
     }
 
-    /// Returns count of tracks which are not stopped.
-    pub async fn count_of_alive_tracks(&self) -> Result<u64, Error> {
-        self.execute(Statement::new(
-            // language=JavaScript
-            r#"
-                async (store) => {
-                    let aliveCount = 0;
-                    for (track of store.tracks) {
-                        let t = track.track.get_track();
-                        let muted = t.muted;
-                        let notEnded = t.readyState != 'ended';
-                        if (!muted && notEnded && !track.stopped) {
-                            aliveCount++;
-                        }
-                    }
-                    return aliveCount;
-                }
-            "#,
-            [],
-        ))
-        .await?
-        .as_u64()
-        .ok_or(Error::TypeCast)
-    }
-
     /// Returns a track from this [`TracksStore`] with the provided
     /// [`MediaKind`] and [`MediaSourceKind`].
     pub async fn get_track(
@@ -204,29 +179,36 @@ impl<T> Object<TracksStore<T>> {
         .await
     }
 
-    /// Checks whether all local `Track`s from this store are stopped or not
-    /// stopped.
-    pub async fn all_tracks_have_stopped_state(
+    /// Returns count of tracks which are not stopped.
+    pub async fn count_tracks_by_selector(
         &self,
-        stopped_state: bool,
-    ) -> Result<bool, Error> {
+        muted: bool,
+        stopped: bool,
+    ) -> Result<u64, Error> {
         self.execute(Statement::new(
             // language=JavaScript
-            r#"
-                async (store) => {
-                    const [stopped] = args;
-                    for (track of store.tracks) {
-                        if (track.stopped !== stopped) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-            "#,
-            [stopped_state.into()],
+            &format!(
+                r#"
+                    async (store) => {{
+                        let count = 0;
+                        for (track of store.tracks) {{
+                            let t = track.track.get_track();
+                            if (t.muted == {muted} &&
+                                track.stopped == {stopped})
+                            {{
+                                count++;
+                            }}
+                        }}
+                        return count;
+                    }}
+                "#,
+                muted = muted,
+                stopped = stopped
+            ),
+            [],
         ))
         .await?
-        .as_bool()
+        .as_u64()
         .ok_or(Error::TypeCast)
     }
 }

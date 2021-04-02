@@ -838,7 +838,10 @@ impl<T> Peer<T> {
     pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
         match endpoint {
             Endpoint::WebRtcPlayEndpoint(play) => {
-                play.set_peer_ids(self.id(), self.partner_peer_id());
+                play.set_peer_id_and_partner_peer_id(
+                    self.id(),
+                    self.partner_peer_id(),
+                );
             }
             Endpoint::WebRtcPublishEndpoint(publish) => {
                 publish.add_peer_id(self.id());

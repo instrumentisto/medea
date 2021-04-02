@@ -12,7 +12,7 @@ use medea_client_api_proto::{
 };
 
 use crate::{
-    grpc_control_api::{create_room_req, ControlClient},
+    grpc_control_api::{pub_sub_room_req, ControlClient},
     signalling::{handle_peer_created, SendCommand, TestMember},
     test_name,
 };
@@ -25,7 +25,7 @@ async fn ice_restart() {
     let control_client = Rc::new(RefCell::new(ControlClient::new().await));
     let credentials = control_client
         .borrow_mut()
-        .create(create_room_req(test_name!()))
+        .create(pub_sub_room_req(test_name!()))
         .await;
 
     let (publisher_tx, mut publisher_rx) = unbounded();

@@ -73,9 +73,13 @@ impl WebRtcPlayEndpointInner {
         self.src.upgrade()
     }
 
-    fn set_peer_id(&mut self, peer_id: PeerId, partner_peer_id: PeerId) {
-        self.peer_id = Some(peer_id);
-        self.partner_peer_id = Some(partner_peer_id)
+    fn set_peer_id_and_partner_peer_id(
+        &mut self,
+        pid: PeerId,
+        partner_pid: PeerId,
+    ) {
+        self.peer_id = Some(pid);
+        self.partner_peer_id = Some(partner_pid)
     }
 
     fn peer_id(&self) -> Option<PeerId> {
@@ -162,8 +166,14 @@ impl WebRtcPlayEndpoint {
     /// Saves [`PeerId`]s of this [`WebRtcPlayEndpoint`] and source
     /// [`WebRtcPublishEndpoint`].
     #[inline]
-    pub fn set_peer_ids(&self, peer_id: PeerId, partner_peer_id: PeerId) {
-        self.0.borrow_mut().set_peer_id(peer_id, partner_peer_id);
+    pub fn set_peer_id_and_partner_peer_id(
+        &self,
+        pid: PeerId,
+        partner_pid: PeerId,
+    ) {
+        self.0
+            .borrow_mut()
+            .set_peer_id_and_partner_peer_id(pid, partner_pid);
     }
 
     /// Returns [`PeerId`] of this [`WebRtcPlayEndpoint`]'s [`Peer`].

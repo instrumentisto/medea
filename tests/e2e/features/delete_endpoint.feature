@@ -3,12 +3,12 @@ Feature: Delete endpoint
   Scenario: Control API deletes WebRtcPublishEndpoint
     Given room with joined member Alice and Bob
     When Control API deletes Alice's publish endpoint
-    Then Bob's remote tracks from Alice are ended
+    Then Bob has 2 stopped remote tracks from Alice
 
   Scenario: Control API deletes WebRtcPlayEndpoint
     Given room with joined member Alice and Bob
     When Control API deletes Alice's play endpoint with Bob
-    Then Alice's remote tracks from Bob are ended
+    Then Alice has 2 stopped remote tracks from Bob
 
   Scenario: Control API deletes all endpoints
     Given room with joined member Alice and Bob
@@ -20,9 +20,9 @@ Feature: Delete endpoint
   Scenario: Publishing continues when WebRtcPlayEndpoint is deleted
     Given room with joined member Alice and Bob
     When Control API deletes Alice's play endpoint with Bob
-    Then Bob's remote tracks from Alice are live
+    Then Bob has 2 live remote tracks from Alice
 
   Scenario: Publishing continues when partner's WebRtcPublishEndpoint is deleted
     Given room with joined member Alice and Bob
     When Control API deletes Alice's publish endpoint
-    Then Alice's remote tracks from Bob are live
+    Then Alice has 2 live remote tracks from Bob

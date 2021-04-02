@@ -12,7 +12,7 @@ use medea::api::control::error_codes::{
 
 use crate::test_name;
 
-use super::{create_room_req, ControlClient};
+use super::{pub_sub_room_req, ControlClient};
 
 /// Tests `Delete` method of [Medea]'s [Control API].
 ///
@@ -35,7 +35,7 @@ async fn test_for_delete(
     error_code: MedeaErrorCode,
 ) {
     let mut client = ControlClient::new().await;
-    client.create(create_room_req(room_id)).await;
+    client.create(pub_sub_room_req(room_id)).await;
 
     client.try_get(element_id).await.unwrap();
 
@@ -101,7 +101,7 @@ async fn test_cascade_delete(
     root_elem_uri: &str,
 ) {
     let mut client = ControlClient::new().await;
-    client.create(create_room_req(room_id)).await;
+    client.create(pub_sub_room_req(room_id)).await;
     client.delete(elements_uris).await.unwrap();
 
     match client.try_get(root_elem_uri).await {
