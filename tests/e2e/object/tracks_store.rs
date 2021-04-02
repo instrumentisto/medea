@@ -3,8 +3,6 @@
 
 use std::marker::PhantomData;
 
-use derive_more::Display;
-
 use crate::{
     browser::Statement,
     object::{
@@ -16,23 +14,6 @@ use crate::{
 };
 
 use super::Error;
-
-/// Representation of a [MediaStreamTrackState][1].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrackstate
-#[derive(Clone, Copy, Debug, Eq, Display, PartialEq)]
-pub enum MediaStreamTrackState {
-    /// Track is active (the track's underlying media source is making a
-    /// best-effort attempt to provide data in real time).
-    #[display(fmt = "live")]
-    Live,
-
-    /// Track has ended (the track's underlying media source is no longer
-    /// providing data, and will never provide more data for this track). Once
-    /// a track enters this state, it never exits it.
-    #[display(fmt = "ended")]
-    Ended,
-}
 
 /// Shortcut for a [`TracksStore`] of [`LocalTrack`]s.
 pub type LocalTracksStore = TracksStore<LocalTrack>;
@@ -139,6 +120,31 @@ impl<T> Object<TracksStore<T>> {
         .ok_or(Error::TypeCast)
     }
 
+    /// Returns count of tracks which are not stopped.
+    pub async fn count_of_alive_tracks(&self) -> Result<u64, Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (store) => {
+                    let aliveCount = 0;
+                    for (track of store.tracks) {
+                        let t = track.track.get_track();
+                        let muted = t.muted;
+                        let notEnded = t.readyState != 'ended';
+                        if (!muted && notEnded && !track.stopped) {
+                            aliveCount++;
+                        }
+                    }
+                    return aliveCount;
+                }
+            "#,
+            [],
+        ))
+        .await?
+        .as_u64()
+        .ok_or(Error::TypeCast)
+    }
+
     /// Returns a track from this [`TracksStore`] with the provided
     /// [`MediaKind`] and [`MediaSourceKind`].
     pub async fn get_track(
@@ -198,28 +204,26 @@ impl<T> Object<TracksStore<T>> {
         .await
     }
 
-    /// Checks whether all local `Track`s from this store are in the `ended`
-    /// `readyState`.
-    pub async fn all_tracks_have_ready_state(
+    /// Checks whether all local `Track`s from this store are stopped or not
+    /// stopped.
+    pub async fn all_tracks_have_stopped_state(
         &self,
-        ready_state: MediaStreamTrackState,
+        stopped_state: bool,
     ) -> Result<bool, Error> {
         self.execute(Statement::new(
             // language=JavaScript
-            &format!(
-                r#"
-                    async (store) => {{
-                        for (track of store.tracks) {{
-                            if (track.track.get_track().readyState !== '{}') {{
-                                return false;
-                            }}
-                        }}
-                        return true;
-                    }}
-                "#,
-                ready_state,
-            ),
-            [],
+            r#"
+                async (store) => {
+                    const [stopped] = args;
+                    for (track of store.tracks) {
+                        if (track.stopped !== stopped) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            "#,
+            [stopped_state.into()],
         ))
         .await?
         .as_bool()

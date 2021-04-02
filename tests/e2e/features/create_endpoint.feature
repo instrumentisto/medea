@@ -47,3 +47,15 @@ Feature: Create endpoint
     When Control API starts Alice's video publishing to Bob
     Then Alice doesn't have remote tracks from Bob
     And Bob has video remote track from Alice
+
+  Scenario: WebRtcPlayEndpoint created after delete
+    Given room with joined member Alice and Bob
+    When Control API deletes Alice's play endpoint with Bob
+    And Control API starts Bob's media publishing to Alice
+    Then Alice has 2 alive remote tracks from Bob
+
+  Scenario: Endpoints created after delete
+    Given room with joined member Alice and Bob
+    When Control API deletes Bob's publish endpoint
+    And Control API starts Bob's media publishing to Alice
+    Then Alice has 2 alive remote tracks from Bob

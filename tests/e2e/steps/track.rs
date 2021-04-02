@@ -1,10 +1,11 @@
 use cucumber_rust::then;
 
 use crate::{
-    object::{tracks_store::MediaStreamTrackState, MediaKind, MediaSourceKind},
+    object::{MediaKind, MediaSourceKind},
     steps::parse_media_kinds,
     world::World,
 };
+use std::time::Duration;
 
 #[then(regex = r"^(\S+) has (\d+) local track(?:s)?$")]
 async fn then_member_has_local_tracks(
@@ -46,6 +47,28 @@ async fn then_member_has_remote_track(
             .await
             .is_ok());
     }
+}
+
+#[then(regex = r"^(\S+) has (\d+) alive remote tracks from (\S+)$")]
+async fn then_member_has_alive_remote_track(
+    world: &mut World,
+    id: String,
+    count_of_tracks: u64,
+    remote_id: String,
+) {
+    tokio_1::time::sleep(Duration::from_millis(300)).await;
+    let member = world.get_member(&id).unwrap();
+    let connection = member
+        .connections()
+        .wait_for_connection(remote_id)
+        .await
+        .unwrap();
+    let tracks_store = connection.tracks_store().await.unwrap();
+
+    assert_eq!(
+        tracks_store.count_of_alive_tracks().await.unwrap(),
+        count_of_tracks
+    );
 }
 
 #[then(regex = r"^(\S+) has local (audio|(?:device |display )?video)$")]
@@ -216,7 +239,7 @@ async fn then_member_doesnt_have_live_local_tracks(
     let member = world.get_member(&id).unwrap();
     let local_tracks = member.room().local_tracks().await.unwrap();
     assert!(local_tracks
-        .all_tracks_have_ready_state(MediaStreamTrackState::Ended)
+        .all_tracks_have_stopped_state(true)
         .await
         .unwrap());
 }
@@ -232,14 +255,9 @@ async fn then_remote_tracks_are_stopped(
     let connection =
         member.connections().get(partner_id).await.unwrap().unwrap();
     let tracks_store = connection.tracks_store().await.unwrap();
-    let ready_state = if live_or_ended == "live" {
-        MediaStreamTrackState::Live
-    } else {
-        MediaStreamTrackState::Ended
-    };
     assert!(tracks_store.count().await.unwrap() > 0);
     assert!(tracks_store
-        .all_tracks_have_ready_state(ready_state)
+        .all_tracks_have_stopped_state(live_or_ended == "ended")
         .await
         .unwrap());
 }
