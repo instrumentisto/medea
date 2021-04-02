@@ -47,6 +47,10 @@ struct WebRtcPlayEndpointInner {
     /// [`Peer`]: crate::media::peer::Peer
     peer_id: Option<PeerId>,
 
+    /// [`PeerId`] of [`Peer`] created for source [`WebRtcPublishEndpoint`]
+    /// from which this [`WebRtcPlayEndpoint`] receives data.
+    partner_peer_id: Option<PeerId>,
+
     /// Indicator whether only `relay` ICE candidates are allowed for this
     /// [`WebRtcPlayEndpoint`].
     is_force_relayed: bool,
@@ -69,8 +73,9 @@ impl WebRtcPlayEndpointInner {
         self.src.upgrade()
     }
 
-    fn set_peer_id(&mut self, peer_id: PeerId) {
-        self.peer_id = Some(peer_id)
+    fn set_peer_id(&mut self, peer_id: PeerId, partner_peer_id: PeerId) {
+        self.peer_id = Some(peer_id);
+        self.partner_peer_id = Some(partner_peer_id)
     }
 
     fn peer_id(&self) -> Option<PeerId> {
@@ -85,6 +90,9 @@ impl WebRtcPlayEndpointInner {
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
         if let Some(receiver_publisher) = self.src.safe_upgrade() {
+            if let Some(partner_peer_id) = self.partner_peer_id {
+                receiver_publisher.remove_peer_ids(&[partner_peer_id])
+            }
             receiver_publisher.remove_empty_weaks_from_sinks();
         }
     }
@@ -113,6 +121,7 @@ impl WebRtcPlayEndpoint {
             src: publisher,
             owner,
             peer_id: None,
+            partner_peer_id: None,
             is_force_relayed,
         })))
     }
@@ -150,10 +159,11 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().src()
     }
 
-    /// Saves [`PeerId`] of this [`WebRtcPlayEndpoint`].
+    /// Saves [`PeerId`]s of this [`WebRtcPlayEndpoint`] and source
+    /// [`WebRtcPublishEndpoint`].
     #[inline]
-    pub fn set_peer_id(&self, peer_id: PeerId) {
-        self.0.borrow_mut().set_peer_id(peer_id);
+    pub fn set_peer_ids(&self, peer_id: PeerId, partner_peer_id: PeerId) {
+        self.0.borrow_mut().set_peer_id(peer_id, partner_peer_id);
     }
 
     /// Returns [`PeerId`] of this [`WebRtcPlayEndpoint`]'s [`Peer`].
