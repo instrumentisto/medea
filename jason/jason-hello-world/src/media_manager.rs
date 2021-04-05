@@ -17,3 +17,11 @@ impl MediaManager {
         vec![LocalMediaTrack]
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn MediaManager__init_local_tracks(
+    this: *mut MediaManager,
+) -> Array<LocalMediaTrack> {
+    let this = Box::from_raw(this);
+    Array::new(this.init_local_tracks())
+}

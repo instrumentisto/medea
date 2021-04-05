@@ -32,3 +32,35 @@ impl InputDeviceInfo {
         format!("foo {} - bar {}", self.foo, self.bar)
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn InputDeviceInfo__device_id(
+    this: *mut InputDeviceInfo,
+) -> *const libc::c_char {
+    let this = Box::from_raw(this);
+    super::into_dart_string(this.device_id())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn InputDeviceInfo__kind(
+    this: *mut InputDeviceInfo,
+) -> u8 {
+    let this = Box::from_raw(this);
+    this.kind().into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn InputDeviceInfo__label<'a>(
+    this: *mut InputDeviceInfo,
+) -> *const libc::c_char {
+    let this = Box::from_raw(this);
+    super::into_dart_string(this.label())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn InputDeviceInfo_nativeGroupId<'a>(
+    this: *mut InputDeviceInfo,
+) -> *const libc::c_char {
+    let this = Box::from_raw(this);
+    super::into_dart_string(this.group_id())
+}
