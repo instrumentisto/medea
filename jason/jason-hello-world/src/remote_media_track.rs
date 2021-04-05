@@ -6,11 +6,11 @@ impl RemoteMediaTrack {
     pub fn enable(&self) {}
 
     pub fn kind(&self) -> MediaKind {
-        MediaKind::Foo
+        MediaKind::Audio
     }
 
     pub fn media_source_kind(&self) -> MediaSourceKind {
-        MediaSourceKind::Foo
+        MediaSourceKind::Device
     }
 }
 
@@ -27,7 +27,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__kind(
     this: *mut RemoteMediaTrack,
 ) -> u8 {
     let this = Box::from_raw(this);
-    this.kind().into()
+    this.kind() as u8
 }
 
 #[no_mangle]
@@ -35,5 +35,5 @@ pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
     this: *mut RemoteMediaTrack,
 ) -> u8 {
     let this = Box::from_raw(this);
-    this.media_source_kind().into()
+    this.media_source_kind() as u8
 }

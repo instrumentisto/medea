@@ -1,6 +1,4 @@
-use dart_sys::Dart_Handle;
-
-use super::input_device_info::InputDeviceInfo;
+use crate::utils::into_dart_string;
 
 pub struct ConnectionHandle;
 
@@ -15,5 +13,5 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: *mut ConnectionHandle,
 ) -> *const libc::c_char {
     let this = Box::from_raw(this);
-    super::into_dart_string(this.get_remote_member_id())
+    into_dart_string(this.get_remote_member_id())
 }

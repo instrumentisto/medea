@@ -1,4 +1,4 @@
-use crate::into_dart_string;
+use crate::utils::into_dart_string;
 
 pub struct RoomCloseReason;
 

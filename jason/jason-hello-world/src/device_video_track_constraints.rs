@@ -1,5 +1,7 @@
 use std::convert::TryFrom;
 
+use crate::utils::from_dart_string;
+
 pub struct DeviceVideoTrackConstraints;
 
 impl DeviceVideoTrackConstraints {
@@ -38,7 +40,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
     device_id: *const libc::c_char,
 ) {
     let mut this = Box::from_raw(this);
-    this.device_id(super::dart_string(device_id));
+    this.device_id(from_dart_string(device_id));
 }
 
 #[no_mangle]

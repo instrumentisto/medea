@@ -1,5 +1,7 @@
-use crate::{media_manager::MediaManager, room_handle::RoomHandle, Array, into_dart_string};
-use crate::input_device_info::InputDeviceInfo;
+use crate::{
+    input_device_info::InputDeviceInfo, media_manager::MediaManager,
+    room_handle::RoomHandle, utils::Array,
+};
 
 pub struct Jason;
 
