@@ -63,12 +63,12 @@ Delete single `Endpoint` element.
 
 ### `PUT /control-api/{room_id}`
 
-Apply given spec to `Room`.
+Apply given spec to the `Room`.
 
 
 ### `PUT /control-api/{room_id}/{element_id}`
 
-Apply given spec to `Room` element.
+Apply given spec to the `Room` element.
 
 
 ### `GET /callbacks`
