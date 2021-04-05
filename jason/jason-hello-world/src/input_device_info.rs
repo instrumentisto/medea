@@ -56,3 +56,10 @@ pub unsafe extern "C" fn InputDeviceInfo_nativeGroupId<'a>(
     let this = Box::from_raw(this);
     into_dart_string(this.group_id())
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn InputDeviceInfo__free(
+    this: *mut InputDeviceInfo
+) {
+    Box::from_raw(this);
+}

@@ -66,3 +66,10 @@ pub unsafe extern "C" fn Jason__close_room(
     let room_to_delete = Box::from_raw(room_to_delete);
     this.close_room(&room_to_delete);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn Jason__free(
+    this: *mut Jason
+) {
+    Box::from_raw(this);
+}

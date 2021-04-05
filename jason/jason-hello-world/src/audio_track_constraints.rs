@@ -15,3 +15,10 @@ pub unsafe extern "C" fn AudioTrackConstraints__native_device_id(
     // TODO: drop strings on Dart side
     this.native_device_id(from_dart_string(device_id))
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn AudioTrackConstraints__free(
+    this: *mut AudioTrackConstraints,
+) {
+    Box::from_raw(this);
+}

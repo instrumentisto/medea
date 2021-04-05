@@ -43,3 +43,10 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
     let constraints = Box::from_raw(constraints);
     this.display_video(&constraints);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn MediaStreamSettings__free(
+    this: *mut MediaStreamSettings,
+) {
+    Box::from_raw(this);
+}

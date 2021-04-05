@@ -23,3 +23,10 @@ pub unsafe extern "C" fn MediaManager__init_local_tracks(
     let this = Box::from_raw(this);
     Array::new(this.init_local_tracks())
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn MediaManager__free(
+    this: *mut MediaManager,
+) {
+    Box::from_raw(this);
+}

@@ -27,3 +27,10 @@ pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
     let this = Box::from_raw(this);
     this.media_source_kind() as u8
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn LocalMediaTrack__free(
+    this: *mut LocalMediaTrack,
+) {
+    Box::from_raw(this);
+}

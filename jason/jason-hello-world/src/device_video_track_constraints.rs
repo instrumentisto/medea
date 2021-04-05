@@ -118,3 +118,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
     let mut this = Box::from_raw(this);
     this.width_in_range(min, max);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn DeviceVideoTrackConstraints__free(
+    this: *mut DeviceVideoTrackConstraints,
+) {
+    Box::from_raw(this);
+}
