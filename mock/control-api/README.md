@@ -61,6 +61,16 @@ Delete element from `Room`.
 Delete single `Endpoint` element.
 
 
+### `PUT /control-api/{room_id}`
+
+Apply given spec to `Room`.
+
+
+### `PUT /control-api/{room_id}/{element_id}`
+
+Apply given spec to `Room` element.
+
+
 ### `GET /callbacks`
 
 Get list of all `Callback`s that [Control API] mock server received from [Medea].

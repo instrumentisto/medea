@@ -29,12 +29,19 @@ use crate::{
     utils,
 };
 
-/// URI used by clients to connect to a media server via Client API.
+/// URI used by `Member`s to connect to a media server via Client API.
 #[derive(Clone, Debug)]
 pub struct Sid {
+    /// Public URL of HTTP server.
     public_url: PublicUrl,
+
+    /// [`RoomId`] of the `Room` the `Member` is in.
     room_id: RoomId,
+
+    /// [`Id`] of the `Member`.
     member_id: Id,
+
+    /// [`Credential`] of the `Member` to authorize connection with.
     credential: Credential,
 }
 
