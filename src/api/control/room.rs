@@ -96,7 +96,7 @@ impl TryFrom<&RootElement> for RoomSpec {
     }
 }
 
-/// Implement [`TryFrom`] proto element for [`RoomSpec`].
+/// Implements [`TryFrom`] proto element for a [`RoomSpec`].
 macro_rules! impl_from_el_for_room_spec {
     ($proto_el:path) => {
         impl TryFrom<$proto_el> for RoomSpec {

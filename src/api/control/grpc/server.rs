@@ -264,7 +264,8 @@ impl ControlApiService {
     }
 }
 
-/// Converts [`Sids`] to the [`HashMap`] for gRPC Control API protocol.
+/// Converts [`Sids`] to a [`HashMap`] of [`String`]s for gRPC Control API
+/// protocol.
 fn proto_sids(sids: Sids) -> HashMap<String, String> {
     sids.into_iter()
         .map(|(id, sid)| (id.to_string(), sid.to_string()))

@@ -349,10 +349,10 @@ impl PeersService {
         if let Ok(change) = self.peers.delete_sink_endpoint(sink) {
             change
         } else {
-            // This can happen only if provided endpoint contains peers that
-            // dont exist anymore. Not a reason to propagate error, since we are
-            // removing this endpoint anyway, but that means that we didnt clean
-            // up this endpoint.
+            // This can happen only if the provided endpoint contains peers that
+            // don't exist anymore. Not a reason to propagate error, since we're
+            // removing this endpoint anyway, but that means that we didn't
+            // clean this endpoint up.
             warn!("Error while removing sink {:?}", sink);
             HashSet::new()
         }
@@ -374,10 +374,10 @@ impl PeersService {
         if let Ok(change) = self.peers.delete_src_endpoint(src) {
             change
         } else {
-            // This can happen only if provided endpoint contains peers that
-            // dont exist anymore. Not a reason to propagate error, since we are
-            // removing this endpoint anyway, but that means that we didnt clean
-            // up this endpoint.
+            // This can happen only if the provided endpoint contains peers that
+            // don't exist anymore. Not a reason to propagate error, since we're
+            // removing this endpoint anyway, but that means that we didn't
+            // clean this endpoint up.
             warn!("Error while removing sink {:?}", src);
             HashSet::new()
         }

@@ -143,7 +143,7 @@ impl ControlClient {
         response.map(tonic::Response::into_inner)
     }
 
-    /// Applies provided element with gRPC Control API.
+    /// Applies the provided element via gRPC Control API.
     ///
     /// # Errors
     ///

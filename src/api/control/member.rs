@@ -29,8 +29,7 @@ use crate::{
     utils,
 };
 
-/// URI which should be used by clients to connect to a media server via Client
-/// API
+/// URI used by clients to connect to a media server via Client API.
 #[derive(Clone, Debug)]
 pub struct Sid {
     public_url: PublicUrl,
@@ -59,7 +58,7 @@ impl Sid {
 }
 
 impl fmt::Display for Sid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}/{}/{}", self.public_url, self.room_id, self.member_id)?;
         if let Credential::Plain(plain) = &self.credential {
             write!(f, "?token={}", plain)?;
@@ -243,7 +242,7 @@ impl MemberSpec {
         }
     }
 
-    /// Lookups [`WebRtcPlayEndpoint`] by ID.
+    /// Lookups a [`WebRtcPlayEndpoint`] by its ID.
     #[must_use]
     pub fn get_play_endpoint_by_id(
         &self,

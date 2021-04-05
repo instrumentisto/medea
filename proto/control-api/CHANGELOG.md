@@ -6,10 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.1.1] · To-be-done
-[0.1.1]: /../../tree/medea-control-api-proto-0.1.1/proto/control-api
+## [0.2.0] · To-be-done
+[0.2.0]: /../../tree/medea-control-api-proto-0.2.0/proto/control-api
 
-[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Milestone](/../../milestone/2)
 
 ### Added
 

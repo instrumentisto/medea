@@ -110,9 +110,9 @@ pub enum RoomError {
     #[display(fmt = "CallbackService errored in Room: {}", _0)]
     CallbackClientError(CallbackClientError),
 
-    /// Errors that can occur when we try transform some spec from `Element`.
+    /// Errors occurring when we try transform some spec from `Element`.
     ///
-    /// This error used in all [`TryFrom`] of Control API.
+    /// This error used in all [`TryFrom`] impls of Control API.
     ///
     /// [`TryFrom`]: std::convert::TryFrom
     #[display(fmt = "Failed to convert element: {:?}", _0)]

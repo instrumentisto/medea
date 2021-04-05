@@ -103,7 +103,7 @@ impl Room {
                 }
             }
             for updated_peer_id in updated_peers {
-                // we are sure that provided peer exists.
+                // We are sure that the provided peer exists.
                 self.peers
                     .commit_scheduled_changes(updated_peer_id)
                     .unwrap();
@@ -377,7 +377,7 @@ impl Handler<Delete> for Room {
     }
 }
 
-/// Signal for applying [`MemberSpec`] in this [`Room`].
+/// Signal for applying a [`MemberSpec`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct ApplyMember(pub MemberId, pub MemberSpec);

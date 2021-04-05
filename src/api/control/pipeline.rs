@@ -17,27 +17,27 @@ pub struct Pipeline<K: Hash + Eq, V> {
 }
 
 impl<K: Hash + Eq, V> Pipeline<K, V> {
-    /// Creates new [`Pipeline`] from provided [`HashMap`].
+    /// Creates a new [`Pipeline`] from the provided [`HashMap`].
     #[inline]
     #[must_use]
     pub fn new(pipeline: HashMap<K, V>) -> Self {
         Self { pipeline }
     }
 
-    /// Iterates over pipeline by reference.
+    /// Iterates over this [`Pipeline`] by reference.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.into_iter()
     }
 
-    /// Lookups element of [`Pipeline`] by ID.
+    /// Lookups an element of this [`Pipeline`] by its ID.
     #[inline]
     #[must_use]
     pub fn get(&self, id: &K) -> Option<&V> {
         self.pipeline.get(id)
     }
 
-    /// Returns `true` if the [`Pipeline`] contains a value for the specified
+    /// Indicates whether this [`Pipeline`] contains a value with the specified
     /// ID.
     #[inline]
     #[must_use]
