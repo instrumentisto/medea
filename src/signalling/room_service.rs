@@ -210,7 +210,7 @@ impl RoomService {
         }
     }
 
-    /// Creates new [`Room`] by provided [`RoomSpec`].
+    /// Creates a new [`Room`] by the provided [`RoomSpec`].
     ///
     /// # Errors
     ///

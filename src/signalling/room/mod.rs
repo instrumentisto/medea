@@ -110,7 +110,7 @@ pub enum RoomError {
     #[display(fmt = "CallbackService errored in Room: {}", _0)]
     CallbackClientError(CallbackClientError),
 
-    /// Errors occurring when we try transform some spec from `Element`.
+    /// Errors occurring when we try to transform some spec from `Element`.
     ///
     /// This error used in all [`TryFrom`] impls of Control API.
     ///

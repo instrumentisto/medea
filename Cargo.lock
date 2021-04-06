@@ -2226,7 +2226,7 @@ dependencies = [
 
 [[package]]
 name = "medea-control-api-mock"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "actix",
  "actix-cors",
@@ -2252,7 +2252,7 @@ dependencies = [
 
 [[package]]
 name = "medea-control-api-proto"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "prost",
  "prost-types",

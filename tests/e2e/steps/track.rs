@@ -253,6 +253,6 @@ async fn then_member_has_n_remote_tracks_from(
             .count_tracks_by_selector(muted, stopped)
             .await
             .unwrap(),
-        count_of_tracks
+        count_of_tracks,
     );
 }

@@ -32,16 +32,16 @@ use crate::{
 /// URI used by `Member`s to connect to a media server via Client API.
 #[derive(Clone, Debug)]
 pub struct Sid {
-    /// Public URL of HTTP server.
+    /// Public URL of HTTP server to establish WebSocket connection with.
     public_url: PublicUrl,
 
-    /// [`RoomId`] of the `Room` the `Member` is in.
+    /// [`RoomId`] of the `Room` the `Member` participates in.
     room_id: RoomId,
 
     /// [`Id`] of the `Member`.
     member_id: Id,
 
-    /// [`Credential`] of the `Member` to authorize connection with.
+    /// [`Credential`] of the `Member` to authorize his connection with.
     credential: Credential,
 }
 
