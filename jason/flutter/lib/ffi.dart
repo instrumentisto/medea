@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'package:ffi/ffi.dart';
 
 final DynamicLibrary _dl = _open();
 final DynamicLibrary dl = _dl;
@@ -19,22 +20,13 @@ void doDynamicLinking() {
   }
 
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_closure_caller")(
-      Pointer.fromFunction<Void Function(Handle)>(doClosureCallback));
-
-  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-    "register_connection_handle_closure_caller"
-  )(Pointer.fromFunction<Void Function(Handle, Pointer)>(doPointerClosureCallback));
-  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_close_reason_closure_caller"
-  )(Pointer.fromFunction<Void Function(Handle, Pointer)>(doPointerClosureCallback));
-  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_reconnect_handle_closure_caller"
-  )(Pointer.fromFunction<Void Function(Handle, Pointer)>(doPointerClosureCallback));
-  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_local_media_track_closure_caller"
+      "register_any_closure_caller"
   )(Pointer.fromFunction<Void Function(Handle, Pointer)>(doPointerClosureCallback));
 }
+
+final _get_remote_member_id_Dart _get_remote_member_id = _dl.lookupFunction<_get_remote_member_id_C, _get_remote_member_id_Dart>('ConnectionHandle__get_remote_member_id');
+typedef _get_remote_member_id_C = Pointer<Utf8> Function(Pointer);
+typedef _get_remote_member_id_Dart = Pointer<Utf8> Function(Pointer);
 
 void doClosureCallback(void Function() callback) {
   callback();
@@ -42,4 +34,16 @@ void doClosureCallback(void Function() callback) {
 
 void doPointerClosureCallback(void Function(Pointer) callback, Pointer pointer) {
   callback(pointer);
+}
+
+final cb_test = _dl.lookupFunction<
+    Void Function(Handle),
+    void Function(void Function(Pointer))>("cb_test");
+
+void simpleCallback() {
+  doDynamicLinking();
+  cb_test((conn) {
+      var str = _get_remote_member_id(conn).toDartString();
+      print('callback fired: $str');
+  });
 }
