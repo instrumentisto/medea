@@ -299,7 +299,11 @@ pub type Sids = HashMap<MemberId, Sid>;
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct ApplyRoom {
+    /// [`RoomId`] of [`Room`] for which [`RoomSpec`] is provided and should be
+    /// applied.
     pub id: RoomId,
+
+    /// [`RoomSpec`] which should be applied on [`Room`].
     pub spec: RoomSpec,
 }
 
@@ -365,7 +369,15 @@ impl Handler<CreateRoom> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct ApplyMember {
+    /// [`Fid`] of [`Member`] for which [`MemberSpec`] is provided and should
+    /// be applied.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fid: Fid<ToMember>,
+
+    /// [`MemberSpec`] which should be applied on [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub spec: MemberSpec,
 }
 

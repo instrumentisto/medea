@@ -331,6 +331,8 @@ impl World {
         }
     }
 
+    /// Creates `WebRtcPublishEndpoint`s and `WebRtcPlayEndpoint`s for the
+    /// provided [`MembersPair`] with `Apply` method.
     pub async fn interconnect_members_via_apply(&mut self, pair: MembersPair) {
         let mut spec = self.get_spec().await;
         if let Some(proto::RoomElement::Member(member)) =
@@ -509,6 +511,7 @@ impl World {
             .collect()
     }
 
+    /// Returns [`proto::Room`] spec of the `Room` created for this [`World`].
     pub async fn get_spec(&mut self) -> proto::Room {
         let el = self
             .control_client
@@ -524,6 +527,8 @@ impl World {
         }
     }
 
+    /// Applies provided [`proto::Room`] spec on the `Room` created for this
+    /// [`World`].
     pub async fn apply(&mut self, el: proto::Room) {
         self.control_client
             .apply(&self.room_id, proto::Element::Room(el))
