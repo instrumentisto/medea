@@ -18,6 +18,13 @@ impl RoomHandle {
     pub fn on_connection_loss(&self, cb: DartCallback<ReconnectHandle>) {}
 
     pub fn on_new_connection(&self, cb: DartCallback<ConnectionHandle>) {}
+
+    pub async fn join(&self) {}
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__join(this: *mut RoomHandle) {
+
 }
 
 #[no_mangle]
@@ -57,8 +64,6 @@ pub unsafe extern "C" fn RoomHandle__on_new_connection(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__free(
-    this: *mut RoomHandle
-) {
+pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
     Box::from_raw(this);
 }

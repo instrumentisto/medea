@@ -41,8 +41,6 @@ pub unsafe extern "C" fn RoomCloseReason__is_err(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn RoomCloseReason__free(
-    this: *mut RoomCloseReason,
-) {
+pub unsafe extern "C" fn RoomCloseReason__free(this: *mut RoomCloseReason) {
     Box::from_raw(this);
 }

@@ -39,8 +39,6 @@ pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn RemoteMediaTrack__free(
-    this: *mut RemoteMediaTrack,
-) {
+pub unsafe extern "C" fn RemoteMediaTrack__free(this: *mut RemoteMediaTrack) {
     Box::from_raw(this);
 }

@@ -29,8 +29,6 @@ pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn LocalMediaTrack__free(
-    this: *mut LocalMediaTrack,
-) {
+pub unsafe extern "C" fn LocalMediaTrack__free(this: *mut LocalMediaTrack) {
     Box::from_raw(this);
 }

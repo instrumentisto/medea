@@ -1,13 +1,16 @@
+use std::{any::Any, marker::PhantomData};
+
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
-use std::any::Any;
-use std::marker::PhantomData;
-use crate::{Dart_NewPersistentHandle_DL_Trampolined, Dart_DeletePersistentHandle_DL_Trampolined, Dart_HandleFromPersistent_DL_Trampolined};
+
+use crate::{
+    Dart_DeletePersistentHandle_DL_Trampolined,
+    Dart_HandleFromPersistent_DL_Trampolined,
+    Dart_NewPersistentHandle_DL_Trampolined,
+};
 
 pub type AnyClosureCaller = extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
 
-static mut ANY_CLOSURE_CALLER: Option<
-    AnyClosureCaller
-> = None;
+static mut ANY_CLOSURE_CALLER: Option<AnyClosureCaller> = None;
 
 pub unsafe fn set_any_closure_caller(caller: AnyClosureCaller) {
     ANY_CLOSURE_CALLER = Some(caller);

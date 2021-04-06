@@ -25,8 +25,6 @@ pub unsafe extern "C" fn MediaManager__init_local_tracks(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn MediaManager__free(
-    this: *mut MediaManager,
-) {
+pub unsafe extern "C" fn MediaManager__free(this: *mut MediaManager) {
     Box::from_raw(this);
 }

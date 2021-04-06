@@ -1,4 +1,5 @@
 pub mod audio_track_constraints;
+mod callback;
 pub mod connection_handle;
 pub mod device_video_track_constraints;
 pub mod display_video_track_constraints;
@@ -12,19 +13,19 @@ pub mod remote_media_track;
 pub mod room_close_reason;
 pub mod room_handle;
 mod utils;
-mod callback;
 
-use std::any::Any;
-use std::marker::PhantomData;
+use std::{any::Any, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
 use crate::{
-    connection_handle::ConnectionHandle, local_media_track::LocalMediaTrack,
-    reconnect_handle::ReconnectHandle, room_close_reason::RoomCloseReason,
+    callback::{set_any_closure_caller, AnyClosureCaller, DartCallback},
+    connection_handle::ConnectionHandle,
+    local_media_track::LocalMediaTrack,
+    reconnect_handle::ReconnectHandle,
+    room_close_reason::RoomCloseReason,
     room_handle::RoomHandle,
 };
-use crate::callback::{DartCallback, set_any_closure_caller, AnyClosureCaller};
 
 #[link(name = "trampoline")]
 extern "C" {
@@ -54,9 +55,7 @@ pub unsafe extern "C" fn register_any_closure_caller(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn cb_test(
-    cb: Dart_Handle,
-) {
+pub unsafe extern "C" fn cb_test(cb: Dart_Handle) {
     DartCallback::<ConnectionHandle>::new(cb).call(ConnectionHandle);
 }
 
