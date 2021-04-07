@@ -277,7 +277,8 @@ fn proto_sids(sids: Sids) -> HashMap<String, String> {
 impl ControlApi for ControlApiService {
     /// Creates new [`Element`] with a given ID.
     ///
-    /// Not idempotent. Errors if an Element with the same ID already exists.
+    /// Not idempotent. Errors if an [`Element`] with the same ID already
+    /// exists.
     ///
     /// Propagates request to [`ControlApiService::create_element`].
     ///
@@ -303,8 +304,8 @@ impl ControlApi for ControlApiService {
 
     /// Removes [`Element`] by its ID.
     ///
-    /// Allows referring multiple Elements on the last two levels.
-    /// Idempotent. If no Elements with such IDs exist, then succeeds.
+    /// Allows referring multiple [`Element`]s on the last two levels.
+    /// Idempotent. If no [`Element`]s with such IDs exist, then succeeds.
     ///
     /// Propagates request to [`ControlApiService::delete_element`].
     ///
@@ -352,7 +353,7 @@ impl ControlApi for ControlApiService {
     /// Applies the given spec to [`Element`] by its ID.
     ///
     /// Idempotent. If no [`Element`] with such ID exists, then it will be
-    /// created, otherwise it will be reconfigured. Elements that exist, but
+    /// created, otherwise it will be reconfigured. [`Element`]s that exist, but
     /// are not specified in the provided spec will be removed.
     ///
     /// Propagates request to [`ControlApiService::apply_element`].
