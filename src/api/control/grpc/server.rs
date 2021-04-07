@@ -120,7 +120,8 @@ impl ControlApiService {
             .await??)
     }
 
-    /// Implementation of `Apply` method for `Endpoint` element.
+    /// Parses provided [`proto::ApplyRequest`] and sends [`ApplyRoom`] or
+    /// [`ApplyMember`] message to [`RoomService`].
     async fn apply_element(
         &self,
         req: proto::ApplyRequest,
@@ -274,6 +275,13 @@ fn proto_sids(sids: Sids) -> HashMap<String, String> {
 
 #[async_trait]
 impl ControlApi for ControlApiService {
+    /// Creates new [`Element`] with a given ID.
+    ///
+    /// Not idempotent. Errors if an Element with the same ID already exists.
+    ///
+    /// Propagates request to [`ControlApiService::create_element`].
+    ///
+    /// [`Element`]: proto::create_request::El
     async fn create(
         &self,
         request: tonic::Request<proto::CreateRequest>,
@@ -293,6 +301,14 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(create_response))
     }
 
+    /// Removes [`Element`] by its ID.
+    ///
+    /// Allows referring multiple Elements on the last two levels.
+    /// Idempotent. If no Elements with such IDs exist, then succeeds.
+    ///
+    /// Propagates request to [`ControlApiService::delete_element`].
+    ///
+    /// [`Element`]: proto::Element
     async fn delete(
         &self,
         request: tonic::Request<proto::IdRequest>,
@@ -307,6 +323,14 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(response))
     }
 
+    /// Returns [`Element`] by its ID.
+    ///
+    /// Allows referring multiple [`Element`]s.
+    /// If no ID specified, returns all [`Element`]s declared.
+    ///
+    /// Propagates request to [`ControlApiService::get_element`].
+    ///
+    /// [`Element`]: proto::Element
     async fn get(
         &self,
         request: tonic::Request<proto::IdRequest>,
@@ -325,6 +349,15 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(response))
     }
 
+    /// Applies the given spec to [`Element`] by its ID.
+    ///
+    /// Idempotent. If no [`Element`] with such ID exists, then it will be
+    /// created, otherwise it will be reconfigured. Elements that exist, but
+    /// are not specified in the provided spec will be removed.
+    ///
+    /// Propagates request to [`ControlApiService::apply_element`].
+    ///
+    /// [`Element`]: proto::apply_request::El
     async fn apply(
         &self,
         request: tonic::Request<proto::ApplyRequest>,

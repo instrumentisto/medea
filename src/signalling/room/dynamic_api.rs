@@ -303,6 +303,8 @@ pub struct SerializeProto(pub Vec<StatefulFid>);
 impl Handler<SerializeProto> for Room {
     type Result = Result<HashMap<StatefulFid, proto::Element>, RoomError>;
 
+    /// Lookups and returns [`HashMap<StatefulFid, proto::Element>`] by provided
+    /// list of [`StatefulFid`].
     fn handle(
         &mut self,
         msg: SerializeProto,
@@ -351,6 +353,11 @@ pub struct Delete(pub Vec<StatefulFid>);
 impl Handler<Delete> for Room {
     type Result = ();
 
+    /// Deletes elements from [`Room`] by provided IDs.
+    ///
+    /// Extracts [`MemberId`]s and [`EndpointId`]s from provided [`Delete`]
+    /// message. Calls [`Room::delete_member`] for each [`MemberId`] and
+    /// [`Room::delete_endpoint`] for each [`EndpointId`].
     fn handle(&mut self, msg: Delete, ctx: &mut Self::Context) {
         let mut member_ids = Vec::new();
         let mut endpoint_ids = Vec::new();
@@ -377,7 +384,9 @@ impl Handler<Delete> for Room {
     }
 }
 
-/// Signal for applying a [`MemberSpec`] in this [`Room`].
+/// Signal for applying given [`MemberSpec`] to [`Member`] in this [`Room`].
+///
+/// [`Member`]: crate::signalling::elements::Member
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct ApplyMember(pub MemberId, pub MemberSpec);
@@ -385,6 +394,11 @@ pub struct ApplyMember(pub MemberId, pub MemberSpec);
 impl Handler<ApplyMember> for Room {
     type Result = Result<(), RoomError>;
 
+    /// Creates new [`Member`] based on provided [`MemberSpec`] if could not
+    /// find [`Member`] with specified [`MemberId`]. Updates found [`Member`]'s
+    /// endpoints according to [`MemberSpec`] otherwise.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn handle(
         &mut self,
         msg: ApplyMember,
@@ -426,7 +440,7 @@ impl Handler<ApplyMember> for Room {
     }
 }
 
-/// Signal for applying [`RoomSpec`] in this [`Room`].
+/// Signal for applying given [`RoomSpec`] to this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct Apply(pub RoomSpec);
@@ -434,6 +448,7 @@ pub struct Apply(pub RoomSpec);
 impl Handler<Apply> for Room {
     type Result = Result<(), RoomError>;
 
+    /// Applies given [`RoomSpec`] to current [`Room`].
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
         for id in self.members.members_ids() {
             if !msg.0.pipeline.contains_key(&id) {
@@ -499,6 +514,10 @@ pub struct CreateMember(pub MemberId, pub MemberSpec);
 impl Handler<CreateMember> for Room {
     type Result = Result<(), RoomError>;
 
+    /// Creates new [`Member`] with provided [`MemberId`] according to given
+    /// [`MemberSpec`].
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn handle(
         &mut self,
         msg: CreateMember,
@@ -525,6 +544,14 @@ pub struct CreateEndpoint {
 impl Handler<CreateEndpoint> for Room {
     type Result = Result<(), RoomError>;
 
+    /// Creates new [`Endpoint`] with provided [`EndpointId`] for [`Member`]
+    /// with given [`MemberId`] according to given [`EndpointSpec`].
+    ///
+    /// Propagates request to [`Room::create_sink_endpoint`] or
+    /// [`Room::create_src_endpoint`] based on kind of [`Endpoint`].
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
+    /// [`Member`]: crate::signalling::elements::Member
     fn handle(
         &mut self,
         msg: CreateEndpoint,
@@ -559,6 +586,11 @@ pub struct Close;
 impl Handler<Close> for Room {
     type Result = AtomicResponse<Self, ()>;
 
+    /// Closes this [`Room`].
+    ///
+    /// Clears [`Member`]s list and closes all active connections.
+    ///
+    /// [`Member`]: crate::signalling::elements::Member
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
         for id in self.members.members().keys() {
             self.delete_member(id, ctx);

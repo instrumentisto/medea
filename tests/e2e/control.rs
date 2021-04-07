@@ -50,7 +50,7 @@ impl Client {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
     }
 
-    /// Gets a media [`Element`] from the provided `path`.
+    /// Returns a media [`Element`] by the provided `path`.
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
         Ok(self.0.get(&get_url(path)).send().await?.json().await?)
     }

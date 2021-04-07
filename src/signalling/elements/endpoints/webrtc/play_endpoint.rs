@@ -57,22 +57,28 @@ struct WebRtcPlayEndpointInner {
 }
 
 impl WebRtcPlayEndpointInner {
+    /// Inner implementation of [`WebRtcPlayEndpoint::src_uri`].
     fn src_uri(&self) -> SrcUri {
         self.src_uri.clone()
     }
 
+    /// Inner implementation of [`WebRtcPlayEndpoint::owner`].
     fn owner(&self) -> Member {
         self.owner.upgrade()
     }
 
+    /// Inner implementation of [`WebRtcPlayEndpoint::weak_owner`].
     fn weak_owner(&self) -> WeakMember {
         self.owner.clone()
     }
 
+    /// Inner implementation of [`WebRtcPlayEndpoint::src`].
     fn src(&self) -> WebRtcPublishEndpoint {
         self.src.upgrade()
     }
 
+    /// Inner implementation of
+    /// [`WebRtcPlayEndpoint::set_peer_id_and_partner_peer_id`].
     fn set_peer_id_and_partner_peer_id(
         &mut self,
         pid: PeerId,

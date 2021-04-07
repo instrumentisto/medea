@@ -340,14 +340,14 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
-    /// Returns [`WebRtcPlayId`] of all sinks of this [`Member`].
+    /// Returns [`WebRtcPlayId`]s of all sinks of this [`Member`].
     #[inline]
     #[must_use]
     pub fn sinks_ids(&self) -> Vec<WebRtcPlayId> {
         self.0.borrow().sinks.keys().cloned().collect()
     }
 
-    /// Returns [`WebRtcPublishId`] of all srcs of this [`Member`].
+    /// Returns [`WebRtcPublishId`]s of all srcs of this [`Member`].
     #[inline]
     #[must_use]
     pub fn srcs_ids(&self) -> Vec<WebRtcPublishId> {

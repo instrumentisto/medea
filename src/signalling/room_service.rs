@@ -295,7 +295,7 @@ impl Handler<StartStaticRooms> for RoomService {
 /// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<MemberId, Sid>;
 
-/// Signal for applying [`RoomSpec`] on [`Room`].
+/// Signal for applying [`RoomSpec`] to [`Room`] with given [`RoomId`].
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct ApplyRoom {
@@ -365,7 +365,10 @@ impl Handler<CreateRoom> for RoomService {
     }
 }
 
-/// Signal for applying [`MemberSpec`] in [`Room`].
+/// Signal for applying given [`MemberSpec`] to [`Member`] in specified
+/// [`Room`].
+///
+/// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct ApplyMember {

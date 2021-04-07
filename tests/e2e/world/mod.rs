@@ -332,7 +332,7 @@ impl World {
     }
 
     /// Creates `WebRtcPublishEndpoint`s and `WebRtcPlayEndpoint`s for the
-    /// provided [`MembersPair`] with `Apply` method.
+    /// provided [`MembersPair`] using `Apply` method.
     pub async fn interconnect_members_via_apply(&mut self, pair: MembersPair) {
         let mut spec = self.get_spec().await;
         if let Some(proto::RoomElement::Member(member)) =
@@ -527,7 +527,7 @@ impl World {
         }
     }
 
-    /// Applies provided [`proto::Room`] spec on the `Room` created for this
+    /// Applies provided [`proto::Room`] spec to the `Room` created for this
     /// [`World`].
     pub async fn apply(&mut self, el: proto::Room) {
         self.control_client
