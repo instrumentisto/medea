@@ -146,7 +146,7 @@ impl Object<RemoteTrack> {
         .map(drop)
     }
 
-    /// Waits for the `RemoteMediaTrack.on_muted()` callback to fire `count`
+    /// Waits for the `RemoteMediaTrack.on_unmuted()` callback to fire `count`
     /// times.
     pub async fn wait_for_on_unmuted_fire_count(
         &self,

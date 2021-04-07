@@ -96,7 +96,7 @@ async fn then_remote_track_stops(
                 time(?:s)? on (\\S+)'s remote (audio|(?:device|display) video) \
                 track from (\\S+)$"
 )]
-async fn then_on_remote_enabled_callback_fires(
+async fn then_callback_fires_on_remote_track(
     world: &mut World,
     callback_kind: String,
     times: u64,
@@ -108,7 +108,6 @@ async fn then_on_remote_enabled_callback_fires(
     let remote_conn =
         member.connections().get(remote_id).await.unwrap().unwrap();
     let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
-
     let track = remote_conn
         .tracks_store()
         .await
