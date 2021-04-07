@@ -23,3 +23,9 @@ pub unsafe extern "C" fn MediaManager__init_local_tracks(
     let this = Box::from_raw(this);
     Array::new(this.init_local_tracks())
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn MediaManager__enumerate_devices(this: *mut MediaManager) -> Array<InputDeviceInfo> {
+    let this = Box::from_raw(this);
+    Array::new(this.enumerate_devices())
+}
