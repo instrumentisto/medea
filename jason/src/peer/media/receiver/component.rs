@@ -43,6 +43,7 @@ pub struct State {
     sender_id: MemberId,
     enabled_individual: Rc<MediaExchangeStateController>,
     enabled_general: ProgressableCell<media_exchange_state::Stable>,
+    muted: ObservableCell<bool>,
     sync_state: ObservableCell<SyncState>,
 }
 
@@ -79,6 +80,7 @@ impl SynchronizableState for State {
             enabled_general: ProgressableCell::new(
                 input.enabled_general.into(),
             ),
+            muted: ObservableCell::new(input.muted),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
@@ -185,6 +187,7 @@ impl State {
             enabled_general: ProgressableCell::new(
                 media_exchange_state::Stable::Enabled,
             ),
+            muted: ObservableCell::new(false),
             sync_state: ObservableCell::new(SyncState::Synced),
         }
     }
@@ -232,6 +235,13 @@ impl State {
         self.enabled_general.get() == media_exchange_state::Stable::Enabled
     }
 
+    /// Returns current mute state of this [`State`].
+    #[inline]
+    #[must_use]
+    pub fn muted(&self) -> bool {
+        self.muted.get()
+    }
+
     /// Updates this [`State`] with the provided [`TrackPatchEvent`].
     pub fn update(&self, track_patch: &TrackPatchEvent) {
         if self.id != track_patch.id {
@@ -242,6 +252,9 @@ impl State {
         }
         if let Some(enabled_individual) = track_patch.enabled_individual {
             self.enabled_individual.update(enabled_individual.into());
+        }
+        if let Some(muted) = track_patch.muted {
+            self.muted.set(muted);
         }
     }
 }
@@ -314,6 +327,25 @@ impl Component {
         state: media_exchange_state::Transition,
     ) -> Result<()> {
         receiver.send_media_exchange_state_intention(state);
+        Ok(())
+    }
+
+    /// Watcher for the mute state updates.
+    ///
+    /// Propagates command to associated [`Receiver`] and updates its media
+    /// track (if any).
+    #[inline]
+    #[watch(self.muted.subscribe())]
+    async fn mute_state_changed(
+        receiver: Rc<Receiver>,
+        _: Rc<State>,
+        muted: bool,
+    ) -> Result<()> {
+        receiver.muted.set(muted);
+        if let Some(track) = receiver.track.borrow().as_ref() {
+            track.set_muted(muted)
+        }
+
         Ok(())
     }
 

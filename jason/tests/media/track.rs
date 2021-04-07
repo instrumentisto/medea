@@ -2,7 +2,10 @@
 
 use std::rc::{Rc, Weak};
 
-use futures::channel::oneshot;
+use futures::{
+    channel::{mpsc, oneshot},
+    StreamExt as _,
+};
 use medea_jason::{
     media::MediaManager, DeviceVideoTrackConstraints, MediaStreamSettings,
 };
@@ -47,12 +50,27 @@ async fn on_track_enabled_works() {
         .into(),
     );
 
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    track.on_muted(dont_fire());
+    track.on_unmuted(dont_fire());
+    track.on_stopped(dont_fire());
+
     track.set_enabled(false);
+    assert!(!track.muted());
     assert!(!track.js_enabled());
     track.set_enabled(true);
+    assert!(!track.muted());
     assert!(track.js_enabled());
 
     timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
 }
 
 #[wasm_bindgen_test]
@@ -69,7 +87,97 @@ async fn on_track_disabled_works() {
         .into(),
     );
 
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    track.on_muted(dont_fire());
+    track.on_unmuted(dont_fire());
+    track.on_enabled(dont_fire());
+    track.on_stopped(dont_fire());
+
+    assert!(!track.muted());
+    assert!(track.js_enabled());
     track.set_enabled(false);
+    assert!(!track.muted());
 
     timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
+}
+
+#[wasm_bindgen_test]
+async fn on_track_unmuted_works() {
+    let track = get_audio_track().await;
+
+    let track_clone = track.clone();
+    let (test_tx, test_rx) = oneshot::channel();
+    track.on_unmuted(
+        Closure::once_into_js(move || {
+            assert!(!track_clone.muted());
+            test_tx.send(()).unwrap();
+        })
+        .into(),
+    );
+
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    track.on_disabled(dont_fire());
+    track.on_enabled(dont_fire());
+    track.on_stopped(dont_fire());
+
+    track.set_muted(true);
+    assert!(track.js_enabled());
+    assert!(track.muted());
+    track.set_muted(false);
+    assert!(track.js_enabled());
+    assert!(!track.muted());
+
+    timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
+}
+
+#[wasm_bindgen_test]
+async fn on_track_muted_works() {
+    let track = get_audio_track().await;
+
+    let track_clone = track.clone();
+    let (test_tx, test_rx) = oneshot::channel();
+    track.on_muted(
+        Closure::once_into_js(move || {
+            assert!(track_clone.muted());
+            test_tx.send(()).unwrap();
+        })
+        .into(),
+    );
+
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    track.on_unmuted(dont_fire());
+    track.on_disabled(dont_fire());
+    track.on_enabled(dont_fire());
+    track.on_stopped(dont_fire());
+
+    assert!(track.js_enabled());
+    assert!(!track.muted());
+    track.set_muted(true);
+    assert!(track.js_enabled());
+
+    timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
 }

@@ -39,6 +39,7 @@ pub struct Receiver {
     is_track_notified: Cell<bool>,
     enabled_general: Cell<bool>,
     enabled_individual: Cell<bool>,
+    muted: Cell<bool>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     track_events_sender: mpsc::UnboundedSender<TrackEvent>,
 }
@@ -101,6 +102,7 @@ impl Receiver {
             peer_events_sender: connections.peer_events_sender.clone(),
             enabled_general: Cell::new(state.enabled_individual()),
             enabled_individual: Cell::new(state.enabled_general()),
+            muted: Cell::new(state.muted()),
             track_events_sender,
         };
 
@@ -183,15 +185,18 @@ impl Receiver {
             }
         }
 
-        let new_track =
-            remote::Track::new(new_track, self.caps.media_source_kind());
+        let new_track = remote::Track::new(
+            new_track,
+            self.caps.media_source_kind(),
+            self.enabled_individual.get(),
+            self.muted.get(),
+        );
 
-        if self.enabled() {
+        if self.enabled_individual.get() {
             transceiver.add_direction(TransceiverDirection::RECV);
         } else {
             transceiver.sub_direction(TransceiverDirection::RECV);
         }
-        new_track.set_enabled(self.enabled());
 
         self.transceiver.replace(Some(transceiver));
         if let Some(prev_track) = self.track.replace(Some(new_track)) {
@@ -218,13 +223,6 @@ impl Receiver {
     #[inline]
     pub fn transceiver(&self) -> Option<Transceiver> {
         self.transceiver.borrow().clone()
-    }
-
-    /// Indicates whether this [`Receiver`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.enabled_individual.get()
     }
 
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media

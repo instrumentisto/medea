@@ -670,6 +670,12 @@ window.onload = async function() {
         track.on_disabled( () => {
           console.log(`Track disabled: ${track.kind()}`);
         });
+        track.on_muted( () => {
+          console.log(`Track muted: ${track.kind()}`);
+        });
+        track.on_unmuted( () => {
+          console.log(`Track unmuted: ${track.kind()}`);
+        });
         track.on_stopped( () => {
           track.free();
           playElement.remove();
