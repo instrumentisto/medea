@@ -9,7 +9,10 @@ crate-type = ["staticlib"]
 
 [dependencies]
 dart-sys = "2.0"
+extern_executor = { version = "0.1", features = ["dart"]}
 libc = "0.2"
+futures = "0.3"
+futures-timer = "3.0"
 
 [build-dependencies]
 cc = "1.0"

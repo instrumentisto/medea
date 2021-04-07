@@ -1,9 +1,11 @@
+use std::any::Any;
+
 use dart_sys::Dart_Handle;
 
 use crate::{
-    connection_handle::ConnectionHandle, local_media_track::LocalMediaTrack,
-    reconnect_handle::ReconnectHandle, room_close_reason::RoomCloseReason,
-    DartCallback,
+    completer::Completer, connection_handle::ConnectionHandle,
+    local_media_track::LocalMediaTrack, reconnect_handle::ReconnectHandle,
+    room_close_reason::RoomCloseReason, DartCallback,
 };
 
 pub struct RoomHandle;
@@ -23,8 +25,17 @@ impl RoomHandle {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__join(this: *mut RoomHandle) {
-
+pub unsafe extern "C" fn RoomHandle__join(
+    this: *mut RoomHandle,
+) -> Dart_Handle {
+    let this = Box::from_raw(this);
+    let completer: Completer<(), ()> = Completer::new();
+    let fut = completer.future();
+    extern_executor::spawn(async move {
+        this.join().await;
+        completer.complete(());
+    });
+    fut
 }
 
 #[no_mangle]

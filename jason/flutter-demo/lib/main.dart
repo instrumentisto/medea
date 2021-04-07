@@ -50,8 +50,9 @@ class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
   Jason _jason = Jason();
 
-  void _incrementCounter() {
+  void _incrementCounter() async {
     _jason.cb_test();
+    await _jason.foobar();
 
     setState(() {
       // This call to setState tells the Flutter framework that something has

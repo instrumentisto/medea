@@ -1,8 +1,10 @@
 pub mod audio_track_constraints;
 mod callback;
+mod completer;
 pub mod connection_handle;
 pub mod device_video_track_constraints;
 pub mod display_video_track_constraints;
+mod executor;
 pub mod input_device_info;
 pub mod jason;
 pub mod local_media_track;
@@ -14,12 +16,15 @@ pub mod room_close_reason;
 pub mod room_handle;
 mod utils;
 
-use std::{any::Any, marker::PhantomData};
+use std::{any::Any, marker::PhantomData, time::Duration};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
+use extern_executor::spawn;
+use futures_timer::Delay;
 
 use crate::{
     callback::{set_any_closure_caller, AnyClosureCaller, DartCallback},
+    completer::Completer,
     connection_handle::ConnectionHandle,
     local_media_track::LocalMediaTrack,
     reconnect_handle::ReconnectHandle,
@@ -52,6 +57,18 @@ pub unsafe extern "C" fn register_any_closure_caller(
     callback: AnyClosureCaller,
 ) {
     set_any_closure_caller(callback);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn test_future() -> Dart_Handle {
+    let completer: Completer<(), ()> = Completer::new();
+    let future = completer.future();
+    spawn(async move {
+        Delay::new(Duration::from_millis(3000 as u64)).await;
+        completer.complete(());
+    });
+
+    future
 }
 
 #[no_mangle]

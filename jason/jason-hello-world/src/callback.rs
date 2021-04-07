@@ -31,12 +31,15 @@ impl<T: 'static> DartCallback<T> {
         }
     }
 
-    pub unsafe fn call(&self, arg: T) {
-        let closure_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-        ANY_CLOSURE_CALLER.unwrap()(
-            closure_handle,
-            Box::into_raw(Box::new(arg) as Box<dyn Any>),
-        );
+    pub fn call(&self, arg: T) {
+        let closure_handle =
+            unsafe { Dart_HandleFromPersistent_DL_Trampolined(self.cb) };
+        unsafe {
+            ANY_CLOSURE_CALLER.unwrap()(
+                closure_handle,
+                Box::into_raw(Box::new(arg) as Box<dyn Any>),
+            );
+        }
     }
 }
 
