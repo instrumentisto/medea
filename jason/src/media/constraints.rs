@@ -102,6 +102,8 @@ impl LocalTracksConstraints {
     /// Returns [`LocalStreamUpdateCriteria`] with [`MediaKind`] and
     /// [`MediaSourceKind`] which are different in the provided
     /// [`MediaStreamSettings`].
+    #[inline]
+    #[must_use]
     pub fn calculate_kinds_diff(
         &self,
         settings: &MediaStreamSettings,
@@ -441,6 +443,7 @@ impl MediaStreamSettings {
 
     /// Returns only audio constraints.
     #[inline]
+    #[must_use]
     pub fn get_audio(&self) -> &AudioTrackConstraints {
         &self.audio.constraints
     }
@@ -450,6 +453,7 @@ impl MediaStreamSettings {
     ///
     /// Returns [`None`] if [`DisplayVideoTrackConstraints`] is unconstrained.
     #[inline]
+    #[must_use]
     pub fn get_display_video(&self) -> Option<&DisplayVideoTrackConstraints> {
         self.display_video.constraints.as_ref()
     }
@@ -459,6 +463,7 @@ impl MediaStreamSettings {
     ///
     /// Returns [`None`] if [`DeviceVideoTrackConstraints`] is unconstrained.
     #[inline]
+    #[must_use]
     pub fn get_device_video(&self) -> Option<&DeviceVideoTrackConstraints> {
         self.device_video.constraints.as_ref()
     }
@@ -581,6 +586,7 @@ impl MediaStreamSettings {
 
     /// Indicates whether audio is enabled in this [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn is_audio_enabled(&self) -> bool {
         self.audio.enabled
     }
@@ -588,6 +594,7 @@ impl MediaStreamSettings {
     /// Returns `true` if [`DeviceVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
+    #[must_use]
     pub fn is_device_video_enabled(&self) -> bool {
         self.device_video.enabled()
     }
@@ -595,6 +602,7 @@ impl MediaStreamSettings {
     /// Returns `true` if [`DisplayVideoTrackConstraints`] are currently
     /// constrained and enabled.
     #[inline]
+    #[must_use]
     pub fn is_display_video_enabled(&self) -> bool {
         self.display_video.enabled()
     }
@@ -602,6 +610,7 @@ impl MediaStreamSettings {
     /// Indicates whether the given [`MediaType`] is enabled and constrained in
     /// this [`MediaStreamSettings`].
     #[inline]
+    #[must_use]
     pub fn enabled(&self, kind: &MediaType) -> bool {
         match kind {
             MediaType::Video(video) => {
@@ -762,6 +771,7 @@ impl VideoSource {
     /// If this [`VideoSource`] is important then without this [`VideoSource`]
     /// call session can't be started.
     #[inline]
+    #[must_use]
     pub fn required(&self) -> bool {
         match self {
             VideoSource::Device(device) => device.required,
@@ -1210,6 +1220,7 @@ impl DisplayVideoTrackConstraints {
     /// contained [`DisplayVideoTrackConstraints`].
     #[allow(clippy::unused_self)]
     #[inline]
+    #[must_use]
     pub fn satisfies<T: AsRef<platform::MediaStreamTrack>>(
         &self,
         track: T,

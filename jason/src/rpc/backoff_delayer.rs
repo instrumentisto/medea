@@ -27,6 +27,8 @@ pub struct BackoffDelayer {
 
 impl BackoffDelayer {
     /// Creates and returns new [`BackoffDelayer`].
+    #[inline]
+    #[must_use]
     pub fn new(
         starting_interval: Duration,
         interval_multiplier: f32,
@@ -45,11 +47,13 @@ impl BackoffDelayer {
     /// [`BackoffDelayer::current_interval`] *
     /// [`BackoffDelayer::interval_multiplier`] milliseconds,
     /// until [`BackoffDelayer::max_interval`] is reached.
+    #[inline]
     pub async fn delay(&mut self) {
         platform::delay_for(self.get_delay()).await;
     }
 
     /// Returns current interval and increases it for next call.
+    #[must_use]
     fn get_delay(&mut self) -> Duration {
         if self.is_max_interval_reached() {
             self.max_interval
@@ -64,6 +68,7 @@ impl BackoffDelayer {
 
     /// Returns `true` when max delay ([`BackoffDelayer::max_interval`]) is
     /// reached.
+    #[must_use]
     fn is_max_interval_reached(&self) -> bool {
         self.current_interval >= self.max_interval
     }

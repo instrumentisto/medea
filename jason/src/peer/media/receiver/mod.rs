@@ -195,7 +195,9 @@ impl Receiver {
         new_track.set_enabled(self.enabled());
 
         self.transceiver.replace(Some(transceiver));
-        self.track.replace(Some(new_track));
+        if let Some(prev_track) = self.track.replace(Some(new_track)) {
+            prev_track.stop();
+        };
         self.maybe_notify_track();
     }
 
@@ -257,5 +259,18 @@ impl Receiver {
     #[must_use]
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
+    }
+}
+
+impl Drop for Receiver {
+    fn drop(&mut self) {
+        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
+            if !transceiver.is_stopped() {
+                transceiver.sub_direction(TransceiverDirection::RECV);
+            }
+        }
+        if let Some(recv_track) = self.track.borrow_mut().take() {
+            recv_track.stop();
+        }
     }
 }

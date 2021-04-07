@@ -69,6 +69,7 @@ pub fn build_peers_traffic_watcher(
 //       Will be enabled in https://github.com/instrumentisto/medea/pull/91
 /// Builds [`PeerTrafficWatcher`].
 #[cfg(not(test))]
+#[must_use]
 pub fn build_peers_traffic_watcher(
     _: &conf::Media,
 ) -> Arc<dyn PeerTrafficWatcher> {

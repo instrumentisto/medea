@@ -1,5 +1,9 @@
 mod connection;
+mod control_api;
 mod media_state;
+mod room;
+mod track;
+mod websocket;
 
 use std::{convert::Infallible, str::FromStr};
 
@@ -7,16 +11,17 @@ use async_recursion::async_recursion;
 use cucumber_rust::{given, when};
 
 use crate::{
-    object::MediaKind,
-    world::{MemberBuilder, World},
+    object::{room::ParsingFailedError, MediaKind, MediaSourceKind},
+    world::{member::Builder as MemberBuilder, World},
 };
 
+#[allow(clippy::too_many_arguments)]
 #[given(regex = "^(?:room with )?(joined )?member(?:s)? (\\S+)\
                   (?:(?:, | and )(\\S+)(?: and (\\S+)?)?)?\
                   (?: with (no (play |publish )?WebRTC endpoints\
                           |(?:disabled|muted) (media|audio|video) \
                                               (publishing|playing)?))?$")]
-#[async_recursion]
+#[async_recursion(?Send)]
 async fn new_given_member(
     world: &mut World,
     joined: Matched,
@@ -53,33 +58,67 @@ async fn new_given_member(
     }
 
     let member = world.get_member(&first_member_id).unwrap();
+    let is_audio = disabled_media_type == DisabledMediaType::Audio
+        || disabled_media_type == DisabledMediaType::All;
+    let is_video = disabled_media_type == DisabledMediaType::Video
+        || disabled_media_type == DisabledMediaType::All;
     match media_settings {
         MediaSettings::DisabledMedia => {
-            let is_audio = !(disabled_media_type != DisabledMediaType::Audio);
-            let is_video = !(disabled_media_type != DisabledMediaType::Video);
-            let is_publish = !(disabled_direction != Direction::Publish);
-            let is_play = !(disabled_direction != Direction::Play);
+            let is_publish = disabled_direction == Direction::Publish
+                || disabled_direction == Direction::None;
+            let is_play = disabled_direction == Direction::Play
+                || disabled_direction == Direction::None;
 
             if is_publish {
                 if is_audio {
                     member
-                        .disable_media_send(MediaKind::Audio, None)
+                        .toggle_media(Some(MediaKind::Audio), None, false)
                         .await
                         .unwrap();
                 }
                 if is_video {
                     member
-                        .disable_media_send(MediaKind::Video, None)
+                        .toggle_media(Some(MediaKind::Video), None, false)
                         .await
                         .unwrap();
                 }
             }
             if is_play {
-                todo!("Play disabling is not implemented atm");
+                if is_audio {
+                    member
+                        .toggle_remote_media(
+                            Some(MediaKind::Audio),
+                            None,
+                            false,
+                        )
+                        .await
+                        .unwrap();
+                }
+                if is_video {
+                    member
+                        .toggle_remote_media(
+                            Some(MediaKind::Video),
+                            None,
+                            false,
+                        )
+                        .await
+                        .unwrap();
+                }
             }
         }
         MediaSettings::MutedMedia => {
-            todo!("Muting is not implemented atm");
+            if is_audio {
+                member
+                    .toggle_mute(Some(MediaKind::Audio), None, true)
+                    .await
+                    .unwrap();
+            }
+            if is_video {
+                member
+                    .toggle_mute(Some(MediaKind::Video), None, true)
+                    .await
+                    .unwrap();
+            }
         }
         _ => (),
     }
@@ -105,17 +144,6 @@ async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
 }
 
-/// Parses [`MediaKind`] from the given `step` description match.
-#[must_use]
-fn parse_media_kind(step: &str) -> Option<MediaKind> {
-    match step {
-        "audio" => Some(MediaKind::Audio),
-        "video" => Some(MediaKind::Video),
-        "all" => None,
-        _ => unreachable!(),
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct Matched(pub bool);
 
@@ -139,6 +167,7 @@ enum MediaSettings {
 impl FromStr for MediaSettings {
     type Err = Infallible;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(if s.contains("no WebRTC endpoints") {
             Self::NoWebRtcEndpoint
@@ -163,6 +192,7 @@ enum DisabledMediaType {
 impl FromStr for DisabledMediaType {
     type Err = Infallible;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(if s.contains("audio") {
             Self::Audio
@@ -186,6 +216,7 @@ enum Direction {
 impl FromStr for Direction {
     type Err = Infallible;
 
+    #[inline]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(if s.contains("publishing") {
             Self::Publish
@@ -195,4 +226,33 @@ impl FromStr for Direction {
             Self::None
         })
     }
+}
+
+/// Tries to find `audio`, `video` or `all` in the provided text.
+///
+/// If `audio` or `video` found, then [`Some`] [`MediaKind`] will be returned.
+/// If `all` found, then [`None`] will be returned.
+/// Otherwise, this function will panic.
+#[must_use]
+fn parse_media_kind(text: &str) -> Option<MediaKind> {
+    match text {
+        "audio" => Some(MediaKind::Audio),
+        "video" => Some(MediaKind::Video),
+        "all" => None,
+        _ => {
+            panic!("Unknown media kind: {}", text)
+        }
+    }
+}
+
+/// Parses a [`MediaKind`] and a [`MediaSourceKind`] from the provided [`str`].
+fn parse_media_kinds(
+    s: &str,
+) -> Result<(MediaKind, MediaSourceKind), ParsingFailedError> {
+    let media_kind = s.parse()?;
+    let source_kind = match media_kind {
+        MediaKind::Audio => MediaSourceKind::Device,
+        MediaKind::Video => s.parse()?,
+    };
+    Ok((media_kind, source_kind))
 }

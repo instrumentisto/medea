@@ -4,7 +4,7 @@ use actix::{Handler, Message, StreamHandler, WeakAddr};
 use chrono::{DateTime, Utc};
 use medea_client_api_proto::{
     ConnectionQualityScore, Event, MemberId, NegotiationRole, PeerId,
-    TrackUpdate,
+    PeerUpdate,
 };
 
 use crate::{
@@ -29,15 +29,26 @@ impl Room {
     fn send_peer_created(&self, peer_id: PeerId) -> Result<(), RoomError> {
         let peer: Peer<Stable> = self.peers.take_inner_peer(peer_id)?;
         let partner_peer: Peer<Stable> =
-            self.peers.take_inner_peer(peer.partner_peer_id())?;
+            match self.peers.take_inner_peer(peer.partner_peer_id()) {
+                Ok(p) => p,
+                Err(e) => {
+                    self.peers.add_peer(peer);
+                    return Err(e);
+                }
+            };
+
+        let ice_servers = if let Some(ice_servers) = peer.ice_servers_list() {
+            ice_servers
+        } else {
+            let member_id = peer.member_id().clone();
+            self.peers.add_peer(peer);
+            self.peers.add_peer(partner_peer);
+            return Err(RoomError::NoTurnCredentials(member_id));
+        };
 
         let peer = peer.start_as_offerer();
         let partner_peer = partner_peer.start_as_answerer();
 
-        let member_id = peer.member_id();
-        let ice_servers = peer
-            .ice_servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
             peer_id: peer.id(),
             negotiation_role: NegotiationRole::Offerer,
@@ -46,10 +57,13 @@ impl Room {
             force_relay: peer.is_force_relayed(),
         };
 
+        self.members
+            .send_event_to_member(peer.member_id(), peer_created);
+
         self.peers.add_peer(peer);
         self.peers.add_peer(partner_peer);
 
-        self.members.send_event_to_member(member_id, peer_created)
+        Ok(())
     }
 }
 
@@ -113,12 +127,13 @@ impl PeersMetricsEventHandler for Room {
         quality_score: ConnectionQualityScore,
     ) -> Self::Output {
         self.members.send_event_to_member(
-            member_id,
+            &member_id,
             Event::ConnectionQualityUpdated {
                 partner_member_id,
                 quality_score,
             },
-        )
+        );
+        Ok(())
     }
 
     /// Schedules ICE restart and commits scheduled changes.
@@ -186,12 +201,12 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
     }
 
     /// Upgrades [`WeakAddr`] and if it's successful then notifies [`Room`] that
-    /// the provided [`TrackUpdate`]s were forcibly (without negotiation)
+    /// the provided [`PeerUpdate`]s were forcibly (without negotiation)
     /// applied to the [`Peer`].
     ///
     /// If [`WeakAddr`] upgrade fails then nothing will be done.
     #[inline]
-    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>) {
+    fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>) {
         if let Some(addr) = self.upgrade() {
             addr.do_send(ForceUpdate(peer_id, changes));
         }
@@ -199,34 +214,33 @@ impl PeerUpdatesSubscriber for WeakAddr<Room> {
 }
 
 /// [`Message`] which indicates that [`Peer`] with a provided [`PeerId`] should
-/// be updated with provided [`TrackUpdate`]s without negotiation.
+/// be updated with provided [`PeerUpdate`]s without negotiation.
 ///
 /// Can be done in any [`Peer`] state.
 #[derive(Message, Clone, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
-pub struct ForceUpdate(PeerId, Vec<TrackUpdate>);
+pub struct ForceUpdate(PeerId, Vec<PeerUpdate>);
 
 impl Handler<ForceUpdate> for Room {
     type Result = Result<(), RoomError>;
 
     /// Gets [`MemberId`] of the provided [`Peer`] and sends all provided
-    /// [`TrackUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
+    /// [`PeerUpdate`]s to this [`MemberId`] with `negotiation_role: None`.
     fn handle(
         &mut self,
         msg: ForceUpdate,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let member_id = self
-            .peers
-            .map_peer_by_id(msg.0, PeerStateMachine::member_id)?;
-        self.members.send_event_to_member(
-            member_id,
-            Event::TracksApplied {
-                peer_id: msg.0,
-                updates: msg.1,
-                negotiation_role: None,
-            },
-        )
+        self.peers.map_peer_by_id(msg.0, |peer| {
+            self.members.send_event_to_member(
+                peer.member_id(),
+                Event::PeerUpdated {
+                    peer_id: msg.0,
+                    updates: msg.1,
+                    negotiation_role: None,
+                },
+            );
+        })
     }
 }
 
@@ -247,14 +261,14 @@ impl Handler<NegotiationNeeded> for Room {
     /// Sends [`Event::PeerCreated`] if this [`Peer`] unknown for the remote
     /// side.
     ///
-    /// Sends [`Event::TracksApplied`] if this [`Peer`] known for the remote
+    /// Sends [`Event::PeerUpdated`] if this [`Peer`] known for the remote
     /// side.
     ///
     /// If this [`Peer`] or it's partner not [`Stable`] then forcible
     /// track changes will be committed.
     ///
     /// [`Event::PeerCreated`]: medea_client_api_proto::Event::PeerCreated
-    /// [`Event::TracksApplied`]: medea_client_api_proto::Event::TracksApplied
+    /// [`Event::PeerUpdated`]: medea_client_api_proto::Event::PeerUpdated
     fn handle(
         &mut self,
         msg: NegotiationNeeded,

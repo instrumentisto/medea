@@ -429,6 +429,8 @@ pub struct Unvalidated;
 // is fix for it. This allow not works on function.
 impl DeleteElements<Unvalidated> {
     /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
+    #[inline]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             fids: Vec::new(),
@@ -437,6 +439,7 @@ impl DeleteElements<Unvalidated> {
     }
 
     /// Adds [`StatefulFid`] to request.
+    #[inline]
     pub fn add_fid(&mut self, fid: StatefulFid) {
         self.fids.push(fid)
     }
@@ -523,7 +526,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
 
         if !room_messages_futs.is_empty() {
             future::try_join_all(room_messages_futs)
-                .map_ok(|_| ())
+                .map_ok(drop)
                 .map_err(RoomServiceError::RoomMailboxErr)
                 .boxed_local()
         } else if !deletes_from_room.is_empty() {
@@ -533,7 +536,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
                 || future::ok(()).boxed_local(),
                 |room| {
                     room.send(Delete(deletes_from_room))
-                        .map_ok(|_| ())
+                        .map_ok(drop)
                         .map_err(RoomServiceError::RoomMailboxErr)
                         .err_into()
                         .boxed_local()

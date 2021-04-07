@@ -50,17 +50,17 @@ impl CommandHandler for Room {
         from_peer.set_mids(mids)?;
         from_peer.update_senders_statuses(senders_statuses);
 
-        let from_member_id = from_peer.member_id();
         let from_peer = from_peer.set_local_offer(sdp_offer.clone());
         let to_peer = to_peer.set_remote_offer(sdp_offer.clone());
 
+        let from_member_id = from_peer.member_id();
         let to_member_id = to_peer.member_id();
         let ice_servers = to_peer.ice_servers_list().ok_or_else(|| {
             RoomError::NoTurnCredentials(to_member_id.clone())
         })?;
 
         let event = if from_peer.is_known_to_remote() {
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 peer_id: to_peer.id(),
                 negotiation_role: Some(NegotiationRole::Answerer(
                     sdp_offer.clone(),
@@ -77,19 +77,18 @@ impl CommandHandler for Room {
             }
         };
 
-        self.peers.add_peer(from_peer);
-        self.peers.add_peer(to_peer);
-
-        self.peers.sync_peer_spec(from_peer_id)?;
-
         self.members.send_event_to_member(
             from_member_id,
             Event::LocalDescriptionApplied {
                 peer_id: from_peer_id,
                 sdp_offer,
             },
-        )?;
-        self.members.send_event_to_member(to_member_id, event)
+        );
+        self.members.send_event_to_member(to_member_id, event);
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+        self.peers.sync_peer_spec(from_peer_id)
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -111,20 +110,15 @@ impl CommandHandler for Room {
 
         from_peer.update_senders_statuses(senders_statuses);
 
-        let from_member_id = from_peer.member_id();
         let from_peer = from_peer.set_local_answer(sdp_answer.clone());
         let to_peer = to_peer.set_remote_answer(sdp_answer.clone());
 
+        let from_member_id = from_peer.member_id();
         let to_member_id = to_peer.member_id();
         let event = Event::SdpAnswerMade {
             peer_id: to_peer.id(),
             sdp_answer: sdp_answer.clone(),
         };
-
-        self.peers.add_peer(from_peer);
-        self.peers.add_peer(to_peer);
-
-        self.peers.sync_peer_spec(from_peer_id)?;
 
         self.members.send_event_to_member(
             from_member_id,
@@ -132,8 +126,12 @@ impl CommandHandler for Room {
                 peer_id: from_peer_id,
                 sdp_offer: sdp_answer,
             },
-        )?;
-        self.members.send_event_to_member(to_member_id, event)
+        );
+        self.members.send_event_to_member(to_member_id, event);
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+        self.peers.sync_peer_spec(from_peer_id)
     }
 
     /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
@@ -153,20 +151,18 @@ impl CommandHandler for Room {
             return Ok(());
         }
 
-        let to_peer_id = self
+        let peer_id = self
             .peers
             .map_peer_by_id(from_peer_id, PeerStateMachine::partner_peer_id)?;
-        let to_member_id =
-            self.peers.map_peer_by_id_mut(to_peer_id, |to_peer| {
-                to_peer.add_ice_candidate(candidate.clone());
-                to_peer.member_id()
-            })?;
-        let event = Event::IceCandidateDiscovered {
-            peer_id: to_peer_id,
-            candidate,
-        };
 
-        self.members.send_event_to_member(to_member_id, event)
+        self.peers.map_peer_by_id_mut(peer_id, |to_peer| {
+            to_peer.add_ice_candidate(candidate.clone());
+
+            self.members.send_event_to_member(
+                to_peer.member_id(),
+                Event::IceCandidateDiscovered { peer_id, candidate },
+            );
+        })
     }
 
     /// Adds new [`Peer`] connection metrics.
@@ -195,7 +191,7 @@ impl CommandHandler for Room {
         Ok(())
     }
 
-    /// Sends [`Event::TracksApplied`] with data from the received
+    /// Sends [`Event::PeerUpdated`] with data from the received
     /// [`Command::UpdateTracks`].
     ///
     /// Starts renegotiation process.

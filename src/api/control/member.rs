@@ -137,16 +137,17 @@ pub struct MemberSpec {
     ping_interval: Option<Duration>,
 }
 
-impl Into<RoomElement> for MemberSpec {
-    fn into(self) -> RoomElement {
-        RoomElement::Member {
-            spec: self.pipeline,
-            credentials: self.credentials,
-            on_join: self.on_join,
-            on_leave: self.on_leave,
-            idle_timeout: self.idle_timeout,
-            reconnect_timeout: self.reconnect_timeout,
-            ping_interval: self.ping_interval,
+impl From<MemberSpec> for RoomElement {
+    #[inline]
+    fn from(spec: MemberSpec) -> Self {
+        Self::Member {
+            spec: spec.pipeline,
+            credentials: spec.credentials,
+            on_join: spec.on_join,
+            on_leave: spec.on_leave,
+            idle_timeout: spec.idle_timeout,
+            reconnect_timeout: spec.reconnect_timeout,
+            ping_interval: spec.ping_interval,
         }
     }
 }
@@ -154,6 +155,7 @@ impl Into<RoomElement> for MemberSpec {
 impl MemberSpec {
     /// Creates new [`MemberSpec`] with the given parameters.
     #[inline]
+    #[must_use]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
         credentials: Credential,
@@ -187,6 +189,7 @@ impl MemberSpec {
     }
 
     /// Lookups [`WebRtcPublishEndpoint`] by ID.
+    #[must_use]
     pub fn get_publish_endpoint_by_id(
         &self,
         id: WebRtcPublishId,
@@ -212,16 +215,22 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
+    #[inline]
+    #[must_use]
     pub fn credentials(&self) -> &Credential {
         &self.credentials
     }
 
     /// Returns reference to `on_join` [`CallbackUrl`].
+    #[inline]
+    #[must_use]
     pub fn on_join(&self) -> &Option<CallbackUrl> {
         &self.on_join
     }
 
     /// Returns reference to `on_leave` [`CallbackUrl`].
+    #[inline]
+    #[must_use]
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
     }
@@ -230,6 +239,8 @@ impl MemberSpec {
     /// Client API.
     ///
     /// Once reached, the `Member` is considered being idle.
+    #[inline]
+    #[must_use]
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
@@ -237,11 +248,15 @@ impl MemberSpec {
     /// Returns timeout of the `Member` reconnecting via Client API.
     ///
     /// Once reached, the `Member` is considered disconnected.
+    #[inline]
+    #[must_use]
     pub fn reconnect_timeout(&self) -> Option<Duration> {
         self.reconnect_timeout
     }
 
     /// Returns interval of sending `Ping`s to the `Member` via Client API.
+    #[inline]
+    #[must_use]
     pub fn ping_interval(&self) -> Option<Duration> {
         self.ping_interval
     }

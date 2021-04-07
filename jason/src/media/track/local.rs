@@ -41,8 +41,8 @@ pub struct Track {
 }
 
 impl Track {
-    /// Builds a new [`Track`] from the provided [`platform::MediaStreamTrack`]
-    /// and [`proto::MediaSourceKind`].
+    /// Builds a new [`Track`] from the provided [`sys::MediaStreamTrack`] and
+    /// [`proto::MediaSourceKind`].
     #[inline]
     #[must_use]
     pub fn new(

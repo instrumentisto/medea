@@ -44,6 +44,7 @@ pub struct Turn {
 impl Turn {
     /// Builds [`String`] addr from `host` and `port`.
     #[inline]
+    #[must_use]
     pub fn addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
     }

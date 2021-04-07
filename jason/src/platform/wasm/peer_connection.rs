@@ -566,6 +566,11 @@ impl RtcPeerConnection {
     /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
     /// [set of this RTCPeerConnection's transceivers][2] by provided `mid`.
     ///
+    /// # Panics
+    ///
+    /// If fails to [iterate over transceivers on JS side](js_sys::try_iter).
+    /// Not supposed to ever happen.
+    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
     pub fn get_transceiver_by_mid(

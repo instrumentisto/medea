@@ -18,6 +18,8 @@ pub struct Pipeline<K: Hash + Eq, V> {
 
 impl<K: Hash + Eq, V> Pipeline<K, V> {
     /// Creates new [`Pipeline`] from provided [`HashMap`].
+    #[inline]
+    #[must_use]
     pub fn new(pipeline: HashMap<K, V>) -> Self {
         Self { pipeline }
     }
@@ -30,6 +32,7 @@ impl<K: Hash + Eq, V> Pipeline<K, V> {
 
     /// Lookups element of [`Pipeline`] by ID.
     #[inline]
+    #[must_use]
     pub fn get(&self, id: &K) -> Option<&V> {
         self.pipeline.get(id)
     }

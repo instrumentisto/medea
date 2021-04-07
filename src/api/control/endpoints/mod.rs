@@ -53,15 +53,14 @@ pub enum EndpointSpec {
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl Into<MemberElement> for EndpointSpec {
-    fn into(self) -> MemberElement {
-        match self {
-            Self::WebRtcPublish(e) => {
-                MemberElement::WebRtcPublishEndpoint { spec: e }
+impl From<EndpointSpec> for MemberElement {
+    #[inline]
+    fn from(spec: EndpointSpec) -> Self {
+        match spec {
+            EndpointSpec::WebRtcPublish(e) => {
+                Self::WebRtcPublishEndpoint { spec: e }
             }
-            Self::WebRtcPlay(e) => {
-                MemberElement::WebRtcPlayEndpoint { spec: e }
-            }
+            EndpointSpec::WebRtcPlay(e) => Self::WebRtcPlayEndpoint { spec: e },
         }
     }
 }

@@ -16,6 +16,11 @@ struct Inner {
     /// Underlying platform-specific [`platform::MediaStreamTrack`].
     track: platform::MediaStreamTrack,
 
+    /// Listener for an [ended][1] event.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
+    on_ended: Option<EventListener<platform::MediaStreamTrack, sys::Event>>,
+
     /// Underlying [`platform::MediaStreamTrack`] source kind.
     media_source_kind: proto::MediaSourceKind,
 
@@ -25,11 +30,21 @@ struct Inner {
     /// Callback invoked when this [`Track`] is disabled.
     on_disabled: platform::Callback<()>,
 
+    /// Callback to be invoked when this [`Track`] is stopped.
+    on_stopped: Rc<platform::Callback<()>>,
+
     /// [`enabled`][1] property of this [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
     enabled: ObservableCell<bool>,
+}
+
+impl Drop for Inner {
+    #[inline]
+    fn drop(&mut self) {
+        self.on_ended.take();
+    }
 }
 
 /// Wrapper around a received remote [MediaStreamTrack][1].
@@ -49,10 +64,26 @@ impl Track {
         platform::MediaStreamTrack: From<T>,
     {
         let track = platform::MediaStreamTrack::from(track);
+
+        let on_stopped = Rc::new(platform::Callback::default());
+        let on_ended = EventListener::new_once(Rc::clone(&track), "ended", {
+            let on_stopped = Rc::clone(&on_stopped);
+            let track = Rc::clone(&track);
+            move |_| {
+                // Not supposed to ever happen, but call `on_stopped` just
+                // in case.
+                log::error!("Unexpected track stop: {}", track.id());
+                drop(on_stopped.call());
+            }
+        })
+        .unwrap();
+
         let track = Track(Rc::new(Inner {
             enabled: ObservableCell::new(track.enabled()),
             on_enabled: platform::Callback::default(),
             on_disabled: platform::Callback::default(),
+            on_stopped,
+            on_ended: Some(on_ended),
             media_source_kind,
             track,
         }));
@@ -117,6 +148,16 @@ impl Track {
         self.0.media_source_kind.into()
     }
 
+    /// Stops this [`Track`] invoking an `on_stopped` callback if it's in a
+    /// [`sys::MediaStreamTrackState::Live`] state.
+    #[inline]
+    pub fn stop(self) {
+        if self.0.track.ready_state() == sys::MediaStreamTrackState::Live {
+            self.0.track.stop();
+            self.0.on_stopped.call();
+        }
+    }
+
     /// Returns the underlying [`platform::MediaStreamTrack`] of this [`Track`].
     #[inline]
     #[must_use]
@@ -141,5 +182,11 @@ impl Track {
     #[inline]
     pub fn on_disabled(&self, callback: platform::Function<()>) {
         self.0.on_disabled.set_func(callback);
+    }
+
+    /// Sets callback to invoke when this [`Track`] is stopped.
+    #[inline]
+    pub fn on_stopped(&self, callback: platform::Function<()>) {
+        self.0.on_stopped.set_func(callback);
     }
 }

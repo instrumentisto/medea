@@ -27,7 +27,7 @@ where
     let futures: Vec<_> = futures.into_iter().collect();
     AllProcessed::new(Box::new(move || {
         let futures = futures.iter().map(AsRef::as_ref).map(|f| f());
-        Box::pin(future::join_all(futures).map(|_| ()))
+        Box::pin(future::join_all(futures).map(drop))
     }))
 }
 
@@ -65,10 +65,10 @@ impl<'a, T> Future for Processed<'a, T> {
     }
 }
 
-impl<'a, T> Into<Factory<'a, T>> for Processed<'a, T> {
+impl<'a, T> From<Processed<'a, T>> for Factory<'a, T> {
     #[inline]
-    fn into(self) -> Factory<'a, T> {
-        self.factory
+    fn from(p: Processed<'a, T>) -> Self {
+        p.factory
     }
 }
 
@@ -95,10 +95,10 @@ pub struct AllProcessed<'a, T = ()> {
     fut: LocalBoxFuture<'a, T>,
 }
 
-impl<'a, T> Into<Factory<'a, T>> for AllProcessed<'a, T> {
+impl<'a, T> From<AllProcessed<'a, T>> for Factory<'a, T> {
     #[inline]
-    fn into(self) -> Box<dyn Fn() -> LocalBoxFuture<'a, T>> {
-        self.factory
+    fn from(p: AllProcessed<'a, T>) -> Self {
+        p.factory
     }
 }
 

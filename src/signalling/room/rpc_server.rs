@@ -24,7 +24,6 @@ use crate::{
         RpcServer, RpcServerError,
     },
     log::prelude::*,
-    media::PeerStateMachine,
     signalling::room::RoomError,
 };
 
@@ -76,16 +75,16 @@ impl Room {
             ),
         };
 
-        let peer_member_id = self
-            .peers
-            .map_peer_by_id(peer_id, PeerStateMachine::member_id)
-            .map_err(|e| PeerNotFound(peer_id, e))?;
-
-        if peer_member_id != command.member_id {
-            return Err(PeerBelongsToAnotherMember(peer_id, peer_member_id));
-        }
-
-        Ok(())
+        self.peers
+            .map_peer_by_id(peer_id, |s| {
+                let member_id = s.member_id();
+                if member_id == &command.member_id {
+                    Ok(())
+                } else {
+                    Err(PeerBelongsToAnotherMember(peer_id, member_id.clone()))
+                }
+            })
+            .map_err(|e| PeerNotFound(peer_id, e))?
     }
 }
 
@@ -119,17 +118,17 @@ impl RpcServer for Addr<Room> {
 
     /// Sends [`actix::Message`] to Room actor ignoring any errors.
     fn connection_closed(
-        &self,
+        self: Box<Self>,
         member_id: MemberId,
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()> {
-        self.send(RpcConnectionClosed { member_id, reason })
-            .map(|res| {
-                if let Err(e) = res {
-                    error!("Failed to send RpcConnectionClosed cause {:?}", e,);
-                };
-            })
-            .boxed_local()
+        Box::pin(async move {
+            if let Err(e) =
+                self.send(RpcConnectionClosed { member_id, reason }).await
+            {
+                error!("Failed to send RpcConnectionClosed cause {:?}", e);
+            }
+        })
     }
 
     /// Sends [`actix::Message`] message to Room actor ignoring any errors.
@@ -199,12 +198,8 @@ impl Handler<Synchronize> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let state = self.get_state(&msg.0);
-        if let Err(e) = self.members.send_event_to_member(
-            msg.0.clone(),
-            Event::StateSynchronized { state },
-        ) {
-            error!("Failed to synchronize Member [id = {}]: {:?}", msg.0, e);
-        }
+        self.members
+            .send_event_to_member(&msg.0, Event::StateSynchronized { state });
     }
 }
 

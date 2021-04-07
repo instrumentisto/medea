@@ -67,6 +67,7 @@ impl RoomCloseReason {
     /// `is_err` may be `true` only on closing by client.
     ///
     /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
+    #[must_use]
     pub fn new(reason: CloseReason) -> Self {
         match reason {
             CloseReason::ByServer(reason) => Self {
@@ -393,6 +394,7 @@ impl RoomHandle {
     ) -> Result<(), Traced<RoomError>> {
         upgrade_inner!(self.0).map(|inner| inner.on_connection_loss.set_func(f))
     }
+
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
@@ -890,6 +892,7 @@ impl Room {
     /// Creates a new external handle to [`Room`]. You can create them as many
     /// as you need.
     #[inline]
+    #[must_use]
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
     }
@@ -897,12 +900,14 @@ impl Room {
     /// Indicates whether this [`Room`] reference is the same as the given
     /// [`Room`] reference. Compares pointers, not values.
     #[inline]
+    #[must_use]
     pub fn ptr_eq(&self, other: &Room) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
     /// Checks [`RoomHandle`] equality by comparing inner pointers.
     #[inline]
+    #[must_use]
     pub fn inner_ptr_eq(&self, handle: &RoomHandle) -> bool {
         handle
             .0
@@ -912,6 +917,7 @@ impl Room {
 
     /// Downgrades this [`Room`] to a weak reference.
     #[inline]
+    #[must_use]
     pub fn downgrade(&self) -> WeakRoom {
         WeakRoom(Rc::downgrade(&self.0))
     }
@@ -1320,10 +1326,10 @@ impl InnerRoom {
                 )
             },
         ))
-        .map(|r| r.map(|_| ()))
+        .map(|r| r.map(drop))
         .await
         .map_err(tracerr::map_from_and_wrap!())
-        .map(|_| ())
+        .map(drop)
     }
 
     /// Returns [`local::Track`]s for the provided [`MediaKind`] and
@@ -1665,7 +1671,7 @@ impl EventHandler for InnerRoom {
     }
 
     /// Creates new `Track`s, updates existing [`Sender`]s/[`Receiver`]s with
-    /// [`TrackUpdate`]s.
+    /// [`PeerUpdate`]s.
     ///
     /// Will start (re)negotiation process if `Some` [`NegotiationRole`] is
     /// provided.
@@ -1675,7 +1681,7 @@ impl EventHandler for InnerRoom {
     async fn on_tracks_applied(
         &self,
         peer_id: PeerId,
-        updates: Vec<TrackUpdate>,
+        updates: Vec<PeerUpdate>,
         negotiation_role: Option<NegotiationRole>,
     ) -> Self::Output {
         let peer_state = self
@@ -1686,18 +1692,19 @@ impl EventHandler for InnerRoom {
 
         for update in updates {
             match update {
-                TrackUpdate::Added(track) => peer_state
+                PeerUpdate::Added(track) => peer_state
                     .insert_track(&track, self.send_constraints.clone())
                     .map_err(|e| {
                         self.on_failed_local_media
                             .call1(JasonError::from(e.clone()));
                         tracerr::map_from_and_new!(e)
                     })?,
-                TrackUpdate::Updated(track_patch) => {
-                    peer_state.patch_track(&track_patch)
-                }
-                TrackUpdate::IceRestart => {
+                PeerUpdate::Updated(patch) => peer_state.patch_track(&patch),
+                PeerUpdate::IceRestart => {
                     peer_state.restart_ice();
+                }
+                PeerUpdate::Removed(id) => {
+                    peer_state.remove_track(id);
                 }
             }
         }

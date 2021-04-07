@@ -3,7 +3,14 @@
   <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
   <title>Medea's E2E test</title>
   <script type="module">
-    import init, {Jason} from "/pkg/medea_jason.js";
+    import init from "/pkg/medea_jason.js";
+
+    window.originalWs = WebSocket;
+    let oldProto = WebSocket.prototype;
+    WebSocket = function(url) {
+        return window.wsConstructor(url);
+    };
+    WebSocket.prototype = oldProto;
 
     window.onload = async () => {
       await init();

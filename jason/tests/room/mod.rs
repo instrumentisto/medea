@@ -45,7 +45,7 @@ async fn only_one_strong_rpc_rc_exists() {
                 }
             });
             transport.expect_send().returning(|_| Ok(()));
-            transport.expect_set_close_reason().return_once(|_| ());
+            transport.expect_set_close_reason().return_once(drop);
             transport.expect_on_state_change().return_once_st(move || {
                 Box::pin(stream::once(async { TransportState::Open }))
             });
@@ -282,7 +282,7 @@ async fn room_closes_on_rpc_transport_close() {
                     }
                 });
                 transport.expect_send().return_once(|_| Ok(()));
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport
                     .expect_on_state_change()
                     .return_once_st(move || on_state_change_mock.subscribe());

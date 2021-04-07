@@ -186,8 +186,6 @@ jobs:
       - name: Unpack `medea-control-api-mock` Docker image
         run: make docker.untar from-file=image.tar
 
-      - uses: c-py/action-dotenv-to-setenv@v2
-
       - name: Chrome
         run: make test.e2e browser=chrome up=yes dockerized=yes
                            tag=build-${{ github.run_number }}
@@ -322,9 +320,10 @@ jobs:
       matrix:
         include:
           - image: medea
-            cache: ${{ github.ref != 'refs/heads/master'
-                       && !startsWith(github.ref, 'refs/tags/medea-')
-                       && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            cache: false  # temporary disable caching due to CI issues
+            #cache: ${{ github.ref != 'refs/heads/master'
+            #           && !startsWith(github.ref, 'refs/tags/medea-')
+            #           && !contains(github.event.head_commit.message, '[fresh ci]') }}
             export: true
             if: true
 
@@ -343,8 +342,9 @@ jobs:
             if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
                     || startsWith(github.ref, 'refs/tags/medea-demo-')}}
           - image: medea-demo-edge
-            cache: ${{ github.ref != 'refs/heads/master'
-                       && !contains(github.event.head_commit.message, '[fresh ci]') }}
+            cache: false  # temporary disable caching due to CI issues
+            #cache: ${{ github.ref != 'refs/heads/master'
+            #           && !contains(github.event.head_commit.message, '[fresh ci]') }}
             export: ${{ github.ref == 'refs/heads/master' }}
             if: ${{ !startsWith(github.ref, 'refs/tags/medea-') }}
     runs-on: ubuntu-latest

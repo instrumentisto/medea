@@ -3,6 +3,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use bitflags::bitflags;
+use futures::future::LocalBoxFuture;
 use medea_client_api_proto::Direction as DirectionProto;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
@@ -60,21 +61,32 @@ impl Transceiver {
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn set_send_track(
         &self,
-        new_track: Option<Rc<local::Track>>,
+        new_track: Rc<local::Track>,
     ) -> Result<(), JsValue> {
-        if new_track.is_none() {
-            self.send_track.replace(None);
-        }
-        let sys_track: Option<&MediaStreamTrack> =
-            new_track.as_ref().map(|t| (**t).as_ref());
+        let sys_track = new_track.sys_track();
         JsFuture::from(
-            self.transceiver
-                .sender()
-                .replace_track(sys_track.map(AsRef::as_ref)),
+            self.transceiver.sender().replace_track(Some(sys_track)),
         )
-        .await
-        .map(|_| {
-            self.send_track.replace(new_track);
+        .await?;
+        self.send_track.replace(Some(new_track));
+        Ok(())
+    }
+
+    /// Sets a [`TransceiverDirection::SEND`] [`local::Track`] of this
+    /// [`Transceiver`] to [`None`].
+    ///
+    /// # Panics
+    ///
+    /// If [`local::Track`] replacement with [`None`] fails on JS side, but
+    /// basing on [WebAPI docs] it should never happen.
+    ///
+    /// [WebAPI docs]: https://tinyurl.com/7pnszaa8
+    pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
+        self.send_track.replace(None);
+        let fut = self.transceiver.sender().replace_track(None);
+        Box::pin(async move {
+            // Replacing track to None should never fail.
+            JsFuture::from(fut).await.unwrap();
         })
     }
 
@@ -108,6 +120,13 @@ impl Transceiver {
         if let Some(track) = self.send_track.borrow().as_ref() {
             track.set_enabled(enabled);
         }
+    }
+
+    /// Indicates whether the underlying [`RtcRtpTransceiver`] is stopped.
+    #[inline]
+    #[must_use]
+    pub fn is_stopped(&self) -> bool {
+        self.transceiver.stopped()
     }
 }
 

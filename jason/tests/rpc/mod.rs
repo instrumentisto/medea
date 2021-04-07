@@ -425,7 +425,7 @@ mod connect {
                 })
             });
             transport.expect_send().return_once(|_| Ok(()));
-            transport.expect_set_close_reason().return_once(|_| ());
+            transport.expect_set_close_reason().return_once(drop);
             transport.expect_on_state_change().return_once(|| {
                 stream::once(async { TransportState::Open }).boxed()
             });
@@ -463,7 +463,7 @@ mod connect {
                     })
                 });
                 transport.expect_send().return_once(|_| Ok(()));
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport.expect_on_state_change().return_once(|| {
                     stream::once(async { TransportState::Open }).boxed()
                 });
@@ -515,7 +515,7 @@ mod connect {
                     })
                 });
                 transport.expect_send().return_once(|_| Ok(()));
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport.expect_on_state_change().return_once(|| {
                     stream::once(async { TransportState::Open }).boxed()
                 });
@@ -555,7 +555,7 @@ mod on_connection_loss {
                             .unwrap_or(u32::max_value()),
                     })
                 });
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
 
                 transport.expect_on_state_change().return_once(move || {
                     stream::once(async move { TransportState::Open })
@@ -727,7 +727,7 @@ mod on_reconnected {
                     })
                 });
                 transport.expect_send().return_once(|_| Ok(()));
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport.expect_on_state_change().return_once(|| {
                     stream::once(async { TransportState::Open }).boxed()
                 });
@@ -766,7 +766,7 @@ mod on_reconnected {
                     .times(3)
                     .returning_st(move || messages_mock.subscribe());
                 transport.expect_send().return_once(|_| Ok(()));
-                transport.expect_set_close_reason().return_once(|_| ());
+                transport.expect_set_close_reason().return_once(drop);
                 transport
                     .expect_on_state_change()
                     .return_once_st(move || on_close_mock.subscribe());
