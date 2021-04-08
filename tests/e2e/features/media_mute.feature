@@ -41,7 +41,7 @@ Feature: Media muting
     When Bob unmutes video
     Then `on_unmuted` callback fires 1 time on Alice's remote device video track from Bob
 
-  Scenario: `RemoteTrack.on_muted()` and `RemoteTrack.on_zzunmuted()` callbacks fire when audio is muted/unmuted
+  Scenario: `RemoteTrack.on_muted()` and `RemoteTrack.on_unmuted()` callbacks fire when audio is muted/unmuted
     Given room with joined members Alice and Bob
     When Bob mutes audio
     Then `on_muted` callback fires 1 time on Alice's remote audio track from Bob

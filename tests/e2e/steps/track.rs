@@ -93,11 +93,9 @@ async fn then_remote_track_stops(
     assert!(track.disabled().await.unwrap());
 }
 
-#[then(
-    regex = "^`on_(enabled|disabled|muted|unmuted)` callback fires (\\d+) \
-                time(?:s)? on (\\S+)'s remote (audio|(?:device|display) video) \
-                track from (\\S+)$"
-)]
+#[then(regex = "^`on_(enabled|disabled|muted|unmuted)` callback fires \
+                 (\\d+) time(?:s)? on (\\S+)'s \
+                 remote (audio|(?:device|display) video) track from (\\S+)$")]
 async fn then_callback_fires_on_remote_track(
     world: &mut World,
     callback_kind: String,
@@ -134,7 +132,7 @@ async fn then_callback_fires_on_remote_track(
         _ => {
             unreachable!(
                 "unknown RemoteMediaTrack callback: `on_{}`",
-                callback_kind
+                callback_kind,
             );
         }
     }

@@ -51,7 +51,8 @@ struct Inner {
     /// [`sendrecv`][1] or [`recvonly`][2].
     ///
     /// Updating this value fires `on_enabled` or `on_disabled` callback and
-    /// changes [`enabled`][3] property of underlying [MediaStreamTrack][4].
+    /// changes [`enabled`][3] property of the underlying
+    /// [MediaStreamTrack][4].
     ///
     /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendrecv
@@ -63,7 +64,8 @@ struct Inner {
     /// Indicates whether this track is muted.
     ///
     /// Updating this value fires `on_muted` or `on_unmuted` callback and
-    /// changes [`enabled`][1] property of underlying [MediaStreamTrack][2].
+    /// changes [`enabled`][1] property of the underlying
+    /// [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
@@ -192,7 +194,7 @@ impl Track {
 
     /// Sets `enabled` property on this [`Track`].
     ///
-    /// Calls `on_enabled` or `or_disabled` callback.
+    /// Calls `on_enabled` or `or_disabled` callback respectively.
     ///
     /// Updates [`enabled`][1] property in the underlying
     /// [`sys::MediaStreamTrack`].
@@ -205,7 +207,7 @@ impl Track {
 
     /// Sets `muted` property on this [`Track`].
     ///
-    /// Calls `on_muted` or `or_unmuted` callback.
+    /// Calls `on_muted` or `or_unmuted` callback respectively.
     ///
     /// Updates [`enabled`][1] property in the underlying
     /// [`sys::MediaStreamTrack`].

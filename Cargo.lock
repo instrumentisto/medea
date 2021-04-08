@@ -2181,7 +2181,7 @@ dependencies = [
  "lazy_static",
  "medea-client-api-proto",
  "medea-control-api-mock",
- "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-control-api-proto",
  "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0",
  "mockall",
@@ -2228,7 +2228,7 @@ dependencies = [
 
 [[package]]
 name = "medea-control-api-mock"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "actix",
  "actix-cors",
@@ -2238,7 +2238,7 @@ dependencies = [
  "derive_more",
  "dotenv",
  "humantime-serde",
- "medea-control-api-proto 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-control-api-proto",
  "protobuf",
  "serde 1.0.125",
  "serde_json",
@@ -2254,19 +2254,7 @@ dependencies = [
 
 [[package]]
 name = "medea-control-api-proto"
-version = "0.1.0"
-dependencies = [
- "prost",
- "prost-types",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
-name = "medea-control-api-proto"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42e72cb95f866992883b4a6d52c44646742c4211f185cc96d4d1bc57e51e2092"
+version = "0.2.0"
 dependencies = [
  "prost",
  "prost-types",

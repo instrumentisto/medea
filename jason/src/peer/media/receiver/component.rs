@@ -332,7 +332,7 @@ impl Component {
 
     /// Watcher for the mute state updates.
     ///
-    /// Propagates command to associated [`Receiver`] and updates its media
+    /// Propagates command to the associated [`Receiver`] and updates its media
     /// track (if any).
     #[inline]
     #[watch(self.muted.subscribe())]
@@ -345,7 +345,6 @@ impl Component {
         if let Some(track) = receiver.track.borrow().as_ref() {
             track.set_muted(muted)
         }
-
         Ok(())
     }
 

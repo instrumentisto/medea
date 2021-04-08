@@ -21,7 +21,7 @@ First, consider [0.2.0-rc.1] changes.
 - Library API:
     - `RemoteMediaTrack.on_stopped` callback that is called when `RemoteMediaTrack` is stopped ([#109]);
     - `RemoteMediaTrack.on_muted` and `RemoteMediaTrack.on_unmuted` callbacks being called when `RemoteMediaTrack` is muted or unmuted ([#191]);
-    - `RemoteMediaTrack.muted()` function that returns whether this `RemoteMediaTrack` is muted ([#191]).
+    - `RemoteMediaTrack.muted()` method indicating whether this `RemoteMediaTrack` is muted ([#191]).
 
 [#109]: /../../pull/109
 [#191]: /../../pull/191
