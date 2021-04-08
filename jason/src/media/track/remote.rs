@@ -151,7 +151,7 @@ impl Track {
             let weak_inner = Rc::downgrade(&track.0);
             async move {
                 loop {
-                    let event: TrackChange = futures::select! {
+                    let event = futures::select! {
                         enabled = enabled_changes.select_next_some() => {
                             TrackChange::Enabled(enabled)
                         },
@@ -190,7 +190,7 @@ impl Track {
         track
     }
 
-    /// Sets [`Track::enabled`] to the provided value.
+    /// Sets `enabled` property on this [`Track`].
     ///
     /// Calls `on_enabled` or `or_disabled` callback.
     ///
@@ -203,7 +203,7 @@ impl Track {
         self.0.enabled.set(enabled);
     }
 
-    /// Sets [`Track::muted`] to the provided value.
+    /// Sets `muted` property on this [`Track`].
     ///
     /// Calls `on_muted` or `or_unmuted` callback.
     ///

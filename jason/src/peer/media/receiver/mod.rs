@@ -171,9 +171,6 @@ impl Receiver {
 
     /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this
     /// [`Receiver`].
-    ///
-    /// Sets [`sys::MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of
-    /// this [`Receiver`].
     pub fn set_remote_track(
         &self,
         transceiver: Transceiver,
