@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    create_room_req, ControlClient, MemberBuilder, RoomBuilder,
+    pub_sub_room_req, ControlClient, MemberBuilder, RoomBuilder,
     WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
 };
 
@@ -28,7 +28,7 @@ mod room {
     #[named]
     async fn room() {
         let mut client = ControlClient::new().await;
-        let sids = client.create(create_room_req(test_name!())).await;
+        let sids = client.create(pub_sub_room_req(test_name!())).await;
         assert_eq!(sids.len(), 2);
         sids.get(&"publisher".to_string()).unwrap();
         let responder_sid =
@@ -128,7 +128,7 @@ mod member {
     #[named]
     async fn member() {
         let mut client = ControlClient::new().await;
-        client.create(create_room_req(test_name!())).await;
+        client.create(pub_sub_room_req(test_name!())).await;
 
         let add_member = MemberBuilder::default()
             .id("test-member")
@@ -241,7 +241,7 @@ mod endpoint {
     #[named]
     async fn endpoint() {
         let mut client = ControlClient::new().await;
-        client.create(create_room_req(test_name!())).await;
+        client.create(pub_sub_room_req(test_name!())).await;
 
         let create_req = WebRtcPublishEndpointBuilder::default()
             .id("publish")
@@ -391,7 +391,7 @@ mod endpoint {
     #[named]
     async fn create_endpoint_in_the_interconnected_members() {
         let mut client = ControlClient::new().await;
-        let credentials = client.create(create_room_req(test_name!())).await;
+        let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
         let (publisher_tx, mut rx) = mpsc::unbounded::<()>();
         let publisher_done = timeout(Duration::from_secs(5), rx.next());

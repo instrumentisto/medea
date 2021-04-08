@@ -6,7 +6,7 @@ use medea_client_api_proto::{
 };
 
 use crate::{
-    grpc_control_api::{create_room_req, ControlClient},
+    grpc_control_api::{pub_sub_room_req, ControlClient},
     if_let_next,
     signalling::{SendCommand, TestMember},
     test_name,
@@ -18,7 +18,7 @@ use crate::{
 #[named]
 async fn track_mute_doesnt_renegotiates() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -119,7 +119,7 @@ async fn track_mute_doesnt_renegotiates() {
 #[named]
 async fn track_mute_with_disable_will_start_renegotiation() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(

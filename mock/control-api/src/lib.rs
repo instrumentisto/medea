@@ -20,7 +20,7 @@ pub mod proto {
             WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         },
         member::{Credentials, Member},
-        room::Room,
+        room::{Room, RoomElement},
         CreateResponse, Element, ErrorResponse, Response, SingleGetResponse,
     };
 }

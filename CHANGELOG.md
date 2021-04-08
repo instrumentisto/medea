@@ -17,8 +17,12 @@ First, consider [0.2.0-rc.1] changes.
 
 - Signalling:
     - Emitting `TracksApplied` event to remove existing tracks on a client side ([#109]).
+- Control API:
+    - Dynamic Control API exposed via gRPC:
+        - `Apply` method for `Room`, `Member` and `Endpoint` creation ([#187]).
 
 [#109]: /../../pull/109
+[#187]: /../../pull/187
 
 
 

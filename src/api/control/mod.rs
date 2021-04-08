@@ -118,7 +118,8 @@ pub enum RootElement {
 }
 
 /// Errors that can occur when we try transform some spec from `Element`.
-/// This error used in all [`TryFrom`] of Control API.
+///
+/// This error is used in all [`TryFrom`] impls of Control API.
 ///
 /// [`TryFrom`]: std::convert::TryFrom
 #[allow(clippy::pub_enum_variant_names)]
@@ -238,10 +239,6 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 /// # Errors
 ///
 /// Errors if unable to send message to [`RoomService`] actor.
-///
-/// # Panics
-///
-/// If the [`RoomService`] fails to start all static [`Room`]s.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Room`]: crate::signalling::room::Room

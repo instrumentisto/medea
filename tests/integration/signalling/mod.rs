@@ -2,6 +2,7 @@
 
 mod add_endpoints_synchronization;
 mod command_validation;
+mod dynamic_endpoints_removal;
 mod ice_restart;
 mod pub_sub_signallng;
 mod rpc_settings;
