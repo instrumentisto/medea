@@ -23,6 +23,7 @@ pub struct Jason(jason::Jason);
 impl Jason {
     /// Instantiates a new [`Jason`] interface to interact with this library.
     #[wasm_bindgen(constructor)]
+    #[must_use]
     pub fn new() -> Self {
         set_panic_hook();
         init_logger();
@@ -31,11 +32,13 @@ impl Jason {
     }
 
     /// Creates a new `Room` and returns its [`RoomHandle`].
+    #[must_use]
     pub fn init_room(&self) -> RoomHandle {
         self.0.init_room().into()
     }
 
     /// Returns a [`MediaManagerHandle`].
+    #[must_use]
     pub fn media_manager(&self) -> MediaManagerHandle {
         self.0.media_manager().into()
     }

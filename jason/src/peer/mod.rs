@@ -40,7 +40,6 @@ use crate::{
 #[doc(inline)]
 pub use self::{
     component::{Component, State},
-    conn::{IceCandidate, RtcPeerConnection, RtcPeerConnectionError, SdpType},
     media::{
         media_exchange_state, mute_state, receiver, sender, MediaConnections,
         MediaConnectionsError, MediaExchangeState,

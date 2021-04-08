@@ -22,6 +22,7 @@ pub struct ConstraintsUpdateException(room::ConstraintsUpdateException);
 #[wasm_bindgen]
 impl ConstraintsUpdateException {
     /// Returns name of this [`ConstraintsUpdateException`].
+    #[must_use]
     pub fn name(&self) -> String {
         self.0.name()
     }
@@ -36,6 +37,7 @@ impl ConstraintsUpdateException {
 
     /// Returns [`js_sys::Array`] with the [`JasonError`]s if this
     /// [`ConstraintsUpdateException`] represents a `RecoverFailedException`.
+    #[must_use]
     pub fn recover_fail_reasons(&self) -> JsValue {
         js_sys::Array::from_iter(
             self.0

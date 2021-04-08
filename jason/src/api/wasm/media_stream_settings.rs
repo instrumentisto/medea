@@ -20,6 +20,7 @@ pub struct MediaStreamSettings(media::MediaStreamSettings);
 impl MediaStreamSettings {
     /// Creates new [`MediaStreamSettings`] with none constraints configured.
     #[wasm_bindgen(constructor)]
+    #[must_use]
     pub fn new() -> Self {
         media::MediaStreamSettings::new().into()
     }
@@ -53,6 +54,7 @@ pub struct AudioTrackConstraints(media::AudioTrackConstraints);
 impl AudioTrackConstraints {
     /// Creates new [`AudioTrackConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
+    #[must_use]
     pub fn new() -> Self {
         media::AudioTrackConstraints::new().into()
     }
@@ -78,6 +80,7 @@ impl DeviceVideoTrackConstraints {
     /// Creates new [`DeviceVideoTrackConstraints`] with none constraints
     /// configured.
     #[wasm_bindgen(constructor)]
+    #[must_use]
     pub fn new() -> Self {
         media::DeviceVideoTrackConstraints::new().into()
     }
@@ -156,6 +159,7 @@ impl DisplayVideoTrackConstraints {
     /// Creates new [`DisplayVideoTrackConstraints`] with none constraints
     /// configured.
     #[wasm_bindgen(constructor)]
+    #[must_use]
     pub fn new() -> Self {
         media::DisplayVideoTrackConstraints::new().into()
     }

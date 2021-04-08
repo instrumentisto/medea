@@ -22,6 +22,7 @@ impl RoomCloseReason {
     /// Returns the [`Room`]'s close reason.
     ///
     /// [`Room`]: room::Room
+    #[must_use]
     pub fn reason(&self) -> String {
         self.0.reason()
     }
@@ -29,6 +30,7 @@ impl RoomCloseReason {
     /// Indicates whether the [`Room`] was closed by server.
     ///
     /// [`Room`]: room::Room
+    #[must_use]
     pub fn is_closed_by_server(&self) -> bool {
         self.0.is_closed_by_server()
     }
@@ -36,6 +38,7 @@ impl RoomCloseReason {
     /// Indicates whether the [`Room`] close reason is considered as an error.
     ///
     /// [`Room`]: room::Room
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.0.is_err()
     }

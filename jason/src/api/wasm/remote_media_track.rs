@@ -22,11 +22,13 @@ impl RemoteMediaTrack {
     /// Returns the underlying [MediaStreamTrack][1].
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    #[must_use]
     pub fn get_track(&self) -> web_sys::MediaStreamTrack {
         Clone::clone(self.0.get_track().as_ref())
     }
 
     /// Indicates whether this [`RemoteMediaTrack`] is enabled.
+    #[must_use]
     pub fn enabled(&self) -> bool {
         self.0.enabled()
     }
@@ -44,6 +46,7 @@ impl RemoteMediaTrack {
     /// Returns a [`MediaKind::Audio`] if this [`RemoteMediaTrack`] represents
     /// an audio track, or a [`MediaKind::Video`] if it represents a video
     /// track.
+    #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.0.kind().into()
     }
@@ -54,6 +57,7 @@ impl RemoteMediaTrack {
     /// [MediaDevices.getDisplayMedia()][1].
     ///
     /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+    #[must_use]
     pub fn media_source_kind(&self) -> MediaSourceKind {
         self.0.media_source_kind().into()
     }

@@ -131,8 +131,15 @@ impl WebSocketRpcTransport {
     /// With [`TransportError::InitSocket`] if [WebSocket.onclose][1] callback
     /// fired before [WebSocket.onopen][2] callback.
     ///
+    /// # Panics
+    ///
+    /// If binding to [`close`][3] or [`open`][4] events fails. Not supposed to
+    /// ever happen.
+    ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
+    /// [3]: https://html.spec.whatwg.org/#event-close
+    /// [4]: https://html.spec.whatwg.org/#event-open
     pub async fn new(url: ApiUrl) -> Result<Self> {
         let socket = Rc::new(RefCell::new(InnerSocket::new(url.as_ref())?));
         {

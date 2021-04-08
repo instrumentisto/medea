@@ -266,7 +266,7 @@ impl Drop for Receiver {
     fn drop(&mut self) {
         if let Some(transceiver) = self.transceiver.borrow().as_ref() {
             if !transceiver.is_stopped() {
-                transceiver.sub_direction(TransceiverDirection::RECV);
+                transceiver.sub_direction(platform::TransceiverDirection::RECV);
             }
         }
         if let Some(recv_track) = self.track.borrow_mut().take() {

@@ -9,7 +9,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::{media::track::local, platform::MediaStreamTrack};
+use crate::media::track::local;
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -63,7 +63,8 @@ impl Transceiver {
         &self,
         new_track: Rc<local::Track>,
     ) -> Result<(), JsValue> {
-        let sys_track = new_track.sys_track();
+        let sys_track: &web_sys::MediaStreamTrack =
+            (*new_track).as_ref().as_ref();
         JsFuture::from(
             self.transceiver.sender().replace_track(Some(sys_track)),
         )

@@ -29,6 +29,11 @@ use super::window;
 /// With [`MediaManagerError::EnumerateDevicesFailed`] if
 /// [MediaDevices.enumerateDevices()][1] returns error.
 ///
+/// # Panics
+///
+/// If [`js_sys::Array`] returned from [MediaDevices.enumerateDevices()][1]
+/// contains something that is not [`web_sys::MediaDeviceInfo`].
+///
 /// [1]: https://tinyurl.com/w3-streams/#dom-mediadevices-enumeratedevices
 /// [2]: https://tinyurl.com/w3-streams/#mediadevices
 pub async fn enumerate_devices(
@@ -75,6 +80,11 @@ pub async fn enumerate_devices(
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
 /// [MediaDevices.getUserMedia()][1] returns error.
+///
+/// # Panics
+///
+/// If [`js_sys::Array`] returned from [MediaDevices.getUserMedia()][1]
+/// contains something that is not [`web_sys::MediaStreamTrack`].
 ///
 /// [1]: https://tinyurl.com/w3-streams/#dom-mediadevices-getusermedia
 /// [2]: https://tinyurl.com/w3-streams/#mediadevices
@@ -123,6 +133,11 @@ pub async fn get_user_media(
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
 /// [MediaDevices.getDisplayMedia()][1] returns error.
+///
+/// # Panics
+///
+/// If [`js_sys::Array`] returned from [MediaDevices.getDisplayMedia()][1]
+/// contains something that is not [`web_sys::MediaStreamTrack`].
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 /// [2]: https://tinyurl.com/w3-streams/#mediadevices

@@ -781,7 +781,7 @@ window.onload = async function() {
               console.error('Name: "' + err.name() + '";\nMessage: "' + err.message() + '";');
             }
           } else if (name === 'ErroredException') {
-            alert('Fatal error occurred while MediaStreamSettings update.');
+            alert('Fatal error occured while MediaStreamSettings update.');
           }
           console.error("Changing video source failed: " + name);
         }

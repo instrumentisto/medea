@@ -16,8 +16,8 @@ use futures::{
 use medea_client_api_proto::{
     self as proto, Command, ConnectionQualityScore, Event as RpcEvent,
     EventHandler, IceCandidate, IceConnectionState, IceServer, MemberId,
-    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, Track, TrackId,
-    TrackUpdate,
+    NegotiationRole, PeerConnectionState, PeerId, PeerMetrics, PeerUpdate,
+    Track, TrackId,
 };
 use tracerr::Traced;
 
@@ -394,7 +394,6 @@ impl RoomHandle {
     ) -> Result<(), Traced<RoomError>> {
         upgrade_inner!(self.0).map(|inner| inner.on_connection_loss.set_func(f))
     }
-
 
     /// Updates this [`Room`]s [`MediaStreamSettings`]. This affects all
     /// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
@@ -1678,7 +1677,7 @@ impl EventHandler for InnerRoom {
     ///
     /// [`Receiver`]: peer::media::Receiver
     /// [`Sender`]: peer::media::Sender
-    async fn on_tracks_applied(
+    async fn on_peer_updated(
         &self,
         peer_id: PeerId,
         updates: Vec<PeerUpdate>,

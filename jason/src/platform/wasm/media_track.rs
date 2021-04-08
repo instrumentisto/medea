@@ -2,11 +2,13 @@
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
 
+use std::{cell::RefCell, rc::Rc};
+
 use derive_more::AsRef;
 
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
-    platform::get_property_by_name,
+    platform::{get_property_by_name, wasm::utils::EventListener},
 };
 
 /// Wrapper around [MediaStreamTrack][1] received from a
@@ -15,11 +17,17 @@ use crate::{
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
 /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [3]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
-#[derive(AsRef, Clone, Debug)]
+#[derive(AsRef, Debug)]
 pub struct MediaStreamTrack {
     #[as_ref]
-    sys_track: web_sys::MediaStreamTrack,
+    sys_track: Rc<web_sys::MediaStreamTrack>,
     kind: MediaKind,
+    /// Listener for an [ended][1] event.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
+    on_ended: RefCell<
+        Option<EventListener<web_sys::MediaStreamTrack, web_sys::Event>>,
+    >,
 }
 
 impl<T> From<T> for MediaStreamTrack
@@ -34,7 +42,11 @@ where
             "video" => MediaKind::Video,
             _ => unreachable!(),
         };
-        MediaStreamTrack { sys_track, kind }
+        MediaStreamTrack {
+            sys_track: Rc::new(sys_track),
+            kind,
+            on_ended: RefCell::new(None),
+        }
     }
 }
 
@@ -59,8 +71,14 @@ impl MediaStreamTrack {
     /// Returns [MediaStreamTrackState][1] of the underlying
     /// [MediaStreamTrack][2].
     ///
+    /// # Panics
+    ///
+    /// If [`readyState`][3] property of underlying [MediaStreamTrack][2] is
+    /// neither `live` nor `ended`.
+    ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrackstate
     /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [3]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-readystate
     #[must_use]
     pub fn ready_state(&self) -> MediaStreamTrackState {
         let state = self.sys_track.ready_state();
@@ -191,6 +209,58 @@ impl MediaStreamTrack {
                 val.as_string()
             })
             .is_some()
+        }
+    }
+
+    /// Forks this [`Track`].
+    ///
+    /// Creates a new [`platform::MediaStreamTrack`] from this
+    /// [`platform::MediaStreamTrack`] using a [`clone()`][1] method. It won't
+    /// clone current [`Track`]'s callbacks.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-clone
+    pub fn fork(&self) -> Self {
+        Self {
+            sys_track: Rc::new(web_sys::MediaStreamTrack::clone(
+                &self.sys_track,
+            )),
+            kind: self.kind,
+            on_ended: RefCell::new(None),
+        }
+    }
+
+    /// Sets handler for [`ended`][1] event on underlying
+    /// [`web_sys::MediaStreamTrack`].
+    ///
+    /// # Panics
+    ///
+    /// If binding to [`ended`][1] event fails. Not supposed to ever happen.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
+    #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
+    pub fn on_ended<F>(&self, f: Option<F>)
+    where
+        F: 'static + FnOnce(),
+    {
+        let mut on_ended = self.on_ended.borrow_mut();
+        match f {
+            None => {
+                on_ended.take();
+            }
+            Some(f) => {
+                on_ended.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
+                    EventListener::new_once(
+                        Rc::clone(&self.sys_track),
+                        "ended",
+                        move |_| {
+                            f();
+                        },
+                    )
+                    .unwrap(),
+                );
+            }
         }
     }
 }

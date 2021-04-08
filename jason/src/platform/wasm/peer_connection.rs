@@ -163,8 +163,13 @@ impl RtcPeerConnection {
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
     /// [`ontrack` callback][2]).
     ///
+    /// # Panics
+    ///
+    /// If binding to [`track`][3] event fails. Not supposed to ever happen.
+    ///
     /// [1]: https://w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
+    /// [3]: https://w3.org/TR/webrtc/#event-track
     pub fn on_track<F>(&self, f: Option<F>)
     where
         F: 'static + FnMut(MediaStreamTrack, Transceiver),
@@ -197,8 +202,14 @@ impl RtcPeerConnection {
     /// Sets handler for [`RtcPeerConnectionIceEvent`] event
     /// (see [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
     ///
+    /// # Panics
+    ///
+    /// If binding to [`icecandidate`][3] fails. Not supposed to ever
+    /// happen.
+    ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
+    /// [3]: https://w3.org/TR/webrtc/#event-icecandidate
     pub fn on_ice_candidate<F>(&self, f: Option<F>)
     where
         F: 'static + FnMut(IceCandidate),
@@ -253,6 +264,11 @@ impl RtcPeerConnection {
 
     /// Sets handler for [`iceconnectionstatechange`][1] event.
     ///
+    /// # Panics
+    ///
+    /// If binding to [`iceconnectionstatechange`][1] event fails. Not supposed
+    /// to ever happen.
+    ///
     /// [1]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
     pub fn on_ice_connection_state_change<F>(&self, f: Option<F>)
     where
@@ -285,6 +301,11 @@ impl RtcPeerConnection {
     }
 
     /// Sets handler for [`connectionstatechange`][1] event.
+    ///
+    /// # Panics
+    ///
+    /// If binding to [`connectionstatechange`][1] event fails. Not supposed to
+    /// ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
     pub fn on_connection_state_change<F>(&self, f: Option<F>)

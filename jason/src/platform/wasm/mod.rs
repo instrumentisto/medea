@@ -51,7 +51,11 @@ where
     wasm_bindgen_futures::spawn_local(task);
 }
 
-/// [`Future`] which resolves after the provided [`Duration`].
+/// [`Future`] which resolves after the provided [`JsDuration`].
+///
+/// # Panics
+///
+/// If fails to interact with JS side.
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
@@ -88,6 +92,7 @@ where
 /// # Panics
 ///
 /// When global [`Window`] object is inaccessible.
+#[must_use]
 pub fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.
     // Safe to unwrap.

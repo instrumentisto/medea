@@ -268,7 +268,8 @@ impl Sender {
 impl Drop for Sender {
     fn drop(&mut self) {
         if !self.transceiver.is_stopped() {
-            self.transceiver.sub_direction(TransceiverDirection::SEND);
+            self.transceiver
+                .sub_direction(platform::TransceiverDirection::SEND);
             spawn_local(self.transceiver.drop_send_track());
         }
     }

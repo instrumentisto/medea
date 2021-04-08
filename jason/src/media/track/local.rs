@@ -92,7 +92,7 @@ impl Track {
 
     /// Forks this [`Track`].
     ///
-    /// Creates new a [`platform::MediaStreamTrack`] from this [`Track`]'s
+    /// Creates a new [`Track`] from this [`Track`]'s
     /// [`platform::MediaStreamTrack`] using a [`clone()`][1] method.
     ///
     /// Forked [`Track`] will hold a strong reference to this [`Track`].
@@ -101,7 +101,7 @@ impl Track {
     #[must_use]
     pub fn fork(self: &Rc<Self>) -> Self {
         let parent = Rc::clone(self);
-        let track = platform::MediaStreamTrack::clone(&self.track);
+        let track = self.track.fork();
         Self {
             track,
             source_kind: self.source_kind,
