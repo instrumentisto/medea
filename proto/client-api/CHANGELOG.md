@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.3.0] · 2021-??-?? · To-be-done
+## [0.3.0] · 2021-04-09
 [0.3.0]: /../../tree/medea-client-api-proto-0.3.0/proto/client-api
 
 [Diff](/../../compare/medea-client-api-proto-0.2.0...medea-client-api-proto-0.3.0) | [Milestone](/../../milestone/2)
@@ -17,7 +17,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Add `PeerUpdate::Removed` variant to the `PeerUpdated` event ([#109]).
+- `PeerUpdate::Removed` variant to `PeerUpdated` event ([#109]).
 
 [#109]: /../../pull/109
 [#139]: /../../pull/139
