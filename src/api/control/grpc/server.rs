@@ -30,7 +30,9 @@ use crate::{
         endpoints::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         error_codes::{
             ErrorCode,
-            ErrorCode::{ElementIdIsTooLong, ElementIdMismatch},
+            ErrorCode::{
+                ElementIdIsTooLong, ElementIdMismatch, UnimplementedCall,
+            },
             ErrorResponse,
         },
         refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
@@ -39,8 +41,8 @@ use crate::{
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
-        CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
-        Get, RoomService, RoomServiceError, Sids,
+        ApplyMember, ApplyRoom, CreateEndpointInRoom, CreateMemberInRoom,
+        CreateRoom, DeleteElements, Get, RoomService, RoomServiceError, Sids,
     },
     AppContext,
 };
@@ -116,6 +118,57 @@ impl ControlApiService {
                 spec,
             })
             .await??)
+    }
+
+    /// Parses the provided [`proto::ApplyRequest`] and sends [`ApplyRoom`] or
+    /// [`ApplyMember`] message to [`RoomService`].
+    async fn apply_element(
+        &self,
+        req: proto::ApplyRequest,
+    ) -> Result<Sids, ErrorResponse> {
+        let unparsed_fid = req.parent_fid;
+        let elem = if let Some(elem) = req.el {
+            elem
+        } else {
+            return Err(ErrorResponse::new(
+                ErrorCode::NoElement,
+                &unparsed_fid,
+            ));
+        };
+
+        let parent_fid = StatefulFid::try_from(unparsed_fid)?;
+        match parent_fid {
+            StatefulFid::Room(fid) => match elem {
+                proto::apply_request::El::Room(_) => Ok(self
+                    .0
+                    .send(ApplyRoom {
+                        id: fid.take_room_id(),
+                        spec: RoomSpec::try_from(elem)?,
+                    })
+                    .await
+                    .map_err(GrpcControlApiError::from)??),
+                _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
+            },
+            StatefulFid::Member(fid) => match elem {
+                proto::apply_request::El::Member(member) => Ok(self
+                    .0
+                    .send(ApplyMember {
+                        fid,
+                        spec: MemberSpec::try_from(member)?,
+                    })
+                    .await
+                    .map(|_| Sids::new())
+                    .map_err(GrpcControlApiError::from)?),
+                _ => Err(ErrorResponse::new(ElementIdMismatch, &fid)),
+            },
+            StatefulFid::Endpoint(_) => Err(ErrorResponse::with_explanation(
+                UnimplementedCall,
+                String::from(
+                    "Apply method for Endpoints is not currently supported.",
+                ),
+                None,
+            )),
+        }
     }
 
     /// Creates element based on provided [`proto::CreateRequest`].
@@ -212,8 +265,24 @@ impl ControlApiService {
     }
 }
 
+/// Converts [`Sids`] to a [`HashMap`] of [`String`]s for gRPC Control API
+/// protocol.
+fn proto_sids(sids: Sids) -> HashMap<String, String> {
+    sids.into_iter()
+        .map(|(id, sid)| (id.to_string(), sid.to_string()))
+        .collect()
+}
+
 #[async_trait]
 impl ControlApi for ControlApiService {
+    /// Creates a new [`Element`] with a given ID.
+    ///
+    /// Not idempotent. Errors if an [`Element`] with the same ID already
+    /// exists.
+    ///
+    /// Propagates request to [`ControlApiService::create_element`].
+    ///
+    /// [`Element`]: proto::create_request::El
     async fn create(
         &self,
         request: tonic::Request<proto::CreateRequest>,
@@ -221,15 +290,26 @@ impl ControlApi for ControlApiService {
         debug!("Create gRPC Request: [{:?}]", request);
         let create_response =
             match self.create_element(request.into_inner()).await {
-                Ok(sid) => proto::CreateResponse { sid, error: None },
-                Err(err) => proto::CreateResponse {
+                Ok(sid) => proto::CreateResponse {
+                    sid: proto_sids(sid),
+                    error: None,
+                },
+                Err(e) => proto::CreateResponse {
                     sid: HashMap::new(),
-                    error: Some(err.into()),
+                    error: Some(e.into()),
                 },
             };
         Ok(tonic::Response::new(create_response))
     }
 
+    /// Removes an [`Element`] by its ID.
+    ///
+    /// Allows referring multiple [`Element`]s on the last two levels.
+    /// Idempotent. If no [`Element`]s with such IDs exist, then succeeds.
+    ///
+    /// Propagates request to [`ControlApiService::delete_element`].
+    ///
+    /// [`Element`]: proto::Element
     async fn delete(
         &self,
         request: tonic::Request<proto::IdRequest>,
@@ -244,6 +324,14 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(response))
     }
 
+    /// Returns an [`Element`] by its ID.
+    ///
+    /// Allows referring multiple [`Element`]s.
+    /// If no ID specified, returns all the declared [`Element`]s.
+    ///
+    /// Propagates request to [`ControlApiService::get_element`].
+    ///
+    /// [`Element`]: proto::Element
     async fn get(
         &self,
         request: tonic::Request<proto::IdRequest>,
@@ -257,6 +345,33 @@ impl ControlApi for ControlApiService {
             Err(e) => proto::GetResponse {
                 elements: HashMap::new(),
                 error: Some(ErrorResponse::from(e).into()),
+            },
+        };
+        Ok(tonic::Response::new(response))
+    }
+
+    /// Applies the given spec to an [`Element`] by its ID.
+    ///
+    /// Idempotent. If no [`Element`] with such ID exists, then it will be
+    /// created, otherwise it will be reconfigured. [`Element`]s that exist, but
+    /// are not specified in the provided spec will be removed.
+    ///
+    /// Propagates request to [`ControlApiService::apply_element`].
+    ///
+    /// [`Element`]: proto::apply_request::El
+    async fn apply(
+        &self,
+        request: tonic::Request<proto::ApplyRequest>,
+    ) -> Result<tonic::Response<proto::CreateResponse>, Status> {
+        debug!("Apply gRPC Request: [{:?}]", request);
+        let response = match self.apply_element(request.into_inner()).await {
+            Ok(sid) => proto::CreateResponse {
+                sid: proto_sids(sid),
+                error: None,
+            },
+            Err(e) => proto::CreateResponse {
+                sid: HashMap::new(),
+                error: Some(e.into()),
             },
         };
         Ok(tonic::Response::new(response))
@@ -290,7 +405,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
              shutting down.",
         );
         if let Some(grpc_shutdown) = self.0.take() {
-            grpc_shutdown.send(()).ok();
+            let _ = grpc_shutdown.send(());
         }
     }
 }

@@ -167,6 +167,14 @@ impl ParticipantService {
         self.members.clone()
     }
 
+    /// Returns [`MemberId`]s of all [`Member`]s from this
+    /// [`ParticipantService`].
+    #[inline]
+    #[must_use]
+    pub fn members_ids(&self) -> Vec<MemberId> {
+        self.members.keys().cloned().collect()
+    }
+
     /// Lookups [`Member`] by provided [`MemberId`] and credentials.
     ///
     /// # Errors

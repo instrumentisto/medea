@@ -4,7 +4,7 @@ use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
     api::Response,
     callback::CallbackItem,
-    proto::{CreateResponse, Element},
+    proto::{CreateResponse, Element, SingleGetResponse},
 };
 
 use crate::conf;
@@ -48,6 +48,28 @@ impl Client {
     /// Deletes a media [`Element`] identified by the provided `path`.
     pub async fn delete(&self, path: &str) -> Result<Response> {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
+    }
+
+    /// Returns a media [`Element`] identified by the provided `path`.
+    pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
+        Ok(self.0.get(&get_url(path)).send().await?.json().await?)
+    }
+
+    /// Applies on a media server the provided media [`Element`] identified by
+    /// the provided `path`.
+    pub async fn apply(
+        &self,
+        path: &str,
+        element: Element,
+    ) -> Result<CreateResponse> {
+        Ok(self
+            .0
+            .put(&get_url(path))
+            .json(&element)
+            .send()
+            .await?
+            .json()
+            .await?)
     }
 
     // TODO: Server side filtering on GET requests or SSE/WS subscription would

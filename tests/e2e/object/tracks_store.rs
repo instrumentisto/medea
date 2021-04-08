@@ -3,8 +3,6 @@
 
 use std::marker::PhantomData;
 
-use derive_more::Display;
-
 use crate::{
     browser::Statement,
     object::{
@@ -16,23 +14,6 @@ use crate::{
 };
 
 use super::Error;
-
-/// Representation of a [MediaStreamTrackState][1].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrackstate
-#[derive(Clone, Copy, Debug, Eq, Display, PartialEq)]
-pub enum MediaStreamTrackState {
-    /// Track is active (the track's underlying media source is making a
-    /// best-effort attempt to provide data in real time).
-    #[display(fmt = "live")]
-    Live,
-
-    /// Track has ended (the track's underlying media source is no longer
-    /// providing data, and will never provide more data for this track). Once
-    /// a track enters this state, it never exits it.
-    #[display(fmt = "ended")]
-    Ended,
-}
 
 /// Shortcut for a [`TracksStore`] of [`LocalTrack`]s.
 pub type LocalTracksStore = TracksStore<LocalTrack>;
@@ -198,31 +179,36 @@ impl<T> Object<TracksStore<T>> {
         .await
     }
 
-    /// Checks whether all local `Track`s from this store are in the `ended`
-    /// `readyState`.
-    pub async fn all_tracks_have_ready_state(
+    /// Returns count of tracks by the provided `muted` and `stopped` values.
+    pub async fn count_tracks_by_selector(
         &self,
-        ready_state: MediaStreamTrackState,
-    ) -> Result<bool, Error> {
+        muted: bool,
+        stopped: bool,
+    ) -> Result<u64, Error> {
         self.execute(Statement::new(
             // language=JavaScript
             &format!(
                 r#"
                     async (store) => {{
+                        let count = 0;
                         for (track of store.tracks) {{
-                            if (track.track.get_track().readyState !== '{}') {{
-                                return false;
+                            let t = track.track.get_track();
+                            if (t.muted == {muted} &&
+                                track.stopped == {stopped})
+                            {{
+                                count++;
                             }}
                         }}
-                        return true;
+                        return count;
                     }}
                 "#,
-                ready_state,
+                muted = muted,
+                stopped = stopped
             ),
             [],
         ))
         .await?
-        .as_bool()
+        .as_u64()
         .ok_or(Error::TypeCast)
     }
 }

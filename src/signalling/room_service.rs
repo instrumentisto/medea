@@ -18,17 +18,18 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
-        member::Credential,
+        member::Sid,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, LoadStaticControlSpecsError, MemberSpec, RoomSpec,
         TryFromElementError,
     },
+    conf::server::PublicUrl,
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
         peers::{build_peers_traffic_watcher, PeerTrafficWatcher},
         room::{
-            Close, CreateEndpoint, CreateMember, Delete, RoomError,
+            Apply, Close, CreateEndpoint, CreateMember, Delete, RoomError,
             SerializeProto,
         },
         room_repo::RoomRepository,
@@ -122,7 +123,7 @@ pub struct RoomService {
     /// Public URL of server. Address for exposed [Client API].
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
-    public_url: String,
+    public_url: PublicUrl,
 
     /// [`PeerTrafficWatcher`] for all [`Room`]s of this [`RoomService`].
     peer_traffic_watcher: Arc<dyn PeerTrafficWatcher>,
@@ -186,31 +187,61 @@ impl RoomService {
             })
     }
 
-    /// Returns [Control API] sid based on provided arguments and
-    /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
-    ///
-    /// Returns sid with a token (`?token=<token>`) if [`ControlCredential`] is
-    /// [`ControlCredential::Plain`].
-    ///
-    /// Returns sid without token if [`ControlCredential`] is
-    /// [`ControlCredential::Hash`].
-    fn get_sid(
+    /// Returns [Control API] sids for `Members` in provided [`RoomSpec`] and
+    /// based on `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
+    fn get_sids_from_spec(
         &self,
-        room_id: &RoomId,
-        member_id: &MemberId,
-        credentials: &Credential,
-    ) -> String {
-        match credentials {
-            Credential::Hash(_) => {
-                format!("{}/{}/{}", self.public_url, room_id, member_id)
-            }
-            Credential::Plain(plain) => {
-                format!(
-                    "{}/{}/{}?token={}",
-                    self.public_url, room_id, member_id, plain,
-                )
-            }
+        spec: &RoomSpec,
+    ) -> Result<Sids, RoomServiceError> {
+        match spec.members() {
+            Ok(members) => Ok(members
+                .iter()
+                .map(|(member_id, member)| {
+                    let sid = Sid::new(
+                        self.public_url.clone(),
+                        spec.id().clone(),
+                        member_id.clone(),
+                        member.credentials().clone(),
+                    );
+                    (member_id.clone(), sid)
+                })
+                .collect()),
+            Err(e) => Err(RoomServiceError::TryFromElement(e)),
         }
+    }
+
+    /// Creates a new [`Room`] according to the provided [`RoomSpec`].
+    ///
+    /// # Errors
+    ///
+    /// With [`RoomServiceError::TryFromElement`] if the provided `room_spec` is
+    /// invalid.
+    ///
+    /// With [`RoomServiceError::RoomAlreadyExists`] if a [`Room`] with the
+    /// provided ID already exists.
+    fn create_room(&self, room_spec: RoomSpec) -> Result<(), RoomServiceError> {
+        if self.room_repo.get(&room_spec.id).is_some() {
+            return Err(RoomServiceError::RoomAlreadyExists(
+                Fid::<ToRoom>::new(room_spec.id),
+            ));
+        }
+
+        let room_addr = Room::start(
+            &room_spec,
+            &self.app,
+            self.peer_traffic_watcher.clone(),
+        )?;
+
+        shutdown::subscribe(
+            &self.graceful_shutdown,
+            room_addr.clone().recipient(),
+            shutdown::Priority(2),
+        );
+
+        debug!("New Room [id = {}] started.", room_spec.id);
+        self.room_repo.add(room_spec.id, room_addr);
+
+        Ok(())
     }
 }
 
@@ -263,7 +294,53 @@ impl Handler<StartStaticRooms> for RoomService {
 /// Type alias for success [`CreateResponse`]'s sids.
 ///
 /// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
-pub type Sids = HashMap<String, String>;
+pub type Sids = HashMap<MemberId, Sid>;
+
+/// Signal for applying a [`RoomSpec`] to a [`Room`] with the given [`RoomId`].
+#[derive(Message)]
+#[rtype(result = "Result<Sids, RoomServiceError>")]
+pub struct ApplyRoom {
+    /// [`RoomId`] of the [`Room`] for which the [`RoomSpec`] is provided and
+    /// should be applied to.
+    pub id: RoomId,
+
+    /// [`RoomSpec`] which should be applied on the [`Room`].
+    pub spec: RoomSpec,
+}
+
+impl Handler<ApplyRoom> for RoomService {
+    type Result = ResponseFuture<Result<Sids, RoomServiceError>>;
+
+    #[allow(clippy::option_if_let_else)]
+    fn handle(
+        &mut self,
+        msg: ApplyRoom,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let sids = match self.get_sids_from_spec(&msg.spec) {
+            Ok(sids) => sids,
+            Err(err) => {
+                return Box::pin(future::err(err));
+            }
+        };
+
+        if let Some(room) = self.room_repo.get(&msg.id) {
+            let fut = room.send(Apply(msg.spec));
+
+            Box::pin(async move {
+                fut.await.map_err(RoomServiceError::RoomMailboxErr)??;
+                Ok(sids)
+            })
+        } else {
+            let res = self.create_room(msg.spec);
+
+            Box::pin(async move {
+                res?;
+                Ok(sids)
+            })
+        }
+    }
+}
 
 /// Signal for creating new [`Room`].
 #[derive(Message)]
@@ -283,44 +360,60 @@ impl Handler<CreateRoom> for RoomService {
         msg: CreateRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let room_spec = msg.spec;
-        let sid = match room_spec.members() {
-            Ok(members) => members
-                .iter()
-                .map(|(member_id, member)| {
-                    let uri = self.get_sid(
-                        room_spec.id(),
-                        &member_id,
-                        member.credentials(),
-                    );
-                    (member_id.clone().to_string(), uri)
-                })
-                .collect(),
-            Err(e) => return Err(RoomServiceError::TryFromElement(e)),
-        };
+        let sids = self.get_sids_from_spec(&msg.spec)?;
+        self.create_room(msg.spec)?;
+        Ok(sids)
+    }
+}
 
-        if self.room_repo.get(&room_spec.id).is_some() {
-            return Err(RoomServiceError::RoomAlreadyExists(
-                Fid::<ToRoom>::new(room_spec.id),
-            ));
-        }
+/// Signal for applying the given [`MemberSpec`] to a [`Member`] in the given
+/// [`Room`].
+///
+/// [`Member`]: crate::signalling::elements::member::Member
+#[derive(Message)]
+#[rtype(result = "Result<(), RoomServiceError>")]
+pub struct ApplyMember {
+    /// [`Fid`] of the [`Member`] for which the [`MemberSpec`] is provided and
+    /// should be applied to.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    pub fid: Fid<ToMember>,
 
-        let room_addr = Room::start(
-            &room_spec,
-            &self.app,
-            self.peer_traffic_watcher.clone(),
-        )?;
+    /// [`MemberSpec`] which should be applied to the [`Member`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    pub spec: MemberSpec,
+}
 
-        shutdown::subscribe(
-            &self.graceful_shutdown,
-            room_addr.clone().recipient(),
-            shutdown::Priority(2),
-        );
+impl Handler<ApplyMember> for RoomService {
+    type Result = ResponseFuture<Result<(), RoomServiceError>>;
 
-        debug!("New Room [id = {}] started.", room_spec.id);
-        self.room_repo.add(room_spec.id, room_addr);
-
-        Ok(sid)
+    fn handle(
+        &mut self,
+        msg: ApplyMember,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let (room_id, member_id) = msg.fid.take_all();
+        let spec = msg.spec;
+        self.room_repo.get(&room_id).map_or_else(
+            || {
+                future::err(RoomServiceError::RoomNotFound(Fid::<ToRoom>::new(
+                    room_id,
+                )))
+                .boxed_local()
+            },
+            |room| {
+                async move {
+                    room.send(crate::signalling::room::ApplyMember(
+                        member_id, spec,
+                    ))
+                    .await
+                    .map_err(RoomServiceError::RoomMailboxErr)??;
+                    Ok(())
+                }
+                .boxed_local()
+            },
+        )
     }
 }
 
@@ -344,9 +437,14 @@ impl Handler<CreateMemberInRoom> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.parent_fid.take_room_id();
-        let id = msg.id;
+        let member_id = msg.id;
         let spec = msg.spec;
-        let sid = self.get_sid(&room_id, &id, spec.credentials());
+        let sid = Sid::new(
+            self.public_url.clone(),
+            room_id.clone(),
+            member_id.clone(),
+            spec.credentials().clone(),
+        );
 
         self.room_repo.get(&room_id).map_or_else(
             || {
@@ -357,11 +455,10 @@ impl Handler<CreateMemberInRoom> for RoomService {
             },
             |room| {
                 async move {
-                    let id_str = id.to_string();
-                    room.send(CreateMember(id, spec))
+                    room.send(CreateMember(member_id.clone(), spec))
                         .await
                         .map_err(RoomServiceError::RoomMailboxErr)??;
-                    Ok(hashmap! {id_str => sid})
+                    Ok(hashmap! {member_id => sid})
                 }
                 .boxed_local()
             },
@@ -672,9 +769,16 @@ mod room_service_specs {
 
     use crate::{
         api::control::{
-            endpoints::webrtc_publish_endpoint::P2pMode,
+            endpoints::{
+                webrtc_publish_endpoint::{
+                    AudioSettings, P2pMode, VideoSettings,
+                },
+                WebRtcPublishEndpoint,
+            },
+            member::{Credential, MemberElement},
+            pipeline::Pipeline,
             refs::{Fid, ToEndpoint},
-            RootElement,
+            RoomElement, RootElement, WebRtcPublishId,
         },
         conf::{self, Conf},
     };
@@ -740,8 +844,8 @@ mod room_service_specs {
                 $room_service.send($create_msg).await.unwrap().unwrap();
                 let mut resp =
                     $room_service.send(get_msg).await.unwrap().unwrap();
-                resp.remove(&$element_fid).unwrap();
-                actix::System::current().stop();
+                let el = resp.remove(&$element_fid).unwrap().el.unwrap();
+                $test(el);
             }
         };
     }
@@ -759,7 +863,12 @@ mod room_service_specs {
             CreateRoom { spec },
             caller_fid,
             |member_el| {
-                assert_eq!(member_el.get_member().get_pipeline().len(), 1);
+                match member_el {
+                    proto::element::El::Member(member) => {
+                        assert_eq!(member.pipeline.len(), 1);
+                    }
+                    _ => unreachable!(),
+                }
             }
         )
         .await;
@@ -771,11 +880,11 @@ mod room_service_specs {
         let member_spec = spec
             .members()
             .unwrap()
-            .get(&"caller".to_string().into())
+            .get(&MemberId::from("caller"))
             .unwrap()
             .clone();
 
-        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_id = RoomId::from("pub-sub-video-call");
         let room = Room::start(
             &spec,
             &app_ctx(),
@@ -787,7 +896,7 @@ mod room_service_specs {
         )));
 
         let member_parent_fid = Fid::<ToRoom>::new(room_id);
-        let member_id: MemberId = "test-member".to_string().into();
+        let member_id = MemberId::from("test-member");
         let member_full_id: StatefulFid = member_parent_fid
             .clone()
             .push_member_id(member_id.clone())
@@ -802,7 +911,12 @@ mod room_service_specs {
             },
             member_full_id,
             |member_el| {
-                assert_eq!(member_el.get_member().get_pipeline().len(), 1);
+                match member_el {
+                    proto::element::El::Member(member) => {
+                        assert_eq!(member.pipeline.len(), 1);
+                    }
+                    _ => unreachable!(),
+                }
             }
         )
         .await;
@@ -817,13 +931,15 @@ mod room_service_specs {
             .unwrap()
             .get(&"caller".to_string().into())
             .unwrap()
-            .get_publish_endpoint_by_id("publish".to_string().into())
+            .get_publish_endpoint_by_id(WebRtcPublishId::from(String::from(
+                "publish",
+            )))
             .unwrap()
             .clone();
         endpoint_spec.p2p = P2pMode::Never;
         let endpoint_spec = endpoint_spec.into();
 
-        let room_id: RoomId = "pub-sub-video-call".into();
+        let room_id = RoomId::from("pub-sub-video-call");
         let room = Room::start(
             &spec,
             &app_ctx(),
@@ -835,8 +951,8 @@ mod room_service_specs {
         )));
 
         let endpoint_parent_fid =
-            Fid::<ToMember>::new(room_id, "caller".to_string().into());
-        let endpoint_id: EndpointId = "test-publish".to_string().into();
+            Fid::<ToMember>::new(room_id, MemberId::from("caller"));
+        let endpoint_id = EndpointId::from(String::from("test-publish"));
         let endpoint_full_id: StatefulFid = endpoint_parent_fid
             .clone()
             .push_endpoint_id(endpoint_id.clone())
@@ -851,10 +967,13 @@ mod room_service_specs {
             },
             endpoint_full_id,
             |endpoint_el| {
-                assert_eq!(
-                    endpoint_el.get_webrtc_pub().get_p2p(),
-                    P2pMode::Never.into()
-                );
+                match endpoint_el {
+                    proto::element::El::WebrtcPub(publish) => {
+                        let endpoint = WebRtcPublishEndpoint::from(&publish);
+                        assert_eq!(endpoint.p2p, P2pMode::Never);
+                    }
+                    _ => unreachable!(),
+                }
             }
         )
         .await;
@@ -881,13 +1000,11 @@ mod room_service_specs {
             room_service.send(Get(vec![element_fid])).await.unwrap();
 
         assert!(get_result.is_err());
-
-        actix::System::current().stop();
     }
 
     #[actix_rt::test]
     async fn delete_and_get_room() {
-        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_id = RoomId::from("pub-sub-video-call");
         let room_full_id =
             StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
@@ -906,10 +1023,10 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn delete_and_get_member() {
-        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_id = RoomId::from("pub-sub-video-call");
         let member_fid = StatefulFid::from(Fid::<ToMember>::new(
             room_id.clone(),
-            "caller".to_string().into(),
+            MemberId::from("caller"),
         ));
 
         let room = Room::start(
@@ -927,11 +1044,11 @@ mod room_service_specs {
 
     #[actix_rt::test]
     async fn delete_and_get_endpoint() {
-        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_id = RoomId::from("pub-sub-video-call");
         let endpoint_fid = StatefulFid::from(Fid::<ToEndpoint>::new(
             room_id.clone(),
-            "caller".to_string().into(),
-            "publish".to_string().into(),
+            MemberId::from("caller"),
+            EndpointId::from(String::from("publish")),
         ));
 
         let room = Room::start(
@@ -945,5 +1062,359 @@ mod room_service_specs {
         )));
 
         test_for_delete_and_get(room_service, endpoint_fid).await;
+    }
+
+    #[actix_rt::test]
+    async fn create_member_via_apply_room() {
+        let room_id = RoomId::from("test");
+        let room = Room::start(
+            &RoomSpec {
+                id: room_id.clone(),
+                pipeline: Pipeline::new(HashMap::new()),
+            },
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::Media::default()),
+        )
+        .unwrap();
+        let room_service = room_service(RoomRepository::from(hashmap!(
+            room_id => room,
+        )));
+
+        let mut apply_result = room_service
+            .send(ApplyRoom {
+                id: RoomId::from("test"),
+                spec: RoomSpec {
+                    id: RoomId::from("test"),
+                    pipeline: Pipeline::new(hashmap! {
+                        MemberId::from("member1") => RoomElement::Member {
+                            spec: Pipeline::new(hashmap! {
+                                EndpointId::from(String::from("pub")) =>
+                                    MemberElement::WebRtcPublishEndpoint {
+                                        spec: WebRtcPublishEndpoint {
+                                            p2p: P2pMode::Always,
+                                            force_relay: false,
+                                            audio_settings:
+                                                AudioSettings::default(),
+                                            video_settings:
+                                                VideoSettings::default()
+                                        }
+                                    }
+                            }),
+                            credentials: Credential::Plain(String::from("1")),
+                            on_leave: None,
+                            on_join: None,
+                            idle_timeout: None,
+                            reconnect_timeout: None,
+                            ping_interval: None,
+                        },
+                        MemberId::from("member2") => RoomElement::Member {
+                            spec: Pipeline::new(HashMap::new()),
+                            credentials: Credential::Plain(String::from("2")),
+                            on_leave: None,
+                            on_join: None,
+                            idle_timeout: None,
+                            reconnect_timeout: None,
+                            ping_interval: None,
+                        }
+                    }),
+                },
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(apply_result.len(), 2);
+        let member1_sid =
+            apply_result.remove(&MemberId::from("member1")).unwrap();
+        let member2_sid =
+            apply_result.remove(&MemberId::from("member2")).unwrap();
+
+        assert_eq!(
+            member1_sid.to_string(),
+            "ws://127.0.0.1:8080/ws/test/member1?token=1"
+        );
+        assert_eq!(
+            member2_sid.to_string(),
+            "ws://127.0.0.1:8080/ws/test/member2?token=2"
+        );
+
+        let mut get_resp: HashMap<StatefulFid, proto::Element> = room_service
+            .send(Get(vec![
+                StatefulFid::try_from(String::from("test")).unwrap()
+            ]))
+            .await
+            .unwrap()
+            .unwrap();
+
+        // panic!("{:#?}", get_resp.keys());
+        let room = get_resp
+            .remove(&StatefulFid::try_from(String::from("test")).unwrap())
+            .unwrap();
+        match room.el.unwrap() {
+            proto::element::El::Room(mut room) => {
+                let member1 = room
+                    .pipeline
+                    .remove("member1")
+                    .unwrap()
+                    .el
+                    .map(|el| match el {
+                        proto::room::element::El::Member(member) => {
+                            MemberSpec::try_from(member).unwrap()
+                        }
+                        _ => unreachable!(),
+                    })
+                    .unwrap();
+                let member2 = room
+                    .pipeline
+                    .remove("member2")
+                    .unwrap()
+                    .el
+                    .map(|el| match el {
+                        proto::room::element::El::Member(member) => {
+                            MemberSpec::try_from(member).unwrap()
+                        }
+                        _ => unreachable!(),
+                    })
+                    .unwrap();
+
+                assert_eq!(member1.publish_endpoints().count(), 1);
+                assert_eq!(member1.play_endpoints().count(), 0);
+
+                assert_eq!(member2.publish_endpoints().count(), 0);
+                assert_eq!(member2.play_endpoints().count(), 0);
+            }
+            _ => unreachable!(),
+        };
+    }
+
+    #[actix_rt::test]
+    async fn create_endpoints_via_apply_member() {
+        let room_id = RoomId::from("test");
+        let member_id = MemberId::from("member1");
+        let room = Room::start(
+            &RoomSpec {
+                id: room_id.clone(),
+                pipeline: Pipeline::new(HashMap::new()),
+            },
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::Media::default()),
+        )
+        .unwrap();
+
+        let room_service = room_service(RoomRepository::from(hashmap!(
+            room_id.clone() => room,
+        )));
+
+        // create member without endpoints
+        room_service
+            .send(CreateMemberInRoom {
+                id: member_id.clone(),
+                parent_fid: Fid::<ToRoom>::new(room_id.clone()),
+                spec: MemberSpec::new(
+                    Pipeline::new(HashMap::new()),
+                    Credential::Plain(String::from("asd")),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        // add two publish endpoints
+        room_service
+            .send(ApplyMember {
+                fid: Fid::<ToMember>::new(room_id, member_id),
+                spec: MemberSpec::new(
+                    Pipeline::new(hashmap! {
+                        EndpointId::from(String::from("pub1")) =>
+                            MemberElement::WebRtcPublishEndpoint {
+                            spec: WebRtcPublishEndpoint {
+                                p2p: P2pMode::Always,
+                                force_relay: false,
+                                audio_settings: AudioSettings::default(),
+                                video_settings: VideoSettings::default()
+                            }
+                        },
+                        EndpointId::from(String::from("pub2")) =>
+                            MemberElement::WebRtcPublishEndpoint {
+                            spec: WebRtcPublishEndpoint {
+                                p2p: P2pMode::Always,
+                                force_relay: false,
+                                audio_settings: AudioSettings::default(),
+                                video_settings: VideoSettings::default()
+                            }
+                        },
+                    }),
+                    Credential::Plain(String::from("asd")),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        let resp = room_service
+            .send(Get(vec![
+                StatefulFid::try_from(String::from("test/member1/pub1"))
+                    .unwrap(),
+                StatefulFid::try_from(String::from("test/member1/pub2"))
+                    .unwrap(),
+            ]))
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(resp.len(), 2);
+    }
+
+    #[actix_rt::test]
+    async fn delete_members_via_apply_room() {
+        let room_id = RoomId::from("pub-sub-video-call");
+        let room = Room::start(
+            &room_spec(),
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::Media::default()),
+        )
+        .unwrap();
+        let room_service = room_service(RoomRepository::from(hashmap!(
+            room_id.clone() => room,
+        )));
+
+        room_service
+            .send(ApplyRoom {
+                id: room_id.clone(),
+                spec: RoomSpec {
+                    id: room_id.clone(),
+                    pipeline: Pipeline::new(HashMap::new()),
+                },
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        let room = room_service
+            .send(Get(vec![StatefulFid::try_from(String::from(
+                "pub-sub-video-call",
+            ))
+            .unwrap()]))
+            .await
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .map(|(_, room)| room.el.unwrap())
+            .next()
+            .unwrap();
+
+        match room {
+            proto::element::El::Room(room) => {
+                // make sure members are deleted
+                assert!(room.pipeline.is_empty())
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[actix_rt::test]
+    async fn delete_endpoints_via_apply_room() {
+        let room_id = RoomId::from("pub-sub-video-call");
+        let room = Room::start(
+            &room_spec(),
+            &app_ctx(),
+            build_peers_traffic_watcher(&conf::Media::default()),
+        )
+        .unwrap();
+        let room_service = room_service(RoomRepository::from(hashmap!(
+            room_id.clone() => room,
+        )));
+
+        room_service
+            .send(ApplyRoom {
+                id: room_id.clone(),
+                spec: RoomSpec {
+                    id: room_id.clone(),
+                    pipeline: Pipeline::new(hashmap! {
+                        MemberId::from("caller") => RoomElement::Member {
+                            spec: Pipeline::new(HashMap::new()),
+                            credentials:
+                                Credential::Plain(String::from("test")),
+                            on_leave: None,
+                            on_join: None,
+                            idle_timeout: None,
+                            reconnect_timeout: None,
+                            ping_interval: None,
+                        },
+                        MemberId::from("responder") => RoomElement::Member {
+                            spec: Pipeline::new(HashMap::new()),
+                            credentials:
+                                Credential::Plain(String::from("test")),
+                            on_leave: None,
+                            on_join: None,
+                            idle_timeout: None,
+                            reconnect_timeout: None,
+                            ping_interval: None,
+                        }
+                    }),
+                },
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        let room = room_service
+            .send(Get(vec![StatefulFid::try_from(String::from(
+                "pub-sub-video-call",
+            ))
+            .unwrap()]))
+            .await
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .map(|(_, room)| room.el.unwrap())
+            .next()
+            .unwrap();
+
+        match room {
+            proto::element::El::Room(mut room) => {
+                assert_eq!(room.pipeline.len(), 2);
+                let caller = room
+                    .pipeline
+                    .remove("caller")
+                    .unwrap()
+                    .el
+                    .map(|el| match el {
+                        proto::room::element::El::Member(member) => {
+                            MemberSpec::try_from(member).unwrap()
+                        }
+                        _ => unreachable!(),
+                    })
+                    .unwrap();
+                let responder = room
+                    .pipeline
+                    .remove("responder")
+                    .unwrap()
+                    .el
+                    .map(|el| match el {
+                        proto::room::element::El::Member(member) => {
+                            MemberSpec::try_from(member).unwrap()
+                        }
+                        _ => unreachable!(),
+                    })
+                    .unwrap();
+
+                assert_eq!(caller.play_endpoints().count(), 0);
+                assert_eq!(caller.publish_endpoints().count(), 0);
+                assert_eq!(responder.play_endpoints().count(), 0);
+                assert_eq!(responder.publish_endpoints().count(), 0);
+            }
+            _ => unreachable!(),
+        };
     }
 }
