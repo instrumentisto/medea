@@ -120,7 +120,7 @@ impl ControlApiService {
             .await??)
     }
 
-    /// Parses provided [`proto::ApplyRequest`] and sends [`ApplyRoom`] or
+    /// Parses the provided [`proto::ApplyRequest`] and sends [`ApplyRoom`] or
     /// [`ApplyMember`] message to [`RoomService`].
     async fn apply_element(
         &self,
@@ -275,7 +275,7 @@ fn proto_sids(sids: Sids) -> HashMap<String, String> {
 
 #[async_trait]
 impl ControlApi for ControlApiService {
-    /// Creates new [`Element`] with a given ID.
+    /// Creates a new [`Element`] with a given ID.
     ///
     /// Not idempotent. Errors if an [`Element`] with the same ID already
     /// exists.
@@ -302,7 +302,7 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(create_response))
     }
 
-    /// Removes [`Element`] by its ID.
+    /// Removes an [`Element`] by its ID.
     ///
     /// Allows referring multiple [`Element`]s on the last two levels.
     /// Idempotent. If no [`Element`]s with such IDs exist, then succeeds.
@@ -324,10 +324,10 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(response))
     }
 
-    /// Returns [`Element`] by its ID.
+    /// Returns an [`Element`] by its ID.
     ///
     /// Allows referring multiple [`Element`]s.
-    /// If no ID specified, returns all [`Element`]s declared.
+    /// If no ID specified, returns all the declared [`Element`]s.
     ///
     /// Propagates request to [`ControlApiService::get_element`].
     ///
@@ -350,7 +350,7 @@ impl ControlApi for ControlApiService {
         Ok(tonic::Response::new(response))
     }
 
-    /// Applies the given spec to [`Element`] by its ID.
+    /// Applies the given spec to an [`Element`] by its ID.
     ///
     /// Idempotent. If no [`Element`] with such ID exists, then it will be
     /// created, otherwise it will be reconfigured. [`Element`]s that exist, but

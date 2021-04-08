@@ -353,9 +353,9 @@ pub struct Delete(pub Vec<StatefulFid>);
 impl Handler<Delete> for Room {
     type Result = ();
 
-    /// Deletes elements from [`Room`] by provided IDs.
+    /// Deletes elements from this [`Room`] by the provided IDs.
     ///
-    /// Extracts [`MemberId`]s and [`EndpointId`]s from provided [`Delete`]
+    /// Extracts [`MemberId`]s and [`EndpointId`]s from the provided [`Delete`]
     /// message. Calls [`Room::delete_member`] for each [`MemberId`] and
     /// [`Room::delete_endpoint`] for each [`EndpointId`].
     fn handle(&mut self, msg: Delete, ctx: &mut Self::Context) {
@@ -384,7 +384,7 @@ impl Handler<Delete> for Room {
     }
 }
 
-/// Signal for applying given [`MemberSpec`] to [`Member`] in this [`Room`].
+/// Signal for applying the given [`MemberSpec`] to a [`Member`] in a [`Room`].
 ///
 /// [`Member`]: crate::signalling::elements::Member
 #[derive(Message, Debug)]
@@ -394,9 +394,9 @@ pub struct ApplyMember(pub MemberId, pub MemberSpec);
 impl Handler<ApplyMember> for Room {
     type Result = Result<(), RoomError>;
 
-    /// Creates new [`Member`] based on provided [`MemberSpec`] if could not
-    /// find [`Member`] with specified [`MemberId`]. Updates found [`Member`]'s
-    /// endpoints according to [`MemberSpec`] otherwise.
+    /// Creates a new [`Member`] basing on the provided [`MemberSpec`] if
+    /// couldn't find a [`Member`] with the specified [`MemberId`]. Updates
+    /// found [`Member`]'s endpoints according to the [`MemberSpec`] otherwise.
     ///
     /// [`Member`]: crate::signalling::elements::Member
     fn handle(
@@ -440,7 +440,7 @@ impl Handler<ApplyMember> for Room {
     }
 }
 
-/// Signal for applying given [`RoomSpec`] to this [`Room`].
+/// Signal for applying the given [`RoomSpec`] to a [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct Apply(pub RoomSpec);
@@ -448,7 +448,7 @@ pub struct Apply(pub RoomSpec);
 impl Handler<Apply> for Room {
     type Result = Result<(), RoomError>;
 
-    /// Applies given [`RoomSpec`] to current [`Room`].
+    /// Applies the given [`RoomSpec`] to this [`Room`].
     fn handle(&mut self, msg: Apply, ctx: &mut Self::Context) -> Self::Result {
         for id in self.members.members_ids() {
             if !msg.0.pipeline.contains_key(&id) {
@@ -514,8 +514,8 @@ pub struct CreateMember(pub MemberId, pub MemberSpec);
 impl Handler<CreateMember> for Room {
     type Result = Result<(), RoomError>;
 
-    /// Creates new [`Member`] with provided [`MemberId`] according to given
-    /// [`MemberSpec`].
+    /// Creates a new [`Member`] with the provided [`MemberId`] according to the
+    /// given [`MemberSpec`].
     ///
     /// [`Member`]: crate::signalling::elements::Member
     fn handle(
@@ -544,11 +544,12 @@ pub struct CreateEndpoint {
 impl Handler<CreateEndpoint> for Room {
     type Result = Result<(), RoomError>;
 
-    /// Creates new [`Endpoint`] with provided [`EndpointId`] for [`Member`]
-    /// with given [`MemberId`] according to given [`EndpointSpec`].
+    /// Creates a new [`Endpoint`] with the provided [`EndpointId`] for a
+    /// [`Member`] with the given [`MemberId`] according to the given
+    /// [`EndpointSpec`].
     ///
     /// Propagates request to [`Room::create_sink_endpoint`] or
-    /// [`Room::create_src_endpoint`] based on kind of [`Endpoint`].
+    /// [`Room::create_src_endpoint`] basing on a kind of the [`Endpoint`].
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     /// [`Member`]: crate::signalling::elements::Member
@@ -588,7 +589,7 @@ impl Handler<Close> for Room {
 
     /// Closes this [`Room`].
     ///
-    /// Clears [`Member`]s list and closes all active connections.
+    /// Clears [`Member`]s list and closes all the active connections.
     ///
     /// [`Member`]: crate::signalling::elements::Member
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {

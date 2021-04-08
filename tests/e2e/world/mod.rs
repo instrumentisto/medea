@@ -332,7 +332,7 @@ impl World {
     }
 
     /// Creates `WebRtcPublishEndpoint`s and `WebRtcPlayEndpoint`s for the
-    /// provided [`MembersPair`] using `Apply` method.
+    /// provided [`MembersPair`] using an `Apply` method of Control API.
     pub async fn interconnect_members_via_apply(&mut self, pair: MembersPair) {
         let mut spec = self.get_spec().await;
         if let Some(proto::RoomElement::Member(member)) =

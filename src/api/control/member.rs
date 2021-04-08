@@ -46,7 +46,7 @@ pub struct Sid {
 }
 
 impl Sid {
-    /// Returns new [`Sid`] for the provided authentication data.
+    /// Returns a new [`Sid`] for the provided authentication data.
     #[inline]
     #[must_use]
     pub fn new(

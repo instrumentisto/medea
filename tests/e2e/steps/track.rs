@@ -1,6 +1,6 @@
-use cucumber_rust::then;
-
 use std::time::Duration;
+
+use cucumber_rust::then;
 
 use crate::{
     object::{MediaKind, MediaSourceKind},
@@ -217,20 +217,18 @@ async fn then_member_doesnt_have_live_local_tracks(
 ) {
     let member = world.get_member(&id).unwrap();
     let local_tracks = member.room().local_tracks().await.unwrap();
-    assert_eq!(
-        local_tracks
-            .count_tracks_by_selector(true, true)
-            .await
-            .unwrap(),
-        0
-    );
+    let count = local_tracks
+        .count_tracks_by_selector(true, true)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
 }
 
 #[then(regex = r"^(\S+) has (\d+) (live|stopped) remote tracks from (\S+)$")]
 async fn then_member_has_n_remote_tracks_from(
     world: &mut World,
     id: String,
-    count_of_tracks: u64,
+    expected_count: u64,
     live_or_stopped: String,
     remote_id: String,
 ) {
@@ -248,11 +246,9 @@ async fn then_member_has_n_remote_tracks_from(
         (true, true)
     };
 
-    assert_eq!(
-        tracks_store
-            .count_tracks_by_selector(muted, stopped)
-            .await
-            .unwrap(),
-        count_of_tracks,
-    );
+    let actual_count = tracks_store
+        .count_tracks_by_selector(muted, stopped)
+        .await
+        .unwrap();
+    assert_eq!(actual_count, expected_count);
 }

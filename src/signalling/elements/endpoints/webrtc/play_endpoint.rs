@@ -47,8 +47,9 @@ struct WebRtcPlayEndpointInner {
     /// [`Peer`]: crate::media::peer::Peer
     peer_id: Option<PeerId>,
 
-    /// [`PeerId`] of [`Peer`] created for source [`WebRtcPublishEndpoint`]
-    /// from which this [`WebRtcPlayEndpoint`] receives data.
+    /// [`PeerId`] of the [`Peer`] created to source a
+    /// [`WebRtcPublishEndpoint`] from which this [`WebRtcPlayEndpoint`]
+    /// receives data.
     partner_peer_id: Option<PeerId>,
 
     /// Indicator whether only `relay` ICE candidates are allowed for this
@@ -57,28 +58,22 @@ struct WebRtcPlayEndpointInner {
 }
 
 impl WebRtcPlayEndpointInner {
-    /// Inner implementation of [`WebRtcPlayEndpoint::src_uri`].
     fn src_uri(&self) -> SrcUri {
         self.src_uri.clone()
     }
 
-    /// Inner implementation of [`WebRtcPlayEndpoint::owner`].
     fn owner(&self) -> Member {
         self.owner.upgrade()
     }
 
-    /// Inner implementation of [`WebRtcPlayEndpoint::weak_owner`].
     fn weak_owner(&self) -> WeakMember {
         self.owner.clone()
     }
 
-    /// Inner implementation of [`WebRtcPlayEndpoint::src`].
     fn src(&self) -> WebRtcPublishEndpoint {
         self.src.upgrade()
     }
 
-    /// Inner implementation of
-    /// [`WebRtcPlayEndpoint::set_peer_id_and_partner_peer_id`].
     fn set_peer_id_and_partner_peer_id(
         &mut self,
         pid: PeerId,
@@ -169,7 +164,7 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().src()
     }
 
-    /// Saves [`PeerId`]s of this [`WebRtcPlayEndpoint`] and source
+    /// Saves [`PeerId`]s of this [`WebRtcPlayEndpoint`] and the source
     /// [`WebRtcPublishEndpoint`].
     #[inline]
     pub fn set_peer_id_and_partner_peer_id(

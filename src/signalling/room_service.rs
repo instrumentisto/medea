@@ -214,10 +214,11 @@ impl RoomService {
     ///
     /// # Errors
     ///
-    /// With [`RoomServiceError::TryFromElement`] if provided spec is invalid.
+    /// With [`RoomServiceError::TryFromElement`] if the provided `room_spec` is
+    /// invalid.
     ///
-    /// With [`RoomServiceError::RoomAlreadyExists`] if [`Room`] with a provided
-    /// ID already exists.
+    /// With [`RoomServiceError::RoomAlreadyExists`] if a [`Room`] with the
+    /// provided ID already exists.
     fn create_room(&self, room_spec: RoomSpec) -> Result<(), RoomServiceError> {
         if self.room_repo.get(&room_spec.id).is_some() {
             return Err(RoomServiceError::RoomAlreadyExists(
@@ -295,15 +296,15 @@ impl Handler<StartStaticRooms> for RoomService {
 /// [`CreateResponse`]: medea_control_api_proto::grpc::api::CreateResponse
 pub type Sids = HashMap<MemberId, Sid>;
 
-/// Signal for applying [`RoomSpec`] to [`Room`] with given [`RoomId`].
+/// Signal for applying a [`RoomSpec`] to a [`Room`] with the given [`RoomId`].
 #[derive(Message)]
 #[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct ApplyRoom {
-    /// [`RoomId`] of [`Room`] for which [`RoomSpec`] is provided and should be
-    /// applied.
+    /// [`RoomId`] of the [`Room`] for which the [`RoomSpec`] is provided and
+    /// should be applied to.
     pub id: RoomId,
 
-    /// [`RoomSpec`] which should be applied on [`Room`].
+    /// [`RoomSpec`] which should be applied on the [`Room`].
     pub spec: RoomSpec,
 }
 
@@ -365,20 +366,20 @@ impl Handler<CreateRoom> for RoomService {
     }
 }
 
-/// Signal for applying given [`MemberSpec`] to [`Member`] in specified
+/// Signal for applying the given [`MemberSpec`] to a [`Member`] in the given
 /// [`Room`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct ApplyMember {
-    /// [`Fid`] of [`Member`] for which [`MemberSpec`] is provided and should
-    /// be applied.
+    /// [`Fid`] of the [`Member`] for which the [`MemberSpec`] is provided and
+    /// should be applied to.
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub fid: Fid<ToMember>,
 
-    /// [`MemberSpec`] which should be applied on [`Member`].
+    /// [`MemberSpec`] which should be applied to the [`Member`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
     pub spec: MemberSpec,

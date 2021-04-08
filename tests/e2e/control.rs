@@ -50,13 +50,13 @@ impl Client {
         Ok(self.0.delete(&get_url(path)).send().await?.json().await?)
     }
 
-    /// Returns a media [`Element`] by the provided `path`.
+    /// Returns a media [`Element`] identified by the provided `path`.
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
         Ok(self.0.get(&get_url(path)).send().await?.json().await?)
     }
 
-    /// Applies the provided media [`Element`] in the provided `path` on a Medea
-    /// media server.
+    /// Applies on a media server the provided media [`Element`] identified by
+    /// the provided `path`.
     pub async fn apply(
         &self,
         path: &str,

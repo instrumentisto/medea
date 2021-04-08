@@ -179,7 +179,7 @@ impl<T> Object<TracksStore<T>> {
         .await
     }
 
-    /// Returns count of tracks by provided `muted` and `stopped` values.
+    /// Returns count of tracks by the provided `muted` and `stopped` values.
     pub async fn count_tracks_by_selector(
         &self,
         muted: bool,
