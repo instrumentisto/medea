@@ -1,7 +1,9 @@
+use std::time::Duration;
+
 use cucumber_rust::then;
 
 use crate::{
-    object::{tracks_store::MediaStreamTrackState, MediaKind, MediaSourceKind},
+    object::{MediaKind, MediaSourceKind},
     steps::parse_media_kinds,
     world::World,
 };
@@ -215,31 +217,38 @@ async fn then_member_doesnt_have_live_local_tracks(
 ) {
     let member = world.get_member(&id).unwrap();
     let local_tracks = member.room().local_tracks().await.unwrap();
-    assert!(local_tracks
-        .all_tracks_have_ready_state(MediaStreamTrackState::Ended)
+    let count = local_tracks
+        .count_tracks_by_selector(true, true)
         .await
-        .unwrap());
+        .unwrap();
+    assert_eq!(count, 0);
 }
 
-#[then(regex = r"^(\S+)'s remote tracks from (\S+) are (live|ended$)")]
-async fn then_remote_tracks_are_stopped(
+#[then(regex = r"^(\S+) has (\d+) (live|stopped) remote tracks from (\S+)$")]
+async fn then_member_has_n_remote_tracks_from(
     world: &mut World,
     id: String,
-    partner_id: String,
-    live_or_ended: String,
+    expected_count: u64,
+    live_or_stopped: String,
+    remote_id: String,
 ) {
+    tokio_1::time::sleep(Duration::from_millis(300)).await;
     let member = world.get_member(&id).unwrap();
-    let connection =
-        member.connections().get(partner_id).await.unwrap().unwrap();
-    let tracks_store = connection.tracks_store().await.unwrap();
-    let ready_state = if live_or_ended == "live" {
-        MediaStreamTrackState::Live
-    } else {
-        MediaStreamTrackState::Ended
-    };
-    assert!(tracks_store.count().await.unwrap() > 0);
-    assert!(tracks_store
-        .all_tracks_have_ready_state(ready_state)
+    let connection = member
+        .connections()
+        .wait_for_connection(remote_id)
         .await
-        .unwrap());
+        .unwrap();
+    let tracks_store = connection.tracks_store().await.unwrap();
+    let (muted, stopped) = if live_or_stopped == "live" {
+        (false, false)
+    } else {
+        (true, true)
+    };
+
+    let actual_count = tracks_store
+        .count_tracks_by_selector(muted, stopped)
+        .await
+        .unwrap();
+    assert_eq!(actual_count, expected_count);
 }

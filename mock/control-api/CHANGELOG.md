@@ -6,6 +6,20 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.2.0] · 2021-??-?? · To-be-done
+[0.2.0]: /../../tree/medea-control-api-mock-0.2.0/mock/control-api
+
+### Added
+
+- Endpoints:
+    - `PUT /control-api/{room_id}` ([#187]);
+    - `PUT /control-api/{room_id}/{element_id}` ([#187]).
+
+[#187]: /../../pull/187
+
+
+
+
 ## [0.1.0] · 2021-02-01
 [0.1.0]: /../../tree/medea-control-api-mock-0.1.0/mock/control-api
 

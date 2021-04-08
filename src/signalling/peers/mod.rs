@@ -341,17 +341,21 @@ impl PeersService {
     /// Deletes the provided [`WebRtcPlayEndpoint`].
     ///
     /// Returns [`PeerChange`]s which were performed by this function.
-    ///
-    /// # Errors
-    ///
-    /// If a [`Peer`] with the provided [`PeerId`] or a partner [`Peer`] hasn't
-    /// been found.
     #[inline]
     pub fn delete_sink_endpoint(
         &self,
         sink: &WebRtcPlayEndpoint,
-    ) -> Result<HashSet<PeerChange>, RoomError> {
-        self.peers.delete_sink_endpoint(sink)
+    ) -> HashSet<PeerChange> {
+        if let Ok(change) = self.peers.delete_sink_endpoint(sink) {
+            change
+        } else {
+            // This can happen only if the provided endpoint contains peers that
+            // don't exist anymore. Not a reason to propagate error, since we're
+            // removing this endpoint anyway, but that means that we didn't
+            // clean this endpoint up.
+            warn!("Error while removing sink {:?}", sink);
+            HashSet::new()
+        }
     }
 
     /// Deletes the provided [`WebRtcPublishEndpoint`].
@@ -366,8 +370,17 @@ impl PeersService {
     pub fn delete_src_endpoint(
         &self,
         src: &WebRtcPublishEndpoint,
-    ) -> Result<HashSet<PeerChange>, RoomError> {
-        self.peers.delete_src_endpoint(src)
+    ) -> HashSet<PeerChange> {
+        if let Ok(change) = self.peers.delete_src_endpoint(src) {
+            change
+        } else {
+            // This can happen only if the provided endpoint contains peers that
+            // don't exist anymore. Not a reason to propagate error, since we're
+            // removing this endpoint anyway, but that means that we didn't
+            // clean this endpoint up.
+            warn!("Error while removing sink {:?}", src);
+            HashSet::new()
+        }
     }
 
     /// Returns already created [`Peer`] pair's [`PeerId`]s as

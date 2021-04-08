@@ -27,6 +27,7 @@ use crate::{
         },
         refs::{Fid, StatefulFid, ToEndpoint, ToMember},
         room::RoomSpec,
+        TryFromElementError,
     },
     log::prelude::*,
     media::{peer::PeerUpdatesSubscriber, Peer, PeerError, Stable},
@@ -42,7 +43,8 @@ use crate::{
 };
 
 pub use dynamic_api::{
-    Close, CreateEndpoint, CreateMember, Delete, SerializeProto,
+    Apply, ApplyMember, Close, CreateEndpoint, CreateMember, Delete,
+    SerializeProto,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -107,6 +109,14 @@ pub enum RoomError {
     /// Failed to send callback via [`CallbackService`]
     #[display(fmt = "CallbackService errored in Room: {}", _0)]
     CallbackClientError(CallbackClientError),
+
+    /// Errors occurring when we try to transform some spec from `Element`.
+    ///
+    /// This error used in all [`TryFrom`] impls of Control API.
+    ///
+    /// [`TryFrom`]: std::convert::TryFrom
+    #[display(fmt = "Failed to convert element: {:?}", _0)]
+    TryFromElement(TryFromElementError),
 }
 
 /// Media server room with its [`Member`]s.
@@ -272,7 +282,7 @@ impl Room {
 
     /// Signals about removing [`Member`]'s [`Peer`]s.
     fn member_peers_removed(
-        &mut self,
+        &self,
         peers_id: Vec<PeerId>,
         member_id: &MemberId,
     ) {

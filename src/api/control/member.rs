@@ -5,10 +5,11 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    fmt,
     time::Duration,
 };
 
-use medea_client_api_proto::{self as client_proto, MemberId as Id};
+use medea_client_api_proto::{self as client_proto, MemberId as Id, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -24,8 +25,54 @@ use crate::{
         EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
         WebRtcPlayId,
     },
+    conf::server::PublicUrl,
     utils,
 };
+
+/// URI used by `Member`s to connect to a media server via Client API.
+#[derive(Clone, Debug)]
+pub struct Sid {
+    /// Public URL of HTTP server to establish WebSocket connection with.
+    public_url: PublicUrl,
+
+    /// [`RoomId`] of the `Room` the `Member` participates in.
+    room_id: RoomId,
+
+    /// [`Id`] of the `Member`.
+    member_id: Id,
+
+    /// [`Credential`] of the `Member` to authorize his connection with.
+    credential: Credential,
+}
+
+impl Sid {
+    /// Returns a new [`Sid`] for the provided authentication data.
+    #[inline]
+    #[must_use]
+    pub fn new(
+        public_url: PublicUrl,
+        room_id: RoomId,
+        member_id: Id,
+        credential: Credential,
+    ) -> Self {
+        Self {
+            public_url,
+            room_id,
+            member_id,
+            credential,
+        }
+    }
+}
+
+impl fmt::Display for Sid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}/{}", self.public_url, self.room_id, self.member_id)?;
+        if let Credential::Plain(plain) = &self.credential {
+            write!(f, "?token={}", plain)?;
+        }
+        Ok(())
+    }
+}
 
 /// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -196,6 +243,20 @@ impl MemberSpec {
     ) -> Option<&WebRtcPublishEndpoint> {
         let e = self.pipeline.get(&id.into())?;
         if let MemberElement::WebRtcPublishEndpoint { spec } = e {
+            Some(spec)
+        } else {
+            None
+        }
+    }
+
+    /// Lookups a [`WebRtcPlayEndpoint`] by its ID.
+    #[must_use]
+    pub fn get_play_endpoint_by_id(
+        &self,
+        id: WebRtcPlayId,
+    ) -> Option<&WebRtcPlayEndpoint> {
+        let e = self.pipeline.get(&id.into())?;
+        if let MemberElement::WebRtcPlayEndpoint { spec } = e {
             Some(spec)
         } else {
             None

@@ -927,7 +927,7 @@ window.onload = async function() {
             await room.join(await createMember(roomId, username));
             return;
           }
-          await room.join(baseUrl + roomId + '/' + username + '/test')
+          await room.join(baseUrl + roomId + '/' + username + '?token=test')
         } catch (e) {
           console.error(e);
           console.error(

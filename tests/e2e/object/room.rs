@@ -337,6 +337,7 @@ impl Object<Room> {
                                 track: t,
                                 on_enabled_fire_count: 0,
                                 on_disabled_fire_count: 0,
+                                stopped: false,
                                 onEnabledSubs: [],
                                 onDisabledSubs: []
                             };
@@ -353,6 +354,9 @@ impl Object<Room> {
                                     sub();
                                 }
                                 track.onDisabledSubs = [];
+                            });
+                            track.track.on_stopped(() => {
+                                track.stopped = true;
                             });
                             tracksStore.tracks.push(track);
                             let newStoreSubs = tracksStore.subs
