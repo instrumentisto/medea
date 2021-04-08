@@ -117,4 +117,60 @@ impl Object<RemoteTrack> {
         .await
         .map(drop)
     }
+
+    /// Waits for the `RemoteMediaTrack.on_muted()` callback to fire `count`
+    /// times.
+    pub async fn wait_for_on_muted_fire_count(
+        &self,
+        count: u64,
+    ) -> Result<(), Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (track) => {
+                    const [count] = args;
+                    while (track.on_muted_fire_count !== count) {
+                        await new Promise((resolve) => {
+                            if (track.on_muted_fire_count !== count) {
+                                track.onMutedSubs.push(resolve);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    }
+                }
+            "#,
+            [count.into()],
+        ))
+        .await
+        .map(drop)
+    }
+
+    /// Waits for the `RemoteMediaTrack.on_unmuted()` callback to fire `count`
+    /// times.
+    pub async fn wait_for_on_unmuted_fire_count(
+        &self,
+        count: u64,
+    ) -> Result<(), Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (track) => {
+                    const [count] = args;
+                    while (track.on_unmuted_fire_count !== count) {
+                        await new Promise((resolve) => {
+                            if (track.on_unmuted_fire_count !== count) {
+                                track.onUnmutedSubs.push(resolve);
+                            } else {
+                                resolve();
+                            }
+                        });
+                    }
+                }
+            "#,
+            [count.into()],
+        ))
+        .await
+        .map(drop)
+    }
 }

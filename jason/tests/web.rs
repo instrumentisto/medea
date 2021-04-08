@@ -309,7 +309,7 @@ async fn get_video_track() -> remote::Track {
     settings.device_video(DeviceVideoTrackConstraints::new());
     let stream = manager.get_tracks(settings).await.unwrap();
     let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
-    remote::Track::new(track, MediaSourceKind::Device)
+    remote::Track::new(track, MediaSourceKind::Device, true, false)
 }
 
 async fn get_audio_track() -> remote::Track {
@@ -318,7 +318,7 @@ async fn get_audio_track() -> remote::Track {
     settings.audio(AudioTrackConstraints::new());
     let stream = manager.get_tracks(settings).await.unwrap();
     let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
-    remote::Track::new(track, MediaSourceKind::Device)
+    remote::Track::new(track, MediaSourceKind::Device, true, false)
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
