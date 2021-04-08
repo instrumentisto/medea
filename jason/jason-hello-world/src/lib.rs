@@ -18,7 +18,7 @@ mod utils;
 
 use std::{any::Any, marker::PhantomData, time::Duration};
 
-use dart_sys::{Dart_Handle, Dart_PersistentHandle};
+use dart_sys::{Dart_Handle, Dart_PersistentHandle, _Dart_Handle};
 use extern_executor::spawn;
 use futures_timer::Delay;
 
@@ -30,7 +30,78 @@ use crate::{
     reconnect_handle::ReconnectHandle,
     room_close_reason::RoomCloseReason,
     room_handle::RoomHandle,
+    utils::into_dart_string,
 };
+
+struct DartResult(Dart_Handle);
+
+impl<T, E> From<Result<T, E>> for DartResult {
+    fn from(_: Result<T, E>) -> Self {
+        Self(unsafe {
+            new_error_without_source_caller.unwrap()(
+                into_dart_string("name".to_string()),
+                into_dart_string("message".to_string()),
+                into_dart_string("stacktrace".to_string()),
+            )
+        })
+    }
+}
+
+impl Into<Dart_Handle> for DartResult {
+    fn into(self) -> Dart_Handle {
+        self.0
+    }
+}
+
+static mut new_error_without_source_caller: Option<
+    NewErrorWithoutSourceCaller,
+> = None;
+type NewErrorWithoutSourceCaller = extern "C" fn(
+    name: *const libc::c_char,
+    message: *const libc::c_char,
+    stacktrace: *const libc::c_char,
+) -> Dart_Handle;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_new_error_without_source_caller(
+    c: NewErrorWithoutSourceCaller,
+) {
+    new_error_without_source_caller = Some(c);
+}
+
+static mut new_error_with_source_caller: Option<NewErrorWithSourceCaller> =
+    None;
+type NewErrorWithSourceCaller = extern "C" fn(
+    name: *const libc::c_char,
+    message: *const libc::c_char,
+    stacktrace: *const libc::c_char,
+    source: Dart_Handle,
+) -> Dart_Handle;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_new_error_with_source_caller(
+    c: NewErrorWithSourceCaller,
+) {
+    new_error_with_source_caller = Some(c);
+}
+
+static mut new_ok_caller: Option<NewOkCaller> = None;
+type NewOkCaller = extern "C" fn() -> Dart_Handle;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_new_ok_caller(c: NewOkCaller) {
+    new_ok_caller = Some(c);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn test_ok_result() -> Dart_Handle {
+    DartResult::from(Ok::<(), ()>(())).into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn test_err_result() -> Dart_Handle {
+    DartResult::from(Err::<(), ()>(())).into()
+}
 
 #[link(name = "trampoline")]
 extern "C" {
@@ -96,7 +167,7 @@ impl From<i32> for MediaKind {
         match i {
             0 => Self::Audio,
             1 => Self::Video,
-            _ => unreachable!()
+            _ => unreachable!(),
         }
     }
 }

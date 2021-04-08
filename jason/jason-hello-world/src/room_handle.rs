@@ -2,11 +2,12 @@ use std::any::Any;
 
 use dart_sys::Dart_Handle;
 
-use crate::media_stream_settings::MediaStreamSettings;
 use crate::{
     completer::Completer, connection_handle::ConnectionHandle,
-    local_media_track::LocalMediaTrack, reconnect_handle::ReconnectHandle,
-    room_close_reason::RoomCloseReason, DartCallback, MediaSourceKind,
+    local_media_track::LocalMediaTrack,
+    media_stream_settings::MediaStreamSettings,
+    reconnect_handle::ReconnectHandle, room_close_reason::RoomCloseReason,
+    DartCallback, MediaSourceKind,
 };
 use extern_executor::spawn;
 
@@ -34,18 +35,27 @@ impl RoomHandle {
     }
 
     pub async fn mute_audio(&self) {}
+
     pub async fn unmute_audio(&self) {}
+
     pub async fn disable_audio(&self) {}
+
     pub async fn enable_audio(&self) {}
 
     pub async fn mute_video(&self, source_kind: MediaSourceKind) {}
+
     pub async fn unmute_video(&self, source_kind: MediaSourceKind) {}
+
     pub async fn disable_video(&self, source_kind: MediaSourceKind) {}
+
     pub async fn enable_video(&self, source_kind: MediaSourceKind) {}
 
     pub async fn disable_remote_audio(&self) {}
+
     pub async fn enable_remote_audio(&self) {}
+
     pub async fn disable_remote_video(&self) {}
+
     pub async fn enable_remote_video(&self) {}
 }
 
