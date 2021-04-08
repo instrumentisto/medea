@@ -11,8 +11,10 @@ typedef _RustTaskDrop = void Function(Pointer<_RustTask> task);
 
 typedef _postCObject = Int8 Function(Int64, Pointer<Dart_CObject>);
 
-typedef _rustLoopInit = Void Function(Int64 wakePort, Pointer<NativeFunction<_postCObject>> taskPost);
-typedef _RustLoopInit = void Function(int wakePort, Pointer<NativeFunction<_postCObject>> taskPost);
+typedef _rustLoopInit = Void Function(
+    Int64 wakePort, Pointer<NativeFunction<_postCObject>> taskPost);
+typedef _RustLoopInit = void Function(
+    int wakePort, Pointer<NativeFunction<_postCObject>> taskPost);
 
 class Executor {
   final _RustTaskPoll _taskPoll;
@@ -21,11 +23,16 @@ class Executor {
   ReceivePort? _wakePort;
 
   Executor(DynamicLibrary dylib)
-      : _taskPoll = dylib.lookup<NativeFunction<_rustTaskPoll>>('task_poll').asFunction()
-  , _taskDrop = dylib.lookup<NativeFunction<_rustTaskDrop>>('task_drop').asFunction()
-  , _loopInit = dylib.lookup<NativeFunction<_rustLoopInit>>('loop_init').asFunction()
-  , _wakePort = null
-  {}
+      : _taskPoll = dylib
+            .lookup<NativeFunction<_rustTaskPoll>>('task_poll')
+            .asFunction(),
+        _taskDrop = dylib
+            .lookup<NativeFunction<_rustTaskDrop>>('task_drop')
+            .asFunction(),
+        _loopInit = dylib
+            .lookup<NativeFunction<_rustLoopInit>>('loop_init')
+            .asFunction(),
+        _wakePort = null {}
 
   bool get started => _wakePort != null;
   bool get stopped => !started;

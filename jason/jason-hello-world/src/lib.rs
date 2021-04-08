@@ -91,7 +91,27 @@ pub enum MediaKind {
     Video = 1,
 }
 
+impl From<i32> for MediaKind {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => Self::Audio,
+            1 => Self::Video,
+            _ => unreachable!()
+        }
+    }
+}
+
 pub enum MediaSourceKind {
     Device = 0,
     Display = 1,
+}
+
+impl From<i32> for MediaSourceKind {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => Self::Device,
+            1 => Self::Display,
+            _ => unreachable!(),
+        }
+    }
 }

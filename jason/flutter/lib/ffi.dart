@@ -12,8 +12,7 @@ DynamicLibrary _open() {
 }
 
 void doDynamicLinking() {
-  final nativeInitializeApi = _dl.lookupFunction<
-      IntPtr Function(Pointer<Void>),
+  final nativeInitializeApi = _dl.lookupFunction<IntPtr Function(Pointer<Void>),
       int Function(Pointer<Void>)>("InitDartApiDL");
 
   if (nativeInitializeApi(NativeApi.initializeApiDLData) != 0) {
@@ -21,21 +20,23 @@ void doDynamicLinking() {
   }
 
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_any_closure_caller"
-  )(Pointer.fromFunction<Void Function(Handle, Pointer)>(doPointerClosureCallback));
+          "register_any_closure_caller")(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(
+          doPointerClosureCallback));
 
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_new_completer"
-  )(Pointer.fromFunction<Handle Function()>(newCompleter));
+          "register_new_completer")(
+      Pointer.fromFunction<Handle Function()>(newCompleter));
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_completer_complete"
-  )(Pointer.fromFunction<Void Function(Handle, Pointer)>(completerComplete));
+          "register_completer_complete")(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(completerComplete));
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_completer_complete_error"
-  )(Pointer.fromFunction<Void Function(Handle, Pointer)>(completerCompleteError));
+          "register_completer_complete_error")(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(
+          completerCompleteError));
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      "register_completer_future"
-  )(Pointer.fromFunction<Handle Function(Handle)>(completerFuture));
+          "register_completer_future")(
+      Pointer.fromFunction<Handle Function(Handle)>(completerFuture));
 }
 
 Object newCompleter() {
@@ -62,11 +63,14 @@ void completerCompleteError(Object completer, Pointer arg) {
   }
 }
 
-final _get_remote_member_id_Dart _get_remote_member_id = _dl.lookupFunction<_get_remote_member_id_C, _get_remote_member_id_Dart>('ConnectionHandle__get_remote_member_id');
+final _get_remote_member_id_Dart _get_remote_member_id =
+    _dl.lookupFunction<_get_remote_member_id_C, _get_remote_member_id_Dart>(
+        'ConnectionHandle__get_remote_member_id');
 typedef _get_remote_member_id_C = Pointer<Utf8> Function(Pointer);
 typedef _get_remote_member_id_Dart = Pointer<Utf8> Function(Pointer);
 
-final _test_future_Dart _test_future = _dl.lookupFunction<_test_future_C, _test_future_Dart>('test_future');
+final _test_future_Dart _test_future =
+    _dl.lookupFunction<_test_future_C, _test_future_Dart>('test_future');
 typedef _test_future_C = Handle Function();
 typedef _test_future_Dart = Object Function();
 
@@ -79,18 +83,18 @@ void doClosureCallback(void Function() callback) {
   callback();
 }
 
-void doPointerClosureCallback(void Function(Pointer) callback, Pointer pointer) {
+void doPointerClosureCallback(
+    void Function(Pointer) callback, Pointer pointer) {
   callback(pointer);
 }
 
-final cb_test = _dl.lookupFunction<
-    Void Function(Handle),
+final cb_test = _dl.lookupFunction<Void Function(Handle),
     void Function(void Function(Pointer))>("cb_test");
 
 void simpleCallback() {
   doDynamicLinking();
   cb_test((conn) {
-      var str = _get_remote_member_id(conn).toDartString();
-      print('callback fired: $str');
+    var str = _get_remote_member_id(conn).toDartString();
+    print('callback fired: $str');
   });
 }
