@@ -2182,7 +2182,7 @@ dependencies = [
  "medea-client-api-proto 0.3.0",
  "medea-control-api-mock",
  "medea-control-api-proto 0.2.0",
- "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-coturn-telnet-client 0.1.0",
  "medea-macro 0.2.1",
  "mockall",
  "once_cell",
@@ -2291,6 +2291,8 @@ dependencies = [
 [[package]]
 name = "medea-coturn-telnet-client"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5cad0c73b7523be968c728787697a8487b846b6c94c2b3ecebc01aa7ead7105"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
@@ -2305,9 +2307,7 @@ dependencies = [
 
 [[package]]
 name = "medea-coturn-telnet-client"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5cad0c73b7523be968c728787697a8487b846b6c94c2b3ecebc01aa7ead7105"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "bytes 0.5.6",
