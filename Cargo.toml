@@ -1,6 +1,6 @@
 [package]
 name = "medea"
-version = "0.2.0-rc.1"
+version = "0.2.0"
 edition = "2018"
 resolver = "2"
 description = "Medea media server"
@@ -52,9 +52,9 @@ dotenv = "0.15"
 failure = "0.1"
 futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "1.0"
-medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
-medea-control-api-proto = { path = "proto/control-api" }
-medea-macro = { path = "crates/medea-macro" }
+medea-client-api-proto = { version = "0.3", features = ["medea"] }
+medea-control-api-proto = "0.2"
+medea-macro = "0.2"
 rand = "0.8"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }

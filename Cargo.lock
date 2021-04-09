@@ -2152,7 +2152,7 @@ checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "medea"
-version = "0.2.0-rc.1"
+version = "0.2.0"
 dependencies = [
  "actix",
  "actix-codec",
@@ -2179,11 +2179,11 @@ dependencies = [
  "humantime-serde",
  "hyper 0.14.5",
  "lazy_static",
- "medea-client-api-proto 0.3.0",
+ "medea-client-api-proto 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-control-api-mock",
- "medea-control-api-proto 0.2.0",
+ "medea-control-api-proto 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-coturn-telnet-client 0.1.0",
- "medea-macro 0.2.1",
+ "medea-macro 0.2.0",
  "mockall",
  "once_cell",
  "rand 0.8.3",
