@@ -2,8 +2,17 @@ apiVersion: v1
 entries:
   medea-demo:
   - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2021-04-09T13:22:59.199323679Z"
+    digest: 665bb84accb09adf868884846c451e982272cf5202210e7148c3fbd10547b22c
+    name: medea-demo
+    type: application
+    urls:
+    - https://instrumentisto.github.io/medea/charts/medea-demo-0.5.3.tgz
+    version: 0.5.3
+  - apiVersion: v2
     appVersion: 0.1.0-rc.1
-    created: "2021-02-02T08:31:44.627694631Z"
+    created: "2021-04-09T13:22:59.198689175Z"
     digest: 6c7312df9b8233144f0386d4118232c7791441c7e26000d93adeda39a3c26a28
     name: medea-demo
     type: application
@@ -12,7 +21,7 @@ entries:
     version: 0.5.2
   - apiVersion: v2
     appVersion: 0.2.0-dev
-    created: "2021-02-02T08:31:44.626836634Z"
+    created: "2021-04-09T13:22:59.198015271Z"
     digest: 6c4914cb82bd8b8f50fa5a6ee911618d102f9ffac908367d349ad488f586d410
     name: medea-demo
     type: application
@@ -21,7 +30,7 @@ entries:
     version: 0.5.1
   - apiVersion: v2
     appVersion: 0.2.0-dev
-    created: "2021-02-02T08:31:44.625988237Z"
+    created: "2021-04-09T13:22:59.196476063Z"
     digest: b911ef9f1dc8a1cac451ea5e73c1eddcfce884112dc96a509bb25447653034d1
     name: medea-demo
     type: application
@@ -30,7 +39,7 @@ entries:
     version: 0.5.0
   - apiVersion: v2
     appVersion: 0.2.0-dev
-    created: "2021-02-02T08:31:44.625394439Z"
+    created: "2021-04-09T13:22:59.195210356Z"
     digest: d82667014946f79fd3ff34e6dca7fdb230f642a49027b9ef08b7a8e61b0d5492
     name: medea-demo
     type: application
@@ -39,7 +48,7 @@ entries:
     version: 0.4.2
   - apiVersion: v2
     appVersion: 0.2.0-dev
-    created: "2021-02-02T08:31:44.62478434Z"
+    created: "2021-04-09T13:22:59.194536352Z"
     digest: 263433880d833800dcfd4238f447e1ff38a0f843e1f57726f559411def49d210
     name: medea-demo
     type: application
@@ -48,7 +57,7 @@ entries:
     version: 0.4.1
   - apiVersion: v2
     appVersion: 0.2.0-dev
-    created: "2021-02-02T08:31:44.623677144Z"
+    created: "2021-04-09T13:22:59.193909248Z"
     digest: 2b96d0ddf9aca55c797a528750407a71367e57d738fc74ef2682bf3c59771761
     name: medea-demo
     type: application
@@ -57,7 +66,7 @@ entries:
     version: 0.4.0
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2021-02-02T08:31:44.62173315Z"
+    created: "2021-04-09T13:22:59.193233144Z"
     digest: d049dbcc5fe68e0493ea0dc38fd4753631d2fc03964f5f83f4a727ef75c7a760
     name: medea-demo
     type: application
@@ -66,7 +75,7 @@ entries:
     version: 0.3.2
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2021-02-02T08:31:44.621156852Z"
+    created: "2021-04-09T13:22:59.192632441Z"
     digest: dc121dd16e286f51ef505b5644a8c20a091f95e1e522daabe57fcdea658c3064
     name: medea-demo
     urls:
@@ -74,7 +83,7 @@ entries:
     version: 0.3.1
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2021-02-02T08:31:44.620557954Z"
+    created: "2021-04-09T13:22:59.191949637Z"
     digest: 352da84002120076aa671506165f9f03cb925e7174ed47793bdbfd7a4c067838
     name: medea-demo
     urls:
@@ -82,7 +91,7 @@ entries:
     version: 0.3.0
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2021-02-02T08:31:44.619978755Z"
+    created: "2021-04-09T13:22:59.191310434Z"
     digest: e4bdbcd139aa1e66f2a27bd22f70143c8b0af625e0aefc1cd3b4530f41f2e0a0
     name: medea-demo
     urls:
@@ -90,7 +99,7 @@ entries:
     version: 0.2.0
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2021-02-02T08:31:44.619417157Z"
+    created: "2021-04-09T13:22:59.19070053Z"
     digest: ac4e5cee69a8c49cd42b3b96875de82595bf25a5f32a849cafbc006518e5fa2f
     name: medea-demo
     urls:
@@ -98,10 +107,10 @@ entries:
     version: 0.1.1
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2021-02-02T08:31:44.618803659Z"
+    created: "2021-04-09T13:22:59.190081227Z"
     digest: 309cdd8aa637c7385122b1d323dd73a3a26e10d0f8bfaefc4ea9e0b3b127610b
     name: medea-demo
     urls:
     - https://instrumentisto.github.io/medea/charts/medea-demo-0.1.0.tgz
     version: 0.1.0
-generated: "2021-02-02T08:31:44.618005562Z"
+generated: "2021-04-09T13:22:59.189270522Z"
