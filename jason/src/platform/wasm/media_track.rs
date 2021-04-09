@@ -229,12 +229,12 @@ impl MediaStreamTrack {
         }
     }
 
-    /// Sets handler for [`ended`][1] event on underlying
+    /// Sets handler for the [`ended`][1] event on underlying
     /// [`web_sys::MediaStreamTrack`].
     ///
     /// # Panics
     ///
-    /// If binding to [`ended`][1] event fails. Not supposed to ever happen.
+    /// If binding to the [`ended`][1] event fails. Not supposed to ever happen.
     ///
     /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
     #[allow(clippy::unused_self, clippy::needless_pass_by_value)]

@@ -133,8 +133,8 @@ impl WebSocketRpcTransport {
     ///
     /// # Panics
     ///
-    /// If binding to [`close`][3] or [`open`][4] events fails. Not supposed to
-    /// ever happen.
+    /// If binding to the [`close`][3] or the [`open`][4] events fails. Not
+    /// supposed to ever happen.
     ///
     /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
