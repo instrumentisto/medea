@@ -2,7 +2,7 @@
 # yarn lockfile v1
 
 
-medea-jason@0.2.0-rc.1:
-  version "0.2.0-rc.1"
-  resolved "https://registry.yarnpkg.com/medea-jason/-/medea-jason-0.2.0-rc.1.tgz#cc1171d26a0897b405b4fae81b0c9c0defa6d91e"
-  integrity sha512-ucch0Vi3+8THoygEdunC512ur9MndI2EHjvjvB+qaDwEPIM3tKGLu6NN0bSfe3NcVaHXQzbzV81hPJPCnI7Oqg==
+medea-jason@^0.2:
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/medea-jason/-/medea-jason-0.2.0.tgz#7c1bb091d1f0a93a7d9cf72b8e3fd85aef6b1b26"
+  integrity sha512-XVp+xYh0E/gyRrSIYjKMzZW6UITCN8yMMSAwq3a0WvCwnI0ZsKAJ9CjoaBPyytilJ8o3BaMqHczsZtA1oxUdag==
