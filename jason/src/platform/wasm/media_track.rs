@@ -212,11 +212,11 @@ impl MediaStreamTrack {
         }
     }
 
-    /// Forks this [`Track`].
+    /// Forks this [`MediaStreamTrack`].
     ///
-    /// Creates a new [`platform::MediaStreamTrack`] from this
-    /// [`platform::MediaStreamTrack`] using a [`clone()`][1] method. It won't
-    /// clone current [`Track`]'s callbacks.
+    /// Creates a new [`MediaStreamTrack`] from this [`MediaStreamTrack`] using
+    /// a [`clone()`][1] method. It won't clone current [`MediaStreamTrack`]'s
+    /// callbacks.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-clone
     pub fn fork(&self) -> Self {

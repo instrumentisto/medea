@@ -51,7 +51,7 @@ where
     wasm_bindgen_futures::spawn_local(task);
 }
 
-/// [`Future`] which resolves after the provided [`JsDuration`].
+/// [`Future`] which resolves after the provided [`Duration`].
 ///
 /// # Panics
 ///

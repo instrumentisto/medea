@@ -207,7 +207,7 @@ impl Track {
     }
 
     /// Stops this [`Track`] invoking an `on_stopped` callback if it's in a
-    /// [`sys::MediaStreamTrackState::Live`] state.
+    /// [`MediaStreamTrackState::Live`] state.
     #[inline]
     pub fn stop(self) {
         if self.0.track.ready_state() == MediaStreamTrackState::Live {
