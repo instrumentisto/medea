@@ -2183,7 +2183,7 @@ dependencies = [
  "medea-control-api-mock",
  "medea-control-api-proto 0.2.0",
  "medea-coturn-telnet-client 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-macro 0.2.0",
+ "medea-macro 0.2.1",
  "mockall",
  "once_cell",
  "rand 0.8.3",
@@ -2220,7 +2220,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "derive_more",
- "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-macro 0.2.0",
  "serde 1.0.125",
  "serde_json",
  "serde_with",
@@ -2234,7 +2234,7 @@ checksum = "b87e20991dae0ac3aff45f33f93116f62a45d55289c37299f3254f1909e3abb8"
 dependencies = [
  "async-trait",
  "derive_more",
- "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-macro 0.2.0",
  "serde 1.0.125",
  "serde_json",
  "serde_with",
@@ -2336,7 +2336,7 @@ dependencies = [
  "js-sys",
  "log",
  "medea-client-api-proto 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-macro 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-macro 0.2.0",
  "medea-reactive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mockall",
  "predicates-tree",
@@ -2355,10 +2355,10 @@ dependencies = [
 [[package]]
 name = "medea-macro"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85ed73c75173554c00391a02924184638f3358d61c25146f294eb7d35d454523"
 dependencies = [
  "Inflector",
- "async-trait",
- "medea-jason",
  "proc-macro2 1.0.26",
  "quote 1.0.9",
  "syn 1.0.69",
@@ -2367,11 +2367,11 @@ dependencies = [
 
 [[package]]
 name = "medea-macro"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85ed73c75173554c00391a02924184638f3358d61c25146f294eb7d35d454523"
+version = "0.2.1"
 dependencies = [
  "Inflector",
+ "async-trait",
+ "medea-jason",
  "proc-macro2 1.0.26",
  "quote 1.0.9",
  "syn 1.0.69",
