@@ -33,3 +33,17 @@ Feature: Media muting
     Given room with joined members Alice and Bob
     When Bob mutes audio
     Then Bob's audio local track is not muted
+
+  Scenario: `RemoteTrack.on_muted()` and `RemoteTrack.on_unmuted()` callbacks fire when video is muted/unmuted
+    Given room with joined members Alice and Bob
+    When Bob mutes video
+    Then `on_muted` callback fires 1 time on Alice's remote device video track from Bob
+    When Bob unmutes video
+    Then `on_unmuted` callback fires 1 time on Alice's remote device video track from Bob
+
+  Scenario: `RemoteTrack.on_muted()` and `RemoteTrack.on_unmuted()` callbacks fire when audio is muted/unmuted
+    Given room with joined members Alice and Bob
+    When Bob mutes audio
+    Then `on_muted` callback fires 1 time on Alice's remote audio track from Bob
+    When Bob unmutes audio
+    Then `on_unmuted` callback fires 1 time on Alice's remote audio track from Bob

@@ -1,6 +1,6 @@
 [package]
 name = "medea-coturn-telnet-client"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 resolver = "2"
 description = "Coturn TURN server telnet client"

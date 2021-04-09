@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::StreamExt;
+use futures::StreamExt as _;
 use medea_client_api_proto as proto;
 use medea_reactive::ObservableCell;
 
@@ -25,14 +25,39 @@ struct Inner {
     /// Callback invoked when this [`Track`] is disabled.
     on_disabled: platform::Callback<()>,
 
+    /// Callback to be invoked when this [`Track`] is muted.
+    on_muted: platform::Callback<()>,
+
+    /// Callback to be invoked when this [`Track`] is unmuted.
+    on_unmuted: platform::Callback<()>,
+
     /// Callback to be invoked when this [`Track`] is stopped.
     on_stopped: platform::Callback<()>,
 
-    /// [`enabled`][1] property of this [MediaStreamTrack][2].
+    /// Indicates whether this track is enabled, meaning that
+    /// [RTCRtpTransceiver] that created this track has its direction set to
+    /// [`sendrecv`][1] or [`recvonly`][2].
+    ///
+    /// Updating this value fires `on_enabled` or `on_disabled` callback and
+    /// changes [`enabled`][3] property of the underlying
+    /// [MediaStreamTrack][4].
+    ///
+    /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendrecv
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-revonly
+    /// [3]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [4]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    enabled: ObservableCell<bool>,
+
+    /// Indicates whether this track is muted.
+    ///
+    /// Updating this value fires `on_muted` or `on_unmuted` callback and
+    /// changes [`enabled`][1] property of the underlying
+    /// [MediaStreamTrack][2].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
     /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
-    enabled: ObservableCell<bool>,
+    muted: ObservableCell<bool>,
 }
 
 /// Wrapper around a received remote [MediaStreamTrack][1].
@@ -42,23 +67,31 @@ struct Inner {
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1]
-    /// property changes.
+    /// Creates a new [`Track`].
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    #[allow(clippy::mut_mut)]
     #[must_use]
-    pub fn new<T>(track: T, media_source_kind: proto::MediaSourceKind) -> Self
+    pub fn new<T>(
+        track: T,
+        media_source_kind: proto::MediaSourceKind,
+        enabled: bool,
+        muted: bool,
+    ) -> Self
     where
         platform::MediaStreamTrack: From<T>,
     {
         let track = platform::MediaStreamTrack::from(track);
         let track = Track(Rc::new(Inner {
+            track,
             media_source_kind,
+            enabled: ObservableCell::new(enabled),
+            muted: ObservableCell::new(muted),
             on_enabled: platform::Callback::default(),
             on_disabled: platform::Callback::default(),
             on_stopped: platform::Callback::default(),
-            enabled: ObservableCell::new(track.enabled()),
-            track,
+            on_muted: Callback0::default(),
+            on_unmuted: Callback0::default(),
         }));
 
         track.0.track.on_ended({
@@ -68,24 +101,50 @@ impl Track {
                 // in case.
                 if let Some(inner) = weak_inner.upgrade() {
                     log::error!("Unexpected track stop: {}", inner.track.id());
-                    inner.on_stopped.call0();
+                    inner.on_stopped.call();
                 }
             })
         });
 
-        let mut track_enabled_state_changes =
-            track.0.enabled.subscribe().skip(1);
-        platform::spawn({
+        let mut enabled_changes = track.0.enabled.subscribe().skip(1).fuse();
+        let mut muted_changes = track.0.muted.subscribe().skip(1).fuse();
+        spawn_local({
+            enum TrackChange {
+                Enabled(bool),
+                Muted(bool),
+            }
+
             let weak_inner = Rc::downgrade(&track.0);
             async move {
-                while let Some(enabled) =
-                    track_enabled_state_changes.next().await
-                {
+                loop {
+                    let event = futures::select! {
+                        enabled = enabled_changes.select_next_some() => {
+                            TrackChange::Enabled(enabled)
+                        },
+                        muted = muted_changes.select_next_some() => {
+                            TrackChange::Muted(muted)
+                        },
+                        complete => break,
+                    };
                     if let Some(track) = weak_inner.upgrade() {
-                        if enabled {
-                            track.on_enabled.call0();
-                        } else {
-                            track.on_disabled.call0();
+                        track.track.set_enabled(
+                            track.enabled.get() && !track.muted.get(),
+                        );
+                        match event {
+                            TrackChange::Enabled(enabled) => {
+                                if enabled {
+                                    track.on_enabled.call();
+                                } else {
+                                    track.on_disabled.call();
+                                }
+                            }
+                            TrackChange::Muted(muted) => {
+                                if muted {
+                                    track.on_muted.call();
+                                } else {
+                                    track.on_unmuted.call();
+                                }
+                            }
                         }
                     } else {
                         break;
@@ -97,7 +156,9 @@ impl Track {
         track
     }
 
-    /// Sets [`Track::enabled`] to the provided value.
+    /// Sets `enabled` property on this [`Track`].
+    ///
+    /// Calls `on_enabled` or `or_disabled` callback respectively.
     ///
     /// Updates [`enabled`][1] property in the underlying
     /// [`platform::MediaStreamTrack`].
@@ -106,7 +167,19 @@ impl Track {
     #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
-        self.0.track.set_enabled(enabled);
+    }
+
+    /// Sets `muted` property on this [`Track`].
+    ///
+    /// Calls `on_muted` or `or_unmuted` callback respectively.
+    ///
+    /// Updates [`enabled`][1] property in the underlying
+    /// [`platform::MediaStreamTrack`].
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    #[inline]
+    pub fn set_muted(&self, muted: bool) {
+        self.0.muted.set(muted);
     }
 
     /// Returns [`id`][1] of the underlying [`platform::MediaStreamTrack`] of
@@ -138,7 +211,7 @@ impl Track {
     #[inline]
     pub fn stop(self) {
         if self.0.track.ready_state() == MediaStreamTrackState::Live {
-            self.0.on_stopped.call0();
+            self.0.on_stopped.call();
         }
     }
 

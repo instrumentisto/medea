@@ -93,34 +93,12 @@ async fn then_remote_track_stops(
     assert!(track.disabled().await.unwrap());
 }
 
-#[then(regex = "^`on_disabled` callback fires (\\d+) time(?:s)? on (\\S+)'s \
+#[then(regex = "^`on_(enabled|disabled|muted|unmuted)` callback fires \
+                 (\\d+) time(?:s)? on (\\S+)'s \
                  remote (audio|(?:device|display) video) track from (\\S+)$")]
-async fn then_on_remote_disabled_callback_fires(
+async fn then_callback_fires_on_remote_track(
     world: &mut World,
-    times: u64,
-    id: String,
-    kind: String,
-    remote_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    let remote_conn =
-        member.connections().get(remote_id).await.unwrap().unwrap();
-    let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
-
-    let track = remote_conn
-        .tracks_store()
-        .await
-        .unwrap()
-        .get_track(media_kind, source_kind)
-        .await
-        .unwrap();
-    assert!(track.wait_for_on_disabled_fire_count(times).await.is_ok());
-}
-
-#[then(regex = "^`on_enabled` callback fires (\\d+) time(?:s)? on (\\S+)'s \
-                 remote (audio|(?:device|display) video) track from (\\S+)$")]
-async fn then_on_remote_enabled_callback_fires(
-    world: &mut World,
+    callback_kind: String,
     times: u64,
     id: String,
     kind: String,
@@ -137,7 +115,27 @@ async fn then_on_remote_enabled_callback_fires(
         .get_track(media_kind, source_kind)
         .await
         .unwrap();
-    assert!(track.wait_for_on_enabled_fire_count(times).await.is_ok());
+
+    match callback_kind.as_str() {
+        "enabled" => {
+            assert!(track.wait_for_on_enabled_fire_count(times).await.is_ok());
+        }
+        "disabled" => {
+            assert!(track.wait_for_on_disabled_fire_count(times).await.is_ok());
+        }
+        "muted" => {
+            assert!(track.wait_for_on_muted_fire_count(times).await.is_ok());
+        }
+        "unmuted" => {
+            assert!(track.wait_for_on_unmuted_fire_count(times).await.is_ok());
+        }
+        _ => {
+            unreachable!(
+                "unknown RemoteMediaTrack callback: `on_{}`",
+                callback_kind,
+            );
+        }
+    }
 }
 
 #[then(regex = "^(\\S+)'s (audio|(?:display|device) video) remote track \

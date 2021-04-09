@@ -6,8 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.2.0] · 2021-??-?? · To-be-done
+## [0.2.0] · 2021-04-09
 [0.2.0]: /../../tree/medea-control-api-mock-0.2.0/mock/control-api
+
+[Diff](/../../compare/medea-control-api-mock-0.1.0...medea-control-api-mock-0.2.0)
 
 ### Added
 

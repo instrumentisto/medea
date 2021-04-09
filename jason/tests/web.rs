@@ -310,7 +310,7 @@ async fn get_video_track() -> api::RemoteMediaTrack {
     settings.device_video(DeviceVideoTrackConstraints::new());
     let mut tracks = manager.get_tracks(settings).await.unwrap();
     let track = tracks.pop().unwrap().0.as_ref().as_ref().fork();
-    remote::Track::new(track, MediaSourceKind::Device).into()
+    remote::Track::new(track, MediaSourceKind::Device, true, false).into()
 }
 
 async fn get_audio_track() -> api::RemoteMediaTrack {
@@ -319,7 +319,7 @@ async fn get_audio_track() -> api::RemoteMediaTrack {
     settings.audio(AudioTrackConstraints::new());
     let mut tracks = manager.get_tracks(settings).await.unwrap();
     let track = tracks.pop().unwrap().0.as_ref().as_ref().fork();
-    remote::Track::new(track, MediaSourceKind::Device).into()
+    remote::Track::new(track, MediaSourceKind::Device, true, false).into()
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
