@@ -56,7 +56,7 @@ async fn on_track_enabled_works() {
         Closure::once_into_js(move || {
             tx.unbounded_send(()).unwrap();
         })
-            .into()
+        .into()
     };
     api_track.on_muted(dont_fire());
     api_track.on_unmuted(dont_fire());
@@ -94,7 +94,7 @@ async fn on_track_disabled_works() {
         Closure::once_into_js(move || {
             tx.unbounded_send(()).unwrap();
         })
-            .into()
+        .into()
     };
     track.on_muted(dont_fire());
     track.on_unmuted(dont_fire());
@@ -123,7 +123,7 @@ async fn on_track_unmuted_works() {
             assert!(!track_clone.muted());
             test_tx.send(()).unwrap();
         })
-            .into(),
+        .into(),
     );
 
     let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
@@ -132,7 +132,7 @@ async fn on_track_unmuted_works() {
         Closure::once_into_js(move || {
             tx.unbounded_send(()).unwrap();
         })
-            .into()
+        .into()
     };
     track.on_disabled(dont_fire());
     track.on_enabled(dont_fire());
@@ -160,7 +160,7 @@ async fn on_track_muted_works() {
             assert!(track_clone.muted());
             test_tx.send(()).unwrap();
         })
-            .into(),
+        .into(),
     );
 
     let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
@@ -169,7 +169,7 @@ async fn on_track_muted_works() {
         Closure::once_into_js(move || {
             tx.unbounded_send(()).unwrap();
         })
-            .into()
+        .into()
     };
     track.on_unmuted(dont_fire());
     track.on_disabled(dont_fire());
@@ -184,4 +184,3 @@ async fn on_track_muted_works() {
     timeout(100, test_rx).await.unwrap().unwrap();
     timeout(100, dont_fire_rx.next()).await.unwrap_err();
 }
-

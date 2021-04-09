@@ -90,8 +90,8 @@ impl Track {
             on_enabled: platform::Callback::default(),
             on_disabled: platform::Callback::default(),
             on_stopped: platform::Callback::default(),
-            on_muted: Callback0::default(),
-            on_unmuted: Callback0::default(),
+            on_muted: platform::Callback::default(),
+            on_unmuted: platform::Callback::default(),
         }));
 
         track.0.track.on_ended({
@@ -101,14 +101,14 @@ impl Track {
                 // in case.
                 if let Some(inner) = weak_inner.upgrade() {
                     log::error!("Unexpected track stop: {}", inner.track.id());
-                    inner.on_stopped.call();
+                    inner.on_stopped.call0();
                 }
             })
         });
 
         let mut enabled_changes = track.0.enabled.subscribe().skip(1).fuse();
         let mut muted_changes = track.0.muted.subscribe().skip(1).fuse();
-        spawn_local({
+        platform::spawn({
             enum TrackChange {
                 Enabled(bool),
                 Muted(bool),
@@ -133,16 +133,16 @@ impl Track {
                         match event {
                             TrackChange::Enabled(enabled) => {
                                 if enabled {
-                                    track.on_enabled.call();
+                                    track.on_enabled.call0();
                                 } else {
-                                    track.on_disabled.call();
+                                    track.on_disabled.call0();
                                 }
                             }
                             TrackChange::Muted(muted) => {
                                 if muted {
-                                    track.on_muted.call();
+                                    track.on_muted.call0();
                                 } else {
-                                    track.on_unmuted.call();
+                                    track.on_unmuted.call0();
                                 }
                             }
                         }
@@ -211,7 +211,7 @@ impl Track {
     #[inline]
     pub fn stop(self) {
         if self.0.track.ready_state() == MediaStreamTrackState::Live {
-            self.0.on_stopped.call();
+            self.0.on_stopped.call0();
         }
     }
 
@@ -229,6 +229,13 @@ impl Track {
         self.0.enabled.get()
     }
 
+    /// Indicate whether this [`Track`] is muted.
+    #[inline]
+    #[must_use]
+    pub fn muted(&self) -> bool {
+        self.0.muted.get()
+    }
+
     /// Sets callback, invoked when this [`Track`] is enabled.
     #[inline]
     pub fn on_enabled(&self, callback: platform::Function<()>) {
@@ -239,6 +246,18 @@ impl Track {
     #[inline]
     pub fn on_disabled(&self, callback: platform::Function<()>) {
         self.0.on_disabled.set_func(callback);
+    }
+
+    /// Sets callback to invoke when this [`Track`] is muted.
+    #[inline]
+    pub fn on_muted(&self, callback: platform::Function<()>) {
+        self.0.on_muted.set_func(callback);
+    }
+
+    /// Sets callback to invoke when this [`Track`] is unmuted.
+    #[inline]
+    pub fn on_unmuted(&self, callback: platform::Function<()>) {
+        self.0.on_unmuted.set_func(callback);
     }
 
     /// Sets callback to invoke when this [`Track`] is stopped.

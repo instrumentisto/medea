@@ -33,6 +33,12 @@ impl RemoteMediaTrack {
         self.0.enabled()
     }
 
+    /// Indicate whether this [`Track`] is muted.
+    #[must_use]
+    pub fn muted(&self) -> bool {
+        self.0.muted()
+    }
+
     /// Sets callback, invoked when this [`RemoteMediaTrack`] is enabled.
     pub fn on_enabled(&self, cb: js_sys::Function) {
         self.0.on_enabled(cb.into())
@@ -41,6 +47,21 @@ impl RemoteMediaTrack {
     /// Sets callback, invoked when this [`RemoteMediaTrack`] is disabled.
     pub fn on_disabled(&self, cb: js_sys::Function) {
         self.0.on_disabled(cb.into())
+    }
+
+    /// Sets callback to invoke when this [`Track`] is muted.
+    pub fn on_muted(&self, cb: js_sys::Function) {
+        self.0.on_muted(cb.into());
+    }
+
+    /// Sets callback to invoke when this [`Track`] is unmuted.
+    pub fn on_unmuted(&self, cb: js_sys::Function) {
+        self.0.on_unmuted(cb.into());
+    }
+
+    /// Sets callback to invoke when this [`Track`] is stopped.
+    pub fn on_stopped(&self, cb: js_sys::Function) {
+        self.0.on_stopped(cb.into());
     }
 
     /// Returns a [`MediaKind::Audio`] if this [`RemoteMediaTrack`] represents
