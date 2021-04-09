@@ -2337,7 +2337,7 @@ dependencies = [
  "log",
  "medea-client-api-proto 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.2.0",
- "medea-reactive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-reactive 0.1.0",
  "mockall",
  "predicates-tree",
  "serde 1.0.125",
@@ -2381,18 +2381,18 @@ dependencies = [
 [[package]]
 name = "medea-reactive"
 version = "0.1.0"
-dependencies = [
- "futures 0.3.13",
- "tokio 0.2.25",
-]
-
-[[package]]
-name = "medea-reactive"
-version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8493c11328ceb1a0bb9b5c74af84ae4abb5386838605362dfb4c17f97fbc484"
 dependencies = [
  "futures 0.3.13",
+]
+
+[[package]]
+name = "medea-reactive"
+version = "0.1.1"
+dependencies = [
+ "futures 0.3.13",
+ "tokio 0.2.25",
 ]
 
 [[package]]
