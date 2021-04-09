@@ -7,7 +7,7 @@ use crate::{
     local_media_track::LocalMediaTrack,
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle, room_close_reason::RoomCloseReason,
-    DartCallback, MediaSourceKind,
+    DartCallback, DartResult, MediaSourceKind,
 };
 use extern_executor::spawn;
 
@@ -272,36 +272,40 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
 pub unsafe extern "C" fn RoomHandle__on_close(
     this: *mut RoomHandle,
     cb: Dart_Handle,
-) {
+) -> Dart_Handle {
     let this = Box::from_raw(this);
     this.on_close(DartCallback::new(cb));
+    DartResult::from(Ok::<(), ()>(())).into()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_connection_loss(
     this: *mut RoomHandle,
     cb: Dart_Handle,
-) {
+) -> Dart_Handle {
     let this = Box::from_raw(this);
     this.on_connection_loss(DartCallback::new(cb));
+    DartResult::from(Ok::<(), ()>(())).into()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_local_track(
     this: *mut RoomHandle,
     cb: Dart_Handle,
-) {
+) -> Dart_Handle {
     let this = Box::from_raw(this);
     this.on_local_track(DartCallback::new(cb));
+    DartResult::from(Ok::<(), ()>(())).into()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_new_connection(
     this: *mut RoomHandle,
     cb: Dart_Handle,
-) {
+) -> Dart_Handle {
     let this = Box::from_raw(this);
     this.on_new_connection(DartCallback::new(cb));
+    DartResult::from(Ok::<(), ()>(())).into()
 }
 
 #[no_mangle]

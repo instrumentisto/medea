@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'result.dart';
 
 final DynamicLibrary _dl = _open();
 final DynamicLibrary dl = _dl;
@@ -37,6 +38,32 @@ void doDynamicLinking() {
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           "register_completer_future")(
       Pointer.fromFunction<Handle Function(Handle)>(completerFuture));
+  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      Pointer.fromFunction<Handle Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Handle)>(newErrorWithSource));
+}
+
+Object newError(
+    Pointer<Utf8> name,
+    Pointer<Utf8> msg,
+    Pointer<Utf8> stacktrace,
+    ) {
+  return new Result.err(new JasonError.withoutSource(name, msg, stacktrace));
+}
+
+Object newOk(
+    Pointer res,
+    ) {
+  return new Result.ok(res);
+}
+
+Object newErrorWithSource(
+    Pointer<Utf8> name,
+    Pointer<Utf8> msg,
+    Pointer<Utf8> stacktrace,
+    Object source,
+    ) {
+  return new Result.err(
+      new JasonError.withSource(name, msg, stacktrace, source));
 }
 
 Object newCompleter() {
