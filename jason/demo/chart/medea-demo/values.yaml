@@ -6,7 +6,7 @@ labels: {}
 server:
   image:
     repository: ghcr.io/instrumentisto/medea
-    tag: 0.2.0-rc.1
+    tag: 0.2.0
     pullPolicy: IfNotPresent
 
   # Medea media server configuration:
@@ -64,7 +64,7 @@ server:
   control-mock:
     image:
       repository: ghcr.io/instrumentisto/medea-control-api-mock
-      tag: 0.1.0
+      tag: 0.2.0
       pullPolicy: IfNotPresent
 
     # Medea's Control API mock server configuration.
@@ -126,7 +126,7 @@ server:
 web-client:
   image:
     repository: ghcr.io/instrumentisto/medea-demo
-    tag: 0.2.0-rc.1
+    tag: 0.1.0
     pullPolicy: IfNotPresent
 
   conf:

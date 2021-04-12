@@ -5,55 +5,57 @@ mod component;
 use std::cell::{Cell, RefCell};
 
 use futures::channel::mpsc;
-use medea_client_api_proto as proto;
-use medea_client_api_proto::{MediaType, MemberId};
+use medea_client_api_proto::{self as proto, MediaType, MemberId};
 use proto::TrackId;
-use web_sys as sys;
 
 use crate::{
     media::{track::remote, MediaKind, RecvConstraints, TrackConstraints},
     peer::{
-        media::{media_exchange_state, TrackEvent},
-        transceiver::Transceiver,
-        MediaConnections, MediaStateControllable, PeerEvent,
-        TransceiverDirection,
+        media::media_exchange_state, MediaConnections, MediaStateControllable,
+        PeerEvent, TrackEvent,
     },
+    platform,
 };
 
 use super::TransceiverSide;
 
+#[doc(inline)]
 pub use self::component::{Component, State};
 
 /// Representation of a remote [`remote::Track`] that is being received from
 /// some remote peer. It may have two states: `waiting` and `receiving`.
 ///
-/// We can save related [`Transceiver`] and the actual
+/// We can save related [`platform::Transceiver`] and the actual
 /// [`remote::Track`] only when [`remote::Track`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
     caps: TrackConstraints,
     sender_id: MemberId,
-    transceiver: RefCell<Option<Transceiver>>,
+    transceiver: RefCell<Option<platform::Transceiver>>,
     mid: RefCell<Option<String>>,
     track: RefCell<Option<remote::Track>>,
     is_track_notified: Cell<bool>,
     enabled_general: Cell<bool>,
     enabled_individual: Cell<bool>,
+    muted: Cell<bool>,
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
     track_events_sender: mpsc::UnboundedSender<TrackEvent>,
 }
 
 impl Receiver {
-    /// Creates new [`Transceiver`] if provided `mid` is `None`, otherwise
-    /// creates [`Receiver`] without [`Transceiver`]. It will be injected
-    /// when [`remote::Track`] arrives.
+    /// Creates a new [`platform::Transceiver`] if provided `mid` is [`None`],
+    /// otherwise creates a [`Receiver`] without a [`platform::Transceiver`]. It
+    /// will be injected when a [`remote::Track`] will arrive.
     ///
-    /// Created [`Transceiver`] direction is set to
-    /// [`TransceiverDirection::INACTIVE`] if `enabled_individual` is `false`.
+    /// Created [`platform::Transceiver`] direction is set to
+    /// [`TransceiverDirection::INACTIVE`][1] if `enabled_individual` is
+    /// `false`.
     ///
     /// `track` field in the created [`Receiver`] will be `None`, since
     /// [`Receiver`] must be created before the actual [`remote::Track`] data
     /// arrives.
+    ///
+    /// [1]: platform::TransceiverDirection::INACTIVE
     pub fn new(
         state: &State,
         media_connections: &MediaConnections,
@@ -64,9 +66,9 @@ impl Receiver {
         let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
         let transceiver_direction = if state.enabled_individual() {
-            TransceiverDirection::RECV
+            platform::TransceiverDirection::RECV
         } else {
-            TransceiverDirection::INACTIVE
+            platform::TransceiverDirection::INACTIVE
         };
 
         let transceiver = if state.mid().is_none() {
@@ -101,6 +103,7 @@ impl Receiver {
             peer_events_sender: connections.peer_events_sender.clone(),
             enabled_general: Cell::new(state.enabled_individual()),
             enabled_individual: Cell::new(state.enabled_general()),
+            muted: Cell::new(state.muted()),
             track_events_sender,
         };
 
@@ -144,7 +147,7 @@ impl Receiver {
     pub fn is_receiving(&self) -> bool {
         let is_recv_direction =
             self.transceiver.borrow().as_ref().map_or(false, |trnsvr| {
-                trnsvr.has_direction(TransceiverDirection::RECV)
+                trnsvr.has_direction(platform::TransceiverDirection::RECV)
             });
 
         self.enabled_individual.get() && is_recv_direction
@@ -167,15 +170,15 @@ impl Receiver {
         );
     }
 
-    /// Adds provided [`sys::MediaStreamTrack`] and [`Transceiver`] to this
-    /// [`Receiver`].
+    /// Adds the provided [`platform::MediaStreamTrack`] and
+    /// [`platform::Transceiver`] to this [`Receiver`].
     ///
-    /// Sets [`sys::MediaStreamTrack::enabled`] same as [`Receiver::enabled`] of
-    /// this [`Receiver`].
+    /// Sets [`platform::MediaStreamTrack::enabled`] same as
+    /// [`Receiver::enabled_individual`] of this [`Receiver`].
     pub fn set_remote_track(
         &self,
-        transceiver: Transceiver,
-        new_track: sys::MediaStreamTrack,
+        transceiver: platform::Transceiver,
+        new_track: platform::MediaStreamTrack,
     ) {
         if let Some(old_track) = self.track.borrow().as_ref() {
             if old_track.id() == new_track.id() {
@@ -183,46 +186,47 @@ impl Receiver {
             }
         }
 
-        let new_track =
-            remote::Track::new(new_track, self.caps.media_source_kind());
+        let new_track = remote::Track::new(
+            new_track,
+            self.caps.media_source_kind(),
+            self.enabled_individual.get(),
+            self.muted.get(),
+        );
 
-        if self.enabled() {
-            transceiver.add_direction(TransceiverDirection::RECV);
+        if self.enabled_individual.get() {
+            transceiver.add_direction(platform::TransceiverDirection::RECV);
         } else {
-            transceiver.sub_direction(TransceiverDirection::RECV);
+            transceiver.sub_direction(platform::TransceiverDirection::RECV);
         }
-        new_track.set_enabled(self.enabled());
 
         self.transceiver.replace(Some(transceiver));
-        self.track.replace(Some(new_track));
+        if let Some(prev_track) = self.track.replace(Some(new_track)) {
+            prev_track.stop();
+        };
         self.maybe_notify_track();
     }
 
-    /// Replaces [`Receiver`]'s [`Transceiver`] with a provided [`Transceiver`].
+    /// Replaces [`Receiver`]'s [`platform::Transceiver`] with the provided
+    /// [`platform::Transceiver`].
     ///
-    /// Doesn't update [`TransceiverDirection`] of the [`Transceiver`].
+    /// Doesn't update [`platform::TransceiverDirection`] of the
+    /// [`platform::Transceiver`].
     ///
-    /// No-op if provided with the same [`Transceiver`] as already exists in
-    /// this [`Receiver`].
-    pub fn replace_transceiver(&self, transceiver: Transceiver) {
+    /// No-op if provided with the same [`platform::Transceiver`] as already
+    /// exists in this [`Receiver`].
+    pub fn replace_transceiver(&self, transceiver: platform::Transceiver) {
         if self.mid.borrow().as_ref() == transceiver.mid().as_ref() {
             self.transceiver.replace(Some(transceiver));
         }
     }
 
-    /// Returns [`Transceiver`] of this [`Receiver`].
+    /// Returns a [`platform::Transceiver`] of this [`Receiver`].
     ///
-    /// Returns [`None`] if this [`Receiver`] doesn't have [`Transceiver`].
+    /// Returns [`None`] if this [`Receiver`] doesn't have a
+    /// [`platform::Transceiver`].
     #[inline]
-    pub fn transceiver(&self) -> Option<Transceiver> {
+    pub fn transceiver(&self) -> Option<platform::Transceiver> {
         self.transceiver.borrow().clone()
-    }
-
-    /// Indicates whether this [`Receiver`] is enabled.
-    #[inline]
-    #[must_use]
-    pub fn enabled(&self) -> bool {
-        self.enabled_individual.get()
     }
 
     /// Emits [`PeerEvent::NewRemoteTrack`] if [`Receiver`] is receiving media
@@ -253,5 +257,18 @@ impl Receiver {
     #[must_use]
     pub fn enabled_general(&self) -> bool {
         self.enabled_general.get()
+    }
+}
+
+impl Drop for Receiver {
+    fn drop(&mut self) {
+        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
+            if !transceiver.is_stopped() {
+                transceiver.sub_direction(platform::TransceiverDirection::RECV);
+            }
+        }
+        if let Some(recv_track) = self.track.borrow_mut().take() {
+            recv_track.stop();
+        }
     }
 }

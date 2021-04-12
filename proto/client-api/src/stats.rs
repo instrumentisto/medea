@@ -1,6 +1,6 @@
 //! Contains DTOs for [RTCPeerConnection] metrics.
 //!
-//! [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+//! [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 
 #![allow(clippy::module_name_repetitions)]
 
@@ -32,7 +32,7 @@ pub enum NonExhaustive<T> {
 /// objects, MUST have the same ID if they were produced by inspecting the same
 /// underlying object.
 ///
-/// [RTCStatsReport]: https://w3.org/TR/webrtc/#dom-rtcstatsreport
+/// [RTCStatsReport]: https://w3.org/TR/webrtc#dom-rtcstatsreport
 #[derive(
     Clone, Debug, Deserialize, Display, Eq, From, Hash, PartialEq, Serialize,
 )]
@@ -46,13 +46,13 @@ pub struct StatId(pub String);
 ///
 /// [stats object]: https://w3.org/TR/webrtc-stats/#dfn-stats-object
 /// [monitored object]: https://w3.org/TR/webrtc-stats/#dfn-monitored-object
-/// [1]: https://w3.org/TR/webrtc/#rtcstats-dictionary
+/// [1]: https://w3.org/TR/webrtc#rtcstats-dictionary
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 pub struct RtcStat {
     /// Unique ID that is associated with the object that was inspected to
     /// produce this [RTCStats] object.
     ///
-    /// [RTCStats]: https://w3.org/TR/webrtc/#dom-rtcstats
+    /// [RTCStats]: https://w3.org/TR/webrtc#dom-rtcstats
     pub id: StatId,
 
     /// Timestamp associated with this object.
@@ -85,7 +85,7 @@ pub enum RtcStatsType {
     /// sent or received by [RTCPeerConnection] object.
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     #[cfg(feature = "extended-stats")]
     Codec(Box<RtcCodecStats>),
 
@@ -93,7 +93,7 @@ pub enum RtcStatsType {
     /// [RTCPeerConnection] object.
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     InboundRtp(Box<RtcInboundRtpStreamStats>),
 
     /// Statistics for an outbound [RTP] stream that is currently sent with
@@ -109,7 +109,7 @@ pub enum RtcStatsType {
     /// [RTCSenderVideoTrackAttachmentStats][4]).
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcaudiosenderstats
     /// [2]: https://w3.org/TR/webrtc-stats/#dom-rtcvideosenderstats
     /// [3]: https://tinyurl.com/sefa5z4
@@ -124,7 +124,7 @@ pub enum RtcStatsType {
     /// Report (RR) or RTCP Extended Report (XR).
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     RemoteInboundRtp(Box<RtcRemoteInboundRtpStreamStats>),
 
     /// Statistics for the remote endpoint's outbound [RTP] stream
@@ -135,7 +135,7 @@ pub enum RtcStatsType {
     /// Report (SR).
     ///
     /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     RemoteOutboundRtp(Box<RtcRemoteOutboundRtpStreamStats>),
 
     /// Statistics for the media produced by a [MediaStreamTrack][1] that is
@@ -143,9 +143,9 @@ pub enum RtcStatsType {
     /// is fed to the encoder after [getUserMedia] constraints have been
     /// applied (i.e. not the raw media produced by the camera).
     ///
-    /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
+    /// [RTCRtpSender]: https://w3.org/TR/webrtc#rtcrtpsender-interface
     /// [getUserMedia]: https://tinyurl.com/sngpyr6
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
     MediaSource(Box<MediaSourceStats>),
 
     /// Statistics for a contributing source (CSRC) that contributed to an
@@ -157,13 +157,13 @@ pub enum RtcStatsType {
 
     /// Statistics related to the [RTCPeerConnection] object.
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     #[cfg(feature = "extended-stats")]
     PeerConnection(Box<RtcPeerConnectionStats>),
 
     /// Statistics related to each [RTCDataChannel] ID.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
     #[cfg(feature = "extended-stats")]
     DataChannel(Box<DataChannelStats>),
 
@@ -171,45 +171,45 @@ pub enum RtcStatsType {
     ///
     /// This is now obsolete.
     ///
-    /// [MediaStream]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [MediaStream]: https://w3.org/TR/mediacapture-streams#mediastream
     #[cfg(feature = "extended-stats")]
     Stream(Box<MediaStreamStats>),
 
     /// Statistics related to a specific [MediaStreamTrack][1]'s attachment to
     /// an [RTCRtpSender] and the corresponding media-level metrics.
     ///
-    /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [RTCRtpSender]: https://w3.org/TR/webrtc#rtcrtpsender-interface
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
     Track(Box<TrackStats>),
 
     /// Statistics related to a specific [RTCRtpTransceiver].
     ///
-    /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
+    /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc#dom-rtcrtptransceiver
     #[cfg(feature = "extended-stats")]
     Transceiver(Box<RtcRtpTransceiverStats>),
 
     /// Statistics related to a specific [RTCRtpSender] and the corresponding
     /// media-level metrics.
     ///
-    /// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
+    /// [RTCRtpSender]: https://w3.org/TR/webrtc#rtcrtpsender-interface
     #[cfg(feature = "extended-stats")]
     Sender(Box<SenderStatsKind>),
 
     /// Statistics related to a specific [RTCRtpReceiver] and the corresponding
     /// media-level metrics.
     ///
-    /// [RTCRtpReceiver]: https://w3.org/TR/webrtc/#dom-rtcrtpreceiver
+    /// [RTCRtpReceiver]: https://w3.org/TR/webrtc#dom-rtcrtpreceiver
     #[cfg(feature = "extended-stats")]
     Receiver(Box<ReceiverStatsKind>),
 
     /// Transport statistics related to the [RTCPeerConnection] object.
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     Transport(Box<RtcTransportStats>),
 
     /// SCTP transport statistics related to an [RTCSctpTransport] object.
     ///
-    /// [RTCSctpTransport]: https://w3.org/TR/webrtc/#dom-rtcsctptransport
+    /// [RTCSctpTransport]: https://w3.org/TR/webrtc#dom-rtcsctptransport
     SctpTransport(Box<RtcSctpTransportStats>),
 
     /// ICE candidate pair statistics related to the [RTCIceTransport] objects.
@@ -223,7 +223,7 @@ pub enum RtcStatsType {
     /// candidate pair generated from the new candidates; this time doesn't
     /// correspond to any other externally observable event.
     ///
-    /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+    /// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
     /// [1]: https://w3.org/TR/webrtc-stats/#dfn-deleted
     CandidatePair(Box<RtcIceCandidatePairStats>),
 
@@ -234,7 +234,7 @@ pub enum RtcStatsType {
     /// ICE restart, and the candidate is no longer a member of any
     /// non-deleted candidate pair.
     ///
-    /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+    /// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
     /// [1]: https://w3.org/TR/webrtc-stats/#dfn-deleted
     LocalCandidate(Box<RtcIceCandidateStats>),
 
@@ -245,13 +245,13 @@ pub enum RtcStatsType {
     /// ICE restart, and the candidate is no longer a member of any non-deleted
     /// candidate pair.
     ///
-    /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+    /// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
     /// [1]: https://w3.org/TR/webrtc-stats/#dfn-deleted
     RemoteCandidate(Box<RtcIceCandidateStats>),
 
     /// Information about a certificate used by [RTCIceTransport].
     ///
-    /// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+    /// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
     #[cfg(feature = "extended-stats")]
     Certificate(Box<RtcCertificateStats>),
 
@@ -275,7 +275,7 @@ pub enum RtcStatsType {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [MediaStream]: https://w3.org/TR/mediacapture-streams/#mediastream
+/// [MediaStream]: https://w3.org/TR/mediacapture-streams#mediastream
 /// [1]: https://w3.org/TR/webrtc-stats/#idl-def-rtcmediastreamstats
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -283,7 +283,7 @@ pub enum RtcStatsType {
 pub struct MediaStreamStats {
     /// [`stream.id`][1] property.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastream-id
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastream-id
     pub stream_identifier: String,
 
     /// ID of the stats object, not the `track.id`.
@@ -297,7 +297,7 @@ pub struct MediaStreamStats {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
+/// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
 /// [1]: https://w3.org/TR/webrtc-stats/#dcstats-dict%2A
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -305,33 +305,33 @@ pub struct MediaStreamStats {
 pub struct DataChannelStats {
     /// [`label`][1] value of the [RTCDataChannel] object.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
-    /// [1]: https://w3.org/TR/webrtc/#dom-datachannel-label
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
+    /// [1]: https://w3.org/TR/webrtc#dom-datachannel-label
     pub label: Option<String>,
 
     /// [`protocol`][1] value of the [RTCDataChannel] object.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
-    /// [1]: https://w3.org/TR/webrtc/#dom-datachannel-protocol
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
+    /// [1]: https://w3.org/TR/webrtc#dom-datachannel-protocol
     pub protocol: Option<Protocol>,
 
     /// [`id`][1] attribute of the [RTCDataChannel] object.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcdatachannel-id
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcdatachannel-id
     pub data_channel_identifier: Option<u64>,
 
     /// [Stats object reference][1] for the transport used to carry
     /// [RTCDataChannel].
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
     /// [1]: https://w3.org/TR/webrtc-stats/#dfn-stats-object-reference
     pub transport_id: Option<String>,
 
     /// [`readyState`][1] value of the [RTCDataChannel] object.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
-    /// [1]: https://w3.org/TR/webrtc/#dom-datachannel-readystate
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
+    /// [1]: https://w3.org/TR/webrtc#dom-datachannel-readystate
     pub state: Option<DataChannelState>,
 
     /// Total number of API `message` events sent.
@@ -340,7 +340,7 @@ pub struct DataChannelStats {
     /// Total number of payload bytes sent on this [RTCDataChannel], i.e. not
     /// including headers or padding.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
     pub bytes_sent: Option<u64>,
 
     /// Total number of API `message` events received.
@@ -349,7 +349,7 @@ pub struct DataChannelStats {
     /// Total number of bytes received on this [RTCDataChannel], i.e. not
     /// including headers or padding.
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
     pub bytes_received: Option<u64>,
 }
 
@@ -358,7 +358,7 @@ pub type DataChannelState = NonExhaustive<KnownDataChannelState>;
 
 /// State of the [RTCDataChannel]'s underlying data connection.
 ///
-/// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
+/// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum KnownDataChannelState {
@@ -367,29 +367,29 @@ pub enum KnownDataChannelState {
     /// with [createDataChannel][1], or dispatched as a part of an
     /// [RTCDataChannelEvent].
     ///
-    /// [RTCDataChannel]: https://w3.org/TR/webrtc/#dom-rtcdatachannel
-    /// [RTCDataChannelEvent]: https://w3.org/TR/webrtc/#dom-rtcdatachannelevent
-    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-createdatachannel
+    /// [RTCDataChannel]: https://w3.org/TR/webrtc#dom-rtcdatachannel
+    /// [RTCDataChannelEvent]: https://w3.org/TR/webrtc#dom-rtcdatachannelevent
+    /// [1]: https://w3.org/TR/webrtc#dom-peerconnection-createdatachannel
     Connecting,
 
     /// [Underlying data transport][1] is established and communication is
     /// possible.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dfn-data-transport
+    /// [1]: https://w3.org/TR/webrtc#dfn-data-transport
     Open,
 
     /// [`procedure`][2] to close down the [underlying data transport][1] has
     /// started.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dfn-data-transport
-    /// [2]: https://w3.org/TR/webrtc/#data-transport-closing-procedure
+    /// [1]: https://w3.org/TR/webrtc#dfn-data-transport
+    /// [2]: https://w3.org/TR/webrtc#data-transport-closing-procedure
     Closing,
 
     /// [Underlying data transport][1] has been [`closed`][2] or could not be
     /// established.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dfn-data-transport
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcdatachannelstate-closed
+    /// [1]: https://w3.org/TR/webrtc#dfn-data-transport
+    /// [2]: https://w3.org/TR/webrtc#dom-rtcdatachannelstate-closed
     Closed,
 }
 
@@ -401,7 +401,7 @@ pub enum KnownDataChannelState {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#pcstats-dict%2A
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -423,14 +423,14 @@ pub struct RtcPeerConnectionStats {
     /// If the underlying data transport is not established, these may be in
     /// the `connecting` state.
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    /// [1]: https://w3.org/TR/webrtc/#dom-peerconnection-createdatachannel
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
+    /// [1]: https://w3.org/TR/webrtc#dom-peerconnection-createdatachannel
     pub data_channels_requested: Option<u64>,
 
     /// Number of unique `DataChannel`s signaled in a `datachannel` event on
     /// the [RTCPeerConnection].
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     pub data_channels_accepted: Option<u64>,
 }
 
@@ -510,7 +510,7 @@ pub struct RtpContributingSourceStats {
 /// [Full doc on W3C][1].
 ///
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#remoteoutboundrtpstats-dict%2A
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -552,7 +552,7 @@ pub struct RtcRemoteOutboundRtpStreamStats {
 /// [Full doc on W3C][1].
 ///
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcinboundrtpstreamstats
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -612,11 +612,11 @@ pub struct RtcRemoteInboundRtpStreamStats {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-/// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
+/// [RTCRtpTransceiver]: https://w3.org/TR/webrtc#dom-rtcrtptransceiver
 /// [1]: https://w3.org/TR/webrtc-stats/#transceiver-dict%2A
-/// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-addtransceiver
-/// [3]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-addtrack
+/// [2]: https://w3.org/TR/webrtc#dom-rtcpeerconnection-addtransceiver
+/// [3]: https://w3.org/TR/webrtc#dom-rtcpeerconnection-addtrack
 /// [4]: https://tinyurl.com/vejym8v
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -626,22 +626,22 @@ pub struct RtcRtpTransceiverStats {
     /// [RTCRtpSender associated with the RTCRtpTransceiver][1] represented by
     /// this stats object.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver-sender
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcrtptransceiver-sender
     pub sender_id: Option<String>,
 
     /// ID of the stats object representing the
     /// [RTCRtpReceiver associated with the RTCRtpTransceiver][1] represented
     /// by this stats object.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver-receiver
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcrtptransceiver-receiver
     pub receiver_id: Option<String>,
 
     /// If the [RTCRtpTransceiver] that this stats object represents has a
     /// [`mid` value][1] that is not null, this is that value, otherwise this
     /// value is undefined.
     ///
-    /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc#dom-rtcrtptransceiver
+    /// [1]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub mid: Option<String>,
 }
 
@@ -651,7 +651,7 @@ pub struct RtcRtpTransceiverStats {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCSctpTransport]: https://w3.org/TR/webrtc/#dom-rtcsctptransport
+/// [RTCSctpTransport]: https://w3.org/TR/webrtc#dom-rtcsctptransport
 /// [1]: https://w3.org/TR/webrtc-stats/#sctptransportstats-dict%2A
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -682,12 +682,12 @@ pub struct RtcSctpTransportStats {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCDtlsTransport]: https://w3.org/TR/webrtc/#dom-rtcdtlstransport
-/// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [RTCDtlsTransport]: https://w3.org/TR/webrtc#dom-rtcdtlstransport
+/// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 /// [WebRTC]: https://w3.org/TR/webrtc
 /// [1]: https://w3.org/TR/webrtc-stats/#transportstats-dict%2A
-/// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+/// [2]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -701,20 +701,20 @@ pub struct RtcTransportStats {
     /// Total number of payload bytes sent on this [RTCPeerConnection], i.e.
     /// not including headers or padding.
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     pub bytes_sent: Option<u64>,
 
     /// Total number of bytes received on this [RTCPeerConnection], i.e. not
     /// including headers or padding.
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     pub bytes_received: Option<u64>,
 
     /// Set to the current value of the [`role` attribute][1] of the
     /// [underlying RTCDtlsTransport's `transport`][2].
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-icetransport-role
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcdtlstransport-icetransport
+    /// [1]: https://w3.org/TR/webrtc#dom-icetransport-role
+    /// [2]: https://w3.org/TR/webrtc#dom-rtcdtlstransport-icetransport
     pub ice_role: Option<IceRole>,
 }
 
@@ -723,7 +723,7 @@ pub struct RtcTransportStats {
 /// More info in the [RFC 5245].
 ///
 /// [RFC 5245]: https://tools.ietf.org/html/rfc5245
-/// [1]: https://w3.org/TR/webrtc/#dom-icetransport-role
+/// [1]: https://w3.org/TR/webrtc#dom-icetransport-role
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum IceRole {
@@ -753,7 +753,7 @@ pub enum IceRole {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
+/// [RTCRtpSender]: https://w3.org/TR/webrtc#rtcrtpsender-interface
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-sender
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -779,7 +779,7 @@ pub enum SenderStatsKind {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCRtpReceiver]: https://w3.org/TR/webrtc/#dom-rtcrtpreceiver
+/// [RTCRtpReceiver]: https://w3.org/TR/webrtc#dom-rtcrtpreceiver
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-receiver
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -811,7 +811,7 @@ pub enum ReceiverStatsKind {
 ///
 /// [Full doc on W3C][2].
 ///
-/// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+/// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
 /// [1]: https://w3.org/TR/webrtc-stats/#dfn-deleted
 /// [2]: https://w3.org/TR/webrtc-stats/#candidatepair-dict%2A
 #[serde_with::skip_serializing_none]
@@ -936,7 +936,7 @@ pub type Protocol = NonExhaustive<KnownProtocol>;
 /// [RTCIceCandidateType] represents the type of the ICE candidate, as
 /// defined in [Section 15.1 of RFC 5245][1].
 ///
-/// [RTCIceCandidateType]: https://w3.org/TR/webrtc/#rtcicecandidatetype-enum
+/// [RTCIceCandidateType]: https://w3.org/TR/webrtc#rtcicecandidatetype-enum
 /// [1]: https://tools.ietf.org/html/rfc5245#section-15.1
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -979,9 +979,9 @@ pub enum RtcInboundRtpStreamMediaType {
         /// voice activity or not based on the presence of the V bit in the
         /// extension header, as defined in [RFC 6464].
         ///
-        /// [RTCRtpReceiver]: https://w3.org/TR/webrtc/#rtcrtpreceiver-interface
+        /// [RTCRtpReceiver]: https://w3.org/TR/webrtc#rtcrtpreceiver-interface
         /// [RFC 6464]: https://tools.ietf.org/html/rfc6464#page-3
-        /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+        /// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
         voice_activity_flag: Option<bool>,
 
         /// Total number of samples that have been received on this RTP stream.
@@ -1163,8 +1163,8 @@ pub struct RtcInboundRtpStreamStats {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+/// [RTCRtpSender]: https://w3.org/TR/webrtc#rtcrtpsender-interface
+/// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
 /// [2]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-track
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -1172,13 +1172,13 @@ pub struct RtcInboundRtpStreamStats {
 pub struct TrackStats {
     /// [`id` property][1] of the track.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-id
     pub track_identifier: String,
 
     /// `true` if the source is remote, for instance if it is sourced from
     /// another host via an [RTCPeerConnection]. `false` otherwise.
     ///
-    /// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     pub remote_source: Option<bool>,
 
     /// Reflection of the "ended" state of the track.
@@ -1188,15 +1188,15 @@ pub struct TrackStats {
     ///
     /// This reflects the [`kind` attribute][2] of the [MediaStreamTrack][1].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
+    /// [2]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
     pub kind: Option<TrackStatsKind>,
 }
 
 /// [`kind` attribute] values of the [MediaStreamTrack][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
-/// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+/// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
+/// [2]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TrackStatsKind {
@@ -1272,7 +1272,7 @@ pub enum RtcOutboundRtpStreamMediaType {
 /// [Full doc on W3C][5].
 ///
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtcaudiosenderstats
 /// [2]: https://w3.org/TR/webrtc-stats/#dom-rtcvideosenderstats
 /// [3]: https://tinyurl.com/sefa5z4
@@ -1309,7 +1309,7 @@ pub struct RtcOutboundRtpStreamStats {
 ///
 /// [Full doc on W3C][2].
 ///
-/// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+/// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
 /// [1]: https://tools.ietf.org/html/rfc5245#section-15.1
 /// [2]: https://w3.org/TR/webrtc-stats/#icecandidate-dict%2A
 #[serde_with::skip_serializing_none]
@@ -1346,7 +1346,7 @@ pub struct RtcIceCandidateStats {
     ///
     /// `None` for remote candidates.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnectioniceevent
+    /// [1]: https://w3.org/TR/webrtc#rtcpeerconnectioniceevent
     pub url: Option<String>,
 
     /// Protocol used by the endpoint to communicate with the TURN server.
@@ -1399,9 +1399,9 @@ pub enum MediaKind {
 ///
 /// [Full doc on W3C][2].
 ///
-/// [RTCRtpSender]: https://w3.org/TR/webrtc/#rtcrtpsender-interface
+/// [RTCRtpSender]: https://w3.org/TR/webrtc#rtcrtpsender-interface
 /// [getUserMedia]: https://tinyurl.com/sngpyr6
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+/// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
 /// [2]: https://w3.org/TR/webrtc-stats/#dom-rtcstatstype-media-source
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Hash, PartialEq, Serialize)]
@@ -1409,7 +1409,7 @@ pub enum MediaKind {
 pub struct MediaSourceStats {
     /// Value of the [MediaStreamTrack][1]'s ID attribute.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
     pub track_identifier: Option<String>,
 
     /// Fields which should be in the [`RtcStat`] based on `kind`.
@@ -1427,7 +1427,7 @@ pub struct MediaSourceStats {
 /// [Full doc on W3C][1].
 ///
 /// [RTP]: https://en.wikipedia.org/wiki/Real-time_Transport_Protocol
-/// [RTCPeerConnection]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [RTCPeerConnection]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
 /// [1]: https://w3.org/TR/webrtc-stats/#dom-rtccodecstats
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -1454,7 +1454,7 @@ pub struct RtcCodecStats {
 ///
 /// [Full doc on W3C][1].
 ///
-/// [RTCIceTransport]: https://w3.org/TR/webrtc/#dom-rtcicetransport
+/// [RTCIceTransport]: https://w3.org/TR/webrtc#dom-rtcicetransport
 /// [1]: https://w3.org/TR/webrtc-stats/#certificatestats-dict%2A
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]

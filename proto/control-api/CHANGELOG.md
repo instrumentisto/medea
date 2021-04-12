@@ -6,6 +6,23 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.2.0] · 2021-04-08
+[0.2.0]: /../../tree/medea-control-api-proto-0.2.0/proto/control-api
+
+[Diff](/../../compare/medea-control-api-proto-0.1.0...medea-control-api-proto-0.2.0) | [Milestone](/../../milestone/2)
+
+### Added
+
+- gRPC:
+    - `ControlApi` service:
+        - Methods:
+            - `Apply` ([#187]).
+
+[#187]: /../../pull/187
+
+
+
+
 ## [0.1.0] · 2021-02-01
 [0.1.0]: /../../tree/medea-control-api-proto-0.1.0/proto/control-api
 

@@ -11,10 +11,14 @@ use futures::{future, stream, FutureExt as _, StreamExt as _};
 use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, ServerMsg,
 };
-use medea_jason::rpc::{
-    websocket::{MockRpcTransport, TransportState},
-    CloseMsg, ConnectionInfo, RpcSession, RpcTransport, SessionError,
-    WebSocketRpcClient, WebSocketRpcSession, WebSocketRpcTransport,
+use medea_jason::{
+    platform::{
+        MockRpcTransport, RpcTransport, TransportState, WebSocketRpcTransport,
+    },
+    rpc::{
+        CloseMsg, ConnectionInfo, RpcSession, SessionError, WebSocketRpcClient,
+        WebSocketRpcSession,
+    },
 };
 use wasm_bindgen_test::*;
 

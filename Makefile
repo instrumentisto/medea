@@ -23,7 +23,7 @@ IMAGE_NAME := $(strip \
 
 RUST_VER := 1.51
 CHROME_VERSION := 89.0
-FIREFOX_VERSION := 86.0.1
+FIREFOX_VERSION := 87.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -541,8 +541,8 @@ release.crates:
 ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-control-api-proto medea-coturn-telnet-client medea-macro medea-reactive),)
 	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
-		cargo publish --token $(release-crates-token) ,\
-		cargo package --allow-dirty )
+		cargo +beta publish --token $(release-crates-token) ,\
+		cargo +beta package --allow-dirty )
 endif
 
 

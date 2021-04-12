@@ -1,11 +1,16 @@
+//! Wrapper around [RTCPeerConnection][1].
+//!
+//! [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+
 use std::{
     cell::{Cell, RefCell},
     convert::TryFrom as _,
     rc::Rc,
 };
 
-use derive_more::{Display, From};
-use medea_client_api_proto::{IceServer, PeerConnectionState};
+use medea_client_api_proto::{
+    IceConnectionState, IceServer, PeerConnectionState,
+};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -18,37 +23,14 @@ use web_sys::{
 
 use crate::{
     media::{MediaKind, TrackConstraints},
-    peer::stats::{RtcStats, RtcStatsError},
-    utils::{
-        get_property_by_name, EventListener, EventListenerBindError, JsCaused,
-        JsError,
+    platform::{
+        self, get_property_by_name, wasm::utils::EventListener, IceCandidate,
+        MediaStreamTrack, RtcPeerConnectionError, RtcStats, SdpType,
+        Transceiver, TransceiverDirection,
     },
 };
 
-use super::{ice_server::RtcIceServers, TransceiverDirection};
-
-/// [RTCIceCandidate][1] representation.
-///
-/// [1]: https://w3.org/TR/webrtc/#rtcicecandidate-interface
-pub struct IceCandidate {
-    /// [`candidate` field][2] of the discovered [RTCIceCandidate][1].
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-candidate
-    pub candidate: String,
-
-    /// [`sdpMLineIndex` field][2] of the discovered [RTCIceCandidate][1].
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmlineindex
-    pub sdp_m_line_index: Option<u16>,
-
-    /// [`sdpMid` field][2] of the discovered [RTCIceCandidate][1].
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
-    pub sdp_mid: Option<String>,
-}
+use super::ice_server::RtcIceServers;
 
 impl From<&TrackConstraints> for MediaKind {
     fn from(media_type: &TrackConstraints) -> Self {
@@ -57,83 +39,6 @@ impl From<&TrackConstraints> for MediaKind {
             TrackConstraints::Video(_) => Self::Video,
         }
     }
-}
-
-/// Representation of [RTCSdpType].
-///
-/// [RTCSdpType]: https://w3.org/TR/webrtc/#dom-rtcsdptype
-pub enum SdpType {
-    /// [`offer` type][1] of SDP.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcsdptype-offer
-    Offer(String),
-
-    /// [`answer` type][1] of SDP.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcsdptype-answer
-    Answer(String),
-}
-
-/// Errors that may occur during signaling between this and remote
-/// [RTCPeerConnection][1] and event handlers setting errors.
-///
-/// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-#[derive(Clone, Debug, Display, From, JsCaused)]
-pub enum RtcPeerConnectionError {
-    /// Occurs when cannot adds new remote candidate to the
-    /// [RTCPeerConnection][1]'s remote description.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
-    #[display(fmt = "Failed to add ICE candidate: {}", _0)]
-    #[from(ignore)]
-    AddIceCandidateFailed(JsError),
-
-    /// Occurs when cannot obtains [SDP answer][`SdpType::Answer`] from
-    /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`].
-    #[display(fmt = "Failed to create SDP answer: {}", _0)]
-    #[from(ignore)]
-    CreateAnswerFailed(JsError),
-
-    /// Occurs when a new [`RtcPeerConnection`] cannot be created.
-    #[display(fmt = "Failed to create PeerConnection: {}", _0)]
-    #[from(ignore)]
-    PeerCreationError(JsError),
-
-    /// Occurs when cannot obtains [SDP offer][`SdpType::Offer`] from
-    /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
-    #[display(fmt = "Failed to create SDP offer: {}", _0)]
-    #[from(ignore)]
-    CreateOfferFailed(JsError),
-
-    /// Occurs when handler failed to bind to some [`RtcPeerConnection`] event.
-    /// Not really supposed to ever happen.
-    #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
-    PeerConnectionEventBindFailed(EventListenerBindError),
-
-    /// Occurs while getting and parsing [`RtcStats`] of [`PeerConnection`].
-    ///
-    /// [`PeerConnection`]: super::PeerConnection
-    #[display(fmt = "Failed to get RTCStats: {}", _0)]
-    RtcStatsError(#[js(cause)] RtcStatsError),
-
-    /// [PeerConnection.getStats][1] promise thrown exception.
-    ///
-    /// [1]: https://tinyurl.com/w6hmt5f
-    #[display(fmt = "PeerConnection.getStats() failed with error: {}", _0)]
-    #[from(ignore)]
-    GetStatsException(JsError),
-
-    /// Occurs if the local description associated with the
-    /// [`RtcPeerConnection`] cannot be changed.
-    #[display(fmt = "Failed to set local SDP description: {}", _0)]
-    #[from(ignore)]
-    SetLocalDescriptionFailed(JsError),
-
-    /// Occurs if the description of the remote end of the
-    /// [`RtcPeerConnection`] cannot be changed.
-    #[display(fmt = "Failed to set remote SDP description: {}", _0)]
-    #[from(ignore)]
-    SetRemoteDescriptionFailed(JsError),
 }
 
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
@@ -233,7 +138,7 @@ impl RtcPeerConnection {
         })
     }
 
-    /// Returns [`RtcStats`] of this [`PeerConnection`].
+    /// Returns [`RtcStats`] of this [`RtcPeerConnection`].
     ///
     /// # Errors
     ///
@@ -243,32 +148,31 @@ impl RtcPeerConnection {
     /// Errors with [`RtcPeerConnectionError::GetStatsException`] when
     /// [PeerConnection.getStats][1] promise throws exception.
     ///
-    /// [`PeerConnection`]: super::PeerConnection
     /// [1]: https://tinyurl.com/w6hmt5f
     pub async fn get_stats(&self) -> Result<RtcStats> {
         let js_stats =
             JsFuture::from(self.peer.get_stats()).await.map_err(|e| {
                 tracerr::new!(RtcPeerConnectionError::GetStatsException(
-                    JsError::from(e)
+                    platform::Error::from(e)
                 ))
             })?;
 
         RtcStats::try_from(&js_stats).map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
+    /// Sets handler for a [`RtcTrackEvent`] (see [RTCTrackEvent][1] and
     /// [`ontrack` callback][2]).
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Errors with [`RtcPeerConnectionError::PeerConnectionEventBindFailed`] if
-    /// [`EventListener`] binding fails.
+    /// If binding to the [`track`][3] event fails. Not supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
-    pub fn on_track<F>(&self, f: Option<F>) -> Result<()>
+    /// [3]: https://w3.org/TR/webrtc/#event-track
+    pub fn on_track<F>(&self, f: Option<F>)
     where
-        F: 'static + FnMut(RtcTrackEvent),
+        F: 'static + FnMut(MediaStreamTrack, Transceiver),
     {
         let mut on_track = self.on_track.borrow_mut();
         match f {
@@ -277,31 +181,36 @@ impl RtcPeerConnection {
             }
             Some(mut f) => {
                 on_track.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "track",
                         move |msg: RtcTrackEvent| {
-                            f(msg);
+                            f(
+                                MediaStreamTrack::from(msg.track()),
+                                Transceiver::from(msg.transceiver()),
+                            );
                         },
                     )
-                    .map_err(tracerr::map_from_and_wrap!())?,
+                    .unwrap(),
                 );
             }
         }
-        Ok(())
     }
 
-    /// Sets handler for [`RtcPeerConnectionIceEvent`] event
-    /// (see [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
+    /// Sets handler for a [`RtcPeerConnectionIceEvent`] (see
+    /// [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Errors with [`RtcPeerConnectionError::PeerConnectionEventBindFailed`] if
-    /// [`EventListener`] binding fails.
+    /// If binding to the [`icecandidate`][3] event fails. Not supposed to ever
+    /// happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
-    pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<()>
+    /// [3]: https://w3.org/TR/webrtc/#event-icecandidate
+    pub fn on_ice_candidate<F>(&self, f: Option<F>)
     where
         F: 'static + FnMut(IceCandidate),
     {
@@ -312,6 +221,8 @@ impl RtcPeerConnection {
             }
             Some(mut f) => {
                 on_ice_candidate.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "icecandidate",
@@ -329,18 +240,17 @@ impl RtcPeerConnection {
                             }
                         },
                     )
-                    .map_err(tracerr::map_from_and_wrap!())?,
+                    .unwrap(),
                 );
             }
         }
-        Ok(())
     }
 
     /// Returns [`RtcIceConnectionState`] of this [`RtcPeerConnection`].
     #[inline]
     #[must_use]
-    pub fn ice_connection_state(&self) -> RtcIceConnectionState {
-        self.peer.ice_connection_state()
+    pub fn ice_connection_state(&self) -> IceConnectionState {
+        parse_ice_connection_state(self.peer.ice_connection_state())
     }
 
     /// Returns [`PeerConnectionState`] of this [`RtcPeerConnection`].
@@ -352,17 +262,17 @@ impl RtcPeerConnection {
         get_peer_connection_state(&self.peer)?.ok()
     }
 
-    /// Sets handler for [`iceconnectionstatechange`][1] event.
+    /// Sets handler for an [`iceconnectionstatechange`][1] event.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Will return [`RtcPeerConnectionError::PeerConnectionEventBindFailed`] if
-    /// [`EventListener`] binding fails.
+    /// If binding to the [`iceconnectionstatechange`][1] event fails. Not
+    /// supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
-    pub fn on_ice_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
+    pub fn on_ice_connection_state_change<F>(&self, f: Option<F>)
     where
-        F: 'static + FnMut(RtcIceConnectionState),
+        F: 'static + FnMut(IceConnectionState),
     {
         let mut on_ice_connection_state_changed =
             self.on_ice_connection_state_changed.borrow_mut();
@@ -373,31 +283,32 @@ impl RtcPeerConnection {
             Some(mut f) => {
                 let peer = Rc::clone(&self.peer);
                 on_ice_connection_state_changed.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "iceconnectionstatechange",
                         move |_| {
-                            f(peer.ice_connection_state());
+                            f(parse_ice_connection_state(
+                                peer.ice_connection_state(),
+                            ));
                         },
                     )
-                    .map_err(tracerr::map_from_and_wrap!())?,
+                    .unwrap(),
                 );
             }
         }
-        Ok(())
     }
 
-    /// Sets handler for [`connectionstatechange`][1] event.
+    /// Sets handler for a [`connectionstatechange`][1] event.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// Will return [`RtcPeerConnectionError::PeerConnectionEventBindFailed`] if
-    /// [`EventListener`] binding fails.
-    /// This error can be ignored, since this event is currently implemented
-    /// only in Chrome and Safari.
+    /// If binding to the [`connectionstatechange`][1] event fails. Not supposed
+    /// to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
-    pub fn on_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
+    pub fn on_connection_state_change<F>(&self, f: Option<F>)
     where
         F: 'static + FnMut(PeerConnectionState),
     {
@@ -410,6 +321,8 @@ impl RtcPeerConnection {
             Some(mut f) => {
                 let peer = Rc::clone(&self.peer);
                 on_connection_state_changed.replace(
+                    // Unwrapping is OK here, because this function shouldn't
+                    // error ever.
                     EventListener::new_mut(
                         Rc::clone(&self.peer),
                         "connectionstatechange",
@@ -438,11 +351,10 @@ impl RtcPeerConnection {
                             }
                         },
                     )
-                    .map_err(tracerr::map_from_and_wrap!())?,
+                    .unwrap(),
                 );
             }
         }
-        Ok(())
     }
 
     /// Adds remote [RTCPeerConnection][1]'s [ICE candidate][2] to this
@@ -483,6 +395,7 @@ impl RtcPeerConnection {
     /// After this function returns, the offer returned by the next call to
     /// [`RtcPeerConnection::create_offer`] is automatically configured
     /// to trigger ICE restart.
+    #[inline]
     pub fn restart_ice(&self) {
         self.ice_restart.set(true);
     }
@@ -740,4 +653,25 @@ fn get_peer_connection_state(
             return Some(Err(state));
         }
     }))
+}
+
+/// Parses a [`IceConnectionState`] out of the given [`RtcIceConnectionState`].
+#[must_use]
+fn parse_ice_connection_state(
+    state: RtcIceConnectionState,
+) -> IceConnectionState {
+    use RtcIceConnectionState as S;
+
+    match state {
+        S::New => IceConnectionState::New,
+        S::Checking => IceConnectionState::Checking,
+        S::Connected => IceConnectionState::Connected,
+        S::Completed => IceConnectionState::Completed,
+        S::Failed => IceConnectionState::Failed,
+        S::Disconnected => IceConnectionState::Disconnected,
+        S::Closed => IceConnectionState::Closed,
+        S::__Nonexhaustive => {
+            unreachable!("Unknown ICE connection state {:?}", state);
+        }
+    }
 }

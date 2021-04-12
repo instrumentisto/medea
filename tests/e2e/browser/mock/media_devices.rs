@@ -6,14 +6,14 @@ use crate::browser::{Statement, Window};
 
 /// Mock of a [MediaDevices][1] interface.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
+/// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
 pub struct MediaDevices<'a>(pub(super) &'a Window);
 
 impl<'a> MediaDevices<'a> {
     /// Instantiates a [MediaDevices][1] interface mock in the provided
     /// [`Window`].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
     pub(super) async fn instantiate(window: &Window) {
         window
             .execute(Statement::new(

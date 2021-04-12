@@ -427,11 +427,11 @@ impl From<RoomError> for ErrorResponse {
             E::EndpointAlreadyExists(id) => {
                 Self::new(ErrorCode::EndpointAlreadyExists, &id)
             }
+            E::TryFromElement(id) => Self::new(ErrorCode::NotMemberInSpec, &id),
             E::WrongRoomId(_, _)
             | E::PeerNotFound(_)
             | E::CallbackClientError(_)
             | E::NoTurnCredentials(_)
-            | E::ConnectionNotExists(_)
             | E::PeerError(_)
             | E::BadRoomSpec(_)
             | E::PeerTrafficWatcherMailbox(_)

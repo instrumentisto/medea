@@ -1,6 +1,8 @@
 //! Delayer that increases delay time by provided multiplier on each call.
 
-use crate::utils::{delay_for, JsDuration};
+use std::time::Duration;
+
+use crate::platform;
 
 /// Delayer that increases delay time by provided multiplier on each call.
 ///
@@ -13,10 +15,10 @@ pub struct BackoffDelayer {
     /// Delay of next [`BackoffDelayer::delay`] call.
     ///
     /// Will be increased by [`BackoffDelayer::delay`] call.
-    current_interval: JsDuration,
+    current_interval: Duration,
 
     /// Maximum delay for which this [`BackoffDelayer`] may delay.
-    max_interval: JsDuration,
+    max_interval: Duration,
 
     /// The multiplier by which [`BackoffDelayer::current_interval`] will be
     /// multiplied on [`BackoffDelayer::delay`] call.
@@ -28,14 +30,14 @@ impl BackoffDelayer {
     #[inline]
     #[must_use]
     pub fn new(
-        starting_interval: JsDuration,
+        starting_interval: Duration,
         interval_multiplier: f32,
-        max_interval: JsDuration,
+        max_interval: Duration,
     ) -> Self {
         Self {
             current_interval: starting_interval,
             max_interval,
-            interval_multiplier,
+            interval_multiplier: interval_multiplier.max(0_f32),
         }
     }
 
@@ -47,18 +49,19 @@ impl BackoffDelayer {
     /// until [`BackoffDelayer::max_interval`] is reached.
     #[inline]
     pub async fn delay(&mut self) {
-        delay_for(self.get_delay()).await;
+        platform::delay_for(self.get_delay()).await;
     }
 
     /// Returns current interval and increases it for next call.
     #[must_use]
-    fn get_delay(&mut self) -> JsDuration {
+    fn get_delay(&mut self) -> Duration {
         if self.is_max_interval_reached() {
             self.max_interval
         } else {
             let delay = self.current_interval;
-            self.current_interval =
-                self.current_interval * self.interval_multiplier;
+            self.current_interval = Duration::from_secs_f32(
+                self.current_interval.as_secs_f32() * self.interval_multiplier,
+            );
             delay
         }
     }

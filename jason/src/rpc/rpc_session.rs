@@ -1,3 +1,8 @@
+//! Wrapper around [WebSocket] based transport that implements `Room`
+//! management.
+//!
+//! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
+
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -15,18 +20,19 @@ use futures::{
 use medea_client_api_proto::{Command, Event, MemberId, RoomId};
 use medea_reactive::ObservableCell;
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
+    platform,
     rpc::{
         websocket::RpcEventHandler, ClientDisconnect, CloseReason,
         ConnectionInfo, RpcClientError, WebSocketRpcClient,
     },
-    utils::{JsCaused, JsError},
+    utils::JsCaused,
 };
 
 /// Errors which are can be returned from the [`WebSocketRpcSession`].
 #[derive(Clone, Debug, From, JsCaused, Display)]
+#[js(error = "platform::Error")]
 pub enum SessionError {
     /// [`WebSocketRpcSession`] goes into [`SessionState::Finished`] and can't
     /// be used.
@@ -75,7 +81,7 @@ pub trait RpcSession {
     /// new RPC connection.
     ///
     /// If [`RpcSession`] already in [`SessionState::Connecting`] then this
-    /// function will not perform one more connection try. It will subsribe
+    /// function will not perform one more connection try. It will subscribe
     /// to [`SessionState`] changes and wait for first connection result.
     /// And based on this result - this function will be resolved.
     ///
@@ -112,14 +118,12 @@ pub trait RpcSession {
 
     /// Subscribe to connection loss events.
     ///
-    /// Connection loss is any unexpected [`RpcTransport`] close. In case of
-    /// connection loss, JS side user should select reconnection strategy with
-    /// [`ReconnectHandle`] (or simply close [`Room`]).
+    /// Connection loss is any unexpected [`platform::RpcTransport`] close. In
+    /// case of connection loss, client side user should select reconnection
+    /// strategy with [`ReconnectHandle`] (or simply close [`Room`]).
     ///
-    /// [`ReconnectHandle`]: crate::rpc::RpcTransport
-    /// [`Room`]: crate::api::Room
-    /// [`RpcTransport`]: crate::rpc::RpcTransport
-    /// [`Stream`]: futures::Stream
+    /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
+    /// [`Room`]: crate::room::Room
     fn on_connection_loss(&self) -> LocalBoxStream<'static, ()>;
 
     /// Subscribe to reconnected events.
@@ -133,9 +137,9 @@ pub trait RpcSession {
 ///
 /// Responsible for [`Room`] authorization and closing.
 ///
-/// [`Room`]: crate::api::Room
+/// [`Room`]: crate::room::Room
 pub struct WebSocketRpcSession {
-    /// [WebSocket] based Rpc Client used to .
+    /// [WebSocket] based Rpc Client used to talk with `Medea` server.
     ///
     /// [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
     client: Rc<WebSocketRpcClient>,
@@ -249,7 +253,7 @@ impl WebSocketRpcSession {
 
         let mut state_updates = self.state.subscribe();
         let weak_this = Rc::downgrade(self);
-        spawn_local(async move {
+        platform::spawn(async move {
             while let Some(state) = state_updates.next().await {
                 let this = upgrade_or_break!(weak_this);
                 match state {
@@ -290,7 +294,7 @@ impl WebSocketRpcSession {
 
         let mut client_on_connection_loss = self.client.on_connection_loss();
         let weak_this = Rc::downgrade(self);
-        spawn_local(async move {
+        platform::spawn(async move {
             while client_on_connection_loss.next().await.is_some() {
                 let this = upgrade_or_break!(weak_this);
 
@@ -322,7 +326,7 @@ impl WebSocketRpcSession {
     fn spawn_close_watcher(self: &Rc<Self>) {
         let on_normal_close = self.client.on_normal_close();
         let weak_this = Rc::downgrade(self);
-        spawn_local(async move {
+        platform::spawn(async move {
             let reason = on_normal_close.await.unwrap_or_else(|_| {
                 ClientDisconnect::RpcClientUnexpectedlyDropped.into()
             });
@@ -336,7 +340,7 @@ impl WebSocketRpcSession {
     fn spawn_server_msg_listener(self: &Rc<Self>) {
         let mut server_msg_rx = self.client.subscribe();
         let weak_this = Rc::downgrade(self);
-        spawn_local(async move {
+        platform::spawn(async move {
             while let Some(msg) = server_msg_rx.next().await {
                 let this = upgrade_or_break!(weak_this);
                 msg.dispatch_with(this.as_ref());

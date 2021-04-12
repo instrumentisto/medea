@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use cucumber_rust::then;
 
 use crate::{
@@ -91,34 +93,12 @@ async fn then_remote_track_stops(
     assert!(track.disabled().await.unwrap());
 }
 
-#[then(regex = "^`on_disabled` callback fires (\\d+) time(?:s)? on (\\S+)'s \
+#[then(regex = "^`on_(enabled|disabled|muted|unmuted)` callback fires \
+                 (\\d+) time(?:s)? on (\\S+)'s \
                  remote (audio|(?:device|display) video) track from (\\S+)$")]
-async fn then_on_remote_disabled_callback_fires(
+async fn then_callback_fires_on_remote_track(
     world: &mut World,
-    times: u64,
-    id: String,
-    kind: String,
-    remote_id: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    let remote_conn =
-        member.connections().get(remote_id).await.unwrap().unwrap();
-    let (media_kind, source_kind) = parse_media_kinds(&kind).unwrap();
-
-    let track = remote_conn
-        .tracks_store()
-        .await
-        .unwrap()
-        .get_track(media_kind, source_kind)
-        .await
-        .unwrap();
-    assert!(track.wait_for_on_disabled_fire_count(times).await.is_ok());
-}
-
-#[then(regex = "^`on_enabled` callback fires (\\d+) time(?:s)? on (\\S+)'s \
-                 remote (audio|(?:device|display) video) track from (\\S+)$")]
-async fn then_on_remote_enabled_callback_fires(
-    world: &mut World,
+    callback_kind: String,
     times: u64,
     id: String,
     kind: String,
@@ -135,7 +115,27 @@ async fn then_on_remote_enabled_callback_fires(
         .get_track(media_kind, source_kind)
         .await
         .unwrap();
-    assert!(track.wait_for_on_enabled_fire_count(times).await.is_ok());
+
+    match callback_kind.as_str() {
+        "enabled" => {
+            assert!(track.wait_for_on_enabled_fire_count(times).await.is_ok());
+        }
+        "disabled" => {
+            assert!(track.wait_for_on_disabled_fire_count(times).await.is_ok());
+        }
+        "muted" => {
+            assert!(track.wait_for_on_muted_fire_count(times).await.is_ok());
+        }
+        "unmuted" => {
+            assert!(track.wait_for_on_unmuted_fire_count(times).await.is_ok());
+        }
+        _ => {
+            unreachable!(
+                "unknown RemoteMediaTrack callback: `on_{}`",
+                callback_kind,
+            );
+        }
+    }
 }
 
 #[then(regex = "^(\\S+)'s (audio|(?:display|device) video) remote track \
@@ -208,9 +208,45 @@ async fn then_member_doesnt_have_remote_tracks_with(
     assert_eq!(tracks_count, 0);
 }
 
-#[then(regex = r"^(\S+) doesn't have live tracks$")]
-async fn then_member_doesnt_has_live_tracks(world: &mut World, id: String) {
+#[then(regex = r"^(\S+) doesn't have live local tracks$")]
+async fn then_member_doesnt_have_live_local_tracks(
+    world: &mut World,
+    id: String,
+) {
     let member = world.get_member(&id).unwrap();
     let local_tracks = member.room().local_tracks().await.unwrap();
-    assert!(local_tracks.is_all_tracks_ended().await.unwrap());
+    let count = local_tracks
+        .count_tracks_by_selector(true, true)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[then(regex = r"^(\S+) has (\d+) (live|stopped) remote tracks from (\S+)$")]
+async fn then_member_has_n_remote_tracks_from(
+    world: &mut World,
+    id: String,
+    expected_count: u64,
+    live_or_stopped: String,
+    remote_id: String,
+) {
+    tokio_1::time::sleep(Duration::from_millis(300)).await;
+    let member = world.get_member(&id).unwrap();
+    let connection = member
+        .connections()
+        .wait_for_connection(remote_id)
+        .await
+        .unwrap();
+    let tracks_store = connection.tracks_store().await.unwrap();
+    let (muted, stopped) = if live_or_stopped == "live" {
+        (false, false)
+    } else {
+        (true, true)
+    };
+
+    let actual_count = tracks_store
+        .count_tracks_by_selector(muted, stopped)
+        .await
+        .unwrap();
+    assert_eq!(actual_count, expected_count);
 }

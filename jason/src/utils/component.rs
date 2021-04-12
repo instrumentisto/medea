@@ -1,16 +1,12 @@
 //! Implementation of the [`Component`].
 
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use derive_more::Deref;
 use futures::{future, Future, FutureExt as _, Stream, StreamExt};
 use medea_reactive::AllProcessed;
-use wasm_bindgen_futures::spawn_local;
 
-use crate::{
-    media::LocalTracksConstraints,
-    utils::{JasonError, TaskHandle},
-};
+use crate::{media::LocalTracksConstraints, platform, utils::TaskHandle};
 
 /// Abstraction over a state which can be transformed to the states from the
 /// [`medea_client_api_proto::state`].
@@ -114,8 +110,8 @@ pub struct WatchersSpawner<S, O> {
 impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
     /// Spawns watchers for the provided [`Stream`].
     ///
-    /// If watcher returns an error then this error will be converted into the
-    /// [`JasonError`] and printed with a [`JasonError::print()`].
+    /// If watcher returns an error then this error will be printed to the error
+    /// log.
     ///
     /// You can stop all listeners tasks spawned by this function by
     /// [`Drop`]ping [`Component`].
@@ -124,7 +120,7 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
         F: Fn(Rc<O>, Rc<S>, V) -> H + 'static,
         R: Stream<Item = V> + Unpin + 'static,
         H: Future<Output = Result<(), E>> + 'static,
-        E: Into<JasonError>,
+        E: Display,
     {
         let obj = Rc::clone(&self.obj);
         let state = Rc::clone(&self.state);
@@ -133,11 +129,11 @@ impl<S: 'static, O: 'static> WatchersSpawner<S, O> {
                 if let Err(e) =
                     (handle)(Rc::clone(&obj), Rc::clone(&state), value).await
                 {
-                    Into::<JasonError>::into(e).print();
+                    log::error!("{}", e);
                 }
             }
         });
-        spawn_local(fut.map(drop));
+        platform::spawn(fut.map(drop));
 
         self.spawned_watchers.push(handle.into());
     }

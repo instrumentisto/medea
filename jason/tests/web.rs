@@ -74,9 +74,9 @@ macro_rules! js_callback {
     }}
 }
 
-mod api;
 mod media;
 mod peer;
+mod room;
 mod rpc;
 mod utils;
 
@@ -87,13 +87,13 @@ use medea_client_api_proto::{
     TrackId, VideoSettings,
 };
 use medea_jason::{
-    api::ConstraintsUpdateException,
-    media::{track::remote, LocalTracksConstraints, MediaKind, MediaManager},
+    api,
+    media::{
+        track::remote, AudioTrackConstraints, DeviceVideoTrackConstraints,
+        LocalTracksConstraints, MediaKind, MediaManager, MediaStreamSettings,
+    },
     peer::media_exchange_state,
     rpc::ApiUrl,
-    utils::{window, JasonError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints,
-    DisplayVideoTrackConstraints, MediaStreamSettings,
 };
 use url::Url;
 use wasm_bindgen::prelude::*;
@@ -139,7 +139,7 @@ extern "C" {
 
 #[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
-    fn get_jason_error(err: JsValue) -> JasonError;
+    fn get_jason_error(err: JsValue) -> api::JasonError;
 }
 
 #[wasm_bindgen(
@@ -148,7 +148,7 @@ extern "C" {
 extern "C" {
     fn get_constraints_update_exception(
         err: JsValue,
-    ) -> ConstraintsUpdateException;
+    ) -> api::ConstraintsUpdateException;
 }
 
 pub fn get_test_required_tracks() -> (Track, Track) {
@@ -257,14 +257,14 @@ pub async fn delay_for(delay_ms: i32) {
 fn media_stream_settings(
     is_audio_enabled: bool,
     is_video_enabled: bool,
-) -> MediaStreamSettings {
-    let mut settings = MediaStreamSettings::new();
+) -> api::MediaStreamSettings {
+    let mut settings = api::MediaStreamSettings::new();
     if is_audio_enabled {
-        settings.audio(AudioTrackConstraints::default());
+        settings.audio(api::AudioTrackConstraints::new());
     }
     if is_video_enabled {
-        settings.device_video(DeviceVideoTrackConstraints::default());
-        settings.display_video(DisplayVideoTrackConstraints::default());
+        settings.device_video(api::DeviceVideoTrackConstraints::new());
+        settings.display_video(api::DisplayVideoTrackConstraints::new());
     }
 
     settings
@@ -275,8 +275,9 @@ fn local_constraints(
     is_video_enabled: bool,
 ) -> LocalTracksConstraints {
     let constraints = LocalTracksConstraints::default();
-    constraints
-        .constrain(media_stream_settings(is_audio_enabled, is_video_enabled));
+    constraints.constrain(
+        media_stream_settings(is_audio_enabled, is_video_enabled).into(),
+    );
 
     constraints
 }
@@ -303,26 +304,26 @@ async fn wait_and_check_test_result(
     };
 }
 
-async fn get_video_track() -> remote::Track {
+async fn get_video_track() -> api::RemoteMediaTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.device_video(DeviceVideoTrackConstraints::new());
-    let stream = manager.get_tracks(settings).await.unwrap();
-    let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
-    remote::Track::new(track, MediaSourceKind::Device)
+    let mut tracks = manager.get_tracks(settings).await.unwrap();
+    let track = tracks.pop().unwrap().0.as_ref().as_ref().fork();
+    remote::Track::new(track, MediaSourceKind::Device, true, false).into()
 }
 
-async fn get_audio_track() -> remote::Track {
+async fn get_audio_track() -> api::RemoteMediaTrack {
     let manager = MediaManager::default();
     let mut settings = MediaStreamSettings::new();
     settings.audio(AudioTrackConstraints::new());
-    let stream = manager.get_tracks(settings).await.unwrap();
-    let track = Clone::clone(stream.into_iter().next().unwrap().0.sys_track());
-    remote::Track::new(track, MediaSourceKind::Device)
+    let mut tracks = manager.get_tracks(settings).await.unwrap();
+    let track = tracks.pop().unwrap().0.as_ref().as_ref().fork();
+    remote::Track::new(track, MediaSourceKind::Device, true, false).into()
 }
 
 /// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If within
-/// provided `timeout` time this [`LocalBoxFuture`] won'tbe resolved, then
+/// provided `timeout` time this [`LocalBoxFuture`] won't be resolved, then
 /// `Err(String)` will be returned, otherwise a result of the provided
 /// [`LocalBoxFuture`] will be returned.
 async fn timeout<T>(timeout_ms: i32, future: T) -> Result<T::Output, String>
@@ -343,6 +344,17 @@ where
 /// Async [`std::thread::yield_now`].
 pub async fn yield_now() {
     delay_for(0).await;
+}
+
+/// Returns [`Window`] object.
+///
+/// # Panics
+///
+/// When global [`Window`] object is inaccessible.
+pub fn window() -> web_sys::Window {
+    // Cannot use `lazy_static` since `window` is `!Sync`.
+    // Safe to unwrap.
+    web_sys::window().unwrap()
 }
 
 // TODO: Might be extended to proc macro at some point.

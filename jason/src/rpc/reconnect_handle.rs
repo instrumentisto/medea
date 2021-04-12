@@ -2,26 +2,31 @@
 
 use std::{rc::Weak, time::Duration};
 
-use derive_more::Display;
-use js_sys::Promise;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::future_to_promise;
+use derive_more::{Display, From};
+use tracerr::Traced;
 
 use crate::{
-    rpc::{BackoffDelayer, RpcSession},
-    utils::{delay_for, HandlerDetachedError, JasonError, JsCaused, JsError},
+    platform,
+    rpc::{BackoffDelayer, RpcSession, SessionError},
+    utils::JsCaused,
 };
 
-/// Error which indicates that [`RpcSession`]'s (which this [`ReconnectHandle`]
-/// tries to reconnect) token is `None`.
-#[derive(Debug, Display, JsCaused)]
-struct NoTokenError;
+/// Errors occurring in a [`ReconnectHandle`].
+#[derive(Clone, From, Display, JsCaused)]
+#[js(error = "platform::Error")]
+pub enum ReconnectError {
+    /// Some [`SessionError`] has occurred while reconnecting.
+    #[display(fmt = "{}", _0)]
+    Session(#[js(cause)] SessionError),
 
-/// Handle that JS side can reconnect to the Medea media server on
-/// a connection loss with.
+    /// [`ReconnectHandle`]'s [`Weak`] pointer is detached.
+    #[display(fmt = "Reconnector is in detached state")]
+    Detached,
+}
+
+/// External handle used to reconnect to a media server when connection is lost.
 ///
-/// This handle will be provided into `Room.on_connection_loss` callback.
-#[wasm_bindgen]
+/// This handle will be passed to a `Room.on_connection_loss` callback.
 #[derive(Clone)]
 pub struct ReconnectHandle(Weak<dyn RpcSession>);
 
@@ -33,27 +38,31 @@ impl ReconnectHandle {
     pub fn new(rpc: Weak<dyn RpcSession>) -> Self {
         Self(rpc)
     }
-}
 
-#[wasm_bindgen]
-impl ReconnectHandle {
     /// Tries to reconnect after the provided delay in milliseconds.
     ///
     /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
-    pub fn reconnect_with_delay(&self, delay_ms: u32) -> Promise {
-        let rpc = Clone::clone(&self.0);
-        future_to_promise(async move {
-            delay_for(Duration::from_millis(u64::from(delay_ms)).into()).await;
+    ///
+    /// # Errors
+    ///
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
+    ///
+    /// With [`ReconnectError::Session`] if error while reconnecting has
+    /// occurred.
+    pub async fn reconnect_with_delay(
+        &self,
+        delay_ms: u32,
+    ) -> Result<(), Traced<ReconnectError>> {
+        platform::delay_for(Duration::from_millis(u64::from(delay_ms))).await;
 
-            let rpc = upgrade_or_detached!(rpc, JsValue)?;
-            rpc.reconnect()
-                .await
-                .map_err(|e| JsValue::from(JasonError::from(e)))?;
+        let rpc = self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?;
 
-            Ok(JsValue::UNDEFINED)
-        })
+        rpc.reconnect().await.map_err(tracerr::map_from_and_wrap!())
     }
 
     /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
@@ -74,29 +83,33 @@ impl ReconnectHandle {
     ///
     /// If `multiplier` is negative number than `multiplier` will be considered
     /// as `0.0`.
-    pub fn reconnect_with_backoff(
+    ///
+    /// # Errors
+    ///
+    /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
+    pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
         multiplier: f32,
         max_delay: u32,
-    ) -> Promise {
-        let rpc = self.0.clone();
-        future_to_promise(async move {
-            let mut backoff_delayer = BackoffDelayer::new(
-                Duration::from_millis(u64::from(starting_delay_ms)).into(),
-                multiplier,
-                Duration::from_millis(u64::from(max_delay)).into(),
-            );
+    ) -> Result<(), Traced<ReconnectError>> {
+        let mut backoff_delayer = BackoffDelayer::new(
+            Duration::from_millis(u64::from(starting_delay_ms)),
+            multiplier,
+            Duration::from_millis(u64::from(max_delay)),
+        );
+        backoff_delayer.delay().await;
+        while self
+            .0
+            .upgrade()
+            .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?
+            .reconnect()
+            .await
+            .is_err()
+        {
             backoff_delayer.delay().await;
-            while upgrade_or_detached!(rpc, JsValue)?
-                .reconnect()
-                .await
-                .is_err()
-            {
-                backoff_delayer.delay().await;
-            }
+        }
 
-            Ok(JsValue::UNDEFINED)
-        })
+        Ok(())
     }
 }

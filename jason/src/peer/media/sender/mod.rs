@@ -6,15 +6,14 @@ use std::{cell::Cell, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::TrackId;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
         track::local, LocalTracksConstraints, MediaKind, TrackConstraints,
     },
-    peer::{
-        transceiver::{Transceiver, TransceiverDirection},
-        TrackEvent,
-    },
+    peer::TrackEvent,
+    platform,
 };
 
 use super::{
@@ -22,13 +21,14 @@ use super::{
     MediaStateControllable, Result,
 };
 
+#[doc(inline)]
 pub use self::component::{Component, State};
 
 /// Representation of a [`local::Track`] that is being sent to some remote peer.
 pub struct Sender {
     track_id: TrackId,
     caps: TrackConstraints,
-    transceiver: Transceiver,
+    transceiver: platform::Transceiver,
     muted: Cell<bool>,
     enabled_individual: Cell<bool>,
     enabled_general: Cell<bool>,
@@ -37,10 +37,9 @@ pub struct Sender {
 }
 
 impl Sender {
-    /// Creates new [`Transceiver`] if provided `mid` is [`None`], otherwise
-    /// retrieves existing [`Transceiver`] via provided `mid` from a
-    /// provided [`MediaConnections`]. Errors if [`Transceiver`] lookup
-    /// fails.
+    /// Creates a new [`platform::Transceiver`] if the provided `mid` is
+    /// [`None`], otherwise retrieves an existing [`platform::Transceiver`] via
+    /// the provided `mid` from the provided [`MediaConnections`].
     ///
     /// # Errors
     ///
@@ -82,8 +81,10 @@ impl Sender {
                 })
                 .and_then(|rcvr| rcvr.transceiver())
                 .unwrap_or_else(|| {
-                    connections
-                        .add_transceiver(kind, TransceiverDirection::INACTIVE)
+                    connections.add_transceiver(
+                        kind,
+                        platform::TransceiverDirection::INACTIVE,
+                    )
                 }),
             Some(mid) => connections
                 .get_transceiver_by_mid(mid)
@@ -128,7 +129,8 @@ impl Sender {
     #[inline]
     #[must_use]
     pub fn is_publishing(&self) -> bool {
-        self.transceiver.has_direction(TransceiverDirection::SEND)
+        self.transceiver
+            .has_direction(platform::TransceiverDirection::SEND)
     }
 
     /// Drops [`local::Track`] used by this [`Sender`]. Sets track used by
@@ -144,7 +146,7 @@ impl Sender {
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     #[inline]
     pub async fn remove_track(&self) {
-        self.transceiver.set_send_track(None).await.unwrap();
+        self.transceiver.drop_send_track().await;
     }
 
     /// Indicates whether this [`Sender`] has [`local::Track`].
@@ -173,7 +175,7 @@ impl Sender {
         new_track.set_enabled(!self.muted.get());
 
         self.transceiver
-            .set_send_track(Some(Rc::new(new_track)))
+            .set_send_track(Rc::new(new_track))
             .await
             .map_err(Into::into)
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
@@ -182,10 +184,10 @@ impl Sender {
         Ok(())
     }
 
-    /// Returns [`Transceiver`] of this [`Sender`].
+    /// Returns [`platform::Transceiver`] of this [`Sender`].
     #[inline]
     #[must_use]
-    pub fn transceiver(&self) -> Transceiver {
+    pub fn transceiver(&self) -> platform::Transceiver {
         self.transceiver.clone()
     }
 
@@ -260,5 +262,15 @@ impl Sender {
     #[must_use]
     pub fn muted(&self) -> bool {
         self.muted.get()
+    }
+}
+
+impl Drop for Sender {
+    fn drop(&mut self) {
+        if !self.transceiver.is_stopped() {
+            self.transceiver
+                .sub_direction(platform::TransceiverDirection::SEND);
+            spawn_local(self.transceiver.drop_send_track());
+        }
     }
 }

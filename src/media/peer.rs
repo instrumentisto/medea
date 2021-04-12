@@ -172,9 +172,9 @@ impl PeerError {
 /// +---------------+                   +------------------+
 /// ```
 #[enum_delegate(pub fn id(&self) -> Id)]
-#[enum_delegate(pub fn member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn member_id(&self) -> &MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
-#[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn partner_member_id(&self) -> &MemberId)]
 #[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
@@ -194,6 +194,7 @@ impl PeerError {
 #[enum_delegate(
     pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate)
 )]
+#[enum_delegate(pub fn is_empty(&self) -> bool)]
 #[enum_delegate(pub fn ice_candidates(&self) -> &HashSet<IceCandidate>)]
 #[enum_delegate(pub fn is_ice_restart(&self) -> bool)]
 #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
@@ -220,7 +221,7 @@ impl PeerStateMachine {
                         id: sender.id(),
                         mid: sender.mid(),
                         media_type: sender.media_type().clone(),
-                        receivers: vec![self.partner_member_id()],
+                        receivers: vec![self.partner_member_id().clone()],
                         enabled_individual: sender
                             .send_media_state()
                             .is_enabled(),
@@ -244,7 +245,7 @@ impl PeerStateMachine {
                         id: *id,
                         mid: receiver.mid(),
                         media_type: receiver.media_type().clone(),
-                        sender_id: self.partner_member_id(),
+                        sender_id: self.partner_member_id().clone(),
                         enabled_individual: receiver
                             .recv_media_state()
                             .is_enabled(),
@@ -488,6 +489,10 @@ pub enum PeerChange {
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
 
+    /// [`TrackId`] of the removed [`MediaTrack`]. Remote [`Peer`] is not aware
+    /// of this change.
+    RemoveTrack(TrackId),
+
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(TrackPatchEvent),
 
@@ -522,7 +527,9 @@ impl PeerChange {
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
         match self.as_peer_update(partner_member_id) {
             PeerUpdate::Added(track) => Some(track),
-            PeerUpdate::Updated(_) | PeerUpdate::IceRestart => None,
+            PeerUpdate::Updated(_)
+            | PeerUpdate::IceRestart
+            | PeerUpdate::Removed(_) => None,
         }
     }
 
@@ -545,6 +552,7 @@ impl PeerChange {
                     mid: track.mid(),
                 },
             }),
+            Self::RemoveTrack(track_id) => PeerUpdate::Removed(*track_id),
             Self::TrackPatch(track_patch)
             | Self::PartnerTrackPatch(track_patch) => {
                 PeerUpdate::Updated(track_patch.clone())
@@ -558,7 +566,8 @@ impl PeerChange {
         match self {
             Self::AddSendTrack(_)
             | Self::AddRecvTrack(_)
-            | Self::IceRestart => false,
+            | Self::IceRestart
+            | Self::RemoveTrack(_) => false,
             Self::TrackPatch(_) | Self::PartnerTrackPatch(_) => true,
         }
     }
@@ -636,6 +645,14 @@ impl<T> PeerChangeHandler for Peer<T> {
         }
 
         PeerChange::TrackPatch(patch)
+    }
+
+    /// Removes [`MediaTrack`] with the provided [`TrackId`] from this [`Peer`].
+    #[inline]
+    fn on_remove_track(&mut self, track_id: TrackId) -> Self::Output {
+        self.context.senders.remove(&track_id);
+        self.context.receivers.remove(&track_id);
+        PeerChange::RemoveTrack(track_id)
     }
 
     /// Sets [`Context::ice_restart`] flag to `true`.
@@ -728,8 +745,8 @@ impl<T> Peer<T> {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     #[inline]
-    pub fn member_id(&self) -> MemberId {
-        self.context.member_id.clone()
+    pub fn member_id(&self) -> &MemberId {
+        &self.context.member_id
     }
 
     /// Returns ID of [`Peer`].
@@ -748,8 +765,8 @@ impl<T> Peer<T> {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     #[inline]
-    pub fn partner_member_id(&self) -> MemberId {
-        self.context.partner_member.clone()
+    pub fn partner_member_id(&self) -> &MemberId {
+        &self.context.partner_member
     }
 
     /// Returns SDP offer of this [`Peer`].
@@ -774,7 +791,7 @@ impl<T> Peer<T> {
         self.context
             .pending_peer_changes
             .iter()
-            .map(|c| c.as_peer_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect()
     }
 
@@ -783,7 +800,7 @@ impl<T> Peer<T> {
         self.context
             .pending_peer_changes
             .iter()
-            .filter_map(|c| c.as_new_track(self.partner_member_id()))
+            .filter_map(|c| c.as_new_track(self.partner_member_id().clone()))
             .collect()
     }
 
@@ -821,7 +838,10 @@ impl<T> Peer<T> {
     pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
         match endpoint {
             Endpoint::WebRtcPlayEndpoint(play) => {
-                play.set_peer_id(self.id());
+                play.set_peer_id_and_partner_peer_id(
+                    self.id(),
+                    self.partner_peer_id(),
+                );
             }
             Endpoint::WebRtcPublishEndpoint(publish) => {
                 publish.add_peer_id(self.id());
@@ -877,7 +897,7 @@ impl<T> Peer<T> {
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .map(|c| c.as_peer_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect();
 
         if !updates.is_empty() {
@@ -917,7 +937,7 @@ impl<T> Peer<T> {
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .map(|c| c.as_peer_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect();
 
         if !updates.is_empty() {
@@ -941,6 +961,34 @@ impl<T> Peer<T> {
     #[must_use]
     pub fn is_known_to_remote(&self) -> bool {
         self.context.is_known_to_remote
+    }
+
+    /// Returns `true` if this [`Peer`] doesn't have any `Send` and `Recv`
+    /// [`MediaTrack`]s.
+    pub fn is_empty(&self) -> bool {
+        if self.context.senders.is_empty() && self.context.receivers.is_empty()
+        {
+            return true;
+        }
+
+        let removed_tracks: HashSet<_> = self
+            .context
+            .peer_changes_queue
+            .iter()
+            .filter_map(|change| match change {
+                PeerChange::RemoveTrack(track_id) => Some(*track_id),
+                _ => None,
+            })
+            .collect();
+        let peers_tracks: HashSet<_> = self
+            .context
+            .senders
+            .iter()
+            .chain(self.context.receivers.iter())
+            .map(|t| *t.0)
+            .collect();
+
+        removed_tracks == peers_tracks
     }
 
     /// Returns [`PeerChangesScheduler`] for this [`Peer`].
@@ -1269,7 +1317,9 @@ impl Peer<Stable> {
                     self.id(),
                     negotiationless_changes
                         .into_iter()
-                        .map(|c| c.as_peer_update(self.partner_member_id()))
+                        .map(|c| {
+                            c.as_peer_update(self.partner_member_id().clone())
+                        })
                         .collect(),
                 );
             } else {
@@ -1352,6 +1402,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
+            src.add_track_id(self.context.id, track_audio.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(track_audio);
@@ -1367,6 +1418,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&camera_video_track));
+            src.add_track_id(self.context.id, camera_video_track.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(camera_video_track);
@@ -1378,6 +1430,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&display_video_track));
+            src.add_track_id(self.context.id, display_video_track.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(display_video_track);
@@ -1408,6 +1461,36 @@ impl<'a> PeerChangesScheduler<'a> {
     #[inline]
     fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.schedule_change(PeerChange::AddSendTrack(track));
+    }
+
+    /// Removes [`Track`]s with a provided [`TrackId`]s from this [`Peer`].
+    pub fn remove_tracks(&mut self, track_ids: &[TrackId]) {
+        track_ids.iter().for_each(|id| {
+            let changes_indexes_to_remove: Vec<_> = self
+                .context
+                .peer_changes_queue
+                .iter()
+                .enumerate()
+                .filter_map(|(n, change)| match change {
+                    PeerChange::AddSendTrack(track)
+                    | PeerChange::AddRecvTrack(track) => {
+                        if track.id() == *id {
+                            Some(n)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                })
+                .collect();
+            if changes_indexes_to_remove.is_empty() {
+                self.schedule_change(PeerChange::RemoveTrack(*id))
+            } else {
+                for remove_index in changes_indexes_to_remove {
+                    self.context.peer_changes_queue.remove(remove_index);
+                }
+            }
+        });
     }
 }
 

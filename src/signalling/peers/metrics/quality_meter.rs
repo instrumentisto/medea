@@ -93,7 +93,7 @@ impl RtcStatsHandler for QualityMeterStatsHandler {
             .unwrap_or_default();
         let peer_metric = Rc::new(RefCell::new(PeerMetric {
             id,
-            member_id: peer.member_id(),
+            member_id: peer.member_id().clone(),
             partner_peer,
             quality_meter: QualityMeter::new(Duration::from_secs(5)),
             connection_state: PeerConnectionState::New,

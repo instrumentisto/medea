@@ -1,6 +1,6 @@
 //! [MediaStreamConstraints][1] related objects.
 //!
-//! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+//! [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
 
 use std::{collections::HashMap, convert::TryFrom, rc::Rc};
 
@@ -10,16 +10,18 @@ use tracerr::Traced;
 
 use crate::{
     media::{
-        track::local, AudioTrackConstraints, MediaKind, MediaStreamSettings,
+        track::local, AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaKind, MediaStreamSettings,
         TrackConstraints, VideoSource,
     },
-    utils::{JsCaused, JsError},
-    DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
+    platform,
+    utils::JsCaused,
 };
 
 /// Errors that may occur when validating [`TracksRequest`] or
 /// parsing [`local::Track`]s.
 #[derive(Clone, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
 pub enum TracksRequestError {
     /// [`TracksRequest`] contains multiple [`AudioTrackConstraints`].
     #[display(fmt = "only one audio track is allowed in SimpleTracksRequest")]
@@ -74,9 +76,9 @@ type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 /// should be included into returned `MediaStream`, and, optionally,
 /// to establish constraints for those track's settings.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-/// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
-/// [3]: https://w3.org/TR/mediacapture-streams/#mediastream
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
+/// [2]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
+/// [3]: https://w3.org/TR/mediacapture-streams#mediastream
 #[derive(Debug, Default)]
 pub struct TracksRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,
@@ -164,7 +166,7 @@ impl SimpleTracksRequest {
 
         if let Some((id, audio)) = &self.audio {
             if let Some(track) = audio_tracks.into_iter().next() {
-                if audio.satisfies(track.sys_track()) {
+                if audio.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidAudioTrack));
@@ -173,7 +175,7 @@ impl SimpleTracksRequest {
         }
         if let Some((id, device_video)) = &self.device_video {
             if let Some(track) = device_video_tracks.into_iter().next() {
-                if device_video.satisfies(track.sys_track()) {
+                if device_video.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));
@@ -182,7 +184,7 @@ impl SimpleTracksRequest {
         }
         if let Some((id, display_video)) = &self.display_video {
             if let Some(track) = display_video_tracks.into_iter().next() {
-                if display_video.satisfies(track.sys_track()) {
+                if display_video.satisfies(track.as_ref()) {
                     parsed_tracks.insert(*id, track);
                 } else {
                     return Err(tracerr::new!(InvalidVideoTrack));

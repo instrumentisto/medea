@@ -7,9 +7,8 @@ use futures::{
     future,
     future::{AbortHandle, FutureExt},
 };
-use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::delay_for;
+use crate::platform;
 
 type FutureResolver = Rc<RefCell<Option<oneshot::Sender<()>>>>;
 
@@ -84,12 +83,12 @@ impl ResettableDelayHandle {
         let future_resolver = self.future_resolver.clone();
         let timeout = self.timeout;
         let (fut, abort) = future::abortable(async move {
-            delay_for(timeout.into()).await;
-            if let Some(rslvr) = future_resolver.borrow_mut().take() {
-                let _ = rslvr.send(());
+            platform::delay_for(timeout).await;
+            if let Some(rsvr) = future_resolver.borrow_mut().take() {
+                let _ = rsvr.send(());
             }
         });
-        spawn_local(fut.map(drop));
+        platform::spawn(fut.map(drop));
 
         self.abort_handle.replace(abort);
     }
