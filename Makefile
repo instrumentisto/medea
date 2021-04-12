@@ -62,15 +62,33 @@ crate-ver := $(strip \
 # Usage:
 #	make build
 
-build: build.medea build.jason
+build: build.medea build.jason.wasm
 
 
 build.medea:
 	@make cargo.build crate=medea debug=$(debug) dockerized=$(dockerized)
 
-
-build.jason:
+build.jason.wasm:
 	@make cargo.build crate=medea-jason debug=$(debug) dockerized=$(dockerized)
+
+build.jason.android:
+ifeq ($(target),)
+	@make build.jason.android target=arm64-v8a
+	@make build.jason.android target=armeabi-v7a
+	@make build.jason.android target=x86
+	@make build.jason.android target=x86_64
+else
+	cd jason && \
+		cargo ndk --platform 28 \
+			--target ${target} \
+			-o ../../jason/flutter/android/src/main/jniLibs \
+			build
+endif
+
+build.jason.ios:
+	cd jason && cargo lipo
+	cp target/universal/debug/libjason.a \
+	   jason/flutter/ios
 
 
 # Resolve all project dependencies.
@@ -247,7 +265,7 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
+	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev) -- --features wasm
 endif
 endif
 
@@ -815,7 +833,7 @@ docker-up-e2e-env = RUST_BACKTRACE=1 \
 			$(CHROME_VERSION) ))
 
 docker.up.e2e: docker.down.e2e
-	@make build.jason debug=$(debug) dockerized=no
+	@make build.jason.wasm debug=$(debug) dockerized=no
 	env $(docker-up-e2e-env) \
 	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		up $(if $(call eq,$(dockerized),yes),\
@@ -1085,9 +1103,10 @@ endef
 # .PHONY section #
 ##################
 
-.PHONY: build build.jason build.medea \
+.PHONY: build build.jason.wasm build.jason.android build.jason.ios build.medea \
         cargo cargo.build cargo.changelog.link cargo.fmt cargo.gen cargo.lint \
         	cargo.version \
+		crate.type.jason \
         docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
         	docker.down.e2e docker.down.medea docker.down.webdriver  \

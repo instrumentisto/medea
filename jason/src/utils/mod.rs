@@ -5,6 +5,7 @@ mod errors;
 
 pub mod component;
 mod resettable_delay;
+pub mod dart;
 
 use std::future::Future;
 

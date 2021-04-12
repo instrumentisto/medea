@@ -1,9 +1,11 @@
 //! External [`Jason`] API.
 
+#[cfg(feature = "wasm")]
 pub mod wasm;
 
 use crate::media;
 
+#[cfg(feature = "wasm")]
 pub use self::wasm::{
     connection_handle::ConnectionHandle,
     constraints_update_exception::ConstraintsUpdateException,

@@ -15,10 +15,12 @@ categories = ["multimedia", "api-bindings", "web-programming", "wasm"]
 exclude = ["/demo/", "/e2e-demo/"]
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
 
 [features]
-default = ["console_error_panic_hook", "wee_alloc"]
+default = []
+wasm = ["console_error_panic_hook", "wee_alloc", "js-sys", "wasm-bindgen", "wasm-bindgen-futures", "wasm-logger"]
+dart = []
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 
 [dependencies]
@@ -26,12 +28,13 @@ async-recursion = "0.3"
 async-trait = "0.1"
 bitflags = "1.2"
 console_error_panic_hook = { version = "0.1", optional = true }
+dart-sys = "0.2"
 derivative = "2.1"
 derive_more = "0.99"
 downcast = { version = "0.10", optional = true }
 fragile = { version = "1.0", optional = true }
 futures = "0.3"
-js-sys = "0.3"
+js-sys = { version = "0.3", optional = true }
 log = "0.4"
 medea-client-api-proto = { version = "0.3", features = ["jason"] }
 medea-macro = "0.2"
@@ -42,9 +45,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tracerr = "0.1"
 url = "2.1"
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4"
-wasm-logger = "0.2"
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"], optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+wasm-logger = { version = "0.2", optional = true }
 wee_alloc = { version = "0.4", optional = true }
 [dependencies.web-sys]
     version = "0.3.47"
