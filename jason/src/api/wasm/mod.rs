@@ -23,7 +23,7 @@ pub use self::jason_error::JasonError;
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaKind {
@@ -48,7 +48,7 @@ pub enum MediaSourceKind {
 /// Describes directions that a camera can face, as seen from a user's
 /// perspective. Representation of a [VideoFacingModeEnum][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-videofacingmodeenum
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum FacingMode {

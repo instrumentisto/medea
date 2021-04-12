@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    create_room_req, ControlClient, MemberBuilder, RoomBuilder,
+    pub_sub_room_req, ControlClient, MemberBuilder, RoomBuilder,
     WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
 };
 
@@ -28,7 +28,7 @@ mod room {
     #[named]
     async fn room() {
         let mut client = ControlClient::new().await;
-        let sids = client.create(create_room_req(test_name!())).await;
+        let sids = client.create(pub_sub_room_req(test_name!())).await;
         assert_eq!(sids.len(), 2);
         sids.get(&"publisher".to_string()).unwrap();
         let responder_sid =
@@ -128,7 +128,7 @@ mod member {
     #[named]
     async fn member() {
         let mut client = ControlClient::new().await;
-        client.create(create_room_req(test_name!())).await;
+        client.create(pub_sub_room_req(test_name!())).await;
 
         let add_member = MemberBuilder::default()
             .id("test-member")
@@ -232,7 +232,7 @@ mod endpoint {
     use std::time::Duration;
 
     use futures::{channel::mpsc, StreamExt as _};
-    use medea_client_api_proto::{Event, TrackUpdate};
+    use medea_client_api_proto::{Event, PeerUpdate};
     use tokio::time::timeout;
 
     use super::*;
@@ -241,7 +241,7 @@ mod endpoint {
     #[named]
     async fn endpoint() {
         let mut client = ControlClient::new().await;
-        client.create(create_room_req(test_name!())).await;
+        client.create(pub_sub_room_req(test_name!())).await;
 
         let create_req = WebRtcPublishEndpointBuilder::default()
             .id("publish")
@@ -391,7 +391,7 @@ mod endpoint {
     #[named]
     async fn create_endpoint_in_the_interconnected_members() {
         let mut client = ControlClient::new().await;
-        let credentials = client.create(create_room_req(test_name!())).await;
+        let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
         let (publisher_tx, mut rx) = mpsc::unbounded::<()>();
         let publisher_done = timeout(Duration::from_secs(5), rx.next());
@@ -404,10 +404,10 @@ mod endpoint {
             credentials.get("publisher").unwrap(),
             Some(Box::new(move |event, _, _| {
                 match event {
-                    Event::TracksApplied { updates, .. } => {
+                    Event::PeerUpdated { updates, .. } => {
                         if updates
                             .iter()
-                            .any(|u| enum_eq!(TrackUpdate::Added, u))
+                            .any(|u| enum_eq!(PeerUpdate::Added, u))
                         {
                             publisher_tx.unbounded_send(()).unwrap();
                         }
@@ -427,8 +427,8 @@ mod endpoint {
         let _responder = TestMember::connect(
             credentials.get("responder").unwrap(),
             Some(Box::new(move |event, _, events| {
-                if let Event::TracksApplied { updates, .. } = event {
-                    if updates.iter().any(|u| enum_eq!(TrackUpdate::Added, u)) {
+                if let Event::PeerUpdated { updates, .. } = event {
+                    if updates.iter().any(|u| enum_eq!(PeerUpdate::Added, u)) {
                         responder_tx.unbounded_send(()).unwrap();
                         let sdp_answer_made_count = events
                             .iter()

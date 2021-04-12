@@ -5,10 +5,11 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
+    fmt,
     time::Duration,
 };
 
-use medea_client_api_proto::{self as client_proto, MemberId as Id};
+use medea_client_api_proto::{self as client_proto, MemberId as Id, RoomId};
 use medea_control_api_proto::grpc::api as proto;
 use serde::Deserialize;
 
@@ -24,8 +25,54 @@ use crate::{
         EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
         WebRtcPlayId,
     },
+    conf::server::PublicUrl,
     utils,
 };
+
+/// URI used by `Member`s to connect to a media server via Client API.
+#[derive(Clone, Debug)]
+pub struct Sid {
+    /// Public URL of HTTP server to establish WebSocket connection with.
+    public_url: PublicUrl,
+
+    /// [`RoomId`] of the `Room` the `Member` participates in.
+    room_id: RoomId,
+
+    /// [`Id`] of the `Member`.
+    member_id: Id,
+
+    /// [`Credential`] of the `Member` to authorize his connection with.
+    credential: Credential,
+}
+
+impl Sid {
+    /// Returns a new [`Sid`] for the provided authentication data.
+    #[inline]
+    #[must_use]
+    pub fn new(
+        public_url: PublicUrl,
+        room_id: RoomId,
+        member_id: Id,
+        credential: Credential,
+    ) -> Self {
+        Self {
+            public_url,
+            room_id,
+            member_id,
+            credential,
+        }
+    }
+}
+
+impl fmt::Display for Sid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}/{}", self.public_url, self.room_id, self.member_id)?;
+        if let Credential::Plain(plain) = &self.credential {
+            write!(f, "?token={}", plain)?;
+        }
+        Ok(())
+    }
+}
 
 /// Credentials of the `Member` element.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -137,16 +184,17 @@ pub struct MemberSpec {
     ping_interval: Option<Duration>,
 }
 
-impl Into<RoomElement> for MemberSpec {
-    fn into(self) -> RoomElement {
-        RoomElement::Member {
-            spec: self.pipeline,
-            credentials: self.credentials,
-            on_join: self.on_join,
-            on_leave: self.on_leave,
-            idle_timeout: self.idle_timeout,
-            reconnect_timeout: self.reconnect_timeout,
-            ping_interval: self.ping_interval,
+impl From<MemberSpec> for RoomElement {
+    #[inline]
+    fn from(spec: MemberSpec) -> Self {
+        Self::Member {
+            spec: spec.pipeline,
+            credentials: spec.credentials,
+            on_join: spec.on_join,
+            on_leave: spec.on_leave,
+            idle_timeout: spec.idle_timeout,
+            reconnect_timeout: spec.reconnect_timeout,
+            ping_interval: spec.ping_interval,
         }
     }
 }
@@ -154,6 +202,7 @@ impl Into<RoomElement> for MemberSpec {
 impl MemberSpec {
     /// Creates new [`MemberSpec`] with the given parameters.
     #[inline]
+    #[must_use]
     pub fn new(
         pipeline: Pipeline<EndpointId, MemberElement>,
         credentials: Credential,
@@ -187,12 +236,27 @@ impl MemberSpec {
     }
 
     /// Lookups [`WebRtcPublishEndpoint`] by ID.
+    #[must_use]
     pub fn get_publish_endpoint_by_id(
         &self,
         id: WebRtcPublishId,
     ) -> Option<&WebRtcPublishEndpoint> {
         let e = self.pipeline.get(&id.into())?;
         if let MemberElement::WebRtcPublishEndpoint { spec } = e {
+            Some(spec)
+        } else {
+            None
+        }
+    }
+
+    /// Lookups a [`WebRtcPlayEndpoint`] by its ID.
+    #[must_use]
+    pub fn get_play_endpoint_by_id(
+        &self,
+        id: WebRtcPlayId,
+    ) -> Option<&WebRtcPlayEndpoint> {
+        let e = self.pipeline.get(&id.into())?;
+        if let MemberElement::WebRtcPlayEndpoint { spec } = e {
             Some(spec)
         } else {
             None
@@ -212,16 +276,22 @@ impl MemberSpec {
     }
 
     /// Returns credentials from this [`MemberSpec`].
+    #[inline]
+    #[must_use]
     pub fn credentials(&self) -> &Credential {
         &self.credentials
     }
 
     /// Returns reference to `on_join` [`CallbackUrl`].
+    #[inline]
+    #[must_use]
     pub fn on_join(&self) -> &Option<CallbackUrl> {
         &self.on_join
     }
 
     /// Returns reference to `on_leave` [`CallbackUrl`].
+    #[inline]
+    #[must_use]
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
     }
@@ -230,6 +300,8 @@ impl MemberSpec {
     /// Client API.
     ///
     /// Once reached, the `Member` is considered being idle.
+    #[inline]
+    #[must_use]
     pub fn idle_timeout(&self) -> Option<Duration> {
         self.idle_timeout
     }
@@ -237,11 +309,15 @@ impl MemberSpec {
     /// Returns timeout of the `Member` reconnecting via Client API.
     ///
     /// Once reached, the `Member` is considered disconnected.
+    #[inline]
+    #[must_use]
     pub fn reconnect_timeout(&self) -> Option<Duration> {
         self.reconnect_timeout
     }
 
     /// Returns interval of sending `Ping`s to the `Member` via Client API.
+    #[inline]
+    #[must_use]
     pub fn ping_interval(&self) -> Option<Duration> {
         self.ping_interval
     }

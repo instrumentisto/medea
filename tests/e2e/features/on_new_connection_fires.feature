@@ -20,3 +20,10 @@ Feature: `on_new_connection` callback
     When Alice joins the room
     Then Alice doesn't receive connection with Bob
     And Bob doesn't receive connection with Alice
+
+  Scenario: Third member joined
+    Given room with joined members Alice and Bob
+    And member Carol
+    When Carol joins the room
+    Then Alice receives connection with Carol
+    And Bob receives connection with Carol

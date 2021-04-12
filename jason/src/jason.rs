@@ -38,6 +38,7 @@ struct Inner {
 
 impl Jason {
     /// Instantiates a new [`Jason`] interface to interact with this library.
+    #[must_use]
     pub fn new() -> Self {
         Self::with_rpc_client(Rc::new(WebSocketRpcClient::new(Box::new(
             |url| {

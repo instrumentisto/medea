@@ -6,8 +6,8 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.1.0-rc.1] · 2021-02-02
-[0.1.0-rc.1]: /../../tree/medea-demo-0.1.0-rc.1/jason/demo
+## [0.1.0] · 2021-04-09
+[0.1.0]: /../../tree/medea-demo-0.1.0/jason/demo
 
 ### Added
 

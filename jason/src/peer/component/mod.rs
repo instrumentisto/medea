@@ -232,6 +232,15 @@ impl State {
         self.restart_ice.set(true);
     }
 
+    /// Removes [`sender::State`] or [`receiver::State`] with the provided
+    /// [`TrackId`].
+    #[inline]
+    pub fn remove_track(&self, track_id: TrackId) {
+        if !self.receivers.remove(track_id) {
+            self.senders.remove(track_id);
+        }
+    }
+
     /// Sets remote SDP offer to the provided value.
     #[inline]
     pub fn set_remote_sdp(&self, sdp: String) {
@@ -320,7 +329,7 @@ impl State {
             .update_local_stream(criteria)
             .await
             .map_err(tracerr::map_from_and_wrap!())
-            .map(|_| ());
+            .map(drop);
         for s in senders {
             if let Err(err) = res.clone() {
                 s.failed_local_stream_update(err);
@@ -550,7 +559,7 @@ impl State {
         use futures::FutureExt as _;
         self.negotiation_state
             .when_eq(NegotiationState::WaitLocalSdpApprove)
-            .map(|_| ())
+            .map(drop)
     }
 
     /// Stabilizes all [`receiver::State`]s of this [`State`].

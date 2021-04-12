@@ -111,6 +111,7 @@ impl Heartbeat {
 
     /// Returns [`LocalBoxStream`] to which will sent `()` when [`Heartbeat`]
     /// considers that [`platform::RpcTransport`] is idle.
+    #[must_use]
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
         self.0.borrow_mut().on_idle_subs.push(on_idle_tx);

@@ -6,10 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.2.0-rc.1] · 2021-02-01
-[0.2.0-rc.1]: /../../tree/medea-jason-0.2.0-rc.1/jason
+## [0.2.0] · 2021-04-09
+[0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
-[Diff](/../../compare/medea-jason-0.1.0...medea-jason-0.2.0-rc.1) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Diff](/../../compare/medea-jason-0.1.0...medea-jason-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### BC Breaks
 
@@ -59,6 +59,9 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.on_failed_local_media` callback ([#54], [#143]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]);
         - `RemoteMediaTrack.on_enabled` and `RemoteMediaTrack.on_disabled` callbacks being called when `RemoteMediaTrack` is enabled or disabled ([#123], [#143], [#156]);
+        - `RemoteMediaTrack.on_stopped` callback that is called when `RemoteMediaTrack` is stopped ([#109]);
+        - `RemoteMediaTrack.on_muted` and `RemoteMediaTrack.on_unmuted` callbacks being called when `RemoteMediaTrack` is muted or unmuted ([#191]);
+        - `RemoteMediaTrack.muted()` method indicating whether this `RemoteMediaTrack` is muted ([#191]);
         - `ConnectionHandle.on_remote_track_added` callback being called when new receiver `RemoteMediaTrack` is added ([#123], [#143], [#156]);
         - Enabling/disabling remote video/audio ([#127], [#155]):
             - `Room.disable_remote_audio`;
@@ -94,7 +97,7 @@ All user visible changes to this project will be documented in this file. This p
         - Enabling/disabling audio/video send/receive via `UpdateTracks` command ([#81], [#155]);
         - Muting/unmuting audio/video send via `UpdateTracks` ([#156]).
     - Handling of RPC events:
-        - `TracksApplied` with `TrackUpdate::Added`, `TrackUpdate::Updated` and `TrackUpdate::IceRestart` ([#105], [#138]);
+        - `PeerUpdated` with `PeerUpdate::Added`, `PeerUpdate::Updated`, `PeerUpdate::IceRestart` and `PeerUpdate::Removed` ([#105], [#138], [#139], [#109]);
         - `ConnectionQualityUpdated` ([#132]).
 - Error handling:
     - Library API:
@@ -120,6 +123,7 @@ All user visible changes to this project will be documented in this file. This p
 [#97]: /../../pull/97
 [#105]: /../../pull/105
 [#106]: /../../pull/106
+[#109]: /../../pull/109
 [#120]: /../../pull/120
 [#123]: /../../pull/123
 [#124]: /../../pull/124
@@ -127,6 +131,7 @@ All user visible changes to this project will be documented in this file. This p
 [#132]: /../../pull/132
 [#137]: /../../pull/137
 [#138]: /../../pull/138
+[#139]: /../../pull/139
 [#143]: /../../pull/143
 [#144]: /../../pull/144
 [#145]: /../../pull/145
@@ -137,6 +142,7 @@ All user visible changes to this project will be documented in this file. This p
 [#158]: /../../pull/158
 [#160]: /../../pull/160
 [#167]: /../../pull/167
+[#191]: /../../pull/191
 
 
 

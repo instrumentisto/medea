@@ -16,12 +16,13 @@ pub struct EventListenerBindError(platform::Error);
 /// Wrapper for closure that handles some [`EventTarget`] event.
 ///
 /// [`EventTarget`]: web_sys::EventTarget
+#[derive(Debug)]
 pub struct EventListener<T, A>
 where
     T: Deref<Target = web_sys::EventTarget>,
 {
     event_name: &'static str,
-    target: Rc<T>,
+    target: Rc<T>, // TODO: Get rid of Rc?
     closure: Closure<dyn FnMut(A)>,
 }
 

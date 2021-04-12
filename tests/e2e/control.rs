@@ -2,8 +2,9 @@
 
 use derive_more::{Display, Error, From};
 use medea_control_api_mock::{
-    api::{Response, SingleGetResponse},
-    proto::{CreateResponse, Element},
+    api::Response,
+    callback::CallbackItem,
+    proto::{CreateResponse, Element, SingleGetResponse},
 };
 
 use crate::conf;
@@ -53,10 +54,41 @@ impl Client {
     pub async fn get(&self, path: &str) -> Result<SingleGetResponse> {
         Ok(self.0.get(&get_url(path)).send().await?.json().await?)
     }
+
+    /// Applies on a media server the provided media [`Element`] identified by
+    /// the provided `path`.
+    pub async fn apply(
+        &self,
+        path: &str,
+        element: Element,
+    ) -> Result<CreateResponse> {
+        Ok(self
+            .0
+            .put(&get_url(path))
+            .json(&element)
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
+
+    // TODO: Server side filtering on GET requests or SSE/WS subscription would
+    //       speed up things. We a probably wasting a lot of time on ser/deser
+    //       of huge JSON's.
+    /// Fetches all callbacks received by Control API mock server.
+    pub async fn callbacks(&self) -> Result<Vec<CallbackItem>> {
+        Ok(self
+            .0
+            .get(&format!("{}/callbacks", *conf::CONTROL_API_ADDR))
+            .send()
+            .await?
+            .json()
+            .await?)
+    }
 }
 
 /// Returns URL of a media [`Element`] identified by the provided `path`.
 #[must_use]
 fn get_url(path: &str) -> String {
-    format!("{}/{}", *conf::CONTROL_API_ADDR, path)
+    format!("{}/control-api/{}", *conf::CONTROL_API_ADDR, path)
 }

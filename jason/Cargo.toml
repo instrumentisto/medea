@@ -1,7 +1,8 @@
 [package]
 name = "medea-jason"
-version = "0.2.0-rc.1"
+version = "0.2.0"
 edition = "2018"
+resolver = "2"
 description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MPL-2.0"
@@ -32,7 +33,7 @@ fragile = { version = "1.0", optional = true }
 futures = "0.3"
 js-sys = "0.3"
 log = "0.4"
-medea-client-api-proto = { version = "0.2", features = ["jason"] }
+medea-client-api-proto = { version = "0.3", features = ["jason"] }
 medea-macro = "0.2"
 medea-reactive = "0.1"
 mockall = { version = "0.9", optional = true }

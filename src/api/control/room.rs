@@ -52,43 +52,6 @@ pub struct RoomSpec {
     pub pipeline: Pipeline<MemberId, RoomElement>,
 }
 
-impl TryFrom<proto::create_request::El> for RoomSpec {
-    type Error = TryFromProtobufError;
-
-    fn try_from(proto: proto::create_request::El) -> Result<Self, Self::Error> {
-        use proto::create_request::El;
-
-        let id = match proto {
-            El::Room(room) => {
-                let mut pipeline = HashMap::new();
-                for (id, room_element) in room.pipeline {
-                    if let Some(elem) = room_element.el {
-                        let member =
-                            MemberSpec::try_from((MemberId(id.clone()), elem))?;
-                        pipeline.insert(id.into(), member.into());
-                    } else {
-                        return Err(TryFromProtobufError::EmptyElement(id));
-                    }
-                }
-
-                let pipeline = Pipeline::new(pipeline);
-                return Ok(Self {
-                    id: room.id.into(),
-                    pipeline,
-                });
-            }
-            El::Member(member) => member.id,
-            El::WebrtcPub(webrtc_pub) => webrtc_pub.id,
-            El::WebrtcPlay(webrtc_play) => webrtc_play.id,
-        };
-
-        Err(TryFromProtobufError::ExpectedOtherElement(
-            String::from("Room"),
-            id,
-        ))
-    }
-}
-
 impl RoomSpec {
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
     ///
@@ -110,6 +73,8 @@ impl RoomSpec {
     }
 
     /// Returns ID of this [`RoomSpec`]
+    #[inline]
+    #[must_use]
     pub fn id(&self) -> &Id {
         &self.id
     }
@@ -130,3 +95,52 @@ impl TryFrom<&RootElement> for RoomSpec {
         }
     }
 }
+
+/// Implements [`TryFrom`] proto element for a [`RoomSpec`].
+macro_rules! impl_from_el_for_room_spec {
+    ($proto_el:path) => {
+        impl TryFrom<$proto_el> for RoomSpec {
+            type Error = TryFromProtobufError;
+
+            fn try_from(proto: $proto_el) -> Result<Self, Self::Error> {
+                use $proto_el as proto_el;
+
+                let id = match proto {
+                    proto_el::Room(room) => {
+                        let mut pipeline = HashMap::new();
+                        for (id, room_element) in room.pipeline {
+                            if let Some(elem) = room_element.el {
+                                let member = MemberSpec::try_from((
+                                    MemberId(id.clone()),
+                                    elem,
+                                ))?;
+                                pipeline.insert(id.into(), member.into());
+                            } else {
+                                return Err(
+                                    TryFromProtobufError::EmptyElement(id),
+                                );
+                            }
+                        }
+
+                        let pipeline = Pipeline::new(pipeline);
+                        return Ok(Self {
+                            id: room.id.into(),
+                            pipeline,
+                        });
+                    }
+                    proto_el::Member(member) => member.id,
+                    proto_el::WebrtcPub(webrtc_pub) => webrtc_pub.id,
+                    proto_el::WebrtcPlay(webrtc_play) => webrtc_play.id,
+                };
+
+                Err(TryFromProtobufError::ExpectedOtherElement(
+                    String::from("Room"),
+                    id,
+                ))
+            }
+        }
+    };
+}
+
+impl_from_el_for_room_spec!(proto::create_request::El);
+impl_from_el_for_room_spec!(proto::apply_request::El);

@@ -63,6 +63,7 @@ enum NotificationVariants<'a> {
 
 impl Notification {
     /// Builds `method: Created` [`Notification`].
+    #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn created(fid: &Fid, element: &Element) -> Notification {
         Self(
@@ -75,6 +76,7 @@ impl Notification {
     }
 
     /// Builds `method: Deleted` [`Notification`].
+    #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn deleted(fid: &Fid) -> Notification {
         Self(
@@ -86,6 +88,7 @@ impl Notification {
     }
 
     /// Builds `method: Broadcast` [`Notification`].
+    #[allow(clippy::missing_panics_doc)]
     #[must_use]
     pub fn broadcast(payload: Value) -> Notification {
         Self(

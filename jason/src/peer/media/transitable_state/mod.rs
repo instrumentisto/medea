@@ -32,8 +32,8 @@ pub enum MediaState {
     /// Responsible for changing [`enabled`][1] property of
     /// [MediaStreamTrack][2].
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
-    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
     Mute(mute_state::Stable),
 
     /// Responsible for changing [RTCRtpTransceiverDirection][1] to stop
@@ -41,7 +41,7 @@ pub enum MediaState {
     ///
     /// Requires renegotiation for changes to take an effect.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcrtptransceiverdirection
     MediaExchange(media_exchange_state::Stable),
 }
 

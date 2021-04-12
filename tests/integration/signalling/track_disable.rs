@@ -13,15 +13,15 @@ use futures::{
     future, Stream, StreamExt,
 };
 use medea_client_api_proto::{
-    Command, Direction, Event, NegotiationRole, PeerId, TrackId,
-    TrackPatchCommand, TrackUpdate,
+    Command, Direction, Event, NegotiationRole, PeerId, PeerUpdate, TrackId,
+    TrackPatchCommand,
 };
 use medea_control_api_proto::grpc::api as proto;
 use tokio::time::timeout;
 
 use crate::{
     grpc_control_api::{
-        create_room_req, pub_pub_room_req, ControlClient,
+        pub_pub_room_req, pub_sub_room_req, ControlClient,
         WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
     },
     if_let_next,
@@ -32,9 +32,9 @@ use crate::{
 };
 
 // Sends 2 UpdateTracks with provided `enabled`.
-// Waits for single/multiple TracksApplied with expected track changes on on
+// Waits for single/multiple PeerUpdated with expected track changes on on
 // `publisher_rx`.
-// Waits for single/multiple TracksApplied with expected track
+// Waits for single/multiple PeerUpdated with expected track
 // changes on on `subscriber_rx`.
 async fn helper(
     enabled: bool,
@@ -74,14 +74,14 @@ async fn helper(
         let mut first_disabled = false;
         let mut second_disabled = false;
         loop {
-            if let Event::TracksApplied {
+            if let Event::PeerUpdated {
                 peer_id, updates, ..
             } = rx.select_next_some().await
             {
                 assert_eq!(peer_id, expected_peer_id);
                 for update in updates {
                     match update {
-                        TrackUpdate::Updated(patch) => {
+                        PeerUpdate::Updated(patch) => {
                             if let Some(enabled_general) = patch.enabled_general
                             {
                                 assert_eq!(enabled_general, enabled);
@@ -108,7 +108,7 @@ async fn helper(
                 }
             }
         }
-    };
+    }
     wait_tracks_applied(enabled, publisher_rx, PeerId(0)).await;
     wait_tracks_applied(enabled, subscriber_rx, PeerId(1)).await;
 }
@@ -119,7 +119,7 @@ async fn helper(
 #[named]
 async fn track_disables_and_enables() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -170,20 +170,20 @@ async fn track_disables_and_enables_are_instant() {
     ) -> impl Stream<Item = (bool, Option<NegotiationRole>)> {
         rx.filter_map(|val| async {
             match val {
-                Event::TracksApplied {
+                Event::PeerUpdated {
                     mut updates,
                     negotiation_role,
                     ..
                 } => {
                     match updates.len() {
                         0 => {
-                            // 0 updates means that TracksApplied must proc
+                            // 0 updates means that PeerUpdated must proc
                             // negotiation
                             negotiation_role.unwrap();
                             None
                         }
                         1 => {
-                            if let TrackUpdate::Updated(patch) =
+                            if let PeerUpdate::Updated(patch) =
                                 updates.pop().unwrap()
                             {
                                 Some((patch.enabled_general?, negotiation_role))
@@ -200,7 +200,7 @@ async fn track_disables_and_enables_are_instant() {
     }
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -278,9 +278,9 @@ async fn track_disables_and_enables_are_instant() {
     mutes_received_by_pub.dedup();
     assert_eq!(mutes_received_by_pub.len(), mutes_received_by_pub_len);
 
-    // make sure that all TracksApplied events received by sub have
+    // make sure that all PeerUpdated events received by sub have
     // Some(NegotiationRole), meaning that there no point to force push
-    // TracksApplied to other member
+    // PeerUpdated to other member
     assert!(mutes_received_by_sub.iter().all(|val| val.1.is_some()));
 
     assert_eq!(
@@ -293,7 +293,7 @@ async fn track_disables_and_enables_are_instant() {
 #[named]
 async fn track_disables_and_enables_are_instant2() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
     client
         .create(
             WebRtcPublishEndpointBuilder::default()
@@ -387,7 +387,7 @@ async fn track_disables_and_enables_are_instant2() {
         .await
         .unwrap();
     if_let_next! {
-        Event::TracksApplied {
+        Event::PeerUpdated {
             peer_id,
             negotiation_role,
             ..
@@ -409,7 +409,7 @@ async fn track_disables_and_enables_are_instant2() {
         .await
         .unwrap();
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates: _,
             negotiation_role,
@@ -428,7 +428,7 @@ async fn track_disables_and_enables_are_instant2() {
 #[named]
 async fn force_update_works() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (pub_con_established_tx, mut pub_con_established_rx) =
         mpsc::unbounded();
@@ -453,7 +453,7 @@ async fn force_update_works() {
                         }],
                     }));
                 }
-                Event::TracksApplied {
+                Event::PeerUpdated {
                     negotiation_role,
                     peer_id,
                     ..
@@ -511,7 +511,7 @@ async fn force_update_works() {
                     }],
                 }));
             }
-            Event::TracksApplied {
+            Event::PeerUpdated {
                 negotiation_role, ..
             } => {
                 if negotiation_role.is_none() {
@@ -563,7 +563,7 @@ async fn force_update_works() {
 ///
 /// 5. `Alice` sends SDP offer
 ///
-/// 6. `Bob` should receive [`Event::TracksApplied`] with empty updates
+/// 6. `Bob` should receive [`Event::PeerUpdated`] with empty updates
 #[actix_rt::test]
 #[named]
 async fn ordering_on_force_update_is_correct() {
@@ -674,14 +674,14 @@ async fn ordering_on_force_update_is_correct() {
         .await
         .unwrap();
     if_let_next! {
-        Event::TracksApplied {
+        Event::PeerUpdated {
                 peer_id,
                 negotiation_role,
                 mut updates,
         } = alice_events_rx {
             assert_eq!(peer_id, alice_peer_id);
             let update = updates.pop().unwrap();
-            if let TrackUpdate::Updated(patch) = update {
+            if let PeerUpdate::Updated(patch) = update {
                 assert_eq!(patch.id, alice_sender_id);
                 assert_eq!(patch.enabled_individual, Some(true));
                 assert_eq!(patch.enabled_general, Some(true));
@@ -703,7 +703,7 @@ async fn ordering_on_force_update_is_correct() {
         .await
         .unwrap();
     if_let_next! {
-        Event::TracksApplied {
+        Event::PeerUpdated {
             peer_id,
             negotiation_role,
             mut updates,
@@ -711,7 +711,7 @@ async fn ordering_on_force_update_is_correct() {
         {
             assert_eq!(peer_id, alice_peer_id);
             let update = updates.pop().unwrap();
-            if let TrackUpdate::Updated(patch) = update {
+            if let PeerUpdate::Updated(patch) = update {
                 assert_eq!(patch.id, alice_sender_id);
                 assert_eq!(patch.enabled_individual, Some(false));
                 assert_eq!(patch.enabled_general, Some(false));
@@ -733,7 +733,7 @@ async fn ordering_on_force_update_is_correct() {
     .unwrap();
 
     if_let_next! {
-        Event::TracksApplied {
+        Event::PeerUpdated {
             peer_id,
             negotiation_role,
             updates,
@@ -743,7 +743,7 @@ async fn ordering_on_force_update_is_correct() {
             let mut patches: Vec<_> = updates
                 .into_iter()
                 .map(|upd| {
-                    if let TrackUpdate::Updated(patch) = upd {
+                    if let PeerUpdate::Updated(patch) = upd {
                         patch
                     } else {
                         panic!("Expected TrackPatch fount {:?}", upd);
@@ -776,7 +776,7 @@ async fn ordering_on_force_update_is_correct() {
         .unwrap();
 
     if_let_next! {
-        Event::TracksApplied {
+        Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -802,7 +802,7 @@ async fn individual_and_general_mute_states_works() {
     const STAGE3_PROGRESS: AtomicU8 = AtomicU8::new(0);
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (test_finish_tx, test_finish_rx) = mpsc::unbounded();
 
@@ -815,13 +815,13 @@ async fn individual_and_general_mute_states_works() {
             let mut stage3_finished = false;
 
             Box::new(move |event, ctx, _| match event {
-                Event::TracksApplied {
+                Event::PeerUpdated {
                     peer_id, updates, ..
                 } => {
                     assert_eq!(peer_id, &PeerId(1));
                     let update = updates.last().unwrap();
                     match update {
-                        TrackUpdate::Updated(patch) => {
+                        PeerUpdate::Updated(patch) => {
                             if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
                                 && !stage1_finished
                             {
@@ -928,10 +928,10 @@ async fn individual_and_general_mute_states_works() {
                         is_inited = true;
                     }
                 }
-                Event::TracksApplied { updates, .. } => {
+                Event::PeerUpdated { updates, .. } => {
                     let update = updates.last().unwrap();
                     match update {
-                        TrackUpdate::Updated(patch) => {
+                        PeerUpdate::Updated(patch) => {
                             if STAGE1_PROGRESS.load(Ordering::Relaxed) < 2
                                 && !is_stage1_finished
                             {

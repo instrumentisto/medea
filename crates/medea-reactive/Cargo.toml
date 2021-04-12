@@ -1,7 +1,8 @@
 [package]
 name = "medea-reactive"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
+resolver = "2"
 description = "Reactive mutable data containers"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "BlueOak-1.0.0"

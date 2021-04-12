@@ -1,6 +1,6 @@
 //! Adapters to [RTCPeerConnection][1] and related objects.
 //!
-//! [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+//! [1]: https://w3.org/TR/webrtc#rtcpeerconnection-interface
 
 mod component;
 pub mod media;
@@ -53,7 +53,7 @@ pub use self::{
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
-/// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+/// [1]: https://w3.org/TR/webrtc#rtcpeerconnection-interface
 #[derive(Clone, Debug, Display, From, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum PeerError {
@@ -68,7 +68,7 @@ pub enum PeerError {
     /// Errors that may occur during signaling between this and remote
     /// [RTCPeerConnection][1] and event handlers setting errors.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcpeerconnection
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(#[js(cause)] platform::RtcPeerConnectionError),
 
@@ -113,27 +113,27 @@ pub enum PeerEvent {
     ///
     /// Wrapper around [RTCPeerConnectionIceEvent][1].
     ///
-    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnectioniceevent
+    /// [1]: https://w3.org/TR/webrtc#rtcpeerconnectioniceevent
     IceCandidateDiscovered {
         /// ID of the [`PeerConnection`] that discovered new ICE candidate.
         peer_id: Id,
 
         /// [`candidate` field][2] of the discovered [RTCIceCandidate][1].
         ///
-        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-candidate
+        /// [1]: https://w3.org/TR/webrtc#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc#dom-rtcicecandidate-candidate
         candidate: String,
 
         /// [`sdpMLineIndex` field][2] of the discovered [RTCIceCandidate][1].
         ///
-        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmlineindex
+        /// [1]: https://w3.org/TR/webrtc#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc#dom-rtcicecandidate-sdpmlineindex
         sdp_m_line_index: Option<u16>,
 
         /// [`sdpMid` field][2] of the discovered [RTCIceCandidate][1].
         ///
-        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
-        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
+        /// [1]: https://w3.org/TR/webrtc#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc#dom-rtcicecandidate-sdpmid
         sdp_mid: Option<String>,
     },
 
@@ -155,12 +155,12 @@ pub enum PeerEvent {
 
     /// [`platform::RtcPeerConnection`]'s [ICE connection][1] state changed.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
+    /// [1]: https://w3.org/TR/webrtc#dfn-ice-connection-state
     IceConnectionStateChanged {
         /// ID of the [`PeerConnection`] that sends
         /// [`iceconnectionstatechange`][1] event.
         ///
-        /// [1]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
+        /// [1]: https://w3.org/TR/webrtc#event-iceconnectionstatechange
         peer_id: Id,
 
         /// New [`IceConnectionState`].
@@ -169,12 +169,12 @@ pub enum PeerEvent {
 
     /// [`platform::RtcPeerConnection`]'s [connection][1] state changed.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
+    /// [1]: https://w3.org/TR/webrtc#dfn-ice-connection-state
     ConnectionStateChanged {
         /// ID of the [`PeerConnection`] that sends
         /// [`connectionstatechange`][1] event.
         ///
-        /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
+        /// [1]: https://w3.org/TR/webrtc#event-connectionstatechange
         peer_id: Id,
 
         /// New [`PeerConnectionState`].
@@ -701,7 +701,7 @@ impl PeerConnection {
     /// [`local::Track`] couldn't inserted into [`PeerConnection`]s [`Sender`]s.
     ///
     /// [`Sender`]: sender::Sender
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediastream
     /// [2]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub async fn update_local_stream(
         &self,
@@ -937,6 +937,13 @@ impl PeerConnection {
             );
         }
         Ok(())
+    }
+
+    /// Removes a [`sender::Component`] and a [`receiver::Component`] with the
+    /// provided [`TrackId`] from this [`PeerConnection`].
+    #[inline]
+    pub fn remove_track(&self, track_id: TrackId) {
+        self.media_connections.remove_track(track_id);
     }
 }
 

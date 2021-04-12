@@ -27,7 +27,7 @@ use super::track::local;
 pub enum MediaManagerError {
     /// Occurs when cannot get access to [MediaDevices][1] object.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
     CouldNotGetMediaDevices(platform::Error),
 
@@ -45,7 +45,7 @@ pub enum MediaManagerError {
 
     /// Occurs when cannot get info about connected [MediaDevices][1].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(platform::Error),
 
@@ -73,7 +73,7 @@ type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 /// [`local::Track`]s, so if there are no strong references to some track,
 /// then this track is stopped and deleted from [`MediaManager`].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Default)]
 pub struct MediaManager(Rc<InnerMediaManager>);
@@ -239,7 +239,7 @@ impl InnerMediaManager {
     /// With [`MediaManagerError::LocalTrackIsEnded`] if at least one track from
     /// the provided [`platform::MediaStreamTrack`]s is in [`ended`][1] state.
     ///
-    /// In case of error all tracks are stopped and are not saved in
+    /// In case of error all tracks are ended and are not saved in
     /// [`MediaManager`]'s tracks storage.
     ///
     /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
@@ -298,6 +298,7 @@ impl MediaManager {
 
     /// Instantiates a new [`MediaManagerHandle`] for external usage.
     #[inline]
+    #[must_use]
     pub fn new_handle(&self) -> MediaManagerHandle {
         MediaManagerHandle(Rc::downgrade(&self.0))
     }
@@ -313,7 +314,7 @@ impl MediaManager {
 /// are no strong references to some track, then this track is stopped and
 /// deleted from [`MediaManager`].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Clone)]
 pub struct MediaManagerHandle(Weak<InnerMediaManager>);

@@ -99,6 +99,7 @@ impl ControlClient {
     /// # Errors
     ///
     /// Errors if gRPC request fails.
+    #[allow(clippy::missing_panics_doc)]
     pub async fn create(
         &self,
         id: String,
@@ -142,6 +143,38 @@ impl ControlClient {
         response.map(tonic::Response::into_inner)
     }
 
+    /// Applies the provided element via gRPC Control API.
+    ///
+    /// # Errors
+    ///
+    /// Errors if gRPC request fails.
+    pub async fn apply(
+        &self,
+        id: String,
+        fid: Fid,
+        element: Element,
+    ) -> Result<proto::CreateResponse, Status> {
+        use proto::apply_request::El;
+
+        let el = match element {
+            Element::Room(room) => El::Room(room.into_proto(id)),
+            Element::Member(member) => El::Member(member.into_proto(id)),
+            Element::WebRtcPlayEndpoint(webrtc_play) => {
+                El::WebrtcPlay(webrtc_play.into_proto(id))
+            }
+            Element::WebRtcPublishEndpoint(webrtc_pub) => {
+                El::WebrtcPub(webrtc_pub.into_proto(id))
+            }
+        };
+        let req = proto::ApplyRequest {
+            parent_fid: fid.into(),
+            el: Some(el),
+        };
+
+        let response = self.get_client().apply(tonic::Request::new(req)).await;
+        response.map(tonic::Response::into_inner)
+    }
+
     /// Gets element from Control API by FID.
     ///
     /// # Errors
@@ -160,6 +193,7 @@ impl ControlClient {
     /// # Errors
     ///
     /// Errors if gRPC request fails.
+    #[allow(clippy::missing_panics_doc)]
     pub async fn delete(&self, fid: Fid) -> Result<proto::Response, Status> {
         let req = id_request(vec![fid.clone().into()]);
         let response = self.get_client().delete(tonic::Request::new(req)).await;

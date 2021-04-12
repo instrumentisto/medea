@@ -1,6 +1,6 @@
 //! [MediaStreamTrack][1] related objects.
 //!
-//! [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+//! [1]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
 
 pub mod local;
 pub mod remote;

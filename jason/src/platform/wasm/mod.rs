@@ -53,6 +53,10 @@ where
 
 /// [`Future`] which resolves after the provided [`Duration`].
 ///
+/// # Panics
+///
+/// If fails to interact with JS side.
+///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
     let delay_ms = delay.as_millis().try_into().unwrap_or(i32::max_value());
@@ -88,6 +92,7 @@ where
 /// # Panics
 ///
 /// When global [`Window`] object is inaccessible.
+#[must_use]
 pub fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.
     // Safe to unwrap.

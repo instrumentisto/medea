@@ -89,10 +89,6 @@ pub trait Incrementable {
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {
-            // TODO: Remove `clippy::must_use_candidate` once the issue below is
-            //       resolved:
-            //       https://github.com/rust-lang/rust-clippy/issues/4779
-            #[allow(clippy::must_use_candidate)]
             #[inline]
             fn incr(&self) -> Self {
                 Self(self.0 + 1)
@@ -232,7 +228,7 @@ pub enum Command {
     },
 
     /// Web Client asks permission to update [`Track`]s in specified Peer.
-    /// Media Server gives permission by sending [`Event::TracksApplied`].
+    /// Media Server gives permission by sending [`Event::PeerUpdated`].
     UpdateTracks {
         peer_id: PeerId,
         tracks_patches: Vec<TrackPatchCommand>,
@@ -447,12 +443,12 @@ pub enum Event {
 
     /// Media Server notifies about necessity to update [`Track`]s in specified
     /// `Peer`.
-    TracksApplied {
+    PeerUpdated {
         /// [`PeerId`] of `Peer` where [`Track`]s should be updated.
         peer_id: PeerId,
 
-        /// List of [`TrackUpdate`]s which should be applied.
-        updates: Vec<TrackUpdate>,
+        /// List of [`PeerUpdate`]s which should be applied.
+        updates: Vec<PeerUpdate>,
 
         /// Negotiation role basing on which should be sent
         /// [`Command::MakeSdpOffer`] or [`Command::MakeSdpAnswer`].
@@ -496,9 +492,15 @@ pub enum NegotiationRole {
 /// [`Track`] update which should be applied to the `Peer`.
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub enum TrackUpdate {
+pub enum PeerUpdate {
     /// New [`Track`] should be added to the `Peer`.
     Added(Track),
+
+    /// [`Track`] with the provided [`TrackId`] should be removed from the
+    /// `Peer`.
+    ///
+    /// Can only refer [`Track`]s already known to the `Peer`.
+    Removed(TrackId),
 
     /// [`Track`] should be updated by this [`TrackPatchEvent`] in the `Peer`.
     /// Can only refer tracks already known to the `Peer`.
@@ -547,7 +549,7 @@ pub struct TrackPatchCommand {
 }
 
 /// Patch of the [`Track`] which Media Server can send with
-/// [`Event::TracksApplied`].
+/// [`Event::PeerUpdated`].
 #[cfg_attr(feature = "medea", derive(Clone, Debug, Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct TrackPatchEvent {
@@ -642,7 +644,7 @@ pub struct IceServer {
 #[cfg_attr(feature = "medea", derive(Eq, PartialEq, Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[derive(Clone, Debug)]
-// TODO: Use different struct without mids in TracksApplied event.
+// TODO: Use different struct without mids in PeerUpdated event.
 pub enum Direction {
     Send {
         receivers: Vec<MemberId>,

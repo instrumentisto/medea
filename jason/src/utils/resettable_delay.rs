@@ -88,7 +88,7 @@ impl ResettableDelayHandle {
                 let _ = rsvr.send(());
             }
         });
-        platform::spawn(fut.map(|_| ()));
+        platform::spawn(fut.map(drop));
 
         self.abort_handle.replace(abort);
     }

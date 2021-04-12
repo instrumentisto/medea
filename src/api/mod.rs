@@ -62,7 +62,7 @@ pub trait RpcServer: Debug + Send {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     fn connection_closed(
-        &self,
+        self: Box<Self>,
         member_id: MemberId,
         reason: ClosedReason,
     ) -> LocalBoxFuture<'static, ()>;

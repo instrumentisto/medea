@@ -1087,7 +1087,7 @@ async fn reset_transition_timers() {
             )
         }),
     )
-    .map(|_| ())
+    .map(drop)
     .shared();
 
     delay_for(400).await;

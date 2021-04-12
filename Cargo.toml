@@ -1,7 +1,8 @@
 [package]
 name = "medea"
-version = "0.2.0-rc.1"
+version = "0.2.0"
 edition = "2018"
+resolver = "2"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MPL-2.0"
@@ -31,6 +32,9 @@ codegen-units = 1
 [profile.release.package.medea-jason]
 opt-level = "s"  # Tell rustc to optimize for small code size.
 
+[profile.dev]
+split-debuginfo = "unpacked"
+
 [dependencies]
 actix = "0.10"
 actix-http = "2.0"
@@ -48,9 +52,9 @@ dotenv = "0.15"
 failure = "0.1"
 futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "1.0"
-medea-client-api-proto = { version = "0.2", features = ["medea"] }
-medea-control-api-proto = "0.1"
-medea-macro = { path = "crates/medea-macro" }
+medea-client-api-proto = { version = "0.3", features = ["medea"] }
+medea-control-api-proto = "0.2"
+medea-macro = "0.2"
 rand = "0.8"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }

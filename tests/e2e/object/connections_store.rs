@@ -1,19 +1,18 @@
 //! [`Object`] storing all the [`Connection`]s thrown by
-//! `Room.on_new_connection` callback.
+//! `Room.on_new_connection()` callback.
 
 use crate::{
     browser::Statement,
     object::{connection::Connection, Object},
 };
 
-/// Storage for [`Connection`]s thrown by `Room.on_new_connection` callback.
+/// Storage for [`Connection`]s thrown by `Room.on_new_connection()` callback.
 pub struct ConnectionStore;
 
 impl Object<ConnectionStore> {
     /// Returns a [`Connection`] of the provided remote member.
     ///
-    /// Returns [`None`] if a [`Connection`] with the provided remote member
-    /// doesn't exist.
+    /// Returns [`None`] if it doesn't exist.
     pub async fn get(
         &self,
         remote_id: String,
@@ -34,8 +33,8 @@ impl Object<ConnectionStore> {
         Ok((!connection.is_undefined().await?).then(|| connection))
     }
 
-    /// Returns a [`Connection`] for the provided remote member, waiting it if
-    /// it doesn't exists at the moment.
+    /// Returns a [`Connection`] for the provided remote member, awaiting for it
+    /// if it doesn't exists at the moment.
     pub async fn wait_for_connection(
         &self,
         remote_id: String,

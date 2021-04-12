@@ -188,6 +188,7 @@ pub struct Connection(Rc<InnerConnection>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given `Member`.
     #[inline]
+    #[must_use]
     pub fn new(remote_id: MemberId) -> Self {
         Self(Rc::new(InnerConnection {
             remote_id,
@@ -206,6 +207,7 @@ impl Connection {
 
     /// Creates a new external handle to this [`Connection`].
     #[inline]
+    #[must_use]
     pub fn new_handle(&self) -> ConnectionHandle {
         ConnectionHandle(Rc::downgrade(&self.0))
     }

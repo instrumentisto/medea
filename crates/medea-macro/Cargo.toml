@@ -1,7 +1,8 @@
 [package]
 name = "medea-macro"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2018"
+resolver = "2"
 description = "Internal macros and codegen for Medea media server project"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "BlueOak-1.0.0"

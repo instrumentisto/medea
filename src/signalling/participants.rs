@@ -137,6 +137,8 @@ impl ParticipantService {
     ///
     /// __Note__ this function don't check presence of [`Member`] in
     /// [`ParticipantService`].
+    #[inline]
+    #[must_use]
     pub fn get_fid_to_member(&self, member_id: MemberId) -> Fid<ToMember> {
         Fid::<ToMember>::new(self.room_id.clone(), member_id)
     }
@@ -159,8 +161,18 @@ impl ParticipantService {
     }
 
     /// Returns all [`Member`] from this [`ParticipantService`].
+    #[inline]
+    #[must_use]
     pub fn members(&self) -> HashMap<MemberId, Member> {
         self.members.clone()
+    }
+
+    /// Returns [`MemberId`]s of all [`Member`]s from this
+    /// [`ParticipantService`].
+    #[inline]
+    #[must_use]
+    pub fn members_ids(&self) -> Vec<MemberId> {
+        self.members.keys().cloned().collect()
     }
 
     /// Lookups [`Member`] by provided [`MemberId`] and credentials.
@@ -187,29 +199,25 @@ impl ParticipantService {
     }
 
     /// Checks if [`Member`] has __active__ [`RpcConnection`].
+    #[inline]
+    #[must_use]
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Sends [`Event`] to specified remote [`Member`].
-    ///
-    /// # Errors
-    ///
-    /// Errors with [`RoomError::ConnectionNotExists`] if unable to find
-    /// [`RpcConnection`] with specified [`Member`].
-    pub fn send_event_to_member(
-        &self,
-        member_id: MemberId,
-        event: Event,
-    ) -> Result<(), RoomError> {
-        self.connections.get(&member_id).map_or(
-            Err(RoomError::ConnectionNotExists(member_id)),
-            |conn| {
-                conn.send_event(self.room_id.clone(), event);
-                Ok(())
-            },
-        )
+    /// Sends the given [`Event`] to the specified remote [`Member`] if its
+    /// [`RpcConnection`] exists.
+    pub fn send_event_to_member(&self, member_id: &MemberId, event: Event) {
+        if let Some(conn) = self.connections.get(&member_id) {
+            conn.send_event(self.room_id.clone(), event);
+        } else {
+            debug!(
+                "Can't send event [{:?}] cause connection with Member [{}] \
+                does not exist.",
+                event, member_id
+            );
+        }
     }
 
     /// Saves provided [`RpcConnection`].
@@ -313,7 +321,7 @@ impl ParticipantService {
                 },
             ));
 
-        close_rpc_connections.map(|_| ()).boxed_local()
+        close_rpc_connections.map(drop).boxed_local()
     }
 
     /// Deletes a [`Member`] by its ID from this [`ParticipantService`].

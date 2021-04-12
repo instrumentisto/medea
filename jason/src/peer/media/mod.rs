@@ -375,7 +375,7 @@ impl InnerMediaConnections {
 
     /// Lookups a [`platform::Transceiver`] by the provided [`mid`].
     ///
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     fn get_transceiver_by_mid(
         &self,
         mid: &str,
@@ -608,7 +608,7 @@ impl MediaConnections {
     /// transceiver.
     ///
     /// [`Sender`]: self::sender::Sender
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, Rc<local::Track>>,
@@ -660,8 +660,15 @@ impl MediaConnections {
     /// Errors with [`MediaConnectionsError::CouldNotInsertRemoteTrack`] if
     /// could not find [`Receiver`] by transceivers `mid`.
     ///
+    /// # Panics
+    ///
+    /// If the provided [`platform::Transceiver`] doesn't have a [`mid`]. Not
+    /// supposed to happen, since [`platform::MediaStreamTrack`] is only fired
+    /// when a [`platform::Transceiver`] is negotiated, thus have a [`mid`].
+    ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn add_remote_track(
         &self,
         track: platform::MediaStreamTrack,
@@ -691,7 +698,7 @@ impl MediaConnections {
     /// insert it into the [`Receiver`].
     ///
     /// [`Receiver`]: self::receiver::Receiver
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
         for receiver in inner
@@ -750,6 +757,15 @@ impl MediaConnections {
             }),
         );
         remove_tracks_fut.await;
+    }
+
+    /// Removes a [`sender::Component`] or a [`receiver::Component`] with the
+    /// provided [`TrackId`] from these [`MediaConnections`].
+    pub fn remove_track(&self, track_id: TrackId) {
+        let mut inner = self.0.borrow_mut();
+        if inner.receivers.remove(&track_id).is_none() {
+            inner.senders.remove(&track_id);
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 //! [MediaStreamConstraints][1] related objects.
 //!
-//! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+//! [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
 
 use std::{collections::HashMap, convert::TryFrom, rc::Rc};
 
@@ -76,9 +76,9 @@ type Result<T> = std::result::Result<T, Traced<TracksRequestError>>;
 /// should be included into returned `MediaStream`, and, optionally,
 /// to establish constraints for those track's settings.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-/// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
-/// [3]: https://w3.org/TR/mediacapture-streams/#mediastream
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
+/// [2]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
+/// [3]: https://w3.org/TR/mediacapture-streams#mediastream
 #[derive(Debug, Default)]
 pub struct TracksRequest {
     audio: HashMap<TrackId, AudioTrackConstraints>,

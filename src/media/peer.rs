@@ -33,11 +33,11 @@
 //! # Implementing [`Peer`]'s update that requires (re)negotiation
 //!
 //! 1. All changes that require (re)negotiation should be done by adding a new
-//!    variant into [`TrackChange`].
-//! 2. Implement your changing logic in the [`TrackChangeHandler`]
+//!    variant into [`PeerChange`].
+//! 2. Implement your changing logic in the [`PeerChangeHandler`]
 //!    implementation.
 //! 3. Create a function in the [`PeerChangesScheduler`] which will schedule
-//!    your change by adding it into the [`Context::track_changes_queue`].
+//!    your change by adding it into the [`Context::peer_changes_queue`].
 //!
 //! # Applying changes regardless of [`Peer`] state
 //!
@@ -58,8 +58,8 @@ use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     state, AudioSettings, Direction, IceCandidate, IceServer, MediaSourceKind,
-    MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, Track, TrackId,
-    TrackPatchCommand, TrackPatchEvent, TrackUpdate, VideoSettings,
+    MediaType, MemberId, NegotiationRole, PeerId as Id, PeerId, PeerUpdate,
+    Track, TrackId, TrackPatchCommand, TrackPatchEvent, VideoSettings,
 };
 use medea_macro::{dispatchable, enum_delegate};
 
@@ -81,9 +81,9 @@ pub trait PeerUpdatesSubscriber: fmt::Debug {
     /// Notifies subscriber that provided [`Peer`] must be negotiated.
     fn negotiation_needed(&self, peer_id: PeerId);
 
-    /// Notifies subscriber that provided [`TrackUpdate`] were forcibly (without
+    /// Notifies subscriber that provided [`PeerUpdate`] were forcibly (without
     /// negotiation) applied to [`Peer`].
-    fn force_update(&self, peer_id: PeerId, changes: Vec<TrackUpdate>);
+    fn force_update(&self, peer_id: PeerId, changes: Vec<PeerUpdate>);
 }
 
 #[cfg(test)]
@@ -128,6 +128,8 @@ pub enum PeerError {
 }
 
 impl PeerError {
+    #[inline]
+    #[must_use]
     pub fn new_wrong_state(
         peer: &PeerStateMachine,
         expected: &'static str,
@@ -170,9 +172,9 @@ impl PeerError {
 /// +---------------+                   +------------------+
 /// ```
 #[enum_delegate(pub fn id(&self) -> Id)]
-#[enum_delegate(pub fn member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn member_id(&self) -> &MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
-#[enum_delegate(pub fn partner_member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn partner_member_id(&self) -> &MemberId)]
 #[enum_delegate(pub fn local_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn remote_sdp(&self) -> Option<&str>)]
 #[enum_delegate(pub fn is_force_relayed(&self) -> bool)]
@@ -185,18 +187,20 @@ impl PeerError {
 )]
 #[enum_delegate(pub fn senders(&self) -> &HashMap<TrackId, Rc<MediaTrack>>)]
 #[enum_delegate(
-    pub fn get_updates(&self) -> Vec<TrackUpdate>
+    pub fn get_updates(&self) -> Vec<PeerUpdate>
 )]
 #[enum_delegate(pub fn as_changes_scheduler(&mut self) -> PeerChangesScheduler)]
 #[enum_delegate(fn inner_force_commit_scheduled_changes(&mut self))]
 #[enum_delegate(
     pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate)
 )]
+#[enum_delegate(pub fn is_empty(&self) -> bool)]
 #[enum_delegate(pub fn ice_candidates(&self) -> &HashSet<IceCandidate>)]
 #[enum_delegate(pub fn is_ice_restart(&self) -> bool)]
 #[enum_delegate(pub fn negotiation_role(&self) -> Option<NegotiationRole>)]
 #[enum_delegate(pub fn is_known_to_remote(&self) -> bool)]
 #[enum_delegate(pub fn force_commit_partner_changes(&mut self))]
+#[enum_delegate(pub fn set_initialized(&mut self))]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -217,7 +221,7 @@ impl PeerStateMachine {
                         id: sender.id(),
                         mid: sender.mid(),
                         media_type: sender.media_type().clone(),
-                        receivers: vec![self.partner_member_id()],
+                        receivers: vec![self.partner_member_id().clone()],
                         enabled_individual: sender
                             .send_media_state()
                             .is_enabled(),
@@ -241,7 +245,7 @@ impl PeerStateMachine {
                         id: *id,
                         mid: receiver.mid(),
                         media_type: receiver.media_type().clone(),
-                        sender_id: self.partner_member_id(),
+                        sender_id: self.partner_member_id().clone(),
                         enabled_individual: receiver
                             .recv_media_state()
                             .is_enabled(),
@@ -254,6 +258,10 @@ impl PeerStateMachine {
     }
 
     /// Returns a [`state::Peer`] of this [`PeerStateMachine`].
+    ///
+    /// # Panics
+    ///
+    /// If this [`Peer`] doesn't have an [`IceUser`].
     #[must_use]
     pub fn get_state(&self) -> state::Peer {
         state::Peer {
@@ -301,7 +309,7 @@ impl PeerStateMachine {
     }
 
     /// Indicates whether this [`PeerStateMachine`] can forcibly commit a
-    /// [`TrackChange::PartnerTrackPatch`].
+    /// [`PeerChange::PartnerTrackPatch`].
     #[inline]
     #[must_use]
     pub fn can_forcibly_commit_partner_patches(&self) -> bool {
@@ -387,6 +395,16 @@ enum OnNegotiationFinish {
     Noop,
 }
 
+/// State of a [`Peer`] initialization.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum InitializationState {
+    /// [`Peer`] is initialized.
+    Done,
+
+    /// [`Peer`] is initializing currently.
+    InProgress,
+}
+
 #[derive(Debug)]
 pub struct Context {
     /// [`PeerId`] of this [`Peer`].
@@ -432,12 +450,12 @@ pub struct Context {
     /// Indicator whether this [`Peer`] was created on remote.
     is_known_to_remote: bool,
 
-    /// Tracks changes, that remote [`Peer`] is not aware of.
-    pending_track_updates: Vec<TrackChange>,
+    /// [`Peer`] changes, that remote [`Peer`] is not aware of.
+    pending_peer_changes: Vec<PeerChange>,
 
-    /// Queue of the [`TrackChange`]s that are scheduled to apply when this
+    /// Queue of the [`PeerChange`]s that are scheduled to apply when this
     /// [`Peer`] will be in a [`Stable`] state.
-    track_changes_queue: Vec<TrackChange>,
+    peer_changes_queue: Vec<PeerChange>,
 
     /// Subscriber to the events which indicates that negotiation process
     /// should be started for this [`Peer`].
@@ -454,12 +472,15 @@ pub struct Context {
 
     /// Action which should be done on a negotiation process finish.
     on_negotiation_finish: OnNegotiationFinish,
+
+    /// State of the [`Peer`] initialization.
+    initialization_state: InitializationState,
 }
 
-/// Tracks changes, that remote [`Peer`] is not aware of.
+/// [`Peer`] changes, that remote [`Peer`] is not aware of.
 #[dispatchable]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum TrackChange {
+pub enum PeerChange {
     /// [`MediaTrack`]s with [`Direction::Send`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddSendTrack(Rc<MediaTrack>),
@@ -467,6 +488,10 @@ pub enum TrackChange {
     /// [`MediaTrack`]s with [`Direction::Recv`] of this [`Peer`] that remote
     /// Peer is not aware of.
     AddRecvTrack(Rc<MediaTrack>),
+
+    /// [`TrackId`] of the removed [`MediaTrack`]. Remote [`Peer`] is not aware
+    /// of this change.
+    RemoveTrack(TrackId),
 
     /// Changes to some [`MediaTrack`], that remote Peer is not aware of.
     TrackPatch(TrackPatchEvent),
@@ -479,8 +504,8 @@ pub enum TrackChange {
     IceRestart,
 }
 
-impl TrackChange {
-    /// Indicates whether this [`TrackChange`] doesn't require renegotiation.
+impl PeerChange {
+    /// Indicates whether this [`PeerChange`] doesn't require renegotiation.
     #[inline]
     #[must_use]
     fn is_negotiation_state_agnostic(&self) -> bool {
@@ -495,21 +520,23 @@ impl TrackChange {
         )
     }
 
-    /// Tries to return new [`Track`] based on this [`TrackChange`].
+    /// Tries to return new [`Track`] based on this [`PeerChange`].
     ///
-    /// Returns `None` if this [`TrackChange`] doesn't indicates new [`Track`]
+    /// Returns `None` if this [`PeerChange`] doesn't indicates new [`Track`]
     /// creation.
     fn as_new_track(&self, partner_member_id: MemberId) -> Option<Track> {
-        match self.as_track_update(partner_member_id) {
-            TrackUpdate::Added(track) => Some(track),
-            TrackUpdate::Updated(_) | TrackUpdate::IceRestart => None,
+        match self.as_peer_update(partner_member_id) {
+            PeerUpdate::Added(track) => Some(track),
+            PeerUpdate::Updated(_)
+            | PeerUpdate::IceRestart
+            | PeerUpdate::Removed(_) => None,
         }
     }
 
-    /// Returns [`TrackUpdate`] based on this [`TrackChange`].
-    fn as_track_update(&self, partner_member_id: MemberId) -> TrackUpdate {
+    /// Returns [`PeerUpdate`] based on this [`PeerChange`].
+    fn as_peer_update(&self, partner_member_id: MemberId) -> PeerUpdate {
         match self {
-            Self::AddSendTrack(track) => TrackUpdate::Added(Track {
+            Self::AddSendTrack(track) => PeerUpdate::Added(Track {
                 id: track.id(),
                 media_type: track.media_type().clone(),
                 direction: Direction::Send {
@@ -517,7 +544,7 @@ impl TrackChange {
                     mid: track.mid(),
                 },
             }),
-            Self::AddRecvTrack(track) => TrackUpdate::Added(Track {
+            Self::AddRecvTrack(track) => PeerUpdate::Added(Track {
                 id: track.id(),
                 media_type: track.media_type().clone(),
                 direction: Direction::Recv {
@@ -525,34 +552,36 @@ impl TrackChange {
                     mid: track.mid(),
                 },
             }),
+            Self::RemoveTrack(track_id) => PeerUpdate::Removed(*track_id),
             Self::TrackPatch(track_patch)
             | Self::PartnerTrackPatch(track_patch) => {
-                TrackUpdate::Updated(track_patch.clone())
+                PeerUpdate::Updated(track_patch.clone())
             }
-            Self::IceRestart => TrackUpdate::IceRestart,
+            Self::IceRestart => PeerUpdate::IceRestart,
         }
     }
 
-    /// Returns `true` if this [`TrackChange`] can be forcibly applied.
+    /// Returns `true` if this [`PeerChange`] can be forcibly applied.
     fn can_force_apply(&self) -> bool {
         match self {
             Self::AddSendTrack(_)
             | Self::AddRecvTrack(_)
-            | Self::IceRestart => false,
+            | Self::IceRestart
+            | Self::RemoveTrack(_) => false,
             Self::TrackPatch(_) | Self::PartnerTrackPatch(_) => true,
         }
     }
 }
 
-impl<T> TrackChangeHandler for Peer<T> {
-    type Output = TrackChange;
+impl<T> PeerChangeHandler for Peer<T> {
+    type Output = PeerChange;
 
     /// Inserts provided [`MediaTrack`] into [`Context::senders`].
     #[inline]
     fn on_add_send_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
         self.context.senders.insert(track.id(), Rc::clone(&track));
 
-        TrackChange::AddSendTrack(track)
+        PeerChange::AddSendTrack(track)
     }
 
     /// Inserts provided [`MediaTrack`] into [`Context::receivers`].
@@ -560,7 +589,7 @@ impl<T> TrackChangeHandler for Peer<T> {
     fn on_add_recv_track(&mut self, track: Rc<MediaTrack>) -> Self::Output {
         self.context.receivers.insert(track.id(), Rc::clone(&track));
 
-        TrackChange::AddRecvTrack(track)
+        PeerChange::AddRecvTrack(track)
     }
 
     /// Applies provided [`TrackPatchEvent`] to [`Peer`]s [`Track`].
@@ -570,7 +599,7 @@ impl<T> TrackChangeHandler for Peer<T> {
         } else if let Some(rx) = self.receivers().get(&patch.id) {
             (rx, false)
         } else {
-            return TrackChange::TrackPatch(patch);
+            return PeerChange::TrackPatch(patch);
         };
 
         if let Some(enabled) = patch.enabled_individual {
@@ -589,7 +618,7 @@ impl<T> TrackChangeHandler for Peer<T> {
             }
         }
 
-        TrackChange::TrackPatch(patch)
+        PeerChange::TrackPatch(patch)
     }
 
     /// Applies provided [`TrackPatchEvent`] that is sourced from this [`Peer`]s
@@ -615,14 +644,22 @@ impl<T> TrackChangeHandler for Peer<T> {
             }
         }
 
-        TrackChange::TrackPatch(patch)
+        PeerChange::TrackPatch(patch)
+    }
+
+    /// Removes [`MediaTrack`] with the provided [`TrackId`] from this [`Peer`].
+    #[inline]
+    fn on_remove_track(&mut self, track_id: TrackId) -> Self::Output {
+        self.context.senders.remove(&track_id);
+        self.context.receivers.remove(&track_id);
+        PeerChange::RemoveTrack(track_id)
     }
 
     /// Sets [`Context::ice_restart`] flag to `true`.
     #[inline]
     fn on_ice_restart(&mut self) -> Self::Output {
         self.context.ice_restart = true;
-        TrackChange::IceRestart
+        PeerChange::IceRestart
     }
 }
 
@@ -650,7 +687,7 @@ impl TrackPatchDeduper {
     }
 
     /// Returns new [`TrackPatchDeduper`] with the provided whitelist, meaning
-    /// that [`TrackPatchDeduper::drain_merge`] will drain only [`TrackChange`]s
+    /// that [`TrackPatchDeduper::drain_merge`] will drain only [`PeerChange`]s
     /// with [`TrackId`]s in the provided set.
     fn with_whitelist(whitelist: HashSet<TrackId>) -> Self {
         Self {
@@ -661,14 +698,14 @@ impl TrackPatchDeduper {
 
     /// Drains mergeable [`TrackPatchEvent`]s from the provided [`Vec`], merging
     /// those to accumulative [`TrackPatchEvent`]s list inside this struct.
-    fn drain_merge(&mut self, changes: &mut Vec<TrackChange>) {
+    fn drain_merge(&mut self, changes: &mut Vec<PeerChange>) {
         changes.retain(|change| {
             if !change.can_force_apply() {
                 return true;
             }
             let patch = match change {
-                TrackChange::TrackPatch(patch)
-                | TrackChange::PartnerTrackPatch(patch) => patch,
+                PeerChange::TrackPatch(patch)
+                | PeerChange::PartnerTrackPatch(patch) => patch,
                 _ => return true,
             };
 
@@ -686,11 +723,11 @@ impl TrackPatchDeduper {
         });
     }
 
-    /// Returns [`Iterator`] with all previously merged [`TrackChange`]s.
-    fn into_inner(self) -> impl Iterator<Item = TrackChange> {
+    /// Returns [`Iterator`] with all previously merged [`PeerChange`]s.
+    fn into_inner(self) -> impl Iterator<Item = PeerChange> {
         self.result
             .into_iter()
-            .map(|(_, patch)| TrackChange::TrackPatch(patch))
+            .map(|(_, patch)| PeerChange::TrackPatch(patch))
     }
 }
 
@@ -708,8 +745,8 @@ impl<T> Peer<T> {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     #[inline]
-    pub fn member_id(&self) -> MemberId {
-        self.context.member_id.clone()
+    pub fn member_id(&self) -> &MemberId {
+        &self.context.member_id
     }
 
     /// Returns ID of [`Peer`].
@@ -728,8 +765,8 @@ impl<T> Peer<T> {
     ///
     /// [`Member`]: crate::signalling::elements::Member
     #[inline]
-    pub fn partner_member_id(&self) -> MemberId {
-        self.context.partner_member.clone()
+    pub fn partner_member_id(&self) -> &MemberId {
+        &self.context.partner_member
     }
 
     /// Returns SDP offer of this [`Peer`].
@@ -746,24 +783,24 @@ impl<T> Peer<T> {
         self.context.remote_sdp.as_deref()
     }
 
-    /// Returns [`TrackUpdate`]s of this [`Peer`] which should be sent to the
-    /// client in the [`Event::TracksApplied`].
+    /// Returns [`PeerUpdate`]s of this [`Peer`] which should be sent to the
+    /// client in the [`Event::PeerUpdated`].
     ///
-    /// [`Event::TracksApplied`]: medea_client_api_proto::Event::TracksApplied
-    pub fn get_updates(&self) -> Vec<TrackUpdate> {
+    /// [`Event::PeerUpdated`]: medea_client_api_proto::Event::PeerUpdated
+    pub fn get_updates(&self) -> Vec<PeerUpdate> {
         self.context
-            .pending_track_updates
+            .pending_peer_changes
             .iter()
-            .map(|c| c.as_track_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect()
     }
 
     /// Returns [`Track`]s that remote [`Peer`] is not aware of.
     pub fn new_tracks(&self) -> Vec<Track> {
         self.context
-            .pending_track_updates
+            .pending_peer_changes
             .iter()
-            .filter_map(|c| c.as_new_track(self.partner_member_id()))
+            .filter_map(|c| c.as_new_track(self.partner_member_id().clone()))
             .collect()
     }
 
@@ -801,7 +838,10 @@ impl<T> Peer<T> {
     pub fn add_endpoint(&mut self, endpoint: &Endpoint) {
         match endpoint {
             Endpoint::WebRtcPlayEndpoint(play) => {
-                play.set_peer_id(self.id());
+                play.set_peer_id_and_partner_peer_id(
+                    self.id(),
+                    self.partner_peer_id(),
+                );
             }
             Endpoint::WebRtcPublishEndpoint(publish) => {
                 publish.add_peer_id(self.id());
@@ -822,19 +862,19 @@ impl<T> Peer<T> {
         &self.context.senders
     }
 
-    /// Forcibly commits all the [`TrackChange::PartnerTrackPatch`]es.
+    /// Forcibly commits all the [`PeerChange::PartnerTrackPatch`]es.
     pub fn force_commit_partner_changes(&mut self) {
         let mut partner_patches = Vec::new();
         // TODO: use drain_filter when its stable
         let mut i = 0;
-        while i != self.context.track_changes_queue.len() {
+        while i != self.context.peer_changes_queue.len() {
             if matches!(
-                self.context.track_changes_queue[i],
-                TrackChange::PartnerTrackPatch(_)
+                self.context.peer_changes_queue[i],
+                PeerChange::PartnerTrackPatch(_)
             ) {
                 let change = self
                     .context
-                    .track_changes_queue
+                    .peer_changes_queue
                     .remove(i)
                     .dispatch_with(self);
                 partner_patches.push(change);
@@ -847,17 +887,17 @@ impl<T> Peer<T> {
             partner_patches
                 .iter()
                 .filter_map(|t| match t {
-                    TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                    PeerChange::PartnerTrackPatch(patch) => Some(patch.id),
                     _ => None,
                 })
                 .collect(),
         );
-        deduper.drain_merge(&mut self.context.pending_track_updates);
+        deduper.drain_merge(&mut self.context.pending_peer_changes);
         deduper.drain_merge(&mut partner_patches);
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .map(|c| c.as_track_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect();
 
         if !updates.is_empty() {
@@ -867,37 +907,37 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Commits all [`TrackChange`]s which are marked as forcible
-    /// ([`TrackChange::can_force_apply`]).
+    /// Commits all [`PeerChange`]s which are marked as forcible
+    /// ([`PeerChange::can_force_apply`]).
     pub fn inner_force_commit_scheduled_changes(&mut self) {
         let mut forcible_changes = Vec::new();
         let mut filtered_changes_queue = Vec::new();
         // TODO: use drain_filter when its stable
-        for change in std::mem::take(&mut self.context.track_changes_queue) {
+        for change in std::mem::take(&mut self.context.peer_changes_queue) {
             if change.can_force_apply() {
                 forcible_changes.push(change.dispatch_with(self));
             } else {
                 filtered_changes_queue.push(change);
             }
         }
-        self.context.track_changes_queue = filtered_changes_queue;
+        self.context.peer_changes_queue = filtered_changes_queue;
 
         let mut deduper = TrackPatchDeduper::with_whitelist(
             forcible_changes
                 .iter()
                 .filter_map(|t| match t {
-                    TrackChange::TrackPatch(patch)
-                    | TrackChange::PartnerTrackPatch(patch) => Some(patch.id),
+                    PeerChange::TrackPatch(patch)
+                    | PeerChange::PartnerTrackPatch(patch) => Some(patch.id),
                     _ => None,
                 })
                 .collect(),
         );
-        deduper.drain_merge(&mut self.context.pending_track_updates);
+        deduper.drain_merge(&mut self.context.pending_peer_changes);
         deduper.drain_merge(&mut forcible_changes);
 
         let updates: Vec<_> = deduper
             .into_inner()
-            .map(|c| c.as_track_update(self.partner_member_id()))
+            .map(|c| c.as_peer_update(self.partner_member_id().clone()))
             .collect();
 
         if !updates.is_empty() {
@@ -923,6 +963,34 @@ impl<T> Peer<T> {
         self.context.is_known_to_remote
     }
 
+    /// Returns `true` if this [`Peer`] doesn't have any `Send` and `Recv`
+    /// [`MediaTrack`]s.
+    pub fn is_empty(&self) -> bool {
+        if self.context.senders.is_empty() && self.context.receivers.is_empty()
+        {
+            return true;
+        }
+
+        let removed_tracks: HashSet<_> = self
+            .context
+            .peer_changes_queue
+            .iter()
+            .filter_map(|change| match change {
+                PeerChange::RemoveTrack(track_id) => Some(*track_id),
+                _ => None,
+            })
+            .collect();
+        let peers_tracks: HashSet<_> = self
+            .context
+            .senders
+            .iter()
+            .chain(self.context.receivers.iter())
+            .map(|t| *t.0)
+            .collect();
+
+        removed_tracks == peers_tracks
+    }
+
     /// Returns [`PeerChangesScheduler`] for this [`Peer`].
     #[inline]
     #[must_use]
@@ -932,19 +1000,19 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Deduplicates pending [`TrackChange`]s.
+    /// Deduplicates pending [`PeerChange`]s.
     fn dedup_pending_track_updates(&mut self) {
         self.dedup_ice_restarts();
         self.dedup_track_patches();
     }
 
-    /// Dedupes [`TrackChange::IceRestart`]s.
+    /// Dedupes [`PeerChange::IceRestart`]s.
     fn dedup_ice_restarts(&mut self) {
-        let pending_track_updates = &mut self.context.pending_track_updates;
+        let pending_track_updates = &mut self.context.pending_peer_changes;
         let last_ice_restart_rev_index = pending_track_updates
             .iter()
             .rev()
-            .position(|item| matches!(item, TrackChange::IceRestart));
+            .position(|item| matches!(item, PeerChange::IceRestart));
         if let Some(idx) = last_ice_restart_rev_index {
             let last_ice_restart_index = pending_track_updates.len() - 1 - idx;
             pending_track_updates.retain({
@@ -953,18 +1021,18 @@ impl<T> Peer<T> {
                     let is_last_ice_restart = i == last_ice_restart_index;
                     i += 1;
                     is_last_ice_restart
-                        || !matches!(item, TrackChange::IceRestart)
+                        || !matches!(item, PeerChange::IceRestart)
                 }
             });
         }
     }
 
-    /// Dedupes [`TrackChange`]s from this [`Peer`].
+    /// Dedupes [`PeerChange`]s from this [`Peer`].
     fn dedup_track_patches(&mut self) {
         let mut deduper = TrackPatchDeduper::new();
-        deduper.drain_merge(&mut self.context.pending_track_updates);
+        deduper.drain_merge(&mut self.context.pending_peer_changes);
         self.context
-            .pending_track_updates
+            .pending_peer_changes
             .extend(deduper.into_inner());
     }
 
@@ -994,12 +1062,19 @@ impl<T> Peer<T> {
     pub fn negotiation_role(&self) -> Option<NegotiationRole> {
         self.context.negotiation_role.clone()
     }
+
+    /// Marks this [`Peer`] as initialized.
+    #[inline]
+    pub fn set_initialized(&mut self) {
+        self.context.initialization_state = InitializationState::Done;
+    }
 }
 
 impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`WaitRemoteSdp`]
     /// state.
     #[inline]
+    #[must_use]
     pub fn set_local_offer(self, local_sdp: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.local_sdp = Some(local_sdp);
@@ -1012,6 +1087,7 @@ impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`] to [`Stable`]
     /// state.
     #[inline]
+    #[must_use]
     pub fn set_local_answer(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.local_sdp = Some(sdp_answer);
@@ -1069,6 +1145,7 @@ impl Peer<WaitLocalSdp> {
 impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`Stable`] state.
     #[inline]
+    #[must_use]
     pub fn set_remote_answer(mut self, sdp_answer: String) -> Peer<Stable> {
         self.context.remote_sdp = Some(sdp_answer);
 
@@ -1084,6 +1161,7 @@ impl Peer<WaitRemoteSdp> {
     /// Sets remote description and transitions [`Peer`] to [`WaitLocalSdp`]
     /// state.
     #[inline]
+    #[must_use]
     pub fn set_remote_offer(mut self, sdp_offer: String) -> Peer<WaitLocalSdp> {
         self.context.negotiation_role =
             Some(NegotiationRole::Answerer(sdp_offer.clone()));
@@ -1121,13 +1199,14 @@ impl Peer<Stable> {
             is_force_relayed,
             endpoints: Vec::new(),
             is_known_to_remote: false,
-            pending_track_updates: Vec::new(),
-            track_changes_queue: Vec::new(),
+            pending_peer_changes: Vec::new(),
+            peer_changes_queue: Vec::new(),
             peer_updates_sub,
             ice_candidates: HashSet::new(),
             ice_restart: false,
             negotiation_role: None,
             on_negotiation_finish: OnNegotiationFinish::Noop,
+            initialization_state: InitializationState::InProgress,
         };
 
         Self {
@@ -1143,6 +1222,7 @@ impl Peer<Stable> {
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
+    #[must_use]
     pub fn start_as_offerer(self) -> Peer<WaitLocalSdp> {
         let mut context = self.context;
         context.local_sdp = None;
@@ -1163,6 +1243,7 @@ impl Peer<Stable> {
     ///
     /// [SDP]: https://tools.ietf.org/html/rfc4317
     #[inline]
+    #[must_use]
     pub fn start_as_answerer(self) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.local_sdp = None;
@@ -1196,7 +1277,7 @@ impl Peer<Stable> {
         Ok(mids)
     }
 
-    /// Applies previously scheduled [`TrackChange`]s to this [`Peer`], marks
+    /// Applies previously scheduled [`PeerChange`]s to this [`Peer`], marks
     /// those changes as applied, so they can be retrieved via
     /// [`PeerStateMachine::get_updates`]. Calls
     /// [`PeerUpdatesSubscriber::negotiation_needed`] notifying subscriber that
@@ -1204,25 +1285,29 @@ impl Peer<Stable> {
     /// regardless of negotiation state will be immediately force-pushed to
     /// [`PeerUpdatesSubscriber`].
     fn commit_scheduled_changes(&mut self) {
-        if !self.context.track_changes_queue.is_empty()
-            || matches!(
-                self.context.on_negotiation_finish,
-                OnNegotiationFinish::Renegotiate
-            )
+        // If InitializationState is not Done, then we can safely skip this
+        // negotiation, because these changes will be committed by ongoing
+        // initializer.
+        if self.context.initialization_state == InitializationState::Done
+            && (!self.context.peer_changes_queue.is_empty()
+                || matches!(
+                    self.context.on_negotiation_finish,
+                    OnNegotiationFinish::Renegotiate
+                ))
         {
             let mut negotiationless_changes = Vec::new();
-            for task in std::mem::take(&mut self.context.track_changes_queue) {
+            for task in std::mem::take(&mut self.context.peer_changes_queue) {
                 let change = task.dispatch_with(self);
                 if change.is_negotiation_state_agnostic() {
                     negotiationless_changes.push(change);
                 } else {
-                    self.context.pending_track_updates.push(change);
+                    self.context.pending_peer_changes.push(change);
                 }
             }
 
             self.dedup_pending_track_updates();
 
-            if self.context.pending_track_updates.is_empty()
+            if self.context.pending_peer_changes.is_empty()
                 && matches!(
                     self.context.on_negotiation_finish,
                     OnNegotiationFinish::Noop
@@ -1232,12 +1317,14 @@ impl Peer<Stable> {
                     self.id(),
                     negotiationless_changes
                         .into_iter()
-                        .map(|c| c.as_track_update(self.partner_member_id()))
+                        .map(|c| {
+                            c.as_peer_update(self.partner_member_id().clone())
+                        })
                         .collect(),
                 );
             } else {
                 self.context
-                    .pending_track_updates
+                    .pending_peer_changes
                     .append(&mut negotiationless_changes);
                 self.context.peer_updates_sub.negotiation_needed(self.id());
                 self.context.on_negotiation_finish = OnNegotiationFinish::Noop;
@@ -1257,7 +1344,7 @@ impl Peer<Stable> {
     fn negotiation_finished(&mut self) {
         self.context.ice_restart = false;
         self.context.is_known_to_remote = true;
-        self.context.pending_track_updates.clear();
+        self.context.pending_peer_changes.clear();
         self.context.negotiation_role = None;
         self.commit_scheduled_changes();
     }
@@ -1274,25 +1361,25 @@ pub struct PeerChangesScheduler<'a> {
 
 impl<'a> PeerChangesScheduler<'a> {
     /// Schedules provided [`TrackPatchCommand`]s as
-    /// [`TrackChange::TrackPatch`].
+    /// [`PeerChange::TrackPatch`].
     pub fn patch_tracks(&mut self, patches: Vec<TrackPatchCommand>) {
         for patch in patches {
-            self.schedule_change(TrackChange::TrackPatch(patch.into()));
+            self.schedule_change(PeerChange::TrackPatch(patch.into()));
         }
     }
 
     /// Schedules provided [`TrackPatchCommand`] as
-    /// [`TrackChange::PartnerTrackPatch`].
+    /// [`PeerChange::PartnerTrackPatch`].
     pub fn partner_patch_tracks(&mut self, patches: Vec<TrackPatchCommand>) {
         for patch in patches {
-            self.schedule_change(TrackChange::PartnerTrackPatch(patch.into()));
+            self.schedule_change(PeerChange::PartnerTrackPatch(patch.into()));
         }
     }
 
-    /// Schedules [`TrackChange::IceRestart`].
+    /// Schedules [`PeerChange::IceRestart`].
     #[inline]
     pub fn restart_ice(&mut self) {
-        self.schedule_change(TrackChange::IceRestart);
+        self.schedule_change(PeerChange::IceRestart);
     }
 
     /// Schedules `send` tracks adding to `self` and `recv` tracks for this
@@ -1315,6 +1402,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&track_audio));
+            src.add_track_id(self.context.id, track_audio.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(track_audio);
@@ -1330,6 +1418,7 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&camera_video_track));
+            src.add_track_id(self.context.id, camera_video_track.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(camera_video_track);
@@ -1341,36 +1430,67 @@ impl<'a> PeerChangesScheduler<'a> {
                 }),
             ));
             self.add_sender(Rc::clone(&display_video_track));
+            src.add_track_id(self.context.id, display_video_track.id());
             partner_peer
                 .as_changes_scheduler()
                 .add_receiver(display_video_track);
         }
     }
 
-    /// Adds provided [`TrackChange`] to scheduled changes queue.
+    /// Adds provided [`PeerChange`] to scheduled changes queue.
     #[inline]
-    fn schedule_change(&mut self, job: TrackChange) {
-        self.context.track_changes_queue.push(job);
+    fn schedule_change(&mut self, job: PeerChange) {
+        self.context.peer_changes_queue.push(job);
     }
 
     /// Schedules [`Track`] addition to [`Peer`] receive tracks list.
     ///
     /// This [`Track`] will be considered new (not known to remote) and may be
     /// obtained by calling `Peer.new_tracks` after this scheduled
-    /// [`TrackChange`] will be applied.
+    /// [`PeerChange`] will be applied.
     #[inline]
     fn add_receiver(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_change(TrackChange::AddRecvTrack(track));
+        self.schedule_change(PeerChange::AddRecvTrack(track));
     }
 
     /// Schedules [`Track`] addition to [`Peer`] send tracks list.
     ///
     /// This [`Track`] will be considered new (not known to remote) and may be
     /// obtained by calling `Peer.new_tracks` after this scheduled
-    /// [`TrackChange`] will be applied.
+    /// [`PeerChange`] will be applied.
     #[inline]
     fn add_sender(&mut self, track: Rc<MediaTrack>) {
-        self.schedule_change(TrackChange::AddSendTrack(track));
+        self.schedule_change(PeerChange::AddSendTrack(track));
+    }
+
+    /// Removes [`Track`]s with a provided [`TrackId`]s from this [`Peer`].
+    pub fn remove_tracks(&mut self, track_ids: &[TrackId]) {
+        track_ids.iter().for_each(|id| {
+            let changes_indexes_to_remove: Vec<_> = self
+                .context
+                .peer_changes_queue
+                .iter()
+                .enumerate()
+                .filter_map(|(n, change)| match change {
+                    PeerChange::AddSendTrack(track)
+                    | PeerChange::AddRecvTrack(track) => {
+                        if track.id() == *id {
+                            Some(n)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                })
+                .collect();
+            if changes_indexes_to_remove.is_empty() {
+                self.schedule_change(PeerChange::RemoveTrack(*id))
+            } else {
+                for remove_index in changes_indexes_to_remove {
+                    self.context.peer_changes_queue.remove(remove_index);
+                }
+            }
+        });
     }
 }
 
@@ -1381,7 +1501,7 @@ pub mod tests {
     /// Returns dummy [`PeerUpdatesSubscriber`] mock which does nothing.
     pub fn dummy_negotiation_sub_mock() -> Rc<dyn PeerUpdatesSubscriber> {
         let mut mock = MockPeerUpdatesSubscriber::new();
-        mock.expect_negotiation_needed().returning(|_| ());
+        mock.expect_negotiation_needed().returning(drop);
 
         Rc::new(mock)
     }
@@ -1478,6 +1598,12 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
 
         peer.as_changes_scheduler().add_receiver(media_track(0));
         peer.as_changes_scheduler().add_sender(media_track(1));
@@ -1502,7 +1628,7 @@ pub mod tests {
                 tx.send(peer_id).unwrap();
             });
 
-        let peer = Peer::new(
+        let mut peer = Peer::new(
             PeerId(0),
             MemberId::from("member-1"),
             PeerId(1),
@@ -1510,6 +1636,12 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
 
         let mut peer = peer.start_as_offerer();
         peer.as_changes_scheduler().add_sender(media_track(0));
@@ -1524,8 +1656,8 @@ pub mod tests {
         let peer = peer.set_remote_answer(String::new());
         assert_eq!(peer.context.receivers.len(), 1);
         assert_eq!(peer.context.senders.len(), 1);
-        assert_eq!(peer.context.pending_track_updates.len(), 2);
-        assert_eq!(peer.context.track_changes_queue.len(), 0);
+        assert_eq!(peer.context.pending_peer_changes.len(), 2);
+        assert_eq!(peer.context.peer_changes_queue.len(), 0);
         assert_eq!(rx.recv().unwrap(), PeerId(0));
     }
 
@@ -1534,7 +1666,7 @@ pub mod tests {
         let (force_update_tx, force_update_rx) = std::sync::mpsc::channel();
         let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub.expect_force_update().returning(
-            move |peer_id: PeerId, changes: Vec<TrackUpdate>| {
+            move |peer_id: PeerId, changes: Vec<PeerUpdate>| {
                 force_update_tx.send((peer_id, changes)).unwrap();
             },
         );
@@ -1554,6 +1686,12 @@ pub mod tests {
             false,
             Rc::new(negotiation_sub),
         );
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
         peer.context.is_known_to_remote = true;
         peer.as_changes_scheduler().add_sender(media_track(0));
         peer.as_changes_scheduler().add_receiver(media_track(1));
@@ -1581,14 +1719,14 @@ pub mod tests {
 
         assert_eq!(peer_id, PeerId(0));
         assert_eq!(changes.len(), 2);
-        assert!(peer.context.track_changes_queue.is_empty());
+        assert!(peer.context.peer_changes_queue.is_empty());
         assert!(matches!(
             peer.context.on_negotiation_finish,
             OnNegotiationFinish::Renegotiate
         ));
 
         let peer = peer.set_local_offer(String::new());
-        peer.set_remote_answer(String::new());
+        let _ = peer.set_remote_answer(String::new());
 
         let peer_id = negotiation_needed_rx.recv().unwrap();
         assert_eq!(peer_id, PeerId(0));
@@ -1599,7 +1737,7 @@ pub mod tests {
         let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_force_update()
-            .returning(move |_: PeerId, _: Vec<TrackUpdate>| {});
+            .returning(move |_: PeerId, _: Vec<PeerUpdate>| {});
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |_: PeerId| {});
@@ -1651,6 +1789,12 @@ pub mod tests {
         ];
         peer.as_changes_scheduler().patch_tracks(patches);
         let mut peer = PeerStateMachine::from(peer);
+        peer.set_ice_user(IceUser::new_static(
+            String::new(),
+            String::new(),
+            String::new(),
+        ));
+        peer.set_initialized();
         peer.commit_scheduled_changes();
         let peer = if let PeerStateMachine::Stable(peer) = peer {
             peer
@@ -1660,10 +1804,10 @@ pub mod tests {
 
         let mut track_patches_after: Vec<_> = peer
             .context
-            .pending_track_updates
+            .pending_peer_changes
             .iter()
             .filter_map(|t| {
-                if let TrackChange::TrackPatch(patch) = t {
+                if let PeerChange::TrackPatch(patch) = t {
                     Some(patch.clone())
                 } else {
                     None
@@ -1680,21 +1824,21 @@ pub mod tests {
         assert!(track_patches_after.is_empty());
     }
 
-    /// Checks that [`TrackChange::IceRestart`] correctly dedups.
+    /// Checks that [`PeerChange::IceRestart`] correctly dedups.
     #[test]
     fn ice_restart_dedupping_works() {
         let changes = vec![
-            TrackChange::IceRestart,
-            TrackChange::IceRestart,
-            TrackChange::IceRestart,
-            TrackChange::TrackPatch(TrackPatchEvent {
+            PeerChange::IceRestart,
+            PeerChange::IceRestart,
+            PeerChange::IceRestart,
+            PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 enabled_individual: None,
                 enabled_general: None,
                 muted: None,
             }),
-            TrackChange::IceRestart,
-            TrackChange::TrackPatch(TrackPatchEvent {
+            PeerChange::IceRestart,
+            PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 enabled_individual: None,
                 enabled_general: None,
@@ -1705,7 +1849,7 @@ pub mod tests {
         let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
         negotiation_sub
             .expect_force_update()
-            .returning(move |_: PeerId, _: Vec<TrackUpdate>| {});
+            .returning(move |_: PeerId, _: Vec<PeerUpdate>| {});
         negotiation_sub
             .expect_negotiation_needed()
             .returning(move |_: PeerId| {});
@@ -1718,13 +1862,13 @@ pub mod tests {
             Rc::new(negotiation_sub),
         );
 
-        peer.context.pending_track_updates = changes;
+        peer.context.pending_peer_changes = changes;
 
         peer.dedup_ice_restarts();
 
-        let deduped_track_updates = peer.context.pending_track_updates;
+        let deduped_track_updates = peer.context.pending_peer_changes;
         assert_eq!(deduped_track_updates.len(), 3);
-        assert!(matches!(deduped_track_updates[1], TrackChange::IceRestart));
+        assert!(matches!(deduped_track_updates[1], PeerChange::IceRestart));
     }
 
     /// Checks that [`Peer::inner_force_commit_scheduled_changes`] merges
@@ -1737,7 +1881,7 @@ pub mod tests {
             |peer_id, changes| {
                 assert_eq!(peer_id, PeerId(0));
                 assert_eq!(changes.len(), 1);
-                if let TrackUpdate::Updated(patch) = &changes[0] {
+                if let PeerUpdate::Updated(patch) = &changes[0] {
                     assert_eq!(patch.id, TrackId(0));
                     assert_eq!(patch.enabled_individual, Some(false));
                 } else {
@@ -1754,20 +1898,20 @@ pub mod tests {
             false,
             Rc::new(peer_updates_sub),
         );
-        peer.context.pending_track_updates = vec![
-            TrackChange::TrackPatch(TrackPatchEvent {
+        peer.context.pending_peer_changes = vec![
+            PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
                 muted: None,
             }),
-            TrackChange::TrackPatch(TrackPatchEvent {
+            PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 enabled_general: Some(true),
                 enabled_individual: Some(true),
                 muted: None,
             }),
-            TrackChange::TrackPatch(TrackPatchEvent {
+            PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1793,11 +1937,11 @@ pub mod tests {
         ]);
         peer.inner_force_commit_scheduled_changes();
 
-        assert_eq!(peer.context.track_changes_queue.len(), 0);
-        assert_eq!(peer.context.pending_track_updates.len(), 1);
+        assert_eq!(peer.context.peer_changes_queue.len(), 0);
+        assert_eq!(peer.context.pending_peer_changes.len(), 1);
         let filtered_track_change =
-            peer.context.pending_track_updates.pop().unwrap();
-        if let TrackChange::TrackPatch(patch) = filtered_track_change {
+            peer.context.pending_peer_changes.pop().unwrap();
+        if let PeerChange::TrackPatch(patch) = filtered_track_change {
             assert_eq!(patch.id, TrackId(1));
             assert_eq!(patch.enabled_general, Some(false));
         } else {
@@ -1815,13 +1959,13 @@ pub mod tests {
         fn whitelisting_works() {
             let mut deduper =
                 TrackPatchDeduper::with_whitelist(hashset![TrackId(1)]);
-            let filtered_patch = TrackChange::TrackPatch(TrackPatchEvent {
+            let filtered_patch = PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(2),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
                 muted: None,
             });
-            let whitelisted_patch = TrackChange::TrackPatch(TrackPatchEvent {
+            let whitelisted_patch = PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(1),
                 enabled_general: Some(false),
                 enabled_individual: Some(false),
@@ -1838,7 +1982,7 @@ pub mod tests {
             assert_eq!(merged_changes[0], whitelisted_patch);
         }
 
-        /// Checks that [`TrackPatchDeduper`] merges [`TrackChange`]s correctly.
+        /// Checks that [`TrackPatchDeduper`] merges [`PeerChange`]s correctly.
         #[test]
         fn merging_works() {
             let mut deduper = TrackPatchDeduper::new();
@@ -1876,10 +2020,10 @@ pub mod tests {
                 },
             ]
             .into_iter()
-            .map(|p| TrackChange::TrackPatch(p))
+            .map(|p| PeerChange::TrackPatch(p))
             .collect();
             let unrelated_change =
-                TrackChange::AddSendTrack(Rc::new(MediaTrack::new(
+                PeerChange::AddSendTrack(Rc::new(MediaTrack::new(
                     TrackId(1),
                     MediaType::Audio(AudioSettings { required: true }),
                 )));
@@ -1892,7 +2036,7 @@ pub mod tests {
             let merged_changes: HashMap<_, _> = deduper
                 .into_inner()
                 .filter_map(|t| {
-                    if let TrackChange::TrackPatch(patch) = t {
+                    if let PeerChange::TrackPatch(patch) = t {
                         Some((patch.id, patch))
                     } else {
                         None
@@ -1925,16 +2069,13 @@ pub mod tests {
                 enabled_individual: None,
                 enabled_general: None,
             };
-            let changes = vec![TrackChange::TrackPatch(track_patch.clone())];
+            let changes = vec![PeerChange::TrackPatch(track_patch.clone())];
 
             let mut negotiation_sub = MockPeerUpdatesSubscriber::new();
             negotiation_sub.expect_force_update().times(1).return_once(
-                move |peer_id: PeerId, updates: Vec<TrackUpdate>| {
+                move |peer_id: PeerId, updates: Vec<PeerUpdate>| {
                     assert_eq!(peer_id, PeerId(0));
-                    assert_eq!(
-                        updates,
-                        vec![TrackUpdate::Updated(track_patch)]
-                    );
+                    assert_eq!(updates, vec![PeerUpdate::Updated(track_patch)]);
                 },
             );
             let mut peer = Peer::new(
@@ -1945,23 +2086,28 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
-
-            peer.context.track_changes_queue = changes;
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
+            peer.set_initialized();
+            peer.context.peer_changes_queue = changes;
             peer.commit_scheduled_changes();
         }
 
-        /// Checks that [`TrackChange`] which doesn't requires negotiation with
-        /// [`TrackChange`] which requires negotiation will trigger negotiation.
+        /// Checks that [`PeerChange`] which doesn't requires negotiation with
+        /// [`PeerChange`] which requires negotiation will trigger negotiation.
         #[test]
         fn mixed_changeset_will_trigger_negotiation() {
             let changes = vec![
-                TrackChange::TrackPatch(TrackPatchEvent {
+                PeerChange::TrackPatch(TrackPatchEvent {
                     id: TrackId(0),
                     muted: Some(true),
                     enabled_individual: None,
                     enabled_general: None,
                 }),
-                TrackChange::TrackPatch(TrackPatchEvent {
+                PeerChange::TrackPatch(TrackPatchEvent {
                     id: TrackId(1),
                     muted: None,
                     enabled_individual: Some(true),
@@ -1985,8 +2131,14 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
+            peer.set_initialized();
 
-            peer.context.track_changes_queue = changes.clone();
+            peer.context.peer_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
 
             let reversed_changes = {
@@ -1994,14 +2146,14 @@ pub mod tests {
                 changes.reverse();
                 changes
             };
-            assert_eq!(peer.context.pending_track_updates, reversed_changes);
+            assert_eq!(peer.context.pending_peer_changes, reversed_changes);
         }
 
-        /// Checks that [`TrackChange`] which changes negotiationless property
+        /// Checks that [`PeerChange`] which changes negotiationless property
         /// and negotiationful property will trigger negotiation.
         #[test]
         fn mixed_change_will_trigger_negotiation() {
-            let changes = vec![TrackChange::TrackPatch(TrackPatchEvent {
+            let changes = vec![PeerChange::TrackPatch(TrackPatchEvent {
                 id: TrackId(0),
                 muted: Some(true),
                 enabled_individual: Some(true),
@@ -2024,11 +2176,17 @@ pub mod tests {
                 false,
                 Rc::new(negotiation_sub),
             );
+            peer.set_ice_user(IceUser::new_static(
+                String::new(),
+                String::new(),
+                String::new(),
+            ));
+            peer.set_initialized();
 
-            peer.context.track_changes_queue = changes.clone();
+            peer.context.peer_changes_queue = changes.clone();
             peer.commit_scheduled_changes();
 
-            assert_eq!(peer.context.pending_track_updates, changes);
+            assert_eq!(peer.context.pending_peer_changes, changes);
         }
     }
 
@@ -2045,7 +2203,7 @@ pub mod tests {
                 .returning(|_: PeerId| ());
             negotiation_sub
                 .expect_force_update()
-                .returning(|_: PeerId, _: Vec<TrackUpdate>| ());
+                .returning(|_: PeerId, _: Vec<PeerUpdate>| ());
 
             let mut peer = Peer::new(
                 PeerId(0),
@@ -2060,6 +2218,7 @@ pub mod tests {
                 String::new(),
                 String::new(),
             ));
+            peer.set_initialized();
 
             peer
         }

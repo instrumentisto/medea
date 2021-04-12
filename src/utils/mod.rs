@@ -123,6 +123,8 @@ macro_rules! actix_try {
 }
 
 /// Converts provided [`Instant`] into [`chrono::DateTime`].
+#[inline]
+#[must_use]
 pub fn instant_into_utc(instant: Instant) -> DateTime<Utc> {
     chrono::Duration::from_std(instant.elapsed())
         .map_or_else(|_| Utc::now(), |dur| Utc::now() - dur)

@@ -23,7 +23,7 @@ pub use self::{
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaKind {
     /// Audio track.

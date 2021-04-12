@@ -21,9 +21,9 @@ IMAGE_NAME := $(strip \
 	$(if $(call eq,$(image),medea-demo-edge),medea-demo,\
 	$(image))))
 
-RUST_VER := 1.50
-CHROME_VERSION := 88.0
-FIREFOX_VERSION := 86.0
+RUST_VER := 1.51
+CHROME_VERSION := 89.0
+FIREFOX_VERSION := 87.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -439,7 +439,8 @@ endif
 test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml
+	MEDEA_CONF=tests/medea.config.toml \
+	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag))
 
 test.integration:
 ifeq ($(up),yes)
@@ -460,7 +461,7 @@ endif
 # Run E2E tests of project.
 #
 # Usage:
-#	make test.e2e
+#	make test.e2e [only=<regex>]
 #		[( [up=no]
 #		 | up=yes [browser=(chrome|firefox)]
 #		          [( [dockerized=no]
@@ -481,7 +482,7 @@ endif
 	                    dockerized=$(dockerized) tag=$(tag) debug=$(debug)
 	@make wait.port port=4444
 endif
-	cargo test --test e2e
+	cargo test --test e2e $(if $(call eq,$(only),),,-- -e '$(only)')
 ifeq ($(up),yes)
 	@make docker.down.e2e
 endif
@@ -522,8 +523,8 @@ release.crates:
 ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-control-api-proto medea-coturn-telnet-client medea-macro medea-reactive),)
 	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
-		cargo publish --token $(release-crates-token) ,\
-		cargo package --allow-dirty )
+		cargo +beta publish --token $(release-crates-token) ,\
+		cargo +beta package --allow-dirty )
 endif
 
 
@@ -802,8 +803,6 @@ docker.up.demo: docker.down.demo
 
 docker-up-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/medea.config.toml \
 	COMPOSE_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
 	COMPOSE_CONTROL_MOCK_IMAGE_VER=$(if $(call eq,$(tag),),dev,$(tag)) \
 	COMPOSE_WEBDRIVER_IMAGE_NAME=$(strip \

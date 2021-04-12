@@ -160,11 +160,16 @@ impl RtcPeerConnection {
         RtcStats::try_from(&js_stats).map_err(tracerr::map_from_and_wrap!())
     }
 
-    /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
+    /// Sets handler for a [`RtcTrackEvent`] (see [RTCTrackEvent][1] and
     /// [`ontrack` callback][2]).
+    ///
+    /// # Panics
+    ///
+    /// If binding to the [`track`][3] event fails. Not supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
+    /// [3]: https://w3.org/TR/webrtc/#event-track
     pub fn on_track<F>(&self, f: Option<F>)
     where
         F: 'static + FnMut(MediaStreamTrack, Transceiver),
@@ -194,11 +199,17 @@ impl RtcPeerConnection {
         }
     }
 
-    /// Sets handler for [`RtcPeerConnectionIceEvent`] event
-    /// (see [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
+    /// Sets handler for a [`RtcPeerConnectionIceEvent`] (see
+    /// [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
+    ///
+    /// # Panics
+    ///
+    /// If binding to the [`icecandidate`][3] event fails. Not supposed to ever
+    /// happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
+    /// [3]: https://w3.org/TR/webrtc/#event-icecandidate
     pub fn on_ice_candidate<F>(&self, f: Option<F>)
     where
         F: 'static + FnMut(IceCandidate),
@@ -251,7 +262,12 @@ impl RtcPeerConnection {
         get_peer_connection_state(&self.peer)?.ok()
     }
 
-    /// Sets handler for [`iceconnectionstatechange`][1] event.
+    /// Sets handler for an [`iceconnectionstatechange`][1] event.
+    ///
+    /// # Panics
+    ///
+    /// If binding to the [`iceconnectionstatechange`][1] event fails. Not
+    /// supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
     pub fn on_ice_connection_state_change<F>(&self, f: Option<F>)
@@ -284,7 +300,12 @@ impl RtcPeerConnection {
         }
     }
 
-    /// Sets handler for [`connectionstatechange`][1] event.
+    /// Sets handler for a [`connectionstatechange`][1] event.
+    ///
+    /// # Panics
+    ///
+    /// If binding to the [`connectionstatechange`][1] event fails. Not supposed
+    /// to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#event-connectionstatechange
     pub fn on_connection_state_change<F>(&self, f: Option<F>)
@@ -565,6 +586,11 @@ impl RtcPeerConnection {
 
     /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
     /// [set of this RTCPeerConnection's transceivers][2] by provided `mid`.
+    ///
+    /// # Panics
+    ///
+    /// If fails to [iterate over transceivers on JS side](js_sys::try_iter).
+    /// Not supposed to ever happen.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set

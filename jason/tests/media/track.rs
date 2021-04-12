@@ -2,7 +2,10 @@
 
 use std::rc::{Rc, Weak};
 
-use futures::channel::oneshot;
+use futures::{
+    channel::{mpsc, oneshot},
+    StreamExt as _,
+};
 use medea_jason::media::{
     track::remote, DeviceVideoTrackConstraints, MediaManager,
     MediaStreamSettings,
@@ -47,31 +50,136 @@ async fn on_track_enabled_works() {
         })
         .into(),
     );
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    api_track.on_muted(dont_fire());
+    api_track.on_unmuted(dont_fire());
+    api_track.on_stopped(dont_fire());
 
     core_track.set_enabled(false);
+    assert!(!api_track.muted());
     assert!(!api_track.enabled());
     core_track.set_enabled(true);
+    assert!(!api_track.muted());
     assert!(api_track.enabled());
 
     timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
 }
 
 #[wasm_bindgen_test]
 async fn on_track_disabled_works() {
-    let track = get_audio_track().await;
+    let api_track = get_audio_track().await;
+    let core_track: remote::Track = api_track.clone().into();
 
-    let track_clone = track.clone();
+    let core_track_clone = core_track.clone();
     let (test_tx, test_rx) = oneshot::channel();
-    track.on_disabled(
+    api_track.on_disabled(
         Closure::once_into_js(move || {
-            assert!(!track_clone.enabled());
+            assert!(!core_track_clone.enabled());
+            test_tx.send(()).unwrap();
+        })
+        .into(),
+    );
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    api_track.on_muted(dont_fire());
+    api_track.on_unmuted(dont_fire());
+    api_track.on_enabled(dont_fire());
+    api_track.on_stopped(dont_fire());
+
+    assert!(!api_track.muted());
+    assert!(api_track.enabled());
+    core_track.set_enabled(false);
+    assert!(!api_track.muted());
+
+    timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
+}
+
+#[wasm_bindgen_test]
+async fn on_track_unmuted_works() {
+    let api_track = get_audio_track().await;
+    let core_track: remote::Track = api_track.clone().into();
+
+    let core_track_clone = core_track.clone();
+    let (test_tx, test_rx) = oneshot::channel();
+    api_track.on_unmuted(
+        Closure::once_into_js(move || {
+            assert!(!core_track_clone.muted());
             test_tx.send(()).unwrap();
         })
         .into(),
     );
 
-    let track = remote::Track::from(track);
-    track.set_enabled(false);
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    api_track.on_disabled(dont_fire());
+    api_track.on_enabled(dont_fire());
+    api_track.on_stopped(dont_fire());
+
+    core_track.set_muted(true);
+    assert!(api_track.enabled());
+    assert!(api_track.muted());
+    core_track.set_muted(false);
+    assert!(api_track.enabled());
+    assert!(!api_track.muted());
 
     timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
+}
+
+#[wasm_bindgen_test]
+async fn on_track_muted_works() {
+    let api_track = get_audio_track().await;
+    let core_track: remote::Track = api_track.clone().into();
+
+    let core_track_clone = core_track.clone();
+    let (test_tx, test_rx) = oneshot::channel();
+    api_track.on_muted(
+        Closure::once_into_js(move || {
+            assert!(core_track_clone.muted());
+            test_tx.send(()).unwrap();
+        })
+        .into(),
+    );
+
+    let (dont_fire_tx, mut dont_fire_rx) = mpsc::unbounded();
+    let dont_fire = || {
+        let tx = dont_fire_tx.clone();
+        Closure::once_into_js(move || {
+            tx.unbounded_send(()).unwrap();
+        })
+        .into()
+    };
+    api_track.on_unmuted(dont_fire());
+    api_track.on_disabled(dont_fire());
+    api_track.on_enabled(dont_fire());
+    api_track.on_stopped(dont_fire());
+
+    assert!(api_track.enabled());
+    assert!(!api_track.muted());
+    core_track.set_muted(true);
+    assert!(api_track.enabled());
+
+    timeout(100, test_rx).await.unwrap().unwrap();
+    timeout(100, dont_fire_rx.next()).await.unwrap_err();
 }

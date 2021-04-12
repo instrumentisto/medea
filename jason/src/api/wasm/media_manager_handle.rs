@@ -29,7 +29,7 @@ use super::JasonError;
 /// upgraded.
 ///
 /// [`MediaManager`]: media::MediaManager
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[wasm_bindgen]
 #[derive(From)]

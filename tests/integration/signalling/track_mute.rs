@@ -1,12 +1,12 @@
 use function_name::named;
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::{
-    Command, Event, PeerId, TrackId, TrackPatchCommand, TrackPatchEvent,
-    TrackUpdate,
+    Command, Event, PeerId, PeerUpdate, TrackId, TrackPatchCommand,
+    TrackPatchEvent,
 };
 
 use crate::{
-    grpc_control_api::{create_room_req, ControlClient},
+    grpc_control_api::{pub_sub_room_req, ControlClient},
     if_let_next,
     signalling::{SendCommand, TestMember},
     test_name,
@@ -18,7 +18,7 @@ use crate::{
 #[named]
 async fn track_mute_doesnt_renegotiates() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -63,7 +63,7 @@ async fn track_mute_doesnt_renegotiates() {
         .unwrap();
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -76,7 +76,7 @@ async fn track_mute_doesnt_renegotiates() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: None,
@@ -88,7 +88,7 @@ async fn track_mute_doesnt_renegotiates() {
     }
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -101,7 +101,7 @@ async fn track_mute_doesnt_renegotiates() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: None,
@@ -119,7 +119,7 @@ async fn track_mute_doesnt_renegotiates() {
 #[named]
 async fn track_mute_with_disable_will_start_renegotiation() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -164,7 +164,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
         .unwrap();
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -177,7 +177,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: Some(false),
@@ -189,7 +189,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
     }
 
     loop {
-        if let Event::TracksApplied {
+        if let Event::PeerUpdated {
             peer_id,
             updates,
             negotiation_role,
@@ -202,7 +202,7 @@ async fn track_mute_with_disable_will_start_renegotiation() {
             assert_eq!(updates.len(), 1);
             assert_eq!(
                 updates[0],
-                TrackUpdate::Updated(TrackPatchEvent {
+                PeerUpdate::Updated(TrackPatchEvent {
                     muted: Some(true),
                     id: TrackId(0),
                     enabled_general: Some(false),
