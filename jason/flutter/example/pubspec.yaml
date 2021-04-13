@@ -1,0 +1,29 @@
+name: medea_jason_example
+description: Demonstrates how to use the medea_jason plugin.
+
+environment:
+  sdk: ">=2.7.0 <3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # When depending on this package from a real application you should use:
+  #   medea_jason: ^x.y.z
+  # See https://dart.dev/tools/pub/dependencies#version-constraints
+  # The example app is bundled with the plugin so we use a path dependency on
+  # the parent directory to use the current plugin's version.
+  medea_jason:
+    path: ../
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+
+flutter:
+  uses-material-design: true

@@ -38,7 +38,8 @@ COPY proto/control-api/src/grpc/api.proto \
      proto/control-api/src/grpc/api*.rs \
      /app/proto/control-api/src/grpc/
 COPY jason/Cargo.toml /app/jason/
-COPY jason/jason-hello-world/Cargo.toml /app/jason/jason-hello-world/
+# TODO: Temp change. Remove when removing jason-dummy crate.
+COPY jason/jason-dummy/Cargo.toml /app/jason/jason-dummy/
 COPY Cargo.toml Cargo.lock /app/
 WORKDIR /app/
 RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
@@ -50,7 +51,8 @@ RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
  && mkdir -p proto/client-api/src/ && touch proto/client-api/src/lib.rs \
  && mkdir -p proto/control-api/src/ && touch proto/control-api/src/lib.rs \
  && mkdir -p jason/src/ && touch jason/src/lib.rs \
- && mkdir -p jason/jason-hello-world/src/ && touch jason/jason-hello-world/src/lib.rs \
+ # TODO: Temp change. Remove when removing jason-dummy crate.
+ && mkdir -p jason/jason-dummy/src/ && touch jason/jason-dummy/src/lib.rs \
  && mkdir -p src/ && touch src/lib.rs
 
 # Build dependencies only.
