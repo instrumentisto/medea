@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'dart:io';
 import 'result.dart';
+import 'package:web_socket_channel/io.dart';
 
 final DynamicLibrary _dl = _open();
 final DynamicLibrary dl = _dl;
@@ -35,11 +36,61 @@ void doDynamicLinking() {
           "register_completer_complete_error")(
       Pointer.fromFunction<Void Function(Handle, Pointer)>(
           completerCompleteError));
+
   _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           "register_completer_future")(
       Pointer.fromFunction<Handle Function(Handle)>(completerFuture));
-  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      Pointer.fromFunction<Handle Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Handle)>(newErrorWithSource));
+
+  // TODO: check fn name
+  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_new_error_with_source_caller")(
+      Pointer.fromFunction<Handle Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>, Handle)>(newErrorWithSource)
+  );
+
+  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_new_ws")(
+    Pointer.fromFunction<Handle Function(Pointer<Utf8>)>(newWs)
+  );
+
+  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_ws_message_listener_call")(
+    Pointer.fromFunction<Void Function(Handle, Pointer)>(listenWs)
+  );
+
+  _dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_ws_message_listener_send")(
+      Pointer.fromFunction<Void Function(Handle, Pointer<Utf8>)>(sendWsMsg)
+  );
+}
+
+Object newWs(Pointer<Utf8> addr) {
+  return IOWebSocketChannel.connect(Uri.parse(addr.toDartString()));
+}
+
+final _callMessageListenerDart _callMessageListener = _dl
+    .lookupFunction<_callMessageListenerC, _callMessageListenerDart>('call_msg_listener');
+typedef _callMessageListenerC = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
+typedef _callMessageListenerDart = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
+
+void listenWs(Object ws, Pointer listener) {
+  if (ws is IOWebSocketChannel) {
+    ws.stream.listen((msg) {
+      if (msg is String) {
+        _callMessageListener(listener, msg.toNativeUtf8());
+      }
+    });
+  }
+}
+
+void sendWsMsg(Object ws, Pointer<Utf8> msg) {
+  if (ws is IOWebSocketChannel) {
+    ws.sink.add(msg.toDartString());
+  }
+}
+
+final _foobarDart _foobar = _dl
+  .lookupFunction<_foobarC, _foobarDart>('foobar');
+typedef _foobarC = Void Function();
+typedef _foobarDart = void Function();
+
+void anotherFoobar() {
+  _foobar();
 }
 
 Object newError(
@@ -101,10 +152,10 @@ final _test_future_Dart _test_future =
 typedef _test_future_C = Handle Function();
 typedef _test_future_Dart = Object Function();
 
-Future<void> foobar() async {
-  await _test_future();
-  print("Future resolved");
-}
+// Future<void> foobar() async {
+//   await _test_future();
+//   print("Future resolved");
+// }
 
 void doClosureCallback(void Function() callback) {
   callback();

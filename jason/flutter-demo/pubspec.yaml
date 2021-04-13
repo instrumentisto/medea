@@ -23,6 +23,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  web_socket_channel: '^2.0.0'
 
   jason:
     path: ../flutter

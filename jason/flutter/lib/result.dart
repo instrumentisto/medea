@@ -1,3 +1,6 @@
+import 'dart:ffi';
+import 'package:ffi/ffi.dart';
+
 class Result<T> {
   T? _ok;
   JasonError? _err;

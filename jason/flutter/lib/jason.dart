@@ -16,15 +16,19 @@ class Jason {
 
   Jason() {
     ffi.doDynamicLinking();
-    _executor = new Executor(ffi.dl);
-    _executor.start();
+    // _executor = new Executor(ffi.dl);
+    // _executor.start();
   }
 
   void cb_test() {
     ffi.simpleCallback();
   }
 
-  Future<void> foobar() async {
-    await ffi.foobar();
+  // Future<void> foobar() async {
+  //   await ffi.foobar();
+  // }
+
+  void anotherFoobar() {
+    ffi.anotherFoobar();
   }
 }
