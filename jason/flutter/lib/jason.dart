@@ -10,7 +10,6 @@ final _add_Dart _add = _dl.lookupFunction<_add_C, _add_Dart>('add');
 
 DynamicLibrary _load() {
   if (Platform.isAndroid) return DynamicLibrary.open('libjason.so');
-  if (Platform.isIOS) return DynamicLibrary.executable();
   throw UnsupportedError('This platform is not supported.');
 }
 

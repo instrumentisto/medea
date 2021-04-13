@@ -80,7 +80,7 @@ build.jason:
 # Usage:
 #	make deps
 
-deps: cargo yarn
+deps: cargo yarn flutter
 
 
 docs: docs.rust
@@ -359,6 +359,15 @@ cargo.version:
 ####################
 # Flutter commands #
 ####################
+
+# Resolve Flutter project dependencies.
+#
+# Usage:
+#	make flutter [cmd=(pub get|<flutter-cmd>)]
+
+flutter:
+	cd jason/flutter && \
+	flutter $(if $(call eq,$(cmd),),pub get,$(cmd))
 
 # Lint Dart sources with dartanalyzer.
 #
@@ -915,7 +924,7 @@ docker-up-e2e-env = RUST_BACKTRACE=1 \
 			$(CHROME_VERSION) ))
 
 docker.up.e2e: docker.down.e2e
-	@make build.jason.wasm debug=$(debug) dockerized=no
+	@make build.jason debug=$(debug) dockerized=no
 	env $(docker-up-e2e-env) \
 	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		up $(if $(call eq,$(dockerized),yes),\
@@ -1185,7 +1194,7 @@ endef
 # .PHONY section #
 ##################
 
-.PHONY: build build.jason.wasm build.jason.android build.medea \
+.PHONY: build build.jason build.medea \
         cargo cargo.build cargo.changelog.link cargo.fmt cargo.gen cargo.lint \
         	cargo.version \
         docker.build \
@@ -1196,7 +1205,7 @@ endef
         	docker.up.medea docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
-        flutter.fmt flutter.lint flutter.run flutter.test \
+        flutter flutter.fmt flutter.lint flutter.run flutter.test \
         helm helm.dir helm.down helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
