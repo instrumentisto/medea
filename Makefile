@@ -219,10 +219,11 @@ cargo:
 # 										   [api-level=<android-sdk-api-level>])]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
-jni-libs-path = ../../jason/flutter/android/src/main/jniLibs
+jni-libs-path = jason/flutter/android/src/main/jniLibs
 jason-android-targets := "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
 cargo-ndk-api-level = $(if $(call eq,$(api-level),),\
-				$(shell make flutter.android.compile_api_version),$(api-level))
+				$(shell make --no-print-directory \
+				flutter.android.compile_api_version),$(api-level))
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -275,9 +276,9 @@ ifeq ($(target),)
     					$(platform), $(debug), $(target)))
 else
 	# TODO: Replace with actual medea-jason crate.
-	cd jason/jason-dummy && \
-		cargo ndk -p $(cargo-ndk-api-level) -t ${target} \
-			-o $(jni-libs-path) build $(if $(call eq,$(debug),no),--release,)
+	cargo ndk -p $(cargo-ndk-api-level) -t ${target} \
+		-o $(jni-libs-path) --manifest-path jason/jason-dummy/Cargo.toml \
+		build $(if $(call eq,$(debug),no),--release,)
 endif
 else
 	@rm -rf $(crate-dir)/pkg/
@@ -1228,6 +1229,8 @@ endef
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
         flutter flutter.fmt flutter.lint flutter.run flutter.test \
+        	flutter.android.compile_api_version \
+        	flutter.android.min_api_version \
         helm helm.dir helm.down helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
