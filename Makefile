@@ -26,11 +26,6 @@ ANDROID_BUILDER_VER=2.2.0-ndkr22b-rust1.51-r1
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
-JASON_ANDROID_COMPILE_API_VERSION := $(shell grep compileSdkVersion \
-						jason/flutter/android/build.gradle | grep -Po "\d+")
-JASON_ANDROID_MIN_API_VERSION := $(shell grep minSdkVersion \
-						jason/flutter/android/build.gradle | grep -Po "\d+")
-
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -55,7 +50,10 @@ crate-dir = crates/medea-coturn-telnet-client
 endif
 crate-ver := $(strip \
 	$(shell grep -m1 'version = "' $(crate-dir)/Cargo.toml | cut -d '"' -f2))
-
+android-compile-api-version := $(strip $(shell grep compileSdkVersion \
+						jason/flutter/android/build.gradle | grep -Po "\d+"))
+android-min-api-version := $(strip $(shell grep minSdkVersion \
+						jason/flutter/android/build.gradle | grep -Po "\d+"))
 
 
 
@@ -228,7 +226,7 @@ cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 jni-libs-path = ../../jason/flutter/android/src/main/jniLibs
 jason-android-targets := "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
 cargo-ndk-api-level = $(if $(call eq,$(api-level),),\
-						$(JASON_ANDROID_COMPILE_API_VERSION),$(api-level))
+						$(android-compile-api-version),$(api-level))
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -428,7 +426,7 @@ flutter.run:
 #	make flutter.android.compile_api_version
 
 flutter.android.compile_api_version:
-	@printf "$(JASON_ANDROID_COMPILE_API_VERSION)"
+	@printf "$(android-compile-api-version)"
 
 
 # Show Android min API version of medea_jason Flutter plugin.
@@ -437,7 +435,7 @@ flutter.android.compile_api_version:
 #	make flutter.android.min_api_version
 
 flutter.android.min_api_version:
-	@printf "WTFWTFWTFWTF$(JASON_ANDROID_MIN_API_VERSION)"
+	@printf "$(android-min-api-version)"
 
 
 

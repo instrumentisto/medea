@@ -277,11 +277,10 @@ jobs:
 #                    name=min::$(make flutter.android.min_api_version)
 #            && echo ::set-output
 #                    name=target::$(make flutter.android.compile_api_version)
-#      - name: Compile Medea Jason shared object
-#        run: make cargo.build crate=medea-jason platform=android target=x86
-#                  api-level=${{ steps.android-api-level.outputs.target }}
-      - run: make flutter.android.min_api_version
-      - run: make flutter.android.compile_api_version
+      - name: Compile Medea Jason shared object
+        run: make cargo.build crate=medea-jason platform=android target=x86
+#      - run: make flutter.android.min_api_version
+#      - run: make flutter.android.compile_api_version
 #      - uses: reactivecircus/android-emulator-runner@v2
 #        with:
 #          api-level: ${{ steps.android-api-level.outputs.min }}
