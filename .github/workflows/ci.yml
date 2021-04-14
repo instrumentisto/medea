@@ -91,158 +91,158 @@ jobs:
   # Testing #
   ###########
 
-  test-unit:
-    name: Unit tests
-    if: ${{ github.ref == 'refs/heads/master'
-            || startsWith(github.ref, 'refs/tags/medea-')
-            || !contains(github.event.head_commit.message, '[skip ci]') }}
-    strategy:
-      matrix:
-        include:
-          - crate: medea-macro
-            if: ${{ startsWith(github.ref, 'refs/tags/medea-macro-')
-                    || !startsWith(github.ref, 'refs/tags/medea-') }}
-          - crate: medea-reactive
-            if: ${{ startsWith(github.ref, 'refs/tags/medea-reactive-')
-                    || !startsWith(github.ref, 'refs/tags/medea-') }}
-          - crate: medea-coturn-telnet-client
-            if: ${{ startsWith(github.ref, 'refs/tags/medea-coturn-telnet-client-')
-                    || !startsWith(github.ref, 'refs/tags/medea-') }}
-          - crate: medea-client-api-proto
-            if: ${{ startsWith(github.ref, 'refs/tags/medea-client-api-proto-')
-                    || !startsWith(github.ref, 'refs/tags/medea-') }}
-          - crate: medea
-            if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
-                    || startsWith(github.ref, 'refs/tags/medea-0')
-                    || startsWith(github.ref, 'refs/tags/medea-1')
-                    || startsWith(github.ref, 'refs/tags/medea-2')
-                    || startsWith(github.ref, 'refs/tags/medea-3')
-                    || startsWith(github.ref, 'refs/tags/medea-4')
-                    || startsWith(github.ref, 'refs/tags/medea-5')
-                    || startsWith(github.ref, 'refs/tags/medea-6')
-                    || startsWith(github.ref, 'refs/tags/medea-7')
-                    || startsWith(github.ref, 'refs/tags/medea-8')
-                    || startsWith(github.ref, 'refs/tags/medea-9') }}
-                    # don't ask, pass through...
-          - crate: medea-jason
-            wasm: true
-            if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-')
-                    || !startsWith(github.ref, 'refs/tags/medea-') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        if: ${{ matrix.if }}
+#  test-unit:
+#    name: Unit tests
+#    if: ${{ github.ref == 'refs/heads/master'
+#            || startsWith(github.ref, 'refs/tags/medea-')
+#            || !contains(github.event.head_commit.message, '[skip ci]') }}
+#    strategy:
+#      matrix:
+#        include:
+#          - crate: medea-macro
+#            if: ${{ startsWith(github.ref, 'refs/tags/medea-macro-')
+#                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+#          - crate: medea-reactive
+#            if: ${{ startsWith(github.ref, 'refs/tags/medea-reactive-')
+#                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+#          - crate: medea-coturn-telnet-client
+#            if: ${{ startsWith(github.ref, 'refs/tags/medea-coturn-telnet-client-')
+#                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+#          - crate: medea-client-api-proto
+#            if: ${{ startsWith(github.ref, 'refs/tags/medea-client-api-proto-')
+#                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+#          - crate: medea
+#            if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+#                    || startsWith(github.ref, 'refs/tags/medea-0')
+#                    || startsWith(github.ref, 'refs/tags/medea-1')
+#                    || startsWith(github.ref, 'refs/tags/medea-2')
+#                    || startsWith(github.ref, 'refs/tags/medea-3')
+#                    || startsWith(github.ref, 'refs/tags/medea-4')
+#                    || startsWith(github.ref, 'refs/tags/medea-5')
+#                    || startsWith(github.ref, 'refs/tags/medea-6')
+#                    || startsWith(github.ref, 'refs/tags/medea-7')
+#                    || startsWith(github.ref, 'refs/tags/medea-8')
+#                    || startsWith(github.ref, 'refs/tags/medea-9') }}
+#                    # don't ask, pass through...
+#          - crate: medea-jason
+#            wasm: true
+#            if: ${{ startsWith(github.ref, 'refs/tags/medea-jason-')
+#                    || !startsWith(github.ref, 'refs/tags/medea-') }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#        if: ${{ matrix.if }}
+#
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#        if: ${{ matrix.if && !matrix.wasm }}
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          target: wasm32-unknown-unknown
+#        if: ${{ matrix.if && matrix.wasm }}
+#
+#      - uses: Swatinem/rust-cache@v1
+#        if: ${{ matrix.if
+#                && !contains(github.event.head_commit.message, '[fresh ci]') }}
+#
+#      - name: Parse wasm-bindgen-cli version from Cargo.lock
+#        id: wasm-cli
+#        run: echo ::set-output
+#                  name=VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*'
+#                                                           | grep -o '[0-9\.]*')
+#        if: ${{ matrix.if && matrix.wasm }}
+#      - uses: actions-rs/install@v0.1
+#        with:
+#          crate: wasm-bindgen-cli
+#          version: ${{ steps.wasm-cli.outputs.VERSION }}
+#          use-tool-cache: true
+#        if: ${{ matrix.if && matrix.wasm }}
+#
+#      - name: Chrome
+#        run: make test.unit crate=${{ matrix.crate }} browser=chrome
+#        if: ${{ matrix.if && matrix.crate == 'medea-jason' }}
+#      - name: Firefox
+#        run: make test.unit crate=${{ matrix.crate }} browser=firefox
+#        if: ${{ matrix.if && matrix.crate == 'medea-jason' }}
+#
+#      - run: make test.unit crate=${{ matrix.crate }}
+#        if: ${{ matrix.if && matrix.crate != 'medea-jason' }}
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-        if: ${{ matrix.if && !matrix.wasm }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: wasm32-unknown-unknown
-        if: ${{ matrix.if && matrix.wasm }}
+#  test-e2e:
+#    name: E2E tests
+#    needs: ['docker']
+#    if: ${{ github.ref == 'refs/heads/master'
+#            || startsWith(github.ref, 'refs/tags/medea-')
+#            || !contains(github.event.head_commit.message, '[skip ci]') }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          target: wasm32-unknown-unknown
+#
+#      - uses: Swatinem/rust-cache@v1
+#        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+#      - uses: satackey/action-docker-layer-caching@v0.0.11
+#        with:
+#          key: test-e2e-{hash}
+#          restore-keys: test-e2e-
+#        continue-on-error: true
+#        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+#
+#      - uses: actions-rs/install@v0.1
+#        with:
+#          crate: wasm-pack
+#          use-tool-cache: true
+#
+#      - uses: actions/download-artifact@v2
+#        with:
+#          name: docker-medea-${{ github.run_number }}
+#      - name: Unpack `medea` Docker image
+#        run: make docker.untar from-file=image.tar
+#
+#      - uses: actions/download-artifact@v2
+#        with:
+#          name: docker-medea-control-api-mock-${{ github.run_number }}
+#      - name: Unpack `medea-control-api-mock` Docker image
+#        run: make docker.untar from-file=image.tar
+#
+#      - name: Chrome
+#        run: make test.e2e browser=chrome up=yes dockerized=yes
+#                           tag=build-${{ github.run_number }}
+#      - name: Firefox
+#        run: make test.e2e browser=firefox up=yes dockerized=yes
+#                           tag=build-${{ github.run_number }}
 
-      - uses: Swatinem/rust-cache@v1
-        if: ${{ matrix.if
-                && !contains(github.event.head_commit.message, '[fresh ci]') }}
-
-      - name: Parse wasm-bindgen-cli version from Cargo.lock
-        id: wasm-cli
-        run: echo ::set-output
-                  name=VERSION::$(cargo pkgid wasm-bindgen | grep -o '#.*'
-                                                           | grep -o '[0-9\.]*')
-        if: ${{ matrix.if && matrix.wasm }}
-      - uses: actions-rs/install@v0.1
-        with:
-          crate: wasm-bindgen-cli
-          version: ${{ steps.wasm-cli.outputs.VERSION }}
-          use-tool-cache: true
-        if: ${{ matrix.if && matrix.wasm }}
-
-      - name: Chrome
-        run: make test.unit crate=${{ matrix.crate }} browser=chrome
-        if: ${{ matrix.if && matrix.crate == 'medea-jason' }}
-      - name: Firefox
-        run: make test.unit crate=${{ matrix.crate }} browser=firefox
-        if: ${{ matrix.if && matrix.crate == 'medea-jason' }}
-
-      - run: make test.unit crate=${{ matrix.crate }}
-        if: ${{ matrix.if && matrix.crate != 'medea-jason' }}
-
-  test-e2e:
-    name: E2E tests
-    needs: ['docker']
-    if: ${{ github.ref == 'refs/heads/master'
-            || startsWith(github.ref, 'refs/tags/medea-')
-            || !contains(github.event.head_commit.message, '[skip ci]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: wasm32-unknown-unknown
-
-      - uses: Swatinem/rust-cache@v1
-        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-        with:
-          key: test-e2e-{hash}
-          restore-keys: test-e2e-
-        continue-on-error: true
-        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-
-      - uses: actions-rs/install@v0.1
-        with:
-          crate: wasm-pack
-          use-tool-cache: true
-
-      - uses: actions/download-artifact@v2
-        with:
-          name: docker-medea-${{ github.run_number }}
-      - name: Unpack `medea` Docker image
-        run: make docker.untar from-file=image.tar
-
-      - uses: actions/download-artifact@v2
-        with:
-          name: docker-medea-control-api-mock-${{ github.run_number }}
-      - name: Unpack `medea-control-api-mock` Docker image
-        run: make docker.untar from-file=image.tar
-
-      - name: Chrome
-        run: make test.e2e browser=chrome up=yes dockerized=yes
-                           tag=build-${{ github.run_number }}
-      - name: Firefox
-        run: make test.e2e browser=firefox up=yes dockerized=yes
-                           tag=build-${{ github.run_number }}
-
-  test-integration:
-    name: Integration tests
-    if: ${{ github.ref == 'refs/heads/master'
-            || startsWith(github.ref, 'refs/tags/medea-')
-            || !contains(github.event.head_commit.message, '[skip ci]') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-
-      - uses: Swatinem/rust-cache@v1
-        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-        with:
-          key: test-integration-{hash}
-          restore-keys: test-integration-
-        continue-on-error: true
-        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-
-      - run: make test.integration up=yes dockerized=no
+#  test-integration:
+#    name: Integration tests
+#    if: ${{ github.ref == 'refs/heads/master'
+#            || startsWith(github.ref, 'refs/tags/medea-')
+#            || !contains(github.event.head_commit.message, '[skip ci]') }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#
+#      - uses: Swatinem/rust-cache@v1
+#        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+#      - uses: satackey/action-docker-layer-caching@v0.0.11
+#        with:
+#          key: test-integration-{hash}
+#          restore-keys: test-integration-
+#        continue-on-error: true
+#        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+#
+#      - run: make test.integration up=yes dockerized=no
 
 #  test-android:
 #    name: Run medea_jason Flutter plugin android instrumented tests
@@ -280,23 +280,23 @@ jobs:
   # Building #
   ############
 
-  crate-jason-platform-web:
-    name: Build medea-jason for web platform
-    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
-            && (github.ref == 'refs/heads/master'
-                || !contains(github.event.head_commit.message, '[skip ci]')) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v1
-        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - uses: jetli/wasm-pack-action@v0.3.0
-      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
+#  crate-jason-platform-web:
+#    name: Build medea-jason for web platform
+#    if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
+#            && (github.ref == 'refs/heads/master'
+#                || !contains(github.event.head_commit.message, '[skip ci]')) }}
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v2
+#      - uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          target: wasm32-unknown-unknown
+#      - uses: Swatinem/rust-cache@v1
+#        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+#      - uses: jetli/wasm-pack-action@v0.3.0
+#      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
 
 #  crate-jason-platform-android:
 #    name: Build medea-jason shared object for android platform
