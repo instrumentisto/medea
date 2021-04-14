@@ -12,7 +12,6 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
-#[inline]
 pub fn spawn<F>(task: F)
 where
     F: Future<Output = ()> + 'static,
