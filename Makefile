@@ -437,7 +437,7 @@ flutter.android.compile_api_version:
 #	make flutter.android.min_api_version
 
 flutter.android.min_api_version:
-	@printf "$(JASON_ANDROID_MIN_API_VERSION)"
+	@printf "WTFWTFWTFWTF$(JASON_ANDROID_MIN_API_VERSION)"
 
 
 
