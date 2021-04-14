@@ -283,7 +283,7 @@ jobs:
           script: make flutter.test
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ steps.android-api-level.outputs.max }}
+          api-level: ${{ steps.android-api-level.outputs.target }}
           target: google_apis
           profile: Nexus 6
           script: make flutter.test

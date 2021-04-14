@@ -213,7 +213,6 @@ cargo:
 # Build medea's related crates.
 #
 # Usage:
-#
 # 	make cargo.build [([crate=@all]
 #					   [crate=medea]
 # 					   | crate=medea-jason [( [platform=(web|android)] )]
