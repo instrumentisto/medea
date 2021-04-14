@@ -317,8 +317,10 @@ jobs:
         with:
           crate: cargo-ndk
           use-tool-cache: true
-      - run: rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
-      - run: make cargo.build crate=medea-jason dockerized=no debug=yes platform=android
+      - run: rustup target add aarch64-linux-android armv7-linux-androideabi
+                  i686-linux-android x86_64-linux-android
+      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
+                  platform=android
 
   crate-medea:
     name: Build medea
