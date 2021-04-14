@@ -1,29 +1,16 @@
+use dart_sys::Dart_Handle;
+use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
+use tracerr::Traced;
+
 use crate::{
     media::MediaKind,
     platform::{
-        dart::transceiver::Transceiver, RtcPeerConnectionError,
-        TransceiverDirection,
+        dart::transceiver::Transceiver, peer_connection::RtcSdpType,
+        RtcPeerConnectionError, TransceiverDirection,
     },
 };
-use dart_sys::Dart_Handle;
-use tracerr::Traced;
 
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
-
-// TODO: Use this in WASM RtcPeerConnection instead of web_sys.
-//       Move it into crate::platform module.
-#[derive(Clone, Debug)]
-pub enum IceConnectionState {}
-
-// TODO: Use this in WASM RtcPeerConnection instead of web_sys.
-//       Move it into crate::platform module.
-#[derive(Clone, Debug)]
-pub enum ConnectionState {}
-
-// TODO: Use this in WASM RtcPeerConnection instead of web_sys.
-//       Move it into crate::platform module.
-#[derive(Clone, Debug)]
-pub enum SdpType {}
 
 #[derive(Clone, Debug)]
 pub struct RtcPeerConnection {
@@ -35,7 +22,7 @@ impl RtcPeerConnection {
         todo!()
     }
 
-    pub fn connection_state(&self) -> Option<ConnectionState> {
+    pub fn connection_state(&self) -> Option<PeerConnectionState> {
         todo!()
     }
 
@@ -72,7 +59,7 @@ impl RtcPeerConnection {
         todo!()
     }
 
-    pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
+    pub async fn set_remote_description(&self, sdp: RtcSdpType) -> Result<()> {
         todo!()
     }
 

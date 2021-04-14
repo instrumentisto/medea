@@ -13,20 +13,22 @@ use medea_client_api_proto::{
 };
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
+use web_sys as sys;
 use web_sys::{
     Event, RtcBundlePolicy, RtcConfiguration, RtcIceCandidateInit,
     RtcIceConnectionState, RtcIceTransportPolicy, RtcOfferOptions,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcRtpTransceiver, RtcRtpTransceiverInit, RtcSdpType,
-    RtcSessionDescription, RtcSessionDescriptionInit, RtcTrackEvent,
+    RtcRtpTransceiver, RtcRtpTransceiverInit, RtcSessionDescription,
+    RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
     media::{MediaKind, TrackConstraints},
     platform::{
-        self, get_property_by_name, wasm::utils::EventListener, IceCandidate,
-        MediaStreamTrack, RtcPeerConnectionError, RtcStats, SdpType,
-        Transceiver, TransceiverDirection,
+        self, get_property_by_name, peer_connection::RtcSdpType,
+        wasm::utils::EventListener, IceCandidate, MediaStreamTrack,
+        RtcPeerConnectionError, RtcStats, SdpType, Transceiver,
+        TransceiverDirection,
     },
 };
 
@@ -415,7 +417,7 @@ impl RtcPeerConnection {
     ) -> Result<()> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let mut desc = RtcSessionDescriptionInit::new(sdp_type);
+        let mut desc = RtcSessionDescriptionInit::new(sdp_type.into());
         desc.sdp(offer);
 
         JsFuture::from(peer.set_local_description(&desc))
@@ -490,7 +492,7 @@ impl RtcPeerConnection {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
         JsFuture::from(peer.set_local_description(
-            &RtcSessionDescriptionInit::new(RtcSdpType::Rollback),
+            &RtcSessionDescriptionInit::new(sys::RtcSdpType::Rollback),
         ))
         .await
         .map_err(Into::into)
@@ -547,13 +549,13 @@ impl RtcPeerConnection {
         let description = match sdp {
             SdpType::Offer(offer) => {
                 let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+                    RtcSessionDescriptionInit::new(sys::RtcSdpType::Offer);
                 desc.sdp(&offer);
                 desc
             }
             SdpType::Answer(answer) => {
                 let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+                    RtcSessionDescriptionInit::new(sys::RtcSdpType::Answer);
                 desc.sdp(&answer);
                 desc
             }

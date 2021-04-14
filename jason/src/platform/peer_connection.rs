@@ -22,6 +22,24 @@ pub enum SdpType {
     Answer(String),
 }
 
+pub enum RtcSdpType {
+    Offer,
+    Pranswer,
+    Answer,
+    Rollback,
+}
+
+impl From<RtcSdpType> for web_sys::RtcSdpType {
+    fn from(from: RtcSdpType) -> Self {
+        match from {
+            RtcSdpType::Offer => Self::Offer,
+            RtcSdpType::Pranswer => Self::Pranswer,
+            RtcSdpType::Answer => Self::Answer,
+            RtcSdpType::Rollback => Self::Rollback,
+        }
+    }
+}
+
 /// [RTCIceCandidate][1] representation.
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtcicecandidate-interface
