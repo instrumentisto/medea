@@ -252,32 +252,31 @@ jobs:
       || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: macos-latest
     steps:
-      - run: echo "WTF"
-#      - uses: actions/checkout@v2
-#      - uses: actions-rs/toolchain@v1
-#        with:
-#          profile: minimal
-#          toolchain: stable
-#          target: x86_64-linux-android
-#      - uses: Swatinem/rust-cache@v1
-#        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-#      - uses: actions-rs/install@v0.1
-#        with:
-#          crate: cargo-ndk
-#          use-tool-cache: true
-#      - uses: subosito/flutter-action@v1
-#        with:
-#          channel: stable
-#      - name: Compile Medea Jason shared object
-#        run: make cargo.build crate=medea-jason platform=android target="x86_64"
-#      uses: reactivecircus/android-emulator-runner@v2
-#      with:
-#        api-level: 29
-#        ndk: 22.1.7171670
-#        arch: x86_64
-#        profile: Nexus 6
-#        avd-name: Nexus6
-#        script: make flutter.test device=Nexus6
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-linux-android
+      - uses: Swatinem/rust-cache@v1
+        if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-ndk
+          use-tool-cache: true
+      - uses: subosito/flutter-action@v1
+        with:
+          channel: stable
+      - name: Compile Medea Jason shared object
+        run: make cargo.build crate=medea-jason platform=android target="x86_64"
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          ndk: 22.1.7171670
+          arch: x86_64
+          profile: Nexus 6
+          avd-name: Nexus6
+          script: make flutter.test device=Nexus6
 
 
 
