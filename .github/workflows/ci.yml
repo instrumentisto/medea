@@ -251,10 +251,6 @@ jobs:
       || startsWith(github.ref, 'refs/tags/medea-')
       || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: macos-latest
-#    strategy:
-#      matrix:
-#        api-level: [ $(make flutter.android.min_api_version),
-#                     $(make flutter.android.compile_api_version) ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -268,31 +264,29 @@ jobs:
         with:
           crate: cargo-ndk
           use-tool-cache: true
-#      - uses: subosito/flutter-action@v1
-#        with:
-#          channel: stable
-#      - name: Parse Android API versions
-#        id: android-api-level
-#        run: echo ::set-output
-#                    name=min::$(make flutter.android.min_api_version)
-#            && echo ::set-output
-#                    name=target::$(make flutter.android.compile_api_version)
-#      - name: Compile Medea Jason shared object
-#        run: make cargo.build crate=medea-jason platform=android target=x86
-      - run: grep compileSdkVersion jason/flutter/android/build.gradle | grep -Po "\d+"
-      - run: make flutter.android.compile_api_version
-#      - uses: reactivecircus/android-emulator-runner@v2
-#        with:
-#          api-level: ${{ steps.android-api-level.outputs.min }}
-#          target: google_apis
-#          profile: Nexus 6
-#          script: make flutter.test
-#      - uses: reactivecircus/android-emulator-runner@v2
-#        with:
-#          api-level: ${{ steps.android-api-level.outputs.max }}
-#          target: google_apis
-#          profile: Nexus 6
-#          script: make flutter.test
+      - uses: subosito/flutter-action@v1
+        with:
+          channel: stable
+      - name: Parse Android API versions
+        id: android-api-level
+        run: echo ::set-output
+                    name=min::$(make flutter.android.min_api_version)
+            && echo ::set-output
+                    name=target::$(make flutter.android.compile_api_version)
+      - name: Compile Medea Jason shared object
+        run: make cargo.build crate=medea-jason platform=android target=x86
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ steps.android-api-level.outputs.min }}
+          target: google_apis
+          profile: Nexus 6
+          script: make flutter.test
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ steps.android-api-level.outputs.max }}
+          target: google_apis
+          profile: Nexus 6
+          script: make flutter.test
 
 
 

@@ -50,6 +50,10 @@ crate-dir = crates/medea-coturn-telnet-client
 endif
 crate-ver := $(strip \
 	$(shell grep -m1 'version = "' $(crate-dir)/Cargo.toml | cut -d '"' -f2))
+android-compile-api-version := $(strip $(shell grep compileSdkVersion \
+					jason/flutter/android/build.gradle | awk '{print $$2}'))
+android-min-api-version := $(strip $(shell grep minSdkVersion \
+					jason/flutter/android/build.gradle | awk '{print $$2}'))
 
 
 
@@ -215,15 +219,11 @@ cargo:
 # 					   | crate=medea-jason [( [platform=(web|android)] )]
 # 										   [debug=(yes|no)]
 # 										   [dockerized=(no|yes)]
-# 										   [target=<android-target>]
-# 										   [api-level=<android-sdk-api-level>])]
+# 										   [target=<android-target>] )]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 jni-libs-path = jason/flutter/android/src/main/jniLibs
 jason-android-targets := "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
-cargo-ndk-api-level = $(if $(call eq,$(api-level),),\
-				$(shell make --no-print-directory \
-				flutter.android.compile_api_version),$(api-level))
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -276,7 +276,7 @@ ifeq ($(target),)
     					$(platform), $(debug), $(target)))
 else
 	# TODO: Replace with actual medea-jason crate.
-	cargo ndk -p $(cargo-ndk-api-level) -t ${target} \
+	cargo ndk -p $(android-compile-api-version) -t ${target} \
 		-o $(jni-libs-path) --manifest-path jason/jason-dummy/Cargo.toml \
 		build $(if $(call eq,$(debug),no),--release,)
 endif
@@ -423,8 +423,7 @@ flutter.run:
 #	make flutter.android.compile_api_version
 
 flutter.android.compile_api_version:
-	@printf "WTFWTFWTFWTF$(strip $(shell grep compileSdkVersion \
-					jason/flutter/android/build.gradle | grep -Po "\d+"))"
+	@printf "$(android-compile-api-version)"
 
 
 # Show Android min API version of medea_jason Flutter plugin.
@@ -433,8 +432,7 @@ flutter.android.compile_api_version:
 #	make flutter.android.min_api_version
 
 flutter.android.min_api_version:
-	@printf "$(strip $(shell grep minSdkVersion \
-					jason/flutter/android/build.gradle | grep -Po "\d+"))"
+	@printf "$(android-min-api-version)"
 
 
 
