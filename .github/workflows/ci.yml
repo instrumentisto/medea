@@ -277,15 +277,11 @@ jobs:
                     name=min::$(make flutter.android.min_api_version) && \
             echo ::set-output
                     name=max::$(make flutter.android.compile_api_version)
-#      - name: Parse max Android API version
-#        id: android-api-level
-#        run: echo ::set-output name=max::$(make flutter.android.compile_api_version)
       - name: Compile Medea Jason shared object
         run: make cargo.build crate=medea-jason platform=android target=x86
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-#          api-level: ${{ steps.android-api-level.outputs.min }}
-          api-level: 30
+          api-level: ${{ steps.android-api-level.outputs.min }}
           target: google_apis
           profile: Nexus 6
           script: make flutter.test
