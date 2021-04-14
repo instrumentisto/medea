@@ -1,4 +1,4 @@
-use dart_sys::{Dart_Handle, _Dart_Handle};
+use dart_sys::Dart_Handle;
 use std::{marker::PhantomData, slice};
 
 #[repr(C)]

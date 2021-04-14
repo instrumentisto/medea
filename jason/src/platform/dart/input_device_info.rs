@@ -3,39 +3,39 @@ use dart_sys::Dart_Handle;
 use crate::{media::MediaKind, utils::dart::from_dart_string};
 
 type DeviceIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
-static mut device_id_function: Option<DeviceIdFunction> = None;
+static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__device_id(
     f: DeviceIdFunction,
 ) {
-    device_id_function = Some(f);
+    DEVICE_ID_FUNCTION = Some(f);
 }
 
 type LabelFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
-static mut label_function: Option<LabelFunction> = None;
+static mut LABEL_FUNCTION: Option<LabelFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__label(f: LabelFunction) {
-    label_function = Some(f);
+    LABEL_FUNCTION = Some(f);
 }
 
 type GroupIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
-static mut group_id_function: Option<GroupIdFunction> = None;
+static mut GROUP_ID_FUNCTION: Option<GroupIdFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
     f: GroupIdFunction,
 ) {
-    group_id_function = Some(f);
+    GROUP_ID_FUNCTION = Some(f);
 }
 
 type KindFunction = extern "C" fn(Dart_Handle) -> i32;
-static mut kind_function: Option<KindFunction> = None;
+static mut KIND_FUNCTION: Option<KindFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__kind(f: KindFunction) {
-    kind_function = Some(f);
+    KIND_FUNCTION = Some(f);
 }
 
 impl From<i32> for MediaKind {
@@ -66,18 +66,18 @@ impl InputDeviceInfo {
     }
 
     pub fn device_id(&self) -> String {
-        unsafe { from_dart_string(device_id_function.unwrap()(self.info)) }
+        unsafe { from_dart_string(DEVICE_ID_FUNCTION.unwrap()(self.info)) }
     }
 
     pub fn label(&self) -> String {
-        unsafe { from_dart_string(label_function.unwrap()(self.info)) }
+        unsafe { from_dart_string(LABEL_FUNCTION.unwrap()(self.info)) }
     }
 
     pub fn group_id(&self) -> String {
-        unsafe { from_dart_string(group_id_function.unwrap()(self.info)) }
+        unsafe { from_dart_string(GROUP_ID_FUNCTION.unwrap()(self.info)) }
     }
 
     pub fn kind(&self) -> MediaKind {
-        unsafe { kind_function.unwrap()(self.info).into() }
+        unsafe { KIND_FUNCTION.unwrap()(self.info).into() }
     }
 }

@@ -8,40 +8,40 @@ pub struct Transceiver {
 }
 
 type CurrentDirectionFunction = extern "C" fn(Dart_Handle) -> i32;
-static mut current_direction_function: Option<CurrentDirectionFunction> = None;
+static mut CURRENT_DIRECTION_FUNCTION: Option<CurrentDirectionFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_Transceiver__current_direction(
     f: CurrentDirectionFunction,
 ) {
-    current_direction_function = Some(f);
+    CURRENT_DIRECTION_FUNCTION = Some(f);
 }
 
 type SetSendTrackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
-static mut get_send_track_function: Option<SetSendTrackFunction> = None;
+static mut GET_SEND_TRACK_FUNCTION: Option<SetSendTrackFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_Transceiver__set_send_track(
     f: SetSendTrackFunction,
 ) {
-    get_send_track_function = Some(f);
+    GET_SEND_TRACK_FUNCTION = Some(f);
 }
 
 type ReplaceTrackFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut replace_track_function: Option<ReplaceTrackFunction> = None;
+static mut REPLACE_TRACK_FUNCTION: Option<ReplaceTrackFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_Transceiver__replace_track(
     f: ReplaceTrackFunction,
 ) {
-    replace_track_function = Some(f);
+    REPLACE_TRACK_FUNCTION = Some(f);
 }
 
 type DropSenderFunction = extern "C" fn(Dart_Handle);
-static mut drop_sender_function: Option<DropSenderFunction> = None;
+static mut DROP_SENDER_FUNCTION: Option<DropSenderFunction> = None;
 
 type SetSenderTrackEnabledFunction = extern "C" fn(Dart_Handle, bool);
-static mut set_sender_track_enabled_function: Option<
+static mut SET_SENDER_TRACK_ENABLED_FUNCTION: Option<
     SetSenderTrackEnabledFunction,
 > = None;
 
@@ -49,29 +49,29 @@ static mut set_sender_track_enabled_function: Option<
 pub unsafe extern "C" fn register_Transceiver__set_sender_track_enabled(
     f: SetSenderTrackEnabledFunction,
 ) {
-    set_sender_track_enabled_function = Some(f);
+    SET_SENDER_TRACK_ENABLED_FUNCTION = Some(f);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn register_Transceiver__drop_sender(
     f: DropSenderFunction,
 ) {
-    drop_sender_function = Some(f);
+    DROP_SENDER_FUNCTION = Some(f);
 }
 
 type IsStoppedFunction = extern "C" fn(Dart_Handle) -> bool;
-static mut is_stopped_function: Option<IsStoppedFunction> = None;
+static mut IS_STOPPED_FUNCTION: Option<IsStoppedFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_Transceiver__is_stopped(
     f: IsStoppedFunction,
 ) {
-    is_stopped_function = Some(f);
+    IS_STOPPED_FUNCTION = Some(f);
 }
 
 impl Transceiver {
     pub fn current_direction(&self) -> TransceiverDirection {
-        unsafe { current_direction_function.unwrap()(self.transceiver).into() }
+        unsafe { CURRENT_DIRECTION_FUNCTION.unwrap()(self.transceiver).into() }
     }
 
     pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
@@ -89,27 +89,27 @@ impl Transceiver {
     // TODO: replace Dart_Handle with local::Track
     pub fn set_send_track(&self, new_sender: Dart_Handle) {
         unsafe {
-            let sender = get_send_track_function.unwrap()(self.transceiver);
-            replace_track_function.unwrap()(sender, new_sender);
+            let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
+            REPLACE_TRACK_FUNCTION.unwrap()(sender, new_sender);
         }
     }
 
     pub async fn drop_send_track(&self) {
         unsafe {
-            let sender = get_send_track_function.unwrap()(self.transceiver);
-            drop_sender_function.unwrap()(sender);
+            let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
+            DROP_SENDER_FUNCTION.unwrap()(sender);
         }
     }
 
     pub fn set_send_track_enabled(&self, enabled: bool) {
         unsafe {
-            let sender = get_send_track_function.unwrap()(self.transceiver);
-            set_sender_track_enabled_function.unwrap()(sender, enabled);
+            let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
+            SET_SENDER_TRACK_ENABLED_FUNCTION.unwrap()(sender, enabled);
         }
     }
 
     pub fn is_stopped(&self) -> bool {
-        unsafe { is_stopped_function.unwrap()(self.transceiver) }
+        unsafe { IS_STOPPED_FUNCTION.unwrap()(self.transceiver) }
     }
 
     pub fn mid(&self) -> Option<String> {
