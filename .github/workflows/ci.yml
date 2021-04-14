@@ -70,18 +70,18 @@ jobs:
           channel: stable
       - run: make flutter.fmt check=yes
 
-#  dartanalyze:
-#    name: Lint Dart sources with dartanalyze
-#    if: ${{ github.ref == 'refs/heads/master'
-#      || startsWith(github.ref, 'refs/tags/medea-')
-#      || !contains(github.event.head_commit.message, '[skip ci]') }}
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v2
-#      - uses: subosito/flutter-action@v1
-#        with:
-#          channel: stable
-#      - run: make flutter.lint
+  dartanalyze:
+    name: Lint Dart sources with dartanalyze
+    if: ${{ github.ref == 'refs/heads/master'
+      || startsWith(github.ref, 'refs/tags/medea-')
+      || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: subosito/flutter-action@v1
+        with:
+          channel: stable
+      - run: make flutter.lint
 
 
 
