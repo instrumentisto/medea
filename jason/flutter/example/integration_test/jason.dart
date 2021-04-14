@@ -5,7 +5,7 @@ import 'package:medea_jason/jason.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets("add test", (WidgetTester tester) async {
+  testWidgets('add test', (WidgetTester tester) async {
     expect(add(2, 2), equals(4));
   });
 }
