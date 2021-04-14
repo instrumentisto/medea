@@ -276,7 +276,7 @@ jobs:
         with:
           api-level: ${{ matrix.api-level }}
           profile: Nexus 6
-          script: avdmanager list
+          script: make flutter.test
 
 
 
