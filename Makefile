@@ -26,9 +26,9 @@ ANDROID_BUILDER_VER=2.2.0-ndkr22b-rust1.51
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
-JASON_ANDROID_COMPILE_API_VERSION ?= $(shell grep compileSdkVersion \
+JASON_ANDROID_COMPILE_API_VERSION := $(shell grep compileSdkVersion \
 						jason/flutter/android/build.gradle | grep -Po "\d+")
-JASON_ANDROID_MIN_API_VERSION ?= $(shell grep minSdkVersion \
+JASON_ANDROID_MIN_API_VERSION := $(shell grep minSdkVersion \
 						jason/flutter/android/build.gradle | grep -Po "\d+")
 
 crate-dir = .
