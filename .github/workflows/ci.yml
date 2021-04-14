@@ -279,10 +279,8 @@ jobs:
 #                    name=target::$(make flutter.android.compile_api_version)
 #      - name: Compile Medea Jason shared object
 #        run: make cargo.build crate=medea-jason platform=android target=x86
-      - run: pwd
-      - run: ls -a
-      - run: cat jason/flutter/android/build.gradle
-#      - run: make flutter.android.compile_api_version
+      - run: grep compileSdkVersion jason/flutter/android/build.gradle | grep -Po "\d+"
+      - run: make flutter.android.compile_api_version
 #      - uses: reactivecircus/android-emulator-runner@v2
 #        with:
 #          api-level: ${{ steps.android-api-level.outputs.min }}
