@@ -22,7 +22,7 @@ IMAGE_NAME := $(strip \
 	$(image))))
 
 RUST_VER := 1.51
-ANDROID_BUILDER_VER=2.2.0-ndkr22b-rust1.51
+ANDROID_BUILDER_VER=2.2.0-ndkr22b-rust1.51-r1
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
@@ -279,7 +279,7 @@ ifeq ($(target),)
 else
 	# TODO: Replace with actual medea-jason crate.
 	cd jason/jason-dummy && \
-		cargo ndk -p $(JASON_ANDROID_COMPILE_API_VERSION) -t ${target} \
+		cargo ndk -p "$(JASON_ANDROID_COMPILE_API_VERSION)" -t ${target} \
 			-o $(jni-libs-path) build $(if $(call eq,$(debug),no),--release,)
 endif
 else
