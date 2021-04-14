@@ -221,11 +221,14 @@ cargo:
 # 					   | crate=medea-jason [( [platform=(web|android)] )]
 # 										   [debug=(yes|no)]
 # 										   [dockerized=(no|yes)]
-# 										   [target=<android-target>] )]
+# 										   [target=<android-target>]
+# 										   [api-level=<android-sdk-api-level>])]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 jni-libs-path = ../../jason/flutter/android/src/main/jniLibs
 jason-android-targets := "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+cargo-ndk-api-level = $(if $(call eq,$(api-level),),\
+						$(JASON_ANDROID_COMPILE_API_VERSION),$(api-level))
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -279,7 +282,7 @@ ifeq ($(target),)
 else
 	# TODO: Replace with actual medea-jason crate.
 	cd jason/jason-dummy && \
-		cargo ndk -p "$(JASON_ANDROID_COMPILE_API_VERSION)" -t ${target} \
+		cargo ndk -p $(cargo-ndk-api-level) -t ${target} \
 			-o $(jni-libs-path) build $(if $(call eq,$(debug),no),--release,)
 endif
 else
