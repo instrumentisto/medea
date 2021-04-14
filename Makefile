@@ -423,7 +423,7 @@ flutter.run:
 #	make flutter.android.compile_api_version
 
 flutter.android.compile_api_version:
-	@printf "$(strip $(shell grep compileSdkVersion \
+	@printf "WTFWTFWTFWTF$(strip $(shell grep compileSdkVersion \
 					jason/flutter/android/build.gradle | grep -Po "\d+"))"
 
 
