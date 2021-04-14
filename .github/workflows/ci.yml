@@ -271,8 +271,8 @@ jobs:
       - uses: subosito/flutter-action@v1
         with:
           channel: stable
-      - name: Parse Android API versions
-        id: android-api-level
+#      - name: Parse Android API versions
+#        id: android-api-level
 #        run: echo ::set-output
 #                    name=min::$(make flutter.android.min_api_version)
 #            && echo ::set-output
