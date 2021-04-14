@@ -1,3 +1,7 @@
+pub mod array;
+
+pub use self::array::Array;
+
 use std::ffi::{CStr, CString};
 
 pub unsafe fn from_dart_string(string: *const libc::c_char) -> String {

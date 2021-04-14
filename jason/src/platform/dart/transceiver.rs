@@ -1,7 +1,6 @@
 use crate::{media::track::local, platform::TransceiverDirection};
 use dart_sys::Dart_Handle;
 use std::rc::Rc;
-use web_sys::get_senders;
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {

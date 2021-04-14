@@ -39,6 +39,18 @@ pub enum FacingMode {
     Right,
 }
 
+impl From<i32> for FacingMode {
+    fn from(from: i32) -> Self {
+        match from {
+            0 => Self::User,
+            1 => Self::Environment,
+            2 => Self::Left,
+            3 => Self::Right,
+            _ => unreachable!("Unknown FacingMode enum variant"),
+        }
+    }
+}
+
 /// Local media stream for injecting into new created [`PeerConnection`]s.
 ///
 /// [`PeerConnection`]: crate::peer::PeerConnection

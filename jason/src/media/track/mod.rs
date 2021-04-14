@@ -23,6 +23,16 @@ pub enum MediaStreamTrackState {
     Ended,
 }
 
+impl From<i32> for MediaStreamTrackState {
+    fn from(from: i32) -> Self {
+        match from {
+            0 => Self::Live,
+            1 => Self::Ended,
+            _ => unreachable!("Unknown MediaStreamTrackState variant"),
+        }
+    }
+}
+
 /// Media source type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MediaSourceKind {

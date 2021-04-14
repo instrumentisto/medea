@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'package:ffi/ffi.dart' as ffi;
+import 'array.dart';
 
 final DynamicLibrary _dl = _open();
 final DynamicLibrary dl = _dl;

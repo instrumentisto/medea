@@ -1,24 +1,28 @@
-use dart_sys::Dart_Handle;
+use dart_sys::{Dart_Array, Dart_Handle};
 use tracerr::Traced;
 
-use crate::{
-    media::MediaManagerError,
-    platform::{
-        DisplayMediaStreamConstraints, InputDeviceInfo, MediaStreamConstraints,
-        MediaStreamTrack,
-    },
+use super::{
+    constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
+    input_device_info::InputDeviceInfo,
+    media_track::MediaStreamTrack,
 };
+use crate::{media::MediaManagerError, utils::dart::Array};
 
-type EnumerateDevicesFunction = extern "C" fn() -> *mut Dart_Handle;
-static mut enumerate_devices_function: Option<EnumerateDevicesFunction> = None;
-
-#[no_mangle]
-pub unsafe extern "C" fn register_MediaDevices__enumerate_devices(f: Dart_Handle) {
-    enumerate_devices_function = Some(f);
-}
+// type EnumerateDevicesFunction = extern "C" fn() -> Dart_Array;
+// static mut enumerate_devices_function: Option<EnumerateDevicesFunction> =
+// None;
+//
+// #[no_mangle]
+// pub unsafe extern "C" fn register_MediaDevices__enumerate_devices(f:
+// EnumerateDevicesFunction) {     enumerate_devices_function = Some(f);
+// }
 
 pub async fn enumerate_devices(
 ) -> Result<Vec<InputDeviceInfo>, Traced<MediaManagerError>> {
+    // let devices = unsafe { enumerate_devices_function.unwrap()() };
+    // Ok(devices.into_iter()
+    //     .map(|d| InputDeviceInfo::new(d))
+    //     .collect())
     todo!()
 }
 

@@ -24,7 +24,9 @@ type GroupIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut group_id_function: Option<GroupIdFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_InputDeviceInfo__group_id(f: Dart_Handle) {
+pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
+    f: GroupIdFunction,
+) {
     group_id_function = Some(f);
 }
 
@@ -32,7 +34,7 @@ type KindFunction = extern "C" fn(Dart_Handle) -> i32;
 static mut kind_function: Option<KindFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_InputDeviceInfo__kind(f: Dart_Handle) {
+pub unsafe extern "C" fn register_InputDeviceInfo__kind(f: KindFunction) {
     kind_function = Some(f);
 }
 
@@ -54,6 +56,15 @@ pub struct InputDeviceInfo {
 }
 
 impl InputDeviceInfo {
+    pub(super) fn new(handle: Dart_Handle) -> Self {
+        todo!("See todo after this line");
+        Self {
+            // TODO: Provide real MediaKind here
+            media_kind: MediaKind::Audio,
+            info: handle,
+        }
+    }
+
     pub fn device_id(&self) -> String {
         unsafe { from_dart_string(device_id_function.unwrap()(self.info)) }
     }

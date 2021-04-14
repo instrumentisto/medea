@@ -11,6 +11,5 @@ pub struct Error {
 
     /// Message of JS error.
     pub message: Cow<'static, str>,
-
     // TODO: sys_clause
 }
