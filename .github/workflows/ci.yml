@@ -274,9 +274,9 @@ jobs:
       - name: Parse min Android API version
         id: android-api-level
         run: echo ::set-output name=min::$(make flutter.android.min_api_version)
-      - name: Parse max Android API version
-        id: android-api-level
-        run: echo ::set-output name=max::$(make flutter.android.compile_api_version)
+#      - name: Parse max Android API version
+#        id: android-api-level
+#        run: echo ::set-output name=max::$(make flutter.android.compile_api_version)
       - name: Compile Medea Jason shared object
         run: make cargo.build crate=medea-jason platform=android target=x86
       - uses: reactivecircus/android-emulator-runner@v2
