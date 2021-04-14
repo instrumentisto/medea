@@ -271,28 +271,29 @@ jobs:
       - uses: subosito/flutter-action@v1
         with:
           channel: stable
-      - name: Parse min Android API version
-        id: android-api-level
-        run: echo ::set-output
-                  name=min::$(make flutter.android.min_api_version)
-      - name: Parse max Android API version
-        id: android-api-level
-        run: echo ::set-output
-                  name=max::$(make flutter.android.compile_api_version)
+#      - name: Parse min Android API version
+#        id: android-api-level
+#        run: echo ::set-output
+#                  name=min::$(make flutter.android.min_api_version)
+#      - name: Parse max Android API version
+#        id: android-api-level
+#        run: echo ::set-output
+#                  name=max::$(make flutter.android.compile_api_version)
       - name: Compile Medea Jason shared object
         run: make cargo.build crate=medea-jason platform=android target=x86
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ steps.android-api-level.outputs.min }}
+#          api-level: ${{ steps.android-api-level.outputs.min }}
+          api-level: 30
           target: google_apis
           profile: Nexus 6
           script: make flutter.test
-      - uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ steps.android-api-level.outputs.max }}
-          target: google_apis
-          profile: Nexus 6
-          script: make flutter.test
+#      - uses: reactivecircus/android-emulator-runner@v2
+#        with:
+#          api-level: ${{ steps.android-api-level.outputs.max }}
+#          target: google_apis
+#          profile: Nexus 6
+#          script: make flutter.test
 
 
 
