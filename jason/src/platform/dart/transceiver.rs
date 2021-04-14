@@ -1,10 +1,18 @@
 use crate::{media::track::local, platform::TransceiverDirection};
-use dart_sys::Dart_Handle;
+use dart_sys::{Dart_Handle, _Dart_Handle};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
     transceiver: Dart_Handle,
+}
+
+impl From<Dart_Handle> for Transceiver {
+    fn from(handle: *mut _Dart_Handle) -> Self {
+        Self {
+            transceiver: handle,
+        }
+    }
 }
 
 type CurrentDirectionFunction = extern "C" fn(Dart_Handle) -> i32;

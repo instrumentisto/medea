@@ -35,6 +35,15 @@ pub enum MediaKind {
     Video,
 }
 
+impl From<MediaKind> for i32 {
+    fn from(from: MediaKind) -> Self {
+        match from {
+            MediaKind::Audio => 0,
+            MediaKind::Video => 1,
+        }
+    }
+}
+
 impl MediaKind {
     /// Returns string representation of a [`MediaKind`].
     #[inline]

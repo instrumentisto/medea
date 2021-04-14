@@ -29,6 +29,17 @@ pub enum RtcSdpType {
     Rollback,
 }
 
+impl From<RtcSdpType> for i32 {
+    fn from(sdp: RtcSdpType) -> Self {
+        match sdp {
+            RtcSdpType::Offer => 0,
+            RtcSdpType::Pranswer => 1,
+            RtcSdpType::Answer => 2,
+            RtcSdpType::Rollback => 3,
+        }
+    }
+}
+
 impl From<RtcSdpType> for web_sys::RtcSdpType {
     fn from(from: RtcSdpType) -> Self {
         match from {
