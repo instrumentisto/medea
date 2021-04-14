@@ -251,6 +251,9 @@ jobs:
       || startsWith(github.ref, 'refs/tags/medea-')
       || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: macos-latest
+    strategy:
+      matrix:
+        api-level: [ 21, 30 ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -271,10 +274,9 @@ jobs:
         run: make cargo.build crate=medea-jason platform=android target=x86
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
-          ndk: 22.1.7171670
-          profile: Pixel 4
-          script: make flutter.test
+          api-level: ${{ matrix.api-level }}
+          profile: Nexus 6
+          script: avdmanager list
 
 
 
