@@ -268,7 +268,7 @@ jobs:
         with:
           channel: stable
       - name: Compile Medea Jason shared object
-        run: make cargo.build crate=medea-jason platform=android target="x86_64"
+        run: make cargo.build crate=medea-jason platform=android target=x86
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
