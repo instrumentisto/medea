@@ -253,7 +253,8 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        api-level: [ 21, 30 ]
+        api-level: [ $(make flutter.android.min_api_version),
+                     $(make flutter.android.compile_api_version) ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1

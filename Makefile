@@ -26,6 +26,11 @@ ANDROID_BUILDER_VER=2.2.0-ndkr22b-rust1.51
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
+JASON_ANDROID_COMPILE_API_VERSION ?= $(shell grep compileSdkVersion \
+						jason/flutter/android/build.gradle | grep -Po "\d+")
+JASON_ANDROID_MIN_API_VERSION ?= $(shell grep minSdkVersion \
+						jason/flutter/android/build.gradle | grep -Po "\d+")
+
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -220,7 +225,6 @@ cargo:
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 jni-libs-path = ../../jason/flutter/android/src/main/jniLibs
-jason-android-platform := 28
 jason-android-targets := "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
 
 cargo.build:
@@ -275,7 +279,7 @@ ifeq ($(target),)
 else
 	# TODO: Replace with actual medea-jason crate.
 	cd jason/jason-dummy && \
-		cargo ndk -p $(jason-android-platform) -t ${target} \
+		cargo ndk -p $(JASON_ANDROID_COMPILE_API_VERSION) -t ${target} \
 			-o $(jni-libs-path) build $(if $(call eq,$(debug),no),--release,)
 endif
 else
@@ -370,6 +374,7 @@ flutter:
 	cd jason/flutter && \
 	flutter $(if $(call eq,$(cmd),),pub get,$(cmd))
 
+
 # Lint Dart sources with dartanalyzer.
 #
 # Usage:
@@ -394,14 +399,13 @@ flutter.fmt:
 # Usage:
 #	make flutter.test [device=<device-id>]
 
+
 flutter.test:
 	cd jason/flutter/example && \
 	flutter drive \
 			--driver=test_driver/integration_test.dart \
 			--target=integration_test/jason.dart \
 			$(if $(call eq,$(device),),,-d $(device))
-
-
 
 
 # Runs medea-jason Flutter plugin example app on an attached device.
@@ -413,6 +417,24 @@ flutter.run:
 	cd jason/flutter/example && \
 	flutter run $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(device),),,-d $(device))
+
+
+# Show Android compile API version of medea_jason Flutter plugin.
+#
+# Usage:
+#	make flutter.android.compile_api_version
+
+flutter.android.compile_api_version:
+	@printf "$(JASON_ANDROID_COMPILE_API_VERSION)"
+
+
+# Show Android min API version of medea_jason Flutter plugin.
+#
+# Usage:
+#	make flutter.android.min_api_version
+
+flutter.android.min_api_version:
+	@printf "$(JASON_ANDROID_MIN_API_VERSION)"
 
 
 
