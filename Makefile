@@ -273,8 +273,9 @@ ifeq ($(target),)
     				$(call build.jason-android, $(cargo-build-crate), \
     					$(platform), $(debug), $(target)))
 else
-	cd jason/jason-dummy && \ # TODO: Replace with actual medea-jason crate.
-		cargo ndk --p $(jason-android-platform) --t ${target} \
+	# TODO: Replace with actual medea-jason crate.
+	cd jason/jason-dummy && \
+		cargo ndk -p $(jason-android-platform) -t ${target} \
 			-o $(jni-libs-path) build $(if $(call eq,$(debug),no),--release,)
 endif
 else
