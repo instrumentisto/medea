@@ -1,13 +1,14 @@
 use dart_sys::Dart_Handle;
 
-use crate::media::MediaKind;
-use crate::utils::dart::{from_dart_string};
+use crate::{media::MediaKind, utils::dart::from_dart_string};
 
 type DeviceIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut device_id_function: Option<DeviceIdFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_InputDeviceInfo__device_id(f: DeviceIdFunction) {
+pub unsafe extern "C" fn register_InputDeviceInfo__device_id(
+    f: DeviceIdFunction,
+) {
     device_id_function = Some(f);
 }
 
@@ -46,6 +47,7 @@ impl From<i32> for MediaKind {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct InputDeviceInfo {
     media_kind: MediaKind,
     info: Dart_Handle,
@@ -57,20 +59,14 @@ impl InputDeviceInfo {
     }
 
     pub fn label(&self) -> String {
-        unsafe {
-            from_dart_string(label_function.unwrap()(self.info))
-        }
+        unsafe { from_dart_string(label_function.unwrap()(self.info)) }
     }
 
     pub fn group_id(&self) -> String {
-        unsafe {
-            from_dart_string(group_id_function.unwrap()(self.info))
-        }
+        unsafe { from_dart_string(group_id_function.unwrap()(self.info)) }
     }
 
     pub fn kind(&self) -> MediaKind {
-        unsafe {
-            kind_function.unwrap()(self.info).into()
-        }
+        unsafe { kind_function.unwrap()(self.info).into() }
     }
 }

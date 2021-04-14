@@ -1,7 +1,9 @@
+use crate::{media::track::local, platform::TransceiverDirection};
 use dart_sys::Dart_Handle;
-use crate::platform::TransceiverDirection;
+use std::rc::Rc;
 use web_sys::get_senders;
 
+#[derive(Clone, Debug)]
 pub struct Transceiver {
     transceiver: Dart_Handle,
 }
@@ -14,17 +16,6 @@ pub unsafe extern "C" fn register_Transceiver__current_direction(
     f: CurrentDirectionFunction,
 ) {
     current_direction_function = Some(f);
-}
-
-impl From<i32> for TransceiverDirection {
-    fn from(i: i32) -> Self {
-        match i {
-            0 => TransceiverDirection::INACTIVE,
-            1 => TransceiverDirection::SEND,
-            2 => TransceiverDirection::RECV,
-            _ => unreachable!("Unknown TransceiverDirection enum variant"),
-        }
-    }
 }
 
 type SetSendTrackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
@@ -51,7 +42,9 @@ type DropSenderFunction = extern "C" fn(Dart_Handle);
 static mut drop_sender_function: Option<DropSenderFunction> = None;
 
 type SetSenderTrackEnabledFunction = extern "C" fn(Dart_Handle, bool);
-static mut set_sender_track_enabled_function: Option<SetSenderTrackEnabledFunction> = None;
+static mut set_sender_track_enabled_function: Option<
+    SetSenderTrackEnabledFunction,
+> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_Transceiver__set_sender_track_enabled(
@@ -79,9 +72,19 @@ pub unsafe extern "C" fn register_Transceiver__is_stopped(
 
 impl Transceiver {
     pub fn current_direction(&self) -> TransceiverDirection {
-        unsafe {
-            current_direction_function.unwrap()(self.transceiver).into()
-        }
+        unsafe { current_direction_function.unwrap()(self.transceiver).into() }
+    }
+
+    pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
+        todo!()
+    }
+
+    pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
+        todo!()
+    }
+
+    pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
+        todo!()
     }
 
     // TODO: replace Dart_Handle with local::Track
@@ -92,7 +95,7 @@ impl Transceiver {
         }
     }
 
-    pub fn drop_send_track(&self) {
+    pub async fn drop_send_track(&self) {
         unsafe {
             let sender = get_send_track_function.unwrap()(self.transceiver);
             drop_sender_function.unwrap()(sender);
@@ -107,8 +110,18 @@ impl Transceiver {
     }
 
     pub fn is_stopped(&self) -> bool {
-        unsafe {
-            is_stopped_function.unwrap()(self.transceiver)
-        }
+        unsafe { is_stopped_function.unwrap()(self.transceiver) }
+    }
+
+    pub fn mid(&self) -> Option<String> {
+        todo!()
+    }
+
+    pub fn send_track(&self) -> Option<Rc<local::Track>> {
+        todo!()
+    }
+
+    pub fn has_send_track(&self) -> bool {
+        todo!()
     }
 }

@@ -4,8 +4,9 @@
 mod errors;
 
 pub mod component;
-mod resettable_delay;
+#[cfg(feature = "dart")]
 pub mod dart;
+mod resettable_delay;
 
 use std::future::Future;
 
