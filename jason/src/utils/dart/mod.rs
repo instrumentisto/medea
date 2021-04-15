@@ -1,4 +1,5 @@
 pub mod array;
+pub mod option;
 
 pub use self::array::Array;
 

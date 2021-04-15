@@ -1,6 +1,8 @@
-use crate::{media::track::local, platform::TransceiverDirection};
-use dart_sys::{Dart_Handle, _Dart_Handle};
 use std::rc::Rc;
+
+use dart_sys::{Dart_Handle, _Dart_Handle};
+
+use crate::{media::track::local, platform::TransceiverDirection};
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {

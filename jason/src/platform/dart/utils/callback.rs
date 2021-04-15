@@ -1,5 +1,6 @@
-use dart_sys::Dart_Handle;
 use std::{cell::RefCell, marker::PhantomData};
+
+use dart_sys::Dart_Handle;
 
 pub struct Callback<A>(RefCell<Option<Function<A>>>);
 
