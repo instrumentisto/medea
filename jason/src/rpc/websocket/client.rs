@@ -14,15 +14,13 @@ use medea_macro::dispatchable;
 use medea_reactive::ObservableCell;
 use serde::Serialize;
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
+    platform,
     rpc::{
-        websocket::transport::{RpcTransport, TransportError, TransportState},
         ApiUrl, CloseMsg, CloseReason, ClosedStateReason, Heartbeat,
         IdleTimeout, PingInterval, RpcClientError,
     },
-    utils::JasonError,
 };
 
 /// Reasons of closing WebSocket RPC connection by a client side.
@@ -30,22 +28,18 @@ use crate::{
 pub enum ClientDisconnect {
     /// [`Room`] was dropped without any [`CloseReason`].
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     RoomUnexpectedlyDropped,
 
-    /// [`Room`] was normally closed by JS side.
+    /// [`Room`] was normally closed bu client.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     RoomClosed,
 
     /// [`WebSocketRpcClient`] was unexpectedly dropped.
-    ///
-    /// [`WebSocketRpcClient`]: crate::rpc::WebSocketRpcClient
     RpcClientUnexpectedlyDropped,
 
-    /// [`RpcTransport`] was unexpectedly dropped.
-    ///
-    /// [`RpcTransport`]: crate::rpc::RpcTransport
+    /// [`platform::RpcTransport`] was unexpectedly dropped.
     RpcTransportUnexpectedlyDropped,
 
     /// [`WebSocketRpcSession`] was unexpectedly dropped.
@@ -79,7 +73,7 @@ impl From<ClientDisconnect> for CloseReason {
     }
 }
 
-/// State of [`WebSocketRpcClient`] and [`RpcTransport`].
+/// State of a [`WebSocketRpcClient`] and a [`platform::RpcTransport`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClientState {
     /// [`WebSocketRpcClient`] is currently establishing a connection to RPC
@@ -96,7 +90,7 @@ pub enum ClientState {
 /// Inner state of [`WebSocketRpcClient`].
 struct Inner {
     /// Transport connection with remote media server.
-    sock: Option<Rc<dyn RpcTransport>>,
+    sock: Option<Rc<dyn platform::RpcTransport>>,
 
     /// Connection loss detector via ping/pong mechanism.
     heartbeat: Option<Heartbeat>,
@@ -110,19 +104,20 @@ struct Inner {
 
     /// Reason of [`WebSocketRpcClient`] closing.
     ///
-    /// This reason will be provided to the underlying [`RpcTransport`].
+    /// This reason will be provided to the underlying
+    /// [`platform::RpcTransport`].
     close_reason: ClientDisconnect,
 
     /// Subscribers that will be notified when underlying transport connection
     /// is lost.
     on_connection_loss_subs: Vec<mpsc::UnboundedSender<()>>,
 
-    /// Closure which will create new [`RpcTransport`]s for this
+    /// Closure which will create new [`platform::RpcTransport`]s for this
     /// [`WebSocketRpcClient`] on each
     /// [`WebSocketRpcClient:: establish_connection`] call.
     rpc_transport_factory: RpcTransportFactory,
 
-    /// URL that [`RpcTransport`] will connect to.
+    /// URL that [`platform::RpcTransport`] will connect to.
     ///
     /// [`None`] if this [`WebSocketRpcClient`] has never been connected to
     /// a sever.
@@ -132,14 +127,17 @@ struct Inner {
     state: ObservableCell<ClientState>,
 }
 
-/// Factory closure which creates [`RpcTransport`] for
-/// [`WebSocketRpcClient::establish_connection`] function.
+/// Factory closure which creates a [`platform::RpcTransport`] for a
+/// [`WebSocketRpcClient::establish_connection()`] function.
 pub type RpcTransportFactory = Box<
     dyn Fn(
         ApiUrl,
     ) -> LocalBoxFuture<
         'static,
-        Result<Rc<dyn RpcTransport>, Traced<TransportError>>,
+        Result<
+            Rc<dyn platform::RpcTransport>,
+            Traced<platform::TransportError>,
+        >,
     >,
 >;
 
@@ -169,11 +167,11 @@ pub enum RpcEvent {
     /// Notification of the subscribers that [`WebSocketRpcClient`] is joined
     /// [`Room`] on Media Server.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     JoinedRoom {
         /// ID of the joined [`Room`].
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::room::Room
         room_id: RoomId,
 
         /// ID of the joined `Member`.
@@ -183,16 +181,16 @@ pub enum RpcEvent {
     /// Notification of the subscribers that [`WebSocketRpcClient`] left
     /// [`Room`] on Media Server.
     ///
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     LeftRoom {
         /// ID of the [`Room`] being left.
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::room::Room
         room_id: RoomId,
 
         /// Reason of why the [`Room`] has been left.
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::room::Room
         close_reason: CloseReason,
     },
 
@@ -200,7 +198,7 @@ pub enum RpcEvent {
     Event {
         /// ID of the [`Room`] for that this [`Event`] has been received for.
         ///
-        /// [`Room`]: crate::api::Room
+        /// [`Room`]: crate::room::Room
         room_id: RoomId,
 
         /// Received [`Event`].
@@ -308,14 +306,12 @@ impl WebSocketRpcClient {
             },
             ServerMsg::RpcSettings(settings) => {
                 self.update_settings(
-                    IdleTimeout(
-                        Duration::from_millis(settings.idle_timeout_ms.into())
-                            .into(),
-                    ),
-                    PingInterval(
-                        Duration::from_millis(settings.ping_interval_ms.into())
-                            .into(),
-                    ),
+                    IdleTimeout(Duration::from_millis(
+                        settings.idle_timeout_ms.into(),
+                    )),
+                    PingInterval(Duration::from_millis(
+                        settings.ping_interval_ms.into(),
+                    )),
                 )
                 .map_err(tracerr::wrap!(=> RpcClientError))
                 .map_err(|e| {
@@ -335,25 +331,25 @@ impl WebSocketRpcClient {
     }
 
     /// Starts [`Heartbeat`] with provided [`RpcSettings`] for provided
-    /// [`RpcTransport`].
+    /// [`platform::RpcTransport`].
     async fn start_heartbeat(
         self: Rc<Self>,
-        transport: Rc<dyn RpcTransport>,
+        transport: Rc<dyn platform::RpcTransport>,
         rpc_settings: RpcSettings,
     ) -> Result<(), Traced<RpcClientError>> {
-        let idle_timeout = IdleTimeout(
-            Duration::from_millis(rpc_settings.idle_timeout_ms.into()).into(),
-        );
-        let ping_interval = PingInterval(
-            Duration::from_millis(rpc_settings.ping_interval_ms.into()).into(),
-        );
+        let idle_timeout = IdleTimeout(Duration::from_millis(
+            rpc_settings.idle_timeout_ms.into(),
+        ));
+        let ping_interval = PingInterval(Duration::from_millis(
+            rpc_settings.ping_interval_ms.into(),
+        ));
 
         let heartbeat =
             Heartbeat::start(transport, ping_interval, idle_timeout);
 
         let mut on_idle = heartbeat.on_idle();
         let weak_this = Rc::downgrade(&self);
-        spawn_local(async move {
+        platform::spawn(async move {
             while on_idle.next().await.is_some() {
                 if let Some(this) = weak_this.upgrade() {
                     this.handle_connection_loss(ClosedStateReason::Idle);
@@ -412,10 +408,10 @@ impl WebSocketRpcClient {
         // subscribe to transport close
         let mut transport_state_changes = transport.on_state_change();
         let weak_this = Rc::downgrade(&self);
-        spawn_local(async move {
+        platform::spawn(async move {
             while let Some(state) = transport_state_changes.next().await {
                 if let Some(this) = weak_this.upgrade() {
-                    if let TransportState::Closed(msg) = state {
+                    if let platform::TransportState::Closed(msg) = state {
                         this.handle_close_message(msg);
                     }
                 }
@@ -425,7 +421,7 @@ impl WebSocketRpcClient {
         // subscribe to transport message received
         let weak_this = Rc::downgrade(&self);
         let mut on_socket_message = transport.on_message();
-        spawn_local(async move {
+        platform::spawn(async move {
             while let Some(msg) = on_socket_message.next().await {
                 if let Some(this) = weak_this.upgrade() {
                     this.on_transport_message(msg)
@@ -528,10 +524,11 @@ impl WebSocketRpcClient {
         let socket_borrow = &self.0.borrow().sock;
 
         if let Some(socket) = socket_borrow.as_ref() {
-            if let Err(err) =
-                socket.send(&ClientMsg::Command { room_id, command })
+            if let Err(e) = socket
+                .send(&ClientMsg::Command { room_id, command })
+                .map_err(tracerr::map_from_and_wrap!(=> RpcClientError))
             {
-                JasonError::from(err).print()
+                log::error!("{}", e);
             }
         }
     }
@@ -553,12 +550,12 @@ impl WebSocketRpcClient {
 
     /// Subscribe to connection loss events.
     ///
-    /// Connection loss is any unexpected [`RpcTransport`] close. In case of
-    /// connection loss, JS side user should select reconnection strategy with
-    /// [`ReconnectHandle`] (or simply close [`Room`]).
+    /// Connection loss is any unexpected [`platform::RpcTransport`] close. In
+    /// case of connection loss, client side user should select reconnection
+    /// strategy with [`ReconnectHandle`] (or simply close [`Room`]).
     ///
     /// [`ReconnectHandle`]: crate::rpc::ReconnectHandle
-    /// [`Room`]: crate::api::Room
+    /// [`Room`]: crate::room::Room
     /// [`Stream`]: futures::Stream
     pub fn on_connection_loss(&self) -> LocalBoxStream<'static, ()> {
         let (tx, rx) = mpsc::unbounded();

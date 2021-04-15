@@ -20,13 +20,17 @@ pub mod proto {
             WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         },
         member::{Credentials, Member},
-        room::Room,
+        room::{Room, RoomElement},
         CreateResponse, Element, ErrorResponse, Response, SingleGetResponse,
     };
 }
 
 /// Initializes [`slog`] logger outputting logs with a [`slog_term`]'s
 /// decorator.
+///
+/// # Panics
+///
+/// If [`slog_stdlog`] fails to [initialize](slog_stdlog::init).
 pub fn init_logger() -> GlobalLoggerGuard {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();

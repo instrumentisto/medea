@@ -616,51 +616,52 @@ window.onload = async function() {
       });
 
       connection.on_remote_track_added((track) => {
+        let playElement = undefined;
         if (track.kind() === rust.MediaKind.Video) {
           if (track.media_source_kind() === rust.MediaSourceKind.Display) {
-            let displayVideoEl = memberVideoDiv.getElementsByClassName('display-video')[0];
-            if (displayVideoEl === undefined) {
-              displayVideoEl = document.createElement('video');
-              displayVideoEl.classList.add('display-video');
-              displayVideoEl.classList.add('order-2');
-              displayVideoEl.playsinline = 'true';
-              displayVideoEl.controls = 'true';
-              displayVideoEl.autoplay = 'true';
-              memberVideoDiv.appendChild(displayVideoEl);
+            playElement = memberVideoDiv.getElementsByClassName('display-video')[0];
+            if (playElement === undefined) {
+              playElement = document.createElement('video');
+              playElement.classList.add('display-video');
+              playElement.classList.add('order-2');
+              playElement.playsinline = 'true';
+              playElement.controls = 'true';
+              playElement.autoplay = 'true';
+              memberVideoDiv.appendChild(playElement);
             }
             let mediaStream = new MediaStream();
             mediaStream.addTrack(track.get_track());
-            displayVideoEl.srcObject = mediaStream;
+            playElement.srcObject = mediaStream;
           } else {
-            let cameraVideoEl = memberVideoDiv.getElementsByClassName('camera-video')[0];
-            if (cameraVideoEl === undefined) {
-              cameraVideoEl = document.createElement('video');
-              cameraVideoEl.className = 'camera-video';
-              cameraVideoEl.classList.add('camera-video');
-              cameraVideoEl.classList.add('order-1');
-              cameraVideoEl.playsinline = 'true';
-              cameraVideoEl.controls = 'true';
-              cameraVideoEl.autoplay = 'true';
-              memberVideoDiv.appendChild(cameraVideoEl);
+            playElement = memberVideoDiv.getElementsByClassName('camera-video')[0];
+            if (playElement === undefined) {
+              playElement = document.createElement('video');
+              playElement.className = 'camera-video';
+              playElement.classList.add('camera-video');
+              playElement.classList.add('order-1');
+              playElement.playsinline = 'true';
+              playElement.controls = 'true';
+              playElement.autoplay = 'true';
+              memberVideoDiv.appendChild(playElement);
             }
             let mediaStream = new MediaStream();
             mediaStream.addTrack(track.get_track());
-            cameraVideoEl.srcObject = mediaStream;
+            playElement.srcObject = mediaStream;
           }
         } else {
-          let audioEl = memberVideoDiv.getElementsByClassName('audio')[0];
-          if (audioEl === undefined) {
-            audioEl = document.createElement('audio');
-            audioEl.className = 'audio';
-            audioEl.classList.add('audio');
-            audioEl.classList.add('order-3');
-            audioEl.controls = 'true';
-            audioEl.autoplay = 'true';
-            memberVideoDiv.appendChild(audioEl);
+          playElement = memberVideoDiv.getElementsByClassName('audio')[0];
+          if (playElement === undefined) {
+            playElement = document.createElement('audio');
+            playElement.className = 'audio';
+            playElement.classList.add('audio');
+            playElement.classList.add('order-3');
+            playElement.controls = 'true';
+            playElement.autoplay = 'true';
+            memberVideoDiv.appendChild(playElement);
           }
           let mediaStream = new MediaStream();
           mediaStream.addTrack(track.get_track());
-          audioEl.srcObject = mediaStream;
+          playElement.srcObject = mediaStream;
         }
 
         track.on_enabled( () => {
@@ -668,6 +669,16 @@ window.onload = async function() {
         });
         track.on_disabled( () => {
           console.log(`Track disabled: ${track.kind()}`);
+        });
+        track.on_muted( () => {
+          console.log(`Track muted: ${track.kind()}`);
+        });
+        track.on_unmuted( () => {
+          console.log(`Track unmuted: ${track.kind()}`);
+        });
+        track.on_stopped( () => {
+          track.free();
+          playElement.remove();
         });
       });
 
@@ -776,7 +787,7 @@ window.onload = async function() {
               console.error('Name: "' + err.name() + '";\nMessage: "' + err.message() + '";');
             }
           } else if (name === 'ErroredException') {
-            alert('Fatal error occured while MediaStreamSettings update.');
+            alert('Fatal error occurred while MediaStreamSettings update.');
           }
           console.error("Changing video source failed: " + name);
         }
@@ -922,7 +933,7 @@ window.onload = async function() {
             await room.join(await createMember(roomId, username));
             return;
           }
-          await room.join(baseUrl + roomId + '/' + username + '/test')
+          await room.join(baseUrl + roomId + '/' + username + '?token=test')
         } catch (e) {
           console.error(e);
           console.error(

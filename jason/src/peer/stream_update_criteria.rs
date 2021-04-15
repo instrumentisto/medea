@@ -4,7 +4,7 @@ use std::ops::BitOrAssign;
 
 use medea_client_api_proto::{Direction, MediaSourceKind, MediaType, Track};
 
-use crate::MediaKind;
+use crate::media::MediaKind;
 
 bitflags::bitflags! {
     pub struct Inner: u8 {

@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use medea_jason::rpc::{TransportError, WebSocketRpcTransport};
+use medea_jason::platform::{TransportError, WebSocketRpcTransport};
 use url::Url;
 use wasm_bindgen_test::*;
 

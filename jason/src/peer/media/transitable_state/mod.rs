@@ -9,6 +9,7 @@ pub mod mute_state;
 use derive_more::From;
 use medea_client_api_proto::{TrackId, TrackPatchCommand};
 
+#[doc(inline)]
 pub use self::controller::{
     MediaExchangeStateController, MuteStateController,
     TransitableStateController,
@@ -31,8 +32,8 @@ pub enum MediaState {
     /// Responsible for changing [`enabled`][1] property of
     /// [MediaStreamTrack][2].
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
-    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
     Mute(mute_state::Stable),
 
     /// Responsible for changing [RTCRtpTransceiverDirection][1] to stop
@@ -40,7 +41,7 @@ pub enum MediaState {
     ///
     /// Requires renegotiation for changes to take an effect.
     ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcrtptransceiverdirection
     MediaExchange(media_exchange_state::Stable),
 }
 
@@ -86,6 +87,7 @@ impl MediaState {
 
 /// [`TransitableState::Stable`] variant of the [`TransitableState`].
 pub trait InStable: Clone + Copy + PartialEq {
+    /// Transition invariants of this [`InStable`].
     type Transition: InTransition;
 
     /// Converts this [`InStable`] into [`InStable::Transition`].
@@ -95,6 +97,7 @@ pub trait InStable: Clone + Copy + PartialEq {
 
 /// [`TransitableState::Transition`] variant of the [`TransitableState`].
 pub trait InTransition: Clone + Copy + PartialEq {
+    /// Stable invariants of this [`InTransition`].
     type Stable: InStable;
 
     /// Returns intention which this state indicates.

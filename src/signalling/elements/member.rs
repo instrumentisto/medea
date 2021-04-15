@@ -18,7 +18,6 @@ use medea_control_api_proto::grpc::api as proto;
 use crate::{
     api::control::{
         callback::url::CallbackUrl,
-        endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         member::Credential,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
@@ -341,6 +340,20 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
+    /// Returns [`WebRtcPlayId`]s of all sinks of this [`Member`].
+    #[inline]
+    #[must_use]
+    pub fn sinks_ids(&self) -> Vec<WebRtcPlayId> {
+        self.0.borrow().sinks.keys().cloned().collect()
+    }
+
+    /// Returns [`WebRtcPublishId`]s of all srcs of this [`Member`].
+    #[inline]
+    #[must_use]
+    pub fn srcs_ids(&self) -> Vec<WebRtcPublishId> {
+        self.0.borrow().srcs.keys().cloned().collect()
+    }
+
     /// Returns partner [`Member`]s of this [`Member`].
     #[must_use]
     pub fn partners(&self) -> Vec<Member> {
@@ -387,29 +400,17 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned()
     }
 
-    /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
-    #[inline]
-    pub fn remove_sink(&self, id: &WebRtcPlayId) {
-        self.0.borrow_mut().sinks.remove(id);
-    }
-
-    /// Removes source [`WebRtcPublishEndpoint`] from this [`Member`].
-    #[inline]
-    pub fn remove_src(&self, id: &WebRtcPublishId) {
-        self.0.borrow_mut().srcs.remove(id);
-    }
-
     /// Takes sink from [`Member`]'s `sinks`.
     #[inline]
     #[must_use]
-    pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
+    pub fn remove_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
     /// Takes src from [`Member`]'s `srsc`.
     #[inline]
     #[must_use]
-    pub fn take_src(
+    pub fn remove_src(
         &self,
         id: &WebRtcPublishId,
     ) -> Option<WebRtcPublishEndpoint> {
@@ -421,30 +422,6 @@ impl Member {
     #[must_use]
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
-    }
-
-    /// Creates new [`WebRtcPlayEndpoint`] based on provided
-    /// [`WebRtcPlayEndpointSpec`].
-    ///
-    /// This function will add created [`WebRtcPlayEndpoint`] to `src`s of
-    /// [`WebRtcPublishEndpoint`] and to provided [`Member`].
-    pub fn create_sink(
-        member: &Rc<Self>,
-        id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec,
-    ) {
-        let src = member.get_src_by_id(&spec.src.endpoint_id).unwrap();
-
-        let sink = WebRtcPlayEndpoint::new(
-            id,
-            spec.src,
-            src.downgrade(),
-            member.downgrade(),
-            spec.force_relay,
-        );
-
-        src.add_sink(sink.downgrade());
-        member.insert_sink(sink);
     }
 
     /// Lookups [`WebRtcPublishEndpoint`] and [`WebRtcPlayEndpoint`] at one
@@ -544,7 +521,9 @@ pub struct WeakMember(Weak<RefCell<MemberInner>>);
 impl WeakMember {
     /// Upgrades weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer was dropped.
+    /// # Panics
+    ///
+    /// If an inner [`Weak`] pointer upgrade fails.
     #[inline]
     #[must_use]
     pub fn upgrade(&self) -> Member {
@@ -626,50 +605,49 @@ pub fn parse_members(
     Ok(members)
 }
 
-impl Into<proto::Member> for Member {
-    fn into(self) -> proto::Member {
-        let member_pipeline = self
+impl From<Member> for proto::Member {
+    fn from(m: Member) -> Self {
+        let member_pipeline = m
             .sinks()
             .into_iter()
             .map(|(id, play)| (id.to_string(), play.into()))
             .chain(
-                self.srcs()
+                m.srcs()
                     .into_iter()
                     .map(|(id, publish)| (id.to_string(), publish.into())),
             )
             .collect();
 
-        proto::Member {
-            id: self.id().to_string(),
-            credentials: Some(self.credentials().into()),
-            on_leave: self
+        Self {
+            id: m.id().to_string(),
+            credentials: Some(m.credentials().into()),
+            on_leave: m
                 .get_on_leave()
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
-            on_join: self
-                .get_on_join()
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
-            reconnect_timeout: Some(self.get_reconnect_timeout().into()),
-            idle_timeout: Some(self.get_idle_timeout().into()),
-            ping_interval: Some(self.get_ping_interval().into()),
+            on_join: m.get_on_join().map(|c| c.to_string()).unwrap_or_default(),
+            reconnect_timeout: Some(m.get_reconnect_timeout().into()),
+            idle_timeout: Some(m.get_idle_timeout().into()),
+            ping_interval: Some(m.get_ping_interval().into()),
             pipeline: member_pipeline,
         }
     }
 }
 
-impl Into<proto::room::Element> for Member {
-    fn into(self) -> proto::room::Element {
-        proto::room::Element {
-            el: Some(proto::room::element::El::Member(self.into())),
+impl From<Member> for proto::room::Element {
+    #[inline]
+    fn from(m: Member) -> Self {
+        Self {
+            el: Some(proto::room::element::El::Member(m.into())),
         }
     }
 }
 
-impl Into<proto::Element> for Member {
-    fn into(self) -> proto::Element {
-        proto::Element {
-            el: Some(proto::element::El::Member(self.into())),
+impl From<Member> for proto::Element {
+    #[inline]
+    fn from(m: Member) -> Self {
+        Self {
+            el: Some(proto::element::El::Member(m.into())),
         }
     }
 }
@@ -785,10 +763,10 @@ mod tests {
         let some_member = store.get(&id("some-member")).unwrap();
         let responder = store.get(&id("responder")).unwrap();
 
-        caller.remove_src(&id("publish"));
+        drop(caller.remove_src(&id("publish")));
         assert_eq!(responder.sinks().len(), 1);
 
-        some_member.remove_src(&id("publish"));
+        drop(some_member.remove_src(&id("publish")));
         assert_eq!(responder.sinks().len(), 0);
     }
 
@@ -804,11 +782,11 @@ mod tests {
         let some_member_publisher =
             some_member.get_src_by_id(&id("publish")).unwrap();
 
-        responder.remove_sink(&id("play"));
+        drop(responder.remove_sink(&id("play")));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 1);
 
-        responder.remove_sink(&id("play2"));
+        drop(responder.remove_sink(&id("play2")));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 0);
     }

@@ -11,7 +11,9 @@ use crate::{
     utils::{AsProtoState, SynchronizableState},
 };
 
-/// Store of all the [`IceCandidate`]s of a [`PeerComponent`].
+/// Store of all the [`IceCandidate`]s of a [`peer::Component`].
+///
+/// [`peer::Component`]: super::Component
 #[derive(Debug)]
 pub struct IceCandidates(RefCell<ObservableHashSet<IceCandidate>>);
 

@@ -6,10 +6,10 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.2.0-rc.1] · 2021-02-01
-[0.2.0-rc.1]: /../../tree/medea-0.2.0-rc.1
+## [0.2.0] · 2021-04-09
+[0.2.0]: /../../tree/medea-0.2.0
 
-[Diff](/../../compare/medea-0.1.0...medea-0.2.0-rc.1) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+[Diff](/../../compare/medea-0.1.0...medea-0.2.0) | [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### BC Breaks
 
@@ -22,10 +22,11 @@ All user visible changes to this project will be documented in this file. This p
 
 - Control API:
     - Support for static Сontrol API specs ([#28]);
-    - Dynamic Control API exposed via gRPC ([#33]):
-        - `Create` method for `Room`, `Member`, `Endpoint`;
-        - `Get` method for `Room`, `Member`, `Endpoint`;
-        - `Delete` method for `Room`, `Member`, `Endpoint`.
+    - Dynamic Control API exposed via gRPC:
+        - `Create` method for `Room`, `Member`, `Endpoint` ([#33]);
+        - `Get` method for `Room`, `Member`, `Endpoint` ([#33]);
+        - `Delete` method for `Room`, `Member`, `Endpoint` ([#33]);
+        - `Apply` method for `Room`, `Member`, `Endpoint` ([#187]).
     - gRPC Control API callbacks:
         - `on_join` ([#63], [#153]);
         - `on_leave` ([#63]).
@@ -39,6 +40,7 @@ All user visible changes to this project will be documented in this file. This p
     - Send `Event::RpcSettingsUpdated` when `Member` connects ([#75]);
     - Send relay mode in `Event::PeerCreated` which is used for configuring client's `RtcIceTransportPolicy` ([#79]);
     - Emit `PeerUpdated` event to create new and update existing tracks ([#105], [#139]);
+    - Emit `TracksApplied` event to remove existing tracks on a client side ([#109]);
     - `PeerConnection` renegotiation functionality ([#105]);
     - Calculate and send call quality score based on RTC stats ([#132]);
     - Enabling/disabling `MediaTrack`s by receiver ([#127], [#155]);
@@ -81,6 +83,7 @@ All user visible changes to this project will be documented in this file. This p
 [#95]: /../../pull/95
 [#98]: /../../pull/98
 [#105]: /../../pull/105
+[#109]: /../../pull/109
 [#127]: /../../pull/127
 [#132]: /../../pull/132
 [#135]: /../../pull/135
@@ -92,6 +95,7 @@ All user visible changes to this project will be documented in this file. This p
 [#156]: /../../pull/156
 [#167]: /../../pull/167
 [#168]: /../../pull/168
+[#187]: /../../pull/187
 
 
 

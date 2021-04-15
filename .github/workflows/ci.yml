@@ -448,7 +448,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: beta
 
       - name: Release ${{ steps.crate.outputs.group2 }} version
               of '${{ steps.crate.outputs.group1 }}' crate
@@ -594,7 +594,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GCR_BOT_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         if: ${{ matrix.if && contains(matrix.repos, 'ghcr.io') }}
       - name: Login to Quay.io
         uses: docker/login-action@v1

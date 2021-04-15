@@ -118,7 +118,8 @@ pub enum RootElement {
 }
 
 /// Errors that can occur when we try transform some spec from `Element`.
-/// This error used in all [`TryFrom`] of Control API.
+///
+/// This error is used in all [`TryFrom`] impls of Control API.
 ///
 /// [`TryFrom`]: std::convert::TryFrom
 #[allow(clippy::pub_enum_variant_names)]
@@ -252,7 +253,7 @@ pub async fn start_static_rooms(
              specs not loaded. {}",
             e,
         ),
-        Err(e) => panic!("{}", e),
+        Err(e) => return Err(Error::from(e)),
         Ok(_) => {}
     };
     Ok(())

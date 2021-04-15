@@ -2,13 +2,11 @@
 //!
 //! [1]: https://w3.org/TR/mediacapture-streams
 
-mod constraints;
-mod device_info;
+pub mod constraints;
 mod manager;
 pub mod track;
 
 use derive_more::Display;
-use wasm_bindgen::prelude::*;
 
 #[doc(inline)]
 pub use self::{
@@ -19,15 +17,13 @@ pub use self::{
         MultiSourceTracksConstraints, RecvConstraints, TrackConstraints,
         VideoSource, VideoTrackConstraints,
     },
-    device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerError, MediaManagerHandle},
-    track::JsMediaSourceKind,
+    track::MediaSourceKind,
 };
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[wasm_bindgen]
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaKind {
     /// Audio track.

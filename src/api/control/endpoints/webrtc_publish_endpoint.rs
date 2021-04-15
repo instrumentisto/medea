@@ -15,7 +15,7 @@ use medea_control_api_proto::grpc::api as proto;
 pub struct WebRtcPublishId(String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Copy, Deserialize, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
@@ -39,14 +39,13 @@ impl From<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
     }
 }
 
-impl Into<proto::web_rtc_publish_endpoint::P2p> for P2pMode {
-    fn into(self) -> proto::web_rtc_publish_endpoint::P2p {
-        use proto::web_rtc_publish_endpoint::P2p;
-
-        match self {
-            Self::Always => P2p::Always,
-            Self::IfPossible => P2p::IfPossible,
-            Self::Never => P2p::Never,
+impl From<P2pMode> for proto::web_rtc_publish_endpoint::P2p {
+    #[inline]
+    fn from(mode: P2pMode) -> Self {
+        match mode {
+            P2pMode::Always => Self::Always,
+            P2pMode::IfPossible => Self::IfPossible,
+            P2pMode::Never => Self::Never,
         }
     }
 }

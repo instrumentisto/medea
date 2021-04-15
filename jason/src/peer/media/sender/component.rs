@@ -12,7 +12,7 @@ use medea_reactive::{AllProcessed, Guarded, ObservableCell, ProgressableCell};
 use tracerr::Traced;
 
 use crate::{
-    media::{LocalTracksConstraints, TrackConstraints, VideoSource},
+    media::{LocalTracksConstraints, MediaKind, TrackConstraints, VideoSource},
     peer::{
         self,
         component::SyncState,
@@ -22,10 +22,10 @@ use crate::{
         },
         MediaConnectionsError, MediaExchangeStateController, MediaState,
         MediaStateControllable, MuteStateController, PeerError,
-        TransceiverDirection, TransceiverSide,
+        TransceiverSide,
     },
+    platform,
     utils::{component, AsProtoState, SynchronizableState, Updatable},
-    MediaKind,
 };
 
 use super::Sender;
@@ -34,12 +34,18 @@ use super::Sender;
 ///
 /// [`PartialEq`] implementation of this state ignores
 /// [`LocalTrackState::Failed`] content.
+///
+/// [`local::Track`]: crate::media::track::local::Track
 #[derive(Debug, Clone)]
 enum LocalTrackState {
     /// Indicates that [`Sender`] is new, or [`local::Track`] is set.
+    ///
+    /// [`local::Track`]: crate::media::track::local::Track
     Stable,
 
     /// Indicates that [`Sender`] needs a new [`local::Track`].
+    ///
+    /// [`local::Track`]: crate::media::track::local::Track
     NeedUpdate,
 
     /// Indicates that new [`local::Track`] getting is failed.
@@ -47,6 +53,7 @@ enum LocalTrackState {
     /// Contains [`PeerError`] with which
     /// [getUserMedia()][1]/[getDisplayMedia()][2] request was failed.
     ///
+    /// [`local::Track`]: crate::media::track::local::Track
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     Failed(Traced<PeerError>),
@@ -392,10 +399,13 @@ impl State {
 
 #[watchers]
 impl Component {
-    /// Watcher for [`MediaExchangeState::Transition`] update.
+    /// Watcher for media exchange state [`media_exchange_state::Transition`]
+    /// updates.
     ///
-    /// Sends [`TrackEvent::MediaExchangeIntention`] with the provided
+    /// Sends [`TrackEvent::MediaExchangeIntention`][1] with the provided
     /// [`media_exchange_state`].
+    ///
+    /// [1]: crate::peer::TrackEvent::MediaExchangeIntention
     #[watch(self.enabled_individual.subscribe_transition())]
     async fn enabled_individual_transition_started(
         sender: Rc<Sender>,
@@ -406,10 +416,12 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for [`MuteState::Transition`] update.
+    /// Watcher for mute state [`mute_state::Transition`] updates.
     ///
-    /// Sends [`TrackEvent::MuteUpdateIntention`] with the provided
+    /// Sends [`TrackEvent::MuteUpdateIntention`][1] with the provided
     /// [`mute_state`].
+    ///
+    /// [1]: crate::peer::TrackEvent::MuteUpdateIntention
     #[watch(self.mute_state.subscribe_transition())]
     async fn mute_state_transition_watcher(
         sender: Rc<Sender>,
@@ -423,8 +435,10 @@ impl Component {
     /// Watcher for the [`State::enabled_general`] update.
     ///
     /// Updates [`Sender`]'s general media exchange state. Adds or removes
-    /// [`TransceiverDirection::SEND`] from the [`Transceiver`] of the
-    /// [`Receiver`].
+    /// [`TransceiverDirection::SEND`] from the [`platform::Transceiver`] of
+    /// this [`Sender`].
+    ///
+    /// [`TransceiverDirection::SEND`]: platform::TransceiverDirection::SEND
     #[watch(self.enabled_general.subscribe())]
     async fn enabled_general_state_changed(
         sender: Rc<Sender>,
@@ -432,7 +446,6 @@ impl Component {
         new_state: Guarded<media_exchange_state::Stable>,
     ) -> Result<()> {
         let (new_state, _guard) = new_state.into_parts();
-
         sender
             .enabled_general
             .set(new_state == media_exchange_state::Stable::Enabled);
@@ -441,26 +454,29 @@ impl Component {
                 if sender.enabled_in_cons() {
                     sender
                         .transceiver
-                        .add_direction(TransceiverDirection::SEND);
+                        .add_direction(platform::TransceiverDirection::SEND);
                 }
             }
             media_exchange_state::Stable::Disabled => {
-                sender.transceiver.sub_direction(TransceiverDirection::SEND);
+                sender
+                    .transceiver
+                    .sub_direction(platform::TransceiverDirection::SEND);
             }
         }
 
         Ok(())
     }
 
-    /// Watcher for the [`MediaExchangeState::Stable`] update.
+    /// Watcher for [`media_exchange_state::Stable`] media exchange state
+    /// updates.
     ///
-    /// Updates [`Receiver::enabled_individual`] to the `new_state`.
+    /// Updates [`Sender::enabled_individual`] to the `new_state`.
     ///
-    /// Removes `MediaTrack` from [`Transceiver`] if `new_state` is
+    /// Removes `MediaTrack` from [`platform::Transceiver`] if `new_state` is
     /// [`media_exchange_state::Stable::Disabled`].
     ///
-    /// Sets [`State::need_local_stream_update`] to the `true` if `new_state` is
-    /// [`media_exchange_state::Stable::Enabled`].
+    /// Marks [`State::local_track_state`] as [`LocalTrackState::NeedUpdate`] if
+    /// `new_state` is [`media_exchange_state::Stable::Enabled`].
     #[watch(self.enabled_individual.subscribe_stable())]
     async fn enabled_individual_stable_state_changed(
         sender: Rc<Sender>,
@@ -481,11 +497,12 @@ impl Component {
         Ok(())
     }
 
-    /// Watcher for the [`MuteState::Stable`] update.
+    /// Watcher for the [`mute_state::Stable`] updates.
     ///
     /// Updates [`Sender`]'s mute state.
     ///
-    /// Updates [`Sender`]'s [`Transceiver`] `MediaTrack.enabled` property.
+    /// Updates [`Sender`]'s [`platform::Transceiver`] `MediaTrack.enabled`
+    /// property.
     #[watch(self.mute_state.subscribe_stable())]
     async fn mute_state_stable_watcher(
         sender: Rc<Sender>,

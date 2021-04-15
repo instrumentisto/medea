@@ -21,7 +21,7 @@ use tokio::time::timeout;
 
 use crate::{
     grpc_control_api::{
-        create_room_req, pub_pub_room_req, ControlClient,
+        pub_pub_room_req, pub_sub_room_req, ControlClient,
         WebRtcPlayEndpointBuilder, WebRtcPublishEndpointBuilder,
     },
     if_let_next,
@@ -108,7 +108,7 @@ async fn helper(
                 }
             }
         }
-    };
+    }
     wait_tracks_applied(enabled, publisher_rx, PeerId(0)).await;
     wait_tracks_applied(enabled, subscriber_rx, PeerId(1)).await;
 }
@@ -119,7 +119,7 @@ async fn helper(
 #[named]
 async fn track_disables_and_enables() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -200,7 +200,7 @@ async fn track_disables_and_enables_are_instant() {
     }
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (publisher_tx, mut publisher_rx) = mpsc::unbounded();
     let publisher = TestMember::connect(
@@ -293,7 +293,7 @@ async fn track_disables_and_enables_are_instant() {
 #[named]
 async fn track_disables_and_enables_are_instant2() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
     client
         .create(
             WebRtcPublishEndpointBuilder::default()
@@ -428,7 +428,7 @@ async fn track_disables_and_enables_are_instant2() {
 #[named]
 async fn force_update_works() {
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (pub_con_established_tx, mut pub_con_established_rx) =
         mpsc::unbounded();
@@ -802,7 +802,7 @@ async fn individual_and_general_mute_states_works() {
     const STAGE3_PROGRESS: AtomicU8 = AtomicU8::new(0);
 
     let mut client = ControlClient::new().await;
-    let credentials = client.create(create_room_req(test_name!())).await;
+    let credentials = client.create(pub_sub_room_req(test_name!())).await;
 
     let (test_finish_tx, test_finish_rx) = mpsc::unbounded();
 

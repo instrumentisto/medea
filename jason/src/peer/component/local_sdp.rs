@@ -13,9 +13,11 @@ use futures::{
     StreamExt as _,
 };
 use medea_reactive::ObservableCell;
-use wasm_bindgen_futures::spawn_local;
 
-use crate::utils::{resettable_delay_for, ResettableDelayHandle};
+use crate::{
+    platform,
+    utils::{resettable_delay_for, ResettableDelayHandle},
+};
 
 const DESCRIPTION_APPROVE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -55,7 +57,7 @@ impl LocalSdp {
     /// Returns [`Stream`] into which `()` will be sent on every SDP offer
     /// approve.
     ///
-    /// [`Stream`]: futures::stream::Stream
+    /// [`Stream`]: futures::Stream
     #[inline]
     pub fn on_approve(&self) -> LocalBoxStream<'static, ()> {
         Box::pin(self.0.approved.subscribe().filter_map(|approved| {
@@ -150,7 +152,7 @@ impl LocalSdp {
             DESCRIPTION_APPROVE_TIMEOUT,
             self.0.is_rollback_timeout_stopped.get(),
         );
-        spawn_local({
+        platform::spawn({
             let this = self.clone();
             async move {
                 if let Either::Right(_) =

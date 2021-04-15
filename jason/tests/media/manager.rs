@@ -8,9 +8,12 @@ use wasm_bindgen_test::*;
 use web_sys as sys;
 
 use medea_jason::{
-    media::{MediaKind, MediaManager, MediaManagerError},
-    AudioTrackConstraints, DeviceVideoTrackConstraints,
-    DisplayVideoTrackConstraints, MediaStreamSettings,
+    api,
+    media::{
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaKind, MediaManager,
+        MediaManagerError, MediaStreamSettings,
+    },
 };
 
 use crate::{get_jason_error, is_firefox, MockNavigator};
@@ -20,10 +23,12 @@ wasm_bindgen_test_configure!(run_in_browser);
 #[wasm_bindgen_test]
 async fn get_media_devices_info() {
     let media_manager = MediaManager::default();
-    let devices =
-        JsFuture::from(media_manager.new_handle().enumerate_devices())
-            .await
-            .unwrap();
+    let devices = JsFuture::from(
+        api::MediaManagerHandle::from(media_manager.new_handle())
+            .enumerate_devices(),
+    )
+    .await
+    .unwrap();
 
     let devices = JsArray::from(&devices);
     assert!(devices.length() >= 2);
@@ -35,8 +40,11 @@ async fn failed_get_media_devices_info() {
     mock_navigator
         .error_enumerate_devices("failed_get_media_devices_info".into());
     let media_manager = MediaManager::default();
-    let result =
-        JsFuture::from(media_manager.new_handle().enumerate_devices()).await;
+    let result = JsFuture::from(
+        api::MediaManagerHandle::from(media_manager.new_handle())
+            .enumerate_devices(),
+    )
+    .await;
     mock_navigator.stop();
     match result {
         Ok(_) => assert!(false),
@@ -58,13 +66,14 @@ async fn failed_get_user_media() {
     mock_navigator.error_get_user_media("failed_get_user_media".into());
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
-        constraints.audio(AudioTrackConstraints::new());
-        constraints.device_video(DeviceVideoTrackConstraints::new());
+        let mut constraints = api::MediaStreamSettings::new();
+        constraints.audio(api::AudioTrackConstraints::new());
+        constraints.device_video(api::DeviceVideoTrackConstraints::new());
         constraints
     };
     let result = JsFuture::from(
-        media_manager.new_handle().init_local_tracks(&constraints),
+        api::MediaManagerHandle::from(media_manager.new_handle())
+            .init_local_tracks(&constraints),
     )
     .await;
     mock_navigator.stop();
@@ -92,13 +101,14 @@ async fn failed_get_user_media2() {
     mock_navigator.error_get_user_media(error.into());
     let media_manager = MediaManager::default();
     let constraints = {
-        let mut constraints = MediaStreamSettings::new();
-        constraints.audio(AudioTrackConstraints::new());
-        constraints.device_video(DeviceVideoTrackConstraints::new());
+        let mut constraints = api::MediaStreamSettings::new();
+        constraints.audio(api::AudioTrackConstraints::new());
+        constraints.device_video(api::DeviceVideoTrackConstraints::new());
         constraints
     };
     let result = JsFuture::from(
-        media_manager.new_handle().init_local_tracks(&constraints),
+        api::MediaManagerHandle::from(media_manager.new_handle())
+            .init_local_tracks(&constraints),
     )
     .await;
     mock_navigator.stop();
@@ -313,7 +323,7 @@ async fn new_tracks_should_be_live() {
     let mut constraints = MediaStreamSettings::new();
     constraints.audio(AudioTrackConstraints::new());
 
-    let track = Clone::clone(
+    let track: web_sys::MediaStreamTrack = Clone::clone(
         media_manager
             .get_tracks(constraints.clone())
             .await
@@ -321,7 +331,9 @@ async fn new_tracks_should_be_live() {
             .pop()
             .unwrap()
             .0
-            .sys_track(),
+            .as_ref()
+            .as_ref()
+            .as_ref(),
     );
     let ended_track = track.clone();
     ended_track.stop();

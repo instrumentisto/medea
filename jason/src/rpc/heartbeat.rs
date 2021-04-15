@@ -1,42 +1,42 @@
 //! Connection loss detection via ping/pong mechanism.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use derive_more::{Display, From, Mul};
 use futures::{channel::mpsc, future, stream::LocalBoxStream, StreamExt as _};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    rpc::{RpcTransport, TransportError},
-    utils::{delay_for, JsCaused, JsDuration, JsError, TaskHandle},
+    platform,
+    utils::{JsCaused, TaskHandle},
 };
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Clone, Debug, Display, From, JsCaused)]
-pub struct HeartbeatError(TransportError);
+#[js(error = "platform::Error")]
+pub struct HeartbeatError(platform::TransportError);
 
 /// Idle timeout of [`WebSocketRpcClient`].
 ///
 /// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Debug, Copy, Clone)]
-pub struct IdleTimeout(pub JsDuration);
+pub struct IdleTimeout(pub Duration);
 
 /// Ping interval of [`WebSocketRpcClient`].
 ///
 /// [`WebSocketRpcClient`]: super::WebSocketRpcClient
 #[derive(Debug, Copy, Clone, Mul)]
-pub struct PingInterval(pub JsDuration);
+pub struct PingInterval(pub Duration);
 
 /// Inner data of [`Heartbeat`].
 struct Inner {
-    /// [`RpcTransport`] which heartbeats.
-    transport: Rc<dyn RpcTransport>,
+    /// [`platform::RpcTransport`] which heartbeats.
+    transport: Rc<dyn platform::RpcTransport>,
 
-    /// Idle timeout of [`RpcTransport`].
+    /// Idle timeout of the [`platform::RpcTransport`].
     idle_timeout: IdleTimeout,
 
-    /// Ping interval of [`RpcTransport`].
+    /// Ping interval of the [`platform::RpcTransport`].
     ping_interval: PingInterval,
 
     /// [`TaskHandle`] for [`Future`] which sends [`ClientMsg::Pong`] on
@@ -62,7 +62,7 @@ impl Inner {
     fn send_pong(&self, n: u32) {
         self.transport
             .send(&ClientMsg::Pong(n))
-            .map_err(tracerr::wrap!(=> TransportError))
+            .map_err(tracerr::wrap!(=> platform::TransportError))
             .map_err(|e| log::error!("Failed to send pong: {}", e))
             .ok();
     }
@@ -72,10 +72,11 @@ impl Inner {
 pub struct Heartbeat(Rc<RefCell<Inner>>);
 
 impl Heartbeat {
-    /// Start this [`Heartbeat`] for the provided [`RpcTransport`] with
-    /// the provided `idle_timeout` and `ping_interval`.
+    /// Starts this [`Heartbeat`] for the provided [`platform::RpcTransport`]
+    /// with the provided `idle_timeout` and `ping_interval`.
+    #[must_use]
     pub fn start(
-        transport: Rc<dyn RpcTransport>,
+        transport: Rc<dyn platform::RpcTransport>,
         ping_interval: PingInterval,
         idle_timeout: IdleTimeout,
     ) -> Self {
@@ -109,7 +110,7 @@ impl Heartbeat {
     }
 
     /// Returns [`LocalBoxStream`] to which will sent `()` when [`Heartbeat`]
-    /// considers that [`RpcTransport`] is idle.
+    /// considers that [`platform::RpcTransport`] is idle.
     #[must_use]
     pub fn on_idle(&self) -> LocalBoxStream<'static, ()> {
         let (on_idle_tx, on_idle_rx) = mpsc::unbounded();
@@ -130,19 +131,19 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
     let (idle_watchdog_fut, idle_watchdog_handle) =
         future::abortable(async move {
             let wait_for_ping = this.borrow().ping_interval * 2;
-            delay_for(wait_for_ping.0).await;
+            platform::delay_for(wait_for_ping.0).await;
 
             let last_ping_num = this.borrow().last_ping_num;
             this.borrow().send_pong(last_ping_num + 1);
 
             let idle_timeout = this.borrow().idle_timeout;
-            delay_for(idle_timeout.0 - wait_for_ping.0).await;
+            platform::delay_for(idle_timeout.0 - wait_for_ping.0).await;
             this.borrow_mut()
                 .on_idle_subs
                 .retain(|sub| sub.unbounded_send(()).is_ok());
         });
 
-    spawn_local(async move {
+    platform::spawn(async move {
         idle_watchdog_fut.await.ok();
     });
 
@@ -167,7 +168,7 @@ fn spawn_ping_handle_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
             }
         }
     });
-    spawn_local(async move {
+    platform::spawn(async move {
         handle_ping_fut.await.ok();
     });
     handle_ping_task.into()

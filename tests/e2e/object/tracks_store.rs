@@ -179,25 +179,36 @@ impl<T> Object<TracksStore<T>> {
         .await
     }
 
-    /// Checks whether all local `Track`s from this store are in the `ended`
-    /// `readyState`.
-    pub async fn is_all_tracks_ended(&self) -> Result<bool, Error> {
+    /// Returns count of tracks by the provided `muted` and `stopped` values.
+    pub async fn count_tracks_by_selector(
+        &self,
+        muted: bool,
+        stopped: bool,
+    ) -> Result<u64, Error> {
         self.execute(Statement::new(
             // language=JavaScript
-            r#"
-                async (store) => {
-                    for (track of store.tracks) {
-                        if (track.track.get_track().readyState != 'ended') {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-            "#,
+            &format!(
+                r#"
+                    async (store) => {{
+                        let count = 0;
+                        for (track of store.tracks) {{
+                            let t = track.track.get_track();
+                            if (t.muted == {muted} &&
+                                track.stopped == {stopped})
+                            {{
+                                count++;
+                            }}
+                        }}
+                        return count;
+                    }}
+                "#,
+                muted = muted,
+                stopped = stopped
+            ),
             [],
         ))
         .await?
-        .as_bool()
+        .as_u64()
         .ok_or(Error::TypeCast)
     }
 }

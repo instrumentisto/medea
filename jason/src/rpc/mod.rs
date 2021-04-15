@@ -8,16 +8,14 @@ pub mod websocket;
 
 use std::str::FromStr;
 
-use derive_more::{Display, From};
+use derive_more::{AsRef, Display, From};
 use medea_client_api_proto::{
-    CloseDescription, CloseReason as CloseByServerReason, Credential, MemberId,
-    RoomId,
+    CloseReason as CloseByServerReason, Credential, MemberId, RoomId,
 };
 use tracerr::Traced;
 use url::Url;
-use web_sys::CloseEvent;
 
-use crate::utils::{JsCaused, JsError};
+use crate::{platform, utils::JsCaused};
 
 #[cfg(feature = "mockable")]
 pub use self::rpc_session::MockRpcSession;
@@ -25,18 +23,16 @@ pub use self::rpc_session::MockRpcSession;
 pub use self::{
     backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
-    reconnect_handle::ReconnectHandle,
+    reconnect_handle::{ReconnectError, ReconnectHandle},
     rpc_session::{
         RpcSession, SessionError, SessionState, WebSocketRpcSession,
     },
-    websocket::{
-        ClientDisconnect, RpcTransport, TransportError, WebSocketRpcClient,
-        WebSocketRpcTransport,
-    },
+    websocket::{ClientDisconnect, RpcEvent, WebSocketRpcClient},
 };
 
 /// [`Url`] to which transport layer will connect.
-#[derive(Clone, Debug, Eq, From, PartialEq)]
+#[derive(AsRef, Clone, Debug, Eq, From, PartialEq)]
+#[as_ref(forward)]
 pub struct ApiUrl(Url);
 
 /// Information about [`RpcSession`] connection.
@@ -87,7 +83,8 @@ impl ConnectionInfo {
 }
 
 /// Errors which can occur while [`ConnectionInfo`] parsing from the [`str`].
-#[derive(Debug, JsCaused, Display)]
+#[derive(Clone, Debug, Display, JsCaused)]
+#[js(error = "platform::Error")]
 pub enum ConnectionInfoParseError {
     /// [`Url::parse`] returned error.
     #[display(fmt = "Failed to parse provided URL: {:?}", _0)]
@@ -167,15 +164,15 @@ pub enum CloseReason {
     },
 }
 
-/// The reason of why [`WebSocketRpcClient`]/[`RpcTransport`] went into
-/// closed state.
+/// The reason of why [`WebSocketRpcClient`]/[`platform::RpcTransport`] went
+/// into a closed state.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ClosedStateReason {
     /// Connection with server was lost.
     ConnectionLost(CloseMsg),
 
     /// Error while creating connection between client and server.
-    ConnectionFailed(TransportError),
+    ConnectionFailed(platform::TransportError),
 
     /// Indicates that connection with server has never been established.
     NeverConnected,
@@ -194,10 +191,11 @@ pub enum ClosedStateReason {
 
 /// Errors that may occur in [`WebSocketRpcClient`].
 #[derive(Clone, Debug, Display, From, JsCaused)]
+#[js(error = "platform::Error")]
 pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
-    RpcTransportError(#[js(cause)] TransportError),
+    RpcTransportError(#[js(cause)] platform::TransportError),
 
     /// Occurs if the heartbeat cannot be started.
     #[display(fmt = "Start heartbeat failed: {}", _0)]
@@ -234,22 +232,4 @@ pub enum CloseMsg {
     /// Unexpected close determines by non-`1000` close code and for close code
     /// `1000` without reason.
     Abnormal(u16),
-}
-
-impl From<&CloseEvent> for CloseMsg {
-    fn from(event: &CloseEvent) -> Self {
-        let code: u16 = event.code();
-        match code {
-            1000 => {
-                if let Ok(description) =
-                    serde_json::from_str::<CloseDescription>(&event.reason())
-                {
-                    Self::Normal(code, description.reason)
-                } else {
-                    Self::Abnormal(code)
-                }
-            }
-            _ => Self::Abnormal(code),
-        }
-    }
 }

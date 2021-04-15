@@ -138,3 +138,57 @@ async fn when_control_api_interconnects_members(
         .await
         .unwrap();
 }
+
+#[when(regex = r"^Control API removes (\S+) with `Apply` method$")]
+async fn when_control_api_removes_member_via_apply(
+    world: &mut World,
+    id: String,
+) {
+    let mut spec = world.get_spec().await;
+    spec.pipeline.remove(&id).unwrap();
+    world.apply(spec).await;
+}
+
+#[when(regex = "^Control API interconnects (\\S+) and (\\S+) with \
+                 `Apply` method$")]
+async fn when_control_api_interconnects_via_apply(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    world
+        .interconnect_members_via_apply(MembersPair {
+            left: PairedMember {
+                id,
+                recv: true,
+                send_video: Some(VideoSettings::default()),
+                send_audio: Some(AudioSettings::default()),
+            },
+            right: PairedMember {
+                id: partner_id,
+                recv: true,
+                send_video: Some(VideoSettings::default()),
+                send_audio: Some(AudioSettings::default()),
+            },
+        })
+        .await;
+}
+
+#[when(regex = r"^Control API deletes (\S+)'s publish endpoint$")]
+async fn when_control_api_deletes_publish_endpoint(
+    world: &mut World,
+    id: String,
+) {
+    world.delete_publish_endpoint(&id).await;
+    tokio_1::time::sleep(std::time::Duration::from_millis(200)).await;
+}
+
+#[when(regex = r"^Control API deletes (\S+)'s play endpoint with (\S+)$")]
+async fn when_control_api_deletes_play_endpoint(
+    world: &mut World,
+    id: String,
+    partner_id: String,
+) {
+    world.delete_play_endpoint(&id, &partner_id).await;
+    tokio_1::time::sleep(std::time::Duration::from_millis(200)).await;
+}

@@ -50,7 +50,7 @@ impl MediaTrack {
 
     /// Sets [`mid`] of this [`MediaTrack`].
     ///
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     #[inline]
     pub fn set_mid(&self, mid: String) {
         self.mid.borrow_mut().replace(mid);
@@ -58,7 +58,7 @@ impl MediaTrack {
 
     /// Returns [`mid`] of this [`MediaTrack`].
     ///
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     #[inline]
     #[must_use]
     pub fn mid(&self) -> Option<String> {

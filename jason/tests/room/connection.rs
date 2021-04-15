@@ -5,10 +5,7 @@ use futures::{
     StreamExt,
 };
 use medea_client_api_proto::PeerId;
-use medea_jason::{
-    api::{ConnectionHandle, Connections},
-    media::{track::remote, MediaKind},
-};
+use medea_jason::{api, connection::Connections, platform};
 use wasm_bindgen::{closure::Closure, JsValue};
 use wasm_bindgen_test::*;
 
@@ -22,13 +19,15 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn on_new_connection_fires() {
     let cons = Connections::default();
 
-    let (cb, test_result) = js_callback!(|handle: ConnectionHandle| {
+    let (cb, test_result) = js_callback!(|handle: api::ConnectionHandle| {
         cb_assert_eq!(
             handle.get_remote_member_id().unwrap(),
             "bob".to_string()
         );
     });
-    cons.on_new_connection(cb.into());
+    cons.on_new_connection(platform::Function::from(js_sys::Function::from(
+        cb,
+    )));
 
     cons.create_connection(PeerId(1), &"bob".into());
 
@@ -43,13 +42,16 @@ async fn on_remote_track_added_fires() {
 
     let con = cons.get(&"bob".into()).unwrap();
     let con_handle = con.new_handle();
-
-    let (cb, test_result) = js_callback!(|track: remote::Track| {
-        cb_assert_eq!(track.kind(), MediaKind::Video);
+    let (cb, test_result) = js_callback!(|track: api::RemoteMediaTrack| {
+        cb_assert_eq!(track.kind(), api::MediaKind::Video);
     });
-    con_handle.on_remote_track_added(cb.into()).unwrap();
+    con_handle
+        .on_remote_track_added(platform::Function::from(
+            js_sys::Function::from(cb),
+        ))
+        .unwrap();
 
-    con.add_remote_track(get_video_track().await);
+    con.add_remote_track(get_video_track().await.into());
 
     wait_and_check_test_result(test_result, || {}).await;
 }
@@ -61,26 +63,26 @@ async fn tracks_are_added_to_connection() {
     cons.create_connection(PeerId(1), &"bob".into());
 
     let con = cons.get(&"bob".into()).unwrap();
-    let con_handle = con.new_handle();
+    let con_handle = api::ConnectionHandle::from(con.new_handle());
 
     let (tx, rx) = oneshot::channel();
-    let closure = Closure::once_into_js(move |track: remote::Track| {
+    let closure = Closure::once_into_js(move |track: api::RemoteMediaTrack| {
         assert!(tx.send(track).is_ok());
     });
     con_handle.on_remote_track_added(closure.into()).unwrap();
 
-    con.add_remote_track(get_video_track().await);
+    con.add_remote_track(get_video_track().await.into());
     let video_track = timeout(100, rx).await.unwrap().unwrap();
-    assert_eq!(video_track.kind(), MediaKind::Video);
+    assert_eq!(video_track.kind(), api::MediaKind::Video);
 
     let (tx, rx) = oneshot::channel();
-    let closure = Closure::once_into_js(move |track: remote::Track| {
+    let closure = Closure::once_into_js(move |track: api::RemoteMediaTrack| {
         assert!(tx.send(track).is_ok());
     });
     con_handle.on_remote_track_added(closure.into()).unwrap();
-    con.add_remote_track(get_audio_track().await);
+    con.add_remote_track(get_audio_track().await.into());
     let audio_track = timeout(200, rx).await.unwrap().unwrap();
-    assert_eq!(audio_track.kind(), MediaKind::Audio);
+    assert_eq!(audio_track.kind(), api::MediaKind::Audio);
 }
 
 #[wasm_bindgen_test]
@@ -93,7 +95,9 @@ async fn on_closed_fires() {
     let (on_close, test_result) = js_callback!(|nothing: JsValue| {
         cb_assert_eq!(nothing.is_undefined(), true);
     });
-    con_handle.on_close(on_close.into()).unwrap();
+    con_handle
+        .on_close(platform::Function::from(js_sys::Function::from(on_close)))
+        .unwrap();
 
     cons.close_connection(PeerId(1));
 
@@ -106,10 +110,13 @@ async fn two_peers_in_one_connection_works() {
 
     let (test_tx, mut test_rx) = mpsc::unbounded();
     let on_new_connection =
-        Closure::wrap(Box::new(move |_: ConnectionHandle| {
+        Closure::wrap(Box::new(move |_: api::ConnectionHandle| {
             test_tx.unbounded_send(()).unwrap();
-        }) as Box<dyn Fn(ConnectionHandle)>);
-    cons.on_new_connection(on_new_connection.as_ref().clone().into());
+        }) as Box<dyn Fn(api::ConnectionHandle)>)
+        .into_js_value();
+    cons.on_new_connection(platform::Function::from(js_sys::Function::from(
+        on_new_connection,
+    )));
 
     cons.create_connection(PeerId(1), &"bob".into());
     test_rx.next().await.unwrap();
@@ -124,10 +131,13 @@ async fn create_two_connections() {
 
     let (test_tx, mut test_rx) = mpsc::unbounded();
     let on_new_connection =
-        Closure::wrap(Box::new(move |_: ConnectionHandle| {
+        Closure::wrap(Box::new(move |_: api::ConnectionHandle| {
             test_tx.unbounded_send(()).unwrap();
-        }) as Box<dyn Fn(ConnectionHandle)>);
-    cons.on_new_connection(on_new_connection.as_ref().clone().into());
+        }) as Box<dyn Fn(api::ConnectionHandle)>)
+        .into_js_value();
+    cons.on_new_connection(platform::Function::from(js_sys::Function::from(
+        on_new_connection,
+    )));
 
     cons.create_connection(PeerId(1), &"bob".into());
     test_rx.next().await.unwrap();
