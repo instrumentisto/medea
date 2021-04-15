@@ -1,16 +1,22 @@
 use dart_sys::Dart_Handle;
-use futures::channel::oneshot;
-use futures::channel::oneshot::Canceled;
+use futures::channel::{oneshot, oneshot::Canceled};
 use std::future::Future;
 
 pub struct DartFuture(oneshot::Sender<Dart_Handle>);
 
 impl DartFuture {
-    pub fn new(dart_fut: Dart_Handle) -> impl Future<Output = Result<Dart_Handle, Canceled>> {
+    pub fn new(
+        dart_fut: Dart_Handle,
+    ) -> impl Future<Output = Result<Dart_Handle, Canceled>> {
         let (tx, rx) = oneshot::channel();
         let this = Self(tx);
 
-        unsafe { FUTURE_SPAWNER_FUNCTION.unwrap()(dart_fut, Box::into_raw(Box::new(this))) };
+        unsafe {
+            FUTURE_SPAWNER_FUNCTION.unwrap()(
+                dart_fut,
+                Box::into_raw(Box::new(this)),
+            )
+        };
 
         rx
     }
@@ -24,7 +30,9 @@ type FutureSpawnerFunction = extern "C" fn(Dart_Handle, *mut DartFuture);
 static mut FUTURE_SPAWNER_FUNCTION: Option<FutureSpawnerFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_spawn_dart_future_function(f: FutureSpawnerFunction) {
+pub unsafe extern "C" fn register_spawn_dart_future_function(
+    f: FutureSpawnerFunction,
+) {
     FUTURE_SPAWNER_FUNCTION = Some(f);
 }
 

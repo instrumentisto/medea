@@ -1,5 +1,3 @@
-use std::{future::Future, time::Duration};
-
 pub mod constraints;
 pub mod error;
 pub mod ice_server;
@@ -14,6 +12,24 @@ pub mod utils;
 
 pub use extern_executor::spawn;
 
+use std::{future::Future, time::Duration};
+
+use dart_sys::Dart_Handle;
+
+use crate::utils::dart::dart_future::DartFuture;
+
+type DelayedFutureFunction = extern "C" fn(i32) -> Dart_Handle;
+static mut DELAYED_FUTURE_FUNCTION: Option<DelayedFutureFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_delayed_future_function(
+    f: DelayedFutureFunction,
+) {
+    DELAYED_FUTURE_FUNCTION = Some(f);
+}
+
 pub async fn delay_for(delay: Duration) {
-    todo!()
+    let delay = delay.as_millis() as i32;
+    let dart_fut = unsafe { DELAYED_FUTURE_FUNCTION.unwrap()(delay) };
+    DartFuture::new(dart_fut).await;
 }
