@@ -12,12 +12,7 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
-pub fn spawn<F>(task: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    todo!()
-}
+pub use extern_executor::spawn;
 
 pub async fn delay_for(delay: Duration) {
     todo!()
