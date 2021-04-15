@@ -4,6 +4,4 @@ pub struct DartOption<T> {
     is_none: bool,
 }
 
-impl<T> DartOption<T> {
-
-}
+impl<T> DartOption<T> {}
