@@ -59,7 +59,6 @@ jobs:
       - run: make helm.lint chart=${{ matrix.chart }}
 
   dartfmt:
-    name: Format Flutter Dart sources with dartfmt
     if: ${{ github.ref == 'refs/heads/master'
             || startsWith(github.ref, 'refs/tags/medea-')
             || !contains(github.event.head_commit.message, '[skip ci]') }}
@@ -72,7 +71,6 @@ jobs:
       - run: make flutter.fmt check=yes
 
   dartanalyzer:
-    name: Lint Dart sources with dartanalyzer
     if: ${{ github.ref == 'refs/heads/master'
             || startsWith(github.ref, 'refs/tags/medea-')
             || !contains(github.event.head_commit.message, '[skip ci]') }}
