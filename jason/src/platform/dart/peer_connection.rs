@@ -1,11 +1,28 @@
 use dart_sys::Dart_Handle;
-use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
+use medea_client_api_proto::{
+    IceCandidate, IceConnectionState, PeerConnectionState,
+};
 use tracerr::Traced;
 
+use super::{
+    ice_candidate::IceCandidate as PlatformIceCandidate,
+    media_track::MediaStreamTrack,
+};
 use crate::{
     media::MediaKind,
     platform::{
-        dart::transceiver::Transceiver, peer_connection::RtcSdpType,
+        dart::{
+            transceiver::Transceiver,
+            utils::{
+                callback::{
+                    HandleCallback, HandleMutCallback, IntCallback,
+                    TwoArgCallback,
+                },
+                ice_connection_from_int, peer_connection_state_from_int,
+            },
+        },
+        peer_connection::RtcSdpType,
+        rtc_stats::RtcStatsError::Platform,
         RtcPeerConnectionError, SdpType, TransceiverDirection,
     },
     utils::dart::into_dart_string,
@@ -111,6 +128,51 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_remote_description(
     SET_REMOTE_DESCRIPTION_FUNCTION = Some(f);
 }
 
+type OnTrackFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+static mut ON_TRACK_FUNCTION: Option<OnTrackFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__on_track(
+    f: OnTrackFunction,
+) {
+    ON_TRACK_FUNCTION = Some(f);
+}
+
+type OnIceCandidateFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+static mut ON_ICE_CANDIDATE_FUNCTION: Option<OnIceCandidateFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_candidate(
+    f: OnIceCandidateFunction,
+) {
+    ON_ICE_CANDIDATE_FUNCTION = Some(f);
+}
+
+type OnIceConnectionStateChangeFunction =
+    extern "C" fn(Dart_Handle, Dart_Handle);
+static mut ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION: Option<
+    OnIceConnectionStateChangeFunction,
+> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_connection_state_change(
+    f: OnIceConnectionStateChangeFunction,
+) {
+    ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION = Some(f);
+}
+
+type OnConnectionStateChangeFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+static mut ON_CONNECTION_STATE_CHANGE_FUNCTION: Option<
+    OnConnectionStateChangeFunction,
+> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__on_connection_state_change(
+    f: OnConnectionStateChangeFunction,
+) {
+    ON_CONNECTION_STATE_CHANGE_FUNCTION = Some(f);
+}
+
 #[derive(Clone, Debug)]
 pub struct RtcPeerConnection {
     handle: Dart_Handle,
@@ -121,16 +183,7 @@ impl RtcPeerConnection {
         unsafe {
             let ice_connection_state =
                 ICE_CONNECTION_STATE_FUNCTION.unwrap()(self.handle);
-            match ice_connection_state {
-                0 => IceConnectionState::New,
-                1 => IceConnectionState::Checking,
-                2 => IceConnectionState::Connected,
-                3 => IceConnectionState::Completed,
-                4 => IceConnectionState::Failed,
-                5 => IceConnectionState::Disconnected,
-                6 => IceConnectionState::Closed,
-                _ => unreachable!(),
-            }
+            ice_connection_from_int(ice_connection_state)
         }
     }
 
@@ -138,15 +191,81 @@ impl RtcPeerConnection {
         unsafe {
             let connection_state =
                 CONNECTION_STATE_FUNCTION.unwrap()(self.handle);
-            Some(match connection_state {
-                0 => PeerConnectionState::New,
-                1 => PeerConnectionState::Connecting,
-                2 => PeerConnectionState::Connected,
-                3 => PeerConnectionState::Disconnected,
-                4 => PeerConnectionState::Failed,
-                5 => PeerConnectionState::Closed,
-                _ => unreachable!(),
-            })
+            Some(peer_connection_state_from_int(connection_state))
+        }
+    }
+
+    pub fn on_track<F>(&self, f: Option<F>)
+    where
+        F: 'static + FnMut(MediaStreamTrack, Transceiver),
+    {
+        if let Some(mut f) = f {
+            unsafe {
+                ON_TRACK_FUNCTION.unwrap()(
+                    self.handle,
+                    TwoArgCallback::callback(move |track, transceiver| {
+                        f(
+                            MediaStreamTrack::from(track),
+                            Transceiver::from(transceiver),
+                        )
+                    }),
+                )
+            };
+        }
+    }
+
+    // TODO: change IceCandidate path to platform module
+    pub fn on_ice_candidate<F>(&self, f: Option<F>)
+    where
+        F: 'static + FnMut(IceCandidate),
+    {
+        if let Some(mut f) = f {
+            unsafe {
+                ON_ICE_CANDIDATE_FUNCTION.unwrap()(
+                    self.handle,
+                    HandleMutCallback::callback(move |handle| {
+                        let candidate = PlatformIceCandidate::from(handle);
+                        f(IceCandidate {
+                            candidate: candidate.candidate(),
+                            sdp_m_line_index: candidate.sdp_m_line_index(),
+                            sdp_mid: candidate.sdp_mid(),
+                        })
+                    }),
+                );
+            }
+        }
+    }
+
+    pub fn on_ice_connection_state_change<F>(&self, f: Option<F>)
+    where
+        F: 'static + FnMut(IceConnectionState),
+    {
+        if let Some(mut f) = f {
+            unsafe {
+                ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION.unwrap()(
+                    self.handle,
+                    IntCallback::callback(move |v| {
+                        f(ice_connection_from_int(v));
+                    }),
+                );
+            }
+        }
+        todo!()
+    }
+
+    pub fn on_connection_state_change<F>(&self, f: Option<F>)
+    where
+        F: 'static + FnMut(PeerConnectionState),
+    {
+        if let Some(mut f) = f {
+            unsafe {
+                ON_CONNECTION_STATE_CHANGE_FUNCTION.unwrap()(
+                    self.handle,
+                    IntCallback::callback(move |v| {
+                        f(peer_connection_state_from_int(v));
+                    }),
+                )
+            }
         }
     }
 

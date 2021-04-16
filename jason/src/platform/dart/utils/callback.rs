@@ -1,93 +1,159 @@
 use std::{cell::RefCell, marker::PhantomData};
 
+use crate::utils::dart::from_dart_string;
 use dart_sys::Dart_Handle;
 use std::any::Any;
 
-pub struct Callback<A>(RefCell<Option<Function<A>>>);
-
-impl<A> Callback<A> {
-    pub fn set_func(&self, f: Function<A>) {
-        todo!()
-    }
-
-    pub fn is_set(&self) -> bool {
-        todo!()
-    }
-}
-
-// TODO: Maybe it's not needed
-impl Callback<()> {
-    pub fn call0(&self) {
-        todo!()
-    }
-}
-
-impl<A> Default for Callback<A> {
-    fn default() -> Self {
-        Self(RefCell::new(None))
-    }
-}
-
-pub struct Function<A> {
-    handle: Dart_Handle,
-    _ty: PhantomData<A>,
-}
-
-impl Function<()> {
-    pub fn call0(&self) {
-        todo!()
-    }
-}
-
-type CallRustObjectFunction = extern "C" fn(Dart_Handle, *mut dyn Any);
-static mut CALL_RUST_OBJECT_FUNCTION: Option<CallRustObjectFunction> = None;
+type VoidCallbackFunction = extern "C" fn(*mut VoidCallback) -> Dart_Handle;
+static mut VOID_CALLBACK_FUNCTION: Option<VoidCallbackFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_call_rust_object_function(
-    f: CallRustObjectFunction,
+pub unsafe extern "C" fn register_void_callback_function(
+    f: VoidCallbackFunction,
 ) {
-    CALL_RUST_OBJECT_FUNCTION = Some(f);
+    VOID_CALLBACK_FUNCTION = Some(f);
 }
 
-impl<A: 'static> Function<Box<A>> {
-    pub fn call1(&self, arg: Box<A>) {
-        let arg = Box::into_raw(arg);
-        unsafe { CALL_RUST_OBJECT_FUNCTION.unwrap()(self.handle, arg) }
-    }
-}
+pub struct VoidCallback(Box<dyn FnOnce()>);
 
-type CallDartHandleFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut CALL_DART_HANDLE_FUNCTION: Option<CallDartHandleFunction> = None;
-
-#[no_mangle]
-pub unsafe extern "C" fn register_call_dart_handle_function(
-    f: CallDartHandleFunction,
-) {
-    CALL_DART_HANDLE_FUNCTION = Some(f)
-}
-
-impl Function<Dart_Handle> {
-    pub fn call_with_dart_handle(&self, arg: Dart_Handle) {
+impl VoidCallback {
+    pub fn callback<F>(f: F) -> Dart_Handle
+    where
+        F: FnOnce() + 'static,
+    {
+        let this = Self(Box::new(f));
         unsafe {
-            CALL_DART_HANDLE_FUNCTION.unwrap()(self.handle, arg);
+            VOID_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this)))
         }
     }
 }
 
-type CallIntFunction = extern "C" fn(Dart_Handle, i32);
-static mut CALL_INT_FUNCTION: Option<CallIntFunction> = None;
+#[no_mangle]
+pub unsafe extern "C" fn call_string_callback(
+    cb: *mut StringCallback,
+    val: *const libc::c_char,
+) {
+    let cb = Box::from_raw(cb);
+    cb.0(from_dart_string(val));
+}
+type StringCallbackFunction = extern "C" fn(*mut StringCallback) -> Dart_Handle;
+static mut STRING_CALLBACK_FUNCTION: Option<StringCallbackFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_call_int_function(
-    f: CallIntFunction,
+pub unsafe extern "C" fn register_string_callback_function(
+    f: StringCallbackFunction,
 ) {
-    CALL_INT_FUNCTION = Some(f);
+    STRING_CALLBACK_FUNCTION = Some(f);
 }
 
-impl Function<i32> {
-    pub fn call_with_int(&self, int: i32) {
+pub struct StringCallback(Box<dyn FnOnce(String)>);
+
+impl StringCallback {
+    pub fn callback<F>(f: F) -> Dart_Handle
+    where
+        F: FnOnce(String) + 'static,
+    {
+        let this = Self(Box::new(f));
         unsafe {
-            CALL_INT_FUNCTION.unwrap()(self.handle, int);
+            STRING_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this)))
+        }
+    }
+}
+
+type HandleMutCallbackFunction =
+    extern "C" fn(*mut HandleMutCallback) -> Dart_Handle;
+static mut HANDLE_MUT_CALLBACK_FUNCTION: Option<HandleMutCallbackFunction> =
+    None;
+
+#[no_mangle]
+pub unsafe extern "C" fn call_handle_mut_callback(
+    cb: *mut HandleMutCallback,
+    val: Dart_Handle,
+) {
+    (*cb).0(val);
+}
+pub struct HandleMutCallback(Box<dyn FnMut(Dart_Handle)>);
+
+impl HandleMutCallback {
+    pub fn callback<F>(f: F) -> Dart_Handle
+    where
+        F: FnMut(Dart_Handle) + 'static,
+    {
+        let this = Self(Box::new(f));
+        unsafe {
+            HANDLE_MUT_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this)))
+        }
+    }
+}
+
+type HandleCallbackFunction = extern "C" fn(*mut HandleCallback) -> Dart_Handle;
+static mut HANDLE_CALLBACK_FUNCTION: Option<HandleCallbackFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn call_handle_callback(
+    cb: *mut HandleCallback,
+    handle: Dart_Handle,
+) {
+    let cb = Box::from_raw(cb);
+    cb.0(handle);
+}
+
+pub struct HandleCallback(Box<dyn Fn(Dart_Handle)>);
+
+impl HandleCallback {
+    pub fn callback<F>(f: F) -> Dart_Handle
+    where
+        F: Fn(Dart_Handle) + 'static,
+    {
+        let this = Self(Box::new(f));
+        unsafe {
+            HANDLE_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this)))
+        }
+    }
+}
+
+type IntCallbackFunction = extern "C" fn(*mut IntCallback) -> Dart_Handle;
+static mut INT_CALLBACK_FUNCTION: Option<IntCallbackFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn call_int_callback(cb: *mut IntCallback, val: i32) {
+    (*cb).0(val);
+}
+
+pub struct IntCallback(Box<dyn FnMut(i32)>);
+
+impl IntCallback {
+    pub fn callback<F>(f: F) -> Dart_Handle
+    where
+        F: FnMut(i32) + 'static,
+    {
+        let this = Self(Box::new(f));
+        unsafe { INT_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this))) }
+    }
+}
+
+type TwoArgCallbackFunction = extern "C" fn(*mut TwoArgCallback) -> Dart_Handle;
+static mut TWO_ARG_CALLBACK_FUNCTION: Option<TwoArgCallbackFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn call_two_arg_callback(
+    cb: *mut TwoArgCallback,
+    first: Dart_Handle,
+    second: Dart_Handle,
+) {
+    (*cb).0(first, second);
+}
+
+pub struct TwoArgCallback(Box<dyn FnMut(Dart_Handle, Dart_Handle)>);
+
+impl TwoArgCallback {
+    pub fn callback<F>(f: F) -> Dart_Handle
+    where
+        F: FnMut(Dart_Handle, Dart_Handle) + 'static,
+    {
+        let this = Self(Box::new(f));
+        unsafe {
+            TWO_ARG_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this)))
         }
     }
 }

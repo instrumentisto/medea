@@ -1,5 +1,6 @@
 pub mod constraints;
 pub mod error;
+pub mod ice_candidate;
 pub mod ice_server;
 pub mod input_device_info;
 pub mod media_devices;

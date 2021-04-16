@@ -1,11 +1,13 @@
 use dart_sys::Dart_Handle;
+use derive_more::From;
 
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
+    platform::dart::utils::callback::VoidCallback,
     utils::dart::from_dart_string,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, From, Debug)]
 pub struct MediaStreamTrack(Dart_Handle);
 
 type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
@@ -98,6 +100,16 @@ pub unsafe extern "C" fn register_MediaStreamTrack__ready_state(
     READY_STATE_FUNCTION = Some(f);
 }
 
+type OnEndedFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+static mut ON_ENDED_FUNCTION: Option<OnEndedFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_MediaStreamTrack__on_ended(
+    f: OnEndedFunction,
+) {
+    ON_ENDED_FUNCTION = Some(f);
+}
+
 impl MediaStreamTrack {
     pub fn id(&self) -> String {
         unsafe { from_dart_string(ID_FUNCTION.unwrap()(self.0)) }
@@ -170,11 +182,13 @@ impl MediaStreamTrack {
         unimplemented!()
     }
 
-    // TODO: implement it when callback API will be added
     pub fn on_ended<F>(&self, f: Option<F>)
     where
         F: 'static + FnOnce(),
     {
-        todo!()
+        if let Some(cb) = f {
+            let cb = VoidCallback::callback(cb);
+            unsafe { ON_ENDED_FUNCTION.unwrap()(self.0, cb) };
+        }
     }
 }
