@@ -244,7 +244,7 @@ jobs:
       - run: make test.integration up=yes dockerized=no
 
   test-flutter:
-    name: medea-jason Flutter plugin Android instrumented tests
+    name: Flutter Android tests
     if: ${{ github.ref == 'refs/heads/master'
             || startsWith(github.ref, 'refs/tags/medea-jason-')
             || !contains(github.event.head_commit.message, '[skip ci]') }}
