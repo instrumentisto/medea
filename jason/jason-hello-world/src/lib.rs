@@ -62,13 +62,13 @@ type RegisterNewWs = extern "C" fn(
     addr: *const libc::c_char,
 ) -> Dart_Handle;
 
-static mut new_ws: Option<RegisterNewWs> = None;
+static mut NEW_WS: Option<RegisterNewWs> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_new_ws(
     f: RegisterNewWs,
 ) {
-    new_ws = Some(f);
+    NEW_WS = Some(f);
 }
 
 type WsMessageListenerCall = extern "C" fn(
@@ -76,13 +76,13 @@ type WsMessageListenerCall = extern "C" fn(
     listener: *mut WsMessageListener,
 );
 
-static mut ws_message_listener_call: Option<WsMessageListenerCall> = None;
+static mut WS_MESSAGE_LISTENER_CALL: Option<WsMessageListenerCall> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_ws_message_listener_call(
     f: WsMessageListenerCall,
 ) {
-    ws_message_listener_call = Some(f);
+    WS_MESSAGE_LISTENER_CALL = Some(f);
 }
 
 type WsMessageListenerSend = extern "C" fn(
@@ -90,23 +90,23 @@ type WsMessageListenerSend = extern "C" fn(
     msg: *const libc::c_char,
 );
 
-static mut ws_message_listener_send: Option<WsMessageListenerSend> = None;
+static mut WS_MESSAGE_LISTENER_SEND: Option<WsMessageListenerSend> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_ws_message_listener_send(
     f: WsMessageListenerSend,
 ) {
-    ws_message_listener_send = Some(f);
+    WS_MESSAGE_LISTENER_SEND = Some(f);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn foobar() {
-    let ws = new_ws.unwrap()(into_dart_string("wss://echo.websocket.org".to_string()));
+    let ws = NEW_WS.unwrap()(into_dart_string("wss://echo.websocket.org".to_string()));
     let listener = WsMessageListener::new(Box::new((|msg| {
         panic!("Message received");
     })));
-    ws_message_listener_call.unwrap()(ws, Box::into_raw(Box::new(listener)));
-    ws_message_listener_send.unwrap()(ws, into_dart_string("foobar".to_string()));
+    WS_MESSAGE_LISTENER_CALL.unwrap()(ws, Box::into_raw(Box::new(listener)));
+    WS_MESSAGE_LISTENER_SEND.unwrap()(ws, into_dart_string("foobar".to_string()));
 }
 
 struct DartResult(Dart_Handle);
@@ -114,7 +114,7 @@ struct DartResult(Dart_Handle);
 impl<T, E> From<Result<T, E>> for DartResult {
     fn from(_: Result<T, E>) -> Self {
         Self(unsafe {
-            new_error_without_source_caller.unwrap()(
+            NEW_ERROR_WITHOUT_SOURCE_CALLER.unwrap()(
                 into_dart_string("name".to_string()),
                 into_dart_string("message".to_string()),
                 into_dart_string("stacktrace".to_string()),
@@ -129,7 +129,7 @@ impl Into<Dart_Handle> for DartResult {
     }
 }
 
-static mut new_error_without_source_caller: Option<
+static mut NEW_ERROR_WITHOUT_SOURCE_CALLER: Option<
     NewErrorWithoutSourceCaller,
 > = None;
 type NewErrorWithoutSourceCaller = extern "C" fn(
@@ -142,10 +142,10 @@ type NewErrorWithoutSourceCaller = extern "C" fn(
 pub unsafe extern "C" fn register_new_error_without_source_caller(
     c: NewErrorWithoutSourceCaller,
 ) {
-    new_error_without_source_caller = Some(c);
+    NEW_ERROR_WITHOUT_SOURCE_CALLER = Some(c);
 }
 
-static mut new_error_with_source_caller: Option<NewErrorWithSourceCaller> =
+static mut NEW_ERROR_WITH_SOURCE_CALLER: Option<NewErrorWithSourceCaller> =
     None;
 type NewErrorWithSourceCaller = extern "C" fn(
     name: *const libc::c_char,
@@ -158,15 +158,15 @@ type NewErrorWithSourceCaller = extern "C" fn(
 pub unsafe extern "C" fn register_new_error_with_source_caller(
     c: NewErrorWithSourceCaller,
 ) {
-    new_error_with_source_caller = Some(c);
+    NEW_ERROR_WITH_SOURCE_CALLER = Some(c);
 }
 
-static mut new_ok_caller: Option<NewOkCaller> = None;
+static mut NEW_OK_CALLER: Option<NewOkCaller> = None;
 type NewOkCaller = extern "C" fn() -> Dart_Handle;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_new_ok_caller(c: NewOkCaller) {
-    new_ok_caller = Some(c);
+    NEW_OK_CALLER = Some(c);
 }
 
 #[no_mangle]
