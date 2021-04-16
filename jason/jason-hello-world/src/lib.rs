@@ -15,6 +15,7 @@ pub mod remote_media_track;
 pub mod room_close_reason;
 pub mod room_handle;
 mod utils;
+mod websocket;
 
 use std::{any::Any, marker::PhantomData, time::Duration};
 
@@ -31,83 +32,8 @@ use crate::{
     room_close_reason::RoomCloseReason,
     room_handle::RoomHandle,
     utils::into_dart_string,
+    websocket::WsMessageListener,
 };
-
-pub struct WsMessageListener {
-    callback: Box<dyn Fn(String)>,
-}
-
-impl WsMessageListener {
-    pub fn new(callback: Box<dyn Fn(String)>) -> Self {
-        Self {
-            callback
-        }
-    }
-
-    pub fn call(&self, msg: String) {
-        (self.callback)(msg);
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn call_msg_listener(
-    listener: *mut WsMessageListener,
-    msg: *const libc::c_char,
-) {
-    let listener = Box::from_raw(listener);
-    listener.call(crate::utils::from_dart_string(msg));
-}
-
-type RegisterNewWs = extern "C" fn(
-    addr: *const libc::c_char,
-) -> Dart_Handle;
-
-static mut NEW_WS: Option<RegisterNewWs> = None;
-
-#[no_mangle]
-pub unsafe extern "C" fn register_new_ws(
-    f: RegisterNewWs,
-) {
-    NEW_WS = Some(f);
-}
-
-type WsMessageListenerCall = extern "C" fn(
-    ws: Dart_Handle,
-    listener: *mut WsMessageListener,
-);
-
-static mut WS_MESSAGE_LISTENER_CALL: Option<WsMessageListenerCall> = None;
-
-#[no_mangle]
-pub unsafe extern "C" fn register_ws_message_listener_call(
-    f: WsMessageListenerCall,
-) {
-    WS_MESSAGE_LISTENER_CALL = Some(f);
-}
-
-type WsMessageListenerSend = extern "C" fn(
-    ws: Dart_Handle,
-    msg: *const libc::c_char,
-);
-
-static mut WS_MESSAGE_LISTENER_SEND: Option<WsMessageListenerSend> = None;
-
-#[no_mangle]
-pub unsafe extern "C" fn register_ws_message_listener_send(
-    f: WsMessageListenerSend,
-) {
-    WS_MESSAGE_LISTENER_SEND = Some(f);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn foobar() {
-    let ws = NEW_WS.unwrap()(into_dart_string("wss://echo.websocket.org".to_string()));
-    let listener = WsMessageListener::new(Box::new((|msg| {
-        panic!("Message received");
-    })));
-    WS_MESSAGE_LISTENER_CALL.unwrap()(ws, Box::into_raw(Box::new(listener)));
-    WS_MESSAGE_LISTENER_SEND.unwrap()(ws, into_dart_string("foobar".to_string()));
-}
 
 struct DartResult(Dart_Handle);
 
@@ -126,6 +52,20 @@ impl<T, E> From<Result<T, E>> for DartResult {
 impl Into<Dart_Handle> for DartResult {
     fn into(self) -> Dart_Handle {
         self.0
+    }
+}
+
+type PrintFunction = extern "C" fn(*const libc::c_char);
+static mut PRINT_FUNCTION: Option<PrintFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_print(f: PrintFunction) {
+    PRINT_FUNCTION = Some(f);
+}
+
+fn print(msg: String) {
+    unsafe {
+        PRINT_FUNCTION.unwrap()(into_dart_string(msg));
     }
 }
 

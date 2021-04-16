@@ -24,11 +24,7 @@ class Jason {
     ffi.simpleCallback();
   }
 
-  // Future<void> foobar() async {
-  //   await ffi.foobar();
-  // }
-
-  void anotherFoobar() {
-    ffi.anotherFoobar();
+  void websocketTest() {
+    ffi.websocketTest();
   }
 }
