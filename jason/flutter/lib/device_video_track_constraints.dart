@@ -1,60 +1,77 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
-import 'ffi.dart' as ffi;
 
-final _deviceIdDart _deviceId = ffi.dl
-    .lookupFunction<_deviceIdC, _deviceIdDart>(
-        'DeviceVideoTrackConstraints__device_id');
-typedef _deviceIdC = Pointer<Utf8> Function(Pointer);
-typedef _deviceIdDart = Pointer<Utf8> Function(Pointer);
+import 'jason.dart';
+import 'util/errors.dart';
+import 'util/move_semantic.dart';
 
-final _exactFacingModeDart _exactFacingMode = ffi.dl
-    .lookupFunction<_exactFacingModeC, _exactFacingModeDart>(
+typedef _deviceId_C = Void Function(Pointer<Utf8>);
+typedef _deviceId_Dart = void Function(Pointer<Utf8>);
+
+typedef _exactFacingMode_C = Void Function(Pointer, Uint8);
+typedef _exactFacingMode_Dart = void Function(Pointer, int);
+
+typedef _idealFacingMode_C = Void Function(Pointer, Uint8);
+typedef _idealFacingMode_Dart = void Function(Pointer, int);
+
+typedef _exactHeight_C = Void Function(Pointer, Uint32);
+typedef _exactHeight_Dart = void Function(Pointer, int);
+
+typedef _idealHeight_C = Void Function(Pointer, Uint32);
+typedef _idealHeight_Dart = void Function(Pointer, int);
+
+typedef _heightInRange_C = Void Function(Pointer, Uint32, Uint32);
+typedef _heightInRange_Dart = void Function(Pointer, int, int);
+
+typedef _exactWidth_C = Void Function(Pointer, Uint32);
+typedef _exactWidth_Dart = void Function(Pointer, int);
+
+typedef _idealWidth_C = Void Function(Pointer, Uint32);
+typedef _idealWidth_Dart = void Function(Pointer, int);
+
+typedef _widthInRange_C = Void Function(Pointer, Uint32, Uint32);
+typedef _widthInRange_Dart = void Function(Pointer, int, int);
+
+typedef _free_C = Void Function(Pointer);
+typedef _free_Dart = void Function(Pointer);
+
+final _deviceId_Dart _deviceId = dl.lookupFunction<_deviceId_C, _deviceId_Dart>(
+    'DeviceVideoTrackConstraints__device_id');
+
+final _exactFacingMode_Dart _exactFacingMode =
+    dl.lookupFunction<_exactFacingMode_C, _exactFacingMode_Dart>(
         'DeviceVideoTrackConstraints__exact_facing_mode');
-typedef _exactFacingModeC = Void Function(Pointer, int);
-typedef _exactFacingModeDart = void Function(Pointer, int);
 
-final _idealFacingModeDart _idealFacingMode = ffi.dl
-    .lookupFunction<_idealFacingModeC, _idealFacingModeDart>(
+final _idealFacingMode_Dart _idealFacingMode =
+    dl.lookupFunction<_idealFacingMode_C, _idealFacingMode_Dart>(
         'DeviceVideoTrackConstraints__ideal_facing_mode');
-typedef _idealFacingModeC = Void Function(Pointer, int);
-typedef _idealFacingModeDart = void Function(Pointer, int);
 
-final _exactHeightDart _exactHeight = ffi.dl
-    .lookupFunction<_exactHeightC, _exactHeightDart>(
+final _exactHeight_Dart _exactHeight =
+    dl.lookupFunction<_exactHeight_C, _exactHeight_Dart>(
         'DeviceVideoTrackConstraints__exact_height');
-typedef _exactHeightC = Void Function(Pointer, int);
-typedef _exactHeightDart = void Function(Pointer, int);
 
-final _idealHeightDart _idealHeight = ffi.dl
-    .lookupFunction<_idealHeightC, _idealHeightDart>(
+final _idealHeight_Dart _idealHeight =
+    dl.lookupFunction<_idealHeight_C, _idealHeight_Dart>(
         'DeviceVideoTrackConstraints__ideal_height');
-typedef _idealHeightC = Void Function(Pointer, int);
-typedef _idealHeightDart = void Function(Pointer, int);
 
-final _heightInRangeDart _heightInRange = ffi.dl
-    .lookupFunction<_heightInRangeC, _heightInRangeDart>(
+final _heightInRange_Dart _heightInRange =
+    dl.lookupFunction<_heightInRange_C, _heightInRange_Dart>(
         'DeviceVideoTrackConstraints__height_in_range');
-typedef _heightInRangeC = Void Function(Pointer, int, int);
-typedef _heightInRangeDart = void Function(Pointer, int, int);
 
-final _exactWidthDart _exactWidth = ffi.dl
-    .lookupFunction<_exactWidthC, _exactWidthDart>(
+final _exactWidth_Dart _exactWidth =
+    dl.lookupFunction<_exactWidth_C, _exactWidth_Dart>(
         'DeviceVideoTrackConstraints__exact_width');
-typedef _exactWidthC = Void Function(Pointer, int);
-typedef _exactWidthDart = void Function(Pointer, int);
 
-final _idealWidthDart _idealWidth = ffi.dl
-    .lookupFunction<_idealWidthC, _idealWidthDart>(
+final _idealWidth_Dart _idealWidth =
+    dl.lookupFunction<_idealWidth_C, _idealWidth_Dart>(
         'DeviceVideoTrackConstraints__ideal_width');
-typedef _idealWidthC = Void Function(Pointer, int);
-typedef _idealWidthDart = void Function(Pointer, int);
 
-final _widthInRangeDart _widthInRange = ffi.dl
-    .lookupFunction<_widthInRangeC, _widthInRangeDart>(
+final _widthInRange_Dart _widthInRange =
+    dl.lookupFunction<_widthInRange_C, _widthInRange_Dart>(
         'DeviceVideoTrackConstraints__width_in_range');
-typedef _widthInRangeC = Void Function(Pointer, int, int);
-typedef _widthInRangeDart = void Function(Pointer, int, int);
+
+final _free_Dart _free =
+    dl.lookupFunction<_free_C, _free_Dart>('DeviceVideoTrackConstraints__free');
 
 enum FacingMode {
   User,
@@ -63,60 +80,76 @@ enum FacingMode {
   Right,
 }
 
-int facingModeToInt(FacingMode facingMode) {
-  switch (facingMode) {
-    case FacingMode.User:
-      return 0;
-    case FacingMode.Environment:
-      return 1;
-    case FacingMode.Left:
-      return 2;
-    case FacingMode.Right:
-      return 3;
-  }
-  throw Exception("Unknown enum variant");
-}
-
 class DeviceVideoTrackConstraints {
   late Pointer ptr;
 
   DeviceVideoTrackConstraints(Pointer p) {
+    assertNonNull(p);
+
     ptr = p;
   }
 
-  String deviceId() {
-    return _deviceId(ptr).toDartString();
+  void deviceId(String deviceId) {
+    assertNonNull(ptr);
+
+    var deviceIdPtr = deviceId.toNativeUtf8();
+    try {
+      _deviceId(deviceIdPtr);
+    } finally {
+      calloc.free(deviceIdPtr);
+    }
   }
 
   void exactFacingMode(FacingMode facingMode) {
-    _exactFacingMode(ptr, facingModeToInt(facingMode));
+    assertNonNull(ptr);
+
+    _exactFacingMode(ptr, facingMode.index);
   }
 
   void idealFacingMode(FacingMode facingMode) {
-    _idealFacingMode(ptr, facingModeToInt(facingMode));
+    assertNonNull(ptr);
+
+    _idealFacingMode(ptr, facingMode.index);
   }
 
   void exactHeight(int height) {
+    assertNonNull(ptr);
+
     _exactHeight(ptr, height);
   }
 
   void idealHeight(int height) {
+    assertNonNull(ptr);
+
     _idealHeight(ptr, height);
   }
 
   void heightInRange(int min, int max) {
+    assertNonNull(ptr);
+
     _heightInRange(ptr, min, max);
   }
 
   void exactWidth(int width) {
+    assertNonNull(ptr);
+
     _exactWidth(ptr, width);
   }
 
   void idealWidth(int width) {
+    assertNonNull(ptr);
+
     _idealWidth(ptr, width);
   }
 
   void widthInRange(int min, int max) {
+    assertNonNull(ptr);
+
     _widthInRange(ptr, min, max);
+  }
+
+  @moveSemantics
+  void free() {
+    _free(ptr);
   }
 }

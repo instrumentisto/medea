@@ -1,49 +1,76 @@
 import 'dart:ffi';
+
 import 'package:ffi/ffi.dart';
-import 'ffi.dart' as ffi;
+
+import 'jason.dart';
 import 'kind.dart';
+import 'util/errors.dart';
+import 'util/move_semantic.dart';
 
-final _deviceIdDart _deviceId = ffi.dl
-    .lookupFunction<_deviceIdC, _deviceIdDart>('InputDeviceInfo__device_id');
-typedef _deviceIdC = Pointer<Utf8> Function(Pointer);
-typedef _deviceIdDart = Pointer<Utf8> Function(Pointer);
+typedef _deviceId_C = Pointer<Utf8> Function(Pointer);
+typedef _deviceId_Dart = Pointer<Utf8> Function(Pointer);
 
-final _labelDart _label =
-    ffi.dl.lookupFunction<_labelC, _labelDart>('InputDeviceInfo__label');
-typedef _labelC = Pointer<Utf8> Function(Pointer);
-typedef _labelDart = Pointer<Utf8> Function(Pointer);
+typedef _label_C = Pointer<Utf8> Function(Pointer);
+typedef _label_Dart = Pointer<Utf8> Function(Pointer);
 
-final _kindDart _kind =
-    ffi.dl.lookupFunction<_kindC, _kindDart>('InputDeviceInfo__kind');
-typedef _kindC = Int16 Function(Pointer);
-typedef _kindDart = int Function(Pointer);
+typedef _kind_C = Int16 Function(Pointer);
+typedef _kind_Dart = int Function(Pointer);
 
-final _nativeGroupIdDart _nativeGroupId = ffi.dl
-    .lookupFunction<_nativeGroupIdC, _nativeGroupIdDart>(
-        'InputDeviceInfo__native_group_id');
-typedef _nativeGroupIdC = Pointer<Utf8> Function(Pointer);
-typedef _nativeGroupIdDart = Pointer<Utf8> Function(Pointer);
+typedef _nativeGroupId_C = Pointer<Utf8> Function(Pointer);
+typedef _nativeGroupId_Dart = Pointer<Utf8> Function(Pointer);
+
+typedef _free_C = Void Function(Pointer);
+typedef _free_Dart = void Function(Pointer);
+
+final _nativeGroupId_Dart _nativeGroupId =
+    dl.lookupFunction<_nativeGroupId_C, _nativeGroupId_Dart>(
+        'InputDeviceInfo__group_id');
+final _kind_Dart _kind =
+    dl.lookupFunction<_kind_C, _kind_Dart>('InputDeviceInfo__kind');
+final _label_Dart _label =
+    dl.lookupFunction<_label_C, _label_Dart>('InputDeviceInfo__label');
+final _deviceId_Dart _deviceId = dl
+    .lookupFunction<_deviceId_C, _deviceId_Dart>('InputDeviceInfo__device_id');
+
+final _free_Dart _free =
+    dl.lookupFunction<_free_C, _free_Dart>('InputDeviceInfo__free');
 
 class InputDeviceInfo {
-  late Pointer _ptr;
+  late Pointer ptr;
 
-  InputDeviceInfo(Pointer ptr) {
-    _ptr = ptr;
+  InputDeviceInfo(Pointer p) {
+    assertNonNull(p);
+
+    ptr = p;
   }
 
   String deviceId() {
-    return _deviceId(_ptr).toDartString();
+    assertNonNull(ptr);
+
+    return _deviceId(ptr).toDartString();
   }
 
   String label() {
-    return _label(_ptr).toDartString();
+    assertNonNull(ptr);
+
+    return _label(ptr).toDartString();
   }
 
   MediaKind kind() {
-    return mediaKindFromInt(_kind(_ptr));
+    assertNonNull(ptr);
+
+    var index = _kind(ptr);
+    return MediaKind.values[index];
   }
 
   String groupId() {
-    return _nativeGroupId(_ptr).toDartString();
+    assertNonNull(ptr);
+
+    return _nativeGroupId(ptr).toDartString();
+  }
+
+  @moveSemantics
+  void free() {
+    _free(ptr);
   }
 }

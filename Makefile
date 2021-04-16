@@ -22,6 +22,7 @@ IMAGE_NAME := $(strip \
 	$(image))))
 
 RUST_VER := 1.51
+ANDROID_BUILDER_VER=2.2.0-ndkr22b-rust1.51-r1
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
@@ -49,7 +50,10 @@ crate-dir = crates/medea-coturn-telnet-client
 endif
 crate-ver := $(strip \
 	$(shell grep -m1 'version = "' $(crate-dir)/Cargo.toml | cut -d '"' -f2))
-
+android-compile-api-version := $(strip $(shell grep compileSdkVersion \
+					jason/flutter/android/build.gradle | awk '{print $$2}'))
+android-min-api-version := $(strip $(shell grep minSdkVersion \
+					jason/flutter/android/build.gradle | awk '{print $$2}'))
 
 
 
@@ -62,44 +66,16 @@ crate-ver := $(strip \
 # Usage:
 #	make build
 
-build: build.medea build.jason.wasm
+build: build.medea build.jason
 
 
 build.medea:
 	@make cargo.build crate=medea debug=$(debug) dockerized=$(dockerized)
 
-build.jason.wasm:
-	@make cargo.build crate=medea-jason debug=$(debug) dockerized=$(dockerized)
 
-crate.type.jason:
-ifeq ($(type),cdylib)
-	perl -pi -e "s/staticlib/cdylib/g" jason/jason-hello-world/Cargo.toml
-else ifeq ($(type),staticlib)
-	perl -pi -e "s/cdylib/staticlib/g" jason/jason-hello-world/Cargo.toml
-endif
-
-
-build.jason.android:
-	@make crate.type.jason type=cdylib
-ifeq ($(target),)
-	@make build.jason.android target=arm64-v8a
-	@make build.jason.android target=armeabi-v7a
-	@make build.jason.android target=x86
-	@make build.jason.android target=x86_64
-else
-	cd jason/jason-hello-world && \
-		cargo ndk --platform 28 \
-			--target ${target} \
-			-o ../../jason/flutter/android/src/main/jniLibs \
-			build
-endif
-	@make crate.type.jason type=staticlib
-
-build.jason.ios:
-	@make crate.type.jason type=staticlib
-	cd jason/jason-hello-world && cargo lipo
-	cp target/universal/debug/libjason.a \
-	   jason/flutter/ios
+build.jason:
+	@make cargo.build crate=medea-jason debug=$(debug)  \
+		dockerized=$(dockerized) platform=$(platform)
 
 
 # Resolve all project dependencies.
@@ -107,7 +83,7 @@ build.jason.ios:
 # Usage:
 #	make deps
 
-deps: cargo yarn
+deps: cargo yarn flutter
 
 
 docs: docs.rust
@@ -237,16 +213,22 @@ cargo:
 # Build medea's related crates.
 #
 # Usage:
-#	make cargo.build [crate=(@all|medea|medea-jason)]
-#	                 [debug=(yes|no)]
-#	                 [dockerized=(no|yes)]
+# 	make cargo.build [([crate=@all]
+#					   [crate=medea]
+# 					   | crate=medea-jason [( [platform=(web|android)] )]
+# 										   [debug=(yes|no)]
+# 										   [dockerized=(no|yes)]
+# 										   [target=<android-target>] )]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
+jni-libs-path = jason/flutter/android/src/main/jniLibs
+jason-android-targets := "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
 	@make build crate=medea
-	@make build crate=medea-jason
+	@make build crate=medea-jason platform=web
+	@make build crate=medea-jason platform=android
 endif
 ifeq ($(cargo-build-crate),medea)
 ifeq ($(dockerized),yes)
@@ -262,6 +244,16 @@ endif
 endif
 ifeq ($(cargo-build-crate),medea-jason)
 ifeq ($(dockerized),yes)
+ifeq ($(platform),android)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+		-u $(shell id -u):$(shell id -g) \
+		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		-v "$(HOME):$(HOME)" \
+		-e XDG_CACHE_HOME=$(HOME) \
+		instrumentisto/cargo-ndk:$(ANDROID_BUILDER_VER) \
+			make cargo.build crate=medea-jason \
+			                 debug=$(debug) dockerized=no platform=$(platform)
+else
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
@@ -271,14 +263,33 @@ ifeq ($(dockerized),yes)
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no \
 			                 pre-install=yes
+endif
 else
 ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
+ifeq ($(platform),android)
+ifeq ($(target),)
+	$(foreach target,$(subst $(comma), ,$(jason-android-targets)), \
+    				$(call build.jason-android, $(cargo-build-crate), \
+    					$(platform), $(debug), $(target)))
+else
+	# TODO: Replace with actual medea-jason crate.
+	cargo ndk -p $(android-compile-api-version) -t ${target} \
+		-o $(jni-libs-path) --manifest-path jason/jason-dummy/Cargo.toml \
+		build $(if $(call eq,$(debug),no),--release,)
+endif
+else
 	@rm -rf $(crate-dir)/pkg/
 	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
 endif
 endif
+endif
+define build.jason-android
+	$()
+	@make cargo.build crate=$(cargo-build-crate) platform=$(platform) \
+			debug=$(debug) target=$(target)
+endef
 
 
 # Show permalink to CHANGELOG of a concrete version of project's Cargo crate.
@@ -321,8 +332,19 @@ endif
 # Usage:
 #	make cargo.lint
 
+jason-android-targets := "aarch64-linux-android", "armv7-linux-androideabi", \
+						 "x86_64-linux-android", "i686-linux-android"
+
 cargo.lint:
 	cargo clippy --all -- -D clippy::pedantic -D warnings
+	$(foreach target,$(subst $(comma), ,$(jason-android-targets)), \
+					$(call lint.jason-android,$(target)))
+# TODO: replace with actual medea-jason crate.
+define lint.jason-android
+	$()
+	cargo clippy -p jason-dummy --target $(target) \
+				-- -D clippy::pedantic -D warnings
+endef
 
 
 # Show version of project's Cargo crate.
@@ -332,6 +354,84 @@ cargo.lint:
 
 cargo.version:
 	@printf "$(crate-ver)"
+
+
+
+
+####################
+# Flutter commands #
+####################
+
+# Resolve Flutter project dependencies.
+#
+# Usage:
+#	make flutter [cmd=(pub get|<flutter-cmd>)]
+
+flutter:
+	cd jason/flutter && \
+	flutter $(if $(call eq,$(cmd),),pub get,$(cmd))
+
+
+# Lint Dart sources with dartanalyzer.
+#
+# Usage:
+#	make flutter.lint
+
+flutter.lint:
+	flutter analyze jason/flutter
+
+
+# Format Dart sources with dartfmt.
+#
+# Usage:
+#	make flutter.fmt [check=(no|yes)]
+
+flutter.fmt:
+	flutter format $(if $(call eq,$(check),yes), -n --set-exit-if-changed) \
+			jason/flutter
+
+
+# Runs medea-jason Flutter plugin integration tests on an attached device.
+#
+# Usage:
+#	make flutter.test [device=<device-id>]
+
+
+flutter.test:
+	cd jason/flutter/example && \
+	flutter drive \
+			--driver=test_driver/integration_test.dart \
+			--target=integration_test/jason.dart \
+			$(if $(call eq,$(device),),,-d $(device))
+
+
+# Runs medea-jason Flutter plugin example app on an attached device.
+#
+# Usage:
+#	make flutter.run [debug=(yes|no)] [device=<device-id>]
+
+flutter.run:
+	cd jason/flutter/example && \
+	flutter run $(if $(call eq,$(debug),no),--release,) \
+		$(if $(call eq,$(device),),,-d $(device))
+
+
+# Show Android compile API version of medea_jason Flutter plugin.
+#
+# Usage:
+#	make flutter.android.compile_api_version
+
+flutter.android.compile_api_version:
+	@printf "$(android-compile-api-version)"
+
+
+# Show Android min API version of medea_jason Flutter plugin.
+#
+# Usage:
+#	make flutter.android.min_api_version
+
+flutter.android.min_api_version:
+	@printf "$(android-min-api-version)"
 
 
 
@@ -844,7 +944,7 @@ docker-up-e2e-env = RUST_BACKTRACE=1 \
 			$(CHROME_VERSION) ))
 
 docker.up.e2e: docker.down.e2e
-	@make build.jason.wasm debug=$(debug) dockerized=no
+	@make build.jason debug=$(debug) dockerized=no
 	env $(docker-up-e2e-env) \
 	docker-compose -f tests/e2e/docker-compose$(if $(call eq,$(dockerized),yes),,.host).yml \
 		up $(if $(call eq,$(dockerized),yes),\
@@ -1114,10 +1214,9 @@ endef
 # .PHONY section #
 ##################
 
-.PHONY: build build.jason.wasm build.jason.android build.jason.ios build.medea \
+.PHONY: build build.jason build.medea \
         cargo cargo.build cargo.changelog.link cargo.fmt cargo.gen cargo.lint \
         	cargo.version \
-		crate.type.jason \
         docker.build \
         	docker.down.control docker.down.coturn docker.down.demo \
         	docker.down.e2e docker.down.medea docker.down.webdriver  \
@@ -1126,6 +1225,9 @@ endef
         	docker.up.medea docker.up.webdriver \
         docs docs.rust \
         down down.control down.coturn down.demo down.dev down.medea \
+        flutter flutter.fmt flutter.lint flutter.run flutter.test \
+        	flutter.android.compile_api_version \
+        	flutter.android.min_api_version \
         helm helm.dir helm.down helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \

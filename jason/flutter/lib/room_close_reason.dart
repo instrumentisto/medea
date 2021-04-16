@@ -1,38 +1,64 @@
 import 'dart:ffi';
-import 'ffi.dart' as ffi;
+import 'package:ffi/ffi.dart';
 
-final _reasonDart _reason =
-    ffi.dl.lookupFunction<_reasonC, _reasonDart>('RoomCloseReason__reason');
-typedef _reasonC = Pointer<Utf8> Function(Pointer);
-typedef _reasonDart = Pointer<Utf8> Function(Pointer);
+import 'jason.dart';
+import 'util/errors.dart';
+import 'util/move_semantic.dart';
 
-final _isClosedByServerDart _isClosedByServer = ffi.dl
-    .lookupFunction<_isClosedByServerC, _isClosedByServerDart>(
+typedef _reason_C = Pointer<Utf8> Function(Pointer);
+typedef _reason_Dart = Pointer<Utf8> Function(Pointer);
+
+typedef _isClosedByServer_C = Int8 Function(Pointer);
+typedef _isClosedByServer_Dart = int Function(Pointer);
+
+typedef _isErr_C = Int8 Function(Pointer);
+typedef _isErr_Dart = int Function(Pointer);
+
+typedef _free_C = Void Function(Pointer);
+typedef _free_Dart = void Function(Pointer);
+
+final _reason_Dart _reason =
+    dl.lookupFunction<_reason_C, _reason_Dart>('RoomCloseReason__reason');
+
+final _isClosedByServer_Dart _isClosedByServer =
+    dl.lookupFunction<_isClosedByServer_C, _isClosedByServer_Dart>(
         'RoomCloseReason__is_closed_by_server');
-typedef _isClosedByServerC = bool Function(Pointer);
-typedef _isClosedByServerDart = bool Function(Pointer);
 
-final _isErrDart _isErr =
-    ffi.dl.lookupFunction<_isErrC, _isErrDart>('RoomCloseReason__is_err');
-typedef _isErrC = bool Function(Pointer);
-typedef _isErrDart = bool Function(Pointer);
+final _isErr_Dart _isErr =
+    dl.lookupFunction<_isErr_C, _isErr_Dart>('RoomCloseReason__is_err');
+
+final _free_Dart _free =
+    dl.lookupFunction<_free_C, _free_Dart>('RoomCloseReason__free');
 
 class RoomCloseReason {
   late Pointer ptr;
 
   RoomCloseReason(Pointer p) {
+    assertNonNull(p);
+
     ptr = p;
   }
 
   String reason() {
+    assertNonNull(ptr);
+
     return _reason(ptr).toDartString();
   }
 
   bool isClosedByServer() {
-    return _isClosedByServer(ptr);
+    assertNonNull(ptr);
+
+    return _isClosedByServer(ptr) > 0;
   }
 
   bool isErr() {
-    return _isErr(ptr);
+    assertNonNull(ptr);
+
+    return _isErr(ptr) > 0;
+  }
+
+  @moveSemantics
+  void free() {
+    _free(ptr);
   }
 }

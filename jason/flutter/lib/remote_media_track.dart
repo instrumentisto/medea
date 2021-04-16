@@ -1,39 +1,66 @@
 import 'dart:ffi';
-import 'ffi.dart' as ffi;
+
+import 'jason.dart';
 import 'kind.dart';
+import 'util/errors.dart';
+import 'util/move_semantic.dart';
 
-final _enableDart _enable =
-    ffi.dl.lookupFunction<_enableC, _enableDart>('RemoteMediaTrack__enable');
-typedef _enableC = Void Function(Pointer);
-typedef _enableDart = void Function(Pointer);
+typedef _enabled_C = Uint8 Function(Pointer);
+typedef _enabled_Dart = int Function(Pointer);
 
-final _kindDart _kind =
-    ffi.dl.lookupFunction<_kindC, _kindDart>('InputDeviceInfo__kind');
-typedef _kindC = Int16 Function(Pointer);
-typedef _kindDart = int Function(Pointer);
+typedef _kind_C = Uint8 Function(Pointer);
+typedef _kind_Dart = int Function(Pointer);
 
-final _mediaSourceKindDart _mediaSourceKind = ffi.dl
-    .lookupFunction<_mediaSourceKindC, _mediaSourceKindDart>(
+typedef _mediaSourceKind_C = Uint8 Function(Pointer);
+typedef _mediaSourceKind_Dart = int Function(Pointer);
+
+typedef _free_C = Void Function(Pointer);
+typedef _free_Dart = void Function(Pointer);
+
+final _enabled_Dart _enable =
+    dl.lookupFunction<_enabled_C, _enabled_Dart>('RemoteMediaTrack__enabled');
+
+final _kind_Dart _kind =
+    dl.lookupFunction<_kind_C, _kind_Dart>('RemoteMediaTrack__kind');
+
+final _mediaSourceKind_Dart _mediaSourceKind =
+    dl.lookupFunction<_mediaSourceKind_C, _mediaSourceKind_Dart>(
         'RemoteMediaTrack__media_source_kind');
-typedef _mediaSourceKindC = Int32 Function(Pointer);
-typedef _mediaSourceKindDart = int Function(Pointer);
+
+final _free_Dart _free =
+    dl.lookupFunction<_free_C, _free_Dart>('RemoteMediaTrack__free');
 
 class RemoteMediaTrack {
   late Pointer ptr;
 
   RemoteMediaTrack(Pointer p) {
+    assertNonNull(p);
+
     ptr = p;
   }
 
-  void enable() {
-    _enable(ptr);
+  bool enabled() {
+    assertNonNull(ptr);
+
+    return _enable(ptr) > 0;
   }
 
   MediaKind kind() {
-    return mediaKindFromInt(_kind(ptr));
+    assertNonNull(ptr);
+
+    var index = _kind(ptr);
+    return MediaKind.values[index];
   }
 
   MediaSourceKind mediaSourceKind() {
-    return mediaSourceKindFromInt(_mediaSourceKind(ptr));
+    assertNonNull(ptr);
+
+    var index = _mediaSourceKind(ptr);
+    return MediaSourceKind.values[index];
+  }
+
+  @moveSemantics
+  void free() {
+    _free(ptr);
   }
 }

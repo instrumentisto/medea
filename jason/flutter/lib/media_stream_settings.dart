@@ -1,43 +1,70 @@
 import 'dart:ffi';
-import 'package:ffi/ffi.dart';
-import 'ffi.dart' as ffi;
+
 import 'audio_track_constraints.dart';
 import 'device_video_track_constraints.dart';
 import 'display_video_track_constraints.dart';
+import 'jason.dart';
+import 'util/errors.dart';
+import 'util/move_semantic.dart';
 
-final _audioDart _audio =
-    ffi.dl.lookupFunction<_audioC, _audioDart>('MediaStreamSettings__audio');
-typedef _audioC = Void Function(Pointer, Pointer);
-typedef _audioDart = void Function(Pointer, Pointer);
+typedef _audio_C = Void Function(Pointer, Pointer);
+typedef _audio_Dart = void Function(Pointer, Pointer);
 
-final _deviceVideoDart _deviceVideo = ffi.dl
-    .lookupFunction<_deviceVideoC, _deviceVideoDart>(
+typedef _deviceVideo_C = Void Function(Pointer, Pointer);
+typedef _deviceVideo_Dart = void Function(Pointer, Pointer);
+
+typedef _displayVideo_C = Void Function(Pointer, Pointer);
+typedef _displayVideo_Dart = void Function(Pointer, Pointer);
+
+typedef _free_C = Void Function(Pointer);
+typedef _free_Dart = void Function(Pointer);
+
+final _audio_Dart _audio =
+    dl.lookupFunction<_audio_C, _audio_Dart>('MediaStreamSettings__audio');
+
+final _deviceVideo_Dart _deviceVideo =
+    dl.lookupFunction<_deviceVideo_C, _deviceVideo_Dart>(
         'MediaStreamSettings__device_video');
-typedef _deviceVideoC = Void Function(Pointer, Pointer);
-typedef _deviceVideoDart = void Function(Pointer, Pointer);
 
-final _displayVideoDart _displayVideo = ffi.dl
-    .lookupFunction<_displayVideoC, _displayVideoDart>(
+final _displayVideo_Dart _displayVideo =
+    dl.lookupFunction<_displayVideo_C, _displayVideo_Dart>(
         'MediaStreamSettings__display_video');
-typedef _displayVideoC = Void Function(Pointer, Pointer);
-typedef _displayVideoDart = void Function(Pointer, Pointer);
+
+final _free_Dart _free =
+    dl.lookupFunction<_free_C, _free_Dart>('MediaStreamSettings__free');
 
 class MediaStreamSettings {
-  late Pointer _ptr;
+  late Pointer ptr;
 
-  MediaStreamSettings(Pointer ptr) {
-    _ptr = ptr;
+  MediaStreamSettings(Pointer p) {
+    assertNonNull(p);
+
+    ptr = p;
   }
 
-  void audio(AudioTrackConstraints constraints) {
-    _audio(_ptr, constraints.ptr);
+  void audio(@moveSemantics AudioTrackConstraints constraints) {
+    assertNonNull(ptr);
+    assertNonNull(constraints.ptr);
+
+    _audio(ptr, constraints.ptr);
   }
 
-  void deviceVideo(DeviceVideoTrackConstraints constraints) {
-    _deviceVideo(_ptr, constraints.ptr);
+  void deviceVideo(@moveSemantics DeviceVideoTrackConstraints constraints) {
+    assertNonNull(ptr);
+    assertNonNull(constraints.ptr);
+
+    _deviceVideo(ptr, constraints.ptr);
   }
 
-  void displayVideo(DisplayVideoTrackConstraints constraints) {
-    _displayVideo(_ptr, constraints.ptr);
+  void displayVideo(@moveSemantics DisplayVideoTrackConstraints constraints) {
+    assertNonNull(ptr);
+    assertNonNull(constraints.ptr);
+
+    _displayVideo(ptr, constraints.ptr);
+  }
+
+  @moveSemantics
+  void free() {
+    _free(ptr);
   }
 }
