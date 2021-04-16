@@ -9,3 +9,5 @@ name = "jason"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
+
+[workspace]

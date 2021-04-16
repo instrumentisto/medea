@@ -15,8 +15,6 @@
 !jason/src/
 !jason/demo/chart/medea-demo/conf/
 !jason/demo/index.html
-# TODO: Temp change. Remove when removing jason-dummy crate.
-!jason/jason-dummy
 
 # Makefile may be used in Dockerfiles.
 !.env

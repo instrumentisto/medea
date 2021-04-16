@@ -26,8 +26,7 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
-      - run: rustup target add aarch64-linux-android armv7-linux-androideabi
-          i686-linux-android x86_64-linux-android
+      - run: make rustup.android
       - run: make lint
 
   rustfmt:
@@ -60,10 +59,10 @@ jobs:
       - run: make helm.lint chart=${{ matrix.chart }}
 
   dartfmt:
-    name: Format Dart sources with dartfmt
+    name: Format Flutter Dart sources with dartfmt
     if: ${{ github.ref == 'refs/heads/master'
-      || startsWith(github.ref, 'refs/tags/medea-')
-      || !contains(github.event.head_commit.message, '[skip ci]') }}
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -72,11 +71,11 @@ jobs:
           channel: stable
       - run: make flutter.fmt check=yes
 
-  dartanalyze:
-    name: Lint Dart sources with dartanalyze
+  dartanalyzer:
+    name: Lint Dart sources with dartanalyzer
     if: ${{ github.ref == 'refs/heads/master'
-      || startsWith(github.ref, 'refs/tags/medea-')
-      || !contains(github.event.head_commit.message, '[skip ci]') }}
+            || startsWith(github.ref, 'refs/tags/medea-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -85,6 +84,7 @@ jobs:
           channel: stable
       - run: make flutter
       - run: make flutter.lint
+
 
 
 
@@ -245,11 +245,11 @@ jobs:
 
       - run: make test.integration up=yes dockerized=no
 
-  test-android:
-    name: Run medea_jason Flutter plugin android instrumented tests
+  test-flutter:
+    name: medea-jason Flutter plugin Android instrumented tests
     if: ${{ github.ref == 'refs/heads/master'
-      || startsWith(github.ref, 'refs/tags/medea-')
-      || !contains(github.event.head_commit.message, '[skip ci]') }}
+            || startsWith(github.ref, 'refs/tags/medea-jason-')
+            || !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
@@ -260,6 +260,7 @@ jobs:
           target: i686-linux-android
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
+
       - uses: actions-rs/install@v0.1
         with:
           crate: cargo-ndk
@@ -267,26 +268,29 @@ jobs:
       - uses: subosito/flutter-action@v1
         with:
           channel: stable
-      - name: Parse Android API versions
-        id: android-api-level
-        run: echo ::set-output
-                    name=min::$(make flutter.android.min_api_version)
-            && echo ::set-output
-                    name=target::$(make flutter.android.compile_api_version)
-      - name: Compile Medea Jason shared object
+
+      - name: Parse Android NDK versions
+        id: ndk-version
+        run: |
+          echo ::set-output name=min::$(make flutter.android.version.min)
+          echo ::set-output name=target::$(make flutter.android.version.compile)
+
+      - name: Compile shared object
         run: make cargo.build crate=medea-jason platform=android target=x86
+
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ steps.android-api-level.outputs.min }}
+          api-level: ${{ steps.ndk-version.outputs.min }}
           target: google_apis
           profile: Nexus 6
-          script: make flutter.test
+          script: make test.flutter
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ steps.android-api-level.outputs.target }}
+          api-level: ${{ steps.ndk-version.outputs.target }}
           target: google_apis
           profile: Nexus 6
-          script: make flutter.test
+          script: make test.flutter
+
 
 
 
@@ -294,7 +298,7 @@ jobs:
   # Building #
   ############
 
-  crate-jason-platform-web:
+  crate-jason-web:
     name: Build medea-jason for web platform
     if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
             && (github.ref == 'refs/heads/master'
@@ -312,11 +316,11 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.3.0
       - run: make cargo.build crate=medea-jason dockerized=no debug=yes
 
-  crate-jason-platform-android:
-    name: Build medea-jason shared object for android platform
+  crate-jason-android:
+    name: Build medea-jason shared object for Android platform
     if: ${{ !startsWith(github.ref, 'refs/tags/medea-')
-      && (github.ref == 'refs/heads/master'
-      || !contains(github.event.head_commit.message, '[skip ci]')) }}
+            && (github.ref == 'refs/heads/master'
+                || !contains(github.event.head_commit.message, '[skip ci]')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -330,10 +334,9 @@ jobs:
         with:
           crate: cargo-ndk
           use-tool-cache: true
-      - run: rustup target add aarch64-linux-android armv7-linux-androideabi
-                  i686-linux-android x86_64-linux-android
-      - run: make cargo.build crate=medea-jason dockerized=no debug=yes
-                  platform=android
+      - run: make rustup.android
+      - run: make cargo.build crate=medea-jason platform=android
+                              dockerized=no debug=yes
 
   crate-medea:
     name: Build medea
