@@ -1,6 +1,7 @@
 use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
 
 pub mod callback;
+mod array;
 
 pub fn ice_connection_from_int(i: i32) -> IceConnectionState {
     match i {
