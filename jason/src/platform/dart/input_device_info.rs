@@ -1,4 +1,4 @@
-use dart_sys::Dart_Handle;
+use dart_sys::{Dart_Handle, _Dart_Handle};
 
 use crate::{media::MediaKind, utils::dart::from_dart_string};
 
@@ -55,16 +55,17 @@ pub struct InputDeviceInfo {
     info: Dart_Handle,
 }
 
-impl InputDeviceInfo {
-    pub(super) fn new(handle: Dart_Handle) -> Self {
-        todo!("See todo after this line");
+impl From<Dart_Handle> for InputDeviceInfo {
+    fn from(handle: Dart_Handle) -> Self {
+        todo!("Provide real MediaKind");
         Self {
-            // TODO: Provide real MediaKind here
             media_kind: MediaKind::Audio,
             info: handle,
         }
     }
+}
 
+impl InputDeviceInfo {
     pub fn device_id(&self) -> String {
         unsafe { from_dart_string(DEVICE_ID_FUNCTION.unwrap()(self.info)) }
     }

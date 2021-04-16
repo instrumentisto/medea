@@ -1,12 +1,12 @@
 use dart_sys::Dart_Handle;
-use derive_more::{AsRef, Into};
+use derive_more::{AsRef, From, Into};
 
 use crate::media::{
     AudioTrackConstraints, DeviceVideoTrackConstraints,
     DisplayVideoTrackConstraints,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, From, Into)]
 pub struct MediaStreamConstraints(Dart_Handle);
 
 impl MediaStreamConstraints {
@@ -33,7 +33,7 @@ impl Default for MediaStreamConstraints {
 /// [DisplayMediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-displaymediastreamconstraints
-#[derive(AsRef, Debug, Into)]
+#[derive(AsRef, Debug, Into, From)]
 pub struct DisplayMediaStreamConstraints(Dart_Handle);
 
 impl Default for DisplayMediaStreamConstraints {
