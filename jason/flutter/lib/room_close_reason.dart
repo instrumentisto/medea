@@ -2,8 +2,8 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 import 'jason.dart';
-import 'util/errors.dart';
 import 'util/move_semantic.dart';
+import 'util/nullable_pointer.dart';
 
 typedef _reason_C = Pointer<Utf8> Function(Pointer);
 typedef _reason_Dart = Pointer<Utf8> Function(Pointer);
@@ -31,34 +31,25 @@ final _free_Dart _free =
     dl.lookupFunction<_free_C, _free_Dart>('RoomCloseReason__free');
 
 class RoomCloseReason {
-  late Pointer ptr;
+  late NullablePointer ptr;
 
-  RoomCloseReason(Pointer p) {
-    assertNonNull(p);
-
-    ptr = p;
-  }
+  RoomCloseReason(this.ptr);
 
   String reason() {
-    assertNonNull(ptr);
-
-    return _reason(ptr).toDartString();
+    return _reason(ptr.getInnerPtr()).toDartString();
   }
 
   bool isClosedByServer() {
-    assertNonNull(ptr);
-
-    return _isClosedByServer(ptr) > 0;
+    return _isClosedByServer(ptr.getInnerPtr()) > 0;
   }
 
   bool isErr() {
-    assertNonNull(ptr);
-
-    return _isErr(ptr) > 0;
+    return _isErr(ptr.getInnerPtr()) > 0;
   }
 
   @moveSemantics
   void free() {
-    _free(ptr);
+    _free(ptr.getInnerPtr());
+    ptr.free();
   }
 }

@@ -4,8 +4,11 @@ import 'audio_track_constraints.dart';
 import 'device_video_track_constraints.dart';
 import 'display_video_track_constraints.dart';
 import 'jason.dart';
-import 'util/errors.dart';
 import 'util/move_semantic.dart';
+import 'util/nullable_pointer.dart';
+
+typedef _new_C = Pointer Function();
+typedef _new_Dart = Pointer Function();
 
 typedef _audio_C = Void Function(Pointer, Pointer);
 typedef _audio_Dart = void Function(Pointer, Pointer);
@@ -18,6 +21,9 @@ typedef _displayVideo_Dart = void Function(Pointer, Pointer);
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
+
+final _new_Dart _new =
+    dl.lookupFunction<_new_C, _new_Dart>('MediaStreamSettings__new');
 
 final _audio_Dart _audio =
     dl.lookupFunction<_audio_C, _audio_Dart>('MediaStreamSettings__audio');
@@ -34,37 +40,26 @@ final _free_Dart _free =
     dl.lookupFunction<_free_C, _free_Dart>('MediaStreamSettings__free');
 
 class MediaStreamSettings {
-  late Pointer ptr;
-
-  MediaStreamSettings(Pointer p) {
-    assertNonNull(p);
-
-    ptr = p;
-  }
+  final NullablePointer ptr = NullablePointer(_new());
 
   void audio(@moveSemantics AudioTrackConstraints constraints) {
-    assertNonNull(ptr);
-    assertNonNull(constraints.ptr);
-
-    _audio(ptr, constraints.ptr);
+    _audio(ptr.getInnerPtr(), constraints.ptr.getInnerPtr());
+    constraints.ptr.free();
   }
 
   void deviceVideo(@moveSemantics DeviceVideoTrackConstraints constraints) {
-    assertNonNull(ptr);
-    assertNonNull(constraints.ptr);
-
-    _deviceVideo(ptr, constraints.ptr);
+    _deviceVideo(ptr.getInnerPtr(), constraints.ptr.getInnerPtr());
+    constraints.ptr.free();
   }
 
   void displayVideo(@moveSemantics DisplayVideoTrackConstraints constraints) {
-    assertNonNull(ptr);
-    assertNonNull(constraints.ptr);
-
-    _displayVideo(ptr, constraints.ptr);
+    _displayVideo(ptr.getInnerPtr(), constraints.ptr.getInnerPtr());
+    constraints.ptr.free();
   }
 
   @moveSemantics
   void free() {
-    _free(ptr);
+    _free(ptr.getInnerPtr());
+    ptr.free();
   }
 }

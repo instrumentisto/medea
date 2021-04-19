@@ -9,5 +9,7 @@ impl ReconnectHandle {
 
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }

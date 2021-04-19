@@ -4,8 +4,8 @@ import 'package:ffi/ffi.dart';
 
 import 'jason.dart';
 import 'kind.dart';
-import 'util/errors.dart';
 import 'util/move_semantic.dart';
+import 'util/nullable_pointer.dart';
 
 typedef _deviceId_C = Pointer<Utf8> Function(Pointer);
 typedef _deviceId_Dart = Pointer<Utf8> Function(Pointer);
@@ -31,46 +31,34 @@ final _label_Dart _label =
     dl.lookupFunction<_label_C, _label_Dart>('InputDeviceInfo__label');
 final _deviceId_Dart _deviceId = dl
     .lookupFunction<_deviceId_C, _deviceId_Dart>('InputDeviceInfo__device_id');
-
 final _free_Dart _free =
     dl.lookupFunction<_free_C, _free_Dart>('InputDeviceInfo__free');
 
 class InputDeviceInfo {
-  late Pointer ptr;
+  late NullablePointer ptr;
 
-  InputDeviceInfo(Pointer p) {
-    assertNonNull(p);
-
-    ptr = p;
-  }
+  InputDeviceInfo(this.ptr);
 
   String deviceId() {
-    assertNonNull(ptr);
-
-    return _deviceId(ptr).toDartString();
+    return _deviceId(ptr.getInnerPtr()).toDartString();
   }
 
   String label() {
-    assertNonNull(ptr);
-
-    return _label(ptr).toDartString();
+    return _label(ptr.getInnerPtr()).toDartString();
   }
 
   MediaKind kind() {
-    assertNonNull(ptr);
-
-    var index = _kind(ptr);
+    var index = _kind(ptr.getInnerPtr());
     return MediaKind.values[index];
   }
 
   String groupId() {
-    assertNonNull(ptr);
-
-    return _nativeGroupId(ptr).toDartString();
+    return _nativeGroupId(ptr.getInnerPtr()).toDartString();
   }
 
   @moveSemantics
   void free() {
-    _free(ptr);
+    _free(ptr.getInnerPtr());
+    ptr.free();
   }
 }

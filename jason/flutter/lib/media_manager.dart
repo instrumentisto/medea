@@ -3,8 +3,8 @@ import 'dart:ffi';
 import 'input_device_info.dart';
 import 'jason.dart';
 import 'local_media_track.dart';
-import 'util/errors.dart';
 import 'util/move_semantic.dart';
+import 'util/nullable_pointer.dart';
 import 'util/ptrarray.dart';
 
 typedef _initLocalTracks_C = PtrArray Function(Pointer);
@@ -28,34 +28,27 @@ final _free_Dart _free =
     dl.lookupFunction<_free_C, _free_Dart>('MediaManagerHandle__free');
 
 class MediaManager {
-  late Pointer ptr;
+  late NullablePointer ptr;
 
-  MediaManager(Pointer p) {
-    assertNonNull(p);
-
-    ptr = p;
-  }
+  MediaManager(this.ptr);
 
   List<LocalMediaTrack> initLocalTracks() {
-    assertNonNull(ptr);
-
-    return _initLocalTracks(ptr)
+    return _initLocalTracks(ptr.getInnerPtr())
         .intoList()
-        .map((e) => LocalMediaTrack(e))
+        .map((e) => LocalMediaTrack(NullablePointer(e)))
         .toList();
   }
 
   List<InputDeviceInfo> enumerateDevices() {
-    assertNonNull(ptr);
-
-    return _enumerateDevices(ptr)
+    return _enumerateDevices(ptr.getInnerPtr())
         .intoList()
-        .map((e) => InputDeviceInfo(e))
+        .map((e) => InputDeviceInfo(NullablePointer(e)))
         .toList();
   }
 
   @moveSemantics
   void free() {
-    _free(ptr);
+    _free(ptr.getInnerPtr());
+    ptr.free();
   }
 }

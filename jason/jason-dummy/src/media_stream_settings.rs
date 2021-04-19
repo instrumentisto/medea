@@ -20,11 +20,18 @@ impl MediaStreamSettings {
 }
 
 #[no_mangle]
+pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
+    Box::into_raw(Box::new(MediaStreamSettings::new()))
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__audio(
     this: *mut MediaStreamSettings,
     constraints: *mut AudioTrackConstraints,
 ) {
-    ptr_from_dart_as_mut(this).audio(*Box::from_raw(constraints));
+    let this = ptr_from_dart_as_mut(this);
+
+    this.audio(*Box::from_raw(constraints));
 }
 
 #[no_mangle]
@@ -32,7 +39,9 @@ pub unsafe extern "C" fn MediaStreamSettings__device_video(
     this: *mut MediaStreamSettings,
     constraints: *mut DeviceVideoTrackConstraints,
 ) {
-    ptr_from_dart_as_mut(this).device_video(*Box::from_raw(constraints));
+    let this = ptr_from_dart_as_mut(this);
+
+    this.device_video(*Box::from_raw(constraints));
 }
 
 #[no_mangle]
@@ -40,12 +49,16 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
     this: *mut MediaStreamSettings,
     constraints: *mut DisplayVideoTrackConstraints,
 ) {
-    ptr_from_dart_as_mut(this).display_video(*Box::from_raw(constraints));
+    let this = ptr_from_dart_as_mut(this);
+
+    this.display_video(*Box::from_raw(constraints));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__free(
     this: *mut MediaStreamSettings,
 ) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }

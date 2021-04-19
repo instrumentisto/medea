@@ -1,8 +1,4 @@
-use std::{
-    ffi::{CStr, CString},
-    marker::PhantomData,
-    slice,
-};
+use std::{marker::PhantomData, slice};
 
 #[repr(C)]
 pub struct PtrArray<T = ()> {
@@ -43,29 +39,4 @@ impl<T> Drop for PtrArray<T> {
 #[no_mangle]
 pub unsafe extern "C" fn PtrArray_free(arr: PtrArray) {
     drop(arr);
-}
-
-pub unsafe fn c_str_into_string(string: *const libc::c_char) -> String {
-    CStr::from_ptr(string).to_str().unwrap().to_owned()
-}
-
-pub unsafe fn string_into_c_str(string: String) -> *const libc::c_char {
-    CString::new(string).unwrap().into_raw()
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn String_free(s: *mut libc::c_char) {
-    if s.is_null() {
-        return;
-    }
-    CString::from_raw(s);
-}
-
-pub unsafe fn ptr_from_dart_as_mut<'a, T>(ptr: *mut T) -> &'a mut T {
-    match ptr.as_mut() {
-        Some(reference) => reference,
-        None => {
-            unimplemented!()
-        }
-    }
 }

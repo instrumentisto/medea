@@ -1,4 +1,4 @@
-use crate::{utils::ptr_from_dart_as_mut, MediaKind, MediaSourceKind};
+use crate::{utils::ptr_from_dart_as_ref, MediaKind, MediaSourceKind};
 
 pub struct RemoteMediaTrack;
 
@@ -28,26 +28,34 @@ impl RemoteMediaTrack {
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__enabled(
-    this: *mut RemoteMediaTrack,
+    this: *const RemoteMediaTrack,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).enabled() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.enabled() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__kind(
-    this: *mut RemoteMediaTrack,
+    this: *const RemoteMediaTrack,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).kind() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
-    this: *mut RemoteMediaTrack,
+    this: *const RemoteMediaTrack,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).media_source_kind() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.media_source_kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__free(this: *mut RemoteMediaTrack) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }

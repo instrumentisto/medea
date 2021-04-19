@@ -2,11 +2,14 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 import 'jason.dart';
-import 'util/errors.dart';
 import 'util/move_semantic.dart';
+import 'util/nullable_pointer.dart';
 
-typedef _deviceId_C = Void Function(Pointer<Utf8>);
-typedef _deviceId_Dart = void Function(Pointer<Utf8>);
+typedef _new_C = Pointer Function();
+typedef _new_Dart = Pointer Function();
+
+typedef _deviceId_C = Void Function(Pointer, Pointer<Utf8>);
+typedef _deviceId_Dart = void Function(Pointer, Pointer<Utf8>);
 
 typedef _exactFacingMode_C = Void Function(Pointer, Uint8);
 typedef _exactFacingMode_Dart = void Function(Pointer, int);
@@ -34,6 +37,9 @@ typedef _widthInRange_Dart = void Function(Pointer, int, int);
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
+
+final _new_Dart _new =
+    dl.lookupFunction<_new_C, _new_Dart>('DeviceVideoTrackConstraints__new');
 
 final _deviceId_Dart _deviceId = dl.lookupFunction<_deviceId_C, _deviceId_Dart>(
     'DeviceVideoTrackConstraints__device_id');
@@ -81,75 +87,52 @@ enum FacingMode {
 }
 
 class DeviceVideoTrackConstraints {
-  late Pointer ptr;
-
-  DeviceVideoTrackConstraints(Pointer p) {
-    assertNonNull(p);
-
-    ptr = p;
-  }
+  final NullablePointer ptr = NullablePointer(_new());
 
   void deviceId(String deviceId) {
-    assertNonNull(ptr);
-
     var deviceIdPtr = deviceId.toNativeUtf8();
     try {
-      _deviceId(deviceIdPtr);
+      _deviceId(ptr.getInnerPtr(), deviceIdPtr);
     } finally {
       calloc.free(deviceIdPtr);
     }
   }
 
   void exactFacingMode(FacingMode facingMode) {
-    assertNonNull(ptr);
-
-    _exactFacingMode(ptr, facingMode.index);
+    _exactFacingMode(ptr.getInnerPtr(), facingMode.index);
   }
 
   void idealFacingMode(FacingMode facingMode) {
-    assertNonNull(ptr);
-
-    _idealFacingMode(ptr, facingMode.index);
+    _idealFacingMode(ptr.getInnerPtr(), facingMode.index);
   }
 
   void exactHeight(int height) {
-    assertNonNull(ptr);
-
-    _exactHeight(ptr, height);
+    _exactHeight(ptr.getInnerPtr(), height);
   }
 
   void idealHeight(int height) {
-    assertNonNull(ptr);
-
-    _idealHeight(ptr, height);
+    _idealHeight(ptr.getInnerPtr(), height);
   }
 
   void heightInRange(int min, int max) {
-    assertNonNull(ptr);
-
-    _heightInRange(ptr, min, max);
+    _heightInRange(ptr.getInnerPtr(), min, max);
   }
 
   void exactWidth(int width) {
-    assertNonNull(ptr);
-
-    _exactWidth(ptr, width);
+    _exactWidth(ptr.getInnerPtr(), width);
   }
 
   void idealWidth(int width) {
-    assertNonNull(ptr);
-
-    _idealWidth(ptr, width);
+    _idealWidth(ptr.getInnerPtr(), width);
   }
 
   void widthInRange(int min, int max) {
-    assertNonNull(ptr);
-
-    _widthInRange(ptr, min, max);
+    _widthInRange(ptr.getInnerPtr(), min, max);
   }
 
   @moveSemantics
   void free() {
-    _free(ptr);
+    _free(ptr.getInnerPtr());
+    ptr.free();
   }
 }

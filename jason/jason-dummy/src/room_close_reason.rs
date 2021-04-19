@@ -1,4 +1,4 @@
-use crate::utils::{ptr_from_dart_as_mut, string_into_c_str};
+use crate::utils::{ptr_from_dart_as_ref, string_into_c_str};
 
 pub struct RoomCloseReason;
 
@@ -18,27 +18,34 @@ impl RoomCloseReason {
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__reason(
-    this: *mut RoomCloseReason,
+    this: *const RoomCloseReason,
 ) -> *const libc::c_char {
-    let reason = ptr_from_dart_as_mut(this).reason();
-    string_into_c_str(reason)
+    let this = ptr_from_dart_as_ref(this);
+
+    string_into_c_str(this.reason())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
-    this: *mut RoomCloseReason,
+    this: *const RoomCloseReason,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).is_closed_by_server() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.is_closed_by_server() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__is_err(
-    this: *mut RoomCloseReason,
+    this: *const RoomCloseReason,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).is_err() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.is_err() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__free(this: *mut RoomCloseReason) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }

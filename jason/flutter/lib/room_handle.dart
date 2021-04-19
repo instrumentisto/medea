@@ -1,7 +1,8 @@
 import 'dart:ffi';
 
+import 'package:medea_jason/util/nullable_pointer.dart';
+
 import 'jason.dart';
-import 'util/errors.dart';
 import 'util/move_semantic.dart';
 
 typedef _free_C = Void Function(Pointer);
@@ -11,16 +12,13 @@ final _free_Dart _free =
     dl.lookupFunction<_free_C, _free_Dart>('RoomHandle__free');
 
 class RoomHandle {
-  late Pointer ptr;
+  late NullablePointer ptr;
 
-  RoomHandle(Pointer p) {
-    assertNonNull(p);
-
-    ptr = p;
-  }
+  RoomHandle(this.ptr);
 
   @moveSemantics
   void free() {
-    _free(ptr);
+    _free(ptr.getInnerPtr());
+    ptr.free();
   }
 }

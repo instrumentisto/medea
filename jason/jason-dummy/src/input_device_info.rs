@@ -1,5 +1,5 @@
 use crate::{
-    utils::{ptr_from_dart_as_mut, string_into_c_str},
+    utils::{ptr_from_dart_as_ref, string_into_c_str},
     MediaKind,
 };
 
@@ -25,36 +25,43 @@ impl InputDeviceInfo {
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__device_id(
-    this: *mut InputDeviceInfo,
+    this: *const InputDeviceInfo,
 ) -> *const libc::c_char {
-    let device_id = ptr_from_dart_as_mut(this).device_id();
-    string_into_c_str(device_id)
+    let this = ptr_from_dart_as_ref(this);
+
+    string_into_c_str(this.device_id())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__kind(
-    this: *mut InputDeviceInfo,
+    this: *const InputDeviceInfo,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).kind() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__label(
-    this: *mut InputDeviceInfo,
+    this: *const InputDeviceInfo,
 ) -> *const libc::c_char {
-    let label = ptr_from_dart_as_mut(this).label();
-    string_into_c_str(label)
+    let this = ptr_from_dart_as_ref(this);
+
+    string_into_c_str(this.label())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn InputDeviceInfo_nativeGroupId(
-    this: *mut InputDeviceInfo,
+pub unsafe extern "C" fn InputDeviceInfo__group_id(
+    this: *const InputDeviceInfo,
 ) -> *const libc::c_char {
-    let group_id = ptr_from_dart_as_mut(this).group_id();
-    string_into_c_str(group_id)
+    let this = ptr_from_dart_as_ref(this);
+
+    string_into_c_str(this.group_id())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__free(this: *mut InputDeviceInfo) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }

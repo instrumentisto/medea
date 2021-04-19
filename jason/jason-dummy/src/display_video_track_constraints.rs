@@ -16,5 +16,7 @@ pub extern "C" fn DisplayVideoTrackConstraints__new(
 pub unsafe extern "C" fn DisplayVideoTrackConstraints__free(
     this: *mut DisplayVideoTrackConstraints,
 ) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }

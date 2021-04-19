@@ -1,4 +1,4 @@
-use crate::{utils::ptr_from_dart_as_mut, MediaKind, MediaSourceKind};
+use crate::{utils::ptr_from_dart_as_ref, MediaKind, MediaSourceKind};
 
 pub struct LocalMediaTrack;
 
@@ -16,19 +16,25 @@ impl LocalMediaTrack {
 
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__kind(
-    this: *mut LocalMediaTrack,
+    this: *const LocalMediaTrack,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).kind() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
-    this: *mut LocalMediaTrack,
+    this: *const LocalMediaTrack,
 ) -> u8 {
-    ptr_from_dart_as_mut(this).media_source_kind() as u8
+    let this = ptr_from_dart_as_ref(this);
+
+    this.media_source_kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__free(this: *mut LocalMediaTrack) {
-    Box::from_raw(this);
+    if !this.is_null() {
+        Box::from_raw(this);
+    }
 }
