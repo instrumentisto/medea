@@ -299,9 +299,10 @@ endif
 define cargo.build.medea-jason.android
 	$(eval target := $(strip $(1)))
 	$(eval debug := $(strip $(2)))
+	cd jason/jason-dummy/ && \
 	cargo ndk -p $(ANDROID_SDK_COMPILE_VERSION) -t $(target) \
-	          -o jason/flutter/android/src/main/jniLibs \
-	          --manifest-path=jason/jason-dummy/Cargo.toml \
+	          -o ../flutter/android/src/main/jniLibs \
+	          --manifest-path=Cargo.toml \
 		build $(if $(call eq,$(debug),no),--release,)
 endef
 
