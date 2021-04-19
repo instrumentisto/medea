@@ -5,6 +5,7 @@ use std::{
     rc::Rc,
 };
 
+use derive_more::Display;
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaSourceKind,
     MediaType as ProtoTrackConstraints, MediaType, VideoSettings,
@@ -24,18 +25,22 @@ use crate::{
 /// Representation of a [VideoFacingModeEnum][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum FacingMode {
     /// Facing towards a user (a self-view camera).
+    #[display(fmt = "user")]
     User,
 
     /// Facing away from a user (viewing an environment).
+    #[display(fmt = "environment")]
     Environment,
 
     /// Facing to the left of a user.
+    #[display(fmt = "left")]
     Left,
 
     /// Facing to the right of a user.
+    #[display(fmt = "right")]
     Right,
 }
 

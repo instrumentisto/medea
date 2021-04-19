@@ -2,6 +2,7 @@ use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
 
 pub mod callback;
 pub mod list;
+pub mod map;
 
 pub fn ice_connection_from_int(i: i32) -> IceConnectionState {
     match i {
