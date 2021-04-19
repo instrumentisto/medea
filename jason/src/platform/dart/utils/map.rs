@@ -1,5 +1,5 @@
-use dart_sys::{Dart_Handle, _Dart_Handle};
 use crate::utils::dart::into_dart_string;
+use dart_sys::{Dart_Handle, _Dart_Handle};
 
 pub struct DartMap(Dart_Handle);
 
@@ -31,9 +31,7 @@ type NewFunction = extern "C" fn() -> Dart_Handle;
 static mut NEW_FUNCTION: Option<NewFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_DartMap__new(
-    f: NewFunction
-) {
+pub unsafe extern "C" fn register_DartMap__new(f: NewFunction) {
     NEW_FUNCTION = Some(f);
 }
 
@@ -41,9 +39,7 @@ type SetFunction = extern "C" fn(Dart_Handle, *const libc::c_char, Dart_Handle);
 static mut SET_FUNCTION: Option<SetFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_DartMap__set(
-    f: SetFunction,
-) {
+pub unsafe extern "C" fn register_DartMap__set(f: SetFunction) {
     SET_FUNCTION = Some(f);
 }
 
@@ -51,9 +47,7 @@ type RemoveFunction = extern "C" fn(Dart_Handle, *const libc::c_char);
 static mut REMOVE_FUNCTION: Option<RemoveFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_DartMap__remove(
-    f: RemoveFunction,
-) {
+pub unsafe extern "C" fn register_DartMap__remove(f: RemoveFunction) {
     REMOVE_FUNCTION = Some(f);
 }
 
@@ -69,9 +63,7 @@ impl DartMap {
     }
 
     pub fn remove(&self, key: String) {
-        unsafe {
-            REMOVE_FUNCTION.unwrap()(self.0, into_dart_string(key))
-        }
+        unsafe { REMOVE_FUNCTION.unwrap()(self.0, into_dart_string(key)) }
     }
 }
 
@@ -79,9 +71,7 @@ type NewStringFunction = extern "C" fn(*const libc::c_char) -> Dart_Handle;
 static mut NEW_STRING_FUNCTION: Option<NewStringFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_String__new(
-    f: NewStringFunction,
-) {
+pub unsafe extern "C" fn register_String__new(f: NewStringFunction) {
     NEW_STRING_FUNCTION = Some(f);
 }
 
@@ -89,9 +79,7 @@ type NewIntFunction = extern "C" fn(i32) -> Dart_Handle;
 static mut NEW_INT_FUNCTION: Option<NewIntFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_Int__new(
-    f: NewIntFunction,
-) {
+pub unsafe extern "C" fn register_Int__new(f: NewIntFunction) {
     NEW_INT_FUNCTION = Some(f);
 }
 
@@ -105,8 +93,10 @@ impl Into<Dart_Handle> for Value {
     fn into(self) -> *mut _Dart_Handle {
         match self {
             Self::Map(h) => h.0,
-            Self::String(s) => unsafe { NEW_STRING_FUNCTION.unwrap()(into_dart_string(s)) },
-            Self::Int(i) => unsafe { NEW_INT_FUNCTION.unwrap()(i) }
+            Self::String(s) => unsafe {
+                NEW_STRING_FUNCTION.unwrap()(into_dart_string(s))
+            },
+            Self::Int(i) => unsafe { NEW_INT_FUNCTION.unwrap()(i) },
         }
     }
 }

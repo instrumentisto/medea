@@ -1,6 +1,5 @@
+use crate::{platform::dart::error::Error, utils::dart::from_dart_string};
 use dart_sys::Dart_Handle;
-use crate::platform::dart::error::Error;
-use crate::utils::dart::from_dart_string;
 
 pub struct DartResult(Dart_Handle);
 
@@ -8,9 +7,7 @@ type IsOkFunction = extern "C" fn(Dart_Handle) -> u8;
 static mut IS_OK_FUNCTION: Option<IsOkFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_DartResult__is_ok(
-    f: IsOkFunction,
-) {
+pub unsafe extern "C" fn register_DartResult__is_ok(f: IsOkFunction) {
     IS_OK_FUNCTION = Some(f);
 }
 
@@ -43,9 +40,7 @@ type ErrFunction = extern "C" fn(Dart_Handle) -> DartError;
 static mut ERR_FUNCTION: Option<ErrFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_DartResult__err(
-    f: ErrFunction,
-) {
+pub unsafe extern "C" fn register_DartResult__err(f: ErrFunction) {
     ERR_FUNCTION = Some(f);
 }
 
@@ -59,9 +54,7 @@ impl DartResult {
     }
 
     pub fn err(&self) -> DartError {
-        unsafe {
-            ERR_FUNCTION.unwrap()(self.0)
-        }
+        unsafe { ERR_FUNCTION.unwrap()(self.0) }
     }
 }
 
@@ -74,4 +67,3 @@ impl From<DartResult> for Result<Dart_Handle, Error> {
         }
     }
 }
-

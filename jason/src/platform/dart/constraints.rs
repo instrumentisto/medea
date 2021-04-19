@@ -1,13 +1,14 @@
-use dart_sys::{Dart_Handle, Dart_GetMainPortId, _Dart_Handle};
-use derive_more::{AsRef, From, Into};
 use crate::media::constraints::ConstrainU32;
+use dart_sys::{Dart_GetMainPortId, Dart_Handle, _Dart_Handle};
+use derive_more::{AsRef, From, Into};
 
-use crate::media::constraints::ConstrainString;
-use crate::media::{
-    AudioTrackConstraints, DeviceVideoTrackConstraints,
-    DisplayVideoTrackConstraints,
+use crate::{
+    media::{
+        constraints::ConstrainString, AudioTrackConstraints,
+        DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
+    },
+    platform::dart::utils::map::DartMap,
 };
-use crate::platform::dart::utils::map::DartMap;
 
 pub struct MediaTrackConstraints(DartMap);
 
@@ -21,9 +22,7 @@ type NewFunction = extern "C" fn() -> Dart_Handle;
 static mut NEW_FUNCTION: Option<NewFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_MediaStreamConstraints__new(
-    f: NewFunction
-) {
+pub unsafe extern "C" fn register_MediaStreamConstraints__new(f: NewFunction) {
     NEW_FUNCTION = Some(f);
 }
 
@@ -52,20 +51,24 @@ pub struct MediaStreamConstraints(Dart_Handle);
 
 impl MediaStreamConstraints {
     pub fn new() -> Self {
-        unsafe {
-            Self(NEW_FUNCTION.unwrap()())
-        }
+        unsafe { Self(NEW_FUNCTION.unwrap()()) }
     }
 
     pub fn audio(&mut self, audio: AudioTrackConstraints) {
         unsafe {
-            AUDIO_FUNCTION.unwrap()(self.0, MediaTrackConstraints::from(audio).into());
+            AUDIO_FUNCTION.unwrap()(
+                self.0,
+                MediaTrackConstraints::from(audio).into(),
+            );
         }
     }
 
     pub fn video(&mut self, video: DeviceVideoTrackConstraints) {
         unsafe {
-            VIDEO_FUNCTION.unwrap()(self.0, MediaTrackConstraints::from(video).into());
+            VIDEO_FUNCTION.unwrap()(
+                self.0,
+                MediaTrackConstraints::from(video).into(),
+            );
         }
     }
 }
@@ -93,9 +96,7 @@ impl DisplayMediaStreamConstraints {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        unsafe {
-            Self(NEW_FUNCTION.unwrap()())
-        }
+        unsafe { Self(NEW_FUNCTION.unwrap()()) }
     }
 
     /// Specifies the nature and settings of the `video` [MediaStreamTrack][1].
@@ -104,7 +105,10 @@ impl DisplayMediaStreamConstraints {
     #[inline]
     pub fn video(&mut self, video: DisplayVideoTrackConstraints) {
         unsafe {
-            VIDEO_FUNCTION.unwrap()(self.0, MediaTrackConstraints::from(video).into());
+            VIDEO_FUNCTION.unwrap()(
+                self.0,
+                MediaTrackConstraints::from(video).into(),
+            );
         }
     }
 }
@@ -156,14 +160,18 @@ impl From<DeviceVideoTrackConstraints> for MediaTrackConstraints {
         if let Some(height) = from.height {
             match height {
                 ConstrainU32::Ideal(height) => {
-                    ideal_cons.set("height".to_string(), (height as i32).into());
+                    ideal_cons
+                        .set("height".to_string(), (height as i32).into());
                 }
                 ConstrainU32::Exact(height) => {
-                    exact_cons.set("height".to_string(), (height as i32).into());
+                    exact_cons
+                        .set("height".to_string(), (height as i32).into());
                 }
                 ConstrainU32::Range(min, max) => {
-                    exact_cons.set("minHeight".to_string(), (min as i32).into());
-                    exact_cons.set("maxHeight".to_string(), (max as i32).into());
+                    exact_cons
+                        .set("minHeight".to_string(), (min as i32).into());
+                    exact_cons
+                        .set("maxHeight".to_string(), (max as i32).into());
                 }
             }
         }
@@ -184,10 +192,16 @@ impl From<DeviceVideoTrackConstraints> for MediaTrackConstraints {
         if let Some(facing_mode) = from.facing_mode {
             match facing_mode {
                 ConstrainString::Exact(facing_mode) => {
-                    video_cons.set("facing_mode".to_string(), facing_mode.to_string().into());
+                    video_cons.set(
+                        "facing_mode".to_string(),
+                        facing_mode.to_string().into(),
+                    );
                 }
                 ConstrainString::Ideal(facing_mode) => {
-                    video_cons.set("facing_mode".to_string(), facing_mode.to_string().into());
+                    video_cons.set(
+                        "facing_mode".to_string(),
+                        facing_mode.to_string().into(),
+                    );
                 }
             }
         }
