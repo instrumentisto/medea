@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:medea_jason/jason.dart';
 
 void main() {
   runApp(MyApp());
@@ -11,12 +10,9 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  int _sum = 0;
-
   @override
   void initState() {
     super.initState();
-    _sum = add(2, 2);
   }
 
   @override
@@ -27,7 +23,7 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Text('2 + 2 = $_sum\n'),
+          child: Text(''),
         ),
       ),
     );
