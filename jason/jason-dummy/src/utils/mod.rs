@@ -1,5 +1,7 @@
 mod arrays;
+mod trampoline;
 mod string;
+mod callback;
 
 pub use self::{
     arrays::PtrArray,

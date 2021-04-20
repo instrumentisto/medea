@@ -1111,6 +1111,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dart-sys"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42fe64308f2072bb94ecd8f7557f9ac01b69d86e6199bac24be0f091ad74b092"
+
+[[package]]
 name = "deadpool"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2028,6 +2034,15 @@ name = "itoa"
 version = "0.4.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
+
+[[package]]
+name = "jason-dummy"
+version = "0.0.1"
+dependencies = [
+ "cc",
+ "dart-sys",
+ "libc",
+]
 
 [[package]]
 name = "js-sys"

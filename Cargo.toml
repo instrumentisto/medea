@@ -20,6 +20,7 @@ members = [
     "crates/medea-macro",
     "crates/medea-reactive",
     "jason",
+    "jason/jason-dummy",
     "mock/control-api",
     "proto/client-api",
     "proto/control-api",
