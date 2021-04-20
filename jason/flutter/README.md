@@ -1,9 +1,9 @@
 Jason Flutter plugin
-=====
+====================
 
 [Changelog](https://github.com/instrumentisto/medea/blob/master/jason/flutter/CHANGELOG.md)
 
-Client library for integration with [Medea] media server in Flutter application.
+Client library for integration with [Medea] media server in Flutter applications.
 
 __Currently, in early development phase.__
 
