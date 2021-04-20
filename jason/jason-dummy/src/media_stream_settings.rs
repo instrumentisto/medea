@@ -57,7 +57,5 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
 pub unsafe extern "C" fn MediaStreamSettings__free(
     this: *mut MediaStreamSettings,
 ) {
-    if !this.is_null() {
-        Box::from_raw(this);
-    }
+    Box::from_raw(this);
 }

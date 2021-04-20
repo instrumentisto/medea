@@ -44,7 +44,5 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 pub unsafe extern "C" fn MediaManagerHandle__free(
     this: *mut MediaManagerHandle,
 ) {
-    if !this.is_null() {
-        Box::from_raw(this);
-    }
+    Box::from_raw(this);
 }

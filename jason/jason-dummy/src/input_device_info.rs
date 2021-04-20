@@ -58,7 +58,5 @@ pub unsafe extern "C" fn InputDeviceInfo__group_id(
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__free(this: *mut InputDeviceInfo) {
-    if !this.is_null() {
-        Box::from_raw(this);
-    }
+    Box::from_raw(this);
 }

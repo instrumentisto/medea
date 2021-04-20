@@ -53,7 +53,5 @@ pub unsafe extern "C" fn Jason__close_room(
 
 #[no_mangle]
 pub unsafe extern "C" fn Jason__free(this: *mut Jason) {
-    if !this.is_null() {
-        Box::from_raw(this);
-    }
+    Box::from_raw(this);
 }

@@ -13,6 +13,7 @@ class PtrArray extends Struct {
   external int _len;
   external Pointer<Pointer> _arr;
 
+  /// Frees an underlying native memory, so it can only be called once.
   List<Pointer> intoPointerList() {
     try {
       var out = List<Pointer>.empty(growable: true);

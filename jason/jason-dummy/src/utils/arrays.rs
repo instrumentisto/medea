@@ -25,7 +25,7 @@ impl<T> Drop for PtrArray<T> {
     #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
         // Only dropping boxed slice. Elements are leaked and must be
-        // explicitly freed in foreign code.
+        // explicitly freed in a foreign code.
         unsafe {
             let slice = slice::from_raw_parts_mut(
                 self.arr as *mut *mut (),
