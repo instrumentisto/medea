@@ -354,7 +354,11 @@ cargo.lint:
 # TODO: Replace with actual `medea-jason` crate.
 define cargo.lint.medea-jason.android
 	$(eval target := $(strip $(1)))
+
 	cd jason/jason-dummy/ && \
+	PATH=${ANDROID_NDK_HOME}:${PATH} \
+	CC_aarch64_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
+	CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
 	cargo clippy --target=$(target) -- -D clippy::pedantic -D warnings
 endef
 
