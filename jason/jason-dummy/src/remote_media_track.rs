@@ -1,4 +1,5 @@
-use crate::{MediaKind, MediaSourceKind};
+use crate::{utils::DartCallback, MediaKind, MediaSourceKind};
+use dart_sys::Dart_Handle;
 
 pub struct RemoteMediaTrack;
 
@@ -18,12 +19,73 @@ impl RemoteMediaTrack {
     pub fn muted(&self) -> bool {
         false
     }
-    // pub fn on_enabled(&self, callback: Callback<()>)
-    // pub fn on_disabled(&self, callback: Callback<()>)
+
     // pub fn get_track(&self) -> sys::MediaStreamTrack
-    // pub fn on_muted(&self, cb: Callback<()>)
-    // pub fn on_unmuted(&self, cb: Callback<()>)
-    // pub fn on_stopped(&self, cb: Callback<()>)
+
+    pub fn on_enabled(&self, cb: DartCallback<()>) {
+        cb.call_unit();
+    }
+
+    pub fn on_disabled(&self, cb: DartCallback<()>) {
+        cb.call_unit();
+    }
+
+    pub fn on_muted(&self, cb: DartCallback<()>) {
+        cb.call_unit();
+    }
+
+    pub fn on_unmuted(&self, cb: DartCallback<()>) {
+        cb.call_unit();
+    }
+
+    pub fn on_stopped(&self, cb: DartCallback<()>) {
+        cb.call_unit();
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn RemoteMediaTrack__on_enabled(
+    this: *const RemoteMediaTrack,
+    f: Dart_Handle,
+) {
+    let this = this.as_ref().unwrap();
+    this.on_enabled(DartCallback::new(f));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn RemoteMediaTrack__on_disabled(
+    this: *const RemoteMediaTrack,
+    f: Dart_Handle,
+) {
+    let this = this.as_ref().unwrap();
+    this.on_disabled(DartCallback::new(f));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn RemoteMediaTrack__on_muted(
+    this: *const RemoteMediaTrack,
+    f: Dart_Handle,
+) {
+    let this = this.as_ref().unwrap();
+    this.on_muted(DartCallback::new(f));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn RemoteMediaTrack__on_unmuted(
+    this: *const RemoteMediaTrack,
+    f: Dart_Handle,
+) {
+    let this = this.as_ref().unwrap();
+    this.on_unmuted(DartCallback::new(f));
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn RemoteMediaTrack__on_stopped(
+    this: *const RemoteMediaTrack,
+    f: Dart_Handle,
+) {
+    let this = this.as_ref().unwrap();
+    this.on_stopped(DartCallback::new(f));
 }
 
 #[no_mangle]

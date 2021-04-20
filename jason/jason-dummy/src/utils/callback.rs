@@ -8,8 +8,7 @@ use super::trampoline::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-pub type PointerClosureCaller =
-    extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
+type PointerClosureCaller = extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
 static mut POINTER_CLOSURE_CALLER: Option<PointerClosureCaller> = None;
 #[no_mangle]
 pub unsafe extern "C" fn register_pointer_closure_caller(
