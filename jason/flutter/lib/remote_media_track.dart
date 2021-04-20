@@ -8,6 +8,9 @@ import 'util/nullable_pointer.dart';
 typedef _enabled_C = Uint8 Function(Pointer);
 typedef _enabled_Dart = int Function(Pointer);
 
+typedef _muted_C = Uint8 Function(Pointer);
+typedef _muted_Dart = int Function(Pointer);
+
 typedef _kind_C = Uint8 Function(Pointer);
 typedef _kind_Dart = int Function(Pointer);
 
@@ -17,18 +20,19 @@ typedef _mediaSourceKind_Dart = int Function(Pointer);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-final _enabled_Dart _enable =
+final _enabled =
     dl.lookupFunction<_enabled_C, _enabled_Dart>('RemoteMediaTrack__enabled');
 
-final _kind_Dart _kind =
-    dl.lookupFunction<_kind_C, _kind_Dart>('RemoteMediaTrack__kind');
+final _muted =
+    dl.lookupFunction<_muted_C, _muted_Dart>('RemoteMediaTrack__muted');
 
-final _mediaSourceKind_Dart _mediaSourceKind =
+final _kind = dl.lookupFunction<_kind_C, _kind_Dart>('RemoteMediaTrack__kind');
+
+final _mediaSourceKind =
     dl.lookupFunction<_mediaSourceKind_C, _mediaSourceKind_Dart>(
         'RemoteMediaTrack__media_source_kind');
 
-final _free_Dart _free =
-    dl.lookupFunction<_free_C, _free_Dart>('RemoteMediaTrack__free');
+final _free = dl.lookupFunction<_free_C, _free_Dart>('RemoteMediaTrack__free');
 
 class RemoteMediaTrack {
   late NullablePointer ptr;
@@ -36,7 +40,11 @@ class RemoteMediaTrack {
   RemoteMediaTrack(this.ptr);
 
   bool enabled() {
-    return _enable(ptr.getInnerPtr()) > 0;
+    return _enabled(ptr.getInnerPtr()) > 0;
+  }
+
+  bool muted() {
+    return _muted(ptr.getInnerPtr()) > 0;
   }
 
   MediaKind kind() {

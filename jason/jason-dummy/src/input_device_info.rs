@@ -1,7 +1,4 @@
-use crate::{
-    utils::{ptr_from_dart_as_ref, string_into_c_str},
-    MediaKind,
-};
+use crate::{utils::string_into_c_str, MediaKind};
 
 pub struct InputDeviceInfo {}
 
@@ -27,7 +24,7 @@ impl InputDeviceInfo {
 pub unsafe extern "C" fn InputDeviceInfo__device_id(
     this: *const InputDeviceInfo,
 ) -> *const libc::c_char {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     string_into_c_str(this.device_id())
 }
@@ -36,7 +33,7 @@ pub unsafe extern "C" fn InputDeviceInfo__device_id(
 pub unsafe extern "C" fn InputDeviceInfo__kind(
     this: *const InputDeviceInfo,
 ) -> u8 {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     this.kind() as u8
 }
@@ -45,7 +42,7 @@ pub unsafe extern "C" fn InputDeviceInfo__kind(
 pub unsafe extern "C" fn InputDeviceInfo__label(
     this: *const InputDeviceInfo,
 ) -> *const libc::c_char {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     string_into_c_str(this.label())
 }
@@ -54,7 +51,7 @@ pub unsafe extern "C" fn InputDeviceInfo__label(
 pub unsafe extern "C" fn InputDeviceInfo__group_id(
     this: *const InputDeviceInfo,
 ) -> *const libc::c_char {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     string_into_c_str(this.group_id())
 }

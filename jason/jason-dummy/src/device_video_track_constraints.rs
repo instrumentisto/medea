@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::utils::{c_str_into_string, ptr_from_dart_as_mut};
+use crate::utils::c_str_into_string;
 
 pub struct DeviceVideoTrackConstraints;
 
@@ -60,7 +60,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
     this: *mut DeviceVideoTrackConstraints,
     device_id: *const libc::c_char,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.device_id(c_str_into_string(device_id));
 }
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_facing_mode(
     this: *mut DeviceVideoTrackConstraints,
     facing_mode: u8,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.exact_facing_mode(FacingMode::try_from(facing_mode).unwrap());
 }
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_facing_mode(
     this: *mut DeviceVideoTrackConstraints,
     facing_mode: u8,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.ideal_facing_mode(FacingMode::try_from(facing_mode).unwrap());
 }
@@ -90,7 +90,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
     this: *mut DeviceVideoTrackConstraints,
     height: u32,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.exact_height(height);
 }
@@ -100,7 +100,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
     this: *mut DeviceVideoTrackConstraints,
     height: u32,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.ideal_height(height);
 }
@@ -111,7 +111,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
     min: u32,
     max: u32,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.height_in_range(min, max);
 }
@@ -121,7 +121,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
     this: *mut DeviceVideoTrackConstraints,
     width: u32,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.exact_width(width);
 }
@@ -131,7 +131,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
     this: *mut DeviceVideoTrackConstraints,
     width: u32,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.ideal_width(width);
 }
@@ -142,7 +142,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
     min: u32,
     max: u32,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.width_in_range(min, max);
 }

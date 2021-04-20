@@ -24,15 +24,18 @@ typedef _free_Dart = void Function(Pointer);
 
 final DynamicLibrary dl = _dl_load();
 
-final _new_Dart _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');
-final _mediaManager_Dart _media_manager =
-    dl.lookupFunction<_mediaManager_C, _mediaManager_Dart>(
-        'Jason__media_manager');
-final _initRoom_Dart _initRoom =
+final _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');
+
+final _media_manager = dl.lookupFunction<_mediaManager_C, _mediaManager_Dart>(
+    'Jason__media_manager');
+
+final _initRoom =
     dl.lookupFunction<_initRoom_C, _initRoom_Dart>('Jason__init_room');
-final _closeRoom_Dart _close_room =
+
+final _close_room =
     dl.lookupFunction<_closeRoom_C, _closeRoom_Dart>('Jason__close_room');
-final _free_Dart _free = dl.lookupFunction<_free_C, _free_Dart>('Jason__free');
+
+final _free = dl.lookupFunction<_free_C, _free_Dart>('Jason__free');
 
 DynamicLibrary _dl_load() {
   if (Platform.isAndroid) return DynamicLibrary.open('libjason.so');

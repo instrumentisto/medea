@@ -1,7 +1,4 @@
-use crate::{
-    media_manager::MediaManagerHandle, room_handle::RoomHandle,
-    utils::ptr_from_dart_as_ref,
-};
+use crate::{media_manager::MediaManagerHandle, room_handle::RoomHandle};
 
 pub struct Jason;
 
@@ -30,7 +27,7 @@ pub extern "C" fn Jason__new() -> *const Jason {
 pub unsafe extern "C" fn Jason__init_room(
     this: *const Jason,
 ) -> *mut RoomHandle {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     Box::into_raw(Box::new(this.init_room()))
 }
@@ -39,7 +36,7 @@ pub unsafe extern "C" fn Jason__init_room(
 pub unsafe extern "C" fn Jason__media_manager(
     this: *const Jason,
 ) -> *mut MediaManagerHandle {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     Box::into_raw(Box::new(this.media_manager()))
 }
@@ -49,7 +46,7 @@ pub unsafe extern "C" fn Jason__close_room(
     this: *const Jason,
     room_to_delete: *mut RoomHandle,
 ) {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     this.close_room(*Box::from_raw(room_to_delete));
 }

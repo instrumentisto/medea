@@ -1,4 +1,4 @@
-use crate::utils::{c_str_into_string, ptr_from_dart_as_mut};
+use crate::utils::c_str_into_string;
 
 pub struct AudioTrackConstraints;
 
@@ -20,7 +20,7 @@ pub unsafe extern "C" fn AudioTrackConstraints__device_id(
     this: *mut AudioTrackConstraints,
     device_id: *const libc::c_char,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.device_id(c_str_into_string(device_id))
 }

@@ -22,21 +22,18 @@ typedef _displayVideo_Dart = void Function(Pointer, Pointer);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-final _new_Dart _new =
-    dl.lookupFunction<_new_C, _new_Dart>('MediaStreamSettings__new');
+final _new = dl.lookupFunction<_new_C, _new_Dart>('MediaStreamSettings__new');
 
-final _audio_Dart _audio =
+final _audio =
     dl.lookupFunction<_audio_C, _audio_Dart>('MediaStreamSettings__audio');
 
-final _deviceVideo_Dart _deviceVideo =
-    dl.lookupFunction<_deviceVideo_C, _deviceVideo_Dart>(
-        'MediaStreamSettings__device_video');
+final _deviceVideo = dl.lookupFunction<_deviceVideo_C, _deviceVideo_Dart>(
+    'MediaStreamSettings__device_video');
 
-final _displayVideo_Dart _displayVideo =
-    dl.lookupFunction<_displayVideo_C, _displayVideo_Dart>(
-        'MediaStreamSettings__display_video');
+final _displayVideo = dl.lookupFunction<_displayVideo_C, _displayVideo_Dart>(
+    'MediaStreamSettings__display_video');
 
-final _free_Dart _free =
+final _free =
     dl.lookupFunction<_free_C, _free_Dart>('MediaStreamSettings__free');
 
 class MediaStreamSettings {

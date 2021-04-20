@@ -1,4 +1,4 @@
-use crate::utils::{ptr_from_dart_as_ref, string_into_c_str};
+use crate::utils::string_into_c_str;
 
 pub struct ConnectionHandle;
 
@@ -18,7 +18,7 @@ impl ConnectionHandle {
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: *const ConnectionHandle,
 ) -> *const libc::c_char {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     string_into_c_str(this.get_remote_member_id())
 }

@@ -2,7 +2,6 @@ use crate::{
     audio_track_constraints::AudioTrackConstraints,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
-    utils::ptr_from_dart_as_mut,
 };
 
 pub struct MediaStreamSettings;
@@ -29,7 +28,7 @@ pub unsafe extern "C" fn MediaStreamSettings__audio(
     this: *mut MediaStreamSettings,
     constraints: *mut AudioTrackConstraints,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.audio(*Box::from_raw(constraints));
 }
@@ -39,7 +38,7 @@ pub unsafe extern "C" fn MediaStreamSettings__device_video(
     this: *mut MediaStreamSettings,
     constraints: *mut DeviceVideoTrackConstraints,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.device_video(*Box::from_raw(constraints));
 }
@@ -49,7 +48,7 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
     this: *mut MediaStreamSettings,
     constraints: *mut DisplayVideoTrackConstraints,
 ) {
-    let this = ptr_from_dart_as_mut(this);
+    let this = this.as_mut().unwrap();
 
     this.display_video(*Box::from_raw(constraints));
 }

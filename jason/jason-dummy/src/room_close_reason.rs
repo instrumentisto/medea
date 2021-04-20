@@ -1,4 +1,4 @@
-use crate::utils::{ptr_from_dart_as_ref, string_into_c_str};
+use crate::utils::string_into_c_str;
 
 pub struct RoomCloseReason;
 
@@ -20,7 +20,7 @@ impl RoomCloseReason {
 pub unsafe extern "C" fn RoomCloseReason__reason(
     this: *const RoomCloseReason,
 ) -> *const libc::c_char {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     string_into_c_str(this.reason())
 }
@@ -29,7 +29,7 @@ pub unsafe extern "C" fn RoomCloseReason__reason(
 pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
     this: *const RoomCloseReason,
 ) -> u8 {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     this.is_closed_by_server() as u8
 }
@@ -38,7 +38,7 @@ pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
 pub unsafe extern "C" fn RoomCloseReason__is_err(
     this: *const RoomCloseReason,
 ) -> u8 {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     this.is_err() as u8
 }

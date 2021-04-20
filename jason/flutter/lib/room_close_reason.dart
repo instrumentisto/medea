@@ -3,6 +3,7 @@ import 'package:ffi/ffi.dart';
 
 import 'jason.dart';
 import 'util/move_semantic.dart';
+import 'util/native_string.dart';
 import 'util/nullable_pointer.dart';
 
 typedef _reason_C = Pointer<Utf8> Function(Pointer);
@@ -17,18 +18,17 @@ typedef _isErr_Dart = int Function(Pointer);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-final _reason_Dart _reason =
+final _reason =
     dl.lookupFunction<_reason_C, _reason_Dart>('RoomCloseReason__reason');
 
-final _isClosedByServer_Dart _isClosedByServer =
+final _isClosedByServer =
     dl.lookupFunction<_isClosedByServer_C, _isClosedByServer_Dart>(
         'RoomCloseReason__is_closed_by_server');
 
-final _isErr_Dart _isErr =
+final _isErr =
     dl.lookupFunction<_isErr_C, _isErr_Dart>('RoomCloseReason__is_err');
 
-final _free_Dart _free =
-    dl.lookupFunction<_free_C, _free_Dart>('RoomCloseReason__free');
+final _free = dl.lookupFunction<_free_C, _free_Dart>('RoomCloseReason__free');
 
 class RoomCloseReason {
   late NullablePointer ptr;
@@ -36,7 +36,7 @@ class RoomCloseReason {
   RoomCloseReason(this.ptr);
 
   String reason() {
-    return _reason(ptr.getInnerPtr()).toDartString();
+    return _reason(ptr.getInnerPtr()).nativeStringToDartString();
   }
 
   bool isClosedByServer() {

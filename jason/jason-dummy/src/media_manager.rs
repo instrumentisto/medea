@@ -1,7 +1,6 @@
 use crate::{
-    input_device_info::InputDeviceInfo,
-    local_media_track::LocalMediaTrack,
-    utils::{ptr_from_dart_as_ref, PtrArray},
+    input_device_info::InputDeviceInfo, local_media_track::LocalMediaTrack,
+    media_stream_settings::MediaStreamSettings, utils::PtrArray,
 };
 
 pub struct MediaManagerHandle;
@@ -12,7 +11,10 @@ impl MediaManagerHandle {
         vec![InputDeviceInfo {}, InputDeviceInfo {}, InputDeviceInfo {}]
     }
 
-    pub fn init_local_tracks(&self) -> Vec<LocalMediaTrack> {
+    pub fn init_local_tracks(
+        &self,
+        _caps: &MediaStreamSettings,
+    ) -> Vec<LocalMediaTrack> {
         // async && Result
         vec![LocalMediaTrack {}, LocalMediaTrack {}, LocalMediaTrack {}]
     }
@@ -21,17 +23,19 @@ impl MediaManagerHandle {
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     this: *const MediaManagerHandle,
+    caps: *const MediaStreamSettings,
 ) -> PtrArray<LocalMediaTrack> {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
+    let caps = caps.as_ref().unwrap();
 
-    PtrArray::new(this.init_local_tracks())
+    PtrArray::new(this.init_local_tracks(caps))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: *const MediaManagerHandle,
 ) -> PtrArray<InputDeviceInfo> {
-    let this = ptr_from_dart_as_ref(this);
+    let this = this.as_ref().unwrap();
 
     PtrArray::new(this.enumerate_devices())
 }

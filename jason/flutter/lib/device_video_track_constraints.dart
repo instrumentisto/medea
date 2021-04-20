@@ -38,45 +38,39 @@ typedef _widthInRange_Dart = void Function(Pointer, int, int);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-final _new_Dart _new =
+final _new =
     dl.lookupFunction<_new_C, _new_Dart>('DeviceVideoTrackConstraints__new');
 
-final _deviceId_Dart _deviceId = dl.lookupFunction<_deviceId_C, _deviceId_Dart>(
+final _deviceId = dl.lookupFunction<_deviceId_C, _deviceId_Dart>(
     'DeviceVideoTrackConstraints__device_id');
 
-final _exactFacingMode_Dart _exactFacingMode =
+final _exactFacingMode =
     dl.lookupFunction<_exactFacingMode_C, _exactFacingMode_Dart>(
         'DeviceVideoTrackConstraints__exact_facing_mode');
 
-final _idealFacingMode_Dart _idealFacingMode =
+final _idealFacingMode =
     dl.lookupFunction<_idealFacingMode_C, _idealFacingMode_Dart>(
         'DeviceVideoTrackConstraints__ideal_facing_mode');
 
-final _exactHeight_Dart _exactHeight =
-    dl.lookupFunction<_exactHeight_C, _exactHeight_Dart>(
-        'DeviceVideoTrackConstraints__exact_height');
+final _exactHeight = dl.lookupFunction<_exactHeight_C, _exactHeight_Dart>(
+    'DeviceVideoTrackConstraints__exact_height');
 
-final _idealHeight_Dart _idealHeight =
-    dl.lookupFunction<_idealHeight_C, _idealHeight_Dart>(
-        'DeviceVideoTrackConstraints__ideal_height');
+final _idealHeight = dl.lookupFunction<_idealHeight_C, _idealHeight_Dart>(
+    'DeviceVideoTrackConstraints__ideal_height');
 
-final _heightInRange_Dart _heightInRange =
-    dl.lookupFunction<_heightInRange_C, _heightInRange_Dart>(
-        'DeviceVideoTrackConstraints__height_in_range');
+final _heightInRange = dl.lookupFunction<_heightInRange_C, _heightInRange_Dart>(
+    'DeviceVideoTrackConstraints__height_in_range');
 
-final _exactWidth_Dart _exactWidth =
-    dl.lookupFunction<_exactWidth_C, _exactWidth_Dart>(
-        'DeviceVideoTrackConstraints__exact_width');
+final _exactWidth = dl.lookupFunction<_exactWidth_C, _exactWidth_Dart>(
+    'DeviceVideoTrackConstraints__exact_width');
 
-final _idealWidth_Dart _idealWidth =
-    dl.lookupFunction<_idealWidth_C, _idealWidth_Dart>(
-        'DeviceVideoTrackConstraints__ideal_width');
+final _idealWidth = dl.lookupFunction<_idealWidth_C, _idealWidth_Dart>(
+    'DeviceVideoTrackConstraints__ideal_width');
 
-final _widthInRange_Dart _widthInRange =
-    dl.lookupFunction<_widthInRange_C, _widthInRange_Dart>(
-        'DeviceVideoTrackConstraints__width_in_range');
+final _widthInRange = dl.lookupFunction<_widthInRange_C, _widthInRange_Dart>(
+    'DeviceVideoTrackConstraints__width_in_range');
 
-final _free_Dart _free =
+final _free =
     dl.lookupFunction<_free_C, _free_Dart>('DeviceVideoTrackConstraints__free');
 
 enum FacingMode {

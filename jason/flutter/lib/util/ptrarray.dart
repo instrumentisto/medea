@@ -13,14 +13,15 @@ class PtrArray extends Struct {
   external int _len;
   external Pointer<Pointer> _arr;
 
-  List<Pointer> intoList() {
-    var out = List<Pointer>.empty(growable: true);
-    for (var i = 0; i < _len; i++) {
-      out.add(_arr.elementAt(i));
+  List<Pointer> intoPointerList() {
+    try {
+      var out = List<Pointer>.empty(growable: true);
+      for (var i = 0; i < _len; i++) {
+        out.add(_arr.elementAt(i));
+      }
+      return out;
+    } finally {
+      _free(this);
     }
-    // TODO: check that 'this' keyword is correct here
-    _free(this);
-
-    return out;
   }
 }

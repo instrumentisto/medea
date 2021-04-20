@@ -14,13 +14,12 @@ typedef _deviceId_Dart = void Function(Pointer, Pointer<Utf8>);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-final _new_Dart _new =
-    dl.lookupFunction<_new_C, _new_Dart>('AudioTrackConstraints__new');
+final _new = dl.lookupFunction<_new_C, _new_Dart>('AudioTrackConstraints__new');
 
-final _deviceId_Dart _deviceId = dl.lookupFunction<_deviceId_C, _deviceId_Dart>(
+final _deviceId = dl.lookupFunction<_deviceId_C, _deviceId_Dart>(
     'AudioTrackConstraints__device_id');
 
-final _free_Dart _free =
+final _free =
     dl.lookupFunction<_free_C, _free_Dart>('AudioTrackConstraints__free');
 
 class AudioTrackConstraints {

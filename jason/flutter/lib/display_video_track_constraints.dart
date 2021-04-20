@@ -10,7 +10,7 @@ typedef _new_Dart = Pointer Function();
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-final _new_Dart _new =
+final _new =
     dl.lookupFunction<_new_C, _new_Dart>('DisplayVideoTrackConstraints__new');
 
 final _free_Dart _free = dl
