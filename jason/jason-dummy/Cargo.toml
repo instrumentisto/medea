@@ -1,0 +1,13 @@
+[package]
+name = "jason-dummy"
+version = "0.0.1"
+edition = "2018"
+description = "Temp crate to help us bootstrap flutter + rust builds"
+
+[lib]
+name = "jason"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+
+[workspace]

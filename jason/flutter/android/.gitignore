@@ -1,0 +1,7 @@
+/.gradle/
+
+/build/
+/captures/
+/src/main/jniLibs/
+
+/local.properties
