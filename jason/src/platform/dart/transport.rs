@@ -98,7 +98,7 @@ type OnMessageFunction = extern "C" fn(Dart_Handle, Dart_Handle);
 static mut ON_MESSAGE_FUNCTION: Option<OnMessageFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_on_message_function(f: OnMessageFunction) {
+pub unsafe extern "C" fn register_WebSocketRpcTransport__on_message(f: OnMessageFunction) {
     ON_MESSAGE_FUNCTION = Some(f);
 }
 
