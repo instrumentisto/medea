@@ -8,13 +8,15 @@ use super::trampoline::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-pub type PointerClosureCaller = extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
+pub type PointerClosureCaller =
+    extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
 static mut POINTER_CLOSURE_CALLER: Option<PointerClosureCaller> = None;
 #[no_mangle]
-pub unsafe extern "C" fn register_pointer_closure_caller(caller: PointerClosureCaller) {
+pub unsafe extern "C" fn register_pointer_closure_caller(
+    caller: PointerClosureCaller,
+) {
     POINTER_CLOSURE_CALLER = Some(caller);
 }
-
 
 pub struct DartCallback<T> {
     cb: Dart_PersistentHandle,
@@ -33,7 +35,8 @@ impl<T: 'static> DartCallback<T> {
 
     pub fn call(&self, arg: T) {
         unsafe {
-            let closure_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
+            let closure_handle =
+                Dart_HandleFromPersistent_DL_Trampolined(self.cb);
             POINTER_CLOSURE_CALLER.unwrap()(
                 closure_handle,
                 Box::into_raw(Box::new(arg) as Box<dyn Any>),
@@ -52,8 +55,9 @@ pub unsafe extern "C" fn register_unit_closure_caller(f: UnitClosureCaller) {
 impl DartCallback<()> {
     pub fn call_unit(&self) {
         unsafe {
-            let closure_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-            UNIT_CLOSURE_CALLER .unwrap()(closure_handle);
+            let closure_handle =
+                Dart_HandleFromPersistent_DL_Trampolined(self.cb);
+            UNIT_CLOSURE_CALLER.unwrap()(closure_handle);
         }
     }
 }
@@ -68,8 +72,9 @@ pub unsafe extern "C" fn register_int_closure_caller(f: IntClosureCaller) {
 impl DartCallback<i32> {
     pub fn call_int(&self, arg: i32) {
         unsafe {
-            let closure_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-            INT_CLOSURE_CALLER .unwrap()(closure_handle, arg);
+            let closure_handle =
+                Dart_HandleFromPersistent_DL_Trampolined(self.cb);
+            INT_CLOSURE_CALLER.unwrap()(closure_handle, arg);
         }
     }
 }

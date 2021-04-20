@@ -12,8 +12,9 @@ extern "C" {
     pub fn Dart_DeletePersistentHandle_DL_Trampolined(
         object: Dart_PersistentHandle,
     );
-    pub fn Dart_NewApiError_DL_Trampolined(msg: *const libc::c_char)
-                                       -> Dart_Handle;
+    pub fn Dart_NewApiError_DL_Trampolined(
+        msg: *const libc::c_char,
+    ) -> Dart_Handle;
     pub fn Dart_NewUnhandledExceptionError_DL_Trampolined(
         exception: Dart_Handle,
     ) -> Dart_Handle;
