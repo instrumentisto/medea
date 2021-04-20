@@ -20,3 +20,10 @@ extern "C" {
     ) -> Dart_Handle;
     pub fn Dart_PropagateError_DL_Trampolined(handle: Dart_Handle);
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn init_dart_api_dl(
+    obj: *mut libc::c_void,
+) -> libc::intptr_t {
+    return Dart_InitializeApiDL(obj);
+}

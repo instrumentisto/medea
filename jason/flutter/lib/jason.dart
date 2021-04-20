@@ -6,6 +6,7 @@ import 'media_manager.dart';
 import 'room_handle.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
+import 'util/callback.dart' as callback;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
@@ -44,6 +45,17 @@ DynamicLibrary _dl_load() {
 
 class Jason {
   final NullablePointer ptr = NullablePointer(_new());
+
+  Jason() {
+    final nativeInitializeApi = dl.lookupFunction<
+        IntPtr Function(Pointer<Void>),
+        int Function(Pointer<Void>)>('init_dart_api_dl');
+
+    if (nativeInitializeApi(NativeApi.initializeApiDLData) != 0) {
+      throw 'Failed to initialize Dart API';
+    }
+    callback.registerFunctions();
+  }
 
   MediaManager mediaManager() {
     return MediaManager(NullablePointer(_media_manager(ptr.getInnerPtr())));
