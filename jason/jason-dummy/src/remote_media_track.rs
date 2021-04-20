@@ -1,5 +1,6 @@
-use crate::{utils::DartCallback, MediaKind, MediaSourceKind};
 use dart_sys::Dart_Handle;
+
+use crate::{utils::DartCallback, MediaKind, MediaSourceKind};
 
 pub struct RemoteMediaTrack;
 

@@ -1,9 +1,10 @@
+use dart_sys::Dart_Handle;
+
 use crate::{
     connection_handle::ConnectionHandle, local_media_track::LocalMediaTrack,
     reconnect_handle::ReconnectHandle, room_close_reason::RoomCloseReason,
     utils::DartCallback,
 };
-use dart_sys::Dart_Handle;
 
 pub struct RoomHandle;
 

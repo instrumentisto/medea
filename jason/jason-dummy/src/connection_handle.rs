@@ -1,8 +1,9 @@
+use dart_sys::Dart_Handle;
+
 use crate::{
     remote_media_track::RemoteMediaTrack,
     utils::{string_into_c_str, DartCallback},
 };
-use dart_sys::Dart_Handle;
 
 pub struct ConnectionHandle;
 
