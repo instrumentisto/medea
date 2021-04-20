@@ -14,3 +14,5 @@ dart-sys = "2.0"
 
 [build-dependencies]
 cc = "1.0"
+
+[workspace]
