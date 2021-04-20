@@ -10,8 +10,5 @@ pub unsafe fn string_into_c_str(string: String) -> *const libc::c_char {
 
 #[no_mangle]
 pub unsafe extern "C" fn String_free(s: *mut libc::c_char) {
-    if s.is_null() {
-        return;
-    }
     CString::from_raw(s);
 }

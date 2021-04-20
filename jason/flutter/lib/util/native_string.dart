@@ -9,6 +9,7 @@ typedef _free_Dart = void Function(Pointer<Utf8>);
 final _free = dl.lookupFunction<_free_C, _free_Dart>('String_free');
 
 extension RustStringPointer on Pointer<Utf8> {
+  /// Frees underlying native memory, so can only be called once.
   String nativeStringToDartString() {
     try {
       return toDartString();

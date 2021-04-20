@@ -30,7 +30,5 @@ impl RoomHandle {
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
-    if !this.is_null() {
-        Box::from_raw(this);
-    }
+    Box::from_raw(this);
 }
