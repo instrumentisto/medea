@@ -10,6 +10,7 @@ use super::trampoline::{
 
 type PointerClosureCaller = extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
 static mut POINTER_CLOSURE_CALLER: Option<PointerClosureCaller> = None;
+#[allow(improper_ctypes_definitions)]
 #[no_mangle]
 pub unsafe extern "C" fn register_pointer_closure_caller(
     caller: PointerClosureCaller,
