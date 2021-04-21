@@ -20,12 +20,11 @@ crate-type = ["cdylib", "rlib", "staticlib"]
 [features]
 default = []
 wasm = ["console_error_panic_hook", "wee_alloc", "js-sys", "wasm-bindgen", "wasm-bindgen-futures", "wasm-logger"]
-dart = ["libc", "dart-sys", "extern_executor"]
+dart = ["libc", "dart-sys"]
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 
 [dependencies]
 libc = { version = "0.2", optional = true }
-extern_executor = { version = "0.1", features = ["dart"], optional = true }
 async-recursion = "0.3"
 async-trait = "0.1"
 bitflags = "1.2"

@@ -1,5 +1,6 @@
 pub mod constraints;
 pub mod error;
+mod executor;
 pub mod ice_candidate;
 pub mod ice_server;
 pub mod input_device_info;
@@ -11,7 +12,7 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
-pub use extern_executor::spawn;
+pub use self::executor::spawn;
 
 use std::{future::Future, time::Duration};
 
