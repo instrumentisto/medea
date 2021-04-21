@@ -30,7 +30,8 @@ pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
     GROUP_ID_FUNCTION = Some(f);
 }
 
-type KindFunction = extern "C" fn(Dart_Handle) -> String;
+// TODO: Make it *const libc::c_char
+type KindFunction = extern "C" fn(Dart_Handle) -> i32;
 static mut KIND_FUNCTION: Option<KindFunction> = None;
 
 #[no_mangle]

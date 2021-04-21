@@ -2,7 +2,6 @@ pub mod constraints;
 pub mod error;
 mod executor;
 pub mod ice_candidate;
-pub mod ice_server;
 pub mod input_device_info;
 pub mod media_devices;
 pub mod media_track;
