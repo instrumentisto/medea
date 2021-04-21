@@ -1,6 +1,5 @@
 pub mod array;
 pub mod dart_future;
-pub mod executor;
 pub mod option;
 pub mod result;
 

@@ -27,12 +27,17 @@ void replaceSendTrack(Object transceiver, Object track) {
   }
 }
 
-void setSenderTrackEnabled(Object transceiver, int enabled) {
+void setSendTrack(Object transceiver, int enabled) {
   if (transceiver is RTCRtpTransceiver) {
     transceiver.sender.track.enabled = enabled == 1;
   }
 }
 
+void dropSender(Object transceiver) {
+  if (transceiver is RTCRtpTransceiver) {
+    transceiver.sender.setTrack(null);
+  }
+}
 
 int isStopped(Object transceiver) {
   if (transceiver is RTCRtpTransceiver) {

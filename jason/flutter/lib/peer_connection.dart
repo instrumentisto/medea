@@ -1,4 +1,6 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'array.dart';
+import 'array.dart';
 import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
@@ -37,3 +39,18 @@ int iceConnectionState(Object conn) {
   }
 }
 
+void rollback(Object conn) {
+  if (conn is RTCPeerConnection) {
+    conn.setLocalDescription(RTCSessionDescription(null, "rollback"));
+  } else {
+    throw Exception("Unexpected Object received: " + conn.runtimeType.toString());
+  }
+}
+
+Object getTransceivers(Object conn) {
+  if (conn is RTCPeerConnection) {
+    return conn.getTransceivers();
+  } else {
+    throw Exception("Unexpected Object received: " + conn.runtimeType.toString());
+  }
+}
