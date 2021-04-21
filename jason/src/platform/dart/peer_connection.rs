@@ -1,9 +1,8 @@
 use dart_sys::Dart_Handle;
-use medea_client_api_proto::{
-    IceCandidate, IceConnectionState, PeerConnectionState,
-};
+use medea_client_api_proto::{IceConnectionState, PeerConnectionState, IceServer};
 use tracerr::Traced;
 
+use crate::platform::{IceCandidate, RtcStats};
 use super::{
     ice_candidate::IceCandidate as PlatformIceCandidate,
     media_track::MediaStreamTrack,
@@ -179,6 +178,13 @@ pub struct RtcPeerConnection {
 }
 
 impl RtcPeerConnection {
+    pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
+        where
+            I: IntoIterator<Item = IceServer>,
+    {
+        todo!()
+    }
+
     pub fn ice_connection_state(&self) -> IceConnectionState {
         unsafe {
             let ice_connection_state =
@@ -278,6 +284,10 @@ impl RtcPeerConnection {
         todo!("Need to do something with nullable arguments")
     }
 
+    pub async fn get_stats(&self) -> Result<RtcStats> {
+        todo!()
+    }
+
     pub fn restart_ice(&self) {
         unsafe { RESTART_ICE_FUNCTION.unwrap()(self.handle) };
     }
@@ -324,7 +334,7 @@ impl RtcPeerConnection {
         Ok(())
     }
 
-    pub async fn create_answer(&self) -> Result<()> {
+    pub async fn create_answer(&self) -> Result<String> {
         todo!("Should be backed by the same function as create_offer")
     }
 

@@ -2,7 +2,9 @@ use std::rc::Rc;
 
 use dart_sys::{Dart_Handle, _Dart_Handle};
 
+use crate::platform;
 use crate::{media::track::local, platform::TransceiverDirection};
+use std::future::Future;
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
@@ -96,19 +98,21 @@ impl Transceiver {
         todo!()
     }
 
-    // TODO: replace Dart_Handle with local::Track
-    pub fn set_send_track(&self, new_sender: Dart_Handle) {
+    // TODO: future
+    pub async fn set_send_track(&self, new_sender: Rc<local::Track>) -> Result<(), platform::Error> {
         unsafe {
             let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
-            REPLACE_TRACK_FUNCTION.unwrap()(sender, new_sender);
+            REPLACE_TRACK_FUNCTION.unwrap()(sender, new_sender.platform_track().track());
         }
+        Ok(())
     }
 
-    pub async fn drop_send_track(&self) {
+    pub fn drop_send_track(&self) -> impl Future<Output = ()> {
         unsafe {
             let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
             DROP_SENDER_FUNCTION.unwrap()(sender);
         }
+        async {}
     }
 
     pub fn set_send_track_enabled(&self, enabled: bool) {

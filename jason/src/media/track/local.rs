@@ -56,6 +56,11 @@ impl Track {
         }
     }
 
+    // TODO: temporary
+    pub fn platform_track(&self) -> &platform::MediaStreamTrack {
+        &self.track
+    }
+
     /// Changes [`enabled`][1] attribute on the underlying
     /// [MediaStreamTrack][2].
     ///

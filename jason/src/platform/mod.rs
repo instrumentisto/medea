@@ -32,18 +32,21 @@ pub use self::{
 //     utils::{callback::Callback, callback::Function},
 // };
 #[cfg(feature = "wasm")]
-pub use self::wasm::{
+pub use self::dart::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     delay_for,
-    error::Error,
-    get_property_by_name, init_logger,
     input_device_info::InputDeviceInfo,
     media_devices::{enumerate_devices, get_display_media, get_user_media},
     media_track::MediaStreamTrack,
     peer_connection::RtcPeerConnection,
-    rtc_stats::RtcStats,
-    set_panic_hook, spawn,
+    spawn,
     transceiver::Transceiver,
+};
+pub use self::wasm::{
+    get_property_by_name, init_logger,
+    error::Error,
+    rtc_stats::RtcStats,
+    set_panic_hook,
     utils::{Callback, Function},
 };
 

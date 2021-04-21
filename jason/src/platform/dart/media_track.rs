@@ -10,6 +10,12 @@ use crate::{
 #[derive(Clone, From, Debug)]
 pub struct MediaStreamTrack(Dart_Handle);
 
+impl MediaStreamTrack {
+    pub fn track(&self) -> Dart_Handle {
+        self.0
+    }
+}
+
 type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut ID_FUNCTION: Option<IdFunction> = None;
 
