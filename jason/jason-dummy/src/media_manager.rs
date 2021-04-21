@@ -1,9 +1,11 @@
 use crate::{
     input_device_info::InputDeviceInfo, local_media_track::LocalMediaTrack,
-    media_stream_settings::MediaStreamSettings, utils::PtrArray,
+    media_stream_settings::MediaStreamSettings, utils::PtrArray, ForeignClass,
 };
 
 pub struct MediaManagerHandle;
+
+impl ForeignClass for MediaManagerHandle {}
 
 impl MediaManagerHandle {
     pub fn enumerate_devices(&self) -> Vec<InputDeviceInfo> {
@@ -44,5 +46,5 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 pub unsafe extern "C" fn MediaManagerHandle__free(
     this: *mut MediaManagerHandle,
 ) {
-    Box::from_raw(this);
+    MediaManagerHandle::from_ptr(this);
 }

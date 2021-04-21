@@ -3,30 +3,32 @@ use dart_sys::Dart_Handle;
 use crate::{
     connection_handle::ConnectionHandle, local_media_track::LocalMediaTrack,
     reconnect_handle::ReconnectHandle, room_close_reason::RoomCloseReason,
-    utils::DartCallback,
+    utils::DartClosure, ForeignClass,
 };
 
 pub struct RoomHandle;
 
+impl ForeignClass for RoomHandle {}
+
 impl RoomHandle {
-    pub fn on_new_connection(&self, cb: DartCallback<ConnectionHandle>) {
+    pub fn on_new_connection(&self, cb: DartClosure<ConnectionHandle>) {
         // Result<(), JasonError>
-        cb.call(ConnectionHandle);
+        cb.call1(ConnectionHandle);
     }
 
-    pub fn on_close(&self, cb: DartCallback<RoomCloseReason>) {
+    pub fn on_close(&self, cb: DartClosure<RoomCloseReason>) {
         // Result<(), JasonError>
-        cb.call(RoomCloseReason);
+        cb.call1(RoomCloseReason);
     }
 
-    pub fn on_local_track(&self, cb: DartCallback<LocalMediaTrack>) {
+    pub fn on_local_track(&self, cb: DartClosure<LocalMediaTrack>) {
         // Result<(), JasonError>
-        cb.call(LocalMediaTrack);
+        cb.call1(LocalMediaTrack);
     }
 
-    pub fn on_connection_loss(&self, cb: DartCallback<ReconnectHandle>) {
+    pub fn on_connection_loss(&self, cb: DartClosure<ReconnectHandle>) {
         // Result<(), JasonError>
-        cb.call(ReconnectHandle);
+        cb.call1(ReconnectHandle);
     }
 
     // pub async fn join(&self, token: String) -> Result<(), JasonError>
@@ -60,7 +62,7 @@ pub unsafe extern "C" fn RoomHandle__on_new_connection(
     cb: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_new_connection(DartCallback::new(cb));
+    this.on_new_connection(DartClosure::new(cb));
 }
 
 #[no_mangle]
@@ -69,7 +71,7 @@ pub unsafe extern "C" fn RoomHandle__on_close(
     cb: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_close(DartCallback::new(cb));
+    this.on_close(DartClosure::new(cb));
 }
 
 #[no_mangle]
@@ -78,7 +80,7 @@ pub unsafe extern "C" fn RoomHandle__on_local_track(
     cb: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_local_track(DartCallback::new(cb));
+    this.on_local_track(DartClosure::new(cb));
 }
 
 #[no_mangle]
@@ -87,10 +89,10 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
     cb: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_connection_loss(DartCallback::new(cb));
+    this.on_connection_loss(DartClosure::new(cb));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
-    Box::from_raw(this);
+    RoomHandle::from_ptr(this);
 }

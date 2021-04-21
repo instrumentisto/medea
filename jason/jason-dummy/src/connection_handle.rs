@@ -2,10 +2,13 @@ use dart_sys::Dart_Handle;
 
 use crate::{
     remote_media_track::RemoteMediaTrack,
-    utils::{string_into_c_str, DartCallback},
+    utils::{string_into_c_str, DartClosure},
+    ForeignClass,
 };
 
 pub struct ConnectionHandle;
+
+impl ForeignClass for ConnectionHandle {}
 
 impl ConnectionHandle {
     pub fn get_remote_member_id(&self) -> String {
@@ -13,19 +16,19 @@ impl ConnectionHandle {
         String::from("ConnectionHandle.get_remote_member_id")
     }
 
-    pub fn on_close(&self, f: DartCallback<()>) {
+    pub fn on_close(&self, f: DartClosure<()>) {
         // Result<(), JasonError>
-        f.call_unit();
+        f.call0();
     }
 
-    pub fn on_remote_track_added(&self, f: DartCallback<RemoteMediaTrack>) {
+    pub fn on_remote_track_added(&self, f: DartClosure<RemoteMediaTrack>) {
         // Result<(), JasonError>
-        f.call(RemoteMediaTrack);
+        f.call1(RemoteMediaTrack);
     }
 
-    pub fn on_quality_score_update(&self, f: DartCallback<i32>) {
+    pub fn on_quality_score_update(&self, f: DartClosure<u8>) {
         // Result<(), JasonError>
-        f.call_int(4);
+        f.call1(4);
     }
 }
 
@@ -35,7 +38,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_close(DartCallback::new(f));
+    this.on_close(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -44,7 +47,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_remote_track_added(DartCallback::new(f));
+    this.on_remote_track_added(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -53,7 +56,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_quality_score_update(DartCallback::new(f));
+    this.on_quality_score_update(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -67,5 +70,5 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
-    Box::from_raw(this);
+    ConnectionHandle::from_ptr(this);
 }

@@ -1,8 +1,10 @@
 use std::convert::TryFrom;
 
-use crate::utils::c_str_into_string;
+use crate::{utils::c_str_into_string, ForeignClass};
 
 pub struct DeviceVideoTrackConstraints;
+
+impl ForeignClass for DeviceVideoTrackConstraints {}
 
 impl DeviceVideoTrackConstraints {
     pub fn new() -> Self {
@@ -52,7 +54,7 @@ impl From<u8> for FacingMode {
 #[no_mangle]
 pub extern "C" fn DeviceVideoTrackConstraints__new(
 ) -> *const DeviceVideoTrackConstraints {
-    Box::into_raw(Box::new(DeviceVideoTrackConstraints::new()))
+    DeviceVideoTrackConstraints::new().into_ptr()
 }
 
 #[no_mangle]
@@ -151,5 +153,5 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__free(
     this: *mut DeviceVideoTrackConstraints,
 ) {
-    Box::from_raw(this);
+    DeviceVideoTrackConstraints::from_ptr(this);
 }

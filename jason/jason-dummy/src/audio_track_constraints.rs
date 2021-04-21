@@ -1,6 +1,8 @@
-use crate::utils::c_str_into_string;
+use crate::{utils::c_str_into_string, ForeignClass};
 
 pub struct AudioTrackConstraints;
+
+impl ForeignClass for AudioTrackConstraints {}
 
 impl AudioTrackConstraints {
     pub fn new() -> Self {
@@ -12,7 +14,7 @@ impl AudioTrackConstraints {
 
 #[no_mangle]
 pub extern "C" fn AudioTrackConstraints__new() -> *const AudioTrackConstraints {
-    Box::into_raw(Box::new(AudioTrackConstraints::new()))
+    AudioTrackConstraints::new().into_ptr()
 }
 
 #[no_mangle]
@@ -29,5 +31,5 @@ pub unsafe extern "C" fn AudioTrackConstraints__device_id(
 pub unsafe extern "C" fn AudioTrackConstraints__free(
     this: *mut AudioTrackConstraints,
 ) {
-    Box::from_raw(this);
+    AudioTrackConstraints::from_ptr(this);
 }

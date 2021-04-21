@@ -14,14 +14,14 @@ typedef _getRemoteMemberId_Dart = Pointer<Utf8> Function(Pointer);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-typedef _onClose_C = Void Function(Handle, Handle);
+typedef _onClose_C = Void Function(Pointer, Handle);
 typedef _onClose_Dart = void Function(Pointer, void Function());
 
-typedef _onRemoteTrackAdded_C = Void Function(Handle, Handle);
+typedef _onRemoteTrackAdded_C = Void Function(Pointer, Handle);
 typedef _onRemoteTrackAdded_Dart = void Function(
     Pointer, void Function(Pointer));
 
-typedef _onQualityScoreUpdate_C = Void Function(Handle, Handle);
+typedef _onQualityScoreUpdate_C = Void Function(Pointer, Handle);
 typedef _onQualityScoreUpdate_Dart = void Function(Pointer, void Function(int));
 
 final _getRemoteMemberId =

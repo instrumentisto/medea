@@ -1,23 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:medea_jason/audio_track_constraints.dart';
+import 'package:medea_jason/connection_handle.dart';
+import 'package:medea_jason/device_video_track_constraints.dart';
+import 'package:medea_jason/display_video_track_constraints.dart';
 import 'package:medea_jason/jason.dart';
 import 'package:medea_jason/kind.dart';
-import 'package:medea_jason/device_video_track_constraints.dart';
 import 'package:medea_jason/media_stream_settings.dart';
-import 'package:medea_jason/display_video_track_constraints.dart';
+import 'package:medea_jason/remote_media_track.dart';
+import 'package:medea_jason/room_close_reason.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  // testWidgets('Jason', (WidgetTester tester) async {
-  //   var jason = Jason();
-  //   var room = jason.initRoom();
-  //
-  //   expect(() => jason.mediaManager(), returnsNormally);
-  //   expect(() => jason.closeRoom(room), returnsNormally);
-  //   expect(() => jason.closeRoom(room), throwsStateError);
-  // });
+  testWidgets('Jason', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    expect(() => jason.mediaManager(), returnsNormally);
+    expect(() => jason.closeRoom(room), returnsNormally);
+    expect(() => jason.closeRoom(room), throwsStateError);
+  });
 
   testWidgets('MediaManager', (WidgetTester tester) async {
     var jason = Jason();
@@ -92,5 +97,124 @@ void main() {
     constraints2.deviceId('deviceId');
     settings.audio(constraints2);
     expect(() => constraints2.deviceId('deviceId'), throwsStateError);
+  });
+
+  testWidgets('RoomHandle', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    var allFired = List<Completer>.generate(4, (_) => Completer());
+
+    room.onClose((reason) {
+      allFired[0].complete();
+    });
+
+    room.onConnectionLoss((reconnectHandle) {
+      allFired[1].complete();
+    });
+
+    room.onLocalTrack((localTrack) {
+      allFired[2].complete();
+    });
+
+    room.onNewConnection((connection) {
+      allFired[3].complete();
+    });
+
+    await Future.wait(allFired.map((e) => e.future))
+        .timeout(Duration(seconds: 1));
+
+    room.free();
+
+    expect(() => room.onNewConnection((_) {}), throwsStateError);
+  });
+
+  testWidgets('RoomCloseReason', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+    var reasonFut = Completer<RoomCloseReason>();
+
+    room.onClose((reason) {
+      reasonFut.complete(reason);
+    });
+
+    var reason = await reasonFut.future.timeout(Duration(seconds: 1));
+
+    expect(reason.reason(), equals('RoomCloseReason.reason'));
+    expect(reason.isClosedByServer(), equals(false));
+    expect(reason.isErr(), equals(true));
+    reason.free();
+    expect(() => reason.isErr(), throwsStateError);
+  });
+
+  testWidgets('ConnectionHandle', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    var connFut = Completer<ConnectionHandle>();
+    room.onNewConnection((conn) {
+      connFut.complete(conn);
+    });
+    var conn = await connFut.future;
+
+    expect(conn.getRemoteMemberId(),
+        equals('ConnectionHandle.get_remote_member_id'));
+    var allFired = List<Completer>.generate(2, (_) => Completer());
+    conn.onQualityScoreUpdate((score) {
+      allFired[0].complete(score);
+    });
+    conn.onClose(() {
+      allFired[1].complete();
+    });
+
+    var res = await Future.wait(allFired.map((e) => e.future))
+        .timeout(Duration(seconds: 1));
+    expect(res[0], 4);
+  });
+
+  testWidgets('ConnectionHandle', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    var connFut = Completer<ConnectionHandle>();
+    room.onNewConnection((conn) {
+      connFut.complete(conn);
+    });
+    var conn = await connFut.future;
+
+    var trackFut = Completer<RemoteMediaTrack>();
+    conn.onRemoteTrackAdded((remoteTrack) {
+      trackFut.complete(remoteTrack);
+    });
+
+    var track = await trackFut.future;
+
+    expect(track.enabled(), equals(true));
+    expect(track.muted(), equals(false));
+    expect(track.kind(), equals(MediaKind.Video));
+    expect(track.mediaSourceKind(), equals(MediaSourceKind.Device));
+
+    var allFired = List<Completer>.generate(5, (_) => Completer());
+    track.onEnabled(() {
+      allFired[0].complete();
+    });
+    track.onDisabled(() {
+      allFired[1].complete();
+    });
+    track.onMuted(() {
+      allFired[2].complete();
+    });
+    track.onUnmuted(() {
+      allFired[3].complete();
+    });
+    track.onStopped(() {
+      allFired[4].complete();
+    });
+
+    await Future.wait(allFired.map((e) => e.future))
+        .timeout(Duration(seconds: 1));
+
+    track.free();
+    expect(() => track.kind(), throwsStateError);
   });
 }

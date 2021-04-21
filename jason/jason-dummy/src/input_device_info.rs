@@ -1,6 +1,8 @@
-use crate::{utils::string_into_c_str, MediaKind};
+use crate::{utils::string_into_c_str, ForeignClass, MediaKind};
 
 pub struct InputDeviceInfo {}
+
+impl ForeignClass for InputDeviceInfo {}
 
 impl InputDeviceInfo {
     pub fn device_id(&self) -> String {
@@ -58,5 +60,5 @@ pub unsafe extern "C" fn InputDeviceInfo__group_id(
 
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__free(this: *mut InputDeviceInfo) {
-    Box::from_raw(this);
+    InputDeviceInfo::from_ptr(this);
 }

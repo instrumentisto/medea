@@ -1,6 +1,10 @@
-use crate::{media_manager::MediaManagerHandle, room_handle::RoomHandle};
+use crate::{
+    media_manager::MediaManagerHandle, room_handle::RoomHandle, ForeignClass,
+};
 
 pub struct Jason;
+
+impl ForeignClass for Jason {}
 
 impl Jason {
     pub fn new() -> Self {
@@ -20,25 +24,25 @@ impl Jason {
 
 #[no_mangle]
 pub extern "C" fn Jason__new() -> *const Jason {
-    Box::into_raw(Box::new(Jason::new()))
+    Jason::new().into_ptr()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn Jason__init_room(
     this: *const Jason,
-) -> *mut RoomHandle {
+) -> *const RoomHandle {
     let this = this.as_ref().unwrap();
 
-    Box::into_raw(Box::new(this.init_room()))
+    this.init_room().into_ptr()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn Jason__media_manager(
     this: *const Jason,
-) -> *mut MediaManagerHandle {
+) -> *const MediaManagerHandle {
     let this = this.as_ref().unwrap();
 
-    Box::into_raw(Box::new(this.media_manager()))
+    this.media_manager().into_ptr()
 }
 
 #[no_mangle]
@@ -48,10 +52,10 @@ pub unsafe extern "C" fn Jason__close_room(
 ) {
     let this = this.as_ref().unwrap();
 
-    this.close_room(*Box::from_raw(room_to_delete));
+    this.close_room(RoomHandle::from_ptr(room_to_delete));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn Jason__free(this: *mut Jason) {
-    Box::from_raw(this);
+    Jason::from_ptr(this);
 }
