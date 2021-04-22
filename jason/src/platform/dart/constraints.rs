@@ -7,9 +7,8 @@ use crate::{
         constraints::ConstrainString, AudioTrackConstraints,
         DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
     },
-    platform::dart::utils::map::DartMap,
+    platform::dart::utils::{handle::DartHandle, map::DartMap},
 };
-use crate::platform::dart::utils::handle::DartHandle;
 
 pub struct MediaTrackConstraints(DartMap);
 

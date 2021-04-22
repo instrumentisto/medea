@@ -1,6 +1,7 @@
-use crate::utils::dart::into_dart_string;
+use crate::{
+    platform::dart::utils::handle::DartHandle, utils::dart::into_dart_string,
+};
 use dart_sys::{Dart_Handle, _Dart_Handle};
-use crate::platform::dart::utils::handle::DartHandle;
 
 pub struct DartMap(DartHandle);
 
@@ -59,7 +60,11 @@ impl DartMap {
 
     pub fn set(&self, key: String, value: Value) {
         unsafe {
-            SET_FUNCTION.unwrap()(self.0.get(), into_dart_string(key), value.into())
+            SET_FUNCTION.unwrap()(
+                self.0.get(),
+                into_dart_string(key),
+                value.into(),
+            )
         }
     }
 

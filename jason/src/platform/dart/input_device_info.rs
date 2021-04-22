@@ -4,8 +4,9 @@ use dart_sys::{
 };
 
 use crate::{
-    media::MediaKind, platform::dart::utils::handle::DartHandle,
-    utils::dart::from_dart_string,
+    media::MediaKind,
+    platform::dart::utils::handle::DartHandle,
+    utils::dart::{from_dart_string, into_dart_string},
 };
 
 type DeviceIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
@@ -37,7 +38,7 @@ pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
 }
 
 // TODO: Make it *const libc::c_char
-type KindFunction = extern "C" fn(Dart_Handle) -> i32;
+type KindFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut KIND_FUNCTION: Option<KindFunction> = None;
 
 #[no_mangle]
@@ -89,6 +90,10 @@ impl InputDeviceInfo {
     }
 
     pub fn kind(&self) -> MediaKind {
-        unsafe { KIND_FUNCTION.unwrap()(self.info.get()).into() }
+        unsafe {
+            from_dart_string(KIND_FUNCTION.unwrap()(self.info.get()))
+                .parse()
+                .unwrap()
+        }
     }
 }

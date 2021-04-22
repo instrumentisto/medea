@@ -84,7 +84,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__rollback(
 }
 
 type GetTransceiverFunction =
-    extern "C" fn(Dart_Handle, i32, i32) -> Dart_Handle;
+    extern "C" fn(Dart_Handle, *const libc::c_char, i32) -> Dart_Handle;
 static mut GET_TRANSCEIVER_FUNCTION: Option<GetTransceiverFunction> = None;
 
 #[no_mangle]
@@ -368,7 +368,7 @@ impl RtcPeerConnection {
             };
             Transceiver::from(GET_TRANSCEIVER_FUNCTION.unwrap()(
                 self.handle.get(),
-                kind.into(),
+                into_dart_string(kind.to_string()),
                 dir,
             ))
         }

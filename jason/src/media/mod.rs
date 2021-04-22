@@ -35,11 +35,16 @@ pub enum MediaKind {
     Video,
 }
 
-impl From<MediaKind> for i32 {
-    fn from(from: MediaKind) -> Self {
-        match from {
-            MediaKind::Audio => 0,
-            MediaKind::Video => 1,
+use std::str::FromStr;
+
+impl FromStr for MediaKind {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "audio" => Ok(Self::Audio),
+            "video" => Ok(Self::Video),
+            _ => Err(()),
         }
     }
 }

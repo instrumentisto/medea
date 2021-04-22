@@ -1,7 +1,8 @@
-use crate::utils::dart::from_dart_string;
+use crate::{
+    platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,
+};
 use dart_sys::{Dart_Handle, _Dart_Handle};
 use derive_more::From;
-use crate::platform::dart::utils::handle::DartHandle;
 
 #[derive(From)]
 pub struct IceCandidate(DartHandle);
