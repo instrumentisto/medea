@@ -1,9 +1,16 @@
 use crate::utils::dart::from_dart_string;
-use dart_sys::Dart_Handle;
+use dart_sys::{Dart_Handle, _Dart_Handle};
 use derive_more::From;
+use crate::platform::dart::utils::handle::DartHandle;
 
 #[derive(From)]
-pub struct IceCandidate(Dart_Handle);
+pub struct IceCandidate(DartHandle);
+
+impl From<Dart_Handle> for IceCandidate {
+    fn from(handle: Dart_Handle) -> Self {
+        Self(DartHandle::new(handle))
+    }
+}
 
 type CandidateFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut CANDIDATE_FUNCTION: Option<CandidateFunction> = None;
@@ -35,20 +42,20 @@ pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {
 
 impl IceCandidate {
     pub fn candidate(&self) -> String {
-        unsafe { from_dart_string(CANDIDATE_FUNCTION.unwrap()(self.0)) }
+        unsafe { from_dart_string(CANDIDATE_FUNCTION.unwrap()(self.0.get())) }
     }
 
     pub fn sdp_m_line_index(&self) -> Option<u16> {
         unsafe {
             // TODO: make it optional
-            Some(SDP_M_LINE_INDEX_FUNCTION.unwrap()(self.0) as u16)
+            Some(SDP_M_LINE_INDEX_FUNCTION.unwrap()(self.0.get()) as u16)
         }
     }
 
     pub fn sdp_mid(&self) -> Option<String> {
         unsafe {
             // TODO: make it optional
-            Some(from_dart_string(SDP_MID_FUNCTION.unwrap()(self.0)))
+            Some(from_dart_string(SDP_MID_FUNCTION.unwrap()(self.0.get())))
         }
     }
 }

@@ -7,8 +7,8 @@ use tracerr::Traced;
 
 use crate::{
     platform::{
-        dart::utils::callback::StringCallback, RpcTransport, TransportError,
-        TransportState,
+        dart::utils::{callback::StringCallback, handle::DartHandle},
+        RpcTransport, TransportError, TransportState,
     },
     rpc::{ApiUrl, ClientDisconnect},
     utils::dart::into_dart_string,
@@ -45,7 +45,7 @@ pub unsafe extern "C" fn register_WebSocketRpcTransport__close(
 
 #[derive(Clone, Debug)]
 pub struct WebSocketRpcTransport {
-    handle: Dart_Handle,
+    handle: DartHandle,
     on_message_listeners: Rc<RefCell<Vec<mpsc::UnboundedSender<ServerMsg>>>>,
     close_reason: Cell<ClientDisconnect>,
 }
@@ -84,7 +84,7 @@ impl WebSocketRpcTransport {
                 }),
             );
             Ok(Self {
-                handle,
+                handle: DartHandle::new(handle),
                 on_message_listeners,
                 close_reason: Cell::new(
                     ClientDisconnect::RpcTransportUnexpectedlyDropped,
@@ -118,7 +118,7 @@ impl RpcTransport for WebSocketRpcTransport {
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>> {
         let msg = serde_json::to_string(msg).unwrap();
         unsafe {
-            SEND_FUNCTION.unwrap()(self.handle, into_dart_string(msg));
+            SEND_FUNCTION.unwrap()(self.handle.get(), into_dart_string(msg));
         }
         Ok(())
     }
@@ -133,7 +133,11 @@ impl Drop for WebSocketRpcTransport {
         let rsn = serde_json::to_string(&self.close_reason.get())
             .expect("Could not serialize close message");
         unsafe {
-            CLOSE_FUNCTION.unwrap()(self.handle, 1000, into_dart_string(rsn));
+            CLOSE_FUNCTION.unwrap()(
+                self.handle.get(),
+                1000,
+                into_dart_string(rsn),
+            );
         }
     }
 }

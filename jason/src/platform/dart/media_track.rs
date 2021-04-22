@@ -1,20 +1,14 @@
-use dart_sys::Dart_Handle;
+use dart_sys::{Dart_Handle, Dart_HandleFromPersistent, Dart_PersistentHandle};
 use derive_more::From;
 
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
-    platform::dart::utils::callback::VoidCallback,
+    platform::dart::utils::{callback::VoidCallback, handle::DartHandle},
     utils::dart::from_dart_string,
 };
 
 #[derive(Clone, From, Debug)]
-pub struct MediaStreamTrack(Dart_Handle);
-
-impl MediaStreamTrack {
-    pub fn track(&self) -> Dart_Handle {
-        self.0
-    }
-}
+pub struct MediaStreamTrack(DartHandle);
 
 type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut ID_FUNCTION: Option<IdFunction> = None;
@@ -117,23 +111,27 @@ pub unsafe extern "C" fn register_MediaStreamTrack__on_ended(
 }
 
 impl MediaStreamTrack {
+    pub fn track(&self) -> Dart_Handle {
+        self.0.get()
+    }
+
     pub fn id(&self) -> String {
-        unsafe { from_dart_string(ID_FUNCTION.unwrap()(self.0)) }
+        unsafe { from_dart_string(ID_FUNCTION.unwrap()(self.0.get())) }
     }
 
     pub fn kind(&self) -> MediaKind {
-        MediaKind::from(unsafe { KIND_FUNCTION.unwrap()(self.0) })
+        MediaKind::from(unsafe { KIND_FUNCTION.unwrap()(self.0.get()) })
     }
 
     pub fn ready_state(&self) -> MediaStreamTrackState {
         MediaStreamTrackState::from(unsafe {
-            READY_STATE_FUNCTION.unwrap()(self.0)
+            READY_STATE_FUNCTION.unwrap()(self.0.get())
         })
     }
 
     pub fn device_id(&self) -> Option<String> {
         unsafe {
-            let device_id = DEVICE_ID_FUNCTION.unwrap()(self.0);
+            let device_id = DEVICE_ID_FUNCTION.unwrap()(self.0.get());
             if device_id.is_null() {
                 None
             } else {
@@ -144,7 +142,7 @@ impl MediaStreamTrack {
 
     pub fn facing_mode(&self) -> Option<FacingMode> {
         unsafe {
-            let facing_mode = FACING_MODE_FUNCTION.unwrap()(self.0);
+            let facing_mode = FACING_MODE_FUNCTION.unwrap()(self.0.get());
             // TODO: maybe it's needs to be nullable?
             Some(FacingMode::from(facing_mode))
         }
@@ -153,31 +151,31 @@ impl MediaStreamTrack {
     pub fn height(&self) -> Option<u32> {
         unsafe {
             // TODO: maybe it's needs to be nullable?
-            Some(HEIGHT_FUNCTION.unwrap()(self.0) as u32)
+            Some(HEIGHT_FUNCTION.unwrap()(self.0.get()) as u32)
         }
     }
 
     pub fn width(&self) -> Option<u32> {
         unsafe {
             // TODO: maybe it's needs to be nullable?
-            Some(WIDTH_FUNCTION.unwrap()(self.0) as u32)
+            Some(WIDTH_FUNCTION.unwrap()(self.0.get()) as u32)
         }
     }
 
     pub fn set_enabled(&self, enabled: bool) {
         unsafe {
-            SET_ENABLED_FUNCTION.unwrap()(self.0, enabled);
+            SET_ENABLED_FUNCTION.unwrap()(self.0.get(), enabled);
         }
     }
 
     pub fn stop(&self) {
         unsafe {
-            STOP_FUNCTION.unwrap()(self.0);
+            STOP_FUNCTION.unwrap()(self.0.get());
         }
     }
 
     pub fn enabled(&self) -> bool {
-        unsafe { ENABLED_FUNCTION.unwrap()(self.0) }
+        unsafe { ENABLED_FUNCTION.unwrap()(self.0.get()) }
     }
 
     pub fn guess_is_from_display(&self) -> bool {
@@ -194,7 +192,7 @@ impl MediaStreamTrack {
     {
         if let Some(cb) = f {
             let cb = VoidCallback::callback(cb);
-            unsafe { ON_ENDED_FUNCTION.unwrap()(self.0, cb) };
+            unsafe { ON_ENDED_FUNCTION.unwrap()(self.0.get(), cb) };
         }
     }
 }

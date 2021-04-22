@@ -7,13 +7,13 @@ use wasm_bindgen_futures::JsFuture;
 
 use tracerr::Traced;
 
-use crate::{
-    media::MediaManagerError,
-    platform::{
-        DisplayMediaStreamConstraints, Error, InputDeviceInfo,
-        MediaStreamConstraints, MediaStreamTrack,
-    },
+use super::{
+    constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
+    error::Error,
+    input_device_info::InputDeviceInfo,
+    media_track::MediaStreamTrack,
 };
+use crate::media::MediaManagerError;
 
 use super::window;
 

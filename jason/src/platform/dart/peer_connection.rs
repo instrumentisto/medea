@@ -1,8 +1,9 @@
 use dart_sys::Dart_Handle;
-use medea_client_api_proto::{IceConnectionState, PeerConnectionState, IceServer};
+use medea_client_api_proto::{
+    IceConnectionState, IceServer, PeerConnectionState,
+};
 use tracerr::Traced;
 
-use crate::platform::{IceCandidate, RtcStats};
 use super::{
     ice_candidate::IceCandidate as PlatformIceCandidate,
     media_track::MediaStreamTrack,
@@ -17,12 +18,14 @@ use crate::{
                     HandleCallback, HandleMutCallback, IntCallback,
                     TwoArgCallback,
                 },
+                handle::DartHandle,
                 ice_connection_from_int, peer_connection_state_from_int,
             },
         },
         peer_connection::RtcSdpType,
         rtc_stats::RtcStatsError::Platform,
-        RtcPeerConnectionError, SdpType, TransceiverDirection,
+        IceCandidate, RtcPeerConnectionError, RtcStats, SdpType,
+        TransceiverDirection,
     },
     utils::dart::into_dart_string,
 };
@@ -174,13 +177,13 @@ pub unsafe extern "C" fn register_RtcPeerConnection__on_connection_state_change(
 
 #[derive(Clone, Debug)]
 pub struct RtcPeerConnection {
-    handle: Dart_Handle,
+    handle: DartHandle,
 }
 
 impl RtcPeerConnection {
     pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
-        where
-            I: IntoIterator<Item = IceServer>,
+    where
+        I: IntoIterator<Item = IceServer>,
     {
         todo!()
     }
@@ -188,7 +191,7 @@ impl RtcPeerConnection {
     pub fn ice_connection_state(&self) -> IceConnectionState {
         unsafe {
             let ice_connection_state =
-                ICE_CONNECTION_STATE_FUNCTION.unwrap()(self.handle);
+                ICE_CONNECTION_STATE_FUNCTION.unwrap()(self.handle.get());
             ice_connection_from_int(ice_connection_state)
         }
     }
@@ -196,7 +199,7 @@ impl RtcPeerConnection {
     pub fn connection_state(&self) -> Option<PeerConnectionState> {
         unsafe {
             let connection_state =
-                CONNECTION_STATE_FUNCTION.unwrap()(self.handle);
+                CONNECTION_STATE_FUNCTION.unwrap()(self.handle.get());
             Some(peer_connection_state_from_int(connection_state))
         }
     }
@@ -208,7 +211,7 @@ impl RtcPeerConnection {
         if let Some(mut f) = f {
             unsafe {
                 ON_TRACK_FUNCTION.unwrap()(
-                    self.handle,
+                    self.handle.get(),
                     TwoArgCallback::callback(move |track, transceiver| {
                         f(
                             MediaStreamTrack::from(track),
@@ -228,7 +231,7 @@ impl RtcPeerConnection {
         if let Some(mut f) = f {
             unsafe {
                 ON_ICE_CANDIDATE_FUNCTION.unwrap()(
-                    self.handle,
+                    self.handle.get(),
                     HandleMutCallback::callback(move |handle| {
                         let candidate = PlatformIceCandidate::from(handle);
                         f(IceCandidate {
@@ -249,7 +252,7 @@ impl RtcPeerConnection {
         if let Some(mut f) = f {
             unsafe {
                 ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION.unwrap()(
-                    self.handle,
+                    self.handle.get(),
                     IntCallback::callback(move |v| {
                         f(ice_connection_from_int(v));
                     }),
@@ -266,7 +269,7 @@ impl RtcPeerConnection {
         if let Some(mut f) = f {
             unsafe {
                 ON_CONNECTION_STATE_CHANGE_FUNCTION.unwrap()(
-                    self.handle,
+                    self.handle.get(),
                     IntCallback::callback(move |v| {
                         f(peer_connection_state_from_int(v));
                     }),
@@ -289,7 +292,7 @@ impl RtcPeerConnection {
     }
 
     pub fn restart_ice(&self) {
-        unsafe { RESTART_ICE_FUNCTION.unwrap()(self.handle) };
+        unsafe { RESTART_ICE_FUNCTION.unwrap()(self.handle.get()) };
     }
 
     pub async fn set_offer(&self, offer: &str) -> Result<()> {
@@ -307,7 +310,7 @@ impl RtcPeerConnection {
     fn set_local_description(&self, sdp_type: RtcSdpType, sdp: String) {
         unsafe {
             SET_LOCAL_DESCRIPTION_FUNCTION.unwrap()(
-                self.handle,
+                self.handle.get(),
                 sdp_type.into(),
                 into_dart_string(sdp),
             );
@@ -318,14 +321,14 @@ impl RtcPeerConnection {
         match sdp {
             SdpType::Offer(sdp) => unsafe {
                 SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
-                    self.handle,
+                    self.handle.get(),
                     RtcSdpType::Offer.into(),
                     into_dart_string(sdp),
                 );
             },
             SdpType::Answer(sdp) => unsafe {
                 SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
-                    self.handle,
+                    self.handle.get(),
                     RtcSdpType::Answer.into(),
                     into_dart_string(sdp),
                 );
@@ -343,7 +346,7 @@ impl RtcPeerConnection {
     }
 
     pub async fn rollback(&self) -> Result<()> {
-        unsafe { ROLLBACK_FUNCTION.unwrap()(self.handle) };
+        unsafe { ROLLBACK_FUNCTION.unwrap()(self.handle.get()) };
         // TODO: Result?????
         Ok(())
     }
@@ -364,7 +367,7 @@ impl RtcPeerConnection {
                 3
             };
             Transceiver::from(GET_TRANSCEIVER_FUNCTION.unwrap()(
-                self.handle,
+                self.handle.get(),
                 kind.into(),
                 dir,
             ))
@@ -374,7 +377,7 @@ impl RtcPeerConnection {
     pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         unsafe {
             let transceiver = GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
-                self.handle,
+                self.handle.get(),
                 into_dart_string(mid.to_string()),
             );
             if transceiver.is_null() {

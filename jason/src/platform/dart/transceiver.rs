@@ -2,19 +2,22 @@ use std::rc::Rc;
 
 use dart_sys::{Dart_Handle, _Dart_Handle};
 
-use crate::platform;
-use crate::{media::track::local, platform::TransceiverDirection};
+use crate::{
+    media::track::local,
+    platform,
+    platform::{dart::utils::handle::DartHandle, TransceiverDirection},
+};
 use std::future::Future;
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
-    transceiver: Dart_Handle,
+    transceiver: DartHandle,
 }
 
 impl From<Dart_Handle> for Transceiver {
-    fn from(handle: *mut _Dart_Handle) -> Self {
+    fn from(handle: Dart_Handle) -> Self {
         Self {
-            transceiver: handle,
+            transceiver: DartHandle::new(handle),
         }
     }
 }
@@ -83,7 +86,9 @@ pub unsafe extern "C" fn register_Transceiver__is_stopped(
 
 impl Transceiver {
     pub fn current_direction(&self) -> TransceiverDirection {
-        unsafe { CURRENT_DIRECTION_FUNCTION.unwrap()(self.transceiver).into() }
+        unsafe {
+            CURRENT_DIRECTION_FUNCTION.unwrap()(self.transceiver.get()).into()
+        }
     }
 
     pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
@@ -99,17 +104,25 @@ impl Transceiver {
     }
 
     // TODO: future
-    pub async fn set_send_track(&self, new_sender: Rc<local::Track>) -> Result<(), platform::Error> {
+    pub async fn set_send_track(
+        &self,
+        new_sender: Rc<local::Track>,
+    ) -> Result<(), platform::Error> {
         unsafe {
-            let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
-            REPLACE_TRACK_FUNCTION.unwrap()(sender, new_sender.platform_track().track());
+            let sender =
+                GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get());
+            REPLACE_TRACK_FUNCTION.unwrap()(
+                sender,
+                new_sender.platform_track().track(),
+            );
         }
         Ok(())
     }
 
     pub fn drop_send_track(&self) -> impl Future<Output = ()> {
         unsafe {
-            let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
+            let sender =
+                GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get());
             DROP_SENDER_FUNCTION.unwrap()(sender);
         }
         async {}
@@ -117,13 +130,14 @@ impl Transceiver {
 
     pub fn set_send_track_enabled(&self, enabled: bool) {
         unsafe {
-            let sender = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver);
+            let sender =
+                GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get());
             SET_SENDER_TRACK_ENABLED_FUNCTION.unwrap()(sender, enabled);
         }
     }
 
     pub fn is_stopped(&self) -> bool {
-        unsafe { IS_STOPPED_FUNCTION.unwrap()(self.transceiver) }
+        unsafe { IS_STOPPED_FUNCTION.unwrap()(self.transceiver.get()) }
     }
 
     pub fn mid(&self) -> Option<String> {

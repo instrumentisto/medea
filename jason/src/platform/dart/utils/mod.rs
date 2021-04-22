@@ -1,6 +1,7 @@
 use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
 
 pub mod callback;
+pub mod handle;
 pub mod list;
 pub mod map;
 

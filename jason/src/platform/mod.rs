@@ -6,7 +6,7 @@ pub mod peer_connection;
 pub mod rtc_stats;
 pub mod transceiver_direction;
 pub mod transport;
-#[cfg(feature = "wasm")]
+// #[cfg(feature = "wasm")]
 pub mod wasm;
 
 pub use self::{
@@ -31,7 +31,7 @@ pub use self::{
 //     transceiver::Transceiver,
 //     utils::{callback::Callback, callback::Function},
 // };
-#[cfg(feature = "wasm")]
+#[cfg(feature = "dart")]
 pub use self::dart::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     delay_for,
@@ -43,8 +43,8 @@ pub use self::dart::{
     transceiver::Transceiver,
 };
 pub use self::wasm::{
-    get_property_by_name, init_logger,
     error::Error,
+    init_logger,
     rtc_stats::RtcStats,
     set_panic_hook,
     utils::{Callback, Function},

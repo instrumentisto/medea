@@ -1,6 +1,6 @@
 use crate::media::constraints::ConstrainU32;
 use dart_sys::{Dart_GetMainPortId, Dart_Handle, _Dart_Handle};
-use derive_more::{AsRef, From, Into};
+use derive_more::{AsRef, From};
 
 use crate::{
     media::{
@@ -9,6 +9,7 @@ use crate::{
     },
     platform::dart::utils::map::DartMap,
 };
+use crate::platform::dart::utils::handle::DartHandle;
 
 pub struct MediaTrackConstraints(DartMap);
 
@@ -46,18 +47,24 @@ pub unsafe extern "C" fn register_MediaStreamConstraints__video(
     VIDEO_FUNCTION = Some(f);
 }
 
-#[derive(Clone, Debug, From, Into)]
-pub struct MediaStreamConstraints(Dart_Handle);
+#[derive(Clone, Debug, From)]
+pub struct MediaStreamConstraints(DartHandle);
+
+impl Into<Dart_Handle> for MediaStreamConstraints {
+    fn into(self) -> Dart_Handle {
+        self.0.get()
+    }
+}
 
 impl MediaStreamConstraints {
     pub fn new() -> Self {
-        unsafe { Self(NEW_FUNCTION.unwrap()()) }
+        unsafe { Self(DartHandle::new(NEW_FUNCTION.unwrap()())) }
     }
 
     pub fn audio(&mut self, audio: AudioTrackConstraints) {
         unsafe {
             AUDIO_FUNCTION.unwrap()(
-                self.0,
+                self.0.get(),
                 MediaTrackConstraints::from(audio).into(),
             );
         }
@@ -66,7 +73,7 @@ impl MediaStreamConstraints {
     pub fn video(&mut self, video: DeviceVideoTrackConstraints) {
         unsafe {
             VIDEO_FUNCTION.unwrap()(
-                self.0,
+                self.0.get(),
                 MediaTrackConstraints::from(video).into(),
             );
         }
@@ -80,8 +87,14 @@ impl Default for MediaStreamConstraints {
     }
 }
 
-#[derive(Clone, Debug, From, Into)]
-pub struct DisplayMediaStreamConstraints(Dart_Handle);
+#[derive(Clone, Debug, From)]
+pub struct DisplayMediaStreamConstraints(DartHandle);
+
+impl Into<Dart_Handle> for DisplayMediaStreamConstraints {
+    fn into(self) -> Dart_Handle {
+        self.0.get()
+    }
+}
 
 impl Default for DisplayMediaStreamConstraints {
     #[inline]
@@ -96,7 +109,7 @@ impl DisplayMediaStreamConstraints {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        unsafe { Self(NEW_FUNCTION.unwrap()()) }
+        unsafe { Self(DartHandle::new(NEW_FUNCTION.unwrap()())) }
     }
 
     /// Specifies the nature and settings of the `video` [MediaStreamTrack][1].
@@ -106,7 +119,7 @@ impl DisplayMediaStreamConstraints {
     pub fn video(&mut self, video: DisplayVideoTrackConstraints) {
         unsafe {
             VIDEO_FUNCTION.unwrap()(
-                self.0,
+                self.0.get(),
                 MediaTrackConstraints::from(video).into(),
             );
         }

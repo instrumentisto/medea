@@ -1,4 +1,5 @@
-use dart_sys::Dart_Handle;
+use crate::platform::dart::utils::handle::DartHandle;
+use dart_sys::{Dart_Handle, _Dart_Handle};
 use derive_more::From;
 
 type GetFunction = extern "C" fn(Dart_Handle, i32) -> Dart_Handle;
@@ -17,25 +18,30 @@ pub unsafe extern "C" fn register_Array__length(f: LengthFunction) {
     LENGTH_FUNCTION = Some(f);
 }
 
-#[derive(From)]
-pub struct DartList(Dart_Handle);
+pub struct DartList(DartHandle);
+
+impl From<Dart_Handle> for DartList {
+    fn from(handle: Dart_Handle) -> Self {
+        Self(handle.into())
+    }
+}
 
 impl DartList {
-    pub fn get(&self, i: i32) -> Option<Dart_Handle> {
+    pub fn get(&self, i: i32) -> Option<DartHandle> {
         unsafe {
             // TODO: make it optional
-            Some(GET_FUNCTION.unwrap()(self.0, i))
+            Some(GET_FUNCTION.unwrap()(self.0.get(), i).into())
         }
     }
 
     pub fn length(&self) -> i32 {
-        unsafe { LENGTH_FUNCTION.unwrap()(self.0) }
+        unsafe { LENGTH_FUNCTION.unwrap()(self.0.get()) }
     }
 }
 
 impl<T> From<DartList> for Vec<T>
 where
-    T: From<Dart_Handle>,
+    T: From<DartHandle>,
 {
     fn from(list: DartList) -> Self {
         let len = list.length();

@@ -25,14 +25,17 @@ use web_sys::{
 use crate::{
     media::{MediaKind, TrackConstraints},
     platform::{
-        self, get_property_by_name, peer_connection::RtcSdpType,
-        wasm::utils::EventListener, IceCandidate, MediaStreamTrack,
-        RtcPeerConnectionError, RtcStats, SdpType, Transceiver,
-        TransceiverDirection,
+        self,
+        peer_connection::{IceCandidate, RtcSdpType, SdpType},
+        wasm::{
+            media_track::MediaStreamTrack, rtc_stats::RtcStats,
+            transceiver::Transceiver, utils::EventListener,
+        },
+        RtcPeerConnectionError, TransceiverDirection,
     },
 };
 
-use super::ice_server::RtcIceServers;
+use super::{get_property_by_name, ice_server::RtcIceServers};
 
 impl From<&TrackConstraints> for MediaKind {
     fn from(media_type: &TrackConstraints) -> Self {

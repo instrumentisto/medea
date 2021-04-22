@@ -6,9 +6,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use derive_more::AsRef;
 
+use super::get_property_by_name;
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
-    platform::{get_property_by_name, wasm::utils::EventListener},
+    platform::wasm::utils::EventListener,
 };
 
 /// Wrapper around [MediaStreamTrack][1] received from a

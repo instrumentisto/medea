@@ -1,7 +1,8 @@
 use crate::utils::dart::into_dart_string;
 use dart_sys::{Dart_Handle, _Dart_Handle};
+use crate::platform::dart::utils::handle::DartHandle;
 
-pub struct DartMap(Dart_Handle);
+pub struct DartMap(DartHandle);
 
 impl From<DartMap> for Value {
     fn from(from: DartMap) -> Self {
@@ -23,7 +24,7 @@ impl From<i32> for Value {
 
 impl Into<Dart_Handle> for DartMap {
     fn into(self) -> Dart_Handle {
-        self.0
+        self.0.get()
     }
 }
 
@@ -53,17 +54,17 @@ pub unsafe extern "C" fn register_DartMap__remove(f: RemoveFunction) {
 
 impl DartMap {
     pub fn new() -> Self {
-        Self(unsafe { NEW_FUNCTION.unwrap()() })
+        Self(DartHandle::new(unsafe { NEW_FUNCTION.unwrap()() }))
     }
 
     pub fn set(&self, key: String, value: Value) {
         unsafe {
-            SET_FUNCTION.unwrap()(self.0, into_dart_string(key), value.into())
+            SET_FUNCTION.unwrap()(self.0.get(), into_dart_string(key), value.into())
         }
     }
 
     pub fn remove(&self, key: String) {
-        unsafe { REMOVE_FUNCTION.unwrap()(self.0, into_dart_string(key)) }
+        unsafe { REMOVE_FUNCTION.unwrap()(self.0.get(), into_dart_string(key)) }
     }
 }
 
@@ -90,9 +91,9 @@ pub enum Value {
 }
 
 impl Into<Dart_Handle> for Value {
-    fn into(self) -> *mut _Dart_Handle {
+    fn into(self) -> Dart_Handle {
         match self {
-            Self::Map(h) => h.0,
+            Self::Map(h) => h.0.get(),
             Self::String(s) => unsafe {
                 NEW_STRING_FUNCTION.unwrap()(into_dart_string(s))
             },

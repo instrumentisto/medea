@@ -11,7 +11,9 @@ use medea_client_api_proto::stats::{RtcStat, RtcStatsType};
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
-use crate::platform::{self, get_property_by_name, RtcStatsError};
+use crate::platform::{self, RtcStatsError};
+
+use super::get_property_by_name;
 
 /// All available [`RtcStatsType`]s of a [`platform::RtcPeerConnection`].
 #[derive(Clone, Debug)]
