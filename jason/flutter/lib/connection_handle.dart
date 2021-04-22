@@ -30,14 +30,14 @@ final _getRemoteMemberId =
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('ConnectionHandle__free');
 
-final _onClose_Dart _onClose =
+final _onClose =
     dl.lookupFunction<_onClose_C, _onClose_Dart>('ConnectionHandle__on_close');
 
-final _onRemoteTrackAdded_Dart _onRemoteTrackAdded =
+final _onRemoteTrackAdded =
     dl.lookupFunction<_onRemoteTrackAdded_C, _onRemoteTrackAdded_Dart>(
         'ConnectionHandle__on_remote_track_added');
 
-final _onQualityScoreUpdate_Dart _onQualityScoreUpdate =
+final _onQualityScoreUpdate =
     dl.lookupFunction<_onQualityScoreUpdate_C, _onQualityScoreUpdate_Dart>(
         'ConnectionHandle__on_quality_score_update');
 

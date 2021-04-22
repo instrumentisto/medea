@@ -107,10 +107,10 @@ impl<T: ForeignClass> DartClosure<T> {
 /// Implements [`DartClosure::call`] casting argument to `i64`. Should be
 /// called for all integer types that fit into 2^63.
 macro_rules! impl_dart_closure_for_int {
-    ($id:ty) => {
-        impl DartClosure<$id> {
+    ($arg:ty) => {
+        impl DartClosure<$arg> {
             /// Calls underlying Dart closure with provided argument.
-            pub fn call1(&self, arg: $id) {
+            pub fn call1(&self, arg: $arg) {
                 unsafe {
                     let fn_handle =
                         Dart_HandleFromPersistent_DL_Trampolined(self.cb);
@@ -129,6 +129,7 @@ impl_dart_closure_for_int!(isize);
 impl_dart_closure_for_int!(u8);
 impl_dart_closure_for_int!(u16);
 impl_dart_closure_for_int!(u32);
+impl_dart_closure_for_int!(bool);
 
 impl<T> Drop for DartClosure<T> {
     /// Manually deallocate saved [`Dart_PersistentHandle`] so it wont leak.
