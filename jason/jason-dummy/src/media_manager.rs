@@ -1,17 +1,20 @@
 use crate::{
-    input_device_info::InputDeviceInfo, local_media_track::LocalMediaTrack,
-    media_stream_settings::MediaStreamSettings, utils::PtrArray,
+    input_device_info::InputDeviceInfo,
+    local_media_track::LocalMediaTrack,
+    media_stream_settings::MediaStreamSettings,
+    utils::{spawn, Completer, PtrArray},
 };
+use dart_sys::Dart_Handle;
 
 pub struct MediaManagerHandle;
 
 impl MediaManagerHandle {
-    pub fn enumerate_devices(&self) -> Vec<InputDeviceInfo> {
+    pub async fn enumerate_devices(&self) -> Vec<InputDeviceInfo> {
         // async && Result
         vec![InputDeviceInfo {}, InputDeviceInfo {}, InputDeviceInfo {}]
     }
 
-    pub fn init_local_tracks(
+    pub async fn init_local_tracks(
         &self,
         _caps: &MediaStreamSettings,
     ) -> Vec<LocalMediaTrack> {
@@ -24,20 +27,28 @@ impl MediaManagerHandle {
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     this: *const MediaManagerHandle,
     caps: *const MediaStreamSettings,
-) -> PtrArray<LocalMediaTrack> {
+) -> Dart_Handle {
     let this = this.as_ref().unwrap();
     let caps = caps.as_ref().unwrap();
-
-    PtrArray::new(this.init_local_tracks(caps))
+    let completer: Completer<PtrArray<LocalMediaTrack>, ()> = Completer::new();
+    let fut = completer.future();
+    spawn(async move {
+        completer.complete(PtrArray::new(this.init_local_tracks(caps).await));
+    });
+    fut
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: *const MediaManagerHandle,
-) -> PtrArray<InputDeviceInfo> {
+) -> Dart_Handle {
     let this = this.as_ref().unwrap();
-
-    PtrArray::new(this.enumerate_devices())
+    let completer: Completer<PtrArray<InputDeviceInfo>, ()> = Completer::new();
+    let fut = completer.future();
+    spawn(async move {
+        completer.complete(PtrArray::new(this.enumerate_devices().await));
+    });
+    fut
 }
 
 #[no_mangle]

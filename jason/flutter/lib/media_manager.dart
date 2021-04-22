@@ -8,11 +8,11 @@ import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/ptrarray.dart';
 
-typedef _initLocalTracks_C = PtrArray Function(Pointer, Pointer);
-typedef _initLocalTracks_Dart = PtrArray Function(Pointer, Pointer);
+typedef _initLocalTracks_C = Handle Function(Pointer, Pointer);
+typedef _initLocalTracks_Dart = Object Function(Pointer, Pointer);
 
-typedef _enumerateDevices_C = PtrArray Function(Pointer);
-typedef _enumerateDevices_Dart = PtrArray Function(Pointer);
+typedef _enumerateDevices_C = Handle Function(Pointer);
+typedef _enumerateDevices_Dart = Object Function(Pointer);
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
@@ -33,18 +33,28 @@ class MediaManager {
 
   MediaManager(this.ptr);
 
-  List<LocalMediaTrack> initLocalTracks(MediaStreamSettings caps) {
-    return _initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
-        .intoPointerList()
-        .map((e) => LocalMediaTrack(NullablePointer(e)))
-        .toList();
+  Future<List<LocalMediaTrack>> initLocalTracks(MediaStreamSettings caps) async {
+    var tracks = await _initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr());
+    if (tracks is PtrArray) {
+      return tracks
+          .intoPointerList()
+          .map((e) => LocalMediaTrack(NullablePointer(e)))
+          .toList();
+    } else {
+      throw Exception("Future resolved with unexpected Object: " + tracks.runtimeType.toString());
+    }
   }
 
-  List<InputDeviceInfo> enumerateDevices() {
-    return _enumerateDevices(ptr.getInnerPtr())
-        .intoPointerList()
-        .map((e) => InputDeviceInfo(NullablePointer(e)))
-        .toList();
+  Future<List<InputDeviceInfo>> enumerateDevices() async {
+    var devices = await _enumerateDevices(ptr.getInnerPtr());
+    if (devices is PtrArray) {
+      return devices
+          .intoPointerList()
+          .map((e) => InputDeviceInfo(NullablePointer(e)))
+          .toList();
+    } else {
+      throw Exception("Future resolved with unexpected Object: " + devices.runtimeType.toString());
+    }
   }
 
   @moveSemantics

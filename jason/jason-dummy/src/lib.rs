@@ -36,3 +36,13 @@ pub enum MediaSourceKind {
     Device = 0,
     Display = 1,
 }
+
+impl From<i32> for MediaSourceKind {
+    fn from(from: i32) -> Self {
+        match from {
+            0 => Self::Device,
+            1 => Self::Display,
+            _ => unreachable!(),
+        }
+    }
+}
