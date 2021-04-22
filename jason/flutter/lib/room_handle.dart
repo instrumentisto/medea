@@ -6,11 +6,6 @@ import 'package:medea_jason/util/nullable_pointer.dart';
 import 'connection_handle.dart';
 import 'jason.dart';
 import 'kind.dart';
-import 'kind.dart';
-import 'kind.dart';
-import 'kind.dart';
-import 'kind.dart';
-import 'kind.dart';
 import 'media_stream_settings.dart';
 import 'reconnect_handle.dart';
 import 'remote_media_track.dart';
@@ -138,59 +133,129 @@ class RoomHandle {
   RoomHandle(this.ptr);
 
   Future<void> join(String url) async {
-    await _join(ptr.getInnerPtr(), url.toNativeUtf8());
+    var fut = _join(ptr.getInnerPtr(), url.toNativeUtf8());
+    if (fut is Future) {
+      await fut;
+    } else {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> setLocalMediaSettings(MediaStreamSettings settings, bool stopFirst, bool rollbackOnFail) async {
-    await _setLocalMediaSettings(ptr.getInnerPtr(), settings.ptr.getInnerPtr(), stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0);
+    var fut = _setLocalMediaSettings(ptr.getInnerPtr(), settings.ptr.getInnerPtr(), stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0);
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> muteAudio() async {
-    await _muteAudio(ptr.getInnerPtr());
+    var fut = _muteAudio(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> unmuteAudio() async {
-    await _unmuteAudio(ptr.getInnerPtr());
+    var fut = _unmuteAudio(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> muteVideo(MediaSourceKind kind) async {
-    await _muteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    var fut = _muteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> unmuteVideo(MediaSourceKind kind) async {
-    await _unmuteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    var fut = _unmuteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> disableVideo(MediaSourceKind kind) async {
-    await _disableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    var fut = _disableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> enableVideo(MediaSourceKind kind) async {
-    await _enableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    var fut = _enableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> disableAudio() async {
-    await _disableAudio(ptr.getInnerPtr());
+    var fut = _disableAudio(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> enableAudio() async {
-    await _enableAudio(ptr.getInnerPtr());
+    var fut = _enableAudio(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> disableRemoteAudio() async {
-    await _disableRemoteAudio(ptr.getInnerPtr());
+    var fut = _disableRemoteAudio(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> enableRemoteAudio() async {
-    await _enableRemoteAudio(ptr.getInnerPtr());
+    var fut = _enableRemoteAudio(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> disableRemoteVideo() async {
-    await _disableRemoteVideo(ptr.getInnerPtr());
+    var fut = _disableRemoteVideo(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> enableRemoteVideo() async {
-    await _enableRemoteVideo(ptr.getInnerPtr());
+    var fut = _enableRemoteVideo(ptr.getInnerPtr());
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   void onNewConnection(void Function(ConnectionHandle) f) {

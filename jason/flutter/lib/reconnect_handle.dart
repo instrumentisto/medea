@@ -1,6 +1,4 @@
 import 'dart:ffi';
-import 'package:ffi/ffi.dart';
-
 import 'jason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
@@ -26,11 +24,21 @@ class ReconnectHandle {
   ReconnectHandle(this.ptr);
 
   Future<void> reconnectWithDelay(int delayMs) async {
-    await _reconnect_with_delay(ptr.getInnerPtr(), delayMs);
+    var fut = _reconnect_with_delay(ptr.getInnerPtr(), delayMs);
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   Future<void> reconnectWithBackoff(int startingDelayMs, double multiplier, int maxDelay) async {
-    await _reconnect_with_backoff(ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay);
+    var fut = _reconnect_with_backoff(ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay);
+    if (fut is Future) {
+      await fut;
+    } {
+      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
   }
 
   @moveSemantics
