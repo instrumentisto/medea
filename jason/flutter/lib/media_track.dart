@@ -63,6 +63,3 @@ void stop(MediaStreamTrack track) {
 bool enabled(MediaStreamTrack track) {
   return track.enabled;
 }
-
-
-
