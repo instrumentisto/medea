@@ -1,4 +1,5 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:jason/option.dart';
 import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
@@ -15,9 +16,13 @@ void registerFunctions() {
   );
 }
 
-int currentDirection(Object transceiver) {
+RustIntOption currentDirection(Object transceiver) {
   if (transceiver is RTCRtpTransceiver) {
-    return transceiver.currentDirection.index;
+    if (transceiver.currentDirection != null) {
+      return RustIntOption.some(transceiver.currentDirection.index);
+    } else {
+      return RustIntOption.none();
+    }
   }
 }
 
@@ -39,8 +44,12 @@ void dropSender(Object transceiver) {
   }
 }
 
-int isStopped(Object transceiver) {
+RustIntOption isStopped(Object transceiver) {
   if (transceiver is RTCRtpTransceiver) {
-    return transceiver.sender.track.muted ? 1 : 0;
+    if (transceiver.sender.track.muted != null) {
+      return RustIntOption.some(transceiver.sender.track.muted ? 1 : 0);
+    } else {
+      return RustIntOption.none();
+    }
   }
 }

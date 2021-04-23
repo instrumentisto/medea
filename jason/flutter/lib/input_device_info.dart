@@ -1,4 +1,5 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:jason/option.dart';
 import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
@@ -18,33 +19,49 @@ void registerFunctions() {
   );
 }
 
-Pointer<Utf8> deviceId(Object deviceInfo) {
+RustStringOption deviceId(Object deviceInfo) {
   if (deviceInfo is MediaDeviceInfo) {
-    return Utf8.toUtf8(deviceInfo.deviceId);
+    if (deviceInfo.deviceId != null) {
+      return RustStringOption.some(deviceInfo.deviceId.toNativeUtf8());
+    } else {
+      return RustStringOption.none();
+    }
   } else {
     throw Exception("Unexpected Object provided from Rust side: " + deviceInfo.runtimeType.toString());
   }
 }
 
-Pointer<Utf8> label(Object deviceInfo) {
+RustStringOption label(Object deviceInfo) {
   if (deviceInfo is MediaDeviceInfo) {
-    return Utf8.toUtf8(deviceInfo.label);
+    if (deviceInfo.label != null) {
+      return RustStringOption.some(deviceInfo.label.toNativeUtf8());
+    } else {
+      return RustStringOption.none()
+    }
   } else {
     throw Exception("Unexpected Object provided from Rust side: " + deviceInfo.runtimeType.toString());
   }
 }
 
-Pointer<Utf8> groupId(Object deviceInfo) {
+RustStringOption groupId(Object deviceInfo) {
   if (deviceInfo is MediaDeviceInfo) {
-    return Utf8.toUtf8(deviceInfo.groupId);
+    if (deviceInfo.groupId != null) {
+      return RustStringOption.some(deviceInfo.groupId.toNativeUtf8());
+    } else {
+      return RustStringOption.none();
+    }
   } else {
     throw Exception("Unexpected Object provided from Rust side: " + deviceInfo.runtimeType.toString());
   }
 }
 
-Pointer<Utf8> kind(Object deviceInfo) {
+RustStringOption kind(Object deviceInfo) {
   if (deviceInfo is MediaDeviceInfo) {
-    return Utf8.toUtf8(deviceInfo.kind);
+    if (deviceInfo.kind != null) {
+      return RustStringOption.some(deviceInfo.kind.toNativeUtf8());
+    } else {
+      return RustStringOption.none();
+    }
   } else {
     throw Exception("Unexpected Object provided from Rust side: " + deviceInfo.runtimeType.toString());
   }

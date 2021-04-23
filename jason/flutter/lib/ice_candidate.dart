@@ -1,39 +1,52 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:jason/option.dart';
 import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__candidate')(
-      Pointer.fromFunction<Handle Function(Handle)>(candidate)
+      Pointer.fromFunction<RustStringOption Function(Handle)>(candidate)
   );
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_m_line_index')(
-      Pointer.fromFunction<Handle Function()>(sdpMLineIndex)
+      Pointer.fromFunction<RustIntOption Function()>(sdpMLineIndex)
   );
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_mid')(
-      Pointer.fromFunction<Handle Function(Handle)>(sdpMid)
+      Pointer.fromFunction<RustStringOption Function(Handle)>(sdpMid)
   );
 }
 
-Pointer<Utf8> candidate(Object iceCandidate) {
+RustStringOption candidate(Object iceCandidate) {
   if (iceCandidate is RTCIceCandidate) {
-    return Utf8.toUtf8(iceCandidate.candidate);
+    if (iceCandidate.candidate != null) {
+      return RustStringOption.some(iceCandidate.candidate.toNativeUtf8());
+    } else {
+      return RustStringOption.none();
+    }
   } else {
     throw Exception("Unknown object provided from Rust side: " + iceCandidate.runtimeType.toString());
   }
 }
 
-int sdpMLineIndex(Object iceCandidate) {
+RustIntOption sdpMLineIndex(Object iceCandidate) {
   if (iceCandidate is RTCIceCandidate) {
-    return iceCandidate.sdpMlineIndex;
+    if (iceCandidate.sdpMlineIndex != null) {
+      return RustIntOption.some(iceCandidate.sdpMlineIndex);
+    } else {
+      return RustIntOption.none();
+    }
   } else {
     throw Exception("Unknown object provided from Rust side: " + iceCandidate.runtimeType.toString());
   }
 }
 
-Pointer<Utf8> sdpMid(Object iceCandidate) {
+RustStringOption sdpMid(Object iceCandidate) {
   if (iceCandidate is RTCIceCandidate) {
-    return Utf8.toUtf8(iceCandidate.sdpMid);
+    if (iceCandidate.sdpMid != null) {
+      return RustStringOption.some(iceCandidate.sdpMid);
+    } else {
+      return RustStringOption.none();
+    }
   } else {
     throw Exception("Unknown object provided from Rust side: " + iceCandidate.runtimeType.toString());
   }

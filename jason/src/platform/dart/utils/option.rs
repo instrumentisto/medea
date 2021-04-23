@@ -1,32 +1,39 @@
 use std::any::Any;
 
+use dart_sys::Dart_Handle;
+
+use crate::utils::dart::from_dart_string;
+
 #[repr(C)]
 pub struct DartOption {
     is_some: i8,
-    val: *mut dyn Any,
+    val: Dart_Handle,
 }
 
-impl<T: 'static> From<Option<T>> for DartOption {
-    fn from(from: Option<T>) -> Self {
-        if let Some(from) = from {
-            Self {
-                is_some: 1,
-                val: Box::into_raw(Box::new(from)),
+impl From<DartOption> for Option<Dart_Handle> {
+    fn from(from: DartOption) -> Self {
+        if from.is_some == 1 {
+            unsafe {
+                Some(from.val)
             }
         } else {
-            Self {
-                is_some: 0,
-                val: Box::into_raw(Box::new(())),
-            }
+            None
         }
     }
 }
 
-impl<'a, T: 'static> Into<Option<&'a T>> for DartOption {
-    fn into(self) -> Option<&'a T> {
-        if self.is_some == 1 {
+
+#[repr(C)]
+pub struct DartStringOption {
+    is_some: i8,
+    val: *const libc::c_char,
+}
+
+impl From<DartStringOption> for Option<String> {
+    fn from(from: DartStringOption) -> Self {
+        if from.is_some == 1 {
             unsafe {
-                Some(self.val.as_ref().unwrap().downcast_ref().unwrap())
+                Some(from_dart_string(from.val))
             }
         } else {
             None

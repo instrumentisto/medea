@@ -29,6 +29,7 @@ use crate::{
     },
     utils::dart::into_dart_string,
 };
+use crate::platform::dart::utils::option::DartOption;
 
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
 
@@ -95,7 +96,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__get_transceiver(
 }
 
 type GetTransceiverByMid =
-    extern "C" fn(Dart_Handle, *const libc::c_char) -> Dart_Handle;
+    extern "C" fn(Dart_Handle, *const libc::c_char) -> DartOption;
 static mut GET_TRANSCEIVER_BY_MID_FUNCTION: Option<GetTransceiverByMid> = None;
 
 #[no_mangle]
@@ -376,10 +377,10 @@ impl RtcPeerConnection {
 
     pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         unsafe {
-            let transceiver = GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
+            let transceiver: Dart_Handle = Option::from(GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
                 self.handle.get(),
                 into_dart_string(mid.to_string()),
-            );
+            ))?;
             if transceiver.is_null() {
                 None
             } else {

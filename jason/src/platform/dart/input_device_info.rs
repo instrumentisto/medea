@@ -8,8 +8,9 @@ use crate::{
     platform::dart::utils::handle::DartHandle,
     utils::dart::{from_dart_string, into_dart_string},
 };
+use crate::platform::dart::utils::option::DartStringOption;
 
-type DeviceIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
+type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
 
 #[no_mangle]
@@ -19,7 +20,7 @@ pub unsafe extern "C" fn register_InputDeviceInfo__device_id(
     DEVICE_ID_FUNCTION = Some(f);
 }
 
-type LabelFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
+type LabelFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut LABEL_FUNCTION: Option<LabelFunction> = None;
 
 #[no_mangle]
@@ -27,7 +28,7 @@ pub unsafe extern "C" fn register_InputDeviceInfo__label(f: LabelFunction) {
     LABEL_FUNCTION = Some(f);
 }
 
-type GroupIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
+type GroupIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut GROUP_ID_FUNCTION: Option<GroupIdFunction> = None;
 
 #[no_mangle]
@@ -37,8 +38,7 @@ pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
     GROUP_ID_FUNCTION = Some(f);
 }
 
-// TODO: Make it *const libc::c_char
-type KindFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
+type KindFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut KIND_FUNCTION: Option<KindFunction> = None;
 
 #[no_mangle]
@@ -75,25 +75,26 @@ impl From<DartHandle> for InputDeviceInfo {
 }
 
 impl InputDeviceInfo {
-    pub fn device_id(&self) -> String {
+    pub fn device_id(&self) -> Option<String> {
         unsafe {
-            from_dart_string(DEVICE_ID_FUNCTION.unwrap()(self.info.get()))
+            Option::from(DEVICE_ID_FUNCTION.unwrap()(self.info.get()))
         }
     }
 
-    pub fn label(&self) -> String {
-        unsafe { from_dart_string(LABEL_FUNCTION.unwrap()(self.info.get())) }
+    pub fn label(&self) -> Option<String> {
+        unsafe { Option::from(LABEL_FUNCTION.unwrap()(self.info.get())) }
     }
 
-    pub fn group_id(&self) -> String {
-        unsafe { from_dart_string(GROUP_ID_FUNCTION.unwrap()(self.info.get())) }
+    pub fn group_id(&self) -> Option<String> {
+        unsafe { Option::from(GROUP_ID_FUNCTION.unwrap()(self.info.get())) }
     }
 
-    pub fn kind(&self) -> MediaKind {
+    pub fn kind(&self) -> Option<MediaKind> {
         unsafe {
-            from_dart_string(KIND_FUNCTION.unwrap()(self.info.get()))
+            let kind: String = Option::from(KIND_FUNCTION.unwrap()(self.info.get()))?;
+            Some(kind
                 .parse()
-                .unwrap()
+                .unwrap())
         }
     }
 }

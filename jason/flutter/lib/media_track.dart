@@ -1,4 +1,5 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:jason/option.dart';
 import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
@@ -36,7 +37,7 @@ Pointer<Utf8> id(Object track) {
   }
 }
 
-Pointer<Utf8> deviceId(MediaStreamTrack track) {
+RustStringOption deviceId(MediaStreamTrack track) {
   return track.deviceId().toNativeUtf8();
 }
 
