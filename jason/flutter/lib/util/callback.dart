@@ -1,20 +1,31 @@
 import 'dart:ffi';
 
-import '../jason.dart';
+/// Registers the closure callers functions in Rust.
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_ptr_arg_fn_caller')(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(_callPointerArgFn));
 
-void registerFunctions() {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_pointer_closure_caller')(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(callPointerClosure));
+          'register_no_args_fn_caller')(
+      Pointer.fromFunction<Void Function(Handle)>(_callNoArgsFn));
+
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_unit_closure_caller')(
-      Pointer.fromFunction<Void Function(Handle)>(callUnitClosure));
+          'register_int_arg_fn_caller')(
+      Pointer.fromFunction<Void Function(Handle, Int64)>(_callIntArgFn));
 }
 
-void callPointerClosure(void Function(Pointer) callback, Pointer pointer) {
-  callback(pointer);
+/// Function used by Rust to call closures with single [Pointer] argument.
+void _callPointerArgFn(void Function(Pointer) fn, Pointer arg) {
+  fn(arg);
 }
 
-void callUnitClosure(void Function() callback) {
-  callback();
+/// Function used by Rust to call closures without arguments.
+void _callNoArgsFn(void Function() fn) {
+  fn();
+}
+
+/// Function used by Rust to call closures with single [int] argument.
+void _callIntArgFn(void Function(int) fn, int arg) {
+  fn(arg);
 }

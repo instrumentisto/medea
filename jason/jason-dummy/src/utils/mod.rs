@@ -1,14 +1,14 @@
 mod arrays;
-mod callback;
+mod closure;
 mod completer;
+mod dart_api;
 mod string;
-mod trampoline;
 
 use std::future::Future;
 
 pub use self::{
     arrays::PtrArray,
-    callback::DartCallback,
+    closure::DartClosure,
     completer::Completer,
     string::{c_str_into_string, string_into_c_str},
 };

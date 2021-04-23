@@ -1,8 +1,10 @@
 use dart_sys::Dart_Handle;
 
-use crate::{utils::DartCallback, MediaKind, MediaSourceKind};
+use crate::{utils::DartClosure, ForeignClass, MediaKind, MediaSourceKind};
 
 pub struct RemoteMediaTrack;
+
+impl ForeignClass for RemoteMediaTrack {}
 
 impl RemoteMediaTrack {
     pub fn enabled(&self) -> bool {
@@ -23,24 +25,24 @@ impl RemoteMediaTrack {
 
     // pub fn get_track(&self) -> sys::MediaStreamTrack
 
-    pub fn on_enabled(&self, cb: DartCallback<()>) {
-        cb.call_unit();
+    pub fn on_enabled(&self, cb: DartClosure<()>) {
+        cb.call0();
     }
 
-    pub fn on_disabled(&self, cb: DartCallback<()>) {
-        cb.call_unit();
+    pub fn on_disabled(&self, cb: DartClosure<()>) {
+        cb.call0();
     }
 
-    pub fn on_muted(&self, cb: DartCallback<()>) {
-        cb.call_unit();
+    pub fn on_muted(&self, cb: DartClosure<()>) {
+        cb.call0();
     }
 
-    pub fn on_unmuted(&self, cb: DartCallback<()>) {
-        cb.call_unit();
+    pub fn on_unmuted(&self, cb: DartClosure<()>) {
+        cb.call0();
     }
 
-    pub fn on_stopped(&self, cb: DartCallback<()>) {
-        cb.call_unit();
+    pub fn on_stopped(&self, cb: DartClosure<()>) {
+        cb.call0();
     }
 }
 
@@ -50,7 +52,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_enabled(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_enabled(DartCallback::new(f));
+    this.on_enabled(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -59,7 +61,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_disabled(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_disabled(DartCallback::new(f));
+    this.on_disabled(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -68,7 +70,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_muted(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_muted(DartCallback::new(f));
+    this.on_muted(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -77,7 +79,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_unmuted(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_unmuted(DartCallback::new(f));
+    this.on_unmuted(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -86,7 +88,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_stopped(
     f: Dart_Handle,
 ) {
     let this = this.as_ref().unwrap();
-    this.on_stopped(DartCallback::new(f));
+    this.on_stopped(DartClosure::new(f));
 }
 
 #[no_mangle]
@@ -127,5 +129,5 @@ pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__free(this: *mut RemoteMediaTrack) {
-    Box::from_raw(this);
+    RemoteMediaTrack::from_ptr(this);
 }

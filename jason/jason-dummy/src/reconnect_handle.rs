@@ -1,10 +1,14 @@
+use dart_sys::Dart_Handle;
+
 use crate::{
     room_handle::RoomHandle,
     utils::{spawn, Completer},
+    ForeignClass,
 };
-use dart_sys::Dart_Handle;
 
 pub struct ReconnectHandle;
+
+impl ForeignClass for ReconnectHandle {}
 
 impl ReconnectHandle {
     pub async fn reconnect_with_delay(&self, _delay_ms: u32) {
@@ -60,5 +64,5 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
-    Box::from_raw(this);
+    ReconnectHandle::from_ptr(this);
 }

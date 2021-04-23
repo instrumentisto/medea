@@ -14,14 +14,14 @@ typedef _getRemoteMemberId_Dart = Pointer<Utf8> Function(Pointer);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-typedef _onClose_C = Void Function(Handle, Handle);
+typedef _onClose_C = Void Function(Pointer, Handle);
 typedef _onClose_Dart = void Function(Pointer, void Function());
 
-typedef _onRemoteTrackAdded_C = Void Function(Handle, Handle);
+typedef _onRemoteTrackAdded_C = Void Function(Pointer, Handle);
 typedef _onRemoteTrackAdded_Dart = void Function(
     Pointer, void Function(Pointer));
 
-typedef _onQualityScoreUpdate_C = Void Function(Handle, Handle);
+typedef _onQualityScoreUpdate_C = Void Function(Pointer, Handle);
 typedef _onQualityScoreUpdate_Dart = void Function(Pointer, void Function(int));
 
 final _getRemoteMemberId =
@@ -30,14 +30,14 @@ final _getRemoteMemberId =
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('ConnectionHandle__free');
 
-final _onClose_Dart _onClose =
+final _onClose =
     dl.lookupFunction<_onClose_C, _onClose_Dart>('ConnectionHandle__on_close');
 
-final _onRemoteTrackAdded_Dart _onRemoteTrackAdded =
+final _onRemoteTrackAdded =
     dl.lookupFunction<_onRemoteTrackAdded_C, _onRemoteTrackAdded_Dart>(
         'ConnectionHandle__on_remote_track_added');
 
-final _onQualityScoreUpdate_Dart _onQualityScoreUpdate =
+final _onQualityScoreUpdate =
     dl.lookupFunction<_onQualityScoreUpdate_C, _onQualityScoreUpdate_Dart>(
         'ConnectionHandle__on_quality_score_update');
 

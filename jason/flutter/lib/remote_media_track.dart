@@ -20,19 +20,19 @@ typedef _mediaSourceKind_Dart = int Function(Pointer);
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-typedef _onEnabled_C = Void Function(Handle, Handle);
+typedef _onEnabled_C = Void Function(Pointer, Handle);
 typedef _onEnabled_Dart = void Function(Pointer, void Function());
 
-typedef _onDisabled_C = Void Function(Handle, Handle);
+typedef _onDisabled_C = Void Function(Pointer, Handle);
 typedef _onDisabled_Dart = void Function(Pointer, void Function());
 
-typedef _onMuted_C = Void Function(Handle, Handle);
+typedef _onMuted_C = Void Function(Pointer, Handle);
 typedef _onMuted_Dart = void Function(Pointer, void Function());
 
-typedef _onUnmuted_C = Void Function(Handle, Handle);
+typedef _onUnmuted_C = Void Function(Pointer, Handle);
 typedef _onUnmuted_Dart = void Function(Pointer, void Function());
 
-typedef _onStopped_C = Void Function(Handle, Handle);
+typedef _onStopped_C = Void Function(Pointer, Handle);
 typedef _onStopped_Dart = void Function(Pointer, void Function());
 
 final _enabled =

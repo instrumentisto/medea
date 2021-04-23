@@ -25,7 +25,7 @@ RUST_VER := 1.51
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
-CARGO_NDK_VER := 2.2.0-ndkr22b-rust$(RUST_VER)
+CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
 ANDROID_NDK_TARGETS := arm64-v8a \
                        armeabi-v7a \
                        x86 \
@@ -354,17 +354,7 @@ cargo.lint:
 # TODO: Replace with actual `medea-jason` crate.
 define cargo.lint.medea-jason.android
 	$(eval target := $(strip $(1)))
-
 	cd jason/jason-dummy/ && \
-	PATH=${ANDROID_NDK_HOME}:${PATH} \
-	CC_aarch64_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang \
-	CC_armv7_linux_androideabi=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi24-clang \
-	CC_i686_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/i686-linux-android16-clang \
-	CC_x86_64_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android21-clang \
-	AR_aarch64_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar \
-	AR_armv7_linux_androideabi=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar \
-	AR_i686_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar \
-	AR_x86_64_linux_android=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar \
 	cargo clippy --target=$(target) -- -D clippy::pedantic -D warnings
 endef
 

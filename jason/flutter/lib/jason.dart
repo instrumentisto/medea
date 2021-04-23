@@ -39,23 +39,33 @@ final _close_room =
 final _free = dl.lookupFunction<_free_C, _free_Dart>('Jason__free');
 
 DynamicLibrary _dl_load() {
-  if (Platform.isAndroid) return DynamicLibrary.open('libjason.so');
-  throw UnsupportedError('This platform is not supported.');
+  if (!Platform.isAndroid) {
+    throw UnsupportedError('This platform is not supported.');
+  }
+  if (NativeApi.majorVersion != 2) {
+    // If the DartVM we're running on does not have the same major version as
+    // this file was compiled against, refuse to initialize: the symbols are not
+    // compatible.
+    throw 'You are running unsupported NativeApi version.';
+  }
+
+  var dl = DynamicLibrary.open('libjason.so');
+
+  var initResult = dl.lookupFunction<
+      IntPtr Function(Pointer<Void>),
+      int Function(
+          Pointer<Void>)>('init_dart_api_dl')(NativeApi.initializeApiDLData);
+
+  if (initResult != 0) {
+    throw 'Failed to initialize Dart API. Code: $initResult';
+  }
+  callback.registerFunctions(dl);
+
+  return dl;
 }
 
 class Jason {
   final NullablePointer ptr = NullablePointer(_new());
-
-  Jason() {
-    final nativeInitializeApi = dl.lookupFunction<
-        IntPtr Function(Pointer<Void>),
-        int Function(Pointer<Void>)>('init_dart_api_dl');
-
-    if (nativeInitializeApi(NativeApi.initializeApiDLData) != 0) {
-      throw 'Failed to initialize Dart API';
-    }
-    callback.registerFunctions();
-  }
 
   MediaManager mediaManager() {
     return MediaManager(NullablePointer(_media_manager(ptr.getInnerPtr())));

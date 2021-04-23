@@ -2,9 +2,12 @@ use crate::{
     audio_track_constraints::AudioTrackConstraints,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
+    ForeignClass,
 };
 
 pub struct MediaStreamSettings;
+
+impl ForeignClass for MediaStreamSettings {}
 
 impl MediaStreamSettings {
     pub fn new() -> Self {
@@ -20,7 +23,7 @@ impl MediaStreamSettings {
 
 #[no_mangle]
 pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
-    Box::into_raw(Box::new(MediaStreamSettings::new()))
+    MediaStreamSettings::new().into_ptr()
 }
 
 #[no_mangle]
@@ -30,7 +33,7 @@ pub unsafe extern "C" fn MediaStreamSettings__audio(
 ) {
     let this = this.as_mut().unwrap();
 
-    this.audio(*Box::from_raw(constraints));
+    this.audio(AudioTrackConstraints::from_ptr(constraints));
 }
 
 #[no_mangle]
@@ -40,7 +43,7 @@ pub unsafe extern "C" fn MediaStreamSettings__device_video(
 ) {
     let this = this.as_mut().unwrap();
 
-    this.device_video(*Box::from_raw(constraints));
+    this.device_video(DeviceVideoTrackConstraints::from_ptr(constraints));
 }
 
 #[no_mangle]
@@ -50,12 +53,12 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
 ) {
     let this = this.as_mut().unwrap();
 
-    this.display_video(*Box::from_raw(constraints));
+    this.display_video(DisplayVideoTrackConstraints::from_ptr(constraints));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__free(
     this: *mut MediaStreamSettings,
 ) {
-    Box::from_raw(this);
+    MediaStreamSettings::from_ptr(this);
 }

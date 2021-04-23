@@ -1,12 +1,16 @@
+use dart_sys::Dart_Handle;
+
 use crate::{
     input_device_info::InputDeviceInfo,
     local_media_track::LocalMediaTrack,
     media_stream_settings::MediaStreamSettings,
     utils::{spawn, Completer, PtrArray},
+    ForeignClass,
 };
-use dart_sys::Dart_Handle;
 
 pub struct MediaManagerHandle;
+
+impl ForeignClass for MediaManagerHandle {}
 
 impl MediaManagerHandle {
     pub async fn enumerate_devices(&self) -> Vec<InputDeviceInfo> {
@@ -55,5 +59,5 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 pub unsafe extern "C" fn MediaManagerHandle__free(
     this: *mut MediaManagerHandle,
 ) {
-    Box::from_raw(this);
+    MediaManagerHandle::from_ptr(this);
 }

@@ -5,11 +5,11 @@ use dart_sys::Dart_Handle;
 use crate::utils::PtrArray;
 
 use super::{
-    callback::DartCallback,
-    trampoline::{
+    dart_api::{
         Dart_HandleFromPersistent_DL_Trampolined,
         Dart_NewPersistentHandle_DL_Trampolined,
     },
+    DartClosure,
 };
 
 pub type NewCompleter = extern "C" fn() -> Dart_Handle;

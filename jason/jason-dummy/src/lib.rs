@@ -22,10 +22,27 @@ pub mod remote_media_track;
 pub mod room_close_reason;
 pub mod room_handle;
 mod unimplemented;
-mod utils;
+pub mod utils;
 
-#[no_mangle]
-pub extern "C" fn dummy_function() {}
+/// Rust structure that has wrapper class in Dart. Such structures are passed
+/// through FFI boundaries as thin pointers.
+pub trait ForeignClass {
+    /// Consumes `Self` returning a wrapped raw pointer via [`Box::into_raw`].
+    fn into_ptr(self) -> *const Self
+    where
+        Self: Sized,
+    {
+        Box::into_raw(Box::new(self))
+    }
+
+    /// Constructs `Self` from a raw pointer via [`Box::from_raw`].
+    unsafe fn from_ptr(this: *mut Self) -> Self
+    where
+        Self: Sized,
+    {
+        *Box::from_raw(this)
+    }
+}
 
 pub enum MediaKind {
     Audio = 0,
