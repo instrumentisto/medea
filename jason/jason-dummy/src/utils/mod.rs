@@ -13,7 +13,7 @@ pub use self::{
     string::{c_str_into_string, string_into_c_str},
 };
 
-pub fn spawn<F>(f: F)
+pub fn spawn<F>(_: F)
 where
     F: Future<Output = ()> + 'static,
 {

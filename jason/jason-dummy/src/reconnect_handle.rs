@@ -1,7 +1,6 @@
 use dart_sys::Dart_Handle;
 
 use crate::{
-    room_handle::RoomHandle,
     utils::{spawn, Completer},
     ForeignClass,
 };
@@ -25,6 +24,7 @@ impl ReconnectHandle {
     }
 }
 
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     this: *mut ReconnectHandle,
@@ -40,6 +40,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     fut
 }
 
+#[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     this: *mut ReconnectHandle,

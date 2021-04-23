@@ -33,7 +33,8 @@ class MediaManager {
 
   MediaManager(this.ptr);
 
-  Future<List<LocalMediaTrack>> initLocalTracks(MediaStreamSettings caps) async {
+  Future<List<LocalMediaTrack>> initLocalTracks(
+      MediaStreamSettings caps) async {
     var fut = _initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr());
     if (fut is Future) {
       var tracks = await fut;
@@ -43,10 +44,13 @@ class MediaManager {
             .map((e) => LocalMediaTrack(NullablePointer(e)))
             .toList();
       } else {
-        throw Exception('Future resolved with unexpected Object: ' + tracks.runtimeType.toString());
+        throw Exception('Future resolved with unexpected Object: ' +
+            tracks.runtimeType.toString());
       }
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -60,10 +64,13 @@ class MediaManager {
             .map((e) => InputDeviceInfo(NullablePointer(e)))
             .toList();
       } else {
-        throw Exception('Future resolved with unexpected Object: ' + devices.runtimeType.toString());
+        throw Exception('Future resolved with unexpected Object: ' +
+            devices.runtimeType.toString());
       }
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 

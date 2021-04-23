@@ -9,7 +9,6 @@ use super::{
         Dart_HandleFromPersistent_DL_Trampolined,
         Dart_NewPersistentHandle_DL_Trampolined,
     },
-    DartClosure,
 };
 
 pub type NewCompleter = extern "C" fn() -> Dart_Handle;
@@ -24,6 +23,7 @@ pub type CompleterCompleteCaller =
     extern "C" fn(c: Dart_Handle, var: *mut dyn Any);
 static mut COMPLETER_COMPLETE_CALLER: Option<CompleterCompleteCaller> = None;
 
+#[allow(improper_ctypes_definitions)]
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_complete(
     f: CompleterCompleteCaller,
@@ -37,6 +37,7 @@ static mut COMPLETER_COMPLETE_ERROR_CALLER: Option<
     CompleterCompleteErrorCaller,
 > = None;
 
+#[allow(improper_ctypes_definitions)]
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_complete_error(
     f: CompleterCompleteErrorCaller,

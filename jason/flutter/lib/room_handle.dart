@@ -30,8 +30,10 @@ typedef _onConnectionLoss_Dart = void Function(Pointer, void Function(Pointer));
 typedef _join_C = Handle Function(Pointer, Pointer<Utf8>);
 typedef _join_Dart = Object Function(Pointer, Pointer<Utf8>);
 
-typedef _setLocalMediaSettings_C = Handle Function(Pointer, Pointer, Int64, Int64);
-typedef _setLocalMediaSettings_Dart = Object Function(Pointer, Pointer, int, int);
+typedef _setLocalMediaSettings_C = Handle Function(
+    Pointer, Pointer, Int64, Int64);
+typedef _setLocalMediaSettings_Dart = Object Function(
+    Pointer, Pointer, int, int);
 
 typedef _muteAudio_C = Handle Function(Pointer);
 typedef _muteAudio_Dart = Object Function(Pointer);
@@ -85,47 +87,51 @@ final _onConnectionLoss =
     dl.lookupFunction<_onConnectionLoss_C, _onConnectionLoss_Dart>(
         'RoomHandle__on_connection_loss');
 
-final _join =
-    dl.lookupFunction<_join_C, _join_Dart>('ConnectionHandle__join');
+final _join = dl.lookupFunction<_join_C, _join_Dart>('ConnectionHandle__join');
 
 final _setLocalMediaSettings =
-    dl.lookupFunction<_setLocalMediaSettings_C, _setLocalMediaSettings_Dart>('ConnectionHandle__set_local_media_settings');
+    dl.lookupFunction<_setLocalMediaSettings_C, _setLocalMediaSettings_Dart>(
+        'ConnectionHandle__set_local_media_settings');
 
-final _muteAudio =
-    dl.lookupFunction<_muteAudio_C, _muteAudio_Dart>('ConnectionHandle__mute_audio');
+final _muteAudio = dl.lookupFunction<_muteAudio_C, _muteAudio_Dart>(
+    'ConnectionHandle__mute_audio');
 
-final _unmuteAudio =
-  dl.lookupFunction<_unmuteAudio_C, _unmuteAudio_Dart>('ConnectionHandle__unmute_audio');
+final _unmuteAudio = dl.lookupFunction<_unmuteAudio_C, _unmuteAudio_Dart>(
+    'ConnectionHandle__unmute_audio');
 
-final _muteVideo =
-  dl.lookupFunction<_muteVideo_C, _muteVideo_Dart>('ConnectionHandle__mute_video');
+final _muteVideo = dl.lookupFunction<_muteVideo_C, _muteVideo_Dart>(
+    'ConnectionHandle__mute_video');
 
-final _unmuteVideo =
-  dl.lookupFunction<_unmuteVideo_C, _unmuteVideo_Dart>('ConnectionHandle__unmute_video');
+final _unmuteVideo = dl.lookupFunction<_unmuteVideo_C, _unmuteVideo_Dart>(
+    'ConnectionHandle__unmute_video');
 
-final _disableVideo =
-  dl.lookupFunction<_disableVideo_C, _disableVideo_Dart>('ConnectionHandle__disable_video');
+final _disableVideo = dl.lookupFunction<_disableVideo_C, _disableVideo_Dart>(
+    'ConnectionHandle__disable_video');
 
-final _enableVideo =
-  dl.lookupFunction<_enableVideo_C, _enableVideo_Dart>('ConnectionHandle__enable_video');
+final _enableVideo = dl.lookupFunction<_enableVideo_C, _enableVideo_Dart>(
+    'ConnectionHandle__enable_video');
 
-final _disableAudio =
-  dl.lookupFunction<_disableAudio_C, _disableAudio_Dart>('ConnectionHandle__disable_audio');
+final _disableAudio = dl.lookupFunction<_disableAudio_C, _disableAudio_Dart>(
+    'ConnectionHandle__disable_audio');
 
-final _enableAudio =
-  dl.lookupFunction<_enableAudio_C, _enableAudio_Dart>('ConnectionHandle__enable_audio');
+final _enableAudio = dl.lookupFunction<_enableAudio_C, _enableAudio_Dart>(
+    'ConnectionHandle__enable_audio');
 
 final _disableRemoteAudio =
-  dl.lookupFunction<_disableRemoteAudio_C, _disableRemoteAudio_Dart>('ConnectionHandle__disable_remote_audio');
+    dl.lookupFunction<_disableRemoteAudio_C, _disableRemoteAudio_Dart>(
+        'ConnectionHandle__disable_remote_audio');
 
 final _enableRemoteAudio =
-  dl.lookupFunction<_enableRemoteAudio_C, _enableRemoteAudio_Dart>('ConnectionHandle__enable_remote_audio');
+    dl.lookupFunction<_enableRemoteAudio_C, _enableRemoteAudio_Dart>(
+        'ConnectionHandle__enable_remote_audio');
 
 final _disableRemoteVideo =
-dl.lookupFunction<_disableRemoteVideo_C, _disableRemoteVideo_Dart>('ConnectionHandle__disable_remote_video');
+    dl.lookupFunction<_disableRemoteVideo_C, _disableRemoteVideo_Dart>(
+        'ConnectionHandle__disable_remote_video');
 
 final _enableRemoteVideo =
-  dl.lookupFunction<_enableRemoteVideo_C, _enableRemoteVideo_Dart>('ConnectionHandle__enable_remote_video');
+    dl.lookupFunction<_enableRemoteVideo_C, _enableRemoteVideo_Dart>(
+        'ConnectionHandle__enable_remote_video');
 
 class RoomHandle {
   late NullablePointer ptr;
@@ -137,16 +143,21 @@ class RoomHandle {
     if (fut is Future) {
       await fut;
     } else {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
-  Future<void> setLocalMediaSettings(MediaStreamSettings settings, bool stopFirst, bool rollbackOnFail) async {
-    var fut = _setLocalMediaSettings(ptr.getInnerPtr(), settings.ptr.getInnerPtr(), stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0);
+  Future<void> setLocalMediaSettings(
+      MediaStreamSettings settings, bool stopFirst, bool rollbackOnFail) async {
+    var fut = _setLocalMediaSettings(ptr.getInnerPtr(),
+        settings.ptr.getInnerPtr(), stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0);
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -154,8 +165,10 @@ class RoomHandle {
     var fut = _muteAudio(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -163,8 +176,10 @@ class RoomHandle {
     var fut = _unmuteAudio(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -172,8 +187,10 @@ class RoomHandle {
     var fut = _muteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -181,8 +198,10 @@ class RoomHandle {
     var fut = _unmuteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -190,8 +209,10 @@ class RoomHandle {
     var fut = _disableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -199,8 +220,10 @@ class RoomHandle {
     var fut = _enableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -208,8 +231,10 @@ class RoomHandle {
     var fut = _disableAudio(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -217,8 +242,10 @@ class RoomHandle {
     var fut = _enableAudio(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -226,8 +253,10 @@ class RoomHandle {
     var fut = _disableRemoteAudio(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -235,8 +264,10 @@ class RoomHandle {
     var fut = _enableRemoteAudio(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -244,8 +275,10 @@ class RoomHandle {
     var fut = _disableRemoteVideo(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
@@ -253,8 +286,10 @@ class RoomHandle {
     var fut = _enableRemoteVideo(ptr.getInnerPtr());
     if (fut is Future) {
       await fut;
-    } {
-      throw Exception('Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+    }
+    {
+      throw Exception(
+          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
     }
   }
 
