@@ -65,6 +65,7 @@ pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
 }
 
+// TODO: Print exception if Dart closure throws.
 /// Dart closure that can be called from Rust.
 pub struct DartClosure<T> {
     /// [`Dart_PersistentHandle`] to the Dart closure that should be called.
