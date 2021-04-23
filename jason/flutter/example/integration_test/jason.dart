@@ -28,8 +28,8 @@ void main() {
     var jason = Jason();
     var mediaManager = jason.mediaManager();
 
-    var devices = mediaManager.enumerateDevices();
-    var tracks = mediaManager.initLocalTracks(MediaStreamSettings());
+    var devices = await mediaManager.enumerateDevices();
+    var tracks = await mediaManager.initLocalTracks(MediaStreamSettings());
 
     expect(devices.length, equals(3));
     expect(tracks.length, equals(3));
