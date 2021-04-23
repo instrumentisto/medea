@@ -1,4 +1,4 @@
-use dart_sys::{Dart_Handle, Dart_HandleFromPersistent, Dart_PersistentHandle};
+use dart_sys::{Dart_Handle, Dart_HandleFromPersistent, Dart_PersistentHandle, _Dart_Handle};
 use derive_more::From;
 
 use crate::{
@@ -9,6 +9,12 @@ use crate::{
 
 #[derive(Clone, From, Debug)]
 pub struct MediaStreamTrack(DartHandle);
+
+impl From<Dart_Handle> for MediaStreamTrack {
+    fn from(handle: Dart_Handle) -> Self {
+        Self(DartHandle::new(handle))
+    }
+}
 
 type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
 static mut ID_FUNCTION: Option<IdFunction> = None;
