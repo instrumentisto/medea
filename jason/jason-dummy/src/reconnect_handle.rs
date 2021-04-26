@@ -1,9 +1,6 @@
 use dart_sys::Dart_Handle;
 
-use crate::{
-    utils::{spawn, Completer},
-    ForeignClass,
-};
+use crate::{utils::into_dart_future, ForeignClass};
 
 pub struct ReconnectHandle;
 
@@ -31,13 +28,10 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     delay_ms: i64,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.reconnect_with_delay(delay_ms as u32).await;
-        completer.complete(())
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
@@ -49,18 +43,15 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     max_delay: i64,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.reconnect_with_backoff(
             starting_delay as u32,
             multiplier,
             max_delay as u32,
         )
         .await;
-        completer.complete(())
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]

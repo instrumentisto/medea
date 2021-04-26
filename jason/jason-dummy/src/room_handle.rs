@@ -6,7 +6,7 @@ use crate::{
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle,
     room_close_reason::RoomCloseReason,
-    utils::{c_str_into_string, spawn, Completer, DartClosure},
+    utils::{c_str_into_string, into_dart_future, DartClosure},
     ForeignClass, MediaSourceKind,
 };
 
@@ -110,13 +110,10 @@ pub unsafe extern "C" fn RoomHandle__join(
     url: *const libc::c_char,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.join(c_str_into_string(url)).await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -128,14 +125,11 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
     let settings = Box::from_raw(settings);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.set_local_media_settings(&settings, stop_first, rollback_on_fail)
             .await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -143,13 +137,10 @@ pub unsafe extern "C" fn RoomHandle__mute_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.mute_audio().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -157,13 +148,10 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.mute_audio().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -171,13 +159,10 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.disable_audio().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -185,13 +170,10 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.enable_audio().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -201,13 +183,10 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
     let source_kind = MediaSourceKind::from(source_kind);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.mute_video(Some(source_kind)).await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -217,13 +196,10 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
     let source_kind = MediaSourceKind::from(source_kind);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.unmute_video(Some(source_kind)).await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -233,13 +209,10 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
     let source_kind = MediaSourceKind::from(source_kind);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.disable_video(Some(source_kind)).await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -249,13 +222,10 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
     let source_kind = MediaSourceKind::from(source_kind);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.enable_video(Some(source_kind)).await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -263,13 +233,10 @@ pub unsafe extern "C" fn RoomHandle__disable_remove_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.disable_remote_audio().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -277,13 +244,10 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.enable_remote_audio().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -291,13 +255,10 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_video(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.disable_remote_video().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
@@ -305,13 +266,10 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
     let this = Box::from_raw(this);
-    let completer: Completer<(), ()> = Completer::new();
-    let fut = completer.future();
-    spawn(async move {
+    into_dart_future(async move {
         this.enable_remote_video().await;
-        completer.complete(());
-    });
-    fut
+        Ok::<(), ()>(())
+    })
 }
 
 #[no_mangle]
