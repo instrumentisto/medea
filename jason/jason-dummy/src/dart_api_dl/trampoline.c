@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include "./include/dart_api_dl.c"
 
-/** Trampolines to Dynamically Linked Dart API.
+/**
+ * Trampolines to Dynamically Linked Dart API.
  *
  * Trampolines allow to call Dynamically Linked Dart API from Rust.
  *

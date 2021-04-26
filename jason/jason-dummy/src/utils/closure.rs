@@ -1,14 +1,14 @@
 //! Functionality for calling Dart closures from Rust.
 //!
-//! Dart DL API does not allow calling Dart closures directly. So Dart registers
-//! static functions that accept and invoke provided Dart closures. This module
-//! exports function for registering "caller" functions:
+//! Dart DL API doesn't allow calling Dart closures directly. So Dart registers
+//! static functions that accept and invoke the provided Dart closures. This
+//! module exports function for registering "caller" functions:
 //! [`register_ptr_arg_fn_caller`], [`register_no_args_fn_caller`],
 //! [`register_int_arg_fn_caller`].
 //!
 //! These "caller" functions MUST be registered by Dart during FFI
-//! initialization phase: after Dart DL API initialization and before calling
-//! any other exported Rust function.
+//! initialization phase: after Dart DL API is initialized and before any other
+//! exported Rust function is called.
 
 use std::marker::PhantomData;
 
@@ -74,13 +74,13 @@ pub struct DartClosure<T> {
 }
 
 impl<T> DartClosure<T> {
-    /// Creates new [`DartClosure`] from the provided [`Dart_Handle`] to the
-    /// Dart closure. Persists the provided [`Dart_Handle`] so it wont be moved
+    /// Creates a new [`DartClosure`] from the provided [`Dart_Handle`] to a
+    /// Dart closure. Persists the provided [`Dart_Handle`] so it won't be moved
     /// by the Dart VM GC.
     pub fn new(cb: Dart_Handle) -> Self {
         Self {
             cb: unsafe { Dart_NewPersistentHandle_DL_Trampolined(cb) },
-            _arg_kind: PhantomData::default(),
+            _arg_kind: PhantomData,
         }
     }
 }
@@ -105,12 +105,12 @@ impl<T: ForeignClass> DartClosure<T> {
     }
 }
 
-/// Implements [`DartClosure::call`] casting argument to `i64`. Should be
-/// called for all integer types that fit into 2^63.
+/// Implements [`DartClosure::call`] casting argument to `i64`. Should be called
+/// for all integer types that fit into `2^63`.
 macro_rules! impl_dart_closure_for_int {
     ($arg:ty) => {
         impl DartClosure<$arg> {
-            /// Calls underlying Dart closure with provided argument.
+            /// Calls an underlying Dart closure with the provided argument.
             pub fn call1(&self, arg: $arg) {
                 unsafe {
                     let fn_handle =
@@ -133,7 +133,7 @@ impl_dart_closure_for_int!(u32);
 impl_dart_closure_for_int!(bool);
 
 impl<T> Drop for DartClosure<T> {
-    /// Manually deallocate saved [`Dart_PersistentHandle`] so it wont leak.
+    /// Manually deallocate saved [`Dart_PersistentHandle`] so it won't leak.
     fn drop(&mut self) {
         unsafe { Dart_DeletePersistentHandle_DL_Trampolined(self.cb) };
     }

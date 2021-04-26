@@ -1,4 +1,5 @@
-/// Compiles `trampoline.c` and links it into the final library.
+//! Compiles `trampoline.c` and links it into the final library.
+
 fn main() {
     println!("cargo:rerun-if-env-changed=CLIPPY_ARGS");
     if let Ok("cargo-clippy") = std::env::var("CARGO_CFG_FEATURE").as_deref() {

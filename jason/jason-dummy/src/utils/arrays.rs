@@ -10,13 +10,14 @@ use crate::ForeignClass;
 /// free this array by calling [`PtrArray_free`].
 #[repr(C)]
 pub struct PtrArray<T = ()> {
+    /// Pointer to the first element.
+    ptr: *const *mut (),
+
     /// Array length.
     len: u64,
-    /// Pointer to the first element.
-    arr: *const *mut (),
 
     /// Array elements type marker.
-    _marker: PhantomData<T>,
+    _element: PhantomData<T>,
 }
 
 impl<T: ForeignClass> PtrArray<T> {
@@ -27,8 +28,8 @@ impl<T: ForeignClass> PtrArray<T> {
         let out: Vec<_> = arr.into_iter().map(ForeignClass::into_ptr).collect();
         Self {
             len: out.len() as u64,
-            arr: Box::leak(out.into_boxed_slice()).as_ptr().cast::<*mut ()>(),
-            _marker: PhantomData::default(),
+            ptr: Box::leak(out.into_boxed_slice()).as_ptr().cast::<*mut ()>(),
+            _element: PhantomData,
         }
     }
 }
@@ -36,11 +37,11 @@ impl<T: ForeignClass> PtrArray<T> {
 impl<T> Drop for PtrArray<T> {
     #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
-        // Only dropping boxed slice. Elements are leaked and must be
+        // Only dropping a boxed slice. Elements are leaked and must be
         // explicitly freed in the foreign code.
         unsafe {
             let slice = slice::from_raw_parts_mut(
-                self.arr as *mut *mut (),
+                self.ptr as *mut *mut (),
                 self.len as usize,
             );
             Box::from_raw(slice);
