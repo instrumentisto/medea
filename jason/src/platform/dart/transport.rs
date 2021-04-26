@@ -1,4 +1,7 @@
-use std::cell::{Cell, RefCell};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 use dart_sys::Dart_Handle;
 use futures::{channel::mpsc, prelude::stream::LocalBoxStream};
@@ -13,7 +16,6 @@ use crate::{
     rpc::{ApiUrl, ClientDisconnect},
     utils::dart::into_dart_string,
 };
-use std::rc::Rc;
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 

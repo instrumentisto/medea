@@ -1,17 +1,16 @@
+use std::result::Result as StdResult;
+
 use dart_sys::Dart_Handle;
 use medea_client_api_proto::{
     IceConnectionState, IceServer, PeerConnectionState,
 };
 use tracerr::Traced;
 
-use super::{
-    ice_candidate::IceCandidate as PlatformIceCandidate,
-    media_track::MediaStreamTrack,
-};
 use crate::{
     media::MediaKind,
     platform::{
         dart::{
+            error::Error,
             transceiver::Transceiver,
             utils::{
                 callback::{
@@ -19,7 +18,10 @@ use crate::{
                     TwoArgCallback,
                 },
                 handle::DartHandle,
-                ice_connection_from_int, peer_connection_state_from_int,
+                ice_connection_from_int,
+                option::DartOption,
+                peer_connection_state_from_int,
+                result::{DartResult, VoidDartResult},
             },
         },
         peer_connection::RtcSdpType,
@@ -29,7 +31,12 @@ use crate::{
     },
     utils::dart::into_dart_string,
 };
-use crate::platform::dart::utils::option::DartOption;
+
+use super::{
+    ice_candidate::IceCandidate as PlatformIceCandidate,
+    media_track::MediaStreamTrack,
+};
+use crate::platform::dart::utils::option::DartIntOption;
 
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
 
@@ -44,7 +51,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__ice_connection_state(
     ICE_CONNECTION_STATE_FUNCTION = Some(f);
 }
 
-type ConnectionStateFunction = extern "C" fn(Dart_Handle) -> i32;
+type ConnectionStateFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
 static mut CONNECTION_STATE_FUNCTION: Option<ConnectionStateFunction> = None;
 
 #[no_mangle]
@@ -52,6 +59,16 @@ pub unsafe extern "C" fn register_RtcPeerConnection__connection_state(
     f: ConnectionStateFunction,
 ) {
     CONNECTION_STATE_FUNCTION = Some(f);
+}
+
+type AddIceCandidateFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__add_ice_candidate(
+    f: AddIceCandidateFunction,
+) {
+    ADD_ICE_CANDIDATE_FUNCTION = Some(f);
 }
 
 type RestartIceFunction = extern "C" fn(Dart_Handle);
@@ -64,7 +81,9 @@ pub unsafe extern "C" fn register_RtcPeerConnection__restart_ice(
     RESTART_ICE_FUNCTION = Some(f);
 }
 
-type SetOfferFunction = extern "C" fn(Dart_Handle, *const libc::c_char);
+// TODO: Maybe it's not needed
+type SetOfferFunction =
+    extern "C" fn(Dart_Handle, *const libc::c_char) -> VoidDartResult;
 static mut SET_OFFER_FUNCTION: Option<SetOfferFunction> = None;
 
 #[no_mangle]
@@ -74,7 +93,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_offer(
     SET_OFFER_FUNCTION = Some(f);
 }
 
-type RollbackFunction = extern "C" fn(Dart_Handle);
+type RollbackFunction = extern "C" fn(Dart_Handle) -> DartResult;
 static mut ROLLBACK_FUNCTION: Option<RollbackFunction> = None;
 
 #[no_mangle]
@@ -107,7 +126,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__get_transceiver_by_mid(
 }
 
 type SetLocalDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char);
+    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> VoidDartResult;
 static mut SET_LOCAL_DESCRIPTION_FUNCTION: Option<SetLocalDescriptionFunction> =
     None;
 
@@ -119,7 +138,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_local_description(
 }
 
 type SetRemoteDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char);
+    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> VoidDartResult;
 static mut SET_REMOTE_DESCRIPTION_FUNCTION: Option<
     SetRemoteDescriptionFunction,
 > = None;
@@ -199,8 +218,8 @@ impl RtcPeerConnection {
 
     pub fn connection_state(&self) -> Option<PeerConnectionState> {
         unsafe {
-            let connection_state =
-                CONNECTION_STATE_FUNCTION.unwrap()(self.handle.get());
+            let connection_state: i32 =
+                Option::from(CONNECTION_STATE_FUNCTION.unwrap()(self.handle.get()))?;
             Some(peer_connection_state_from_int(connection_state))
         }
     }
@@ -285,7 +304,14 @@ impl RtcPeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
     ) -> Result<()> {
-        todo!("Need to do something with nullable arguments")
+        // TODO: result
+        unsafe {
+            ADD_ICE_CANDIDATE_FUNCTION.unwrap()(
+                self.handle.get(),
+                PlatformIceCandidate::new(candidate, sdp_m_line_index, sdp_mid).handle(),
+            )
+        };
+        Ok(())
     }
 
     pub async fn get_stats(&self) -> Result<RtcStats> {
@@ -308,31 +334,53 @@ impl RtcPeerConnection {
         Ok(())
     }
 
-    fn set_local_description(&self, sdp_type: RtcSdpType, sdp: String) {
+    fn set_local_description(
+        &self,
+        sdp_type: RtcSdpType,
+        sdp: String,
+    ) -> Result<()> {
         unsafe {
-            SET_LOCAL_DESCRIPTION_FUNCTION.unwrap()(
+            StdResult::<(), Error>::from(SET_LOCAL_DESCRIPTION_FUNCTION
+                .unwrap()(
                 self.handle.get(),
                 sdp_type.into(),
                 into_dart_string(sdp),
-            );
+            ))
+            .map_err(|e| {
+                tracerr::new!(
+                    RtcPeerConnectionError::SetLocalDescriptionFailed(e)
+                )
+            })
         }
     }
 
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         match sdp {
             SdpType::Offer(sdp) => unsafe {
-                SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                return StdResult::<(), Error>::from(SET_REMOTE_DESCRIPTION_FUNCTION
+                    .unwrap()(
                     self.handle.get(),
                     RtcSdpType::Offer.into(),
                     into_dart_string(sdp),
-                );
+                ))
+                .map_err(|e| {
+                    tracerr::new!(
+                        RtcPeerConnectionError::SetRemoteDescriptionFailed(e)
+                    )
+                });
             },
             SdpType::Answer(sdp) => unsafe {
-                SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                return StdResult::<(), Error>::from(SET_REMOTE_DESCRIPTION_FUNCTION
+                    .unwrap()(
                     self.handle.get(),
                     RtcSdpType::Answer.into(),
                     into_dart_string(sdp),
-                );
+                ))
+                .map_err(|e| {
+                    tracerr::new!(
+                        RtcPeerConnectionError::SetRemoteDescriptionFailed(e)
+                    )
+                });
             },
         }
         Ok(())
@@ -347,9 +395,11 @@ impl RtcPeerConnection {
     }
 
     pub async fn rollback(&self) -> Result<()> {
-        unsafe { ROLLBACK_FUNCTION.unwrap()(self.handle.get()) };
-        // TODO: Result?????
-        Ok(())
+        todo!("See todo below")
+        // TODO: Use set_offer/create_offer function
+        // unsafe { StdResult::<(),
+        // Error>::from(ROLLBACK_FUNCTION.unwrap()(self.handle.get())).
+        // map_err(|e| tracerr::new!(RtcPeerConnectionError::)) }
     }
 
     pub fn add_transceiver(
@@ -377,10 +427,11 @@ impl RtcPeerConnection {
 
     pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         unsafe {
-            let transceiver: Dart_Handle = Option::from(GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
-                self.handle.get(),
-                into_dart_string(mid.to_string()),
-            ))?;
+            let transceiver: Dart_Handle =
+                Option::from(GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
+                    self.handle.get(),
+                    into_dart_string(mid.to_string()),
+                ))?;
             if transceiver.is_null() {
                 None
             } else {

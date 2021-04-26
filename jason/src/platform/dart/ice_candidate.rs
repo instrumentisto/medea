@@ -1,8 +1,10 @@
-use crate::{
-    platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,
-};
 use dart_sys::{Dart_Handle, _Dart_Handle};
 use derive_more::From;
+
+use crate::{
+    platform::dart::utils::handle::DartHandle,
+    utils::dart::{from_dart_string, into_dart_string},
+};
 
 #[derive(From)]
 pub struct IceCandidate(DartHandle);
@@ -42,6 +44,22 @@ pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {
 }
 
 impl IceCandidate {
+    pub fn new(
+        candidate: &str,
+        sdp_m_line_index: Option<u16>,
+        sdp_mid: &Option<String>,
+    ) -> Self {
+        // TODO: Do with me something
+        unsafe {
+            // NEW.unwrap(into_dart_string(candidate.to_string()))
+        }
+        todo!()
+    }
+
+    pub fn handle(&self) -> Dart_Handle {
+        return self.0.get();
+    }
+
     pub fn candidate(&self) -> String {
         unsafe { from_dart_string(CANDIDATE_FUNCTION.unwrap()(self.0.get())) }
     }

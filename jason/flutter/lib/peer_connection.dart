@@ -9,6 +9,10 @@ void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__set_remote_description')(
       Pointer.fromFunction<Handle Function(Handle)>(setRemoteDescription)
   );
+
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__add_ice_candidate')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(addIceCandidate)
+  );
 }
 
 void setRemoteDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
@@ -20,6 +24,19 @@ void setRemoteDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
 void setLocalDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
   if (conn is RTCPeerConnection) {
     conn.setLocalDescription(RTCSessionDescription(sdp.toDartString(), type.toDartString()));
+  }
+}
+
+// TODO: Return Future to Rust
+void addIceCandidate(Object conn, Object candidate) {
+  if (conn is RTCPeerConnection) {
+    if (candidate is RTCIceCandidate) {
+      conn.addCandidate(candidate);
+    } else {
+      throw Exception("Unexpected Object received: " + candidate.runtimeType.toString());
+    }
+  } else {
+    throw Exception("Unexpected Object received: " + candidate.runtimeType.toString());
   }
 }
 

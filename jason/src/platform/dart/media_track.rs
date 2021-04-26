@@ -1,4 +1,6 @@
-use dart_sys::{Dart_Handle, Dart_HandleFromPersistent, Dart_PersistentHandle, _Dart_Handle};
+use dart_sys::{
+    Dart_Handle, Dart_HandleFromPersistent, Dart_PersistentHandle, _Dart_Handle,
+};
 use derive_more::From;
 
 use crate::{
@@ -6,6 +8,7 @@ use crate::{
     platform::dart::utils::{callback::VoidCallback, handle::DartHandle},
     utils::dart::from_dart_string,
 };
+use crate::platform::dart::utils::option::{DartStringOption, DartIntOption, DartUIntOption};
 
 #[derive(Clone, From, Debug)]
 pub struct MediaStreamTrack(DartHandle);
@@ -24,7 +27,7 @@ pub unsafe extern "C" fn register_MediaStreamTrack__id(f: IdFunction) {
     ID_FUNCTION = Some(f);
 }
 
-type DeviceIdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
+type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
 
 #[no_mangle]
@@ -34,7 +37,7 @@ pub unsafe extern "C" fn register_MediaStreamTrack__device_id(
     DEVICE_ID_FUNCTION = Some(f);
 }
 
-type FacingModeFunction = extern "C" fn(Dart_Handle) -> i32;
+type FacingModeFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
 static mut FACING_MODE_FUNCTION: Option<FacingModeFunction> = None;
 
 #[no_mangle]
@@ -44,7 +47,7 @@ pub unsafe extern "C" fn register_MediaStreamTrack__facing_mode(
     FACING_MODE_FUNCTION = Some(f);
 }
 
-type HeightFunction = extern "C" fn(Dart_Handle) -> i32;
+type HeightFunction = extern "C" fn(Dart_Handle) -> DartUIntOption;
 static mut HEIGHT_FUNCTION: Option<HeightFunction> = None;
 
 #[no_mangle]
@@ -52,7 +55,7 @@ pub unsafe extern "C" fn register_MediaStreamTrack__height(f: HeightFunction) {
     HEIGHT_FUNCTION = Some(f);
 }
 
-type WidthFunction = extern "C" fn(Dart_Handle) -> i32;
+type WidthFunction = extern "C" fn(Dart_Handle) -> DartUIntOption;
 static mut WIDTH_FUNCTION: Option<WidthFunction> = None;
 
 #[no_mangle]
@@ -137,34 +140,26 @@ impl MediaStreamTrack {
 
     pub fn device_id(&self) -> Option<String> {
         unsafe {
-            let device_id = DEVICE_ID_FUNCTION.unwrap()(self.0.get());
-            if device_id.is_null() {
-                None
-            } else {
-                Some(from_dart_string(device_id))
-            }
+            DEVICE_ID_FUNCTION.unwrap()(self.0.get()).into()
         }
     }
 
     pub fn facing_mode(&self) -> Option<FacingMode> {
         unsafe {
-            let facing_mode = FACING_MODE_FUNCTION.unwrap()(self.0.get());
-            // TODO: maybe it's needs to be nullable?
+            let facing_mode: i32 = Option::from(FACING_MODE_FUNCTION.unwrap()(self.0.get()))?;
             Some(FacingMode::from(facing_mode))
         }
     }
 
     pub fn height(&self) -> Option<u32> {
         unsafe {
-            // TODO: maybe it's needs to be nullable?
-            Some(HEIGHT_FUNCTION.unwrap()(self.0.get()) as u32)
+            HEIGHT_FUNCTION.unwrap()(self.0.get()).into()
         }
     }
 
     pub fn width(&self) -> Option<u32> {
         unsafe {
-            // TODO: maybe it's needs to be nullable?
-            Some(WIDTH_FUNCTION.unwrap()(self.0.get()) as u32)
+            WIDTH_FUNCTION.unwrap()(self.0.get()).into()
         }
     }
 

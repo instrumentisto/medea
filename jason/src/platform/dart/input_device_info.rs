@@ -5,10 +5,9 @@ use dart_sys::{
 
 use crate::{
     media::MediaKind,
-    platform::dart::utils::handle::DartHandle,
+    platform::dart::utils::{handle::DartHandle, option::DartStringOption},
     utils::dart::{from_dart_string, into_dart_string},
 };
-use crate::platform::dart::utils::option::DartStringOption;
 
 type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
@@ -75,26 +74,27 @@ impl From<DartHandle> for InputDeviceInfo {
 }
 
 impl InputDeviceInfo {
-    pub fn device_id(&self) -> Option<String> {
+    pub fn device_id(&self) -> String {
+        // Device ID should be always Some
+        unsafe { Option::from(DEVICE_ID_FUNCTION.unwrap()(self.info.get())).unwrap() }
+    }
+
+    pub fn label(&self) -> String {
+        // Label should be always Some
+        unsafe { Option::from(LABEL_FUNCTION.unwrap()(self.info.get())).unwrap() }
+    }
+
+    pub fn group_id(&self) -> String {
+        // Group ID should be always Some
+        unsafe { Option::from(GROUP_ID_FUNCTION.unwrap()(self.info.get())).unwrap() }
+    }
+
+    pub fn kind(&self) -> MediaKind {
         unsafe {
-            Option::from(DEVICE_ID_FUNCTION.unwrap()(self.info.get()))
-        }
-    }
-
-    pub fn label(&self) -> Option<String> {
-        unsafe { Option::from(LABEL_FUNCTION.unwrap()(self.info.get())) }
-    }
-
-    pub fn group_id(&self) -> Option<String> {
-        unsafe { Option::from(GROUP_ID_FUNCTION.unwrap()(self.info.get())) }
-    }
-
-    pub fn kind(&self) -> Option<MediaKind> {
-        unsafe {
-            let kind: String = Option::from(KIND_FUNCTION.unwrap()(self.info.get()))?;
-            Some(kind
-                .parse()
-                .unwrap())
+            // Kind should be always Some
+            let kind: String =
+                Option::from(KIND_FUNCTION.unwrap()(self.info.get())).unwrap();
+            kind.parse().unwrap()
         }
     }
 }

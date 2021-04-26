@@ -1,10 +1,11 @@
 use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
 
-pub mod option;
 pub mod callback;
 pub mod handle;
 pub mod list;
 pub mod map;
+pub mod option;
+pub mod result;
 
 pub fn ice_connection_from_int(i: i32) -> IceConnectionState {
     match i {

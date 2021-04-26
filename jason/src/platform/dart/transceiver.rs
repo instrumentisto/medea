@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{future::Future, rc::Rc};
 
 use dart_sys::{Dart_Handle, _Dart_Handle};
 
@@ -7,7 +7,7 @@ use crate::{
     platform,
     platform::{dart::utils::handle::DartHandle, TransceiverDirection},
 };
-use std::future::Future;
+use crate::platform::dart::utils::option::{DartStringOption, DartOption};
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
@@ -84,6 +84,36 @@ pub unsafe extern "C" fn register_Transceiver__is_stopped(
     IS_STOPPED_FUNCTION = Some(f);
 }
 
+type MidFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+static mut MID_FUNCTION: Option<MidFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_Transceiver__mid(
+    f: MidFunction,
+) {
+    MID_FUNCTION = Some(f)
+}
+
+type SendTrackFunction = extern "C" fn(Dart_Handle) -> DartOption;
+static mut SEND_TRACK_FUNCTION: Option<SendTrackFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_Transceiver__send_track(
+    f: SendTrackFunction,
+) {
+    SEND_TRACK_FUNCTION = Some(f);
+}
+
+type HasSendTrackFunction = extern "C" fn(Dart_Handle) -> i8;
+static mut HAS_SEND_TRACK_FUNCTION: Option<HasSendTrackFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_Transceiver__has_send_track(
+    f: HasSendTrackFunction,
+) {
+    HAS_SEND_TRACK_FUNCTION = Some(f);
+}
+
 impl Transceiver {
     pub fn current_direction(&self) -> TransceiverDirection {
         unsafe {
@@ -116,6 +146,7 @@ impl Transceiver {
                 new_sender.platform_track().track(),
             );
         }
+        // TODO: Replace local::Track of this Transceiver with provided local::Track.
         Ok(())
     }
 
@@ -141,14 +172,16 @@ impl Transceiver {
     }
 
     pub fn mid(&self) -> Option<String> {
-        todo!()
+        unsafe {
+            MID_FUNCTION.unwrap()(self.transceiver.get()).into()
+        }
     }
 
     pub fn send_track(&self) -> Option<Rc<local::Track>> {
-        todo!()
+        todo!("Implement after set_send_track TODO")
     }
 
     pub fn has_send_track(&self) -> bool {
-        todo!()
+        todo!("Implement after set_send_track TODO")
     }
 }

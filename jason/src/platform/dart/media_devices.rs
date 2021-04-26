@@ -1,3 +1,4 @@
+use dart_sys::{Dart_FunctionIsStatic, Dart_Handle};
 use tracerr::Traced;
 
 use super::{
@@ -5,12 +6,12 @@ use super::{
     input_device_info::InputDeviceInfo,
     media_track::MediaStreamTrack,
 };
+
 use crate::{
     media::MediaManagerError,
     platform::dart::utils::list::DartList,
     utils::dart::{dart_future::DartFuture, Array},
 };
-use dart_sys::{Dart_FunctionIsStatic, Dart_Handle};
 
 type EnumerateDevicesFunction = extern "C" fn() -> Dart_Handle;
 static mut ENUMERATE_DEVICES_FUNCTION: Option<EnumerateDevicesFunction> = None;
