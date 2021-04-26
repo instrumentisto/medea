@@ -1,25 +1,24 @@
 import 'dart:async';
 import 'dart:ffi';
 
-import '../jason.dart';
 import 'ptrarray.dart';
 
-void registerFunctions() {
+void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_new_completer')(
+          'register_new_completer_caller')(
       Pointer.fromFunction<Handle Function()>(_newCompleter));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_completer_complete')(
+          'register_completer_complete_caller')(
       Pointer.fromFunction<Void Function(Handle, Pointer)>(_completerComplete));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_completer_complete_error')(
+          'register_completer_complete_error_caller')(
       Pointer.fromFunction<Void Function(Handle, Pointer)>(
           _completerCompleteError));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_array_completer_complete')(
+          'register_array_completer_complete_caller')(
       Pointer.fromFunction<Void Function(Handle, PtrArray)>(
           _arrayCompleterComplete));
 }

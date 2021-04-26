@@ -7,6 +7,7 @@ import 'room_handle.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/callback.dart' as callback;
+import 'util/completer.dart' as completer;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
@@ -60,6 +61,7 @@ DynamicLibrary _dl_load() {
     throw 'Failed to initialize Dart API. Code: $initResult';
   }
   callback.registerFunctions(dl);
+  completer.registerFunctions(dl);
 
   return dl;
 }
