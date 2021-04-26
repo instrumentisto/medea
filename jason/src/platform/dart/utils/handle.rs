@@ -3,7 +3,7 @@ use dart_sys::{
     Dart_NewPersistentHandle, Dart_PersistentHandle, _Dart_Handle,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DartHandle(Dart_PersistentHandle);
 
 impl From<Dart_Handle> for DartHandle {

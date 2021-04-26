@@ -43,11 +43,11 @@ pub use self::dart::{
     transceiver::Transceiver,
 };
 pub use self::wasm::{
-    error::Error,
     init_logger,
     rtc_stats::RtcStats,
     set_panic_hook,
     utils::{Callback, Function},
+    error::Error,
 };
 
 #[cfg(feature = "mockable")]

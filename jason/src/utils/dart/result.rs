@@ -29,10 +29,11 @@ pub struct DartError {
 
 impl From<DartError> for Error {
     fn from(err: DartError) -> Self {
-        Self {
-            name: unsafe { from_dart_string(err.name) },
-            message: unsafe { from_dart_string(err.message) },
-        }
+        todo!("Maybe this module should be removed")
+        // Self {
+        //     name: unsafe { from_dart_string(err.name) },
+        //     message: unsafe { from_dart_string(err.message) },
+        // }
     }
 }
 
