@@ -1,6 +1,6 @@
 //! Functionality for calling [`Dart DL API`] from Rust.
 //!
-//! [`Dart DL API`]: https://tinyurl.com/dart-dl-api
+//! [`Dart DL API`]: https://tinyurl.com/32e7fudh
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 

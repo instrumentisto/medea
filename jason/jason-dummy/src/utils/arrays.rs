@@ -2,6 +2,8 @@
 
 use std::{marker::PhantomData, slice};
 
+use libc::c_void;
+
 use crate::ForeignClass;
 
 /// Array of pointers to [`ForeignClass`] structs.
@@ -11,7 +13,7 @@ use crate::ForeignClass;
 #[repr(C)]
 pub struct PtrArray<T = ()> {
     /// Pointer to the first element.
-    ptr: *const *mut (),
+    ptr: *const *mut libc::c_void,
 
     /// Array length.
     len: u64,
@@ -28,7 +30,7 @@ impl<T: ForeignClass> PtrArray<T> {
         let out: Vec<_> = arr.into_iter().map(ForeignClass::into_ptr).collect();
         Self {
             len: out.len() as u64,
-            ptr: Box::leak(out.into_boxed_slice()).as_ptr().cast::<*mut ()>(),
+            ptr: Box::leak(out.into_boxed_slice()).as_ptr().cast::<*mut c_void>(),
             _element: PhantomData,
         }
     }
@@ -41,7 +43,7 @@ impl<T> Drop for PtrArray<T> {
         // explicitly freed in the foreign code.
         unsafe {
             let slice = slice::from_raw_parts_mut(
-                self.ptr as *mut *mut (),
+                self.ptr as *mut *mut c_void,
                 self.len as usize,
             );
             Box::from_raw(slice);
