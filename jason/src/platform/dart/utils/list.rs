@@ -6,7 +6,7 @@ type GetFunction = extern "C" fn(Dart_Handle, i32) -> Dart_Handle;
 static mut GET_FUNCTION: Option<GetFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_Array__get_function(f: GetFunction) {
+pub unsafe extern "C" fn register_Array__get(f: GetFunction) {
     GET_FUNCTION = Some(f);
 }
 
