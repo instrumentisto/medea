@@ -1,13 +1,17 @@
+use crate::platform::dart::{
+    error::{DartError, Error},
+    utils::handle::DartHandle,
+};
 use dart_sys::Dart_Handle;
 use futures::channel::{oneshot, oneshot::Canceled};
 use std::future::Future;
 
-pub struct DartFuture(oneshot::Sender<Dart_Handle>);
+pub struct DartFuture(oneshot::Sender<Result<DartHandle, DartError>>);
 
 impl DartFuture {
     pub fn new(
         dart_fut: Dart_Handle,
-    ) -> impl Future<Output = Result<Dart_Handle, Canceled>> {
+    ) -> impl Future<Output = Result<DartHandle, DartError>> {
         let (tx, rx) = oneshot::channel();
         let this = Self(tx);
 
@@ -18,11 +22,15 @@ impl DartFuture {
             )
         };
 
-        rx
+        async move { rx.await.unwrap() }
     }
 
-    fn resolve(self, val: Dart_Handle) {
-        self.0.send(val);
+    fn resolve_ok(self, val: Dart_Handle) {
+        self.0.send(Ok(DartHandle::new(val)));
+    }
+
+    fn resolve_err(self, val: Dart_Handle) {
+        self.0.send(Err(DartError::from(val)));
     }
 }
 
@@ -37,10 +45,19 @@ pub unsafe extern "C" fn register_spawn_dart_future_function(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dart_future_resolved(
+pub unsafe extern "C" fn DartFuture__resolve_ok(
     fut: *mut DartFuture,
     val: Dart_Handle,
 ) {
     let fut = Box::from_raw(fut);
-    fut.resolve(val);
+    fut.resolve_ok(val);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn DartFuture__resolve_err(
+    fut: *mut DartFuture,
+    val: Dart_Handle,
+) {
+    let fut = Box::from_raw(fut);
+    fut.resolve_err(val);
 }

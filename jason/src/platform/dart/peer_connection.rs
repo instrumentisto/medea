@@ -18,14 +18,13 @@ use crate::{
                 ice_connection_from_int,
                 option::{DartIntOption, DartOption},
                 peer_connection_state_from_int,
-                result::{DartResult, VoidDartResult},
             },
         },
         peer_connection::RtcSdpType,
         IceCandidate, RtcPeerConnectionError, RtcStats, SdpType,
         TransceiverDirection,
     },
-    utils::dart::into_dart_string,
+    utils::dart::{dart_future::DartFuture, into_dart_string},
 };
 
 use super::{
@@ -57,7 +56,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__connection_state(
 }
 
 type AddIceCandidateFunction =
-    extern "C" fn(Dart_Handle, Dart_Handle) -> VoidDartResult;
+    extern "C" fn(Dart_Handle, Dart_Handle) -> Dart_Handle;
 static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
 
 #[no_mangle]
@@ -77,19 +76,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__restart_ice(
     RESTART_ICE_FUNCTION = Some(f);
 }
 
-// TODO: Maybe it's not needed
-type SetOfferFunction =
-    extern "C" fn(Dart_Handle, *const libc::c_char) -> VoidDartResult;
-static mut SET_OFFER_FUNCTION: Option<SetOfferFunction> = None;
-
-#[no_mangle]
-pub unsafe extern "C" fn register_RtcPeerConnection__set_offer(
-    f: SetOfferFunction,
-) {
-    SET_OFFER_FUNCTION = Some(f);
-}
-
-type RollbackFunction = extern "C" fn(Dart_Handle) -> DartResult;
+type RollbackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
 static mut ROLLBACK_FUNCTION: Option<RollbackFunction> = None;
 
 #[no_mangle]
@@ -122,7 +109,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__get_transceiver_by_mid(
 }
 
 type SetLocalDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> VoidDartResult;
+    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
 static mut SET_LOCAL_DESCRIPTION_FUNCTION: Option<SetLocalDescriptionFunction> =
     None;
 
@@ -134,7 +121,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_local_description(
 }
 
 type SetRemoteDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> VoidDartResult;
+    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
 static mut SET_REMOTE_DESCRIPTION_FUNCTION: Option<
     SetRemoteDescriptionFunction,
 > = None;
@@ -303,13 +290,16 @@ impl RtcPeerConnection {
         sdp_mid: &Option<String>,
     ) -> Result<()> {
         unsafe {
-            StdResult::<(), Error>::from(ADD_ICE_CANDIDATE_FUNCTION.unwrap()(
+            DartFuture::new(ADD_ICE_CANDIDATE_FUNCTION.unwrap()(
                 self.handle.get(),
                 PlatformIceCandidate::new(candidate, sdp_m_line_index, sdp_mid)
                     .handle(),
             ))
+            .await
             .map_err(|e| {
-                tracerr::new!(RtcPeerConnectionError::AddIceCandidateFailed(e))
+                tracerr::new!(RtcPeerConnectionError::AddIceCandidateFailed(
+                    Error::from(e)
+                ))
             })
         };
         Ok(())
@@ -325,65 +315,73 @@ impl RtcPeerConnection {
 
     pub async fn set_offer(&self, offer: &str) -> Result<()> {
         self.set_local_description(RtcSdpType::Offer, offer.to_string())
+            .await
             .map_err(tracerr::map_from_and_wrap!())
     }
 
     pub async fn set_answer(&self, answer: &str) -> Result<()> {
         self.set_local_description(RtcSdpType::Answer, answer.to_string())
+            .await
             .map_err(tracerr::map_from_and_wrap!())
     }
 
-    fn set_local_description(
+    async fn set_local_description(
         &self,
         sdp_type: RtcSdpType,
         sdp: String,
     ) -> Result<()> {
         unsafe {
-            StdResult::<(), Error>::from(SET_LOCAL_DESCRIPTION_FUNCTION
-                .unwrap()(
+            DartFuture::new(SET_LOCAL_DESCRIPTION_FUNCTION.unwrap()(
                 self.handle.get(),
                 sdp_type.into(),
                 into_dart_string(sdp),
             ))
+            .await
             .map_err(|e| {
                 tracerr::new!(
-                    RtcPeerConnectionError::SetLocalDescriptionFailed(e)
+                    RtcPeerConnectionError::SetLocalDescriptionFailed(
+                        Error::from(e)
+                    )
                 )
-            })
+            })?;
         }
+        Ok(())
     }
 
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         match sdp {
             SdpType::Offer(sdp) => unsafe {
-                return StdResult::<(), Error>::from(
-                    SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
-                        self.handle.get(),
-                        RtcSdpType::Offer.into(),
-                        into_dart_string(sdp),
-                    ),
-                )
+                DartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                    self.handle.get(),
+                    RtcSdpType::Offer.into(),
+                    into_dart_string(sdp),
+                ))
+                .await
                 .map_err(|e| {
                     tracerr::new!(
-                        RtcPeerConnectionError::SetRemoteDescriptionFailed(e)
+                        RtcPeerConnectionError::SetRemoteDescriptionFailed(
+                            Error::from(e)
+                        )
                     )
-                });
+                })?;
             },
             SdpType::Answer(sdp) => unsafe {
-                return StdResult::<(), Error>::from(
-                    SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
-                        self.handle.get(),
-                        RtcSdpType::Answer.into(),
-                        into_dart_string(sdp),
-                    ),
-                )
+                DartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                    self.handle.get(),
+                    RtcSdpType::Answer.into(),
+                    into_dart_string(sdp),
+                ))
+                .await
                 .map_err(|e| {
                     tracerr::new!(
-                        RtcPeerConnectionError::SetRemoteDescriptionFailed(e)
+                        RtcPeerConnectionError::SetRemoteDescriptionFailed(
+                            Error::from(e)
+                        )
                     )
-                });
+                })?;
             },
         }
+        Ok(())
     }
 
     pub async fn create_answer(&self) -> Result<String> {

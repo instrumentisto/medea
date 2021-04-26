@@ -1,4 +1,5 @@
 use dart_sys::Dart_Handle;
+use derive_more::From;
 
 use crate::platform::dart::utils::handle::DartHandle;
 
@@ -18,13 +19,8 @@ pub unsafe extern "C" fn register_Array__length(f: LengthFunction) {
     LENGTH_FUNCTION = Some(f);
 }
 
+#[derive(From)]
 pub struct DartList(DartHandle);
-
-impl From<Dart_Handle> for DartList {
-    fn from(handle: Dart_Handle) -> Self {
-        Self(handle.into())
-    }
-}
 
 impl DartList {
     pub fn get(&self, i: i32) -> Option<DartHandle> {
