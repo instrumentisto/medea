@@ -16,7 +16,7 @@ use crate::{
                 callback::{HandleMutCallback, IntCallback, TwoArgCallback},
                 handle::DartHandle,
                 ice_connection_from_int,
-                option::DartOption,
+                option::{DartIntOption, DartOption},
                 peer_connection_state_from_int,
                 result::{DartResult, VoidDartResult},
             },
@@ -32,7 +32,6 @@ use super::{
     ice_candidate::IceCandidate as PlatformIceCandidate,
     media_track::MediaStreamTrack,
 };
-use crate::platform::dart::utils::option::DartIntOption;
 
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
 
@@ -57,7 +56,8 @@ pub unsafe extern "C" fn register_RtcPeerConnection__connection_state(
     CONNECTION_STATE_FUNCTION = Some(f);
 }
 
-type AddIceCandidateFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+type AddIceCandidateFunction =
+    extern "C" fn(Dart_Handle, Dart_Handle) -> VoidDartResult;
 static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
 
 #[no_mangle]
@@ -302,13 +302,15 @@ impl RtcPeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
     ) -> Result<()> {
-        // TODO: result
         unsafe {
-            ADD_ICE_CANDIDATE_FUNCTION.unwrap()(
+            StdResult::<(), Error>::from(ADD_ICE_CANDIDATE_FUNCTION.unwrap()(
                 self.handle.get(),
                 PlatformIceCandidate::new(candidate, sdp_m_line_index, sdp_mid)
                     .handle(),
-            )
+            ))
+            .map_err(|e| {
+                tracerr::new!(RtcPeerConnectionError::AddIceCandidateFailed(e))
+            })
         };
         Ok(())
     }
@@ -322,15 +324,13 @@ impl RtcPeerConnection {
     }
 
     pub async fn set_offer(&self, offer: &str) -> Result<()> {
-        self.set_local_description(RtcSdpType::Offer, offer.to_string());
-        // TODO: result
-        Ok(())
+        self.set_local_description(RtcSdpType::Offer, offer.to_string())
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     pub async fn set_answer(&self, answer: &str) -> Result<()> {
-        self.set_local_description(RtcSdpType::Answer, answer.to_string());
-        // TODO: result
-        Ok(())
+        self.set_local_description(RtcSdpType::Answer, answer.to_string())
+            .map_err(tracerr::map_from_and_wrap!())
     }
 
     fn set_local_description(
