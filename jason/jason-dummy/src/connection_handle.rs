@@ -28,7 +28,7 @@ impl ConnectionHandle {
 
     pub fn on_quality_score_update(&self, f: DartClosure<u8>) {
         // Result<(), JasonError>
-        f.call1(4);
+        f.call_int(4);
     }
 }
 
