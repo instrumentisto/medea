@@ -13,10 +13,7 @@ use crate::{
             error::Error,
             transceiver::Transceiver,
             utils::{
-                callback::{
-                    HandleCallback, HandleMutCallback, IntCallback,
-                    TwoArgCallback,
-                },
+                callback::{HandleMutCallback, IntCallback, TwoArgCallback},
                 handle::DartHandle,
                 ice_connection_from_int,
                 option::DartOption,
@@ -25,7 +22,6 @@ use crate::{
             },
         },
         peer_connection::RtcSdpType,
-        rtc_stats::RtcStatsError::Platform,
         IceCandidate, RtcPeerConnectionError, RtcStats, SdpType,
         TransceiverDirection,
     },
@@ -176,6 +172,7 @@ static mut ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION: Option<
     OnIceConnectionStateChangeFunction,
 > = None;
 
+#[rustfmt::skip]
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_connection_state_change(
     f: OnIceConnectionStateChangeFunction,
@@ -218,8 +215,9 @@ impl RtcPeerConnection {
 
     pub fn connection_state(&self) -> Option<PeerConnectionState> {
         unsafe {
-            let connection_state: i32 =
-                Option::from(CONNECTION_STATE_FUNCTION.unwrap()(self.handle.get()))?;
+            let connection_state: i32 = Option::from(
+                CONNECTION_STATE_FUNCTION.unwrap()(self.handle.get()),
+            )?;
             Some(peer_connection_state_from_int(connection_state))
         }
     }
@@ -308,7 +306,8 @@ impl RtcPeerConnection {
         unsafe {
             ADD_ICE_CANDIDATE_FUNCTION.unwrap()(
                 self.handle.get(),
-                PlatformIceCandidate::new(candidate, sdp_m_line_index, sdp_mid).handle(),
+                PlatformIceCandidate::new(candidate, sdp_m_line_index, sdp_mid)
+                    .handle(),
             )
         };
         Ok(())
@@ -357,12 +356,13 @@ impl RtcPeerConnection {
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         match sdp {
             SdpType::Offer(sdp) => unsafe {
-                return StdResult::<(), Error>::from(SET_REMOTE_DESCRIPTION_FUNCTION
-                    .unwrap()(
-                    self.handle.get(),
-                    RtcSdpType::Offer.into(),
-                    into_dart_string(sdp),
-                ))
+                return StdResult::<(), Error>::from(
+                    SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                        self.handle.get(),
+                        RtcSdpType::Offer.into(),
+                        into_dart_string(sdp),
+                    ),
+                )
                 .map_err(|e| {
                     tracerr::new!(
                         RtcPeerConnectionError::SetRemoteDescriptionFailed(e)
@@ -370,12 +370,13 @@ impl RtcPeerConnection {
                 });
             },
             SdpType::Answer(sdp) => unsafe {
-                return StdResult::<(), Error>::from(SET_REMOTE_DESCRIPTION_FUNCTION
-                    .unwrap()(
-                    self.handle.get(),
-                    RtcSdpType::Answer.into(),
-                    into_dart_string(sdp),
-                ))
+                return StdResult::<(), Error>::from(
+                    SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                        self.handle.get(),
+                        RtcSdpType::Answer.into(),
+                        into_dart_string(sdp),
+                    ),
+                )
                 .map_err(|e| {
                     tracerr::new!(
                         RtcPeerConnectionError::SetRemoteDescriptionFailed(e)
@@ -383,7 +384,6 @@ impl RtcPeerConnection {
                 });
             },
         }
-        Ok(())
     }
 
     pub async fn create_answer(&self) -> Result<String> {

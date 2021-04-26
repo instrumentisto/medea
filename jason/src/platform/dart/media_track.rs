@@ -1,14 +1,15 @@
-use dart_sys::{
-    Dart_Handle, Dart_HandleFromPersistent, Dart_PersistentHandle, _Dart_Handle,
-};
+use dart_sys::Dart_Handle;
 use derive_more::From;
 
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
-    platform::dart::utils::{callback::VoidCallback, handle::DartHandle},
+    platform::dart::utils::{
+        callback::VoidCallback,
+        handle::DartHandle,
+        option::{DartIntOption, DartStringOption, DartUIntOption},
+    },
     utils::dart::from_dart_string,
 };
-use crate::platform::dart::utils::option::{DartStringOption, DartIntOption, DartUIntOption};
 
 #[derive(Clone, From, Debug)]
 pub struct MediaStreamTrack(DartHandle);
@@ -139,28 +140,23 @@ impl MediaStreamTrack {
     }
 
     pub fn device_id(&self) -> Option<String> {
-        unsafe {
-            DEVICE_ID_FUNCTION.unwrap()(self.0.get()).into()
-        }
+        unsafe { DEVICE_ID_FUNCTION.unwrap()(self.0.get()).into() }
     }
 
     pub fn facing_mode(&self) -> Option<FacingMode> {
         unsafe {
-            let facing_mode: i32 = Option::from(FACING_MODE_FUNCTION.unwrap()(self.0.get()))?;
+            let facing_mode: i32 =
+                Option::from(FACING_MODE_FUNCTION.unwrap()(self.0.get()))?;
             Some(FacingMode::from(facing_mode))
         }
     }
 
     pub fn height(&self) -> Option<u32> {
-        unsafe {
-            HEIGHT_FUNCTION.unwrap()(self.0.get()).into()
-        }
+        unsafe { HEIGHT_FUNCTION.unwrap()(self.0.get()).into() }
     }
 
     pub fn width(&self) -> Option<u32> {
-        unsafe {
-            WIDTH_FUNCTION.unwrap()(self.0.get()).into()
-        }
+        unsafe { WIDTH_FUNCTION.unwrap()(self.0.get()).into() }
     }
 
     pub fn set_enabled(&self, enabled: bool) {

@@ -1,8 +1,6 @@
-use std::{cell::RefCell, marker::PhantomData};
+use dart_sys::Dart_Handle;
 
 use crate::utils::dart::from_dart_string;
-use dart_sys::Dart_Handle;
-use std::any::Any;
 
 type VoidCallbackFunction = extern "C" fn(*mut VoidCallback) -> Dart_Handle;
 static mut VOID_CALLBACK_FUNCTION: Option<VoidCallbackFunction> = None;

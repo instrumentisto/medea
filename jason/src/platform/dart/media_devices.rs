@@ -1,4 +1,4 @@
-use dart_sys::{Dart_FunctionIsStatic, Dart_Handle};
+use dart_sys::Dart_Handle;
 use tracerr::Traced;
 
 use super::{
@@ -8,9 +8,8 @@ use super::{
 };
 
 use crate::{
-    media::MediaManagerError,
-    platform::dart::utils::list::DartList,
-    utils::dart::{dart_future::DartFuture, Array},
+    media::MediaManagerError, platform::dart::utils::list::DartList,
+    utils::dart::dart_future::DartFuture,
 };
 
 type EnumerateDevicesFunction = extern "C" fn() -> Dart_Handle;

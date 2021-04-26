@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use dart_sys::Dart_Handle;
 
 use crate::utils::dart::from_dart_string;

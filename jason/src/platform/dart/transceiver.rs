@@ -1,13 +1,18 @@
 use std::{future::Future, rc::Rc};
 
-use dart_sys::{Dart_Handle, _Dart_Handle};
+use dart_sys::Dart_Handle;
 
 use crate::{
     media::track::local,
     platform,
-    platform::{dart::utils::handle::DartHandle, TransceiverDirection},
+    platform::{
+        dart::utils::{
+            handle::DartHandle,
+            option::{DartOption, DartStringOption},
+        },
+        TransceiverDirection,
+    },
 };
-use crate::platform::dart::utils::option::{DartStringOption, DartOption};
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
@@ -88,9 +93,7 @@ type MidFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
 static mut MID_FUNCTION: Option<MidFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_Transceiver__mid(
-    f: MidFunction,
-) {
+pub unsafe extern "C" fn register_Transceiver__mid(f: MidFunction) {
     MID_FUNCTION = Some(f)
 }
 
@@ -146,7 +149,8 @@ impl Transceiver {
                 new_sender.platform_track().track(),
             );
         }
-        // TODO: Replace local::Track of this Transceiver with provided local::Track.
+        // TODO: Replace local::Track of this Transceiver with provided
+        // local::Track.
         Ok(())
     }
 
@@ -172,9 +176,7 @@ impl Transceiver {
     }
 
     pub fn mid(&self) -> Option<String> {
-        unsafe {
-            MID_FUNCTION.unwrap()(self.transceiver.get()).into()
-        }
+        unsafe { MID_FUNCTION.unwrap()(self.transceiver.get()).into() }
     }
 
     pub fn send_track(&self) -> Option<Rc<local::Track>> {

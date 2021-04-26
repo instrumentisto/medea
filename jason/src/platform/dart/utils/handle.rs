@@ -1,6 +1,6 @@
 use dart_sys::{
     Dart_DeletePersistentHandle, Dart_Handle, Dart_HandleFromPersistent,
-    Dart_NewPersistentHandle, Dart_PersistentHandle, _Dart_Handle,
+    Dart_NewPersistentHandle, Dart_PersistentHandle,
 };
 
 #[derive(Clone, Debug, PartialEq)]

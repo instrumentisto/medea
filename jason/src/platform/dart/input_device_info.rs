@@ -1,12 +1,8 @@
-use dart_sys::{
-    Dart_Handle, Dart_HandleFromPersistent, Dart_NewPersistentHandle,
-    Dart_PersistentHandle, _Dart_Handle,
-};
+use dart_sys::Dart_Handle;
 
 use crate::{
     media::MediaKind,
     platform::dart::utils::{handle::DartHandle, option::DartStringOption},
-    utils::dart::{from_dart_string, into_dart_string},
 };
 
 type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
@@ -64,29 +60,30 @@ pub struct InputDeviceInfo {
 
 impl From<DartHandle> for InputDeviceInfo {
     fn from(handle: DartHandle) -> Self {
-        todo!("Provide real MediaKind");
-
-        Self {
-            media_kind: MediaKind::Audio,
-            info: handle,
-        }
+        todo!("Provide real MediaKind")
     }
 }
 
 impl InputDeviceInfo {
     pub fn device_id(&self) -> String {
         // Device ID should be always Some
-        unsafe { Option::from(DEVICE_ID_FUNCTION.unwrap()(self.info.get())).unwrap() }
+        unsafe {
+            Option::from(DEVICE_ID_FUNCTION.unwrap()(self.info.get())).unwrap()
+        }
     }
 
     pub fn label(&self) -> String {
         // Label should be always Some
-        unsafe { Option::from(LABEL_FUNCTION.unwrap()(self.info.get())).unwrap() }
+        unsafe {
+            Option::from(LABEL_FUNCTION.unwrap()(self.info.get())).unwrap()
+        }
     }
 
     pub fn group_id(&self) -> String {
         // Group ID should be always Some
-        unsafe { Option::from(GROUP_ID_FUNCTION.unwrap()(self.info.get())).unwrap() }
+        unsafe {
+            Option::from(GROUP_ID_FUNCTION.unwrap()(self.info.get())).unwrap()
+        }
     }
 
     pub fn kind(&self) -> MediaKind {

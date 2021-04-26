@@ -1,7 +1,8 @@
+use dart_sys::Dart_Handle;
+
 use crate::{
     platform::dart::utils::handle::DartHandle, utils::dart::into_dart_string,
 };
-use dart_sys::{Dart_Handle, _Dart_Handle};
 
 pub struct DartMap(DartHandle);
 

@@ -1,7 +1,6 @@
 pub mod array;
 pub mod dart_future;
 pub mod option;
-pub mod result;
 
 pub use self::array::Array;
 

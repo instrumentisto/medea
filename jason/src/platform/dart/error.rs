@@ -1,6 +1,5 @@
-use std::borrow::Cow;
-
 use derive_more::Display;
+
 use crate::platform::dart::utils::handle::DartHandle;
 
 /// Wrapper for Dart value which returned from Dart side as error.

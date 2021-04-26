@@ -1,9 +1,8 @@
-use dart_sys::{Dart_Handle, _Dart_Handle};
+use dart_sys::Dart_Handle;
 use derive_more::From;
 
 use crate::{
-    platform::dart::utils::handle::DartHandle,
-    utils::dart::{from_dart_string, into_dart_string},
+    platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,
 };
 
 #[derive(From)]

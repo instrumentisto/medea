@@ -1,11 +1,11 @@
 use std::any::Any;
 
-use crate::{
-    platform::dart::error::Error,
-    utils::dart::{from_dart_string, into_dart_string},
-};
 use dart_sys::Dart_Handle;
-use crate::platform::dart::utils::handle::DartHandle;
+
+use crate::{
+    platform::dart::{error::Error, utils::handle::DartHandle},
+    utils::dart::from_dart_string,
+};
 
 #[repr(C)]
 pub struct DartResult {
@@ -27,9 +27,12 @@ impl<T: 'static> From<DartResult> for Result<&T, Error> {
                 message = from_dart_string(from.err_message);
                 name = from_dart_string(from.err_name);
             }
-            Err(Error { name, message, sys_cause: Some(DartHandle::new(from.cause)) })
+            Err(Error {
+                name,
+                message,
+                sys_cause: Some(DartHandle::new(from.cause)),
+            })
         }
-    
     }
 }
 
@@ -52,7 +55,11 @@ impl From<VoidDartResult> for Result<(), Error> {
                 message = from_dart_string(from.err_message);
                 name = from_dart_string(from.err_name);
             }
-            Err(Error { name, message, sys_cause: Some(DartHandle::new(from.cause)) })
+            Err(Error {
+                name,
+                message,
+                sys_cause: Some(DartHandle::new(from.cause)),
+            })
         }
     }
 }

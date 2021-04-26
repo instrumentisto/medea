@@ -1,6 +1,6 @@
 pub mod constraints;
 pub mod error;
-mod executor;
+pub mod executor;
 pub mod ice_candidate;
 pub mod input_device_info;
 pub mod media_devices;
@@ -11,13 +11,13 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
-pub use self::executor::spawn;
-
-use std::{future::Future, time::Duration};
+use std::time::Duration;
 
 use dart_sys::Dart_Handle;
 
 use crate::utils::dart::dart_future::DartFuture;
+
+pub use self::executor::spawn;
 
 type DelayedFutureFunction = extern "C" fn(i32) -> Dart_Handle;
 static mut DELAYED_FUTURE_FUNCTION: Option<DelayedFutureFunction> = None;

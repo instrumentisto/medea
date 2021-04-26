@@ -1,6 +1,6 @@
+use dart_sys::Dart_Handle;
+
 use crate::platform::dart::utils::handle::DartHandle;
-use dart_sys::{Dart_Handle, _Dart_Handle};
-use derive_more::From;
 
 type GetFunction = extern "C" fn(Dart_Handle, i32) -> Dart_Handle;
 static mut GET_FUNCTION: Option<GetFunction> = None;
