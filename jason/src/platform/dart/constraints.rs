@@ -31,7 +31,7 @@ type AudioFunction = extern "C" fn(Dart_Handle, Dart_Handle);
 static mut AUDIO_FUNCTION: Option<AudioFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_MediaStreamConstraints__audio(
+pub unsafe extern "C" fn register_MediaStreamConstraints__set_audio(
     f: AudioFunction,
 ) {
     AUDIO_FUNCTION = Some(f);
@@ -41,7 +41,7 @@ type VideoFunction = extern "C" fn(Dart_Handle, Dart_Handle);
 static mut VIDEO_FUNCTION: Option<VideoFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_MediaStreamConstraints__video(
+pub unsafe extern "C" fn register_MediaStreamConstraints__set_video(
     f: VideoFunction,
 ) {
     VIDEO_FUNCTION = Some(f);

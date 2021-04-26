@@ -4,14 +4,14 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__candidate')(
-      Pointer.fromFunction<Handle Function(Handle)>(candidate)
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_Constraints__new')(
+      Pointer.fromFunction<Handle Function()>(constructor)
   );
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_m_line_index')(
-      Pointer.fromFunction<Handle Function()>(sdpMLineIndex)
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_Constraints__set_audio')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(sdpMLineIndex)
   );
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_mid')(
-      Pointer.fromFunction<Handle Function(Handle)>(sdpMid)
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_Constraints__set_video')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(sdpMLineIndex)
   );
 }
 

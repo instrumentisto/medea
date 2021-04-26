@@ -9,9 +9,28 @@ void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__set_remote_description')(
       Pointer.fromFunction<Handle Function(Handle)>(setRemoteDescription)
   );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__set_local_description')(
+      Pointer.fromFunction<Handle Function(Handle)>(setRemoteDescription)
+  );
 
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__add_ice_candidate')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(addIceCandidate)
+  );
+
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__ice_connection_state')(
+      Pointer.fromFunction<Int32 Function(Handle)>(iceConnectionState)
+  );
+
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__connection_state')(
+      Pointer.fromFunction<Int32 Function(Handle)>(connectionState)
+  );
+
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__restart_ice')(
+      Pointer.fromFunction<Int32 Function(Handle)>(restartIce)
+  );
+
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__rollback')(
+      Pointer.fromFunction<Void Function(Handle)>(rollback)
   );
 }
 
@@ -24,6 +43,12 @@ void setRemoteDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
 void setLocalDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
   if (conn is RTCPeerConnection) {
     conn.setLocalDescription(RTCSessionDescription(sdp.toDartString(), type.toDartString()));
+  }
+}
+
+void restartIce(Object conn) {
+  if (conn is RTCPeerConnection) {
+    throw Exception("Unimplemented");
   }
 }
 
@@ -40,7 +65,7 @@ void addIceCandidate(Object conn, Object candidate) {
   }
 }
 
-int connectionState(Object conn) {
+Int32 connectionState(Object conn) {
   if (conn is RTCPeerConnection) {
     return conn.connectionState.index;
   } else {
@@ -48,7 +73,7 @@ int connectionState(Object conn) {
   }
 }
 
-int iceConnectionState(Object conn) {
+Int32 iceConnectionState(Object conn) {
   if (conn is RTCPeerConnection) {
     return conn.iceConnectionState.index;
   } else {

@@ -37,12 +37,12 @@ pub unsafe extern "C" fn register_Transceiver__current_direction(
     CURRENT_DIRECTION_FUNCTION = Some(f);
 }
 
-type SetSendTrackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
-static mut GET_SEND_TRACK_FUNCTION: Option<SetSendTrackFunction> = None;
+type GetSendTrackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
+static mut GET_SEND_TRACK_FUNCTION: Option<GetSendTrackFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_Transceiver__set_send_track(
-    f: SetSendTrackFunction,
+pub unsafe extern "C" fn register_Transceiver__get_send_track(
+    f: GetSendTrackFunction,
 ) {
     GET_SEND_TRACK_FUNCTION = Some(f);
 }
@@ -60,16 +60,16 @@ pub unsafe extern "C" fn register_Transceiver__replace_track(
 type DropSenderFunction = extern "C" fn(Dart_Handle);
 static mut DROP_SENDER_FUNCTION: Option<DropSenderFunction> = None;
 
-type SetSenderTrackEnabledFunction = extern "C" fn(Dart_Handle, bool);
-static mut SET_SENDER_TRACK_ENABLED_FUNCTION: Option<
-    SetSenderTrackEnabledFunction,
+type SetSendTrackEnabledFunction = extern "C" fn(Dart_Handle, bool);
+static mut SET_SEND_TRACK_ENABLED_FUNCTION: Option<
+    SetSendTrackEnabledFunction,
 > = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_Transceiver__set_sender_track_enabled(
-    f: SetSenderTrackEnabledFunction,
+pub unsafe extern "C" fn register_Transceiver__set_send_track_enabled(
+    f: SetSendTrackEnabledFunction,
 ) {
-    SET_SENDER_TRACK_ENABLED_FUNCTION = Some(f);
+    SET_SEND_TRACK_ENABLED_FUNCTION = Some(f);
 }
 
 #[no_mangle]
@@ -167,7 +167,7 @@ impl Transceiver {
         unsafe {
             let sender =
                 GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get());
-            SET_SENDER_TRACK_ENABLED_FUNCTION.unwrap()(sender, enabled);
+            SET_SEND_TRACK_ENABLED_FUNCTION.unwrap()(sender, enabled);
         }
     }
 

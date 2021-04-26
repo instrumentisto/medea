@@ -1,10 +1,10 @@
 import 'dart:ffi';
 
-class Option<T> {
-  T _some;
+class HandleOption {
+  Handle _some;
   bool _isSome;
 
-  Option.some(T val) {
+  Option.some(Object val) {
     _some = val;
     _isSome = true;
   }
