@@ -23,7 +23,8 @@ use super::dart_api::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-/// Pointer to an extern function that accepts [`Dart_Handle`] and `*const c_void`;
+/// Pointer to an extern function that accepts [`Dart_Handle`] and `*const
+/// c_void`;
 type PointerArgFnCaller = extern "C" fn(Dart_Handle, *const c_void);
 
 /// Pointer to an extern function that accepts [`Dart_Handle`];
@@ -103,12 +104,18 @@ impl<T: ForeignClass> DartClosure<T> {
     pub fn call1(&self, arg: T) {
         unsafe {
             let fn_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-            PTR_ARG_FN_CALLER.unwrap()(fn_handle, arg.into_ptr().cast::<c_void>());
+            PTR_ARG_FN_CALLER.unwrap()(
+                fn_handle,
+                arg.into_ptr().cast::<c_void>(),
+            );
         }
     }
 }
 
-impl<T> DartClosure<T> where i64: From<T> {
+impl<T> DartClosure<T>
+where
+    i64: From<T>,
+{
     /// Calls underlying Dart closure with provided [`ForeignClass`] argument.
     pub fn call_int(&self, arg: T) {
         unsafe {

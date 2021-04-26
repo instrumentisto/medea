@@ -30,7 +30,9 @@ impl<T: ForeignClass> PtrArray<T> {
         let out: Vec<_> = arr.into_iter().map(ForeignClass::into_ptr).collect();
         Self {
             len: out.len() as u64,
-            ptr: Box::leak(out.into_boxed_slice()).as_ptr().cast::<*mut c_void>(),
+            ptr: Box::leak(out.into_boxed_slice())
+                .as_ptr()
+                .cast::<*mut c_void>(),
             _element: PhantomData,
         }
     }
