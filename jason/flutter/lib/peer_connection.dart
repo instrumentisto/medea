@@ -32,6 +32,59 @@ void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__rollback')(
       Pointer.fromFunction<Void Function(Handle)>(rollback)
   );
+
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__on_track')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(onTrack)
+  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__on_ice_candidate')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(onIceCandidate)
+  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__on_ice_connection_state_change')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(onIceConnectionStateChange)
+  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_PeerConnection__on_connection_state_change')(
+      Pointer.fromFunction<Void Function(Handle, Handle)>(onConnectionStateChange)
+  );
+}
+
+void onTrack(Object conn, Object f) {
+  if (conn is RTCPeerConnection) {
+    if (f is Function) {
+      conn.onTrack = (e) {
+        f(e.track);
+      };
+    }
+  }
+}
+
+void onIceCandidate(Object conn, Object f) {
+  if (conn is RTCPeerConnection) {
+    if (f is Function) {
+      conn.onIceCandidate = (e) {
+        f(e);
+      };
+    }
+  }
+}
+
+void onIceConnectionStateChange(Object conn, Object f) {
+  if (conn is RTCPeerConnection) {
+    if (f is Function) {
+      conn.onIceConnectionState = (e) {
+        f(e.index);
+      };
+    }
+  }
+}
+
+void onConnectionStateChange(Object conn, Object f) {
+  if (conn is RTCPeerConnection) {
+    if (f is Function) {
+      conn.onConnectionState = (e) {
+        f(e.index);
+      };
+    }
+  }
 }
 
 void setRemoteDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {

@@ -29,11 +29,24 @@ void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_MediaStreamTrack__stop')(
       Pointer.fromFunction<void Function(Handle)>(stop)
   );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_MediaStreamTrack__on_ended')(
+      Pointer.fromFunction<void Function(Handle, Handle)>(onEnded)
+  );
 }
 
 Pointer<Utf8> id(Object track) {
   if (track is MediaStreamTrack) {
     return track.id.toNativeUtf8();
+  }
+}
+
+void onEnded(Object track, Object f) {
+  if (track is MediaStreamTrack) {
+    if (f is Function) {
+      track.onEnded = () {
+        f();
+      };
+    }
   }
 }
 
