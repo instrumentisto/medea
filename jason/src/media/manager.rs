@@ -27,7 +27,7 @@ use super::track::local;
 pub enum MediaManagerError {
     /// Occurs when cannot get access to [MediaDevices][1] object.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
     CouldNotGetMediaDevices(platform::Error),
 
@@ -45,7 +45,7 @@ pub enum MediaManagerError {
 
     /// Occurs when cannot get info about connected [MediaDevices][1].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(platform::Error),
 
@@ -73,7 +73,7 @@ type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 /// [`local::Track`]s, so if there are no strong references to some track,
 /// then this track is stopped and deleted from [`MediaManager`].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Default)]
 pub struct MediaManager(Rc<InnerMediaManager>);
@@ -314,7 +314,7 @@ impl MediaManager {
 /// are no strong references to some track, then this track is stopped and
 /// deleted from [`MediaManager`].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(Clone)]
 pub struct MediaManagerHandle(Weak<InnerMediaManager>);

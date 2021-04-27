@@ -370,19 +370,17 @@ impl InnerMediaConnections {
         kind: MediaKind,
         direction: platform::TransceiverDirection,
     ) -> platform::Transceiver {
-        platform::Transceiver::from(self.peer.add_transceiver(kind, direction))
+        self.peer.add_transceiver(kind, direction)
     }
 
     /// Lookups a [`platform::Transceiver`] by the provided [`mid`].
     ///
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     fn get_transceiver_by_mid(
         &self,
         mid: &str,
     ) -> Option<platform::Transceiver> {
-        self.peer
-            .get_transceiver_by_mid(mid)
-            .map(platform::Transceiver::from)
+        self.peer.get_transceiver_by_mid(mid)
     }
 }
 
@@ -394,6 +392,7 @@ impl MediaConnections {
     /// Instantiates a new [`MediaConnections`] storage for the given
     /// [`platform::RtcPeerConnection`].
     #[inline]
+    #[must_use]
     pub fn new(
         peer: Rc<platform::RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -608,7 +607,7 @@ impl MediaConnections {
     /// transceiver.
     ///
     /// [`Sender`]: self::sender::Sender
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
+    /// [1]: https://w3.org/TR/webrtc#dom-rtcrtpsender-replacetrack
     pub async fn insert_local_tracks(
         &self,
         tracks: &HashMap<TrackId, Rc<local::Track>>,
@@ -668,7 +667,7 @@ impl MediaConnections {
     ///
     /// [`Sender`]: self::sender::Sender
     /// [`Receiver`]: self::receiver::Receiver
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn add_remote_track(
         &self,
         track: platform::MediaStreamTrack,
@@ -698,7 +697,7 @@ impl MediaConnections {
     /// insert it into the [`Receiver`].
     ///
     /// [`Receiver`]: self::receiver::Receiver
-    /// [`mid`]: https://w3.org/TR/webrtc/#dom-rtptransceiver-mid
+    /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
     pub fn sync_receivers(&self) {
         let inner = self.0.borrow();
         for receiver in inner
@@ -708,7 +707,7 @@ impl MediaConnections {
         {
             if let Some(mid) = receiver.mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
-                    receiver.replace_transceiver(trnscvr.into())
+                    receiver.replace_transceiver(trnscvr)
                 }
             }
         }

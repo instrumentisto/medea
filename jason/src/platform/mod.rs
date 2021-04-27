@@ -41,13 +41,14 @@ pub use self::dart::{
     peer_connection::RtcPeerConnection,
     spawn,
     transceiver::Transceiver,
+    utils::{Callback, Function},
 };
 pub use self::wasm::{
     error::Error,
     init_logger,
     rtc_stats::RtcStats,
     set_panic_hook,
-    utils::{Callback, Function},
+    // utils::{Callback, Function},
 };
 
 #[cfg(feature = "mockable")]

@@ -1,7 +1,7 @@
 //! Wrapper around a [`platform::MediaStreamTrack`] received from a
 //! [getUserMedia()][1]/[getDisplayMedia()][2] request.
 //!
-//! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+//! [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 //! [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 
 use std::rc::Rc;
@@ -20,7 +20,7 @@ use crate::{
 /// Underlying [`platform::MediaStreamTrack`] is stopped on this [`Track`]'s
 /// [`Drop`].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(AsRef, Debug)]
 pub struct Track {
@@ -64,8 +64,8 @@ impl Track {
     /// Changes [`enabled`][1] attribute on the underlying
     /// [MediaStreamTrack][2].
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
-    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
     #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.track.set_enabled(enabled);
@@ -73,8 +73,8 @@ impl Track {
 
     /// Returns [`id`] of underlying [MediaStreamTrack][2].
     ///
-    /// [`id`]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
-    /// [2]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    /// [`id`]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-id
+    /// [2]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
     #[inline]
     #[must_use]
     pub fn id(&self) -> String {
@@ -102,7 +102,7 @@ impl Track {
     ///
     /// Forked [`Track`] will hold a strong reference to this [`Track`].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-clone
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-clone
     #[must_use]
     pub fn fork(self: &Rc<Self>) -> Self {
         let parent = Rc::clone(self);
@@ -125,7 +125,7 @@ impl Drop for Track {
 /// Strongly referenced [`Track`] received from a
 /// [getUserMedia()][1]/[getDisplayMedia()][2] request.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 pub struct LocalMediaTrack(Rc<Track>);
 

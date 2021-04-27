@@ -45,31 +45,33 @@ struct Inner {
     /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendrecv
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-revonly
-    /// [3]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
-    /// [4]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    /// [3]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-enabled
+    /// [4]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
     enabled: ObservableCell<bool>,
 
     /// Indicates whether this track is muted.
     ///
     /// Updating this value fires `on_muted` or `on_unmuted` callback and
-    /// changes [`enabled`][1] property of the underlying
+    /// changes [`muted`][1] property of the underlying
     /// [MediaStreamTrack][2].
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
-    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-muted
+    /// [2]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
     muted: ObservableCell<bool>,
 }
 
 /// Wrapper around a received remote [MediaStreamTrack][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
 #[derive(Clone)]
 pub struct Track(Rc<Inner>);
 
 impl Track {
-    /// Creates a new [`Track`].
+    /// Creates a new [`Track`] spawning a listener for its [`enabled`][1] and
+    /// [`muted`][2] properties changes.
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-enabled
+    /// [2]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-muted
     #[allow(clippy::mut_mut)]
     #[must_use]
     pub fn new<T>(
@@ -163,7 +165,7 @@ impl Track {
     /// Updates [`enabled`][1] property in the underlying
     /// [`platform::MediaStreamTrack`].
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-enabled
     #[inline]
     pub fn set_enabled(&self, enabled: bool) {
         self.0.enabled.set(enabled);
@@ -173,10 +175,10 @@ impl Track {
     ///
     /// Calls `on_muted` or `or_unmuted` callback respectively.
     ///
-    /// Updates [`enabled`][1] property in the underlying
+    /// Updates [`muted`][1] property in the underlying
     /// [`platform::MediaStreamTrack`].
     ///
-    /// [1]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-enabled
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-muted
     #[inline]
     pub fn set_muted(&self, muted: bool) {
         self.0.muted.set(muted);
@@ -185,7 +187,7 @@ impl Track {
     /// Returns [`id`][1] of the underlying [`platform::MediaStreamTrack`] of
     /// this [`Track`].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-id
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-id
     #[inline]
     #[must_use]
     pub fn id(&self) -> String {

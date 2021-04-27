@@ -6,6 +6,8 @@ pub mod constraints;
 mod manager;
 pub mod track;
 
+use std::str::FromStr;
+
 use derive_more::Display;
 
 #[doc(inline)]
@@ -23,7 +25,7 @@ pub use self::{
 
 /// [MediaStreamTrack.kind][1] representation.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum MediaKind {
     /// Audio track.
@@ -34,8 +36,6 @@ pub enum MediaKind {
     #[display(fmt = "video")]
     Video,
 }
-
-use std::str::FromStr;
 
 impl FromStr for MediaKind {
     type Err = ();

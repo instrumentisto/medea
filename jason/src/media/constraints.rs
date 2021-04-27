@@ -24,7 +24,7 @@ use crate::{
 ///
 /// Representation of a [VideoFacingModeEnum][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-videofacingmodeenum
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
 pub enum FacingMode {
     /// Facing towards a user (a self-view camera).
@@ -200,7 +200,7 @@ impl LocalTracksConstraints {
 
 /// [MediaStreamConstraints][1] for the audio media type.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AudioMediaTracksSettings {
     /// Constraints applicable to video tracks.
@@ -238,7 +238,7 @@ fn satisfies_track(
 
 /// [MediaStreamConstraints][1] for the video media type.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct VideoTrackConstraints<C> {
     /// Constraints applicable to video tracks.
@@ -347,22 +347,22 @@ impl VideoTrackConstraints<DisplayVideoTrackConstraints> {
 
 /// [MediaStreamConstraints][1] wrapper.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MediaStreamSettings {
     /// [MediaStreamConstraints][1] for the audio media type.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
     audio: AudioMediaTracksSettings,
 
     /// [MediaStreamConstraints][1] for the device video media type.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
     device_video: VideoTrackConstraints<DeviceVideoTrackConstraints>,
 
     /// [MediaStreamConstraints][1] for the display video media type.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
     display_video: VideoTrackConstraints<DisplayVideoTrackConstraints>,
 }
 
@@ -690,7 +690,7 @@ impl MediaStreamSettings {
 /// source (device or display), and allows to group two requests with different
 /// sources.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamconstraints
+/// [1]: https://w3.org/TR/mediacapture-streams#mediastreamconstraints
 #[derive(Debug)]
 pub enum MultiSourceTracksConstraints {
     /// Only [getUserMedia()][1] request is required.
@@ -834,7 +834,7 @@ impl From<VideoSettings> for VideoSource {
 
 /// Wrapper around [MediaTrackConstraints][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#media-track-constraints
+/// [1]: https://w3.org/TR/mediacapture-streams#media-track-constraints
 #[derive(Clone)]
 pub enum TrackConstraints {
     /// Audio constraints.
@@ -930,7 +930,7 @@ impl AudioTrackConstraints {
 
     /// Sets an exact [deviceId][1] constraint.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+    /// [1]: https://w3.org/TR/mediacapture-streams#def-constraint-deviceId
     #[inline]
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(ConstrainString::Exact(device_id));
@@ -1035,7 +1035,7 @@ impl ConstrainU32 {
 /// Can set exact (must be the parameter's value) and ideal (should be used if
 /// possible) constrain.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConstrainString<T> {
     /// Exact value required for this property.
@@ -1093,7 +1093,7 @@ impl DeviceVideoTrackConstraints {
 
     /// Sets exact [deviceId][1] constraint.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+    /// [1]: https://w3.org/TR/mediacapture-streams#def-constraint-deviceId
     #[inline]
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(ConstrainString::Exact(device_id));
@@ -1101,7 +1101,7 @@ impl DeviceVideoTrackConstraints {
 
     /// Sets exact [facingMode][1] constraint.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
     #[inline]
     pub fn exact_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode = Some(ConstrainString::Exact(facing_mode));
@@ -1109,7 +1109,7 @@ impl DeviceVideoTrackConstraints {
 
     /// Sets ideal [facingMode][1] constraint.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-constraindomstring
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
     #[inline]
     pub fn ideal_facing_mode(&mut self, facing_mode: FacingMode) {
         self.facing_mode = Some(ConstrainString::Ideal(facing_mode));
