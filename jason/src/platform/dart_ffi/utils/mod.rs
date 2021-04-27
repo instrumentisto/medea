@@ -1,4 +1,4 @@
-//! `wasm32`-specific utility structs and functions.
+//! Multiplatform Dart runtime specific utility structs and functions.
 
 mod callback;
 pub mod dart_api;

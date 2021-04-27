@@ -28,11 +28,24 @@ final _enumerateDevices =
 final _free =
     dl.lookupFunction<_free_C, _free_Dart>('MediaManagerHandle__free');
 
-class MediaManager {
+/// External handle to a `MediaManager`.
+///
+/// `MediaManager` performs all media acquisition requests
+/// ([getUserMedia()][1]/[getDisplayMedia()][2]) and stores all received tracks
+/// for further reusage.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
+/// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+class MediaManagerHandle {
+  /// [Pointer] to Rust struct that backs this object.
   late NullablePointer ptr;
 
-  MediaManager(this.ptr);
+  /// Constructs new [MediaManagerHandle] backed by Rust object behind provided
+  /// [Pointer].
+  MediaManagerHandle(this.ptr);
 
+  /// Obtains [LocalMediaTrack]s objects from local media devices
+  /// (or screen capture) based on the provided [MediaStreamSettings].
   List<LocalMediaTrack> initLocalTracks(MediaStreamSettings caps) {
     return _initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
         .intoPointerList()
@@ -40,6 +53,8 @@ class MediaManager {
         .toList();
   }
 
+  /// Returns a list of [InputDeviceInfo] objects representing available media
+  /// input devices, such as microphones, cameras, and so forth.
   List<InputDeviceInfo> enumerateDevices() {
     return _enumerateDevices(ptr.getInnerPtr())
         .intoPointerList()
@@ -47,6 +62,7 @@ class MediaManager {
         .toList();
   }
 
+  /// Drops associated Rust object and nulls the local [Pointer] to this object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

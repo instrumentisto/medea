@@ -322,8 +322,8 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 #[allow(clippy::unused_self)]
 impl MediaManagerHandle {
     /// Returns a list of [`platform::InputDeviceInfo`] objects representing
-    /// available media input and output devices, such as microphones, cameras,
-    /// and so forth.
+    /// available media input and devices, such as microphones, cameras, and so
+    /// forth.
     ///
     /// # Errors
     ///

@@ -19,7 +19,7 @@ pub enum Error {
 /// Representation of [MediaDeviceInfo][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
-pub struct InputDeviceInfo {}
+pub struct InputDeviceInfo;
 
 impl InputDeviceInfo {
     /// Returns unique identifier for the represented device.

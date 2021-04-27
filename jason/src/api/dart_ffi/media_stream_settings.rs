@@ -51,9 +51,10 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
     this.display_video(DisplayVideoTrackConstraints::from_ptr(constraints));
 }
 
-/// Frees the data behind the provided pointer. Should be called when object is
-/// no longer needed. Calling this more than once for the same pointer is
-/// equivalent to double free.
+/// Frees the data behind the provided pointer.
+///
+/// Should be called when object is no longer needed. Calling this more than
+/// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__free(
     this: *mut MediaStreamSettings,

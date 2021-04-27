@@ -41,29 +41,40 @@ final _onQualityScoreUpdate =
     dl.lookupFunction<_onQualityScoreUpdate_C, _onQualityScoreUpdate_Dart>(
         'ConnectionHandle__on_quality_score_update');
 
+/// External handler to a `Connection` with a remote `Member`.
 class ConnectionHandle {
+  /// [Pointer] to Rust struct that backs this object.
   late NullablePointer ptr;
 
+  /// Constructs new [ConnectionHandle] backed by Rust object behind provided
+  /// [Pointer].
   ConnectionHandle(this.ptr);
 
+  /// Returns remote `Member` ID.
   String getRemoteMemberId() {
     return _getRemoteMemberId(ptr.getInnerPtr()).nativeStringToDartString();
   }
 
+  /// Sets callback, invoked when this `Connection` will close.
   void onClose(void Function() f) {
     _onClose(ptr.getInnerPtr(), f);
   }
 
+  /// Sets callback, invoked when a new [RemoteMediaTrack] is added to this
+  /// `Connection`.
   void onRemoteTrackAdded(void Function(RemoteMediaTrack) f) {
     _onRemoteTrackAdded(ptr.getInnerPtr(), (t) {
       f(RemoteMediaTrack(NullablePointer(t)));
     });
   }
 
+  /// Sets callback, invoked when a connection quality score is updated by a
+  /// server.
   void onQualityScoreUpdate(void Function(int) f) {
     _onQualityScoreUpdate(ptr.getInnerPtr(), f);
   }
 
+  /// Drops associated Rust object and nulls the local [Pointer] to this object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

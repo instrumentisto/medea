@@ -34,8 +34,8 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
 }
 
 /// Returns a list of [`platform::InputDeviceInfo`] objects representing
-/// available media input and output devices, such as microphones, cameras,
-/// and so forth.
+/// available media input and devices, such as microphones, cameras, and so
+/// forth.
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: *const MediaManagerHandle,
@@ -48,9 +48,10 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     PtrArray::new(this.enumerate_devices().now_or_never().unwrap().unwrap())
 }
 
-/// Frees the data behind the provided pointer. Should be called when object is
-/// no longer needed. Calling this more than once for the same pointer is
-/// equivalent to double free.
+/// Frees the data behind the provided pointer.
+///
+/// Should be called when object is no longer needed. Calling this more than
+/// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__free(
     this: *mut MediaManagerHandle,

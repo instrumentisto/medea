@@ -24,8 +24,8 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
     this.on_close(platform::Function::new(f)).unwrap();
 }
 
-/// Sets callback, invoked when a new [`remote::Track`] will is added to
-/// this [`Connection`].
+/// Sets callback, invoked when a new [`remote::Track`] is added to this
+/// [`Connection`].
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     this: *const ConnectionHandle,
@@ -66,9 +66,10 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     string_into_c_str(this.get_remote_member_id().unwrap())
 }
 
-/// Frees the data behind the provided pointer. Should be called when object is
-/// no longer needed. Calling this more than once for the same pointer is
-/// equivalent to double free.
+/// Frees the data behind the provided pointer.
+///
+/// Should be called when object is no longer needed. Calling this more than
+/// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
     ConnectionHandle::from_ptr(this);

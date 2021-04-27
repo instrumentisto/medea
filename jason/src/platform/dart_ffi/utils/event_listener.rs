@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ops::Deref, rc::Rc};
+use std::{marker::PhantomData, rc::Rc};
 
 use derive_more::{Display, From};
 use tracerr::Traced;
@@ -12,22 +12,14 @@ use crate::{platform, utils::JsCaused};
 #[js(error = "platform::Error")]
 pub struct EventListenerBindError(platform::Error);
 
-/// Wrapper for closure that handles some [`EventTarget`] event.
-///
-/// [`EventTarget`]: web_sys::EventTarget
+/// Wrapper for closure that handles some event.
 #[derive(Debug)]
-pub struct EventListener<T, A>
-where
-    T: Deref<Target = web_sys::EventTarget>,
-{
+pub struct EventListener<T, A> {
     t: PhantomData<T>,
     a: PhantomData<A>,
 }
 
-impl<T, A> EventListener<T, A>
-where
-    T: Deref<Target = web_sys::EventTarget>,
-{
+impl<T, A> EventListener<T, A> {
     /// Creates new [`EventListener`] from a given [`FnMut`] `closure`.
     ///
     /// # Errors
@@ -61,10 +53,7 @@ where
     }
 }
 
-impl<T, A> Drop for EventListener<T, A>
-where
-    T: Deref<Target = web_sys::EventTarget>,
-{
+impl<T, A> Drop for EventListener<T, A> {
     /// Drops [`EventListener`]'s closure and unregisters appropriate event
     /// handler.
     fn drop(&mut self) {

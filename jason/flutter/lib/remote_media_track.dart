@@ -1,7 +1,7 @@
 import 'dart:ffi';
 
 import 'jason.dart';
-import 'kind.dart';
+import 'track_kinds.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 
@@ -64,49 +64,65 @@ final _onStopped = dl.lookupFunction<_onStopped_C, _onStopped_Dart>(
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('RemoteMediaTrack__free');
 
+/// Wrapper around a received remote [MediaStreamTrack][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
 class RemoteMediaTrack {
+  /// [Pointer] to Rust struct that backs this object.
   late NullablePointer ptr;
 
+  /// Constructs new [RemoteMediaTrack] backed by Rust object behind provided
+  /// [Pointer].
   RemoteMediaTrack(this.ptr);
 
+  /// Indicates whether this [RemoteMediaTrack] is enabled.
   bool enabled() {
     return _enabled(ptr.getInnerPtr()) > 0;
   }
 
+  /// Indicate whether this [RemoteMediaTrack] is muted.
   bool muted() {
     return _muted(ptr.getInnerPtr()) > 0;
   }
 
+  /// Returns this [RemoteMediaTrack]'s kind (audio/video).
   MediaKind kind() {
     var index = _kind(ptr.getInnerPtr());
     return MediaKind.values[index];
   }
 
+  /// Returns this [RemoteMediaTrack]'s media source kind.
   MediaSourceKind mediaSourceKind() {
     var index = _mediaSourceKind(ptr.getInnerPtr());
     return MediaSourceKind.values[index];
   }
 
+  /// Sets callback, invoked when this [RemoteMediaTrack] is enabled.
   void onEnabled(void Function() f) {
     _onEnabled(ptr.getInnerPtr(), f);
   }
 
+  /// Sets callback, invoked when this [RemoteMediaTrack] is disabled.
   void onDisabled(void Function() f) {
     _onDisabled(ptr.getInnerPtr(), f);
   }
 
+  /// Sets callback to invoke when this [RemoteMediaTrack] is muted.
   void onMuted(void Function() f) {
     _onMuted(ptr.getInnerPtr(), f);
   }
 
+  /// Sets callback to invoke when this [RemoteMediaTrack] is unmuted.
   void onUnmuted(void Function() f) {
     _onUnmuted(ptr.getInnerPtr(), f);
   }
 
+  /// Sets callback to invoke when this [RemoteMediaTrack] is stopped.
   void onStopped(void Function() f) {
     _onStopped(ptr.getInnerPtr(), f);
   }
 
+  /// Drops associated Rust object and nulls the local [Pointer] to this object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

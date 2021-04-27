@@ -13,17 +13,7 @@ use crate::media::{track::MediaStreamTrackState, FacingMode, MediaKind};
 /// [2]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [3]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 #[derive(AsRef, Debug)]
-pub struct MediaStreamTrack {}
-
-impl<T> From<T> for MediaStreamTrack
-where
-    web_sys::MediaStreamTrack: From<T>,
-{
-    #[inline]
-    fn from(from: T) -> MediaStreamTrack {
-        unimplemented!()
-    }
-}
+pub struct MediaStreamTrack;
 
 impl MediaStreamTrack {
     /// Returns [`id`] of the underlying [MediaStreamTrack][2].
@@ -46,14 +36,8 @@ impl MediaStreamTrack {
     /// Returns [MediaStreamTrackState][1] of the underlying
     /// [MediaStreamTrack][2].
     ///
-    /// # Panics
-    ///
-    /// If [`readyState`][3] property of underlying [MediaStreamTrack][2] is
-    /// neither `live` nor `ended`.
-    ///
     /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrackstate
     /// [2]: https://w3.org/TR/mediacapture-streams#mediastreamtrack
-    /// [3]: https://tinyurl.com/w3-streams#dom-mediastreamtrack-readystate
     #[must_use]
     pub fn ready_state(&self) -> MediaStreamTrackState {
         unimplemented!()
@@ -153,12 +137,7 @@ impl MediaStreamTrack {
         unimplemented!()
     }
 
-    /// Sets handler for the [`ended`][1] event on underlying
-    /// [`web_sys::MediaStreamTrack`].
-    ///
-    /// # Panics
-    ///
-    /// If binding to the [`ended`][1] event fails. Not supposed to ever happen.
+    /// Sets handler for the [`ended`][1] event.
     ///
     /// [1]: https://tinyurl.com/w3-streams#event-mediastreamtrack-ended
     #[allow(clippy::unused_self, clippy::needless_pass_by_value)]

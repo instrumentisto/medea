@@ -1,6 +1,4 @@
-//! Deserialization of [`RtcStats`] from [`SysRtcStats`].
-//!
-//! [`SysRtcStats`]: web_sys::RtcStats
+//! Deserialization of [`RtcStats`].
 
 use medea_client_api_proto::stats::RtcStat;
 

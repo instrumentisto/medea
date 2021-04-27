@@ -1,4 +1,4 @@
-//! `wasm32`-platform-specific functionality.
+//! Multiplatform Dart runtime specific functionality.
 
 #![allow(
     unused_variables,
@@ -23,7 +23,7 @@ pub mod utils;
 
 use futures::Future;
 
-/// TODO: implement
+/// TODO: Implement panic hook.
 pub fn set_panic_hook() {}
 
 /// Initialize [`android_logger`] as default application logger with min log
@@ -46,10 +46,6 @@ where
 }
 
 /// [`Future`] which resolves after the provided [`Duration`].
-///
-/// # Panics
-///
-/// If fails to interact with JS side.
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {

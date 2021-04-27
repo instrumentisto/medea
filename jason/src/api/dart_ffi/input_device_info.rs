@@ -60,9 +60,10 @@ pub unsafe extern "C" fn InputDeviceInfo__group_id(
     string_into_c_str(this.group_id())
 }
 
-/// Frees the data behind the provided pointer. Should be called when object is
-/// no longer needed. Calling this more than once for the same pointer is
-/// equivalent to double free.
+/// Frees the data behind the provided pointer.
+///
+/// Should be called when object is no longer needed. Calling this more than
+/// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__free(this: *mut InputDeviceInfo) {
     InputDeviceInfo::from_ptr(this);

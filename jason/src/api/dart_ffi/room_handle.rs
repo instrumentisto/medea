@@ -23,7 +23,7 @@ pub unsafe extern "C" fn RoomHandle__on_new_connection(
     this.on_new_connection(platform::Function::new(cb)).unwrap();
 }
 
-/// Sets `on_close` callback, invoked on this [`Room`] close, providing a
+/// Sets callback, invoked on this [`Room`] close, providing a
 /// [`RoomCloseReason`].
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_close(
@@ -56,8 +56,7 @@ pub unsafe extern "C" fn RoomHandle__on_local_track(
     this.on_local_track(platform::Function::new(cb)).unwrap();
 }
 
-/// Sets `on_connection_loss` callback, invoked when a connection with
-/// server is lost.
+/// Sets callback, invoked when a connection with server is lost.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_connection_loss(
     this: *mut RoomHandle,
@@ -71,9 +70,10 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
         .unwrap();
 }
 
-/// Frees the data behind the provided pointer. Should be called when object is
-/// no longer needed. Calling this more than once for the same pointer is
-/// equivalent to double free.
+/// Frees the data behind the provided pointer.
+///
+/// Should be called when object is no longer needed. Calling this more than
+/// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
     RoomHandle::from_ptr(this);

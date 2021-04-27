@@ -73,16 +73,35 @@ final _widthInRange = dl.lookupFunction<_widthInRange_C, _widthInRange_Dart>(
 final _free =
     dl.lookupFunction<_free_C, _free_Dart>('DeviceVideoTrackConstraints__free');
 
+/// Describes directions that a camera can face, as seen from a user's
+/// perspective.
+///
+/// Representation of a [VideoFacingModeEnum][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-videofacingmodeenum
 enum FacingMode {
+  /// Facing towards a user (a self-view camera).
   User,
+
+  /// Facing away from a user (viewing an environment).
   Environment,
+
+  /// Facing to the left of a user.
   Left,
+
+  /// Facing to the right of a user.
   Right,
 }
 
+/// Constraints applicable to video tracks that are sourced from some media
+/// device.
 class DeviceVideoTrackConstraints {
+  /// [Pointer] to Rust struct that backs this object.
   final NullablePointer ptr = NullablePointer(_new());
 
+  /// Sets exact [deviceId][1] constraint.
+  ///
+  /// [1]: https://w3.org/TR/mediacapture-streams#def-constraint-deviceId
   void deviceId(String deviceId) {
     var deviceIdPtr = deviceId.toNativeUtf8();
     try {
@@ -92,38 +111,63 @@ class DeviceVideoTrackConstraints {
     }
   }
 
+  /// Sets exact [facingMode][1] constraint.
+  ///
+  /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
   void exactFacingMode(FacingMode facingMode) {
     _exactFacingMode(ptr.getInnerPtr(), facingMode.index);
   }
 
+  /// Sets ideal [facingMode][1] constraint.
+  ///
+  /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
   void idealFacingMode(FacingMode facingMode) {
     _idealFacingMode(ptr.getInnerPtr(), facingMode.index);
   }
 
+  /// Sets exact [`height`][1] constraint.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void exactHeight(int height) {
     _exactHeight(ptr.getInnerPtr(), height);
   }
 
+  /// Sets ideal [`height`][1] constraint.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void idealHeight(int height) {
     _idealHeight(ptr.getInnerPtr(), height);
   }
 
+  /// Sets range of [`height`][1] constraint.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void heightInRange(int min, int max) {
     _heightInRange(ptr.getInnerPtr(), min, max);
   }
 
+  /// Sets exact [`width`][1] constraint.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void exactWidth(int width) {
     _exactWidth(ptr.getInnerPtr(), width);
   }
 
+  /// Sets ideal [`width`][1] constraint.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void idealWidth(int width) {
     _idealWidth(ptr.getInnerPtr(), width);
   }
 
+  /// Sets range of [`width`][1] constraint.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void widthInRange(int min, int max) {
     _widthInRange(ptr.getInnerPtr(), min, max);
   }
 
+  /// Drops associated Rust object and nulls the local [Pointer] to this object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

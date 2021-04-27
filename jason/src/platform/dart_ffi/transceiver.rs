@@ -4,14 +4,13 @@ use std::rc::Rc;
 
 use bitflags::bitflags;
 use futures::future::LocalBoxFuture;
-use medea_client_api_proto::Direction as DirectionProto;
 
 use crate::{media::track::local, platform::Error};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
 #[derive(Clone)]
-pub struct Transceiver {}
+pub struct Transceiver;
 
 impl Transceiver {
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
@@ -39,7 +38,7 @@ impl Transceiver {
     ///
     /// # Errors
     ///
-    /// Errors with JS error if the underlying [`replaceTrack`][1] call fails.
+    /// Errors with [`Error`] if the underlying [`replaceTrack`][1] call fails.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub async fn set_send_track(
@@ -51,13 +50,6 @@ impl Transceiver {
 
     /// Sets a [`TransceiverDirection::SEND`] [`local::Track`] of this
     /// [`Transceiver`] to [`None`].
-    ///
-    /// # Panics
-    ///
-    /// If [`local::Track`] replacement with [`None`] fails on JS side, but
-    /// basing on [WebAPI docs] it should never happen.
-    ///
-    /// [WebAPI docs]: https://tinyurl.com/7pnszaa8
     #[must_use]
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
         unimplemented!()
@@ -101,16 +93,7 @@ impl Transceiver {
     }
 }
 
-// impl From<RtcRtpTransceiver> for Transceiver {
-//     #[inline]
-//     fn from(transceiver: RtcRtpTransceiver) -> Self {
-//         Transceiver {
-//             send_track: RefCell::new(None),
-//             transceiver,
-//         }
-//     }
-// }
-
+// TODO: Probably should be shared between wasm and dart_ffi.
 bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
     ///
@@ -134,78 +117,5 @@ bitflags! {
         ///
         /// [1]: https://tinyurl.com/y2nlxpzf
         const RECV = 0b10;
-    }
-}
-
-impl From<&DirectionProto> for TransceiverDirection {
-    #[inline]
-    fn from(proto: &DirectionProto) -> Self {
-        match proto {
-            DirectionProto::Recv { .. } => Self::RECV,
-            DirectionProto::Send { .. } => Self::SEND,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{RtcRtpTransceiverDirection, TransceiverDirection};
-
-    #[test]
-    fn enable_works_correctly() {
-        use TransceiverDirection as D;
-
-        for (init, enable_dir, result) in &[
-            (D::INACTIVE, D::SEND, D::SEND),
-            (D::INACTIVE, D::RECV, D::RECV),
-            (D::SEND, D::RECV, D::all()),
-            (D::RECV, D::SEND, D::all()),
-        ] {
-            assert_eq!(*init | *enable_dir, *result);
-        }
-    }
-
-    #[test]
-    fn disable_works_correctly() {
-        use TransceiverDirection as D;
-
-        for (init, disable_dir, result) in &[
-            (D::SEND, D::SEND, D::INACTIVE),
-            (D::RECV, D::RECV, D::INACTIVE),
-            (D::all(), D::SEND, D::RECV),
-            (D::all(), D::RECV, D::SEND),
-        ] {
-            assert_eq!(*init - *disable_dir, *result);
-        }
-    }
-
-    #[test]
-    fn from_trnscvr_direction_to_sys() {
-        use RtcRtpTransceiverDirection as S;
-        use TransceiverDirection as D;
-
-        for (trnscvr_dir, sys_dir) in &[
-            (D::SEND, S::Sendonly),
-            (D::RECV, S::Recvonly),
-            (D::all(), S::Sendrecv),
-            (D::INACTIVE, S::Inactive),
-        ] {
-            assert_eq!(S::from(*trnscvr_dir), *sys_dir);
-        }
-    }
-
-    #[test]
-    fn from_sys_direction_to_trnscvr() {
-        use RtcRtpTransceiverDirection as S;
-        use TransceiverDirection as D;
-
-        for (sys_dir, trnscvr_dir) in &[
-            (S::Sendonly, D::SEND),
-            (S::Recvonly, D::RECV),
-            (S::Sendrecv, D::all()),
-            (S::Inactive, D::INACTIVE),
-        ] {
-            assert_eq!(D::from(*sys_dir), *trnscvr_dir);
-        }
     }
 }

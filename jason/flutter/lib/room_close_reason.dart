@@ -31,22 +31,29 @@ final _isErr =
 final _free = dl.lookupFunction<_free_C, _free_Dart>('RoomCloseReason__free');
 
 class RoomCloseReason {
+  /// [Pointer] to Rust struct that backs this object.
   late NullablePointer ptr;
 
+  /// Constructs new [RoomCloseReason] backed by Rust object behind provided
+  /// [Pointer].
   RoomCloseReason(this.ptr);
 
+  /// Returns a close reason of the `Room`.
   String reason() {
     return _reason(ptr.getInnerPtr()).nativeStringToDartString();
   }
 
+  /// Indicates whether the `Room` was closed by server.
   bool isClosedByServer() {
     return _isClosedByServer(ptr.getInnerPtr()) > 0;
   }
 
+  /// Indicates whether the `Room`'s close reason is considered as an error.
   bool isErr() {
     return _isErr(ptr.getInnerPtr()) > 0;
   }
 
+  /// Drops associated Rust object and nulls the local [Pointer] to this object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

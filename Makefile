@@ -229,6 +229,7 @@ cargo:
 #		   	[( [platform=web]
 #		   	 | platform=android
 #		   	   	[targets=($(ANDROID_TARGETS)|<t1>[,<t2>...])] )] )]
+# 		[args=<cargo-build-args>]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 cargo-build-platform = $(if $(call eq,$(platform),),web,$(platform))
@@ -250,7 +251,7 @@ ifeq ($(dockerized),yes)
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
-	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
+	cargo build --bin medea $(if $(call eq,$(debug),no),--release,) $(args)
 endif
 endif
 ifeq ($(cargo-build-crate),medea-jason)
@@ -283,7 +284,8 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
+	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev) \
+					$(args)
 endif
 ifeq ($(cargo-build-platform),android)
 	$(foreach target,$(subst $(comma), ,$(cargo-build-targets)),\
@@ -297,7 +299,7 @@ define cargo.build.medea-jason.android
 	cargo ndk -p $(ANDROID_SDK_COMPILE_VERSION) -t $(target) \
 	          -o jason/flutter/android/src/main/jniLibs \
 	          --manifest-path=jason/Cargo.toml \
-		build $(if $(call eq,$(debug),no),--release,)
+		build $(if $(call eq,$(debug),no),--release,) $(args)
 endef
 
 
