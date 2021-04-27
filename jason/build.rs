@@ -5,10 +5,6 @@ fn main() {
         return;
     }
 
-    if true {
-        return;
-    }
-
     if let Ok("wasm32-unknown-unknown") = std::env::var("TARGET").as_deref() {
         return;
     }
