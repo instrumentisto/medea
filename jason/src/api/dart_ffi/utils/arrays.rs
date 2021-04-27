@@ -2,7 +2,7 @@
 
 use std::{marker::PhantomData, slice};
 
-use crate::ForeignClass;
+use super::super::ForeignClass;
 
 /// Array of pointers to [`ForeignClass`] structs.
 ///

@@ -12,7 +12,7 @@ use crate::{
     room,
 };
 
-use super::JasonError;
+use super::jason_error::JasonError;
 
 /// JS side handle to a [`Room`] where all the media happens.
 ///
@@ -84,7 +84,7 @@ impl RoomHandle {
     ///
     /// This might happen in such cases:
     /// 1. Media server initiates a media request.
-    /// 2. `disable_audio`/`enable_video` is called.
+    /// 2. `enable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] is updated via `set_local_media_settings`.
     ///
     /// [`Room`]: room::Room

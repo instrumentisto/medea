@@ -38,6 +38,11 @@ extern "C" {
 /// Called with [`NativeApi.initializeApiDLData`][1] from Dart to enable using
 /// the dynamically linked Dart API.
 ///
+/// # Safety
+///
+/// Unsafe because it calls foreign C function. Caller must ensure that pointer
+/// is valid [`NativeApi.initializeApiDLData`][1].
+///
 /// [1]: https://api.dart.dev/dart-ffi/NativeApi/initializeApiDLData.html
 #[no_mangle]
 pub unsafe extern "C" fn init_dart_api_dl(

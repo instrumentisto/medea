@@ -26,11 +26,7 @@ CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
 CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
-ANDROID_NDK_TARGETS := arm64-v8a \
-                       armeabi-v7a \
-                       x86 \
-                       x86_64
-ANDROID_RUST_TARGETS := aarch64-linux-android \
+ANDROID_TARGETS := aarch64-linux-android \
                         armv7-linux-androideabi \
                         i686-linux-android \
                         x86_64-linux-android
@@ -232,12 +228,12 @@ cargo:
 #		 | crate=medea-jason [debug=(yes|no)] [dockerized=(no|yes)]
 #		   	[( [platform=web]
 #		   	 | platform=android
-#		   	   	[targets=($(ANDROID_NDK_TARGETS)|<t1>[,<t2>...])] )] )]
+#		   	   	[targets=($(ANDROID_TARGETS)|<t1>[,<t2>...])] )] )]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 cargo-build-platform = $(if $(call eq,$(platform),),web,$(platform))
 cargo-build-targets = $(strip \
-	$(if $(call eq,$(targets),),$(ANDROID_NDK_TARGETS),$(targets)))
+	$(if $(call eq,$(targets),),$(ANDROID_TARGETS),$(targets)))
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -295,14 +291,12 @@ ifeq ($(cargo-build-platform),android)
 endif
 endif
 endif
-# TODO: Replace with actual `medea-jason` crate.
 define cargo.build.medea-jason.android
 	$(eval target := $(strip $(1)))
 	$(eval debug := $(strip $(2)))
-	cd jason/jason-dummy/ && \
 	cargo ndk -p $(ANDROID_SDK_COMPILE_VERSION) -t $(target) \
-	          -o ../flutter/android/src/main/jniLibs \
-	          --manifest-path=Cargo.toml \
+	          -o jason/flutter/android/src/main/jniLibs \
+	          --manifest-path=jason/Cargo.toml \
 		build $(if $(call eq,$(debug),no),--release,)
 endef
 
@@ -348,14 +342,12 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --all -- -D clippy::pedantic -D warnings
-	$(foreach target,$(subst $(comma), ,$(ANDROID_RUST_TARGETS)),\
+	#cargo clippy --workspace --exclude jason -- -D clippy::pedantic -D warnings
+	$(foreach target,$(subst $(comma), ,$(ANDROID_TARGETS)),\
 		$(call cargo.lint.medea-jason.android,$(target)))
-# TODO: Replace with actual `medea-jason` crate.
 define cargo.lint.medea-jason.android
 	$(eval target := $(strip $(1)))
-	cd jason/jason-dummy/ && \
-	cargo clippy --target=$(target) -- -D clippy::pedantic -D warnings
+	cargo clippy --manifest-path jason/Cargo.toml --target=$(target) -- -D clippy::pedantic -D warnings
 endef
 
 
@@ -374,7 +366,7 @@ cargo.version:
 #	make rustup.android
 
 rustup.android:
-	rustup target add $(ANDROID_RUST_TARGETS)
+	rustup target add $(ANDROID_TARGETS)
 
 
 

@@ -571,7 +571,6 @@ impl State {
     /// Waits until a [`State::local_sdp`] is resolved and returns its new
     /// value.
     #[inline]
-    #[must_use]
     pub async fn when_local_sdp_updated(&self) -> Option<String> {
         use futures::StreamExt as _;
 

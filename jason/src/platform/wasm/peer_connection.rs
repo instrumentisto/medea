@@ -577,11 +577,13 @@ impl RtcPeerConnection {
         &self,
         kind: MediaKind,
         direction: TransceiverDirection,
-    ) -> RtcRtpTransceiver {
+    ) -> Transceiver {
         let mut init = RtcRtpTransceiverInit::new();
         init.direction(direction.into());
-        self.peer
-            .add_transceiver_with_str_and_init(kind.as_str(), &init)
+        let transceiver = self
+            .peer
+            .add_transceiver_with_str_and_init(kind.as_str(), &init);
+        Transceiver::from(transceiver)
     }
 
     /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
@@ -594,10 +596,7 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
-    pub fn get_transceiver_by_mid(
-        &self,
-        mid: &str,
-    ) -> Option<RtcRtpTransceiver> {
+    pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         let mut transceiver = None;
 
         let transceivers = js_sys::try_iter(&self.peer.get_transceivers())
@@ -613,7 +612,7 @@ impl RtcPeerConnection {
             }
         }
 
-        transceiver
+        transceiver.map(Transceiver::from)
     }
 }
 

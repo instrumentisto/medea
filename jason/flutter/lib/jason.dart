@@ -49,7 +49,7 @@ DynamicLibrary _dl_load() {
     throw 'You are running unsupported NativeApi version.';
   }
 
-  var dl = DynamicLibrary.open('libjason.so');
+  var dl = DynamicLibrary.open('libmedea_jason.so');
 
   var initResult = dl.lookupFunction<
       IntPtr Function(Pointer<Void>),

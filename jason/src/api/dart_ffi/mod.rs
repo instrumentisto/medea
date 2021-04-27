@@ -1,3 +1,8 @@
+//! External [`Jason`] API that exposes functions that can be called via FFI
+//! and designed to be integrated into Flutter plugin.
+//!
+//! [`Jason`]: crate::api::Jason
+
 #![allow(
     clippy::module_name_repetitions,
     clippy::unused_self,
@@ -5,7 +10,8 @@
     clippy::missing_safety_doc,
     clippy::must_use_candidate,
     clippy::missing_panics_doc,
-    clippy::new_without_default
+    clippy::new_without_default,
+    missing_docs
 )]
 
 pub mod audio_track_constraints;
@@ -14,6 +20,7 @@ pub mod device_video_track_constraints;
 pub mod display_video_track_constraints;
 pub mod input_device_info;
 pub mod jason;
+pub mod jason_error;
 pub mod local_media_track;
 pub mod media_manager;
 pub mod media_stream_settings;
@@ -42,14 +49,4 @@ pub trait ForeignClass {
     {
         *Box::from_raw(this)
     }
-}
-
-pub enum MediaKind {
-    Audio = 0,
-    Video = 1,
-}
-
-pub enum MediaSourceKind {
-    Device = 0,
-    Display = 1,
 }

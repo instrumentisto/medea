@@ -6,7 +6,6 @@ use std::{cell::Cell, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::TrackId;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{
@@ -177,7 +176,6 @@ impl Sender {
         self.transceiver
             .set_send_track(Rc::new(new_track))
             .await
-            .map_err(Into::into)
             .map_err(MediaConnectionsError::CouldNotInsertLocalTrack)
             .map_err(tracerr::wrap!())?;
 
@@ -270,7 +268,7 @@ impl Drop for Sender {
         if !self.transceiver.is_stopped() {
             self.transceiver
                 .sub_direction(platform::TransceiverDirection::SEND);
-            spawn_local(self.transceiver.drop_send_track());
+            platform::spawn(self.transceiver.drop_send_track());
         }
     }
 }

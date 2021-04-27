@@ -1,23 +1,10 @@
-use crate::{utils::string_into_c_str, ForeignClass};
+use super::{utils::string_into_c_str, ForeignClass};
 
-pub struct RoomCloseReason;
+pub use crate::room::RoomCloseReason;
 
 impl ForeignClass for RoomCloseReason {}
 
-impl RoomCloseReason {
-    pub fn reason(&self) -> String {
-        String::from("RoomCloseReason.reason")
-    }
-
-    pub fn is_closed_by_server(&self) -> bool {
-        false
-    }
-
-    pub fn is_err(&self) -> bool {
-        true
-    }
-}
-
+/// Returns a close reason of the [`Room`].
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__reason(
     this: *const RoomCloseReason,
@@ -27,6 +14,7 @@ pub unsafe extern "C" fn RoomCloseReason__reason(
     string_into_c_str(this.reason())
 }
 
+/// Indicates whether the [`Room`] was closed by server.
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
     this: *const RoomCloseReason,
@@ -36,6 +24,7 @@ pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
     this.is_closed_by_server() as u8
 }
 
+/// Indicates whether the [`Room`]'s close reason is considered as an error.
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__is_err(
     this: *const RoomCloseReason,
@@ -45,6 +34,9 @@ pub unsafe extern "C" fn RoomCloseReason__is_err(
     this.is_err() as u8
 }
 
+/// Frees the data behind the provided pointer. Should be called when object is
+/// no longer needed. Calling this more than once for the same pointer is
+/// equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__free(this: *mut RoomCloseReason) {
     RoomCloseReason::from_ptr(this);

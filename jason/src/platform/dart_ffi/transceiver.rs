@@ -1,45 +1,29 @@
 //! [`RtcRtpTransceiver`] wrapper.
 
-use std::{cell::RefCell, rc::Rc};
+use std::rc::Rc;
 
 use bitflags::bitflags;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::Direction as DirectionProto;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{media::track::local, platform::Error};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
 #[derive(Clone)]
-pub struct Transceiver {
-    send_track: RefCell<Option<Rc<local::Track>>>,
-    transceiver: RtcRtpTransceiver,
-}
+pub struct Transceiver {}
 
 impl Transceiver {
-    /// Returns current [`TransceiverDirection`] of this [`Transceiver`].
-    #[inline]
-    #[must_use]
-    fn current_direction(&self) -> TransceiverDirection {
-        TransceiverDirection::from(self.transceiver.direction())
-    }
-
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
     #[inline]
     pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
-        self.transceiver.set_direction(
-            (self.current_direction() - disabled_direction).into(),
-        );
+        unimplemented!()
     }
 
     /// Enables provided [`TransceiverDirection`] of this [`Transceiver`].
     #[inline]
     pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
-        self.transceiver.set_direction(
-            (self.current_direction() | enabled_direction).into(),
-        );
+        unimplemented!()
     }
 
     /// Indicates whether the provided [`TransceiverDirection`] is enabled for
@@ -47,7 +31,7 @@ impl Transceiver {
     #[inline]
     #[must_use]
     pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
-        self.current_direction().contains(direction)
+        unimplemented!()
     }
 
     /// Replaces [`TransceiverDirection::SEND`] [`local::Track`] of this
@@ -62,14 +46,7 @@ impl Transceiver {
         &self,
         new_track: Rc<local::Track>,
     ) -> Result<(), Error> {
-        let sys_track: &web_sys::MediaStreamTrack =
-            (*new_track).as_ref().as_ref();
-        JsFuture::from(
-            self.transceiver.sender().replace_track(Some(sys_track)),
-        )
-        .await?;
-        self.send_track.replace(Some(new_track));
-        Ok(())
+        unimplemented!()
     }
 
     /// Sets a [`TransceiverDirection::SEND`] [`local::Track`] of this
@@ -82,12 +59,7 @@ impl Transceiver {
     ///
     /// [WebAPI docs]: https://tinyurl.com/7pnszaa8
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
-        self.send_track.replace(None);
-        let fut = self.transceiver.sender().replace_track(None);
-        Box::pin(async move {
-            // Replacing track to None should never fail.
-            JsFuture::from(fut).await.unwrap();
-        })
+        unimplemented!()
     }
 
     /// Returns [`mid`] of this [`Transceiver`].
@@ -96,49 +68,47 @@ impl Transceiver {
     #[inline]
     #[must_use]
     pub fn mid(&self) -> Option<String> {
-        self.transceiver.mid()
+        unimplemented!()
     }
 
     /// Returns [`local::Track`] that is being send to remote, if any.
     #[inline]
     #[must_use]
     pub fn send_track(&self) -> Option<Rc<local::Track>> {
-        self.send_track.borrow().clone()
+        unimplemented!()
     }
 
     /// Indicates whether this [`Transceiver`] has [`local::Track`].
     #[inline]
     #[must_use]
     pub fn has_send_track(&self) -> bool {
-        self.send_track.borrow().is_some()
+        unimplemented!()
     }
 
     /// Sets the underlying [`local::Track`]'s `enabled` field to the provided
     /// value, if any.
     #[inline]
     pub fn set_send_track_enabled(&self, enabled: bool) {
-        if let Some(track) = self.send_track.borrow().as_ref() {
-            track.set_enabled(enabled);
-        }
+        unimplemented!()
     }
 
     /// Indicates whether the underlying [`RtcRtpTransceiver`] is stopped.
     #[inline]
     #[must_use]
     pub fn is_stopped(&self) -> bool {
-        self.transceiver.stopped()
+        unimplemented!()
     }
 }
 
-impl From<RtcRtpTransceiver> for Transceiver {
-    #[inline]
-    fn from(transceiver: RtcRtpTransceiver) -> Self {
-        Transceiver {
-            send_track: RefCell::new(None),
-            transceiver,
-        }
-    }
-}
+// impl From<RtcRtpTransceiver> for Transceiver {
+//     #[inline]
+//     fn from(transceiver: RtcRtpTransceiver) -> Self {
+//         Transceiver {
+//             send_track: RefCell::new(None),
+//             transceiver,
+//         }
+//     }
+// }
 
 bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
@@ -163,39 +133,6 @@ bitflags! {
         ///
         /// [1]: https://tinyurl.com/y2nlxpzf
         const RECV = 0b10;
-    }
-}
-
-impl From<RtcRtpTransceiverDirection> for TransceiverDirection {
-    fn from(direction: RtcRtpTransceiverDirection) -> Self {
-        use RtcRtpTransceiverDirection as D;
-
-        match direction {
-            D::Sendonly => Self::SEND,
-            D::Recvonly => Self::RECV,
-            D::Inactive => Self::INACTIVE,
-            D::Sendrecv => Self::SEND | Self::RECV,
-            D::__Nonexhaustive => {
-                unreachable!("unexpected transceiver direction")
-            }
-        }
-    }
-}
-
-impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
-    #[inline]
-    fn from(direction: TransceiverDirection) -> Self {
-        use TransceiverDirection as D;
-
-        if direction.is_all() {
-            Self::Sendrecv
-        } else if direction.contains(D::RECV) {
-            Self::Recvonly
-        } else if direction.contains(D::SEND) {
-            Self::Sendonly
-        } else {
-            Self::Inactive
-        }
     }
 }
 

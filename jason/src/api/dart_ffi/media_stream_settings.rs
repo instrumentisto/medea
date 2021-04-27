@@ -1,31 +1,22 @@
-use crate::{
+use super::{
     audio_track_constraints::AudioTrackConstraints,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
     ForeignClass,
 };
 
-pub struct MediaStreamSettings;
+pub use crate::media::MediaStreamSettings;
 
 impl ForeignClass for MediaStreamSettings {}
 
-impl MediaStreamSettings {
-    pub fn new() -> Self {
-        Self
-    }
-
-    pub fn audio(&mut self, _: AudioTrackConstraints) {}
-
-    pub fn device_video(&mut self, _: DeviceVideoTrackConstraints) {}
-
-    pub fn display_video(&mut self, _: DisplayVideoTrackConstraints) {}
-}
-
+/// Creates new [`MediaStreamSettings`] with none constraints configured.
 #[no_mangle]
 pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
     MediaStreamSettings::new().into_ptr()
 }
 
+/// Specifies the nature and settings of the audio
+/// [`platform::MediaStreamTrack`].
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__audio(
     this: *mut MediaStreamSettings,
@@ -36,6 +27,8 @@ pub unsafe extern "C" fn MediaStreamSettings__audio(
     this.audio(AudioTrackConstraints::from_ptr(constraints));
 }
 
+/// Set constraints that will be used to obtain local video sourced from
+/// media device.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__device_video(
     this: *mut MediaStreamSettings,
@@ -46,6 +39,8 @@ pub unsafe extern "C" fn MediaStreamSettings__device_video(
     this.device_video(DeviceVideoTrackConstraints::from_ptr(constraints));
 }
 
+/// Set constraints that will be used to capture local video from user
+/// display.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__display_video(
     this: *mut MediaStreamSettings,
@@ -56,6 +51,9 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
     this.display_video(DisplayVideoTrackConstraints::from_ptr(constraints));
 }
 
+/// Frees the data behind the provided pointer. Should be called when object is
+/// no longer needed. Calling this more than once for the same pointer is
+/// equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__free(
     this: *mut MediaStreamSettings,

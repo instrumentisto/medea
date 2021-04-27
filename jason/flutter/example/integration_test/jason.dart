@@ -140,7 +140,7 @@ void main() {
 
     var reason = await reasonFut.future.timeout(Duration(seconds: 1));
 
-    expect(reason.reason(), equals('RoomCloseReason.reason'));
+    expect(reason.reason(), equals('RpcClientUnexpectedlyDropped'));
     expect(reason.isClosedByServer(), equals(false));
     expect(reason.isErr(), equals(true));
     reason.free();
