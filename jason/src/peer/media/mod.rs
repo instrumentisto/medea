@@ -392,6 +392,7 @@ impl MediaConnections {
     /// Instantiates a new [`MediaConnections`] storage for the given
     /// [`platform::RtcPeerConnection`].
     #[inline]
+    #[must_use]
     pub fn new(
         peer: Rc<platform::RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,

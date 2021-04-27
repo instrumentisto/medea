@@ -82,10 +82,7 @@ pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
 #[cfg(feature = "mockable")]
 mod mock {
     use crate::{
-        api::{
-            ConnectionHandle, LocalMediaTrack,
-            ReconnectHandle, JasonError
-        },
+        api::{ConnectionHandle, JasonError, LocalMediaTrack, ReconnectHandle},
         platform,
         room::RoomCloseReason,
         rpc::{ClientDisconnect, CloseReason},
@@ -98,12 +95,15 @@ mod mock {
         pub fn on_new_connection(
             &self,
             cb: platform::Function<ConnectionHandle>,
-        ) -> Result<(), JasonError>{
+        ) -> Result<(), JasonError> {
             cb.call1(ConnectionHandle);
             Ok(())
         }
 
-        pub fn on_close(&self, cb: platform::Function<RoomCloseReason>) -> Result<(), JasonError> {
+        pub fn on_close(
+            &self,
+            cb: platform::Function<RoomCloseReason>,
+        ) -> Result<(), JasonError> {
             cb.call1(RoomCloseReason::new(CloseReason::ByClient {
                 is_err: true,
                 reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
@@ -111,7 +111,10 @@ mod mock {
             Ok(())
         }
 
-        pub fn on_local_track(&self, cb: platform::Function<LocalMediaTrack>) -> Result<(), JasonError>{
+        pub fn on_local_track(
+            &self,
+            cb: platform::Function<LocalMediaTrack>,
+        ) -> Result<(), JasonError> {
             cb.call1(LocalMediaTrack);
             Ok(())
         }

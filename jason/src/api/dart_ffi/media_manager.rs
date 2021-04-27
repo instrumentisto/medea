@@ -60,21 +60,33 @@ pub unsafe extern "C" fn MediaManagerHandle__free(
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use crate::api::{InputDeviceInfo, LocalMediaTrack, MediaStreamSettings, JasonError};
+    use crate::api::{
+        InputDeviceInfo, JasonError, LocalMediaTrack, MediaStreamSettings,
+    };
 
     pub struct MediaManagerHandle;
 
     #[allow(clippy::missing_errors_doc)]
     impl MediaManagerHandle {
-        pub async fn enumerate_devices(&self) -> Result<Vec<InputDeviceInfo>, JasonError> {
-            Ok(vec![InputDeviceInfo {}, InputDeviceInfo {}, InputDeviceInfo {}])
+        pub async fn enumerate_devices(
+            &self,
+        ) -> Result<Vec<InputDeviceInfo>, JasonError> {
+            Ok(vec![
+                InputDeviceInfo {},
+                InputDeviceInfo {},
+                InputDeviceInfo {},
+            ])
         }
 
         pub async fn init_local_tracks(
             &self,
             _caps: MediaStreamSettings,
         ) -> Result<Vec<LocalMediaTrack>, JasonError> {
-            Ok(vec![LocalMediaTrack {}, LocalMediaTrack {}, LocalMediaTrack {}])
+            Ok(vec![
+                LocalMediaTrack {},
+                LocalMediaTrack {},
+                LocalMediaTrack {},
+            ])
         }
     }
 }

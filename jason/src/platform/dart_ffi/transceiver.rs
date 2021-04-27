@@ -58,6 +58,7 @@ impl Transceiver {
     /// basing on [WebAPI docs] it should never happen.
     ///
     /// [WebAPI docs]: https://tinyurl.com/7pnszaa8
+    #[must_use]
     pub fn drop_send_track(&self) -> LocalBoxFuture<'static, ()> {
         unimplemented!()
     }

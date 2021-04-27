@@ -76,7 +76,10 @@ pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use crate::{api::{RemoteMediaTrack, JasonError}, platform};
+    use crate::{
+        api::{JasonError, RemoteMediaTrack},
+        platform,
+    };
 
     pub struct ConnectionHandle;
 
@@ -86,7 +89,10 @@ mod mock {
             Ok(String::from("ConnectionHandle.get_remote_member_id"))
         }
 
-        pub fn on_close(&self, f: platform::Function<()>) -> Result<(), JasonError> {
+        pub fn on_close(
+            &self,
+            f: platform::Function<()>,
+        ) -> Result<(), JasonError> {
             f.call0();
             Ok(())
         }
@@ -99,7 +105,10 @@ mod mock {
             Ok(())
         }
 
-        pub fn on_quality_score_update(&self, f: platform::Function<u8>) -> Result<(), JasonError> {
+        pub fn on_quality_score_update(
+            &self,
+            f: platform::Function<u8>,
+        ) -> Result<(), JasonError> {
             f.call1(4);
             Ok(())
         }

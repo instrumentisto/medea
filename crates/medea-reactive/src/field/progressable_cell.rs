@@ -78,7 +78,7 @@ where
     /// Replaces the wrapped value with a `new_data` one.
     #[inline]
     pub fn set(&self, new_data: D) {
-        drop(self.replace(new_data))
+        let _ = self.replace(new_data);
     }
 
     /// Replaces the wrapped value with a `new_data` one, returning the old

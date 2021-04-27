@@ -489,12 +489,12 @@ impl PeerConnection {
         );
 
         if !stats.0.is_empty() {
-            drop(self.peer_events_sender.unbounded_send(
+            let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::StatsUpdate {
                     peer_id: self.id,
                     stats,
                 },
-            ));
+            );
         }
     }
 
@@ -546,12 +546,12 @@ impl PeerConnection {
         sender: &mpsc::UnboundedSender<PeerEvent>,
         candidate: platform::IceCandidate,
     ) {
-        drop(sender.unbounded_send(PeerEvent::IceCandidateDiscovered {
+        let _ = sender.unbounded_send(PeerEvent::IceCandidateDiscovered {
             peer_id: id,
             candidate: candidate.candidate,
             sdp_m_line_index: candidate.sdp_m_line_index,
             sdp_mid: candidate.sdp_mid,
-        }));
+        });
     }
 
     /// Handle `iceconnectionstatechange` event from underlying peer emitting
@@ -562,10 +562,10 @@ impl PeerConnection {
         sender: &mpsc::UnboundedSender<PeerEvent>,
         ice_connection_state: IceConnectionState,
     ) {
-        drop(sender.unbounded_send(PeerEvent::IceConnectionStateChanged {
+        let _ = sender.unbounded_send(PeerEvent::IceConnectionStateChanged {
             peer_id,
             ice_connection_state,
-        }));
+        });
     }
 
     /// Handles `connectionstatechange` event from the underlying peer emitting
@@ -577,10 +577,10 @@ impl PeerConnection {
         sender: &mpsc::UnboundedSender<PeerEvent>,
         peer_connection_state: PeerConnectionState,
     ) {
-        drop(sender.unbounded_send(PeerEvent::ConnectionStateChanged {
+        let _ = sender.unbounded_send(PeerEvent::ConnectionStateChanged {
             peer_id,
             peer_connection_state,
-        }));
+        });
     }
 
     /// Sends [`PeerConnection`]'s connection state and ICE connection state to
@@ -708,11 +708,11 @@ impl PeerConnection {
         criteria: LocalStreamUpdateCriteria,
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         self.inner_update_local_stream(criteria).await.map_err(|e| {
-            drop(self.peer_events_sender.unbounded_send(
+            let _ = self.peer_events_sender.unbounded_send(
                 PeerEvent::FailedLocalMedia {
                     error: JasonError::from(e.clone()),
                 },
-            ));
+            );
 
             e
         })
@@ -803,9 +803,9 @@ impl PeerConnection {
 
             for (local_track, is_new) in media_tracks {
                 if is_new {
-                    drop(self.peer_events_sender.unbounded_send(
+                    let _ = self.peer_events_sender.unbounded_send(
                         PeerEvent::NewLocalTrack { local_track },
-                    ));
+                    );
                 }
             }
 

@@ -342,12 +342,15 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	#cargo clippy --workspace --exclude jason -- -D clippy::pedantic -D warnings
+	cargo clippy --workspace --exclude medea-jason\
+		-- -D clippy::pedantic -D warnings
+	$(call cargo.lint.medea-jason.android,wasm32-unknown-unknown)
 	$(foreach target,$(subst $(comma), ,$(ANDROID_TARGETS)),\
 		$(call cargo.lint.medea-jason.android,$(target)))
 define cargo.lint.medea-jason.android
 	$(eval target := $(strip $(1)))
-	cargo clippy --manifest-path jason/Cargo.toml --target=$(target) -- -D clippy::pedantic -D warnings
+	cargo clippy --manifest-path jason/Cargo.toml --target=$(target)\
+			-- -D clippy::pedantic -D warnings
 endef
 
 

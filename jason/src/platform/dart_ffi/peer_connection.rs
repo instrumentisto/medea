@@ -260,6 +260,7 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
+    #[must_use]
     pub fn add_transceiver(
         &self,
         kind: MediaKind,
@@ -278,6 +279,7 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
+    #[must_use]
     pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
         unimplemented!()
     }

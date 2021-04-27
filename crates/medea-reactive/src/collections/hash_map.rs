@@ -278,7 +278,9 @@ where
             })
             .collect::<Vec<_>>()
             .into_iter()
-            .for_each(|id| drop(self.remove(&id)));
+            .for_each(|id| {
+                let _ = self.remove(&id);
+            });
     }
 
     /// Inserts a key-value pair to this [`HashMap`].
