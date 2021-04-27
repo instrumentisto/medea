@@ -10,7 +10,7 @@ use tracerr::Traced;
 
 use crate::{
     platform::{
-        dart::utils::{callback::StringCallback, handle::DartHandle},
+        dart::utils::{callback_listener::StringCallback, handle::DartHandle},
         RpcTransport, TransportError, TransportState,
     },
     rpc::{ApiUrl, ClientDisconnect},

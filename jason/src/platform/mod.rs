@@ -48,7 +48,6 @@ pub use self::wasm::{
     init_logger,
     rtc_stats::RtcStats,
     set_panic_hook,
-    // utils::{Callback, Function},
 };
 
 #[cfg(feature = "mockable")]

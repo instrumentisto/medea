@@ -6,6 +6,11 @@ pub mod list;
 pub mod map;
 pub mod option;
 pub mod result;
+pub mod callback_listener;
+
+pub use self::callback::{
+    Callback, Function,
+};
 
 pub fn ice_connection_from_int(i: i32) -> IceConnectionState {
     match i {

@@ -4,7 +4,7 @@ use derive_more::From;
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
     platform::dart::utils::{
-        callback::VoidCallback,
+        callback_listener::VoidCallback,
         handle::DartHandle,
         option::{DartIntOption, DartStringOption, DartUIntOption},
     },

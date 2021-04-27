@@ -63,7 +63,7 @@ impl Transceiver {
         new_track: Rc<local::Track>,
     ) -> Result<(), JsValue> {
         let sys_track: &web_sys::MediaStreamTrack =
-            (*new_track).as_ref().as_ref();
+            todo!("(*new_track).as_ref().as_ref()");
         JsFuture::from(
             self.transceiver.sender().replace_track(Some(sys_track)),
         )
