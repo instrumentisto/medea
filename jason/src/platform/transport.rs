@@ -11,7 +11,7 @@ use crate::{
     utils::{JsCaused, JsonParseError},
 };
 
-pub use super::wasm::transport::WebSocketRpcTransport;
+pub use super::dart::transport::WebSocketRpcTransport;
 
 /// Possible states of a [`RpcTransport`].
 #[derive(Clone, Copy, Debug, PartialEq)]

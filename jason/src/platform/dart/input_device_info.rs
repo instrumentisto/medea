@@ -59,7 +59,7 @@ pub struct InputDeviceInfo {
 }
 
 impl From<DartHandle> for InputDeviceInfo {
-    fn from(handle: DartHandle) -> Self {
+    fn from(_handle: DartHandle) -> Self {
         todo!("Provide real MediaKind")
     }
 }

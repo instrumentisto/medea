@@ -124,15 +124,15 @@ impl Transceiver {
         }
     }
 
-    pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
+    pub fn sub_direction(&self, _disabled_direction: TransceiverDirection) {
         todo!()
     }
 
-    pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
+    pub fn add_direction(&self, _enabled_direction: TransceiverDirection) {
         todo!()
     }
 
-    pub fn has_direction(&self, direction: TransceiverDirection) -> bool {
+    pub fn has_direction(&self, _direction: TransceiverDirection) -> bool {
         todo!()
     }
 

@@ -32,5 +32,5 @@ pub unsafe extern "C" fn register_delayed_future_function(
 pub async fn delay_for(delay: Duration) {
     let delay = delay.as_millis() as i32;
     let dart_fut = unsafe { DELAYED_FUTURE_FUNCTION.unwrap()(delay) };
-    DartFuture::new(dart_fut).await;
+    let _ = DartFuture::new(dart_fut).await;
 }

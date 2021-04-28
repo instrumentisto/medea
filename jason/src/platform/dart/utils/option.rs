@@ -11,7 +11,7 @@ pub struct DartOption {
 impl From<DartOption> for Option<Dart_Handle> {
     fn from(from: DartOption) -> Self {
         if from.is_some == 1 {
-            unsafe { Some(from.val) }
+            Some(from.val)
         } else {
             None
         }

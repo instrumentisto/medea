@@ -104,7 +104,7 @@ impl<A> Callback<A> {
     /// Invokes underlying [`Function`] (if any) passing the single provided
     /// argument to it.
     #[inline]
-    pub fn call1<T>(&self, arg: T) {
+    pub fn call1<T>(&self, _arg: T) {
         unimplemented!()
     }
 }

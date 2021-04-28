@@ -1,9 +1,9 @@
 use crate::platform::dart::{
-    error::{DartError, Error},
+    error::{DartError},
     utils::handle::DartHandle,
 };
 use dart_sys::Dart_Handle;
-use futures::channel::{oneshot, oneshot::Canceled};
+use futures::channel::{oneshot};
 use std::future::Future;
 
 pub struct DartFuture(oneshot::Sender<Result<DartHandle, DartError>>);
@@ -26,11 +26,11 @@ impl DartFuture {
     }
 
     fn resolve_ok(self, val: Dart_Handle) {
-        self.0.send(Ok(DartHandle::new(val)));
+        let _ = self.0.send(Ok(DartHandle::new(val)));
     }
 
     fn resolve_err(self, val: Dart_Handle) {
-        self.0.send(Err(DartError::from(val)));
+        let _ = self.0.send(Err(DartError::from(val)));
     }
 }
 

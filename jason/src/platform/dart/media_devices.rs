@@ -53,7 +53,7 @@ pub async fn get_user_media(
 }
 
 type GetDisplayMediaFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
-static mut GET_DISPLAY_MEDIA_FUNCTION: Option<GetUserMediaFunction> = None;
+static mut GET_DISPLAY_MEDIA_FUNCTION: Option<GetDisplayMediaFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaDevices__get_display_media(

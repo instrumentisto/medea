@@ -37,6 +37,15 @@ pub enum MediaKind {
     Video,
 }
 
+impl From<&TrackConstraints> for MediaKind {
+    fn from(media_type: &TrackConstraints) -> Self {
+        match media_type {
+            TrackConstraints::Audio(_) => Self::Audio,
+            TrackConstraints::Video(_) => Self::Video,
+        }
+    }
+}
+
 impl FromStr for MediaKind {
     type Err = ();
 

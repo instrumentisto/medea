@@ -45,9 +45,7 @@ pub use self::dart::{
 };
 pub use self::wasm::{
     error::Error,
-    init_logger,
     rtc_stats::RtcStats,
-    set_panic_hook,
 };
 
 #[cfg(feature = "mockable")]

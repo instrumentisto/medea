@@ -1,5 +1,3 @@
-use std::result::Result as StdResult;
-
 use dart_sys::Dart_Handle;
 use medea_client_api_proto::{
     IceConnectionState, IceServer, PeerConnectionState,
@@ -10,7 +8,6 @@ use crate::{
     media::MediaKind,
     platform::{
         dart::{
-            error::Error,
             transceiver::Transceiver,
             utils::{
                 callback_listener::{HandleMutCallback, IntCallback, TwoArgCallback},
@@ -185,7 +182,7 @@ pub struct RtcPeerConnection {
 }
 
 impl RtcPeerConnection {
-    pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
+    pub fn new<I>(_ice_servers: I, _is_force_relayed: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
@@ -296,11 +293,11 @@ impl RtcPeerConnection {
                     .handle(),
             ))
             .await
-            .map_err(|e| {
+            .map_err(|_e| {
                 tracerr::new!(RtcPeerConnectionError::AddIceCandidateFailed(
                     todo!("Error::from(e)")
                 ))
-            })
+            })?;
         };
         Ok(())
     }
@@ -337,7 +334,7 @@ impl RtcPeerConnection {
                 into_dart_string(sdp),
             ))
             .await
-            .map_err(|e| {
+            .map_err(|_e| {
                 tracerr::new!(
                     RtcPeerConnectionError::SetLocalDescriptionFailed(
                         todo!("Error::from(e)")
@@ -357,7 +354,7 @@ impl RtcPeerConnection {
                     into_dart_string(sdp),
                 ))
                 .await
-                .map_err(|e| {
+                .map_err(|_e| {
                     tracerr::new!(
                         RtcPeerConnectionError::SetRemoteDescriptionFailed(
                             todo!("Error::from(e)")
@@ -372,7 +369,7 @@ impl RtcPeerConnection {
                     into_dart_string(sdp),
                 ))
                 .await
-                .map_err(|e| {
+                .map_err(|_e| {
                     tracerr::new!(
                         RtcPeerConnectionError::SetRemoteDescriptionFailed(
                             todo!("Error::from(e)")

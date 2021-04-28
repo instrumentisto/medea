@@ -37,15 +37,6 @@ use crate::{
 
 use super::{get_property_by_name, ice_server::RtcIceServers};
 
-impl From<&TrackConstraints> for MediaKind {
-    fn from(media_type: &TrackConstraints) -> Self {
-        match media_type {
-            TrackConstraints::Audio(_) => Self::Audio,
-            TrackConstraints::Video(_) => Self::Video,
-        }
-    }
-}
-
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
 
 /// Representation of [RTCPeerConnection][1].

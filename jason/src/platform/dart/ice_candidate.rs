@@ -44,14 +44,14 @@ pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {
 
 impl IceCandidate {
     pub fn new(
-        candidate: &str,
-        sdp_m_line_index: Option<u16>,
-        sdp_mid: &Option<String>,
+        _candidate: &str,
+        _sdp_m_line_index: Option<u16>,
+        _sdp_mid: &Option<String>,
     ) -> Self {
         // TODO: Do with me something
-        unsafe {
+        // unsafe {
             // NEW.unwrap(into_dart_string(candidate.to_string()))
-        }
+        // }
         todo!()
     }
 

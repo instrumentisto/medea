@@ -2,17 +2,17 @@
 
 use std::{convert::TryInto as _, time::Duration};
 
-pub mod constraints;
+// pub mod constraints;
 pub mod error;
-pub mod ice_server;
-pub mod input_device_info;
-pub mod media_devices;
-pub mod media_track;
-pub mod peer_connection;
+// pub mod ice_server;
+// pub mod input_device_info;
+// pub mod media_devices;
+// pub mod media_track;
+// pub mod peer_connection;
 pub mod rtc_stats;
-pub mod transceiver;
-pub mod transport;
-pub mod utils;
+// pub mod transceiver;
+// pub mod transport;
+// pub mod utils;
 
 use futures::Future;
 use js_sys::{Promise, Reflect};
@@ -32,13 +32,13 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 //
 // For more details see:
 // https://github.com/rustwasm/console_error_panic_hook#readme
-#[cfg(feature = "console_error_panic_hook")]
+// #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
 /// Initialize [`wasm_logger`] as default application logger.
 ///
 /// [`wasm_logger`]: https://docs.rs/wasm-logger
-pub fn init_logger() {
+fn init_logger() {
     wasm_logger::init(wasm_logger::Config::default());
 }
 
@@ -73,7 +73,7 @@ pub async fn delay_for(delay: Duration) {
 
 /// Returns property of JS object by name if its defined.
 /// Converts the value with a given predicate.
-pub fn get_property_by_name<T, F, U>(
+fn get_property_by_name<T, F, U>(
     value: &T,
     name: &str,
     into: F,
@@ -93,14 +93,14 @@ where
 ///
 /// When global [`Window`] object is inaccessible.
 #[must_use]
-pub fn window() -> Window {
+fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.
     // Safe to unwrap.
     web_sys::window().unwrap()
 }
 
 /// Wrapper around interval timer ID.
-pub struct IntervalHandle(pub i32);
+struct IntervalHandle(pub i32);
 
 impl Drop for IntervalHandle {
     /// Clears interval with provided ID.
