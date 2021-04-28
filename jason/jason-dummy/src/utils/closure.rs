@@ -10,10 +10,9 @@
 //! initialization phase: after Dart DL API is initialized and before any other
 //! exported Rust function is called.
 
-use std::marker::PhantomData;
+use std::{ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
-use libc::c_void;
 
 use crate::ForeignClass;
 
@@ -23,16 +22,18 @@ use super::dart_api::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-/// Pointer to an extern function that accepts [`Dart_Handle`] and `*const c_void`;
+/// Pointer to an extern function that accepts a [`Dart_Handle`] and a
+/// `*const c_void` pointer.
 type PointerArgFnCaller = extern "C" fn(Dart_Handle, *const c_void);
 
-/// Pointer to an extern function that accepts [`Dart_Handle`];
+/// Pointer to an extern function that accepts a [`Dart_Handle`].
 type UnitArgFnCaller = extern "C" fn(Dart_Handle);
 
-/// Pointer to an extern function that accepts [`Dart_Handle`] and `i64`;
+/// Pointer to an extern function that accepts a [`Dart_Handle`] and a `i64`
+/// number.
 type IntArgFnCaller = extern "C" fn(Dart_Handle, i64);
 
-/// Dart function used to invoke Dart closures that accept an `*const c_void`
+/// Dart function used to invoke Dart closures that accept a `*const c_void`
 /// argument.
 static mut PTR_ARG_FN_CALLER: Option<PointerArgFnCaller> = None;
 
@@ -43,8 +44,11 @@ static mut NO_ARGS_FN_CALLER: Option<UnitArgFnCaller> = None;
 /// argument.
 static mut INT_ARG_FN_CALLER: Option<IntArgFnCaller> = None;
 
-/// Registers the provided [`PointerArgFnCaller`] as [`PTR_ARG_FN_CALLER`]. Must
-/// be called by dart during FFI initialization.
+/// Registers the provided [`PointerArgFnCaller`] as [`PTR_ARG_FN_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_ptr_arg_fn_caller(
     caller: PointerArgFnCaller,
@@ -52,15 +56,21 @@ pub unsafe extern "C" fn register_ptr_arg_fn_caller(
     PTR_ARG_FN_CALLER = Some(caller);
 }
 
-/// Registers the provided [`UnitArgFnCaller`] as [`NO_ARGS_FN_CALLER`]. Must be
-/// called by dart during FFI initialization.
+/// Registers the provided [`UnitArgFnCaller`] as [`NO_ARGS_FN_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_no_args_fn_caller(f: UnitArgFnCaller) {
     NO_ARGS_FN_CALLER = Some(f)
 }
 
-/// Registers the provided [`IntArgFnCaller`] as [`INT_ARG_FN_CALLER`]. Must be
-/// called by dart during FFI initialization.
+/// Registers the provided [`IntArgFnCaller`] as [`INT_ARG_FN_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
@@ -72,24 +82,26 @@ pub struct DartClosure<T> {
     /// [`Dart_PersistentHandle`] to the Dart closure that should be called.
     cb: Dart_PersistentHandle,
 
-    /// Type of the closure argument.
-    _arg_kind: PhantomData<T>,
+    /// Type of this closure argument.
+    _arg: PhantomData<T>,
 }
 
 impl<T> DartClosure<T> {
     /// Creates a new [`DartClosure`] from the provided [`Dart_Handle`] to a
-    /// Dart closure. Persists the provided [`Dart_Handle`] so it won't be moved
-    /// by the Dart VM GC.
+    /// Dart closure, and persists the provided [`Dart_Handle`] so it won't be
+    /// moved by the Dart VM GC.
+    #[inline]
     pub fn new(cb: Dart_Handle) -> Self {
         Self {
             cb: unsafe { Dart_NewPersistentHandle_DL_Trampolined(cb) },
-            _arg_kind: PhantomData,
+            _arg: PhantomData,
         }
     }
 }
 
 impl DartClosure<()> {
-    /// Calls underlying Dart closure.
+    /// Calls the underlying Dart closure.
+    #[inline]
     pub fn call0(&self) {
         unsafe {
             let fn_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
@@ -99,21 +111,26 @@ impl DartClosure<()> {
 }
 
 impl<T: ForeignClass> DartClosure<T> {
-    /// Calls underlying Dart closure with provided [`ForeignClass`] argument.
+    /// Calls the underlying Dart closure with the provided [`ForeignClass`]
+    /// argument.
+    #[inline]
     pub fn call1(&self, arg: T) {
         unsafe {
             let fn_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-            PTR_ARG_FN_CALLER.unwrap()(fn_handle, arg.into_ptr().cast::<c_void>());
+            PTR_ARG_FN_CALLER.unwrap()(
+                fn_handle,
+                arg.into_ptr().cast::<c_void>(),
+            );
         }
     }
 }
 
-/// Implements [`DartClosure::call`] casting argument to `i64`. Should be called
-/// for all integer types that fit into `2^63`.
+/// Implements [`DartClosure::call1()`] casting argument to `i64`. Should be
+/// called for all integer types that fit into `2^63`.
 macro_rules! impl_dart_closure_for_int {
     ($arg:ty) => {
         impl DartClosure<$arg> {
-            /// Calls an underlying Dart closure with the provided argument.
+            /// Calls the underlying Dart closure with the provided argument.
             pub fn call1(&self, arg: $arg) {
                 unsafe {
                     let fn_handle =
@@ -136,7 +153,7 @@ impl_dart_closure_for_int!(u32);
 impl_dart_closure_for_int!(bool);
 
 impl<T> Drop for DartClosure<T> {
-    /// Manually deallocate saved [`Dart_PersistentHandle`] so it won't leak.
+    /// Manually deallocates saved [`Dart_PersistentHandle`] so it won't leak.
     fn drop(&mut self) {
         unsafe { Dart_DeletePersistentHandle_DL_Trampolined(self.cb) };
     }
