@@ -7,6 +7,7 @@ pub mod map;
 pub mod option;
 pub mod result;
 pub mod callback_listener;
+pub mod nullable;
 
 pub use self::callback::{
     Callback, Function,

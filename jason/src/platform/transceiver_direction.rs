@@ -28,6 +28,22 @@ bitflags! {
     }
 }
 
+impl Into<i32> for TransceiverDirection {
+    fn into(self) -> i32 {
+        use TransceiverDirection as D;
+
+        if self.is_all() {
+            0
+        } else if self.contains(D::RECV) {
+            2
+        } else if self.contains(D::SEND) {
+            1
+        } else {
+            3
+        }
+    }
+}
+
 impl From<RtcRtpTransceiverDirection> for TransceiverDirection {
     fn from(direction: RtcRtpTransceiverDirection) -> Self {
         use RtcRtpTransceiverDirection as D;
