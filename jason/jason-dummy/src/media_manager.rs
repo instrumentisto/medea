@@ -5,7 +5,7 @@ use crate::{
     local_media_track::LocalMediaTrack,
     media_stream_settings::MediaStreamSettings,
     utils::{spawn, Completer, PtrArray},
-    ForeignClass,
+    ForeignClass, ForeignClass,
 };
 
 pub struct MediaManagerHandle;

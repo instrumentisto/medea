@@ -35,8 +35,12 @@ extern "C" {
     );
 }
 
-/// Called with [`NativeApi.initializeApiDLData`][1] from Dart to enable using
-/// the dynamically linked Dart API.
+/// Initializes usage of Dynamically Linked Dart API.
+///
+/// # Safety
+///
+/// Intended to be called ONLY with [`NativeApi.initializeApiDLData`][1] from
+/// Dart.
 ///
 /// [1]: https://api.dart.dev/dart-ffi/NativeApi/initializeApiDLData.html
 #[no_mangle]
