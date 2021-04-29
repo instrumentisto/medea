@@ -44,6 +44,7 @@ pub use self::dart::{
     utils::{Callback, Function},
     error::Error,
     rtc_stats::RtcStats,
+    set_panic_hook,
 };
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 pub use self::wasm::{error::Error, rtc_stats::RtcStats};

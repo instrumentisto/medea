@@ -12,12 +12,31 @@ pub mod transport;
 pub mod utils;
 
 use std::time::Duration;
+use std::panic;
 
-use dart_sys::Dart_Handle;
+use dart_sys::{Dart_PropagateError, Dart_Handle};
 
+use crate::utils::dart::into_dart_string;
 use crate::utils::dart::dart_future::DartFuture;
 
 pub use self::executor::spawn;
+
+type NewExceptionFunction = extern "C" fn(*const libc::c_char) -> Dart_Handle;
+static mut NEW_EXCEPTION_FUNCTION: Option<NewExceptionFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_new_exception_function(f: NewExceptionFunction) {
+    NEW_EXCEPTION_FUNCTION = Some(f);
+}
+
+pub fn set_panic_hook() {
+    panic::set_hook(Box::new(|s| {
+        let exception = unsafe {
+            NEW_EXCEPTION_FUNCTION.unwrap()(into_dart_string(s.to_string()))
+        };
+        unsafe { Dart_PropagateError(exception) };
+    }));
+}
 
 type DelayedFutureFunction = extern "C" fn(i32) -> Dart_Handle;
 static mut DELAYED_FUTURE_FUNCTION: Option<DelayedFutureFunction> = None;

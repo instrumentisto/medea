@@ -63,6 +63,7 @@ mod mock {
 
     impl Jason {
         pub fn new() -> Self {
+            crate::platform::set_panic_hook();
             crate::platform::init_logger();
             Self
         }
