@@ -8,12 +8,6 @@ use crate::ForeignClass;
 ///
 /// Can be safely returned from extern functions. Foreign code must manually
 /// free this array by calling [`PtrArray_free()`].
-///
-/// # Safety
-///
-/// [`PtrArray_free()`] only frees [`PtrArray`], so all elements of this
-/// [`PtrArray`] will be leaked, and must be freed when Dart's GC frees handles
-/// for this elements.
 #[repr(C)]
 pub struct PtrArray<T = ()> {
     /// Pointer to the first element.
@@ -47,11 +41,11 @@ impl<T> Drop for PtrArray<T> {
     ///
     /// # Safety
     ///
-    /// Doesn't drop elements. They are leaked and must be explicitly freed in
-    /// the foreign code __before__ dropping this [`PtrArray`].
-    ///
-    /// [`PtrArray`]'s element must be freed, when Dart's GC frees handle for
-    /// this element.
+    /// Doesn't drop array elements. They are leaked and must be explicitly
+    /// freed in the foreign code whenever foreign code doesn't need them.
+    /// There is no relation between the lifetime of the items that array
+    /// elements point to and this [`PtrArray`]'s lifetime thus drop order
+    /// doesn't matter.
     #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
         unsafe {
@@ -68,11 +62,15 @@ impl<T> Drop for PtrArray<T> {
 ///
 /// # Safety
 ///
-/// Doesn't drop elements. They are leaked and must be explicitly freed in the
-/// foreign code __before__ dropping a [`PtrArray`].
+/// Doesn't drop array elements. They are leaked and must be explicitly
+/// freed in the foreign code whenever foreign code doesn't need them.
+/// There is no relation between the lifetime of the items that array
+/// elements point to and this [`PtrArray`]'s lifetime thus drop order
+/// doesn't matter.
 ///
-/// [`PtrArray`]'s element must be freed, when Dart's GC frees handle for this
-/// element.
+/// This function should not be called before foreign code reads [`PtrArray`]
+/// elements, otherwise pointers will be lost and data behind pointers will stay
+/// leaked.
 #[no_mangle]
 pub unsafe extern "C" fn PtrArray_free(arr: PtrArray) {
     drop(arr);
