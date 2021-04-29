@@ -14,7 +14,7 @@ use std::{cell::RefCell, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::dart_ffi::ForeignClass;
+use crate::api::dart::ForeignClass;
 
 use dart_sys::{
     Dart_DeletePersistentHandle, Dart_HandleFromPersistent,

@@ -32,7 +32,6 @@ impl From<Dart_Handle> for IceCandidate {
     }
 }
 
-
 #[no_mangle]
 pub unsafe extern "C" fn register_IceCandidate__candidate(
     f: CandidateFunction,
@@ -40,14 +39,12 @@ pub unsafe extern "C" fn register_IceCandidate__candidate(
     CANDIDATE_FUNCTION = Some(f);
 }
 
-
 #[no_mangle]
 pub unsafe extern "C" fn register_IceCandidate__sdp_m_line_index(
     f: SdpMLineIndexFunction,
 ) {
     SDP_M_LINE_INDEX_FUNCTION = Some(f);
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {

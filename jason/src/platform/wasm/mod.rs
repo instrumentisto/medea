@@ -2,17 +2,17 @@
 
 use std::{convert::TryInto as _, time::Duration};
 
-// pub mod constraints;
+pub mod constraints;
 pub mod error;
-// pub mod ice_server;
-// pub mod input_device_info;
-// pub mod media_devices;
-// pub mod media_track;
-// pub mod peer_connection;
+pub mod ice_server;
+pub mod input_device_info;
+pub mod media_devices;
+pub mod media_track;
+pub mod peer_connection;
 pub mod rtc_stats;
-// pub mod transceiver;
-// pub mod transport;
-// pub mod utils;
+pub mod transceiver;
+pub mod transport;
+pub mod utils;
 
 use futures::Future;
 use js_sys::{Promise, Reflect};
@@ -38,7 +38,7 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 /// Initialize [`wasm_logger`] as default application logger.
 ///
 /// [`wasm_logger`]: https://docs.rs/wasm-logger
-fn init_logger() {
+pub fn init_logger() {
     wasm_logger::init(wasm_logger::Config::default());
 }
 

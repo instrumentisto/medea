@@ -2363,6 +2363,7 @@ dependencies = [
  "async-trait",
  "bitflags",
  "cc",
+ "cfg-if 1.0.0",
  "console_error_panic_hook",
  "dart-sys",
  "derivative",

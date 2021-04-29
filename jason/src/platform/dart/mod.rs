@@ -11,13 +11,11 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
-use std::time::Duration;
-use std::panic;
+use std::{panic, time::Duration};
 
-use dart_sys::{Dart_PropagateError, Dart_Handle};
+use dart_sys::{Dart_Handle, Dart_PropagateError};
 
-use crate::utils::dart::into_dart_string;
-use crate::utils::dart::dart_future::DartFuture;
+use crate::utils::dart::{dart_future::DartFuture, into_dart_string};
 
 pub use self::executor::spawn;
 
@@ -25,7 +23,9 @@ type NewExceptionFunction = extern "C" fn(*const libc::c_char) -> Dart_Handle;
 static mut NEW_EXCEPTION_FUNCTION: Option<NewExceptionFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_new_exception_function(f: NewExceptionFunction) {
+pub unsafe extern "C" fn register_new_exception_function(
+    f: NewExceptionFunction,
+) {
     NEW_EXCEPTION_FUNCTION = Some(f);
 }
 

@@ -1,5 +1,5 @@
-use derive_more::Display;
 use dart_sys::Dart_Handle;
+use derive_more::Display;
 
 use crate::{
     platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,

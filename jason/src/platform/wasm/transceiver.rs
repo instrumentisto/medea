@@ -2,11 +2,12 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::platform::transceiver_direction::TransceiverDirection;
 use futures::future::LocalBoxFuture;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::RtcRtpTransceiver;
+
+use crate::platform::{transceiver_direction::TransceiverDirection, Error};
 
 use crate::media::track::local;
 
@@ -61,7 +62,7 @@ impl Transceiver {
     pub async fn set_send_track(
         &self,
         new_track: Rc<local::Track>,
-    ) -> Result<(), JsValue> {
+    ) -> Result<(), Error> {
         let sys_track: &web_sys::MediaStreamTrack =
             todo!("(*new_track).as_ref().as_ref()");
         JsFuture::from(
