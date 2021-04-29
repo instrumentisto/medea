@@ -11,6 +11,50 @@ use crate::{
     utils::dart::from_dart_string,
 };
 
+type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
+
+type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
+type FacingModeFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
+
+type HeightFunction = extern "C" fn(Dart_Handle) -> DartUIntOption;
+
+type WidthFunction = extern "C" fn(Dart_Handle) -> DartUIntOption;
+
+type SetEnabledFunction = extern "C" fn(Dart_Handle, bool);
+
+type StopFunction = extern "C" fn(Dart_Handle);
+
+type EnabledFunction = extern "C" fn(Dart_Handle) -> bool;
+
+type KindFunction = extern "C" fn(Dart_Handle) -> i32;
+
+type ReadyStateFunction = extern "C" fn(Dart_Handle) -> i32;
+
+type OnEndedFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
+static mut ID_FUNCTION: Option<IdFunction> = None;
+
+static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
+
+static mut FACING_MODE_FUNCTION: Option<FacingModeFunction> = None;
+
+static mut HEIGHT_FUNCTION: Option<HeightFunction> = None;
+
+static mut WIDTH_FUNCTION: Option<WidthFunction> = None;
+
+static mut SET_ENABLED_FUNCTION: Option<SetEnabledFunction> = None;
+
+static mut STOP_FUNCTION: Option<StopFunction> = None;
+
+static mut ENABLED_FUNCTION: Option<EnabledFunction> = None;
+
+static mut KIND_FUNCTION: Option<KindFunction> = None;
+
+static mut READY_STATE_FUNCTION: Option<ReadyStateFunction> = None;
+
+static mut ON_ENDED_FUNCTION: Option<OnEndedFunction> = None;
+
 #[derive(Clone, From, Debug)]
 pub struct MediaStreamTrack(DartHandle);
 
@@ -20,16 +64,10 @@ impl From<Dart_Handle> for MediaStreamTrack {
     }
 }
 
-type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
-static mut ID_FUNCTION: Option<IdFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__id(f: IdFunction) {
     ID_FUNCTION = Some(f);
 }
-
-type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
-static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__device_id(
@@ -38,9 +76,6 @@ pub unsafe extern "C" fn register_MediaStreamTrack__device_id(
     DEVICE_ID_FUNCTION = Some(f);
 }
 
-type FacingModeFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
-static mut FACING_MODE_FUNCTION: Option<FacingModeFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__facing_mode(
     f: FacingModeFunction,
@@ -48,24 +83,15 @@ pub unsafe extern "C" fn register_MediaStreamTrack__facing_mode(
     FACING_MODE_FUNCTION = Some(f);
 }
 
-type HeightFunction = extern "C" fn(Dart_Handle) -> DartUIntOption;
-static mut HEIGHT_FUNCTION: Option<HeightFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__height(f: HeightFunction) {
     HEIGHT_FUNCTION = Some(f);
 }
 
-type WidthFunction = extern "C" fn(Dart_Handle) -> DartUIntOption;
-static mut WIDTH_FUNCTION: Option<WidthFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__width(f: WidthFunction) {
     WIDTH_FUNCTION = Some(f);
 }
-
-type SetEnabledFunction = extern "C" fn(Dart_Handle, bool);
-static mut SET_ENABLED_FUNCTION: Option<SetEnabledFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__set_enabled(
@@ -74,16 +100,10 @@ pub unsafe extern "C" fn register_MediaStreamTrack__set_enabled(
     SET_ENABLED_FUNCTION = Some(f);
 }
 
-type StopFunction = extern "C" fn(Dart_Handle);
-static mut STOP_FUNCTION: Option<StopFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__stop(f: StopFunction) {
     STOP_FUNCTION = Some(f);
 }
-
-type EnabledFunction = extern "C" fn(Dart_Handle) -> bool;
-static mut ENABLED_FUNCTION: Option<EnabledFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__enabled(
@@ -92,16 +112,10 @@ pub unsafe extern "C" fn register_MediaStreamTrack__enabled(
     ENABLED_FUNCTION = Some(f);
 }
 
-type KindFunction = extern "C" fn(Dart_Handle) -> i32;
-static mut KIND_FUNCTION: Option<KindFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__kind(f: KindFunction) {
     KIND_FUNCTION = Some(f);
 }
-
-type ReadyStateFunction = extern "C" fn(Dart_Handle) -> i32;
-static mut READY_STATE_FUNCTION: Option<ReadyStateFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__ready_state(
@@ -109,9 +123,6 @@ pub unsafe extern "C" fn register_MediaStreamTrack__ready_state(
 ) {
     READY_STATE_FUNCTION = Some(f);
 }
-
-type OnEndedFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut ON_ENDED_FUNCTION: Option<OnEndedFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamTrack__on_ended(

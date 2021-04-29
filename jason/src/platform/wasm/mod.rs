@@ -73,11 +73,7 @@ pub async fn delay_for(delay: Duration) {
 
 /// Returns property of JS object by name if its defined.
 /// Converts the value with a given predicate.
-fn get_property_by_name<T, F, U>(
-    value: &T,
-    name: &str,
-    into: F,
-) -> Option<U>
+fn get_property_by_name<T, F, U>(value: &T, name: &str, into: F) -> Option<U>
 where
     T: AsRef<wasm_bindgen::JsValue>,
     F: Fn(wasm_bindgen::JsValue) -> Option<U>,

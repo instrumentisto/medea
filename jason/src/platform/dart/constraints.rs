@@ -11,6 +11,18 @@ use crate::{
     platform::dart::utils::{handle::DartHandle, map::DartMap},
 };
 
+type NewFunction = extern "C" fn() -> Dart_Handle;
+
+type AudioFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
+type VideoFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
+static mut NEW_FUNCTION: Option<NewFunction> = None;
+
+static mut AUDIO_FUNCTION: Option<AudioFunction> = None;
+
+static mut VIDEO_FUNCTION: Option<VideoFunction> = None;
+
 pub struct MediaTrackConstraints(DartMap);
 
 impl Into<Dart_Handle> for MediaTrackConstraints {
@@ -19,16 +31,10 @@ impl Into<Dart_Handle> for MediaTrackConstraints {
     }
 }
 
-type NewFunction = extern "C" fn() -> Dart_Handle;
-static mut NEW_FUNCTION: Option<NewFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamConstraints__new(f: NewFunction) {
     NEW_FUNCTION = Some(f);
 }
-
-type AudioFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut AUDIO_FUNCTION: Option<AudioFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamConstraints__set_audio(
@@ -36,9 +42,6 @@ pub unsafe extern "C" fn register_MediaStreamConstraints__set_audio(
 ) {
     AUDIO_FUNCTION = Some(f);
 }
-
-type VideoFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut VIDEO_FUNCTION: Option<VideoFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaStreamConstraints__set_video(

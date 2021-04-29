@@ -4,7 +4,7 @@
 mod errors;
 
 pub mod component;
-#[cfg(feature = "dart")]
+#[cfg(all(target_os = "android"))]
 pub mod dart;
 mod resettable_delay;
 

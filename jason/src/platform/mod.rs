@@ -1,6 +1,6 @@
 //! Platform-specific functionality.
 
-#[cfg(feature = "dart")]
+#[cfg(all(target_os = "android"))]
 pub mod dart;
 pub mod peer_connection;
 pub mod rtc_stats;
@@ -31,7 +31,7 @@ pub use self::{
 //     transceiver::Transceiver,
 //     utils::{callback::Callback, callback::Function},
 // };
-#[cfg(feature = "dart")]
+#[cfg(all(target_os = "android"))]
 pub use self::dart::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     delay_for,
@@ -43,10 +43,7 @@ pub use self::dart::{
     transceiver::Transceiver,
     utils::{Callback, Function},
 };
-pub use self::wasm::{
-    error::Error,
-    rtc_stats::RtcStats,
-};
+pub use self::wasm::{error::Error, rtc_stats::RtcStats};
 
 #[cfg(feature = "mockable")]
 pub use self::transport::MockRpcTransport;

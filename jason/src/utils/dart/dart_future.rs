@@ -1,9 +1,6 @@
-use crate::platform::dart::{
-    error::{DartError},
-    utils::handle::DartHandle,
-};
+use crate::platform::dart::{error::DartError, utils::handle::DartHandle};
 use dart_sys::Dart_Handle;
-use futures::channel::{oneshot};
+use futures::channel::oneshot;
 use std::future::Future;
 
 pub struct DartFuture(oneshot::Sender<Result<DartHandle, DartError>>);

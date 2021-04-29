@@ -10,7 +10,9 @@ use crate::{
         dart::{
             transceiver::Transceiver,
             utils::{
-                callback_listener::{HandleMutCallback, IntCallback, TwoArgCallback},
+                callback_listener::{
+                    HandleMutCallback, IntCallback, TwoArgCallback,
+                },
                 handle::DartHandle,
                 ice_connection_from_int,
                 option::{DartIntOption, DartOption},
@@ -32,6 +34,64 @@ use super::{
 type Result<T> = std::result::Result<T, Traced<RtcPeerConnectionError>>;
 
 type IceConnectionStateFunction = extern "C" fn(Dart_Handle) -> i32;
+
+type OnConnectionStateChangeFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
+type ConnectionStateFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
+
+type RestartIceFunction = extern "C" fn(Dart_Handle);
+
+type RollbackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
+
+type OnTrackFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
+type OnIceCandidateFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
+type GetTransceiverByMid =
+    extern "C" fn(Dart_Handle, *const libc::c_char) -> DartOption;
+
+type GetTransceiverFunction =
+    extern "C" fn(Dart_Handle, *const libc::c_char, i32) -> Dart_Handle;
+type AddIceCandidateFunction =
+    extern "C" fn(Dart_Handle, Dart_Handle) -> Dart_Handle;
+
+type OnIceConnectionStateChangeFunction =
+    extern "C" fn(Dart_Handle, Dart_Handle);
+
+type SetLocalDescriptionFunction =
+    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
+
+static mut CONNECTION_STATE_FUNCTION: Option<ConnectionStateFunction> = None;
+
+static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
+
+static mut RESTART_ICE_FUNCTION: Option<RestartIceFunction> = None;
+
+static mut ROLLBACK_FUNCTION: Option<RollbackFunction> = None;
+
+static mut GET_TRANSCEIVER_FUNCTION: Option<GetTransceiverFunction> = None;
+
+static mut GET_TRANSCEIVER_BY_MID_FUNCTION: Option<GetTransceiverByMid> = None;
+
+static mut SET_LOCAL_DESCRIPTION_FUNCTION: Option<SetLocalDescriptionFunction> =
+    None;
+
+static mut SET_REMOTE_DESCRIPTION_FUNCTION: Option<
+    SetRemoteDescriptionFunction,
+> = None;
+
+static mut ON_TRACK_FUNCTION: Option<OnTrackFunction> = None;
+
+static mut ON_ICE_CANDIDATE_FUNCTION: Option<OnIceCandidateFunction> = None;
+
+static mut ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION: Option<
+    OnIceConnectionStateChangeFunction,
+> = None;
+
+static mut ON_CONNECTION_STATE_CHANGE_FUNCTION: Option<
+    OnConnectionStateChangeFunction,
+> = None;
+
 static mut ICE_CONNECTION_STATE_FUNCTION: Option<IceConnectionStateFunction> =
     None;
 
@@ -42,19 +102,12 @@ pub unsafe extern "C" fn register_RtcPeerConnection__ice_connection_state(
     ICE_CONNECTION_STATE_FUNCTION = Some(f);
 }
 
-type ConnectionStateFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
-static mut CONNECTION_STATE_FUNCTION: Option<ConnectionStateFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__connection_state(
     f: ConnectionStateFunction,
 ) {
     CONNECTION_STATE_FUNCTION = Some(f);
 }
-
-type AddIceCandidateFunction =
-    extern "C" fn(Dart_Handle, Dart_Handle) -> Dart_Handle;
-static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__add_ice_candidate(
@@ -63,18 +116,12 @@ pub unsafe extern "C" fn register_RtcPeerConnection__add_ice_candidate(
     ADD_ICE_CANDIDATE_FUNCTION = Some(f);
 }
 
-type RestartIceFunction = extern "C" fn(Dart_Handle);
-static mut RESTART_ICE_FUNCTION: Option<RestartIceFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__restart_ice(
     f: RestartIceFunction,
 ) {
     RESTART_ICE_FUNCTION = Some(f);
 }
-
-type RollbackFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
-static mut ROLLBACK_FUNCTION: Option<RollbackFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__rollback(
@@ -83,10 +130,6 @@ pub unsafe extern "C" fn register_RtcPeerConnection__rollback(
     ROLLBACK_FUNCTION = Some(f);
 }
 
-type GetTransceiverFunction =
-    extern "C" fn(Dart_Handle, *const libc::c_char, i32) -> Dart_Handle;
-static mut GET_TRANSCEIVER_FUNCTION: Option<GetTransceiverFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__get_transceiver(
     f: GetTransceiverFunction,
@@ -94,21 +137,12 @@ pub unsafe extern "C" fn register_RtcPeerConnection__get_transceiver(
     GET_TRANSCEIVER_FUNCTION = Some(f);
 }
 
-type GetTransceiverByMid =
-    extern "C" fn(Dart_Handle, *const libc::c_char) -> DartOption;
-static mut GET_TRANSCEIVER_BY_MID_FUNCTION: Option<GetTransceiverByMid> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__get_transceiver_by_mid(
     f: GetTransceiverByMid,
 ) {
     GET_TRANSCEIVER_BY_MID_FUNCTION = Some(f);
 }
-
-type SetLocalDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
-static mut SET_LOCAL_DESCRIPTION_FUNCTION: Option<SetLocalDescriptionFunction> =
-    None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__set_local_description(
@@ -119,9 +153,6 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_local_description(
 
 type SetRemoteDescriptionFunction =
     extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
-static mut SET_REMOTE_DESCRIPTION_FUNCTION: Option<
-    SetRemoteDescriptionFunction,
-> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__set_remote_description(
@@ -130,18 +161,12 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_remote_description(
     SET_REMOTE_DESCRIPTION_FUNCTION = Some(f);
 }
 
-type OnTrackFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut ON_TRACK_FUNCTION: Option<OnTrackFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__on_track(
     f: OnTrackFunction,
 ) {
     ON_TRACK_FUNCTION = Some(f);
 }
-
-type OnIceCandidateFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut ON_ICE_CANDIDATE_FUNCTION: Option<OnIceCandidateFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_candidate(
@@ -150,12 +175,6 @@ pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_candidate(
     ON_ICE_CANDIDATE_FUNCTION = Some(f);
 }
 
-type OnIceConnectionStateChangeFunction =
-    extern "C" fn(Dart_Handle, Dart_Handle);
-static mut ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION: Option<
-    OnIceConnectionStateChangeFunction,
-> = None;
-
 #[rustfmt::skip]
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_connection_state_change(
@@ -163,11 +182,6 @@ pub unsafe extern "C" fn register_RtcPeerConnection__on_ice_connection_state_cha
 ) {
     ON_ICE_CONNECTION_STATE_CHANGE_FUNCTION = Some(f);
 }
-
-type OnConnectionStateChangeFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut ON_CONNECTION_STATE_CHANGE_FUNCTION: Option<
-    OnConnectionStateChangeFunction,
-> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__on_connection_state_change(
@@ -336,9 +350,9 @@ impl RtcPeerConnection {
             .await
             .map_err(|_e| {
                 tracerr::new!(
-                    RtcPeerConnectionError::SetLocalDescriptionFailed(
-                        todo!("Error::from(e)")
-                    )
+                    RtcPeerConnectionError::SetLocalDescriptionFailed(todo!(
+                        "Error::from(e)"
+                    ))
                 )
             })?;
         }

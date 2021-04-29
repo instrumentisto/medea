@@ -6,7 +6,20 @@ use crate::{
 };
 
 type DeviceIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
+type LabelFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
+type GroupIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
+type KindFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
 static mut DEVICE_ID_FUNCTION: Option<DeviceIdFunction> = None;
+
+static mut LABEL_FUNCTION: Option<LabelFunction> = None;
+
+static mut GROUP_ID_FUNCTION: Option<GroupIdFunction> = None;
+
+static mut KIND_FUNCTION: Option<KindFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__device_id(
@@ -15,16 +28,10 @@ pub unsafe extern "C" fn register_InputDeviceInfo__device_id(
     DEVICE_ID_FUNCTION = Some(f);
 }
 
-type LabelFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
-static mut LABEL_FUNCTION: Option<LabelFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__label(f: LabelFunction) {
     LABEL_FUNCTION = Some(f);
 }
-
-type GroupIdFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
-static mut GROUP_ID_FUNCTION: Option<GroupIdFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
@@ -32,9 +39,6 @@ pub unsafe extern "C" fn register_InputDeviceInfo__group_id(
 ) {
     GROUP_ID_FUNCTION = Some(f);
 }
-
-type KindFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
-static mut KIND_FUNCTION: Option<KindFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_InputDeviceInfo__kind(f: KindFunction) {

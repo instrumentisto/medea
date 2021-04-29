@@ -20,23 +20,30 @@ use crate::{
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
 type NewFunction = extern "C" fn(*const libc::c_char) -> Dart_Handle;
+
+type SendFunction = extern "C" fn(Dart_Handle, *const libc::c_char);
+
+type CloseFunction = extern "C" fn(Dart_Handle, i32, *const libc::c_char);
+
+type OnMessageFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+
 static mut NEW_FUNCTION: Option<NewFunction> = None;
+
+static mut SEND_FUNCTION: Option<SendFunction> = None;
+
+static mut CLOSE_FUNCTION: Option<CloseFunction> = None;
+
+static mut ON_MESSAGE_FUNCTION: Option<OnMessageFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_WebSocketRpcTransport__new(f: NewFunction) {
     NEW_FUNCTION = Some(f);
 }
 
-type SendFunction = extern "C" fn(Dart_Handle, *const libc::c_char);
-static mut SEND_FUNCTION: Option<SendFunction> = None;
-
 #[no_mangle]
 pub unsafe extern "C" fn register_WebSocketRpcTransport__send(f: SendFunction) {
     SEND_FUNCTION = Some(f);
 }
-
-type CloseFunction = extern "C" fn(Dart_Handle, i32, *const libc::c_char);
-static mut CLOSE_FUNCTION: Option<CloseFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_WebSocketRpcTransport__close(
@@ -95,9 +102,6 @@ impl WebSocketRpcTransport {
         }
     }
 }
-
-type OnMessageFunction = extern "C" fn(Dart_Handle, Dart_Handle);
-static mut ON_MESSAGE_FUNCTION: Option<OnMessageFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_WebSocketRpcTransport__on_message(

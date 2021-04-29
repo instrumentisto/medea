@@ -13,7 +13,16 @@ use crate::{
 };
 
 type EnumerateDevicesFunction = extern "C" fn() -> Dart_Handle;
+
+type GetUserMediaFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
+
+type GetDisplayMediaFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
+
 static mut ENUMERATE_DEVICES_FUNCTION: Option<EnumerateDevicesFunction> = None;
+
+static mut GET_USER_MEDIA_FUNCTION: Option<GetUserMediaFunction> = None;
+
+static mut GET_DISPLAY_MEDIA_FUNCTION: Option<GetDisplayMediaFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaDevices__enumerate_devices(
@@ -30,9 +39,6 @@ pub async fn enumerate_devices(
             .unwrap();
     Ok(DartList::from(devices).into())
 }
-
-type GetUserMediaFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
-static mut GET_USER_MEDIA_FUNCTION: Option<GetUserMediaFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaDevices__get_user_media(
@@ -51,9 +57,6 @@ pub async fn get_user_media(
     .unwrap();
     Ok(DartList::from(tracks).into())
 }
-
-type GetDisplayMediaFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
-static mut GET_DISPLAY_MEDIA_FUNCTION: Option<GetDisplayMediaFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_MediaDevices__get_display_media(

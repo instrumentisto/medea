@@ -10,10 +10,9 @@ use crate::{
             handle::DartHandle,
             option::{DartOption, DartStringOption},
         },
-        TransceiverDirection,
+        MediaStreamTrack, TransceiverDirection,
     },
 };
-use crate::platform::MediaStreamTrack;
 use medea_client_api_proto::MediaSourceKind;
 
 #[derive(Clone, Debug)]
@@ -129,7 +128,6 @@ pub unsafe extern "C" fn register_Transceiver__set_direction(
     SET_DIRECTION_FUNCTION = Some(f);
 }
 
-
 impl Transceiver {
     pub fn current_direction(&self) -> TransceiverDirection {
         unsafe {
@@ -139,7 +137,10 @@ impl Transceiver {
 
     fn set_direction(&self, direction: TransceiverDirection) {
         unsafe {
-            SET_DIRECTION_FUNCTION.unwrap()(self.transceiver.get(), direction.into())
+            SET_DIRECTION_FUNCTION.unwrap()(
+                self.transceiver.get(),
+                direction.into(),
+            )
         }
     }
 
@@ -166,7 +167,9 @@ impl Transceiver {
     ) -> Result<(), platform::Error> {
         // TODO: check this
         unsafe {
-            if let Some(sender) = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into() {
+            if let Some(sender) =
+                GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into()
+            {
                 REPLACE_TRACK_FUNCTION.unwrap()(
                     sender,
                     new_sender.platform_track().track(),
@@ -181,7 +184,9 @@ impl Transceiver {
     pub fn drop_send_track(&self) -> impl Future<Output = ()> {
         // TODO: check this
         unsafe {
-            if let Some(sender) = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into() {
+            if let Some(sender) =
+                GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into()
+            {
                 DROP_SENDER_FUNCTION.unwrap()(sender);
             }
         }
@@ -191,7 +196,9 @@ impl Transceiver {
     pub fn set_send_track_enabled(&self, enabled: bool) {
         // TODO: check this
         unsafe {
-            if let Some(sender) = GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into() {
+            if let Some(sender) =
+                GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into()
+            {
                 SET_SEND_TRACK_ENABLED_FUNCTION.unwrap()(sender, enabled);
             }
         }
@@ -210,13 +217,14 @@ impl Transceiver {
         let handle: Dart_Handle = unsafe {
             Option::from(SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()))
         }?;
-        Some(Rc::new(local::Track::new(MediaStreamTrack::from(handle), MediaSourceKind::Device)))
+        Some(Rc::new(local::Track::new(
+            MediaStreamTrack::from(handle),
+            MediaSourceKind::Device,
+        )))
     }
 
     pub fn has_send_track(&self) -> bool {
         // TODO: check this
-        unsafe {
-            HAS_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()) == 1
-        }
+        unsafe { HAS_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()) == 1 }
     }
 }

@@ -2,11 +2,13 @@ use dart_sys::{Dart_Handle, Dart_HandleFromPersistent};
 use derive_more::From;
 use libc::c_char;
 
-use crate::platform::dart::utils::option::{DartOption, DartStringOption, DartIntOption};
-use crate::utils::dart::into_dart_string;
-use crate::platform::dart::utils::nullable::{NullableChar, NullableInt};
 use crate::{
-    platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,
+    platform::dart::utils::{
+        handle::DartHandle,
+        nullable::{NullableChar, NullableInt},
+        option::{DartIntOption, DartOption, DartStringOption},
+    },
+    utils::dart::{from_dart_string, into_dart_string},
 };
 
 #[derive(From)]
@@ -46,7 +48,8 @@ pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {
     SDP_MID_FUNCTION = Some(f);
 }
 
-type NewFunction = extern "C" fn(NullableChar, NullableChar, NullableInt) -> Dart_Handle;
+type NewFunction =
+    extern "C" fn(NullableChar, NullableChar, NullableInt) -> Dart_Handle;
 static mut NEW_FUNCTION: Option<NewFunction> = None;
 
 #[no_mangle]
@@ -61,7 +64,11 @@ impl IceCandidate {
         sdp_mid: &Option<String>,
     ) -> Self {
         let handle = unsafe {
-            NEW_FUNCTION.unwrap()(Some(candidate.to_string()).into(), sdp_mid.clone().into(), sdp_m_line_index.into())
+            NEW_FUNCTION.unwrap()(
+                Some(candidate.to_string()).into(),
+                sdp_mid.clone().into(),
+                sdp_m_line_index.into(),
+            )
         };
         Self(DartHandle::new(handle))
     }
@@ -71,19 +78,20 @@ impl IceCandidate {
     }
 
     pub fn candidate(&self) -> String {
-        unsafe { Option::from(CANDIDATE_FUNCTION.unwrap()(self.0.get())).unwrap() }
+        unsafe {
+            Option::from(CANDIDATE_FUNCTION.unwrap()(self.0.get())).unwrap()
+        }
     }
 
     pub fn sdp_m_line_index(&self) -> Option<u16> {
         unsafe {
-            let index: Option<i32> = SDP_M_LINE_INDEX_FUNCTION.unwrap()(self.0.get()).into();
+            let index: Option<i32> =
+                SDP_M_LINE_INDEX_FUNCTION.unwrap()(self.0.get()).into();
             index.map(|i| i as u16)
         }
     }
 
     pub fn sdp_mid(&self) -> Option<String> {
-        unsafe {
-            SDP_MID_FUNCTION.unwrap()(self.0.get()).into()
-        }
+        unsafe { SDP_MID_FUNCTION.unwrap()(self.0.get()).into() }
     }
 }

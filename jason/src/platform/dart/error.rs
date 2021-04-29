@@ -3,7 +3,7 @@ use derive_more::Display;
 use crate::{
     platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,
 };
-use dart_sys::{Dart_Handle};
+use dart_sys::Dart_Handle;
 
 /// Wrapper for Dart value which returned from Dart side as error.
 #[derive(Clone, Debug, Display, PartialEq)]

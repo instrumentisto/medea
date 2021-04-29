@@ -17,8 +17,7 @@ use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 use crate::api::dart_ffi::ForeignClass;
 
 use dart_sys::{
-    Dart_HandleFromPersistent,
-    Dart_DeletePersistentHandle,
+    Dart_DeletePersistentHandle, Dart_HandleFromPersistent,
     Dart_NewPersistentHandle,
 };
 
@@ -132,8 +131,7 @@ impl Function<()> {
     /// Calls underlying Dart closure.
     pub fn call0(&self) {
         unsafe {
-            let fn_handle =
-                Dart_HandleFromPersistent(self.dart_fn);
+            let fn_handle = Dart_HandleFromPersistent(self.dart_fn);
             NO_ARGS_FN_CALLER.unwrap()(fn_handle);
         }
     }
@@ -143,8 +141,7 @@ impl<T: ForeignClass> Function<T> {
     /// Calls underlying Dart closure with provided [`ForeignClass`] argument.
     pub fn call1(&self, arg: T) {
         unsafe {
-            let fn_handle =
-                Dart_HandleFromPersistent(self.dart_fn);
+            let fn_handle = Dart_HandleFromPersistent(self.dart_fn);
             PTR_ARG_FN_CALLER.unwrap()(fn_handle, arg.into_ptr().cast::<()>());
         }
     }
@@ -158,8 +155,7 @@ macro_rules! impl_dart_closure_for_int {
             /// Calls underlying Dart closure with provided argument.
             pub fn call1(&self, arg: $arg) {
                 unsafe {
-                    let fn_handle =
-                        Dart_HandleFromPersistent(self.dart_fn);
+                    let fn_handle = Dart_HandleFromPersistent(self.dart_fn);
                     INT_ARG_FN_CALLER.unwrap()(fn_handle, arg as i64);
                 }
             }
