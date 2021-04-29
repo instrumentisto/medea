@@ -8,6 +8,8 @@
     clippy::new_without_default
 )]
 
+use std::ptr::NonNull;
+
 pub mod audio_track_constraints;
 pub mod connection_handle;
 pub mod device_video_track_constraints;
@@ -36,11 +38,11 @@ pub trait ForeignClass {
     }
 
     /// Constructs `Self` from a raw pointer via [`Box::from_raw`].
-    unsafe fn from_ptr(this: *mut Self) -> Self
+    unsafe fn from_ptr(this: NonNull<Self>) -> Self
     where
         Self: Sized,
     {
-        *Box::from_raw(this)
+        *Box::from_raw(this.as_ptr())
     }
 }
 

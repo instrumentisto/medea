@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use dart_sys::Dart_Handle;
 
 use crate::{
@@ -34,41 +36,43 @@ impl ConnectionHandle {
 
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_close(
-    this: *const ConnectionHandle,
+    this: NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_close(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
-    this: *const ConnectionHandle,
+    this: NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_remote_track_added(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
-    this: *const ConnectionHandle,
+    this: NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_quality_score_update(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
-    this: *const ConnectionHandle,
+    this: NonNull<ConnectionHandle>,
 ) -> *const libc::c_char {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     string_into_c_str(this.get_remote_member_id())
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
+pub unsafe extern "C" fn ConnectionHandle__free(
+    this: NonNull<ConnectionHandle>,
+) {
     ConnectionHandle::from_ptr(this);
 }

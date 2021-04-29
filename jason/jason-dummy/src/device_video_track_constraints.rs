@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, ptr::NonNull};
 
 use crate::{utils::c_str_into_string, ForeignClass};
 
@@ -59,99 +59,99 @@ pub extern "C" fn DeviceVideoTrackConstraints__new(
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     device_id: *const libc::c_char,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.device_id(c_str_into_string(device_id));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_facing_mode(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     facing_mode: u8,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.exact_facing_mode(FacingMode::try_from(facing_mode).unwrap());
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_facing_mode(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     facing_mode: u8,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.ideal_facing_mode(FacingMode::try_from(facing_mode).unwrap());
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     height: u32,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.exact_height(height);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     height: u32,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.ideal_height(height);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     min: u32,
     max: u32,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.height_in_range(min, max);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     width: u32,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.exact_width(width);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     width: u32,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.ideal_width(width);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<DeviceVideoTrackConstraints>,
     min: u32,
     max: u32,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.width_in_range(min, max);
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__free(
-    this: *mut DeviceVideoTrackConstraints,
+    this: NonNull<DeviceVideoTrackConstraints>,
 ) {
     DeviceVideoTrackConstraints::from_ptr(this);
 }

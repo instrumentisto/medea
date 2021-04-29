@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use crate::{
     input_device_info::InputDeviceInfo, local_media_track::LocalMediaTrack,
     media_stream_settings::MediaStreamSettings, utils::PtrArray, ForeignClass,
@@ -24,27 +26,27 @@ impl MediaManagerHandle {
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
-    this: *const MediaManagerHandle,
-    caps: *const MediaStreamSettings,
+    this: NonNull<MediaManagerHandle>,
+    caps: NonNull<MediaStreamSettings>,
 ) -> PtrArray<LocalMediaTrack> {
-    let this = this.as_ref().unwrap();
-    let caps = caps.as_ref().unwrap();
+    let this = this.as_ref();
+    let caps = caps.as_ref();
 
     PtrArray::new(this.init_local_tracks(caps))
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
-    this: *const MediaManagerHandle,
+    this: NonNull<MediaManagerHandle>,
 ) -> PtrArray<InputDeviceInfo> {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     PtrArray::new(this.enumerate_devices())
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__free(
-    this: *mut MediaManagerHandle,
+    this: NonNull<MediaManagerHandle>,
 ) {
     MediaManagerHandle::from_ptr(this);
 }

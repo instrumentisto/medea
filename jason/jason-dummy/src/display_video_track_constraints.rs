@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use crate::ForeignClass;
 
 pub struct DisplayVideoTrackConstraints;
@@ -18,7 +20,7 @@ pub extern "C" fn DisplayVideoTrackConstraints__new(
 
 #[no_mangle]
 pub unsafe extern "C" fn DisplayVideoTrackConstraints__free(
-    this: *mut DisplayVideoTrackConstraints,
+    this: NonNull<DisplayVideoTrackConstraints>,
 ) {
     DisplayVideoTrackConstraints::from_ptr(this);
 }

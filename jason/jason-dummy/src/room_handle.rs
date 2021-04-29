@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use dart_sys::Dart_Handle;
 
 use crate::{
@@ -58,41 +60,41 @@ impl RoomHandle {
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_new_connection(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_new_connection(DartClosure::new(cb));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_close(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_close(DartClosure::new(cb));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_local_track(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_local_track(DartClosure::new(cb));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_connection_loss(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_connection_loss(DartClosure::new(cb));
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
+pub unsafe extern "C" fn RoomHandle__free(this: NonNull<RoomHandle>) {
     RoomHandle::from_ptr(this);
 }

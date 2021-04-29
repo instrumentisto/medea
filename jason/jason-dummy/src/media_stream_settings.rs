@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use crate::{
     audio_track_constraints::AudioTrackConstraints,
     device_video_track_constraints::DeviceVideoTrackConstraints,
@@ -28,37 +30,37 @@ pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__audio(
-    this: *mut MediaStreamSettings,
-    constraints: *mut AudioTrackConstraints,
+    mut this: NonNull<MediaStreamSettings>,
+    constraints: NonNull<AudioTrackConstraints>,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.audio(AudioTrackConstraints::from_ptr(constraints));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__device_video(
-    this: *mut MediaStreamSettings,
-    constraints: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<MediaStreamSettings>,
+    constraints: NonNull<DeviceVideoTrackConstraints>,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.device_video(DeviceVideoTrackConstraints::from_ptr(constraints));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__display_video(
-    this: *mut MediaStreamSettings,
-    constraints: *mut DisplayVideoTrackConstraints,
+    mut this: NonNull<MediaStreamSettings>,
+    constraints: NonNull<DisplayVideoTrackConstraints>,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.display_video(DisplayVideoTrackConstraints::from_ptr(constraints));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__free(
-    this: *mut MediaStreamSettings,
+    this: NonNull<MediaStreamSettings>,
 ) {
     MediaStreamSettings::from_ptr(this);
 }

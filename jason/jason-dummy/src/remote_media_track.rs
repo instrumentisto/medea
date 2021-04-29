@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use dart_sys::Dart_Handle;
 
 use crate::{utils::DartClosure, ForeignClass, MediaKind, MediaSourceKind};
@@ -48,86 +50,88 @@ impl RemoteMediaTrack {
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_enabled(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_enabled(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_disabled(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_disabled(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_muted(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_muted(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_unmuted(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_unmuted(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_stopped(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
     this.on_stopped(DartClosure::new(f));
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__enabled(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.enabled() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__muted(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.muted() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__kind(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
-    this: *const RemoteMediaTrack,
+    this: NonNull<RemoteMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.media_source_kind() as u8
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn RemoteMediaTrack__free(this: *mut RemoteMediaTrack) {
+pub unsafe extern "C" fn RemoteMediaTrack__free(
+    this: NonNull<RemoteMediaTrack>,
+) {
     RemoteMediaTrack::from_ptr(this);
 }

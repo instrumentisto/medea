@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use crate::{ForeignClass, MediaKind, MediaSourceKind};
 
 pub struct LocalMediaTrack;
@@ -18,23 +20,23 @@ impl LocalMediaTrack {
 
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__kind(
-    this: *const LocalMediaTrack,
+    this: NonNull<LocalMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.kind() as u8
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
-    this: *const LocalMediaTrack,
+    this: NonNull<LocalMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.media_source_kind() as u8
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn LocalMediaTrack__free(this: *mut LocalMediaTrack) {
+pub unsafe extern "C" fn LocalMediaTrack__free(this: NonNull<LocalMediaTrack>) {
     LocalMediaTrack::from_ptr(this);
 }

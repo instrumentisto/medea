@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use crate::ForeignClass;
 
 pub struct ReconnectHandle;
@@ -12,6 +14,6 @@ impl ReconnectHandle {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
+pub unsafe extern "C" fn ReconnectHandle__free(this: NonNull<ReconnectHandle>) {
     ReconnectHandle::from_ptr(this);
 }
