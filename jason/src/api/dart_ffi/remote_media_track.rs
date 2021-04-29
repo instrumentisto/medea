@@ -11,7 +11,7 @@ pub use crate::media::track::remote::Track as RemoteMediaTrack;
 
 impl ForeignClass for RemoteMediaTrack {}
 
-/// Sets callback, invoked when this [`Track`] is enabled.
+/// Sets callback, invoked when this [`RemoteMediaTrack`] is enabled.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_enabled(
     this: *const RemoteMediaTrack,
@@ -21,7 +21,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_enabled(
     this.on_enabled(platform::Function::new(f));
 }
 
-/// Sets callback, invoked when this [`Track`] is disabled.
+/// Sets callback, invoked when this [`RemoteMediaTrack`] is disabled.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_disabled(
     this: *const RemoteMediaTrack,
@@ -31,7 +31,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_disabled(
     this.on_disabled(platform::Function::new(f));
 }
 
-/// Sets callback to invoke when this [`Track`] is muted.
+/// Sets callback to invoke when this [`RemoteMediaTrack`] is muted.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_muted(
     this: *const RemoteMediaTrack,
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_muted(
     this.on_muted(platform::Function::new(f));
 }
 
-/// Sets callback to invoke when this [`Track`] is unmuted.
+/// Sets callback to invoke when this [`RemoteMediaTrack`] is unmuted.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_unmuted(
     this: *const RemoteMediaTrack,
@@ -51,7 +51,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_unmuted(
     this.on_unmuted(platform::Function::new(f));
 }
 
-/// Sets callback to invoke when this [`Track`] is stopped.
+/// Sets callback to invoke when this [`RemoteMediaTrack`] is stopped.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_stopped(
     this: *const RemoteMediaTrack,
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__on_stopped(
     this.on_stopped(platform::Function::new(f));
 }
 
-/// Indicates whether this [`Track`] is enabled.
+/// Indicates whether this [`RemoteMediaTrack`] is enabled.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__enabled(
     this: *const RemoteMediaTrack,
@@ -71,7 +71,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__enabled(
     this.enabled() as u8
 }
 
-/// Indicate whether this [`Track`] is muted.
+/// Indicate whether this [`RemoteMediaTrack`] is muted.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__muted(
     this: *const RemoteMediaTrack,
@@ -81,7 +81,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__muted(
     this.muted() as u8
 }
 
-/// Returns this [`Track`]'s kind (audio/video).
+/// Returns this [`RemoteMediaTrack`]'s kind (audio/video).
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__kind(
     this: *const RemoteMediaTrack,
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__kind(
     this.kind() as u8
 }
 
-/// Returns this [`Track`]'s media source kind.
+/// Returns this [`RemoteMediaTrack`]'s media source kind.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
     this: *const RemoteMediaTrack,

@@ -1,10 +1,11 @@
 //! Media tracks and streams constraints functionality.
 
+use derive_more::{AsRef, Into};
+
 use crate::media::{
     AudioTrackConstraints, DeviceVideoTrackConstraints,
     DisplayVideoTrackConstraints,
 };
-use derive_more::{AsRef, Into};
 
 /// [MediaStreamConstraints][1] wrapper.
 ///
@@ -13,7 +14,8 @@ use derive_more::{AsRef, Into};
 pub struct MediaStreamConstraints;
 
 impl MediaStreamConstraints {
-    /// Creates new [`MediaStreamConstraints`] with none constraints configured.
+    /// Creates a new [`MediaStreamConstraints`] with none constraints
+    /// configured.
     #[inline]
     #[must_use]
     pub fn new() -> Self {

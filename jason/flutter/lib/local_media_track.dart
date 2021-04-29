@@ -28,22 +28,22 @@ final _free = dl.lookupFunction<_free_C, _free_Dart>('LocalMediaTrack__free');
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 class LocalMediaTrack {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   late NullablePointer ptr;
 
-  /// Constructs new [LocalMediaTrack] backed by Rust object behind provided
-  /// [Pointer].
+  /// Constructs a new [LocalMediaTrack] backed by the Rust object behind the
+  /// provided [Pointer].
   LocalMediaTrack(this.ptr);
 
-  /// Returns a [MediaKind.Audio] if this [LocalMediaTrack] represents an
-  /// audio track, or a [MediaKind.Video] if it represents a video track.
+  /// Returns the [MediaKind.Audio] if this [LocalMediaTrack] represents an
+  /// audio track, or the [MediaKind.Video] if it represents a video track.
   MediaKind kind() {
     var index = _kind(ptr.getInnerPtr());
     return MediaKind.values[index];
   }
 
-  /// Returns a [MediaSourceKind.Device] if this [LocalMediaTrack] is sourced
-  /// from some device (webcam/microphone), or a [MediaSourceKind.Display]
+  /// Returns the [MediaSourceKind.Device] if this [LocalMediaTrack] is sourced
+  /// from some device (webcam/microphone), or the [MediaSourceKind.Display]
   /// if it's captured via [MediaDevices.getDisplayMedia()][1].
   ///
   /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
@@ -52,7 +52,8 @@ class LocalMediaTrack {
     return MediaSourceKind.values[index];
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   ///
   /// Note that this is a strong reference, so freeing it will stop underlying
   /// track if there are no other strong references (it is not used in local

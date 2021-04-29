@@ -14,7 +14,7 @@ use std::{cell::RefCell, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::dart_ffi::ForeignClass;
+use crate::api::ForeignClass;
 
 use super::dart_api::{
     Dart_DeletePersistentHandle_DL_Trampolined,
@@ -43,7 +43,7 @@ static mut NO_ARGS_FN_CALLER: Option<UnitArgFnCaller> = None;
 static mut INT_ARG_FN_CALLER: Option<IntArgFnCaller> = None;
 
 /// Registers the provided [`PointerArgFnCaller`] as [`PTR_ARG_FN_CALLER`]. Must
-/// be called by dart during FFI initialization.
+/// be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_ptr_arg_fn_caller(
     caller: PointerArgFnCaller,
@@ -52,14 +52,14 @@ pub unsafe extern "C" fn register_ptr_arg_fn_caller(
 }
 
 /// Registers the provided [`UnitArgFnCaller`] as [`NO_ARGS_FN_CALLER`]. Must be
-/// called by dart during FFI initialization.
+/// called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_no_args_fn_caller(f: UnitArgFnCaller) {
     NO_ARGS_FN_CALLER = Some(f)
 }
 
 /// Registers the provided [`IntArgFnCaller`] as [`INT_ARG_FN_CALLER`]. Must be
-/// called by dart during FFI initialization.
+/// called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
@@ -69,13 +69,13 @@ pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
 pub struct Callback<A>(RefCell<Option<Function<A>>>);
 
 impl<A> Callback<A> {
-    /// Sets the inner [`Function`] function.
+    /// Sets the inner [`Function`].
     #[inline]
     pub fn set_func(&self, f: Function<A>) {
         self.0.borrow_mut().replace(f);
     }
 
-    /// Indicates whether this [`Callback`] is set.
+    /// Indicates whether this [`Callback`]'s inner [`Function`] is set.
     #[inline]
     #[must_use]
     pub fn is_set(&self) -> bool {
@@ -84,7 +84,7 @@ impl<A> Callback<A> {
 }
 
 impl Callback<()> {
-    /// Invokes underlying [`Function`] (if any) passing no arguments to it.
+    /// Invokes the underlying [`Function`] (if any) passing no arguments to it.
     #[inline]
     pub fn call0(&self) {
         if let Some(f) = self.0.borrow().as_ref() {
@@ -101,7 +101,7 @@ impl<A> Default for Callback<A> {
 }
 
 impl<A> Callback<A> {
-    /// Invokes underlying [`Function`] (if any) passing the single provided
+    /// Invokes the underlying [`Function`] (if any) passing the single provided
     /// argument to it.
     #[inline]
     pub fn call1<T>(&self, arg: T) {
@@ -117,7 +117,7 @@ pub struct Function<T> {
 }
 
 impl<T> Function<T> {
-    /// Creates new [`DartClosure`] from the provided [`Dart_Handle`] to the
+    /// Creates a new [`Function`] from the provided [`Dart_Handle`] to the
     /// Dart closure. Persists the provided [`Dart_Handle`] so it wont be moved
     /// by the Dart VM GC.
     pub fn new(cb: Dart_Handle) -> Self {
@@ -129,7 +129,7 @@ impl<T> Function<T> {
 }
 
 impl Function<()> {
-    /// Calls underlying Dart closure.
+    /// Calls the underlying Dart closure.
     pub fn call0(&self) {
         unsafe {
             let fn_handle =

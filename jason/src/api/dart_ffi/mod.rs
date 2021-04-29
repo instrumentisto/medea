@@ -3,16 +3,8 @@
 //!
 //! [`Jason`]: crate::api::Jason
 
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::unused_self,
-    clippy::needless_pass_by_value,
-    clippy::missing_safety_doc,
-    clippy::must_use_candidate,
-    clippy::missing_panics_doc,
-    clippy::new_without_default,
-    missing_docs
-)]
+// TODO: Improve documentation in this module.
+#![allow(clippy::missing_safety_doc, clippy::missing_panics_doc, missing_docs)]
 
 pub mod audio_track_constraints;
 pub mod connection_handle;
@@ -22,7 +14,7 @@ pub mod input_device_info;
 pub mod jason;
 pub mod jason_error;
 pub mod local_media_track;
-pub mod media_manager;
+pub mod media_manager_handle;
 pub mod media_stream_settings;
 pub mod reconnect_handle;
 pub mod remote_media_track;
@@ -30,6 +22,19 @@ pub mod room_close_reason;
 pub mod room_handle;
 mod unimplemented;
 pub mod utils;
+
+pub use self::{
+    audio_track_constraints::AudioTrackConstraints,
+    connection_handle::ConnectionHandle,
+    device_video_track_constraints::DeviceVideoTrackConstraints,
+    display_video_track_constraints::DisplayVideoTrackConstraints,
+    input_device_info::InputDeviceInfo, jason::Jason, jason_error::JasonError,
+    local_media_track::LocalMediaTrack,
+    media_manager_handle::MediaManagerHandle,
+    media_stream_settings::MediaStreamSettings,
+    reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
+    room_close_reason::RoomCloseReason, room_handle::RoomHandle,
+};
 
 /// Rust structure that has wrapper class in Dart. Such structures are passed
 /// through FFI boundaries as thin pointers.

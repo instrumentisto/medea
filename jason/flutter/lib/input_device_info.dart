@@ -36,15 +36,15 @@ final _deviceId = dl
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('InputDeviceInfo__free');
 
-/// Representation of [MediaDeviceInfo][1].
+/// Implementation of the [MediaDeviceInfo][1] interface.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 class InputDeviceInfo {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   late NullablePointer ptr;
 
-  /// Constructs new [InputDeviceInfo] backed by Rust object behind provided
-  /// [Pointer].
+  /// Constructs a new [InputDeviceInfo] backed by the Rust object behind the
+  /// provided [Pointer].
   InputDeviceInfo(this.ptr);
 
   /// Returns unique identifier for the represented device.
@@ -69,7 +69,7 @@ class InputDeviceInfo {
     return MediaKind.values[index];
   }
 
-  /// Returns group identifier of the represented device.
+  /// Returns the group identifier of the represented device.
   ///
   /// Two devices have the same group identifier if they belong to the same
   /// physical device. For example, the audio input and output devices
@@ -81,7 +81,8 @@ class InputDeviceInfo {
     return _nativeGroupId(ptr.getInnerPtr()).nativeStringToDartString();
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

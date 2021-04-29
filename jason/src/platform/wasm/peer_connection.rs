@@ -24,9 +24,10 @@ use web_sys::{
 use crate::{
     media::{MediaKind, TrackConstraints},
     platform::{
-        self, get_property_by_name, wasm::utils::EventListener, IceCandidate,
-        MediaStreamTrack, RtcPeerConnectionError, RtcStats, SdpType,
-        Transceiver, TransceiverDirection,
+        self,
+        wasm::{get_property_by_name, utils::EventListener},
+        IceCandidate, MediaStreamTrack, RtcPeerConnectionError, RtcStats,
+        SdpType, Transceiver, TransceiverDirection,
     },
 };
 

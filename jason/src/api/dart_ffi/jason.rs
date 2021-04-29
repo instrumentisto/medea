@@ -1,5 +1,6 @@
 use super::{
-    media_manager::MediaManagerHandle, room_handle::RoomHandle, ForeignClass,
+    media_manager_handle::MediaManagerHandle, room_handle::RoomHandle,
+    ForeignClass,
 };
 
 #[cfg(feature = "mockable")]
@@ -16,6 +17,8 @@ pub extern "C" fn Jason__new() -> *const Jason {
 }
 
 /// Creates a new [`Room`] and returns its [`RoomHandle`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn Jason__init_room(
     this: *const Jason,

@@ -37,7 +37,7 @@ impl RtcPeerConnection {
     /// # Errors
     ///
     /// Errors with [`RtcPeerConnectionError::PeerCreationError`] if
-    /// [`SysRtcPeerConnection`] creation fails.
+    /// [`RtcPeerConnection`] creation fails.
     pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
@@ -60,8 +60,7 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Sets handler for a [`RtcTrackEvent`] (see [RTCTrackEvent][1] and
-    /// [`ontrack` callback][2]).
+    /// Sets handler for a [RTCTrackEvent][1] (see [`ontrack` callback][2]).
     ///
     /// [1]: https://w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
@@ -72,8 +71,8 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Sets handler for a [`RtcPeerConnectionIceEvent`] (see
-    /// [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
+    /// Sets handler for a [RTCPeerConnectionIceEvent][1] (see
+    /// [`onicecandidate` callback][2]).
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
@@ -84,7 +83,7 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Returns [`RtcIceConnectionState`] of this [`RtcPeerConnection`].
+    /// Returns [`IceConnectionState`] of this [`RtcPeerConnection`].
     #[inline]
     #[must_use]
     pub fn ice_connection_state(&self) -> IceConnectionState {
@@ -174,8 +173,7 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`].
+    /// Obtains [SDP answer][`SdpType::Answer`] from the [`RtcPeerConnection`].
     ///
     /// Should be called whenever remote description has been changed.
     ///
@@ -189,8 +187,7 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Rollbacks the underlying [RTCPeerConnection][`SysRtcPeerConnection`] to
-    /// the previous stable state.
+    /// Rollbacks the [`RtcPeerConnection`] to the previous stable state.
     ///
     /// # Errors
     ///
@@ -202,8 +199,7 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
-    /// [RTCPeerConnection][`SysRtcPeerConnection`].
+    /// Obtains [SDP offer][`SdpType::Offer`] from the [`RtcPeerConnection`].
     ///
     /// Should be called after local tracks changes, which require
     /// (re)negotiation.
@@ -218,9 +214,9 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Instructs the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
-    /// to apply the supplied [SDP][`SdpType`] as the remote
-    /// [offer][`SdpType::Offer`] or [answer][`SdpType::Answer`].
+    /// Instructs the [`RtcPeerConnection`] to apply the supplied
+    /// [SDP][`SdpType`] as the remote [offer][`SdpType::Offer`] or
+    /// [answer][`SdpType::Answer`].
     ///
     /// Changes the local media state.
     ///
@@ -234,8 +230,8 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Creates new [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1])
-    /// and adds it to the [set of this RTCPeerConnection's transceivers][2].
+    /// Creates a new [`Transceiver`] (see [RTCRtpTransceiver][1]) and adds it
+    /// to the [set of this RTCPeerConnection's transceivers][2].
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
@@ -248,7 +244,7 @@ impl RtcPeerConnection {
         unimplemented!()
     }
 
-    /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
+    /// Returns [`Transceiver`] (see [RTCRtpTransceiver][1]) from a
     /// [set of this RTCPeerConnection's transceivers][2] by provided `mid`.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver

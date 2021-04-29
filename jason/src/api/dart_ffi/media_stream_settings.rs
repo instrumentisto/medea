@@ -15,8 +15,9 @@ pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
     MediaStreamSettings::new().into_ptr()
 }
 
-/// Specifies the nature and settings of the audio
-/// [`platform::MediaStreamTrack`].
+/// Specifies the nature and settings of the audio [`MediaStreamTrack`].
+///
+/// [`MediaStreamTrack`]: crate::platform::MediaStreamTrack
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__audio(
     this: *mut MediaStreamSettings,

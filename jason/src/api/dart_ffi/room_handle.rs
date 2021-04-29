@@ -11,6 +11,8 @@ impl ForeignClass for RoomHandle {}
 
 /// Sets callback, invoked when a new [`Connection`] with some remote `Peer`
 /// is established.
+///
+/// [`Connection`]: crate::connection::Connection
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_new_connection(
     this: *mut RoomHandle,
@@ -25,6 +27,9 @@ pub unsafe extern "C" fn RoomHandle__on_new_connection(
 
 /// Sets callback, invoked on this [`Room`] close, providing a
 /// [`RoomCloseReason`].
+///
+/// [`Room`]: crate::room::Room
+/// [`RoomCloseReason`]: crate::room::RoomCloseReason
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_close(
     this: *mut RoomHandle,
@@ -37,13 +42,17 @@ pub unsafe extern "C" fn RoomHandle__on_close(
     this.on_close(platform::Function::new(cb)).unwrap();
 }
 
-/// Sets callback, invoked when a new [`local::Track`] is added to this
+/// Sets callback, invoked when a new [`LocalMediaTrack`] is added to this
 /// [`Room`].
 ///
 /// This might happen in such cases:
 /// 1. Media server initiates a media request.
 /// 2. `enable_audio`/`enable_video` is called.
 /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
+///
+/// [`Room`]: crate::room::Room
+/// [`MediaStreamSettings`]: crate::media::MediaStreamSettings
+/// [`LocalMediaTrack`]: crate::media::track::local::LocalMediaTrack
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_local_track(
     this: *mut RoomHandle,

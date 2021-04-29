@@ -40,12 +40,13 @@ final _onConnectionLoss =
     dl.lookupFunction<_onConnectionLoss_C, _onConnectionLoss_Dart>(
         'RoomHandle__on_connection_loss');
 
+/// Handle to a `Room`.
 class RoomHandle {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   late NullablePointer ptr;
 
-  /// Constructs new [RoomHandle] backed by Rust object behind provided
-  /// [Pointer].
+  /// Constructs a new [RoomHandle] backed by the Rust object behind the
+  /// provided [Pointer].
   RoomHandle(this.ptr);
 
   /// Sets callback, invoked when a new `Connection` with some remote `Peer`
@@ -86,7 +87,8 @@ class RoomHandle {
     });
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

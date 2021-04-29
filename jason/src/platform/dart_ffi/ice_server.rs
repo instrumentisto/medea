@@ -4,7 +4,7 @@
 
 use medea_client_api_proto::IceServer;
 
-/// Collection of [`RtcIceServer`]s (see [RTCIceServer][1]).
+/// Collection of [RTCIceServer][1]s.
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtciceserver-dictionary
 #[derive(Debug)]

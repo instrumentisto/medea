@@ -16,12 +16,13 @@ final _new =
 final _free_Dart _free = dl
     .lookupFunction<_free_C, _free_Dart>('DisplayVideoTrackConstraints__free');
 
-/// Constraints applicable to video tracks sourced from a screen capturing.
+/// Constraints applicable to the video tracks sourced from a screen capturing.
 class DisplayVideoTrackConstraints {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   final NullablePointer ptr = NullablePointer(_new());
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

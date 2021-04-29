@@ -9,15 +9,19 @@ typedef _free_Dart = void Function(Pointer);
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('ReconnectHandle__free');
 
+/// External handle used to reconnect to a media server when connection is lost.
+///
+/// This handle is passed to the `RoomHandle.onConnectionLoss()` callback.
 class ReconnectHandle {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   late NullablePointer ptr;
 
-  /// Constructs new [ReconnectHandle] backed by Rust object behind provided
-  /// [Pointer].
+  /// Constructs a new [ReconnectHandle] backed by the Rust object behind the
+  /// provided [Pointer].
   ReconnectHandle(this.ptr);
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

@@ -344,9 +344,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --workspace --exclude medea-jason\
-		-- -D clippy::pedantic -D warnings
-	$(call cargo.lint.medea-jason.android,wasm32-unknown-unknown)
+	cargo clippy --workspace -- -D clippy::pedantic -D warnings
 	$(foreach target,$(subst $(comma), ,$(ANDROID_TARGETS)),\
 		$(call cargo.lint.medea-jason.android,$(target)))
 define cargo.lint.medea-jason.android

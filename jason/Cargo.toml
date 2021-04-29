@@ -12,7 +12,7 @@ repository = "https://github.com/instrumentisto/medea/tree/master/jason"
 readme = "README.md"
 keywords = ["medea", "jason", "webrtc", "client", "browser"]
 categories = ["multimedia", "api-bindings", "web-programming", "wasm"]
-exclude = ["/demo/", "/e2e-demo/"]
+exclude = ["/demo/", "/e2e-demo/", "/flutter/"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -25,6 +25,7 @@ mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 async-recursion = "0.3"
 async-trait = "0.1"
 bitflags = "1.2"
+cfg-if = "1.0"
 derivative = "2.1"
 derive_more = "0.99"
 downcast = { version = "0.10", optional = true }
@@ -46,14 +47,14 @@ android_logger = "0.10"
 dart-sys = "2.0"
 libc = "0.2"
 
-[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+[target.'cfg(not(target_os = "android"))'.dependencies]
 console_error_panic_hook = { version = "0.1", optional = true }
 js-sys = "0.3"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4"
 wasm-logger = "0.2"
 wee_alloc = { version = "0.4", optional = true }
-[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies.web-sys]
+[target.'cfg(not(target_os = "android"))'.dependencies.web-sys]
     version = "0.3.47"
     features = [
         "console",

@@ -1,7 +1,7 @@
 import 'dart:ffi';
 
-/// Wrapper for [Pointer] that can be null. Accessing pointer after it is freed
-/// will throw [StateError].
+/// Wrapper for a [Pointer] that can be null. Accessing the pointer after it is
+/// freed will throw [StateError].
 class NullablePointer {
   Pointer? _ptr;
 
@@ -15,7 +15,7 @@ class NullablePointer {
     _ptr = ptr;
   }
 
-  /// Returns underlying [Pointer].
+  /// Returns the underlying [Pointer].
   ///
   /// Throws [StateError] if underlying [Pointer] was freed.
   Pointer getInnerPtr() {
@@ -26,10 +26,11 @@ class NullablePointer {
     }
   }
 
-  /// Nulls underlying [Pointer].
+  /// Nulls the underlying [Pointer].
   ///
-  /// This does not affect data behind [Pointer], but Dart won't be able to
-  /// access it, so it is expected that native memory was freed at this point.
+  /// This does not affect the data behind the [Pointer], but Dart won't be able
+  /// to access it, so it is expected that native memory has been freed at this
+  /// point.
   void free() {
     _ptr = null;
   }

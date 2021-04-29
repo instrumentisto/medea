@@ -24,7 +24,7 @@ final _free =
 
 /// Constraints applicable to audio tracks.
 class AudioTrackConstraints {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   final NullablePointer ptr = NullablePointer(_new());
 
   /// Sets an exact [deviceId][1] constraint.
@@ -39,7 +39,8 @@ class AudioTrackConstraints {
     }
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

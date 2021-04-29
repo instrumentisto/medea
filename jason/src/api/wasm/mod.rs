@@ -21,6 +21,24 @@ use wasm_bindgen::prelude::*;
 
 use crate::media;
 
+pub use self::{
+    connection_handle::ConnectionHandle,
+    constraints_update_exception::ConstraintsUpdateException,
+    input_device_info::InputDeviceInfo,
+    jason::Jason,
+    jason_error::JasonError,
+    local_media_track::LocalMediaTrack,
+    media_manager_handle::MediaManagerHandle,
+    media_stream_settings::{
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaStreamSettings,
+    },
+    reconnect_handle::ReconnectHandle,
+    remote_media_track::RemoteMediaTrack,
+    room_close_reason::RoomCloseReason,
+    room_handle::RoomHandle,
+};
+
 /// [MediaStreamTrack.kind][1] representation.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind

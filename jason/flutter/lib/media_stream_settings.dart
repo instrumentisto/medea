@@ -40,7 +40,7 @@ final _free =
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamconstraints
 class MediaStreamSettings {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   final NullablePointer ptr = NullablePointer(_new());
 
   /// Specifies the nature and settings of the audio `LocalMediaTrack`.
@@ -50,20 +50,21 @@ class MediaStreamSettings {
   }
 
   /// Set constraints that will be used to obtain local video sourced from
-  /// media device.
+  /// the media device.
   void deviceVideo(@moveSemantics DeviceVideoTrackConstraints constraints) {
     _deviceVideo(ptr.getInnerPtr(), constraints.ptr.getInnerPtr());
     constraints.ptr.free();
   }
 
-  /// Set constraints that will be used to capture local video from user
+  /// Set constraints that will be used to capture local video from the user's
   /// display.
   void displayVideo(@moveSemantics DisplayVideoTrackConstraints constraints) {
     _displayVideo(ptr.getInnerPtr(), constraints.ptr.getInnerPtr());
     constraints.ptr.free();
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

@@ -26,6 +26,9 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
 
 /// Sets callback, invoked when a new [`remote::Track`] is added to this
 /// [`Connection`].
+///
+/// [`remote::Track`]: crate::media::track::remote::Track
+/// [`Connection`]: crate::connection::Connection
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     this: *const ConnectionHandle,

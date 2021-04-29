@@ -9,6 +9,9 @@ impl ForeignClass for LocalMediaTrack {}
 
 /// Returns a [`MediaKind::Audio`] if this [`LocalMediaTrack`] represents an
 /// audio track, or a [`MediaKind::Video`] if it represents a video track.
+///
+/// [`MediaKind::Audio`]: crate::media::MediaKind::Audio
+/// [`MediaKind::Video`]: crate::media::MediaKind::Video
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__kind(
     this: *const LocalMediaTrack,
@@ -24,6 +27,8 @@ pub unsafe extern "C" fn LocalMediaTrack__kind(
 /// [MediaDevices.getDisplayMedia()][1].
 ///
 /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+/// [`MediaSourceKind::Device`]: crate::media::MediaSourceKind::Device
+/// [`MediaSourceKind::Display`]: crate::media::MediaSourceKind::Display
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
     this: *const LocalMediaTrack,

@@ -5,6 +5,8 @@ pub use crate::room::RoomCloseReason;
 impl ForeignClass for RoomCloseReason {}
 
 /// Returns a close reason of the [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__reason(
     this: *const RoomCloseReason,
@@ -15,6 +17,8 @@ pub unsafe extern "C" fn RoomCloseReason__reason(
 }
 
 /// Indicates whether the [`Room`] was closed by server.
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
     this: *const RoomCloseReason,
@@ -25,6 +29,8 @@ pub unsafe extern "C" fn RoomCloseReason__is_closed_by_server(
 }
 
 /// Indicates whether the [`Room`]'s close reason is considered as an error.
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__is_err(
     this: *const RoomCloseReason,

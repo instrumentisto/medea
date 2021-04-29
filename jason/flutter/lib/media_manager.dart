@@ -37,11 +37,11 @@ final _free =
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 /// [2]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
 class MediaManagerHandle {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   late NullablePointer ptr;
 
-  /// Constructs new [MediaManagerHandle] backed by Rust object behind provided
-  /// [Pointer].
+  /// Creates a new [MediaManagerHandle] backed by the Rust object behind the
+  /// provided [Pointer].
   MediaManagerHandle(this.ptr);
 
   /// Obtains [LocalMediaTrack]s objects from local media devices
@@ -62,7 +62,8 @@ class MediaManagerHandle {
         .toList();
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

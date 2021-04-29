@@ -68,11 +68,11 @@ final _free = dl.lookupFunction<_free_C, _free_Dart>('RemoteMediaTrack__free');
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
 class RemoteMediaTrack {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   late NullablePointer ptr;
 
-  /// Constructs new [RemoteMediaTrack] backed by Rust object behind provided
-  /// [Pointer].
+  /// Constructs a new [RemoteMediaTrack] backed by the Rust object behind the
+  /// provided [Pointer].
   RemoteMediaTrack(this.ptr);
 
   /// Indicates whether this [RemoteMediaTrack] is enabled.
@@ -91,7 +91,7 @@ class RemoteMediaTrack {
     return MediaKind.values[index];
   }
 
-  /// Returns this [RemoteMediaTrack]'s media source kind.
+  /// Returns this [RemoteMediaTrack]'s media source kind (device/display).
   MediaSourceKind mediaSourceKind() {
     var index = _mediaSourceKind(ptr.getInnerPtr());
     return MediaSourceKind.values[index];
@@ -122,7 +122,8 @@ class RemoteMediaTrack {
     _onStopped(ptr.getInnerPtr(), f);
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

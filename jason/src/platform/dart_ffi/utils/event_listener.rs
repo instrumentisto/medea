@@ -5,14 +5,12 @@ use tracerr::Traced;
 
 use crate::{platform, utils::JsCaused};
 
-/// Failed to bind to [`EventTarget`][1] event.
-///
-/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
+/// Failed to bind to specified event.
 #[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
 pub struct EventListenerBindError(platform::Error);
 
-/// Wrapper for closure that handles some event.
+/// Wrapper for the closure that handles some event.
 #[derive(Debug)]
 pub struct EventListener<T, A> {
     t: PhantomData<T>,
@@ -20,7 +18,7 @@ pub struct EventListener<T, A> {
 }
 
 impl<T, A> EventListener<T, A> {
-    /// Creates new [`EventListener`] from a given [`FnMut`] `closure`.
+    /// Creates a new [`EventListener`] from the given [`FnMut`] `closure`.
     ///
     /// # Errors
     ///
@@ -36,7 +34,7 @@ impl<T, A> EventListener<T, A> {
         unimplemented!()
     }
 
-    /// Creates new [`EventListener`] from a given [`FnOnce`] `closure`.
+    /// Creates a new [`EventListener`] from the given [`FnOnce`] `closure`.
     ///
     /// # Errors
     ///
@@ -49,14 +47,6 @@ impl<T, A> EventListener<T, A> {
     where
         F: FnOnce(A) + 'static,
     {
-        unimplemented!()
-    }
-}
-
-impl<T, A> Drop for EventListener<T, A> {
-    /// Drops [`EventListener`]'s closure and unregisters appropriate event
-    /// handler.
-    fn drop(&mut self) {
         unimplemented!()
     }
 }

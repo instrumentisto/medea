@@ -11,12 +11,6 @@ use crate::{
     utils::{JsCaused, JsonParseError},
 };
 
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-pub use super::wasm::transport::WebSocketRpcTransport;
-
-#[cfg(all(target_os = "android"))]
-pub use super::dart_ffi::transport::WebSocketRpcTransport;
-
 /// Possible states of a [`RpcTransport`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TransportState {

@@ -69,10 +69,10 @@ DynamicLibrary _dl_load() {
 /// Responsible for managing shared transports, local media and room
 /// initialization.
 class Jason {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   final NullablePointer ptr = NullablePointer(_new());
 
-  /// Returns a [MediaManagerHandle].
+  /// Returns a [MediaManagerHandle] to `MediaManager` of this [Jason].
   MediaManagerHandle mediaManager() {
     return MediaManagerHandle(
         NullablePointer(_media_manager(ptr.getInnerPtr())));
@@ -83,13 +83,14 @@ class Jason {
     return RoomHandle(NullablePointer(_initRoom(ptr.getInnerPtr())));
   }
 
-  /// Closes `Room` by the provided [RoomHandle].
+  /// Closes the `Room` by the provided [RoomHandle].
   void closeRoom(@moveSemantics RoomHandle room) {
     _close_room(ptr.getInnerPtr(), room.ptr.getInnerPtr());
     room.ptr.free();
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

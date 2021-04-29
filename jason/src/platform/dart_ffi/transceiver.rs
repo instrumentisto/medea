@@ -1,4 +1,6 @@
-//! [`RtcRtpTransceiver`] wrapper.
+//! [RTCRtpTransceiver] wrapper.
+//!
+//! [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
 
 use std::rc::Rc;
 
@@ -7,8 +9,10 @@ use futures::future::LocalBoxFuture;
 
 use crate::{media::track::local, platform::Error};
 
-/// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
+/// Wrapper around [RTCRtpTransceiver] which provides handy methods for
 /// direction changes.
+///
+/// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
 #[derive(Clone)]
 pub struct Transceiver;
 
@@ -85,7 +89,9 @@ impl Transceiver {
         unimplemented!()
     }
 
-    /// Indicates whether the underlying [`RtcRtpTransceiver`] is stopped.
+    /// Indicates whether the underlying [RTCRtpTransceiver] is stopped.
+    ///
+    /// [RTCRtpTransceiver]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     #[inline]
     #[must_use]
     pub fn is_stopped(&self) -> bool {

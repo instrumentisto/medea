@@ -73,30 +73,30 @@ final _widthInRange = dl.lookupFunction<_widthInRange_C, _widthInRange_Dart>(
 final _free =
     dl.lookupFunction<_free_C, _free_Dart>('DeviceVideoTrackConstraints__free');
 
-/// Describes directions that a camera can face, as seen from a user's
+/// Describes the directions that the camera can face, as seen from the user's
 /// perspective.
 ///
-/// Representation of a [VideoFacingModeEnum][1].
+/// Representation of the [VideoFacingModeEnum][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-videofacingmodeenum
 enum FacingMode {
-  /// Facing towards a user (a self-view camera).
+  /// Facing towards the user (a self-view camera).
   User,
 
-  /// Facing away from a user (viewing an environment).
+  /// Facing away from the user (viewing an environment).
   Environment,
 
-  /// Facing to the left of a user.
+  /// Facing to the left of the user.
   Left,
 
-  /// Facing to the right of a user.
+  /// Facing to the right of the user.
   Right,
 }
 
-/// Constraints applicable to video tracks that are sourced from some media
+/// Constraints applicable to the video tracks that are sourced from some media
 /// device.
 class DeviceVideoTrackConstraints {
-  /// [Pointer] to Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backs this object.
   final NullablePointer ptr = NullablePointer(_new());
 
   /// Sets exact [deviceId][1] constraint.
@@ -139,7 +139,7 @@ class DeviceVideoTrackConstraints {
     _idealHeight(ptr.getInnerPtr(), height);
   }
 
-  /// Sets range of [`height`][1] constraint.
+  /// Sets range of the [`height`][1] constraint.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void heightInRange(int min, int max) {
@@ -167,7 +167,8 @@ class DeviceVideoTrackConstraints {
     _widthInRange(ptr.getInnerPtr(), min, max);
   }
 
-  /// Drops associated Rust object and nulls the local [Pointer] to this object.
+  /// Drops the associated Rust object and nulls the local [Pointer] to this
+  /// object.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

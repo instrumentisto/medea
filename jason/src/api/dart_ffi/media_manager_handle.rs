@@ -12,7 +12,7 @@ pub use crate::media::MediaManagerHandle;
 
 impl ForeignClass for MediaManagerHandle {}
 
-/// Returns [`local::LocalMediaTrack`]s objects, built from the provided
+/// Returns [`LocalMediaTrack`]s objects, built from the provided
 /// [`MediaStreamSettings`].
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
@@ -33,9 +33,8 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     )
 }
 
-/// Returns a list of [`platform::InputDeviceInfo`] objects representing
-/// available media input and devices, such as microphones, cameras, and so
-/// forth.
+/// Returns a list of [`InputDeviceInfo`] objects representing available media
+/// input and devices, such as microphones, cameras, and so forth.
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: *const MediaManagerHandle,
