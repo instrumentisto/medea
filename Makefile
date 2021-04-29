@@ -25,7 +25,7 @@ RUST_VER := 1.51
 CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
-CARGO_NDK_VER := 2.2.0-ndkr22b-rust$(RUST_VER)
+CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
 ANDROID_NDK_TARGETS := arm64-v8a \
                        armeabi-v7a \
                        x86 \

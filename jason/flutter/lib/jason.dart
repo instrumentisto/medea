@@ -2,10 +2,12 @@ library jason;
 
 import 'dart:ffi';
 import 'dart:io';
+
 import 'media_manager.dart';
 import 'room_handle.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
+import 'util/callback.dart' as callback;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
@@ -38,8 +40,29 @@ final _close_room =
 final _free = dl.lookupFunction<_free_C, _free_Dart>('Jason__free');
 
 DynamicLibrary _dl_load() {
-  if (Platform.isAndroid) return DynamicLibrary.open('libjason.so');
-  throw UnsupportedError('This platform is not supported.');
+  if (!Platform.isAndroid) {
+    throw UnsupportedError('This platform is not supported.');
+  }
+  if (NativeApi.majorVersion != 2) {
+    // If the DartVM we're running on does not have the same major version as
+    // this file was compiled against, refuse to initialize: the symbols are not
+    // compatible.
+    throw 'You are running unsupported NativeApi version.';
+  }
+
+  var dl = DynamicLibrary.open('libjason.so');
+
+  var initResult = dl.lookupFunction<
+      IntPtr Function(Pointer<Void>),
+      int Function(
+          Pointer<Void>)>('init_dart_api_dl')(NativeApi.initializeApiDLData);
+
+  if (initResult != 0) {
+    throw 'Failed to initialize Dart API. Code: $initResult';
+  }
+  callback.registerFunctions(dl);
+
+  return dl;
 }
 
 class Jason {

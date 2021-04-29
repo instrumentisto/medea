@@ -1,4 +1,8 @@
+use crate::ForeignClass;
+
 pub struct DisplayVideoTrackConstraints;
+
+impl ForeignClass for DisplayVideoTrackConstraints {}
 
 impl DisplayVideoTrackConstraints {
     fn new() -> Self {
@@ -9,12 +13,12 @@ impl DisplayVideoTrackConstraints {
 #[no_mangle]
 pub extern "C" fn DisplayVideoTrackConstraints__new(
 ) -> *const DisplayVideoTrackConstraints {
-    Box::into_raw(Box::new(DisplayVideoTrackConstraints::new()))
+    DisplayVideoTrackConstraints::new().into_ptr()
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn DisplayVideoTrackConstraints__free(
     this: *mut DisplayVideoTrackConstraints,
 ) {
-    Box::from_raw(this);
+    DisplayVideoTrackConstraints::from_ptr(this);
 }

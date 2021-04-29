@@ -1,4 +1,8 @@
+use crate::ForeignClass;
+
 pub struct ReconnectHandle;
+
+impl ForeignClass for ReconnectHandle {}
 
 impl ReconnectHandle {
     // pub async fn reconnect_with_delay(&self, delay_ms: u32) -> Result<(),
@@ -9,5 +13,5 @@ impl ReconnectHandle {
 
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
-    Box::from_raw(this);
+    ReconnectHandle::from_ptr(this);
 }
