@@ -6,6 +6,7 @@ use super::{
 pub use self::mock::Jason;
 #[cfg(not(feature = "mockable"))]
 pub use crate::jason::Jason;
+use std::ptr::NonNull;
 
 impl ForeignClass for Jason {}
 

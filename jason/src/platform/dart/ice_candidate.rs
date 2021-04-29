@@ -11,6 +11,18 @@ use crate::{
     utils::dart::{from_dart_string, into_dart_string},
 };
 
+type CandidateFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
+type SdpMLineIndexFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
+
+type SdpMidFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
+
+static mut CANDIDATE_FUNCTION: Option<CandidateFunction> = None;
+
+static mut SDP_M_LINE_INDEX_FUNCTION: Option<SdpMLineIndexFunction> = None;
+
+static mut SDP_MID_FUNCTION: Option<SdpMidFunction> = None;
+
 #[derive(From)]
 pub struct IceCandidate(DartHandle);
 
@@ -20,8 +32,6 @@ impl From<Dart_Handle> for IceCandidate {
     }
 }
 
-type CandidateFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
-static mut CANDIDATE_FUNCTION: Option<CandidateFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_IceCandidate__candidate(
@@ -30,8 +40,6 @@ pub unsafe extern "C" fn register_IceCandidate__candidate(
     CANDIDATE_FUNCTION = Some(f);
 }
 
-type SdpMLineIndexFunction = extern "C" fn(Dart_Handle) -> DartIntOption;
-static mut SDP_M_LINE_INDEX_FUNCTION: Option<SdpMLineIndexFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_IceCandidate__sdp_m_line_index(
@@ -40,8 +48,6 @@ pub unsafe extern "C" fn register_IceCandidate__sdp_m_line_index(
     SDP_M_LINE_INDEX_FUNCTION = Some(f);
 }
 
-type SdpMidFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
-static mut SDP_MID_FUNCTION: Option<SdpMidFunction> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {

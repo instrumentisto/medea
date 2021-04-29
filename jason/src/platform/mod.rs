@@ -6,7 +6,7 @@ pub mod peer_connection;
 pub mod rtc_stats;
 pub mod transceiver_direction;
 pub mod transport;
-// #[cfg(feature = "wasm")]
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 pub mod wasm;
 
 pub use self::{
@@ -42,7 +42,10 @@ pub use self::dart::{
     spawn,
     transceiver::Transceiver,
     utils::{Callback, Function},
+    error::Error,
+    rtc_stats::RtcStats,
 };
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 pub use self::wasm::{error::Error, rtc_stats::RtcStats};
 
 #[cfg(feature = "mockable")]

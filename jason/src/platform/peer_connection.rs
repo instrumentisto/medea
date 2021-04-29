@@ -40,6 +40,7 @@ impl From<RtcSdpType> for i32 {
     }
 }
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 impl From<RtcSdpType> for web_sys::RtcSdpType {
     fn from(from: RtcSdpType) -> Self {
         match from {
