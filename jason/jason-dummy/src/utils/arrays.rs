@@ -43,6 +43,7 @@ impl<T> Drop for PtrArray<T> {
     ///
     /// Doesn't drop array elements. They are leaked and must be explicitly
     /// freed in the foreign code whenever foreign code doesn't need them.
+    ///
     /// There is no relation between the lifetime of the items that array
     /// elements point to and this [`PtrArray`]'s lifetime thus drop order
     /// doesn't matter.
@@ -62,11 +63,11 @@ impl<T> Drop for PtrArray<T> {
 ///
 /// # Safety
 ///
-/// Doesn't drop array elements. They are leaked and must be explicitly
-/// freed in the foreign code whenever foreign code doesn't need them.
-/// There is no relation between the lifetime of the items that array
-/// elements point to and this [`PtrArray`]'s lifetime thus drop order
-/// doesn't matter.
+/// Doesn't drop array elements. They are leaked and must be explicitly freed in
+/// the foreign code whenever foreign code doesn't need them.
+///
+/// There is no relation between the lifetime of the items that array elements
+/// point to and the [`PtrArray`]'s lifetime thus drop order doesn't matter.
 ///
 /// This function should not be called before foreign code reads [`PtrArray`]
 /// elements, otherwise pointers will be lost and data behind pointers will stay
