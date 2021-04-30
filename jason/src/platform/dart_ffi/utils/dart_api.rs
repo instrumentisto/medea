@@ -1,12 +1,12 @@
 //! Functionality for calling [`Dart DL API`] from Rust.
 //!
-//! [`Dart DL API`]: https://tinyurl.com/dart-dl-api
+//! [`Dart DL API`]: https://tinyurl.com/32e7fudh
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
 #[link(name = "trampoline")]
 extern "C" {
-    /// Initializes dynamically linked Dart API usage. Accepts
+    /// Initializes Dynamically Linked Dart API usage. Accepts
     /// [`NativeApi.initializeApiDLData`][1] that must be retrieved in Dart
     /// code. Must be called before calling any other Dart API method.
     ///
@@ -21,27 +21,26 @@ extern "C" {
         object: Dart_Handle,
     ) -> Dart_PersistentHandle;
 
-    /// Allocates a [`Dart_Handle`] in the current scope from a
+    /// Allocates a [`Dart_Handle`] in the current scope from the given
     /// [`Dart_PersistentHandle`].
     ///
-    /// This does not affect provided [`Dart_PersistentHandle`] lifetime.
+    /// This doesn't affect the provided [`Dart_PersistentHandle`]'s lifetime.
     pub fn Dart_HandleFromPersistent_DL_Trampolined(
         object: Dart_PersistentHandle,
     ) -> Dart_Handle;
 
-    /// Deallocates provided [`Dart_PersistentHandle`].
+    /// Deallocates the provided [`Dart_PersistentHandle`].
     pub fn Dart_DeletePersistentHandle_DL_Trampolined(
         object: Dart_PersistentHandle,
     );
 }
 
-/// Called with [`NativeApi.initializeApiDLData`][1] from Dart to enable using
-/// the dynamically linked Dart API.
+/// Initializes usage of Dynamically Linked Dart API.
 ///
 /// # Safety
 ///
-/// Unsafe because it calls foreign C function. Caller must ensure that pointer
-/// is valid [`NativeApi.initializeApiDLData`][1].
+/// Intended to be called ONLY with [`NativeApi.initializeApiDLData`][1] from
+/// Dart.
 ///
 /// [1]: https://api.dart.dev/dart-ffi/NativeApi/initializeApiDLData.html
 #[no_mangle]

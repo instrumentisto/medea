@@ -11,19 +11,19 @@ final _free_Dart _free =
 
 /// Array of [Pointer]s to Rust objects.
 class PtrArray extends Struct {
+  /// [Pointer] to the first array element.
+  external Pointer<Pointer> _ptr;
+
   /// Length of this [PtrArray].
   @Uint64()
   external int _len;
-
-  /// [Pointer] to the first array element.
-  external Pointer<Pointer> _arr;
 
   /// Frees an underlying native memory, so it can only be called once.
   List<Pointer> intoPointerList() {
     try {
       var out = List<Pointer>.empty(growable: true);
       for (var i = 0; i < _len; i++) {
-        out.add(_arr.elementAt(i));
+        out.add(_ptr.elementAt(i));
       }
       return out;
     } finally {

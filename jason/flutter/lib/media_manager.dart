@@ -56,6 +56,7 @@ class MediaManagerHandle {
   /// Returns a list of [InputDeviceInfo] objects representing available media
   /// input devices, such as microphones, cameras, and so forth.
   List<InputDeviceInfo> enumerateDevices() {
+    print("enumerateDevices_enumerateDevices_enumerateDevices");
     return _enumerateDevices(ptr.getInnerPtr())
         .intoPointerList()
         .map((e) => InputDeviceInfo(NullablePointer(e)))
