@@ -31,27 +31,27 @@ void main() {
     var devices = mediaManager.enumerateDevices();
     var tracks = mediaManager.initLocalTracks(MediaStreamSettings());
 
-      expect(devices.length, equals(3));
-      expect(tracks.length, equals(3));
+    expect(devices.length, equals(3));
+    expect(tracks.length, equals(3));
 
-      expect(devices.first.ptr.getInnerPtr(),
-          isNot(equals(devices.last.ptr.getInnerPtr())));
-      expect(tracks.first.ptr.getInnerPtr(),
-          isNot(equals(tracks.last.ptr.getInnerPtr())));
+    expect(devices.first.ptr.getInnerPtr(),
+        isNot(equals(devices.last.ptr.getInnerPtr())));
+    expect(tracks.first.ptr.getInnerPtr(),
+        isNot(equals(tracks.last.ptr.getInnerPtr())));
 
-      expect(devices.first.deviceId(), equals('InputDeviceInfo.device_id'));
-      expect(devices.first.groupId(), equals('InputDeviceInfo.group_id'));
-      expect(devices.first.kind(), equals(MediaKind.Audio));
-      expect(devices.first.label(), equals('InputDeviceInfo.label'));
+    expect(devices.first.deviceId(), equals('InputDeviceInfo.device_id'));
+    expect(devices.first.groupId(), equals('InputDeviceInfo.group_id'));
+    expect(devices.first.kind(), equals(MediaKind.Audio));
+    expect(devices.first.label(), equals('InputDeviceInfo.label'));
 
-      devices.first.free();
-      expect(() => devices.first.label(), throwsStateError);
+    devices.first.free();
+    expect(() => devices.first.label(), throwsStateError);
 
-      expect(tracks.first.kind(), equals(MediaKind.Video));
-      expect(tracks.first.mediaSourceKind(), equals(MediaSourceKind.Display));
+    expect(tracks.first.kind(), equals(MediaKind.Video));
+    expect(tracks.first.mediaSourceKind(), equals(MediaSourceKind.Display));
 
-      tracks.first.free();
-      expect(() => tracks.first.kind(), throwsStateError);
+    tracks.first.free();
+    expect(() => tracks.first.kind(), throwsStateError);
   });
 
   testWidgets('DeviceVideoTrackConstraints', (WidgetTester tester) async {
