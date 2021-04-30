@@ -1,7 +1,8 @@
-//! External [`Jason`] API that exposes functions that can be called via FFI
-//! and designed to be integrated into Flutter plugin.
+//! External [`Jason`] API exposing functions that can be called via FFI and
+//! designed to be integrated into a [Flutter] plugin.
 //!
 //! [`Jason`]: crate::api::Jason
+//! [Flutter]: https://flutter.dev
 
 // TODO: Improve documentation in this module.
 #![allow(clippy::missing_safety_doc, clippy::missing_panics_doc, missing_docs)]
@@ -36,22 +37,27 @@ pub use self::{
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
 };
 
-/// Rust structure that has wrapper class in Dart. Such structures are passed
-/// through FFI boundaries as thin pointers.
-pub trait ForeignClass {
-    /// Consumes `Self` returning a wrapped raw pointer via [`Box::into_raw`].
-    fn into_ptr(self) -> *const Self
-    where
-        Self: Sized,
-    {
+/// Rust structure having wrapper class in Dart.
+///
+/// Intended to be passed through FFI boundaries as thin pointers.
+pub trait ForeignClass: Sized {
+    /// Consumes itself returning a wrapped raw pointer obtained via
+    /// [`Box::into_raw()`].
+    #[inline]
+    #[must_use]
+    fn into_ptr(self) -> *const Self {
         Box::into_raw(Box::new(self))
     }
 
-    /// Constructs `Self` from a raw pointer via [`Box::from_raw`].
-    unsafe fn from_ptr(this: *mut Self) -> Self
-    where
-        Self: Sized,
-    {
+    /// Constructs a [`ForeignClass`] from the given raw pointer via
+    /// [`Box::from_raw()`].
+    ///
+    /// # Safety
+    ///
+    /// Same as for [`Box::from_raw()`].
+    #[inline]
+    #[must_use]
+    unsafe fn from_ptr(this: *mut Self) -> Self {
         *Box::from_raw(this)
     }
 }

@@ -1,4 +1,5 @@
 import 'dart:ffi';
+
 import 'package:ffi/ffi.dart';
 
 import 'jason.dart';
@@ -24,10 +25,10 @@ final _free =
 
 /// Constraints applicable to audio tracks.
 class AudioTrackConstraints {
-  /// [Pointer] to the Rust struct that backs this object.
+  /// [Pointer] to the Rust struct backing this object.
   final NullablePointer ptr = NullablePointer(_new());
 
-  /// Sets an exact [deviceId][1] constraint.
+  /// Sets an exact [`deviceId`][1] constraint.
   ///
   /// [1]: https://w3.org/TR/mediacapture-streams#def-constraint-deviceId
   void deviceId(String deviceId) {
@@ -39,8 +40,7 @@ class AudioTrackConstraints {
     }
   }
 
-  /// Drops the associated Rust object and nulls the local [Pointer] to this
-  /// object.
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

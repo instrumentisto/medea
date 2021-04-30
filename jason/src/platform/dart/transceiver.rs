@@ -99,7 +99,7 @@ impl Transceiver {
     }
 }
 
-// TODO: Probably should be shared between wasm and dart_ffi.
+// TODO: Probably should be shared between `wasm` and `dart` platforms.
 bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
     ///

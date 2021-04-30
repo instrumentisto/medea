@@ -36,24 +36,25 @@ final _deviceId = dl
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('InputDeviceInfo__free');
 
-/// Implementation of the [MediaDeviceInfo][1] interface.
+/// [`MediaDeviceInfo`][1] interface.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 class InputDeviceInfo {
-  /// [Pointer] to the Rust struct that backs this object.
+  /// [Pointer] to the Rust struct backing this object.
   late NullablePointer ptr;
 
-  /// Constructs a new [InputDeviceInfo] backed by the Rust object behind the
+  /// Constructs a new [InputDeviceInfo] backed by a Rust struct behind the
   /// provided [Pointer].
   InputDeviceInfo(this.ptr);
 
-  /// Returns unique identifier for the represented device.
+  /// Returns an unique identifier of the represented device.
   String deviceId() {
     return _deviceId(ptr.getInnerPtr()).nativeStringToDartString();
   }
 
-  /// Returns label describing the represented device (for example
-  /// "External USB Webcam").
+  /// Returns label describing the represented device (for example "External USB
+  /// Webcam").
+  ///
   /// If the device has no associated label, then returns an empty string.
   String label() {
     return _label(ptr.getInnerPtr()).nativeStringToDartString();
@@ -61,7 +62,7 @@ class InputDeviceInfo {
 
   /// Returns kind of the represented device.
   ///
-  /// This representation of [MediaDeviceInfo][1] ONLY for input device.
+  /// This representation of a [`MediaDeviceInfo`][1] is ONLY for input devices.
   ///
   /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
   MediaKind kind() {
@@ -69,20 +70,19 @@ class InputDeviceInfo {
     return MediaKind.values[index];
   }
 
-  /// Returns the group identifier of the represented device.
+  /// Returns a group identifier of the represented device.
   ///
   /// Two devices have the same group identifier if they belong to the same
   /// physical device. For example, the audio input and output devices
   /// representing the speaker and microphone of the same headset have the
-  /// same [groupId][1].
+  /// same [`groupId`][1].
   ///
   /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadeviceinfo-groupid
   String groupId() {
     return _nativeGroupId(ptr.getInnerPtr()).nativeStringToDartString();
   }
 
-  /// Drops the associated Rust object and nulls the local [Pointer] to this
-  /// object.
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

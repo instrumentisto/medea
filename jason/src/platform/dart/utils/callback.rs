@@ -76,7 +76,7 @@ pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
 }
 
-// TODO: Probably should be shared between wasm and dart_ffi.
+// TODO: Probably should be shared between `wasm` and `dart` platforms.
 /// Wrapper for a single argument Dart callback function.
 pub struct Callback<A>(RefCell<Option<Function<A>>>);
 
@@ -128,18 +128,19 @@ pub struct Function<T> {
     dart_fn: Dart_PersistentHandle,
 
     /// Type of this closure argument.
-    _arg_kind: PhantomData<T>,
+    _arg: PhantomData<T>,
 }
 
 impl<T> Function<T> {
-    /// Creates a new [`Function`] from the provided [`Dart_Handle`] to a
-    /// Dart closure, and persists the provided [`Dart_Handle`] so it won't be
-    /// moved by the Dart VM GC.
+    /// Creates a new [`Function`] from the provided [`Dart_Handle`] to a Dart
+    /// closure, and persists the provided [`Dart_Handle`] so it won't be moved
+    /// by the Dart VM GC.
     #[inline]
+    #[must_use]
     pub fn new(cb: Dart_Handle) -> Self {
         Self {
             dart_fn: unsafe { Dart_NewPersistentHandle_DL_Trampolined(cb) },
-            _arg_kind: PhantomData::default(),
+            _arg: PhantomData,
         }
     }
 }

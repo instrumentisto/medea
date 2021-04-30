@@ -64,14 +64,14 @@ final _onStopped = dl.lookupFunction<_onStopped_C, _onStopped_Dart>(
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('RemoteMediaTrack__free');
 
-/// Wrapper around a received remote [MediaStreamTrack][1].
+/// Representation of a received remote [`MediaStreamTrack`][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
 class RemoteMediaTrack {
-  /// [Pointer] to the Rust struct that backs this object.
+  /// [Pointer] to the Rust struct that backing this object.
   late NullablePointer ptr;
 
-  /// Constructs a new [RemoteMediaTrack] backed by the Rust object behind the
+  /// Constructs a new [RemoteMediaTrack] backed by the Rust struct behind the
   /// provided [Pointer].
   RemoteMediaTrack(this.ptr);
 
@@ -122,8 +122,7 @@ class RemoteMediaTrack {
     _onStopped(ptr.getInnerPtr(), f);
   }
 
-  /// Drops the associated Rust object and nulls the local [Pointer] to this
-  /// object.
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

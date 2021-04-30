@@ -1,6 +1,6 @@
 use dart_sys::Dart_Handle;
 
-use crate::{api::dart_ffi::ForeignClass, platform};
+use crate::{api::dart::ForeignClass, platform};
 
 #[cfg(feature = "mockable")]
 pub use self::mock::RoomHandle;

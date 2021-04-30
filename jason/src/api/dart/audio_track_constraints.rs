@@ -1,5 +1,7 @@
 //! Constraints applicable to audio tracks.
 
+
+
 use super::{utils::c_str_into_string, ForeignClass};
 
 pub use crate::media::AudioTrackConstraints;
@@ -26,6 +28,8 @@ pub unsafe extern "C" fn AudioTrackConstraints__device_id(
 }
 
 /// Frees the data behind the provided pointer.
+///
+/// # Safety
 ///
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.

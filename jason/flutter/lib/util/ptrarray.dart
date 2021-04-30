@@ -1,6 +1,7 @@
 import 'dart:ffi';
 
 import '../jason.dart';
+import 'move_semantics.dart'
 
 typedef _free_C = Void Function(PtrArray);
 typedef _free_Dart = void Function(PtrArray);
@@ -18,7 +19,8 @@ class PtrArray extends Struct {
   @Uint64()
   external int _len;
 
-  /// Frees an underlying native memory, so it can only be called once.
+  /// Converts this [PtrArray] to a Dart's [List] of [Pointer]s.
+  @moveSemantics
   List<Pointer> intoPointerList() {
     try {
       var out = List<Pointer>.empty(growable: true);

@@ -41,16 +41,16 @@ final _onQualityScoreUpdate =
     dl.lookupFunction<_onQualityScoreUpdate_C, _onQualityScoreUpdate_Dart>(
         'ConnectionHandle__on_quality_score_update');
 
-/// External handler to the `Connection` with a remote `Member`.
+/// External handler to a `Connection` with a remote `Member`.
 class ConnectionHandle {
-  /// [Pointer] to the Rust struct that backs this object.
+  /// [Pointer] to the Rust struct backing this object.
   late NullablePointer ptr;
 
-  /// Constructs a new [ConnectionHandle] backed by the Rust object behind the
+  /// Constructs a new [ConnectionHandle] backed by a Rust struct behind the
   /// provided [Pointer].
   ConnectionHandle(this.ptr);
 
-  /// Returns remote `Member` ID.
+  /// Returns ID of the remote `Member`.
   String getRemoteMemberId() {
     return _getRemoteMemberId(ptr.getInnerPtr()).nativeStringToDartString();
   }
@@ -74,8 +74,7 @@ class ConnectionHandle {
     _onQualityScoreUpdate(ptr.getInnerPtr(), f);
   }
 
-  /// Drops the associated Rust object and nulls the local [Pointer] to this
-  /// object.
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

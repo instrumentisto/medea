@@ -13,15 +13,14 @@ final _free = dl.lookupFunction<_free_C, _free_Dart>('ReconnectHandle__free');
 ///
 /// This handle is passed to the `RoomHandle.onConnectionLoss()` callback.
 class ReconnectHandle {
-  /// [Pointer] to the Rust struct that backs this object.
+  /// [Pointer] to the Rust struct backing this object.
   late NullablePointer ptr;
 
-  /// Constructs a new [ReconnectHandle] backed by the Rust object behind the
+  /// Constructs a new [ReconnectHandle] backed by the Rust struct behind the
   /// provided [Pointer].
   ReconnectHandle(this.ptr);
 
-  /// Drops the associated Rust object and nulls the local [Pointer] to this
-  /// object.
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

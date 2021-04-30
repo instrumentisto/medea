@@ -2,6 +2,7 @@ library jason;
 
 import 'dart:ffi';
 import 'dart:io';
+
 import 'media_manager.dart';
 import 'room_handle.dart';
 import 'util/move_semantic.dart';
@@ -69,10 +70,10 @@ DynamicLibrary _dl_load() {
 /// Responsible for managing shared transports, local media and room
 /// initialization.
 class Jason {
-  /// [Pointer] to the Rust struct that backs this object.
+  /// [Pointer] to the Rust struct backing this object.
   final NullablePointer ptr = NullablePointer(_new());
 
-  /// Returns a [MediaManagerHandle] to `MediaManager` of this [Jason].
+  /// Returns a [MediaManagerHandle] to the `MediaManager` of this [Jason].
   MediaManagerHandle mediaManager() {
     return MediaManagerHandle(
         NullablePointer(_media_manager(ptr.getInnerPtr())));
@@ -89,8 +90,7 @@ class Jason {
     room.ptr.free();
   }
 
-  /// Drops the associated Rust object and nulls the local [Pointer] to this
-  /// object.
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());
