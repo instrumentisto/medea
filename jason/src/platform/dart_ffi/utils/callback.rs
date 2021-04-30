@@ -76,6 +76,7 @@ pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
 }
 
+// TODO: Probably should be shared between wasm and dart_ffi.
 /// Wrapper for a single argument Dart callback function.
 pub struct Callback<A>(RefCell<Option<Function<A>>>);
 
