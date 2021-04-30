@@ -3,13 +3,7 @@
   "packages": [
     {
       "name": "async",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/async-2.5.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "boolean_selector",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/boolean_selector-2.1.0",
+      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/async-2.6.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -20,26 +14,14 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "charcode",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/charcode-1.2.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "clock",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/clock-1.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
       "name": "collection",
       "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/collection-1.15.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
     {
-      "name": "fake_async",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/fake_async-1.2.0",
+      "name": "crypto",
+      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/crypto-3.0.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -56,20 +38,8 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "flutter_test",
-      "rootUri": "file:///home/relmay/.flutterSdk/packages/flutter_test",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
       "name": "flutter_webrtc",
       "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/flutter_webrtc-0.6.3",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "matcher",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/matcher-0.12.10",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -80,8 +50,8 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "path",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/path-1.8.0",
+      "name": "pedantic",
+      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/pedantic-1.11.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -92,38 +62,8 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "source_span",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/source_span-1.8.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "stack_trace",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/stack_trace-1.10.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
       "name": "stream_channel",
       "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/stream_channel-2.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "string_scanner",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/string_scanner-1.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "term_glyph",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/term_glyph-1.2.0",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
-      "name": "test_api",
-      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/test_api-0.2.19",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -140,13 +80,19 @@
       "languageVersion": "2.12"
     },
     {
-      "name": "jason",
+      "name": "web_socket_channel",
+      "rootUri": "file:///home/relmay/.flutterSdk/.pub-cache/hosted/pub.dartlang.org/web_socket_channel-2.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "medea_jason",
       "rootUri": "../",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     }
   ],
-  "generated": "2021-04-19T18:39:54.263993Z",
+  "generated": "2021-04-30T16:50:52.206643Z",
   "generator": "pub",
   "generatorVersion": "2.12.2"
 }

@@ -1,16 +1,18 @@
 import 'dart:ffi';
+import 'package:ffi/ffi.dart';
 
-class HandleOption {
-  Handle _some;
-  bool _isSome;
+class HandleOption extends Struct {
+  external Handle _some;
+  @Int8()
+  external int _isSome;
 
-  Option.some(Object val) {
+  HandleOption.some(Object val) {
     _some = val;
-    _isSome = true;
+    _isSome = 1;
   }
 
-  Option.none() {
-    _isSome = false;
+  HandleOption.none() {
+    _isSome = 0;
   }
 }
 
@@ -23,19 +25,19 @@ class RustOption extends Struct {
     if (_is_some == 1) {
       return _val;
     } else {
-      return null;
+      throw Exception("RustOption is None");
     }
   }
 }
 
 class RustStringOption extends Struct {
   @Int8()
-  external int _is_some;
-  external Pointer<Utf8> _val;
+  external int? _is_some;
+  external Pointer<Utf8>? _val;
 
   RustStringOption.some(String val) {
     _is_some = 1;
-    _val = val.toNativeString();
+    _val = val.toNativeUtf8();
   }
 
   RustStringOption.none() {

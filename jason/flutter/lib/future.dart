@@ -13,7 +13,7 @@ final _resolveErr = ffi.dl.lookupFunction<_resolveErr_C, _resolveErr_Dart>('Dart
 
 void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_spawn_dart_future_function')(
-      Pointer.fromFunction<Handle Function()>(spawner)
+      Pointer.fromFunction<Handle Function(Handle, Pointer)>(spawner)
   );
 }
 

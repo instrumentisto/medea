@@ -1,4 +1,5 @@
 import 'ffi.dart' as ffi;
+import 'package:ffi/ffi.dart';
 import 'dart:ffi';
 
 void registerFunctions() {

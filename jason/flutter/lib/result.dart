@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'package:ffi/ffi.dart';
 
 class DartResult extends Struct {
   @Int8()
@@ -8,12 +9,12 @@ class DartResult extends Struct {
   external Pointer<Utf8> _err_message;
 
   DartResult.ok(Pointer res) {
-    _is_ok = true;
+    _is_ok = 1;
     _ok = res;
   }
 
   DartResult.err(String name, String message) {
-    _is_ok = false;
+    _is_ok = 0;
     _ok = Pointer.fromAddress(0);
     _err_name = name.toNativeUtf8();
     _err_message = message.toNativeUtf8();

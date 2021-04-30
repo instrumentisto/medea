@@ -8,10 +8,10 @@ void registerFunctions() {
       Pointer.fromFunction<Handle Function()>(constructor)
   );
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_Constraints__set_audio')(
-      Pointer.fromFunction<Void Function(Handle, Handle)>(sdpMLineIndex)
+      Pointer.fromFunction<Void Function(Handle, Handle)>(setAudio)
   );
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_Constraints__set_video')(
-      Pointer.fromFunction<Void Function(Handle, Handle)>(sdpMLineIndex)
+      Pointer.fromFunction<Void Function(Handle, Handle)>(setVideo)
   );
 }
 

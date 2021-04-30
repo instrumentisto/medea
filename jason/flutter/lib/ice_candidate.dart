@@ -1,5 +1,5 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:jason/option.dart';
+import 'option.dart';
 import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
@@ -9,7 +9,7 @@ void registerFunctions() {
       Pointer.fromFunction<RustStringOption Function(Handle)>(candidate)
   );
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_m_line_index')(
-      Pointer.fromFunction<RustIntOption Function()>(sdpMLineIndex)
+      Pointer.fromFunction<RustIntOption Function(Handle)>(sdpMLineIndex)
   );
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_mid')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(sdpMid)
@@ -19,7 +19,7 @@ void registerFunctions() {
 RustStringOption candidate(Object iceCandidate) {
   if (iceCandidate is RTCIceCandidate) {
     if (iceCandidate.candidate != null) {
-      return RustStringOption.some(iceCandidate.candidate.toNativeUtf8());
+      return RustStringOption.some(iceCandidate.candidate!);
     } else {
       return RustStringOption.none();
     }
@@ -31,7 +31,7 @@ RustStringOption candidate(Object iceCandidate) {
 RustIntOption sdpMLineIndex(Object iceCandidate) {
   if (iceCandidate is RTCIceCandidate) {
     if (iceCandidate.sdpMlineIndex != null) {
-      return RustIntOption.some(iceCandidate.sdpMlineIndex);
+      return RustIntOption.some(iceCandidate.sdpMlineIndex!);
     } else {
       return RustIntOption.none();
     }
@@ -43,7 +43,7 @@ RustIntOption sdpMLineIndex(Object iceCandidate) {
 RustStringOption sdpMid(Object iceCandidate) {
   if (iceCandidate is RTCIceCandidate) {
     if (iceCandidate.sdpMid != null) {
-      return RustStringOption.some(iceCandidate.sdpMid);
+      return RustStringOption.some(iceCandidate.sdpMid!);
     } else {
       return RustStringOption.none();
     }
