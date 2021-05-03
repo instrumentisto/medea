@@ -27,7 +27,6 @@ class Array extends Struct {
     for (var i = 0; i < _len; i++) {
       out.add(_arr[i]);
     }
-    // TODO: check that 'this' keyword is correct here
     _free_array(this);
 
     return out;

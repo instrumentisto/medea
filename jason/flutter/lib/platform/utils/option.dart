@@ -1,17 +1,38 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
+import 'ffi.dart' as ffi;
 
-class HandleOption extends Struct {
-  external Handle _some;
-  @Int8()
-  external int _isSome;
+void registerFunctions() {
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_RustHandleOption__get')(
+      Pointer.fromFunction<Handle Function(Handle)>(get));
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_RustHandleOption__is_none')(
+      Pointer.fromFunction<Int32 Function(Handle)>(isSome, 0));
+}
 
-  HandleOption.some(Object val) {
+Object get(Object option) {
+  option = option as RustHandleOption;
+  return option.some;
+}
+
+int isSome(Object option) {
+  option = option as RustHandleOption;
+  return option.isSome;
+}
+
+class RustHandleOption {
+  Object? _some;
+  late int _isSome;
+  get some => _some;
+  get isSome => _isSome;
+
+  RustHandleOption.some(Object val) {
     _some = val;
     _isSome = 1;
   }
 
-  HandleOption.none() {
+  RustHandleOption.none() {
     _isSome = 0;
   }
 }

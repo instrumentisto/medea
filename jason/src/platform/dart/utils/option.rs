@@ -2,6 +2,38 @@ use dart_sys::Dart_Handle;
 
 use crate::utils::dart::from_dart_string;
 
+type IsSomeFunction = extern "C" fn(Dart_Handle) -> i32;
+static mut IS_SOME_FUNCTION: Option<IsSomeFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RustHandleOption__is_some(
+    f: IsSomeFunction,
+) {
+    IS_SOME_FUNCTION = Some(f);
+}
+
+type GetFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
+static mut GET_FUNCTION: Option<GetFunction> = None;
+
+#[no_mangle]
+pub unsafe extern "C" fn register_RustHandleOption__get(
+    f: GetFunction,
+) {
+    GET_FUNCTION = Some(f);
+}
+
+pub struct RustHandleOption(Dart_Handle);
+
+impl From<RustHandleOption> for Option<Dart_Handle> {
+    fn from(from: RustHandleOption) -> Self {
+        if unsafe { IS_SOME_FUNCTION.unwrap()(from.0) } == 1 {
+            Some(unsafe { GET_FUNCTION.unwrap()(from.0) })
+        } else {
+            None
+        }
+    }
+}
+
 #[repr(C)]
 pub struct DartOption {
     is_some: i8,

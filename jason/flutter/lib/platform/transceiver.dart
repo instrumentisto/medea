@@ -13,7 +13,7 @@ void registerFunctions() {
       Pointer.fromFunction<Void Function(Handle, Handle)>(replaceSendTrack));
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__get_send_track')(
-      Pointer.fromFunction<HandleOption Function(Handle)>(getSendTrack));
+      Pointer.fromFunction<Handle Function(Handle)>(getSendTrack));
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__set_send_track_enabled')(
       Pointer.fromFunction<Handle Function(Handle, Int8)>(setSendTrackEnabled));
@@ -28,7 +28,7 @@ void registerFunctions() {
       Pointer.fromFunction<Pointer<Utf8> Function(Handle)>(mid));
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__send_track')(
-      Pointer.fromFunction<HandleOption Function(Handle)>(sendTrack));
+      Pointer.fromFunction<Handle Function(Handle)>(sendTrack));
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__has_send_track')(
       Pointer.fromFunction<Int8 Function(Handle)>(hasSendTrack, 0));
@@ -48,21 +48,21 @@ Pointer<Utf8> mid(Object transceiver) {
   return transceiver.mid.toNativeUtf8();
 }
 
-HandleOption sendTrack(Object transceiver) {
+Object sendTrack(Object transceiver) {
   transceiver = transceiver as RTCRtpTransceiver;
   if (transceiver.sender.track != null) {
-    return HandleOption.some(transceiver.sender.track!);
+    return RustHandleOption.some(transceiver.sender.track!);
   } else {
-    return HandleOption.none();
+    return RustHandleOption.none();
   }
 }
 
-HandleOption getSendTrack(Object transceiver) {
+Object getSendTrack(Object transceiver) {
   transceiver = transceiver as RTCRtpTransceiver;
   if (transceiver.sender != null) {
-    return HandleOption.some(transceiver.sender.track!);
+    return RustHandleOption.some(transceiver.sender.track!);
   } else {
-    return HandleOption.none();
+    return RustHandleOption.none();
   }
 }
 
