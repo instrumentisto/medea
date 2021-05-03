@@ -4,10 +4,10 @@ import 'ffi.dart' as ffi;
 
 void registerFunctions() {
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_RustHandleOption__get')(
+          'register_RustHandleOption__get')(
       Pointer.fromFunction<Handle Function(Handle)>(get));
   ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_RustHandleOption__is_none')(
+          'register_RustHandleOption__is_none')(
       Pointer.fromFunction<Int32 Function(Handle)>(isSome, 0));
 }
 

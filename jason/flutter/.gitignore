@@ -5,6 +5,7 @@
 /.flutter-plugins
 
 /pubspec.lock
+/.idea/
 
 /doc/api/
 /build/

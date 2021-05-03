@@ -1,32 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:medea_jason/jason.dart';
+import 'join_route.dart';
 
 void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatefulWidget {
-  @override
-  _MyAppState createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-        ),
-        body: Center(
-          child: Text(''),
-        ),
-      ),
-    );
-  }
+  runApp(MaterialApp(
+    title: 'Medea demo',
+    home: JoinRoute(),
+  ));
 }

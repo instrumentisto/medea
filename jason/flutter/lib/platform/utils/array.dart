@@ -3,7 +3,7 @@ import 'package:ffi/ffi.dart';
 import 'ffi.dart' as ffi;
 
 final _free_array_Dart _free_array =
-ffi.dl.lookupFunction<_free_array_C, _free_array_Dart>('free_array');
+    ffi.dl.lookupFunction<_free_array_C, _free_array_Dart>('free_array');
 typedef _free_array_C = Void Function(Array);
 typedef _free_array_Dart = void Function(Array);
 

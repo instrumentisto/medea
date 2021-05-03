@@ -4,21 +4,21 @@ import 'package:ffi/ffi.dart';
 import 'package:web_socket_channel/io.dart';
 
 void linkWebSocketFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_WebSocketRpcTransport__new")(
-      Pointer.fromFunction<Handle Function(Pointer<Utf8>)>(newWs)
-  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          "register_WebSocketRpcTransport__new")(
+      Pointer.fromFunction<Handle Function(Pointer<Utf8>)>(newWs));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_WebSocketRpcTransport__on_message")(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(listenWs)
-  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          "register_WebSocketRpcTransport__on_message")(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(listenWs));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_WebSocketRpcTransport__send")(
-      Pointer.fromFunction<Void Function(Handle, Pointer<Utf8>)>(sendWsMsg)
-  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          "register_WebSocketRpcTransport__send")(
+      Pointer.fromFunction<Void Function(Handle, Pointer<Utf8>)>(sendWsMsg));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>("register_WebSocketRpcTransport__on_close")(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(listenClose)
-  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          "register_WebSocketRpcTransport__on_close")(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(listenClose));
 }
 
 Object newWs(Pointer<Utf8> addr) {
@@ -26,9 +26,11 @@ Object newWs(Pointer<Utf8> addr) {
 }
 
 final _callMessageListenerDart _callMessageListener = ffi.dl
-    .lookupFunction<_callMessageListenerC, _callMessageListenerDart>('WsMessageListener__call');
+    .lookupFunction<_callMessageListenerC, _callMessageListenerDart>(
+        'WsMessageListener__call');
 typedef _callMessageListenerC = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
-typedef _callMessageListenerDart = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
+typedef _callMessageListenerDart = Pointer<Utf8> Function(
+    Pointer, Pointer<Utf8>);
 
 void listenWs(Object ws, Pointer listener) {
   if (ws is IOWebSocketChannel) {

@@ -5,15 +5,15 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__candidate')(
-      Pointer.fromFunction<RustStringOption Function(Handle)>(candidate)
-  );
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_m_line_index')(
-      Pointer.fromFunction<RustIntOption Function(Handle)>(sdpMLineIndex)
-  );
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>('register_IceCandidate__sdp_mid')(
-      Pointer.fromFunction<RustStringOption Function(Handle)>(sdpMid)
-  );
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_IceCandidate__candidate')(
+      Pointer.fromFunction<RustStringOption Function(Handle)>(candidate));
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_IceCandidate__sdp_m_line_index')(
+      Pointer.fromFunction<RustIntOption Function(Handle)>(sdpMLineIndex));
+  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_IceCandidate__sdp_mid')(
+      Pointer.fromFunction<RustStringOption Function(Handle)>(sdpMid));
 }
 
 RustStringOption candidate(Object iceCandidate) {
@@ -24,7 +24,8 @@ RustStringOption candidate(Object iceCandidate) {
       return RustStringOption.none();
     }
   } else {
-    throw Exception("Unknown object provided from Rust side: " + iceCandidate.runtimeType.toString());
+    throw Exception("Unknown object provided from Rust side: " +
+        iceCandidate.runtimeType.toString());
   }
 }
 
@@ -36,7 +37,8 @@ RustIntOption sdpMLineIndex(Object iceCandidate) {
       return RustIntOption.none();
     }
   } else {
-    throw Exception("Unknown object provided from Rust side: " + iceCandidate.runtimeType.toString());
+    throw Exception("Unknown object provided from Rust side: " +
+        iceCandidate.runtimeType.toString());
   }
 }
 
@@ -48,6 +50,7 @@ RustStringOption sdpMid(Object iceCandidate) {
       return RustStringOption.none();
     }
   } else {
-    throw Exception("Unknown object provided from Rust side: " + iceCandidate.runtimeType.toString());
+    throw Exception("Unknown object provided from Rust side: " +
+        iceCandidate.runtimeType.toString());
   }
 }
