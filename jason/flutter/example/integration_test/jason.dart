@@ -7,7 +7,7 @@ import 'package:medea_jason/connection_handle.dart';
 import 'package:medea_jason/device_video_track_constraints.dart';
 import 'package:medea_jason/display_video_track_constraints.dart';
 import 'package:medea_jason/jason.dart';
-import 'package:medea_jason/kind.dart';
+import 'package:medea_jason/track_kinds.dart';
 import 'package:medea_jason/media_stream_settings.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
@@ -140,7 +140,7 @@ void main() {
 
     var reason = await reasonFut.future.timeout(Duration(seconds: 1));
 
-    expect(reason.reason(), equals('RoomCloseReason.reason'));
+    expect(reason.reason(), equals('RpcClientUnexpectedlyDropped'));
     expect(reason.isClosedByServer(), equals(false));
     expect(reason.isErr(), equals(true));
     reason.free();

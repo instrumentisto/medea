@@ -370,7 +370,7 @@ impl InnerMediaConnections {
         kind: MediaKind,
         direction: platform::TransceiverDirection,
     ) -> platform::Transceiver {
-        platform::Transceiver::from(self.peer.add_transceiver(kind, direction))
+        self.peer.add_transceiver(kind, direction)
     }
 
     /// Lookups a [`platform::Transceiver`] by the provided [`mid`].
@@ -380,9 +380,7 @@ impl InnerMediaConnections {
         &self,
         mid: &str,
     ) -> Option<platform::Transceiver> {
-        self.peer
-            .get_transceiver_by_mid(mid)
-            .map(platform::Transceiver::from)
+        self.peer.get_transceiver_by_mid(mid)
     }
 }
 
@@ -394,6 +392,7 @@ impl MediaConnections {
     /// Instantiates a new [`MediaConnections`] storage for the given
     /// [`platform::RtcPeerConnection`].
     #[inline]
+    #[must_use]
     pub fn new(
         peer: Rc<platform::RtcPeerConnection>,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
@@ -708,7 +707,7 @@ impl MediaConnections {
         {
             if let Some(mid) = receiver.mid() {
                 if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
-                    receiver.replace_transceiver(trnscvr.into())
+                    receiver.replace_transceiver(trnscvr)
                 }
             }
         }

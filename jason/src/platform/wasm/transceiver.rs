@@ -5,11 +5,10 @@ use std::{cell::RefCell, rc::Rc};
 use bitflags::bitflags;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::Direction as DirectionProto;
-use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::media::track::local;
+use crate::{media::track::local, platform::Error};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -62,7 +61,7 @@ impl Transceiver {
     pub async fn set_send_track(
         &self,
         new_track: Rc<local::Track>,
-    ) -> Result<(), JsValue> {
+    ) -> Result<(), Error> {
         let sys_track: &web_sys::MediaStreamTrack =
             (*new_track).as_ref().as_ref();
         JsFuture::from(
