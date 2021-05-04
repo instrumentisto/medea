@@ -35,43 +35,22 @@ class MediaManager {
 
   Future<List<LocalMediaTrack>> initLocalTracks(
       MediaStreamSettings caps) async {
-    var fut = _initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr());
-    if (fut is Future) {
-      var tracks = await fut;
-      if (tracks is PtrArray) {
-        return tracks
-            .intoPointerList()
-            .map((e) => LocalMediaTrack(NullablePointer(e)))
-            .toList();
-      } else {
-        throw Exception('Future resolved with unexpected Object: ' +
-            tracks.runtimeType.toString());
-      }
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    PtrArray tracks =
+        await (_initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
+            as Future);
+    return tracks
+        .intoPointerList()
+        .map((e) => LocalMediaTrack(NullablePointer(e)))
+        .toList();
   }
 
   Future<List<InputDeviceInfo>> enumerateDevices() async {
-    var fut = _enumerateDevices(ptr.getInnerPtr());
-    if (fut is Future) {
-      var devices = await fut;
-      if (devices is PtrArray) {
-        return devices
-            .intoPointerList()
-            .map((e) => InputDeviceInfo(NullablePointer(e)))
-            .toList();
-      } else {
-        throw Exception('Future resolved with unexpected Object: ' +
-            devices.runtimeType.toString());
-      }
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    var fut = _enumerateDevices(ptr.getInnerPtr()) as Future;
+    PtrArray devices = await fut;
+    return devices
+        .intoPointerList()
+        .map((e) => InputDeviceInfo(NullablePointer(e)))
+        .toList();
   }
 
   @moveSemantics

@@ -1,4 +1,5 @@
 import 'dart:ffi';
+
 import 'jason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
@@ -29,28 +30,36 @@ class ReconnectHandle {
 
   ReconnectHandle(this.ptr);
 
+  /// Tries to reconnect after the provided delay in milliseconds.
+  ///
+  /// If `Room` is already reconnecting then new reconnection attempt won't be
+  /// performed. Instead, it will wait for the first reconnection attempt result
+  /// and use it here.
   Future<void> reconnectWithDelay(int delayMs) async {
-    var fut = _reconnect_with_delay(ptr.getInnerPtr(), delayMs);
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future);
   }
 
+  /// Tries to reconnect `Room` in a loop with a growing backoff delay.
+  ///
+  /// The first attempt to reconnect is guaranteed to happen no earlier than
+  /// `starting_delay_ms`.
+  ///
+  /// Also, it guarantees that delay between reconnection attempts won't be
+  /// greater than `max_delay_ms`.
+  ///
+  /// After each reconnection attempt, delay between reconnections will be
+  /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
+  ///
+  /// If `Room` is already reconnecting then new reconnection attempt won't be
+  /// performed. Instead, it will wait for the first reconnection attempt result
+  /// and use it here.
+  ///
+  /// If `multiplier` is negative number than `multiplier` will be considered
+  /// as `0.0`.
   Future<void> reconnectWithBackoff(
       int startingDelayMs, double multiplier, int maxDelay) async {
-    var fut = _reconnect_with_backoff(
-        ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay);
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_reconnect_with_backoff(
+        ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay) as Future);
   }
 
   @moveSemantics

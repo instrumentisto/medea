@@ -5,6 +5,8 @@ import 'jason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 
+// TODO: Typedefs should have names that are not bound to concrete methods and
+//       moved to shared lib, so they can be reused and won't pollute things.
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
 

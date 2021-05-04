@@ -14,7 +14,7 @@ use std::{ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::ForeignClass;
+use crate::DartValue;
 
 use super::dart_api::{
     Dart_DeletePersistentHandle_DL_Trampolined,
@@ -83,7 +83,7 @@ pub struct DartClosure<T> {
     cb: Dart_PersistentHandle,
 
     /// Type of this closure argument.
-    _arg: PhantomData<T>,
+    _arg: PhantomData<*const T>,
 }
 
 impl<T> DartClosure<T> {
@@ -99,58 +99,31 @@ impl<T> DartClosure<T> {
     }
 }
 
-impl DartClosure<()> {
-    /// Calls the underlying Dart closure.
-    #[inline]
-    pub fn call0(&self) {
-        unsafe {
-            let fn_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-            NO_ARGS_FN_CALLER.unwrap()(fn_handle);
-        }
-    }
-}
-
-impl<T: ForeignClass> DartClosure<T> {
+impl<T: Into<DartValue>> DartClosure<T> {
     /// Calls the underlying Dart closure with the provided [`ForeignClass`]
     /// argument.
     #[inline]
     pub fn call1(&self, arg: T) {
         unsafe {
             let fn_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-            PTR_ARG_FN_CALLER.unwrap()(
-                fn_handle,
-                arg.into_ptr().cast::<c_void>(),
-            );
-        }
-    }
-}
 
-/// Implements [`DartClosure::call1()`] casting argument to `i64`. Should be
-/// called for all integer types that fit into `2^63`.
-macro_rules! impl_dart_closure_for_int {
-    ($arg:ty) => {
-        impl DartClosure<$arg> {
-            /// Calls the underlying Dart closure with the provided argument.
-            pub fn call1(&self, arg: $arg) {
-                unsafe {
-                    let fn_handle =
-                        Dart_HandleFromPersistent_DL_Trampolined(self.cb);
-                    INT_ARG_FN_CALLER.unwrap()(fn_handle, arg as i64);
+            match arg.into() {
+                DartValue::Ptr(ptr) => {
+                    PTR_ARG_FN_CALLER.unwrap()(fn_handle, ptr);
+                }
+                DartValue::Int(int) => {
+                    INT_ARG_FN_CALLER.unwrap()(fn_handle, int);
+                }
+                DartValue::Void => {
+                    NO_ARGS_FN_CALLER.unwrap()(fn_handle);
+                }
+                DartValue::String(_) | DartValue::PtrArray(_) => {
+                    unimplemented!()
                 }
             }
         }
-    };
+    }
 }
-
-impl_dart_closure_for_int!(i8);
-impl_dart_closure_for_int!(i16);
-impl_dart_closure_for_int!(i32);
-impl_dart_closure_for_int!(i64);
-impl_dart_closure_for_int!(isize);
-impl_dart_closure_for_int!(u8);
-impl_dart_closure_for_int!(u16);
-impl_dart_closure_for_int!(u32);
-impl_dart_closure_for_int!(bool);
 
 impl<T> Drop for DartClosure<T> {
     /// Manually deallocates saved [`Dart_PersistentHandle`] so it won't leak.

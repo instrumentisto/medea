@@ -1,5 +1,6 @@
 use crate::{
-    media_manager::MediaManagerHandle, room_handle::RoomHandle, ForeignClass,
+    media_manager_handle::MediaManagerHandle, room_handle::RoomHandle,
+    ForeignClass,
 };
 
 pub struct Jason;
@@ -24,6 +25,10 @@ impl Jason {
 
 #[no_mangle]
 pub extern "C" fn Jason__new() -> *const Jason {
+    // TODO: init_once should be called only once.
+    android_logger::init_once(
+        android_logger::Config::default().with_min_level(log::Level::Debug),
+    );
     Jason::new().into_ptr()
 }
 

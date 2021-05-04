@@ -31,7 +31,7 @@ typedef _join_C = Handle Function(Pointer, Pointer<Utf8>);
 typedef _join_Dart = Object Function(Pointer, Pointer<Utf8>);
 
 typedef _setLocalMediaSettings_C = Handle Function(
-    Pointer, Pointer, Int64, Int64);
+    Pointer, Pointer, Uint8, Uint8);
 typedef _setLocalMediaSettings_Dart = Object Function(
     Pointer, Pointer, int, int);
 
@@ -87,210 +87,168 @@ final _onConnectionLoss =
     dl.lookupFunction<_onConnectionLoss_C, _onConnectionLoss_Dart>(
         'RoomHandle__on_connection_loss');
 
-final _join = dl.lookupFunction<_join_C, _join_Dart>('ConnectionHandle__join');
+final _join = dl.lookupFunction<_join_C, _join_Dart>('RoomHandle__join');
 
 final _setLocalMediaSettings =
     dl.lookupFunction<_setLocalMediaSettings_C, _setLocalMediaSettings_Dart>(
-        'ConnectionHandle__set_local_media_settings');
+        'RoomHandle__set_local_media_settings');
 
-final _muteAudio = dl.lookupFunction<_muteAudio_C, _muteAudio_Dart>(
-    'ConnectionHandle__mute_audio');
+final _muteAudio =
+    dl.lookupFunction<_muteAudio_C, _muteAudio_Dart>('RoomHandle__mute_audio');
 
 final _unmuteAudio = dl.lookupFunction<_unmuteAudio_C, _unmuteAudio_Dart>(
-    'ConnectionHandle__unmute_audio');
+    'RoomHandle__unmute_audio');
 
-final _muteVideo = dl.lookupFunction<_muteVideo_C, _muteVideo_Dart>(
-    'ConnectionHandle__mute_video');
+final _muteVideo =
+    dl.lookupFunction<_muteVideo_C, _muteVideo_Dart>('RoomHandle__mute_video');
 
 final _unmuteVideo = dl.lookupFunction<_unmuteVideo_C, _unmuteVideo_Dart>(
-    'ConnectionHandle__unmute_video');
+    'RoomHandle__unmute_video');
 
 final _disableVideo = dl.lookupFunction<_disableVideo_C, _disableVideo_Dart>(
-    'ConnectionHandle__disable_video');
+    'RoomHandle__disable_video');
 
 final _enableVideo = dl.lookupFunction<_enableVideo_C, _enableVideo_Dart>(
-    'ConnectionHandle__enable_video');
+    'RoomHandle__enable_video');
 
 final _disableAudio = dl.lookupFunction<_disableAudio_C, _disableAudio_Dart>(
-    'ConnectionHandle__disable_audio');
+    'RoomHandle__disable_audio');
 
 final _enableAudio = dl.lookupFunction<_enableAudio_C, _enableAudio_Dart>(
-    'ConnectionHandle__enable_audio');
+    'RoomHandle__enable_audio');
 
 final _disableRemoteAudio =
     dl.lookupFunction<_disableRemoteAudio_C, _disableRemoteAudio_Dart>(
-        'ConnectionHandle__disable_remote_audio');
+        'RoomHandle__disable_remote_audio');
 
 final _enableRemoteAudio =
     dl.lookupFunction<_enableRemoteAudio_C, _enableRemoteAudio_Dart>(
-        'ConnectionHandle__enable_remote_audio');
+        'RoomHandle__enable_remote_audio');
 
 final _disableRemoteVideo =
     dl.lookupFunction<_disableRemoteVideo_C, _disableRemoteVideo_Dart>(
-        'ConnectionHandle__disable_remote_video');
+        'RoomHandle__disable_remote_video');
 
 final _enableRemoteVideo =
     dl.lookupFunction<_enableRemoteVideo_C, _enableRemoteVideo_Dart>(
-        'ConnectionHandle__enable_remote_video');
+        'RoomHandle__enable_remote_video');
 
 class RoomHandle {
   late NullablePointer ptr;
 
   RoomHandle(this.ptr);
 
-  Future<void> join(String url) async {
-    var fut = _join(ptr.getInnerPtr(), url.toNativeUtf8());
-    if (fut is Future) {
-      await fut;
-    } else {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
+  /// Connects to a media server and joins the `Room` with the provided
+  /// authorization `token`.
+  ///
+  /// Authorization token has a fixed format:
+  /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
+  /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
+  Future<void> join(String token) async {
+    var tokenPtr = token.toNativeUtf8();
+    try {
+      await (_join(ptr.getInnerPtr(), tokenPtr) as Future);
+    } finally {
+      calloc.free(tokenPtr);
     }
   }
 
+  /// Updates this `Room`'s `MediaStreamSettings`. This affects all
+  /// `PeerConnection`s in this `Room`. If `MediaStreamSettings` is configured
+  /// for some `Room`, then this `Room` can only send media tracks that
+  /// correspond to this settings. `MediaStreamSettings` update will change
+  /// media tracks in all sending peers, so that might cause new
+  /// [getUserMedia()][1] request.
+  ///
+  /// Media obtaining/injection errors are additionally fired to
+  /// `on_failed_local_media` callback.
+  ///
+  /// If `stop_first` set to `true` then affected local `Tracks` will be
+  /// dropped before new `MediaStreamSettings` is applied. This is usually
+  /// required when changing video source device due to hardware limitations,
+  /// e.g. having an active track sourced from device `A` may hinder
+  /// [getUserMedia()][1] requests to device `B`.
+  ///
+  /// `rollback_on_fail` option configures `MediaStreamSettings` update request
+  /// to automatically rollback to previous settings if new settings cannot be
+  /// applied.
+  ///
+  /// If recovering from fail state isn't possible then affected media types
+  /// will be disabled.
+  ///
+  /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
   Future<void> setLocalMediaSettings(
       MediaStreamSettings settings, bool stopFirst, bool rollbackOnFail) async {
-    var fut = _setLocalMediaSettings(ptr.getInnerPtr(),
-        settings.ptr.getInnerPtr(), stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0);
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_setLocalMediaSettings(ptr.getInnerPtr(), settings.ptr.getInnerPtr(),
+        stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0) as Future);
   }
 
+  /// Mutes outbound audio in this `Room`.
   Future<void> muteAudio() async {
-    var fut = _muteAudio(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_muteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Unmutes outbound audio in this `Room`.
   Future<void> unmuteAudio() async {
-    var fut = _unmuteAudio(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_unmuteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Mutes outbound video in this `Room`.
+  ///
+  /// Affects only video with specific [MediaSourceKind] if specified.
   Future<void> muteVideo(MediaSourceKind kind) async {
-    var fut = _muteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_muteVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
+  /// Unmutes outbound video in this `Room`.
+  ///
+  /// Affects only video with specific [MediaSourceKind] if specified.
   Future<void> unmuteVideo(MediaSourceKind kind) async {
-    var fut = _unmuteVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_unmuteVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
+  /// Disables outbound video.
+  ///
+  /// Affects only video with specific [MediaSourceKind] if specified.
   Future<void> disableVideo(MediaSourceKind kind) async {
-    var fut = _disableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
+  /// Enables outbound video.
+  ///
+  /// Affects only video with specific [MediaSourceKind] if specified.
   Future<void> enableVideo(MediaSourceKind kind) async {
-    var fut = _enableVideo(ptr.getInnerPtr(), nativeMediaSourceKind(kind));
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_enableVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
+  /// Disables outbound audio in this `Room`.
   Future<void> disableAudio() async {
-    var fut = _disableAudio(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_disableAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Enables outbound audio in this `Room`.
   Future<void> enableAudio() async {
-    var fut = _enableAudio(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_enableAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Disables inbound audio in this `Room`.
   Future<void> disableRemoteAudio() async {
-    var fut = _disableRemoteAudio(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Enables inbound audio in this `Room`.
   Future<void> enableRemoteAudio() async {
-    var fut = _enableRemoteAudio(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Disables inbound video in this `Room`.
   Future<void> disableRemoteVideo() async {
-    var fut = _disableRemoteVideo(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
+  /// Enables inbound video in this `Room`.
   Future<void> enableRemoteVideo() async {
-    var fut = _enableRemoteVideo(ptr.getInnerPtr());
-    if (fut is Future) {
-      await fut;
-    }
-    {
-      throw Exception(
-          'Unexpected Object instead of Future: ' + fut.runtimeType.toString());
-    }
+    await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
   void onNewConnection(void Function(ConnectionHandle) f) {

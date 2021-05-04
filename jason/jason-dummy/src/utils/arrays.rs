@@ -1,6 +1,6 @@
 //! Functionality for passing arrays from Rust to Dart.
 
-use std::{ffi::c_void, marker::PhantomData, slice};
+use std::{ffi::c_void, marker::PhantomData, mem, ptr, slice};
 
 use crate::ForeignClass;
 
@@ -36,8 +36,26 @@ impl<T: ForeignClass> PtrArray<T> {
     }
 }
 
+impl<T> PtrArray<T> {
+    /// Erases type parameter on this [`PtrArray`].
+    ///
+    /// It can simplify things when passing [`PtrArray`] to Dart.
+    ///
+    /// Although this function drops `self` it wont clear an internal slice, its
+    /// ownership is transfered to the resulting  [`PtrArray`].
+    pub fn erase_type(mut self) -> PtrArray {
+        PtrArray {
+            ptr: mem::replace(&mut self.ptr, ptr::null()),
+            len: self.len,
+            _element: PhantomData,
+        }
+    }
+}
+
 impl<T> Drop for PtrArray<T> {
     /// Drops this [`PtrArray`].
+    ///
+    /// Clears internal slice if its pointer is not null.
     ///
     /// # Safety
     ///
@@ -49,6 +67,10 @@ impl<T> Drop for PtrArray<T> {
     /// doesn't matter.
     #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
+        if self.ptr.is_null() {
+            return;
+        }
+
         unsafe {
             let slice = slice::from_raw_parts_mut(
                 self.ptr as *mut *mut c_void,

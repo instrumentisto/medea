@@ -26,23 +26,23 @@ impl RemoteMediaTrack {
     // pub fn get_track(&self) -> sys::MediaStreamTrack
 
     pub fn on_enabled(&self, cb: DartClosure<()>) {
-        cb.call0();
+        cb.call1(());
     }
 
     pub fn on_disabled(&self, cb: DartClosure<()>) {
-        cb.call0();
+        cb.call1(());
     }
 
     pub fn on_muted(&self, cb: DartClosure<()>) {
-        cb.call0();
+        cb.call1(());
     }
 
     pub fn on_unmuted(&self, cb: DartClosure<()>) {
-        cb.call0();
+        cb.call1(());
     }
 
     pub fn on_stopped(&self, cb: DartClosure<()>) {
-        cb.call0();
+        cb.call1(());
     }
 }
 

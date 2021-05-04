@@ -9,8 +9,11 @@ name = "jason"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
+android_logger = "0.10.1"
 dart-sys = "2.0"
+futures = "0.3.14"
 libc = "0.2"
+log = "0.4.14"
 
 [build-dependencies]
 cc = "1.0"

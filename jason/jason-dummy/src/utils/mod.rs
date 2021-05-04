@@ -7,6 +7,9 @@ mod string;
 use std::future::Future;
 
 use dart_sys::Dart_Handle;
+use futures::FutureExt as _;
+
+use crate::DartValue;
 
 pub use self::{
     arrays::PtrArray,
@@ -16,33 +19,37 @@ pub use self::{
 };
 
 /// Spawns provided [`Future`] in the Dart event loop.
-pub fn spawn<F>(_: F)
+pub fn spawn<F>(fut: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    todo!()
+    fut.now_or_never().unwrap();
 }
 
 /// Converts provided [`Future`] to the Dart `Future`.
 ///
 /// Returns [`Dart_Handle`] to the created Dart `Future`.
-pub fn into_dart_future<F, O, E>(f: F) -> Dart_Handle
+pub fn future_to_dart<
+    F,
+    T: Into<DartValue> + 'static,
+    E: Into<DartValue> + 'static,
+>(
+    f: F,
+) -> Dart_Handle
 where
-    F: Future<Output = Result<O, E>> + 'static,
-    O: 'static,
-    E: 'static,
+    F: Future<Output = Result<T, E>> + 'static,
 {
     let completer = Completer::new();
-    let fut = completer.future();
+    let dart_future = completer.future();
     spawn(async move {
         match f.await {
-            Ok(o) => {
-                completer.complete(o);
+            Ok(ok) => {
+                completer.complete(ok);
             }
             Err(e) => {
                 completer.complete_error(e);
             }
         }
     });
-    fut
+    dart_future
 }

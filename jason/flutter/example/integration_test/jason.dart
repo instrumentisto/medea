@@ -9,6 +9,7 @@ import 'package:medea_jason/display_video_track_constraints.dart';
 import 'package:medea_jason/jason.dart';
 import 'package:medea_jason/kind.dart';
 import 'package:medea_jason/media_stream_settings.dart';
+import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
 
@@ -216,5 +217,39 @@ void main() {
 
     track.free();
     expect(() => track.kind(), throwsStateError);
+  });
+
+  testWidgets('RoomHandle', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    await room.join('token');
+    await room.setLocalMediaSettings(MediaStreamSettings(), true, false);
+    await room.muteAudio();
+    await room.unmuteAudio();
+    await room.muteVideo(MediaSourceKind.Device);
+    await room.unmuteVideo(MediaSourceKind.Display);
+    await room.disableVideo(MediaSourceKind.Display);
+    await room.enableVideo(MediaSourceKind.Device);
+    await room.disableAudio();
+    await room.enableAudio();
+    await room.disableRemoteAudio();
+    await room.enableRemoteAudio();
+    await room.disableRemoteVideo();
+    await room.enableRemoteVideo();
+  });
+
+  testWidgets('ReconnectHandle', (WidgetTester tester) async {
+    var jason = Jason();
+    var room = jason.initRoom();
+
+    var handleFut = Completer<ReconnectHandle>();
+    room.onConnectionLoss((reconnectHandle) {
+      handleFut.complete(reconnectHandle);
+    });
+    var handle = await handleFut.future;
+
+    await handle.reconnectWithDelay(155);
+    await handle.reconnectWithBackoff(1, 2, 3);
   });
 }

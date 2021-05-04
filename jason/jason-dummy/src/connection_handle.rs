@@ -18,7 +18,7 @@ impl ConnectionHandle {
 
     pub fn on_close(&self, f: DartClosure<()>) {
         // Result<(), JasonError>
-        f.call0();
+        f.call1(());
     }
 
     pub fn on_remote_track_added(&self, f: DartClosure<RemoteMediaTrack>) {

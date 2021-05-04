@@ -8,6 +8,10 @@
     clippy::new_without_default
 )]
 
+use std::ffi::c_void;
+
+use crate::utils::PtrArray;
+
 pub mod audio_track_constraints;
 pub mod connection_handle;
 pub mod device_video_track_constraints;
@@ -15,7 +19,7 @@ pub mod display_video_track_constraints;
 pub mod input_device_info;
 pub mod jason;
 pub mod local_media_track;
-pub mod media_manager;
+pub mod media_manager_handle;
 pub mod media_stream_settings;
 pub mod reconnect_handle;
 pub mod remote_media_track;
@@ -63,3 +67,51 @@ impl From<i32> for MediaSourceKind {
         }
     }
 }
+
+/// Value that can be transferred to Dart.
+pub enum DartValue {
+    Void,
+    Ptr(*const c_void),
+    String(*const libc::c_char),
+    PtrArray(PtrArray),
+    Int(i64),
+}
+
+impl<T: ForeignClass> From<T> for DartValue {
+    fn from(val: T) -> Self {
+        Self::Ptr(val.into_ptr().cast())
+    }
+}
+
+impl From<()> for DartValue {
+    fn from(_: ()) -> Self {
+        Self::Void
+    }
+}
+
+impl<T> From<PtrArray<T>> for DartValue {
+    fn from(val: PtrArray<T>) -> Self {
+        DartValue::PtrArray(val.erase_type())
+    }
+}
+
+/// Implements [`From`] for [`DartValue`] for types that can by casted to `i64`.
+/// Should be called for all integer types that fit into `2^63`.
+macro_rules! impl_from_num_for_dart_value {
+    ($arg:ty) => {
+        impl From<$arg> for DartValue {
+            fn from(val: $arg) -> Self {
+                DartValue::Int(i64::from(val))
+            }
+        }
+    };
+}
+
+impl_from_num_for_dart_value!(i8);
+impl_from_num_for_dart_value!(i16);
+impl_from_num_for_dart_value!(i32);
+impl_from_num_for_dart_value!(i64);
+impl_from_num_for_dart_value!(u8);
+impl_from_num_for_dart_value!(u16);
+impl_from_num_for_dart_value!(u32);
+impl_from_num_for_dart_value!(bool);

@@ -6,7 +6,7 @@ use crate::{
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle,
     room_close_reason::RoomCloseReason,
-    utils::{c_str_into_string, into_dart_future, DartClosure},
+    utils::{c_str_into_string, future_to_dart, DartClosure},
     ForeignClass, MediaSourceKind,
 };
 
@@ -104,18 +104,53 @@ impl RoomHandle {
     }
 }
 
+/// Connects to a media server and joins the [`Room`] with the provided
+/// authorization `token`.
+///
+/// Authorization token has a fixed format:
+/// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
+/// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__join(
     this: *mut RoomHandle,
-    url: *const libc::c_char,
+    token: *const libc::c_char,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
-        this.join(c_str_into_string(url)).await;
-        Ok::<(), ()>(())
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
+        this.join(c_str_into_string(token)).await;
+        Ok::<_, ()>(())
     })
 }
 
+/// Updates this [`Room`]'s [`MediaStreamSettings`]. This affects all
+/// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+/// configured for some [`Room`], then this [`Room`] can only send media tracks
+/// that correspond to this settings. [`MediaStreamSettings`] update will change
+/// media tracks in all sending peers, so that might cause new
+/// [getUserMedia()][1] request.
+///
+/// Media obtaining/injection errors are additionally fired to
+/// `on_failed_local_media` callback.
+///
+/// If `stop_first` set to `true` then affected local `Tracks` will be
+/// dropped before new [`MediaStreamSettings`] is applied. This is usually
+/// required when changing video source device due to hardware limitations,
+/// e.g. having an active track sourced from device `A` may hinder
+/// [getUserMedia()][1] requests to device `B`.
+///
+/// `rollback_on_fail` option configures [`MediaStreamSettings`] update
+/// request to automatically rollback to previous settings if new settings
+/// cannot be applied.
+///
+/// If recovering from fail state isn't possible then affected media types
+/// will be disabled.
+///
+/// [`Room`]: crate::room::Room
+/// [`PeerConnection`]: crate::peer::PeerConnection
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
     this: *mut RoomHandle,
@@ -123,152 +158,204 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
     stop_first: bool,
     rollback_on_fail: bool,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    let settings = Box::from_raw(settings);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+    let settings = MediaStreamSettings::from_ptr(settings);
+
+    future_to_dart(async move {
         this.set_local_media_settings(&settings, stop_first, rollback_on_fail)
             .await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Mutes outbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.mute_audio().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Unmutes outbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.mute_audio().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Disables outbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.disable_audio().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Enables outbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.enable_audio().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Mutes outbound video in this [`Room`].
+///
+/// Affects only video with specific [`MediaSourceKind`] if specified.
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: *mut RoomHandle,
-    source_kind: i32,
+    source_kind: i32,// TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
+    let this = this.as_ref().unwrap();
     let source_kind = MediaSourceKind::from(source_kind);
-    into_dart_future(async move {
+
+    future_to_dart(async move {
         this.mute_video(Some(source_kind)).await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+
+/// Unmutes outbound video in this [`Room`].
+///
+/// Affects only video with specific [`MediaSourceKind`] if specified.
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: *mut RoomHandle,
-    source_kind: i32,
+    source_kind: i32, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
+    let this = this.as_ref().unwrap();
     let source_kind = MediaSourceKind::from(source_kind);
-    into_dart_future(async move {
+
+    future_to_dart(async move {
         this.unmute_video(Some(source_kind)).await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Disables outbound video.
+///
+/// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: *mut RoomHandle,
-    source_kind: i32,
+    source_kind: i32, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
+    let this = this.as_ref().unwrap();
     let source_kind = MediaSourceKind::from(source_kind);
-    into_dart_future(async move {
+
+    future_to_dart(async move {
         this.disable_video(Some(source_kind)).await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Enables outbound video.
+///
+/// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: *mut RoomHandle,
-    source_kind: i32,
+    source_kind: i32, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
+    let this = this.as_ref().unwrap();
     let source_kind = MediaSourceKind::from(source_kind);
-    into_dart_future(async move {
+
+    future_to_dart(async move {
         this.enable_video(Some(source_kind)).await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_remove_audio(
-    this: *mut RoomHandle,
-) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
-        this.disable_remote_audio().await;
-        Ok::<(), ()>(())
-    })
-}
-
+/// Enables inbound audio in this [`Room`].
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.enable_remote_audio().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Disables inbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
+    this: *mut RoomHandle,
+) -> Dart_Handle {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
+        this.disable_remote_audio().await;
+        Ok::<_, ()>(())
+    })
+}
+
+/// Disables inbound video in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_video(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.disable_remote_video().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 
+/// Enables inbound video in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_video(
     this: *mut RoomHandle,
 ) -> Dart_Handle {
-    let this = Box::from_raw(this);
-    into_dart_future(async move {
+    let this = this.as_ref().unwrap();
+
+    future_to_dart(async move {
         this.enable_remote_video().await;
-        Ok::<(), ()>(())
+        Ok::<_, ()>(())
     })
 }
 

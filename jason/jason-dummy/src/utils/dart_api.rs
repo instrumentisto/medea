@@ -4,6 +4,8 @@
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
+/// TODO: We should check everything returned from API with `Dart_IsError` and
+///       panic or `Dart_PropagateError`.
 #[link(name = "trampoline")]
 extern "C" {
     /// Initializes Dynamically Linked Dart API usage. Accepts

@@ -3,53 +3,62 @@ import 'dart:ffi';
 
 import 'ptrarray.dart';
 
+/// Registers functions that allow Rust to manage [Completer]s.
 void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_new_completer_caller')(
-      Pointer.fromFunction<Handle Function()>(_newCompleter));
+      Pointer.fromFunction<Handle Function()>(_Completer_new));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_completer_complete_caller')(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(_completerComplete));
+          'register_completer_future_caller')(
+      Pointer.fromFunction<Handle Function(Handle)>(_Completer_future));
+
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_completer_complete_ptr_caller')(
+      Pointer.fromFunction<Void Function(Handle, Pointer)>(
+          _Completer_complete_Pointer));
+
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_completer_complete_void_caller')(
+      Pointer.fromFunction<Void Function(Handle)>(_Completer_complete_Void));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_completer_complete_error_caller')(
       Pointer.fromFunction<Void Function(Handle, Pointer)>(
-          _completerCompleteError));
+          _Completer_completeError_Pointer));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_array_completer_complete_caller')(
+          'register_completer_complete_ptr_array_caller')(
       Pointer.fromFunction<Void Function(Handle, PtrArray)>(
-          _arrayCompleterComplete));
+          _Completer_complete_PtrArray));
 }
 
-Object _newCompleter() {
+/// Returns new [Completer].
+Object _Completer_new() {
   return Completer();
 }
 
-void _completerComplete(Object completer, Pointer arg) {
-  if (completer is Completer) {
-    completer.complete(arg);
-  } else {
-    throw Exception('Unexpected Object received from the Rust: ' +
-        completer.runtimeType.toString());
-  }
+/// Returns the [Future] that is completed by the provided [Completer].
+Object _Completer_future(Object completer) {
+  return (completer as Completer).future;
 }
 
-void _completerCompleteError(Object completer, Pointer arg) {
-  if (completer is Completer) {
-    completer.completeError(arg);
-  } else {
-    throw Exception('Unexpected Object received from the Rust: ' +
-        completer.runtimeType.toString());
-  }
+/// Completes the provided [Completer] with the provided [Pointer].
+void _Completer_complete_Pointer(Object completer, Pointer arg) {
+  (completer as Completer).complete(arg);
 }
 
-void _arrayCompleterComplete(Object completer, PtrArray arg) {
-  if (completer is Completer) {
-    completer.complete(arg);
-  } else {
-    throw Exception('Unexpected Object received from the Rust: ' +
-        completer.runtimeType.toString());
-  }
+/// Completes the provided [Completer].
+void _Completer_complete_Void(Object completer) {
+  (completer as Completer).complete();
+}
+
+/// Completes the provided [Completer] with the provided [PtrArray].
+void _Completer_complete_PtrArray(Object completer, PtrArray arg) {
+  (completer as Completer).complete(arg);
+}
+
+/// Complete the provided [Completer] with an error.
+void _Completer_completeError_Pointer(Object completer, Pointer arg) {
+  (completer as Completer).completeError(arg);
 }
