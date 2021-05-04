@@ -141,23 +141,23 @@ mod mock {
         // pub fn get_track(&self) -> sys::MediaStreamTrack
 
         pub fn on_enabled(&self, cb: platform::Function<()>) {
-            cb.call0();
+            cb.call1(());
         }
 
         pub fn on_disabled(&self, cb: platform::Function<()>) {
-            cb.call0();
+            cb.call1(());
         }
 
         pub fn on_muted(&self, cb: platform::Function<()>) {
-            cb.call0();
+            cb.call1(());
         }
 
         pub fn on_unmuted(&self, cb: platform::Function<()>) {
-            cb.call0();
+            cb.call1(());
         }
 
         pub fn on_stopped(&self, cb: platform::Function<()>) {
-            cb.call0();
+            cb.call1(());
         }
     }
 }

@@ -101,7 +101,7 @@ mod mock {
             &self,
             f: platform::Function<()>,
         ) -> Result<(), JasonError> {
-            f.call0();
+            f.call1(());
             Ok(())
         }
 

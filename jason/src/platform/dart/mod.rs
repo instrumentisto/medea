@@ -45,6 +45,7 @@ pub fn set_panic_hook() {}
 ///
 /// [`android_logger`]: https://docs.rs/android_logger
 pub fn init_logger() {
+    // TODO: android_logger::init_once should be called only once.
     android_logger::init_once(
         android_logger::Config::default().with_min_level(log::Level::Debug),
     );

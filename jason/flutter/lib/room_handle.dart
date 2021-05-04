@@ -3,7 +3,7 @@ import 'package:ffi/ffi.dart';
 
 import 'connection_handle.dart';
 import 'jason.dart';
-import 'kind.dart';
+import 'track_kinds.dart';
 import 'media_stream_settings.dart';
 import 'local_media_track.dart';
 import 'reconnect_handle.dart';

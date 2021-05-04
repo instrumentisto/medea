@@ -43,6 +43,7 @@ impl<T> PtrArray<T> {
     ///
     /// Although this function drops `self` it wont clear an internal slice, its
     /// ownership is transfered to the resulting  [`PtrArray`].
+    #[must_use]
     pub fn erase_type(mut self) -> PtrArray {
         PtrArray {
             ptr: mem::replace(&mut self.ptr, ptr::null()),

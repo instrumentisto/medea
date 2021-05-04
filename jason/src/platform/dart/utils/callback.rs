@@ -14,7 +14,7 @@ use std::{cell::RefCell, ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::DartValue;
+use crate::api::DartValue;
 
 use super::dart_api::{
     Dart_DeletePersistentHandle_DL_Trampolined,
@@ -100,7 +100,7 @@ impl Callback<()> {
     #[inline]
     pub fn call0(&self) {
         if let Some(f) = self.0.borrow().as_ref() {
-            f.call0()
+            f.call1(())
         };
     }
 }
@@ -151,7 +151,8 @@ impl<T: Into<DartValue>> Function<T> {
     #[inline]
     pub fn call1(&self, arg: T) {
         unsafe {
-            let fn_handle = Dart_HandleFromPersistent_DL_Trampolined(self.cb);
+            let fn_handle =
+                Dart_HandleFromPersistent_DL_Trampolined(self.dart_fn);
 
             match arg.into() {
                 DartValue::Ptr(ptr) => {

@@ -23,7 +23,7 @@ use std::{ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::{utils::PtrArray, DartValue};
+use crate::api::{utils::PtrArray, DartValue};
 
 use super::dart_api::{
     Dart_HandleFromPersistent_DL_Trampolined,
@@ -116,7 +116,9 @@ static mut COMPLETER_FUTURE_CALLER: Option<CompleterFutureCaller> = None;
 
 /// Registers the provided [`NewCompleterCaller`] as [`NEW_COMPLETER_CALLER`].
 ///
-/// Must be called by Dart during FFI initialization.
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_new_completer_caller(f: CompleterNewCaller) {
     COMPLETER_NEW_CALLER = Some(f);
@@ -125,7 +127,9 @@ pub unsafe extern "C" fn register_new_completer_caller(f: CompleterNewCaller) {
 /// Registers the provided [`CompleterCompleteCaller`] as
 /// [`COMPLETER_COMPLETE_CALLER`].
 ///
-/// Must be called by Dart during FFI initialization.
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_complete_void_caller(
     f: CompleterCompleteVoidCaller,
@@ -136,7 +140,9 @@ pub unsafe extern "C" fn register_completer_complete_void_caller(
 /// Registers the provided [`CompleterCompleteCaller`] as
 /// [`COMPLETER_COMPLETE_CALLER`].
 ///
-/// Must be called by Dart during FFI initialization.
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_complete_ptr_caller(
     f: CompleterCompletePtrCaller,
@@ -147,7 +153,9 @@ pub unsafe extern "C" fn register_completer_complete_ptr_caller(
 /// Registers the provided [`CompleterCompleteErrorCaller`] as
 /// [`COMPLETER_COMPLETE_ERROR_CALLER`].
 ///
-/// Must be called by Dart during FFI initialization.
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_complete_error_caller(
     f: CompleterCompleteErrorCaller,
@@ -158,7 +166,9 @@ pub unsafe extern "C" fn register_completer_complete_error_caller(
 /// Registers the provided [`ArrayCompleterCompleteCaller`] as
 /// [`ARRAY_COMPLETER_COMPLETE_CALLER`].
 ///
-/// Must be called by Dart during FFI initialization.
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_complete_ptr_array_caller(
     f: CompleterCompletePtrArrayCaller,
@@ -169,7 +179,9 @@ pub unsafe extern "C" fn register_completer_complete_ptr_array_caller(
 /// Registers the provided [`CompleterFutureCaller`] as
 /// [`COMPLETER_FUTURE_CALLER`].
 ///
-/// Must be called by Dart during FFI initialization.
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
 pub unsafe extern "C" fn register_completer_future_caller(
     f: CompleterFutureCaller,
@@ -201,6 +213,7 @@ impl<T, E> Completer<T, E> {
     ///
     /// Persists the created [`Dart_Handle`] so it won't be moved by the Dart VM
     /// GC.
+    #[must_use]
     pub fn new() -> Self {
         let handle = unsafe {
             let completer = COMPLETER_NEW_CALLER.unwrap()();
@@ -217,11 +230,18 @@ impl<T, E> Completer<T, E> {
     /// [`Completer`].
     ///
     /// [Future]: https://api.dart.dev/dart-async/Future-class.html
+    #[must_use]
     pub fn future(&self) -> Dart_Handle {
         unsafe {
             let handle = Dart_HandleFromPersistent_DL_Trampolined(self.handle);
             COMPLETER_FUTURE_CALLER.unwrap()(handle)
         }
+    }
+}
+
+impl<T, E> Default for Completer<T, E> {
+    fn default() -> Self {
+        Completer::new()
     }
 }
 

@@ -37,6 +37,10 @@ pub use self::{
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
 };
 
+use std::ffi::c_void;
+
+use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
+
 /// Rust structure having wrapper class in Dart.
 ///
 /// Intended to be passed through FFI boundaries as thin pointers.
@@ -59,5 +63,65 @@ pub trait ForeignClass: Sized {
     #[must_use]
     unsafe fn from_ptr(this: *mut Self) -> Self {
         *Box::from_raw(this)
+    }
+}
+
+/// Value that can be transferred to Dart.
+pub enum DartValue {
+    Void,
+    Ptr(*const c_void),
+    String(*const libc::c_char),
+    PtrArray(PtrArray),
+    Int(i64),
+}
+
+impl<T: ForeignClass> From<T> for DartValue {
+    fn from(val: T) -> Self {
+        Self::Ptr(val.into_ptr().cast())
+    }
+}
+
+impl From<()> for DartValue {
+    fn from(_: ()) -> Self {
+        Self::Void
+    }
+}
+
+impl<T> From<PtrArray<T>> for DartValue {
+    fn from(val: PtrArray<T>) -> Self {
+        DartValue::PtrArray(val.erase_type())
+    }
+}
+
+/// Implements [`From`] for [`DartValue`] for types that can by casted to `i64`.
+/// Should be called for all integer types that fit into `2^63`.
+macro_rules! impl_from_num_for_dart_value {
+    ($arg:ty) => {
+        impl From<$arg> for DartValue {
+            fn from(val: $arg) -> Self {
+                DartValue::Int(i64::from(val))
+            }
+        }
+    };
+}
+
+impl_from_num_for_dart_value!(i8);
+impl_from_num_for_dart_value!(i16);
+impl_from_num_for_dart_value!(i32);
+impl_from_num_for_dart_value!(i64);
+impl_from_num_for_dart_value!(u8);
+impl_from_num_for_dart_value!(u16);
+impl_from_num_for_dart_value!(u32);
+impl_from_num_for_dart_value!(bool);
+
+impl From<u8> for MediaSourceKind {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => MediaSourceKind::Device,
+            1 => MediaSourceKind::Display,
+            _ => {
+                unreachable!()
+            }
+        }
     }
 }
