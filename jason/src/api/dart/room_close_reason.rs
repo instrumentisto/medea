@@ -50,5 +50,5 @@ pub unsafe extern "C" fn RoomCloseReason__is_err(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__free(this: *mut RoomCloseReason) {
-    RoomCloseReason::from_ptr(this);
+    let _ = RoomCloseReason::from_ptr(this);
 }

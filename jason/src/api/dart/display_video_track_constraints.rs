@@ -22,5 +22,5 @@ pub extern "C" fn DisplayVideoTrackConstraints__new(
 pub unsafe extern "C" fn DisplayVideoTrackConstraints__free(
     this: *mut DisplayVideoTrackConstraints,
 ) {
-    DisplayVideoTrackConstraints::from_ptr(this);
+    let _ = DisplayVideoTrackConstraints::from_ptr(this);
 }

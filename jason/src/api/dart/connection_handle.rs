@@ -79,7 +79,7 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
-    ConnectionHandle::from_ptr(this);
+    let _ = ConnectionHandle::from_ptr(this);
 }
 
 #[cfg(feature = "mockable")]

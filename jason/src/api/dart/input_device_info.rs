@@ -71,7 +71,7 @@ pub unsafe extern "C" fn InputDeviceInfo__group_id(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__free(this: *mut InputDeviceInfo) {
-    InputDeviceInfo::from_ptr(this);
+    let _ = InputDeviceInfo::from_ptr(this);
 }
 
 #[cfg(feature = "mockable")]

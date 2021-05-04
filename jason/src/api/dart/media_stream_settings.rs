@@ -60,5 +60,5 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
 pub unsafe extern "C" fn MediaStreamSettings__free(
     this: *mut MediaStreamSettings,
 ) {
-    MediaStreamSettings::from_ptr(this);
+    let _ = MediaStreamSettings::from_ptr(this);
 }

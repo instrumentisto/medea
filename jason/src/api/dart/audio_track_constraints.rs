@@ -37,5 +37,5 @@ pub unsafe extern "C" fn AudioTrackConstraints__device_id(
 pub unsafe extern "C" fn AudioTrackConstraints__free(
     this: *mut AudioTrackConstraints,
 ) {
-    AudioTrackConstraints::from_ptr(this);
+    let _ = AudioTrackConstraints::from_ptr(this);
 }

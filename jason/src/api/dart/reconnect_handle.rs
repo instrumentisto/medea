@@ -15,7 +15,7 @@ impl ForeignClass for ReconnectHandle {}
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
-    ReconnectHandle::from_ptr(this);
+    let _ = ReconnectHandle::from_ptr(this);
 }
 
 #[cfg(feature = "mockable")]

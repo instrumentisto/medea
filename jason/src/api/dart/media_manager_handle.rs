@@ -57,7 +57,7 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 pub unsafe extern "C" fn MediaManagerHandle__free(
     this: *mut MediaManagerHandle,
 ) {
-    MediaManagerHandle::from_ptr(this);
+    let _ = MediaManagerHandle::from_ptr(this);
 }
 
 #[cfg(feature = "mockable")]
