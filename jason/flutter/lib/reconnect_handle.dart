@@ -18,12 +18,12 @@ typedef _reconnect_with_backoff_Dart = Object Function(
 final _free = dl.lookupFunction<_free_C, _free_Dart>('ReconnectHandle__free');
 
 final _reconnect_with_delay =
-dl.lookupFunction<_reconnect_with_delay_C, _reconnect_with_delay_Dart>(
-    'ReconnectHandle__reconnect_with_delay');
+    dl.lookupFunction<_reconnect_with_delay_C, _reconnect_with_delay_Dart>(
+        'ReconnectHandle__reconnect_with_delay');
 
 final _reconnect_with_backoff =
-dl.lookupFunction<_reconnect_with_backoff_C, _reconnect_with_backoff_Dart>(
-    'ReconnectHandle__reconnect_with_backoff');
+    dl.lookupFunction<_reconnect_with_backoff_C, _reconnect_with_backoff_Dart>(
+        'ReconnectHandle__reconnect_with_backoff');
 
 /// External handle used to reconnect to a media server when connection is lost.
 ///

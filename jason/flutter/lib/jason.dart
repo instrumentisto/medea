@@ -5,10 +5,13 @@ import 'dart:io';
 
 import 'media_manager.dart';
 import 'room_handle.dart';
+import 'util/executor.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/callback.dart' as callback;
 import 'util/completer.dart' as completer;
+import 'util/future.dart' as future;
+import 'util/delay_for.dart' as delay_for;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
@@ -28,6 +31,8 @@ typedef _free_Dart = void Function(Pointer);
 final DynamicLibrary dl = _dl_load();
 
 final _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');
+
+final _executor = Executor(dl);
 
 final _media_manager = dl.lookupFunction<_mediaManager_C, _mediaManager_Dart>(
     'Jason__media_manager');
@@ -63,6 +68,8 @@ DynamicLibrary _dl_load() {
   }
   callback.registerFunctions(dl);
   completer.registerFunctions(dl);
+  future.registerFunctions(dl);
+  delay_for.registerFunctions(dl);
 
   return dl;
 }
@@ -74,6 +81,10 @@ DynamicLibrary _dl_load() {
 class Jason {
   /// [Pointer] to the Rust struct backing this object.
   final NullablePointer ptr = NullablePointer(_new());
+
+  Jason() {
+    _executor.start();
+  }
 
   /// Returns a [MediaManagerHandle] to the `MediaManager` of this [Jason].
   MediaManagerHandle mediaManager() {
@@ -95,6 +106,7 @@ class Jason {
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
+    _executor.stop();
     _free(ptr.getInnerPtr());
     ptr.free();
   }

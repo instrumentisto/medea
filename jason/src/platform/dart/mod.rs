@@ -10,6 +10,7 @@
 
 pub mod constraints;
 pub mod error;
+pub mod executor;
 pub mod ice_server;
 pub mod input_device_info;
 pub mod media_devices;
@@ -22,11 +23,12 @@ pub mod utils;
 
 use std::time::Duration;
 
-use futures::Future;
+use dart_sys::Dart_Handle;
 
 pub use self::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     error::Error,
+    executor::spawn,
     input_device_info::InputDeviceInfo,
     media_devices::{enumerate_devices, get_display_media, get_user_media},
     media_track::MediaStreamTrack,
@@ -34,7 +36,7 @@ pub use self::{
     rtc_stats::RtcStats,
     transceiver::{Transceiver, TransceiverDirection},
     transport::WebSocketRpcTransport,
-    utils::{Callback, Function},
+    utils::{dart_future_to_rust, Callback, Function},
 };
 
 /// TODO: Implement panic hook.
@@ -51,18 +53,33 @@ pub fn init_logger() {
     );
 }
 
-/// Runs a Rust [`Future`] on the current thread.
-#[inline]
-pub fn spawn<F>(task: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    unimplemented!()
+/// Pointer to an extern function that returns Dart `Future` which will be
+/// resolved after provided number of milliseconds.
+type DelayedFutureCaller = extern "C" fn(i32) -> Dart_Handle;
+
+/// Stores pointer to the [`DelayerFutureCaller`] extern function.
+///
+/// Should be initialized by Dart during FFI initialization phase.
+static mut DELAYED_FUTURE_CALLER: Option<DelayedFutureCaller> = None;
+
+/// Registers the provided [`DelayedFutureCaller`] as
+/// [`DELAYER_FUTURE_CALLER`].
+///
+/// # Safety
+///
+/// Must ONLY be called by Dart during FFI initialization.
+#[no_mangle]
+pub unsafe extern "C" fn register_delayed_future_caller(
+    f: DelayedFutureCaller,
+) {
+    DELAYED_FUTURE_CALLER = Some(f);
 }
 
 /// [`Future`] which resolves after the provided [`Duration`].
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
-    unimplemented!()
+    let delay = delay.as_millis() as i32;
+    let dart_fut = unsafe { DELAYED_FUTURE_CALLER.unwrap()(delay) };
+    let _ = dart_future_to_rust(dart_fut).await;
 }

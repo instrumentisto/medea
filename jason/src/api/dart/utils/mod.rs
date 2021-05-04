@@ -4,7 +4,6 @@ mod string;
 use std::future::Future;
 
 use dart_sys::Dart_Handle;
-use futures::FutureExt as _;
 
 use crate::{api::DartValue, platform::utils::Completer};
 
@@ -18,7 +17,7 @@ pub fn spawn<F>(fut: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    fut.now_or_never().unwrap();
+    crate::platform::spawn(fut);
 }
 
 /// Converts provided [`Future`] to the Dart `Future`.
