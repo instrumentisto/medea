@@ -18,16 +18,22 @@ typedef _reconnect_with_backoff_Dart = Object Function(
 final _free = dl.lookupFunction<_free_C, _free_Dart>('ReconnectHandle__free');
 
 final _reconnect_with_delay =
-    dl.lookupFunction<_reconnect_with_delay_C, _reconnect_with_delay_Dart>(
-        'ReconnectHandle__reconnect_with_delay');
+dl.lookupFunction<_reconnect_with_delay_C, _reconnect_with_delay_Dart>(
+    'ReconnectHandle__reconnect_with_delay');
 
 final _reconnect_with_backoff =
-    dl.lookupFunction<_reconnect_with_backoff_C, _reconnect_with_backoff_Dart>(
-        'ReconnectHandle__reconnect_with_backoff');
+dl.lookupFunction<_reconnect_with_backoff_C, _reconnect_with_backoff_Dart>(
+    'ReconnectHandle__reconnect_with_backoff');
 
+/// External handle used to reconnect to a media server when connection is lost.
+///
+/// This handle is passed to the `RoomHandle.onConnectionLoss()` callback.
 class ReconnectHandle {
+  /// [Pointer] to the Rust struct backing this object.
   late NullablePointer ptr;
 
+  /// Constructs a new [ReconnectHandle] backed by the Rust struct behind the
+  /// provided [Pointer].
   ReconnectHandle(this.ptr);
 
   /// Tries to reconnect after the provided delay in milliseconds.
@@ -62,6 +68,7 @@ class ReconnectHandle {
         ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay) as Future);
   }
 
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

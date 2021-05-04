@@ -355,7 +355,7 @@ impl RoomHandle {
     ///
     /// This might happen in such cases:
     /// 1. Media server initiates a media request.
-    /// 2. `disable_audio`/`enable_video` is called.
+    /// 2. `enable_audio`/`enable_video` is called.
     /// 3. [`MediaStreamSettings`] updated via `set_local_media_settings`.
     ///
     /// # Errors

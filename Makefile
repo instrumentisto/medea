@@ -26,14 +26,10 @@ CHROME_VERSION := 89.0
 FIREFOX_VERSION := 87.0
 
 CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
-ANDROID_NDK_TARGETS := arm64-v8a \
-                       armeabi-v7a \
-                       x86 \
-                       x86_64
-ANDROID_RUST_TARGETS := aarch64-linux-android \
-                        armv7-linux-androideabi \
-                        i686-linux-android \
-                        x86_64-linux-android
+ANDROID_TARGETS := aarch64-linux-android \
+                   armv7-linux-androideabi \
+                   i686-linux-android \
+                   x86_64-linux-android
 ANDROID_SDK_COMPILE_VERSION := $(strip \
 	$(shell grep compileSdkVersion jason/flutter/android/build.gradle \
 	        | awk '{print $$2}'))
@@ -232,12 +228,13 @@ cargo:
 #		 | crate=medea-jason [debug=(yes|no)] [dockerized=(no|yes)]
 #		   	[( [platform=web]
 #		   	 | platform=android
-#		   	   	[targets=($(ANDROID_NDK_TARGETS)|<t1>[,<t2>...])] )] )]
+#		   	   	[targets=($(ANDROID_TARGETS)|<t1>[,<t2>...])] )] )]
+# 		[args=<cargo-build-args>]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 cargo-build-platform = $(if $(call eq,$(platform),),web,$(platform))
 cargo-build-targets = $(strip \
-	$(if $(call eq,$(targets),),$(ANDROID_NDK_TARGETS),$(targets)))
+	$(if $(call eq,$(targets),),$(ANDROID_TARGETS),$(targets)))
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -254,7 +251,7 @@ ifeq ($(dockerized),yes)
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
-	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
+	cargo build --bin medea $(if $(call eq,$(debug),no),--release,) $(args)
 endif
 endif
 ifeq ($(cargo-build-crate),medea-jason)
@@ -287,7 +284,9 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev)
+	wasm-pack build -t web $(crate-dir) \
+		$(if $(call eq,$(debug),no),,--dev) \
+		$(args)
 endif
 ifeq ($(cargo-build-platform),android)
 	$(foreach target,$(subst $(comma), ,$(cargo-build-targets)),\
@@ -295,15 +294,13 @@ ifeq ($(cargo-build-platform),android)
 endif
 endif
 endif
-# TODO: Replace with actual `medea-jason` crate.
 define cargo.build.medea-jason.android
 	$(eval target := $(strip $(1)))
 	$(eval debug := $(strip $(2)))
-	cd jason/jason-dummy/ && \
 	cargo ndk -p $(ANDROID_SDK_COMPILE_VERSION) -t $(target) \
-	          -o ../flutter/android/src/main/jniLibs \
-	          --manifest-path=Cargo.toml \
-		build $(if $(call eq,$(debug),no),--release,)
+	          -o jason/flutter/android/src/main/jniLibs \
+	          --manifest-path=jason/Cargo.toml \
+		build $(if $(call eq,$(debug),no),--release,) $(args)
 endef
 
 
@@ -348,14 +345,13 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --all -- -D clippy::pedantic -D warnings
-	$(foreach target,$(subst $(comma), ,$(ANDROID_RUST_TARGETS)),\
+	cargo clippy --workspace -- -D clippy::pedantic -D warnings
+	$(foreach target,$(subst $(comma), ,$(ANDROID_TARGETS)),\
 		$(call cargo.lint.medea-jason.android,$(target)))
-# TODO: Replace with actual `medea-jason` crate.
 define cargo.lint.medea-jason.android
 	$(eval target := $(strip $(1)))
-	cd jason/jason-dummy/ && \
-	cargo clippy --target=$(target) -- -D clippy::pedantic -D warnings
+	cargo clippy --manifest-path jason/Cargo.toml --target=$(target) -- \
+		-D clippy::pedantic -D warnings
 endef
 
 
@@ -374,7 +370,7 @@ cargo.version:
 #	make rustup.android
 
 rustup.android:
-	rustup target add $(ANDROID_RUST_TARGETS)
+	rustup target add $(ANDROID_TARGETS)
 
 
 

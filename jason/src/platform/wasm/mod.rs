@@ -1,7 +1,5 @@
 //! `wasm32`-platform-specific functionality.
 
-use std::{convert::TryInto as _, time::Duration};
-
 pub mod constraints;
 pub mod error;
 pub mod ice_server;
@@ -14,11 +12,26 @@ pub mod transceiver;
 pub mod transport;
 pub mod utils;
 
+use std::{convert::TryInto as _, time::Duration};
+
 use futures::Future;
 use js_sys::{Promise, Reflect};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Window;
+
+pub use self::{
+    constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
+    error::Error,
+    input_device_info::InputDeviceInfo,
+    media_devices::{enumerate_devices, get_display_media, get_user_media},
+    media_track::MediaStreamTrack,
+    peer_connection::RtcPeerConnection,
+    rtc_stats::RtcStats,
+    transceiver::{Transceiver, TransceiverDirection},
+    transport::WebSocketRpcTransport,
+    utils::{Callback, Function},
+};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -26,12 +39,12 @@ use web_sys::Window;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-// When the `console_error_panic_hook` feature is enabled, we can call the
-// `set_panic_hook` function at least once during initialization, and then
-// we will get better error messages if our code ever panics.
-//
-// For more details see:
-// https://github.com/rustwasm/console_error_panic_hook#readme
+/// When the `console_error_panic_hook` feature is enabled, we can call the
+/// `set_panic_hook` function at least once during initialization, and then
+/// we will get better error messages if our code ever panics.
+///
+/// For more details see:
+/// <https://github.com/rustwasm/console_error_panic_hook#readme>
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 

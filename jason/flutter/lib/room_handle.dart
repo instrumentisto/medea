@@ -1,16 +1,15 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-import 'package:medea_jason/local_media_track.dart';
-import 'package:medea_jason/util/nullable_pointer.dart';
-
 import 'connection_handle.dart';
 import 'jason.dart';
 import 'kind.dart';
 import 'media_stream_settings.dart';
+import 'local_media_track.dart';
 import 'reconnect_handle.dart';
 import 'room_close_reason.dart';
 import 'util/move_semantic.dart';
+import 'util/nullable_pointer.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
@@ -133,9 +132,13 @@ final _enableRemoteVideo =
     dl.lookupFunction<_enableRemoteVideo_C, _enableRemoteVideo_Dart>(
         'RoomHandle__enable_remote_video');
 
+/// External handle to a `Room`.
 class RoomHandle {
+  /// [Pointer] to the Rust struct that backing this object.
   late NullablePointer ptr;
 
+  /// Constructs a new [RoomHandle] backed by the Rust struct behind the
+  /// provided [Pointer].
   RoomHandle(this.ptr);
 
   /// Connects to a media server and joins the `Room` with the provided
@@ -251,30 +254,45 @@ class RoomHandle {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
+  /// Sets callback, invoked when a new `Connection` with some remote `Peer`
+  /// is established.
   void onNewConnection(void Function(ConnectionHandle) f) {
     _onNewConnection(ptr.getInnerPtr(), (t) {
       f(ConnectionHandle(NullablePointer(t)));
     });
   }
 
+  /// Sets callback, invoked when this `Room` is closed, providing a
+  /// [RoomCloseReason].
   void onClose(void Function(RoomCloseReason) f) {
     _onClose(ptr.getInnerPtr(), (t) {
       f(RoomCloseReason(NullablePointer(t)));
     });
   }
 
+  /// Sets callback, invoked when a new [LocalMediaTrack] is added to this
+  /// `Room`.
+  ///
+  /// This might happen in the following cases:
+  /// 1. Media server initiates a media request.
+  /// 2. [RoomHandle.enableAudio()]/[RoomHandle.enableVideo()] is called.
+  /// 3. [MediaStreamSettings] were updated via
+  ///    [RoomHandle.setLocalMediaSettings()] method.
   void onLocalTrack(void Function(LocalMediaTrack) f) {
     _onLocalTrack(ptr.getInnerPtr(), (t) {
       f(LocalMediaTrack(NullablePointer(t)));
     });
   }
 
+  /// Sets callback, invoked when a connection with a media server is lost,
+  /// providing a [ReconnectHandle].
   void onConnectionLoss(void Function(ReconnectHandle) f) {
     _onConnectionLoss(ptr.getInnerPtr(), (t) {
       f(ReconnectHandle(NullablePointer(t)));
     });
   }
 
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

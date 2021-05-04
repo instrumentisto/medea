@@ -2,7 +2,7 @@
 
 use std::{ffi::c_void, marker::PhantomData, mem, ptr, slice};
 
-use crate::ForeignClass;
+use crate::api::ForeignClass;
 
 /// Array of pointers to [`ForeignClass`] structs.
 ///

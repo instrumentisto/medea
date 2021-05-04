@@ -1,7 +1,5 @@
 mod arrays;
-mod closure;
 mod completer;
-mod dart_api;
 mod string;
 
 use std::future::Future;
@@ -13,7 +11,6 @@ use crate::DartValue;
 
 pub use self::{
     arrays::PtrArray,
-    closure::DartClosure,
     completer::Completer,
     string::{c_str_into_string, string_into_c_str},
 };

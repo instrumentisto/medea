@@ -51,7 +51,7 @@ DynamicLibrary _dl_load() {
     throw 'You are running unsupported NativeApi version.';
   }
 
-  var dl = DynamicLibrary.open('libjason.so');
+  var dl = DynamicLibrary.open('libmedea_jason.so');
 
   var initResult = dl.lookupFunction<
       IntPtr Function(Pointer<Void>),
@@ -67,22 +67,32 @@ DynamicLibrary _dl_load() {
   return dl;
 }
 
+/// General library interface.
+///
+/// Responsible for managing shared transports, local media and room
+/// initialization.
 class Jason {
+  /// [Pointer] to the Rust struct backing this object.
   final NullablePointer ptr = NullablePointer(_new());
 
-  MediaManager mediaManager() {
-    return MediaManager(NullablePointer(_media_manager(ptr.getInnerPtr())));
+  /// Returns a [MediaManagerHandle] to the `MediaManager` of this [Jason].
+  MediaManagerHandle mediaManager() {
+    return MediaManagerHandle(
+        NullablePointer(_media_manager(ptr.getInnerPtr())));
   }
 
+  /// Creates a new `Room` and returns its [RoomHandle].
   RoomHandle initRoom() {
     return RoomHandle(NullablePointer(_initRoom(ptr.getInnerPtr())));
   }
 
+  /// Closes the `Room` by the provided [RoomHandle].
   void closeRoom(@moveSemantics RoomHandle room) {
     _close_room(ptr.getInnerPtr(), room.ptr.getInnerPtr());
     room.ptr.free();
   }
 
+  /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());

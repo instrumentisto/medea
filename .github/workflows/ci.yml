@@ -275,6 +275,7 @@ jobs:
 
       - name: Compile shared object
         run: make cargo.build crate=medea-jason platform=android targets=x86
+                              args="--features mockable"
 
       - uses: reactivecircus/android-emulator-runner@v2
         with:
