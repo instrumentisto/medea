@@ -30,12 +30,6 @@ class _JoinRouteState extends State<JoinRoute> {
                       hintText: 'Username',
                     ),
                   ),
-                  TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: 'Password',
-                    ),
-                  ),
                   TextButton(
                     child: Text('Join Room'),
                     style: TextButton.styleFrom(

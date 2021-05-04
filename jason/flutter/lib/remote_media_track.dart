@@ -1,5 +1,7 @@
 import 'dart:ffi';
 
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+
 import 'jason.dart';
 import 'track_kinds.dart';
 import 'util/move_semantic.dart';
@@ -95,6 +97,10 @@ class RemoteMediaTrack {
   MediaSourceKind mediaSourceKind() {
     var index = _mediaSourceKind(ptr.getInnerPtr());
     return MediaSourceKind.values[index];
+  }
+
+  MediaStreamTrack getTrack() {
+    throw UnimplementedError();
   }
 
   /// Sets callback, invoked when this [RemoteMediaTrack] is enabled.

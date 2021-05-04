@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'call.dart';
 
 class CallRoute extends StatefulWidget {
   @override
@@ -9,6 +11,19 @@ class CallRoute extends StatefulWidget {
 class _CallState extends State {
   bool _videoDisabled = false;
   bool _audioDisabled = false;
+  List<RTCVideoView> _videos = List.empty(growable: true);
+  Call _call = Call();
+
+  @override
+  void initState() {
+    _call.onNewStream((stream) {
+      var renderer = RTCVideoRenderer();
+      renderer.srcObject = stream;
+      _videos.add(RTCVideoView(renderer));
+    });
+    _call.start("foobar", "foobar");
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,9 +33,7 @@ class _CallState extends State {
         ),
         body: Center(
             child: Stack(
-          children: [
-            Text('Joining Room...', style: TextStyle(fontSize: 16)),
-          ],
+          children: _videos,
         )),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
         floatingActionButton: Padding(
@@ -31,10 +44,11 @@ class _CallState extends State {
                 Padding(
                     padding: EdgeInsets.only(right: 30.0),
                     child: FloatingActionButton(
-                      onPressed: () {
+                      onPressed: () async {
                         setState(() {
                           _audioDisabled = !_audioDisabled;
                         });
+                        await _call.toggleAudio(!_audioDisabled);
                       },
                       heroTag: null,
                       child: Icon(_audioDisabled ? Icons.mic : Icons.mic_off),
@@ -42,10 +56,11 @@ class _CallState extends State {
                 Padding(
                     padding: EdgeInsets.only(right: 30.0),
                     child: FloatingActionButton(
-                      onPressed: () {
+                      onPressed: () async {
                         setState(() {
                           _videoDisabled = !_videoDisabled;
                         });
+                        await _call.toggleVideo(!_videoDisabled);
                       },
                       heroTag: null,
                       child: Icon(

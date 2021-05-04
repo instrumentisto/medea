@@ -1,5 +1,7 @@
 import 'dart:ffi';
 
+import 'package:medea_jason/media_stream_settings.dart';
+
 import 'connection_handle.dart';
 import 'jason.dart';
 import 'local_media_track.dart';
@@ -62,6 +64,30 @@ class RoomHandle {
     _onClose(ptr.getInnerPtr(), (t) {
       f(RoomCloseReason(NullablePointer(t)));
     });
+  }
+
+  Future<void> setLocalMediaSettings(
+    MediaStreamSettings constraints,
+    bool stopFirst,
+    bool rollbackOnFail,
+  ) async {
+    throw UnimplementedError();
+  }
+
+  Future<void> disableAudio() async {
+    throw UnimplementedError();
+  }
+
+  Future<void> enableAudio() async {
+    throw UnimplementedError();
+  }
+
+  Future<void> disableVideo() async {
+    throw UnimplementedError();
+  }
+
+  Future<void> enableVideo() async {
+    throw UnimplementedError();
   }
 
   /// Sets callback, invoked when a new [LocalMediaTrack] is added to this

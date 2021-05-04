@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.instrumentisto.medea_jason_example">
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="medea_jason_example"
         android:icon="@mipmap/ic_launcher">
