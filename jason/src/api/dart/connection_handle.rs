@@ -1,3 +1,5 @@
+use std::os::raw::c_char;
+
 use dart_sys::Dart_Handle;
 
 use crate::platform;
@@ -61,7 +63,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: *const ConnectionHandle,
-) -> *const libc::c_char {
+) -> *const c_char {
     let this = this.as_ref().unwrap();
 
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -70,6 +72,8 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 }
 
 /// Frees the data behind the provided pointer.
+///
+/// # Safety
 ///
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.

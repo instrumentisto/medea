@@ -12,7 +12,7 @@ use crate::{
     room,
 };
 
-use super::jason_error::JasonError;
+use super::JasonError;
 
 /// JS side handle to a [`Room`] where all the media happens.
 ///

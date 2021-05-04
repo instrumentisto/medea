@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::{convert::TryFrom, os::raw::c_char};
 
 use crate::media::FacingMode;
 
@@ -36,7 +36,7 @@ pub extern "C" fn DeviceVideoTrackConstraints__new(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
     this: *mut DeviceVideoTrackConstraints,
-    device_id: *const libc::c_char,
+    device_id: *const c_char,
 ) {
     let this = this.as_mut().unwrap();
 

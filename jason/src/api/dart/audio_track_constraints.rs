@@ -1,6 +1,6 @@
 //! Constraints applicable to audio tracks.
 
-
+use std::os::raw::c_char;
 
 use super::{utils::c_str_into_string, ForeignClass};
 
@@ -20,7 +20,7 @@ pub extern "C" fn AudioTrackConstraints__new() -> *const AudioTrackConstraints {
 #[no_mangle]
 pub unsafe extern "C" fn AudioTrackConstraints__device_id(
     this: *mut AudioTrackConstraints,
-    device_id: *const libc::c_char,
+    device_id: *const c_char,
 ) {
     let this = this.as_mut().unwrap();
 

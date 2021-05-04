@@ -2,6 +2,8 @@
 //!
 //! [`Dart DL API`]: https://tinyurl.com/32e7fudh
 
+use std::ffi::c_void;
+
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
 #[link(name = "trampoline")]
@@ -11,7 +13,7 @@ extern "C" {
     /// code. Must be called before calling any other Dart API method.
     ///
     /// [1]: https://api.dart.dev/dart-ffi/NativeApi/initializeApiDLData.html
-    pub fn Dart_InitializeApiDL(obj: *mut libc::c_void) -> libc::intptr_t;
+    pub fn Dart_InitializeApiDL(obj: *mut c_void) -> libc::intptr_t;
 
     /// Allocates a [`Dart_PersistentHandle`] for provided [`Dart_Handle`].
     ///
@@ -44,8 +46,6 @@ extern "C" {
 ///
 /// [1]: https://api.dart.dev/dart-ffi/NativeApi/initializeApiDLData.html
 #[no_mangle]
-pub unsafe extern "C" fn init_dart_api_dl(
-    obj: *mut libc::c_void,
-) -> libc::intptr_t {
+pub unsafe extern "C" fn init_dart_api_dl(obj: *mut c_void) -> libc::intptr_t {
     Dart_InitializeApiDL(obj)
 }

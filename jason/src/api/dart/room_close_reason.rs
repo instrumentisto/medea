@@ -1,3 +1,5 @@
+use std::os::raw::c_char;
+
 use super::{utils::string_into_c_str, ForeignClass};
 
 pub use crate::room::RoomCloseReason;
@@ -10,7 +12,7 @@ impl ForeignClass for RoomCloseReason {}
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__reason(
     this: *const RoomCloseReason,
-) -> *const libc::c_char {
+) -> *const c_char {
     let this = this.as_ref().unwrap();
 
     string_into_c_str(this.reason())

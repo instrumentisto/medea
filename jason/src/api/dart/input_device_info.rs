@@ -1,3 +1,5 @@
+use std::os::raw::c_char;
+
 use super::{utils::string_into_c_str, ForeignClass};
 
 #[cfg(feature = "mockable")]
@@ -7,11 +9,11 @@ pub use crate::platform::InputDeviceInfo;
 
 impl ForeignClass for InputDeviceInfo {}
 
-/// Returns unique identifier for the represented device.
+/// Returns unique identifier of the represented device.
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__device_id(
     this: *const InputDeviceInfo,
-) -> *const libc::c_char {
+) -> *const c_char {
     let this = this.as_ref().unwrap();
 
     string_into_c_str(this.device_id())
@@ -28,16 +30,17 @@ pub unsafe extern "C" fn InputDeviceInfo__kind(
 ) -> u8 {
     let this = this.as_ref().unwrap();
 
-    this.kind() as u8
+    this.kind() as u8 // TODO: .into()
 }
 
-/// Returns label describing the represented device (for example
-/// "External USB Webcam").
+/// Returns label describing the represented device (for example "External USB
+/// Webcam").
+///
 /// If the device has no associated label, then returns an empty string.
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__label(
     this: *const InputDeviceInfo,
-) -> *const libc::c_char {
+) -> *const c_char {
     let this = this.as_ref().unwrap();
 
     string_into_c_str(this.label())
@@ -54,13 +57,15 @@ pub unsafe extern "C" fn InputDeviceInfo__label(
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__group_id(
     this: *const InputDeviceInfo,
-) -> *const libc::c_char {
+) -> *const c_char {
     let this = this.as_ref().unwrap();
 
     string_into_c_str(this.group_id())
 }
 
 /// Frees the data behind the provided pointer.
+///
+/// # Safety
 ///
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.

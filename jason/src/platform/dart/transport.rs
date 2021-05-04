@@ -1,6 +1,6 @@
 //! [WebSocket] transport wrapper.
 //!
-//! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
+//! [WebSocket]: https://developer.mozilla.org/docs/WebSockets
 
 use futures::stream::LocalBoxStream;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
@@ -13,7 +13,7 @@ use crate::{
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
-/// WebSocket [`RpcTransport`] between a client and a server.
+/// [WebSocket] [`RpcTransport`] between a client and a server.
 ///
 /// # Drop
 ///
@@ -22,22 +22,25 @@ type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 ///
 /// If you're adding new cyclic dependencies, then don't forget to drop them in
 /// the [`Drop`].
+///
+/// [WebSocket]: https://developer.mozilla.org/docs/WebSockets
 pub struct WebSocketRpcTransport;
 
 impl WebSocketRpcTransport {
-    /// Initiates new WebSocket connection. Resolves only when underlying
+    /// Initiates a new [WebSocket] connection. Resolves only once an underlying
     /// connection becomes active.
     ///
     /// # Errors
     ///
-    /// With [`TransportError::CreateSocket`] if cannot establish WebSocket to
+    /// With [`TransportError::CreateSocket`] if cannot establish [WebSocket] to
     /// specified URL.
     ///
     /// With [`TransportError::InitSocket`] if [WebSocket.onclose][1] callback
     /// fired before [WebSocket.onopen][2] callback.
     ///
-    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onclose
-    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/onopen
+    /// [WebSocket]: https://developer.mozilla.org/docs/WebSockets
+    /// [1]: https://developer.mozilla.org/docs/Web/API/WebSocket/onclose
+    /// [2]: https://developer.mozilla.org/docs/Web/API/WebSocket/onopen
     pub async fn new(url: ApiUrl) -> Result<Self> {
         unimplemented!()
     }

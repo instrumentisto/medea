@@ -27,9 +27,9 @@ FIREFOX_VERSION := 87.0
 
 CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
 ANDROID_TARGETS := aarch64-linux-android \
-                        armv7-linux-androideabi \
-                        i686-linux-android \
-                        x86_64-linux-android
+                   armv7-linux-androideabi \
+                   i686-linux-android \
+                   x86_64-linux-android
 ANDROID_SDK_COMPILE_VERSION := $(strip \
 	$(shell grep compileSdkVersion jason/flutter/android/build.gradle \
 	        | awk '{print $$2}'))
@@ -284,8 +284,9 @@ ifeq ($(pre-install),yes)
 	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 endif
 	@rm -rf $(crate-dir)/pkg/
-	wasm-pack build -t web $(crate-dir) $(if $(call eq,$(debug),no),,--dev) \
-					$(args)
+	wasm-pack build -t web $(crate-dir) \
+		$(if $(call eq,$(debug),no),,--dev) \
+		$(args)
 endif
 ifeq ($(cargo-build-platform),android)
 	$(foreach target,$(subst $(comma), ,$(cargo-build-targets)),\
@@ -349,8 +350,8 @@ cargo.lint:
 		$(call cargo.lint.medea-jason.android,$(target)))
 define cargo.lint.medea-jason.android
 	$(eval target := $(strip $(1)))
-	cargo clippy --manifest-path jason/Cargo.toml --target=$(target)\
-			-- -D clippy::pedantic -D warnings
+	cargo clippy --manifest-path jason/Cargo.toml --target=$(target) -- \
+		-D clippy::pedantic -D warnings
 endef
 
 

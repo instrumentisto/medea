@@ -5,7 +5,7 @@ use tracerr::Traced;
 
 use crate::{platform, utils::JsCaused};
 
-/// Failed to bind to specified event.
+/// Failure to bind a listener to some event.
 #[derive(Clone, Debug, Display, From, JsCaused, PartialEq)]
 #[js(error = "platform::Error")]
 pub struct EventListenerBindError(platform::Error);

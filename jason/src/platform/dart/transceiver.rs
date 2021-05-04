@@ -103,7 +103,7 @@ impl Transceiver {
 bitflags! {
     /// Representation of [RTCRtpTransceiverDirection][1].
     ///
-    /// [`sendrecv` direction][2] can be represented by
+    /// [`sendrecv` direction][2] is represented by a
     /// [`TransceiverDirection::all`] bitflag.
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection

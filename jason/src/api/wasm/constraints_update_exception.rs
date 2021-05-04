@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::room;
 
-use super::jason_error::JasonError;
+use super::JasonError;
 
 /// Exception returned from [`RoomHandle::set_local_media_settings()`][1].
 ///
