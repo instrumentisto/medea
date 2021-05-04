@@ -16,9 +16,9 @@ impl From<UserData> for WrappedUserData {
     }
 }
 
-impl Into<UserData> for WrappedUserData {
-    fn into(self) -> UserData {
-        self.0
+impl From<WrappedUserData> for UserData {
+    fn from(from: WrappedUserData) -> Self {
+        from.0
     }
 }
 

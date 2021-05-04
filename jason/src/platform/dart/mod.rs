@@ -79,6 +79,7 @@ pub unsafe extern "C" fn register_delayed_future_caller(
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
+    #[allow(clippy::cast_possible_truncation)]
     let delay = delay.as_millis() as i32;
     let dart_fut = unsafe { DELAYED_FUTURE_CALLER.unwrap()(delay) };
     let _ = dart_future_to_rust(dart_fut).await;

@@ -6,10 +6,22 @@ use dart_sys::Dart_Handle;
 use futures::channel::oneshot;
 
 /// Converts provided [`Dart_Handle`] to the Rust [`Future`].
+///
+/// # Errors
+///
+/// Errors if Dart `Future` resolves with error.
+#[allow(clippy::missing_safety_doc)]
 pub fn dart_future_to_rust(
     fut: Dart_Handle,
 ) -> impl Future<Output = Result<Dart_Handle, DartError>> {
-    DartFuture::new(fut)
+    let (tx, rx) = oneshot::channel();
+    let this = DartFuture(tx);
+
+    unsafe {
+        FUTURE_SPAWNER_CALLER.unwrap()(fut, Box::into_raw(Box::new(this)))
+    };
+
+    async move { rx.await.unwrap() }
 }
 
 /// Error which can be obtained from the Dart side.
@@ -28,24 +40,6 @@ impl From<Dart_Handle> for DartError {
 pub struct DartFuture(oneshot::Sender<Result<Dart_Handle, DartError>>);
 
 impl DartFuture {
-    /// Spawns provided [`Dart_Handle`] on the Dart runtime and returns
-    /// [`Future`] which will be resolved when Dart `Future` will be resolved.
-    fn new(
-        dart_fut: Dart_Handle,
-    ) -> impl Future<Output = Result<Dart_Handle, DartError>> {
-        let (tx, rx) = oneshot::channel();
-        let this = Self(tx);
-
-        unsafe {
-            FUTURE_SPAWNER_CALLER.unwrap()(
-                dart_fut,
-                Box::into_raw(Box::new(this)),
-            )
-        };
-
-        async move { rx.await.unwrap() }
-    }
-
     /// Successfully resolves this [`DartFuture`] with the provided
     /// [`Dart_Handle`].
     fn resolve_ok(self, val: Dart_Handle) {
@@ -82,16 +76,19 @@ pub unsafe extern "C" fn register_future_spawner_caller(
 
 /// Successfully resolves provided [`DartFuture`] with the provided
 /// [`Dart_Handle`].
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn DartFuture__resolve_ok(
     fut: *mut DartFuture,
     val: Dart_Handle,
 ) {
+    #[allow(clippy::cast_possible_truncation)]
     let fut = Box::from_raw(fut);
     fut.resolve_ok(val);
 }
 
 /// Resolves provided [`DartFuture`] with the provided [`Dart_Handle`] error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn DartFuture__resolve_err(
     fut: *mut DartFuture,
