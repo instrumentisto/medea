@@ -1,7 +1,7 @@
 import 'dart:ffi';
 
 import '../jason.dart';
-import 'move_semantics.dart'
+import 'move_semantics.dart';
 
 typedef _free_C = Void Function(PtrArray);
 typedef _free_Dart = void Function(PtrArray);
