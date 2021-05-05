@@ -1,11 +1,11 @@
-use core::{
+use std::{
     marker::PhantomData,
     mem,
     mem::ManuallyDrop,
     ops::Deref,
+    rc::Rc,
     task::{RawWaker, RawWakerVTable, Waker},
 };
-use std::rc::Rc;
 
 pub trait Woke {
     fn wake(self: Rc<Self>) {
