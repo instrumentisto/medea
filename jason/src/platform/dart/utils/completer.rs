@@ -263,7 +263,8 @@ impl<T: Into<DartValue>, E> Completer<T, E> {
                 DartValue::Void => {
                     COMPLETER_COMPLETE_VOID_CALLER.unwrap()(handle);
                 }
-                DartValue::String(_) | DartValue::Int(_) => {
+                DartValue::Int(_) => {
+                    // TODO: Implement.
                     unimplemented!()
                 }
             }
@@ -276,6 +277,7 @@ impl<T, E: Into<DartValue>> Completer<T, E> {
     ///
     /// [Future]: https://api.dart.dev/dart-async/Future-class.html
     pub fn complete_error(&self, _: E) {
+        // TODO: Implement.
         // COMPLETER_COMPLETE_ERROR_CALLER
         unimplemented!()
     }
