@@ -23,7 +23,7 @@ use std::{ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::{utils::PtrArray, DartValue};
+use crate::api::{utils::PtrArray, DartError, DartValue, JasonError};
 
 use super::dart_api::{
     Dart_HandleFromPersistent_DL_Trampolined,
@@ -65,7 +65,7 @@ type CompleterCompletePtrArrayCaller = extern "C" fn(Dart_Handle, PtrArray);
 ///
 /// [1]: https://api.dart.dev/dart-async/Completer/completeError.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
-type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, *const c_void);
+type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, DartError);
 
 /// Pointer to an extern function that calls [future] getter on the provided
 /// [`Dart_Handle`] which points to the Dart [Completer] object.
@@ -271,12 +271,14 @@ impl<T: Into<DartValue>, E> Completer<T, E> {
     }
 }
 
-impl<T, E: Into<DartValue>> Completer<T, E> {
+impl<T> Completer<T, JasonError> {
     /// Completes underlying Dart [Future] with error provided as the argument.
     ///
     /// [Future]: https://api.dart.dev/dart-async/Future-class.html
-    pub fn complete_error(&self, _: E) {
-        // COMPLETER_COMPLETE_ERROR_CALLER
-        unimplemented!()
+    pub fn complete_error(&self, e: JasonError) {
+        unsafe {
+            let handle = Dart_HandleFromPersistent_DL_Trampolined(self.handle);
+            COMPLETER_COMPLETE_ERROR_CALLER.unwrap()(handle, e.into());
+        }
     }
 }

@@ -51,6 +51,17 @@ impl<T> PtrArray<T> {
             _element: PhantomData,
         }
     }
+
+    /// Returns null [`PtrArray`].
+    #[must_use]
+    #[inline]
+    pub fn null() -> Self {
+        PtrArray {
+            ptr: ptr::null(),
+            _element: PhantomData,
+            len: 0,
+        }
+    }
 }
 
 impl<T> Drop for PtrArray<T> {

@@ -29,15 +29,19 @@ pub use self::{
     connection_handle::ConnectionHandle,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
-    input_device_info::InputDeviceInfo, jason::Jason, jason_error::JasonError,
+    input_device_info::InputDeviceInfo,
+    jason::Jason,
+    jason_error::{DartError, JasonError},
     local_media_track::LocalMediaTrack,
     media_manager_handle::MediaManagerHandle,
     media_stream_settings::MediaStreamSettings,
-    reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
-    room_close_reason::RoomCloseReason, room_handle::RoomHandle,
+    reconnect_handle::ReconnectHandle,
+    remote_media_track::RemoteMediaTrack,
+    room_close_reason::RoomCloseReason,
+    room_handle::RoomHandle,
 };
 
-use std::ffi::c_void;
+use std::{ffi::c_void, os::raw::c_char};
 
 use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
 
@@ -75,6 +79,18 @@ pub enum DartValue {
     Int(i64),
 }
 
+impl DartValue {
+    pub fn id(&self) -> i32 {
+        match self {
+            Self::Void => 0,
+            Self::Ptr(_) => 1,
+            Self::String(_) => 2,
+            Self::PtrArray(_) => 3,
+            Self::Int(_) => 4,
+        }
+    }
+}
+
 impl<T: ForeignClass> From<T> for DartValue {
     fn from(val: T) -> Self {
         Self::Ptr(val.into_ptr().cast())
@@ -90,6 +106,12 @@ impl From<()> for DartValue {
 impl<T> From<PtrArray<T>> for DartValue {
     fn from(val: PtrArray<T>) -> Self {
         DartValue::PtrArray(val.erase_type())
+    }
+}
+
+impl From<*const c_char> for DartValue {
+    fn from(from: *const c_char) -> Self {
+        Self::String(from)
     }
 }
 

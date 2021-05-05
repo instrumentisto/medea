@@ -26,9 +26,7 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     let caps = caps.as_ref().unwrap().clone();
 
     future_to_dart(async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        Ok::<_, ()>(PtrArray::new(this.init_local_tracks(caps).await.unwrap()))
+        Ok(PtrArray::new(this.init_local_tracks(caps).await?))
     })
 }
 
@@ -42,11 +40,9 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap();
 
-    future_to_dart(async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        Ok::<_, ()>(PtrArray::new(this.enumerate_devices().await.unwrap()))
-    })
+    future_to_dart(
+        async move { Ok(PtrArray::new(this.enumerate_devices().await?)) },
+    )
 }
 
 /// Frees the data behind the provided pointer.

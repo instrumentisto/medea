@@ -1,5 +1,3 @@
-use std::os::raw::c_char;
-
 use dart_sys::Dart_Handle;
 
 use crate::platform;
@@ -8,6 +6,7 @@ use super::{utils::string_into_c_str, ForeignClass};
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ConnectionHandle;
+use crate::api::{dart::utils::DartResult, JasonError};
 #[cfg(not(feature = "mockable"))]
 pub use crate::connection::ConnectionHandle;
 
@@ -18,12 +17,12 @@ impl ForeignClass for ConnectionHandle {}
 pub unsafe extern "C" fn ConnectionHandle__on_close(
     this: *const ConnectionHandle,
     f: Dart_Handle,
-) {
+) -> DartResult {
     let this = this.as_ref().unwrap();
 
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
-    this.on_close(platform::Function::new(f)).unwrap();
+    this.on_close(platform::Function::new(f))
+        .map_err(JasonError::from)
+        .into()
 }
 
 /// Sets callback, invoked when a new [`remote::Track`] is added to this
@@ -35,13 +34,12 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     this: *const ConnectionHandle,
     f: Dart_Handle,
-) {
+) -> DartResult {
     let this = this.as_ref().unwrap();
 
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
     this.on_remote_track_added(platform::Function::new(f))
-        .unwrap();
+        .map_err(JasonError::from)
+        .into()
 }
 
 /// Sets callback, invoked when a connection quality score is updated by
@@ -50,25 +48,25 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
 pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
     this: *const ConnectionHandle,
     f: Dart_Handle,
-) {
+) -> DartResult {
     let this = this.as_ref().unwrap();
 
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
     this.on_quality_score_update(platform::Function::new(f))
-        .unwrap();
+        .map_err(JasonError::from)
+        .into()
 }
 
 /// Returns remote `Member` ID.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: *const ConnectionHandle,
-) -> *const c_char {
+) -> DartResult {
     let this = this.as_ref().unwrap();
 
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
-    string_into_c_str(this.get_remote_member_id().unwrap())
+    this.get_remote_member_id()
+        .map_err(JasonError::from)
+        .map(string_into_c_str)
+        .into()
 }
 
 /// Frees the data behind the provided pointer.

@@ -27,10 +27,8 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     let this = this.as_ref().unwrap();
 
     future_to_dart(async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        this.reconnect_with_delay(delay_ms as u32).await.unwrap();
-        Ok::<_, ()>(())
+        this.reconnect_with_delay(delay_ms as u32).await?;
+        Ok(())
     })
 }
 
@@ -64,16 +62,13 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     let this = this.as_ref().unwrap();
 
     future_to_dart(async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
         this.reconnect_with_backoff(
             starting_delay as u32,
             multiplier,
             max_delay as u32,
         )
-        .await
-        .unwrap();
-        Ok::<_, ()>(())
+        .await?;
+        Ok(())
     })
 }
 
