@@ -18,6 +18,7 @@ pub fn spawn<F>(fut: F)
 where
     F: Future<Output = ()> + 'static,
 {
+    // TODO: Implement executor.
     fut.now_or_never().unwrap();
 }
 

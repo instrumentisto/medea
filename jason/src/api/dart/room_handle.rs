@@ -236,6 +236,8 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 }
 
 /// Enables inbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
     this: *mut RoomHandle,

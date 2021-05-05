@@ -24,7 +24,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     this: *mut ReconnectHandle,
     delay_ms: i64, // TODO: must check for cast_sign_loss
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref().unwrap().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     multiplier: f32,
     max_delay: i64,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref().unwrap().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -92,6 +92,7 @@ pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
 mod mock {
     use crate::api::dart::JasonError;
 
+    #[derive(Clone)]
     pub struct ReconnectHandle;
 
     impl ReconnectHandle {
