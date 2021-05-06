@@ -32,9 +32,9 @@ pub use self::{
     media_track::MediaStreamTrack,
     peer_connection::RtcPeerConnection,
     rtc_stats::RtcStats,
-    transceiver::{Transceiver, TransceiverDirection},
+    transceiver::Transceiver,
     transport::WebSocketRpcTransport,
-    utils::{Callback, Function},
+    utils::Function,
 };
 
 /// TODO: Implement panic hook.
