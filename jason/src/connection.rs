@@ -148,8 +148,8 @@ impl ConnectionHandle {
             .map(|inner| inner.remote_id.0.clone())
     }
 
-    /// Sets callback, invoked when a new [`remote::Track`] will is added to
-    /// this [`Connection`].
+    /// Sets callback, invoked when a new [`remote::Track`] is added to this
+    /// [`Connection`].
     ///
     /// # Errors
     ///

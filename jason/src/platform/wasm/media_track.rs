@@ -8,7 +8,7 @@ use derive_more::AsRef;
 
 use crate::{
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
-    platform::{get_property_by_name, wasm::utils::EventListener},
+    platform::wasm::{get_property_by_name, utils::EventListener},
 };
 
 /// Wrapper around [MediaStreamTrack][1] received from a

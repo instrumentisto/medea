@@ -13,7 +13,7 @@ services:
     network_mode: host
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn
-    image: instrumentisto/coturn:4.5
+    image: ghcr.io/coturn/coturn:4.5-alpine
     depends_on: ["coturn-db"]
     command:
       - --log-file=stdout
