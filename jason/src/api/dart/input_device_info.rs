@@ -1,4 +1,4 @@
-use std::os::raw::c_char;
+use std::{os::raw::c_char, ptr::NonNull};
 
 use super::{utils::string_into_c_str, ForeignClass};
 
@@ -12,9 +12,9 @@ impl ForeignClass for InputDeviceInfo {}
 /// Returns unique identifier of the represented device.
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__device_id(
-    this: *const InputDeviceInfo,
+    this: NonNull<InputDeviceInfo>,
 ) -> *const c_char {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     string_into_c_str(this.device_id())
 }
@@ -26,9 +26,9 @@ pub unsafe extern "C" fn InputDeviceInfo__device_id(
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__kind(
-    this: *const InputDeviceInfo,
+    this: NonNull<InputDeviceInfo>,
 ) -> u8 {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.kind() as u8 // TODO: .into()
 }
@@ -39,9 +39,9 @@ pub unsafe extern "C" fn InputDeviceInfo__kind(
 /// If the device has no associated label, then returns an empty string.
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__label(
-    this: *const InputDeviceInfo,
+    this: NonNull<InputDeviceInfo>,
 ) -> *const c_char {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     string_into_c_str(this.label())
 }
@@ -56,9 +56,9 @@ pub unsafe extern "C" fn InputDeviceInfo__label(
 /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadeviceinfo-groupid
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__group_id(
-    this: *const InputDeviceInfo,
+    this: NonNull<InputDeviceInfo>,
 ) -> *const c_char {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     string_into_c_str(this.group_id())
 }
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn InputDeviceInfo__group_id(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn InputDeviceInfo__free(this: *mut InputDeviceInfo) {
+pub unsafe extern "C" fn InputDeviceInfo__free(this: NonNull<InputDeviceInfo>) {
     let _ = InputDeviceInfo::from_ptr(this);
 }
 

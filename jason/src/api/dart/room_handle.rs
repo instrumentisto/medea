@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use dart_sys::Dart_Handle;
 
 use crate::{
@@ -28,10 +30,10 @@ impl ForeignClass for RoomHandle {}
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__join(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     token: *const libc::c_char,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -69,13 +71,13 @@ pub unsafe extern "C" fn RoomHandle__join(
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
-    this: *mut RoomHandle,
-    settings: *mut MediaStreamSettings,
+    this: NonNull<RoomHandle>,
+    settings: NonNull<MediaStreamSettings>,
     stop_first: bool,
     rollback_on_fail: bool,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
-    let settings = settings.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
+    let settings = settings.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -92,9 +94,9 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_audio(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -109,9 +111,9 @@ pub unsafe extern "C" fn RoomHandle__mute_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_audio(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -126,9 +128,9 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_audio(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -143,9 +145,9 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_audio(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -162,10 +164,10 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_video(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     source_kind: u8, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
     let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
@@ -183,10 +185,10 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_video(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     source_kind: u8, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
     let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
@@ -202,10 +204,10 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 /// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_video(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     source_kind: u8, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
     let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
@@ -221,10 +223,10 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 /// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_video(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     source_kind: u8, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
     let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
@@ -240,9 +242,9 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -257,9 +259,9 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -274,9 +276,9 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_video(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -291,9 +293,9 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_video(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_video(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -309,10 +311,10 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
 /// [`Connection`]: crate::connection::Connection
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_new_connection(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
@@ -326,10 +328,10 @@ pub unsafe extern "C" fn RoomHandle__on_new_connection(
 /// [`RoomCloseReason`]: crate::room::RoomCloseReason
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_close(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
@@ -349,10 +351,10 @@ pub unsafe extern "C" fn RoomHandle__on_close(
 /// [`LocalMediaTrack`]: crate::media::track::local::LocalMediaTrack
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_local_track(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
@@ -362,10 +364,10 @@ pub unsafe extern "C" fn RoomHandle__on_local_track(
 /// Sets callback, invoked when a connection with server is lost.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_connection_loss(
-    this: *mut RoomHandle,
+    this: NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
@@ -380,7 +382,7 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__free(this: *mut RoomHandle) {
+pub unsafe extern "C" fn RoomHandle__free(this: NonNull<RoomHandle>) {
     let _ = RoomHandle::from_ptr(this);
 }
 
