@@ -10,11 +10,11 @@
 //! initialization phase: after Dart DL API is initialized and before any other
 //! exported Rust function is called.
 
-use std::{cell::RefCell, ffi::c_void, marker::PhantomData};
+use std::{ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::ForeignClass;
+use crate::{api::DartValue, platform::Callback};
 
 use super::dart_api::{
     Dart_DeletePersistentHandle_DL_Trampolined,
@@ -76,48 +76,14 @@ pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
 }
 
-// TODO: Probably should be shared between `wasm` and `dart` platforms.
-/// Wrapper for a single argument Dart callback function.
-pub struct Callback<A>(RefCell<Option<Function<A>>>);
-
-impl<A> Callback<A> {
-    /// Sets the inner [`Function`].
-    #[inline]
-    pub fn set_func(&self, f: Function<A>) {
-        self.0.borrow_mut().replace(f);
-    }
-
-    /// Indicates whether this [`Callback`]'s inner [`Function`] is set.
-    #[inline]
-    #[must_use]
-    pub fn is_set(&self) -> bool {
-        self.0.borrow().as_ref().is_some()
-    }
-}
-
-impl Callback<()> {
-    /// Invokes the underlying [`Function`] (if any) passing no arguments to it.
-    #[inline]
-    pub fn call0(&self) {
-        if let Some(f) = self.0.borrow().as_ref() {
-            f.call0()
-        };
-    }
-}
-
-impl<A> Default for Callback<A> {
-    #[inline]
-    fn default() -> Self {
-        Self(RefCell::new(None))
-    }
-}
-
-impl<A> Callback<A> {
+impl<A: Into<DartValue>> Callback<A> {
     /// Invokes the underlying [`Function`] (if any) passing the single provided
     /// argument to it.
     #[inline]
-    pub fn call1<T>(&self, arg: T) {
-        unimplemented!()
+    pub fn call1(&self, arg: A) {
+        if let Some(f) = self.0.borrow().as_ref() {
+            f.call1(arg)
+        };
     }
 }
 
@@ -128,7 +94,7 @@ pub struct Function<T> {
     dart_fn: Dart_PersistentHandle,
 
     /// Type of this closure argument.
-    _arg: PhantomData<T>,
+    _arg: PhantomData<*const T>,
 }
 
 impl<T> Function<T> {
@@ -149,56 +115,36 @@ impl Function<()> {
     /// Calls the underlying Dart closure.
     #[inline]
     pub fn call0(&self) {
-        unsafe {
-            let fn_handle =
-                Dart_HandleFromPersistent_DL_Trampolined(self.dart_fn);
-            NO_ARGS_FN_CALLER.unwrap()(fn_handle);
-        }
+        self.call1(());
     }
 }
 
-impl<T: ForeignClass> Function<T> {
-    /// Calls the underlying Dart closure with the provided [`ForeignClass`]
-    /// argument.
+impl<T: Into<DartValue>> Function<T> {
+    /// Calls the underlying Dart closure with the provided argument.
     #[inline]
     pub fn call1(&self, arg: T) {
         unsafe {
             let fn_handle =
                 Dart_HandleFromPersistent_DL_Trampolined(self.dart_fn);
-            PTR_ARG_FN_CALLER.unwrap()(
-                fn_handle,
-                arg.into_ptr().cast::<c_void>(),
-            );
-        }
-    }
-}
 
-/// Implements [`DartClosure::call1()`] casting argument to `i64`. Should be
-/// called for all integer types that fit into `2^63`.
-macro_rules! impl_dart_closure_for_int {
-    ($arg:ty) => {
-        impl Function<$arg> {
-            /// Calls the underlying Dart closure with the provided argument.
-            pub fn call1(&self, arg: $arg) {
-                unsafe {
-                    let fn_handle =
-                        Dart_HandleFromPersistent_DL_Trampolined(self.dart_fn);
-                    INT_ARG_FN_CALLER.unwrap()(fn_handle, arg as i64);
+            match arg.into() {
+                DartValue::Ptr(ptr) => {
+                    PTR_ARG_FN_CALLER.unwrap()(fn_handle, ptr);
+                }
+                DartValue::Int(int) => {
+                    INT_ARG_FN_CALLER.unwrap()(fn_handle, int);
+                }
+                DartValue::Void => {
+                    NO_ARGS_FN_CALLER.unwrap()(fn_handle);
+                }
+                DartValue::PtrArray(_) => {
+                    // TODO: Implement.
+                    unimplemented!()
                 }
             }
         }
-    };
+    }
 }
-
-impl_dart_closure_for_int!(i8);
-impl_dart_closure_for_int!(i16);
-impl_dart_closure_for_int!(i32);
-impl_dart_closure_for_int!(i64);
-impl_dart_closure_for_int!(isize);
-impl_dart_closure_for_int!(u8);
-impl_dart_closure_for_int!(u16);
-impl_dart_closure_for_int!(u32);
-impl_dart_closure_for_int!(bool);
 
 impl<T> Drop for Function<T> {
     /// Manually deallocates saved [`Dart_PersistentHandle`] so it won't leak.

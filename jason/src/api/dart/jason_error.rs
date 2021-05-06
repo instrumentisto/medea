@@ -9,6 +9,10 @@ use tracerr::{Trace, Traced};
 
 use crate::{platform, utils::JsCaused};
 
+use super::ForeignClass;
+
+impl ForeignClass for JasonError {}
+
 /// Representation of an app error exported to JS side.
 ///
 /// Contains JS side error if it's the cause, and a trace information.

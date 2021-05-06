@@ -5,9 +5,11 @@ import 'dart:io';
 
 import 'media_manager.dart';
 import 'room_handle.dart';
+import 'util/executor.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/callback.dart' as callback;
+import 'util/completer.dart' as completer;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
@@ -61,6 +63,9 @@ DynamicLibrary _dl_load() {
     throw 'Failed to initialize Dart API. Code: $initResult';
   }
   callback.registerFunctions(dl);
+  completer.registerFunctions(dl);
+
+  Executor(dl);
 
   return dl;
 }
