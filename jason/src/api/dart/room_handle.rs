@@ -3,7 +3,7 @@ use dart_sys::Dart_Handle;
 use crate::{
     api::{
         dart::{
-            utils::{c_str_into_string, future_to_dart},
+            utils::{c_str_into_string, future_to_dart, DartResult},
             ForeignClass,
         },
         JasonError,
@@ -16,7 +16,6 @@ use super::MediaStreamSettings;
 
 #[cfg(feature = "mockable")]
 pub use self::mock::RoomHandle;
-use crate::api::dart::utils::DartResult;
 #[cfg(not(feature = "mockable"))]
 pub use crate::room::RoomHandle;
 

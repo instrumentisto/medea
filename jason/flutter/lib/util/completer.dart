@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'ptrarray.dart';
+import 'result.dart';
 
 /// Registers functions that allow Rust to manage [Completer]s.
 void registerFunctions(DynamicLibrary dl) {
@@ -24,7 +25,7 @@ void registerFunctions(DynamicLibrary dl) {
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_completer_complete_error_caller')(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(
+      Pointer.fromFunction<Void Function(Handle, Error)>(
           _Completer_completeError_Pointer));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
@@ -59,6 +60,6 @@ void _Completer_complete_PtrArray(Object completer, PtrArray arg) {
 }
 
 /// Complete the provided [Completer] with an error.
-void _Completer_completeError_Pointer(Object completer, Pointer arg) {
+void _Completer_completeError_Pointer(Object completer, Error arg) {
   (completer as Completer).completeError(arg);
 }

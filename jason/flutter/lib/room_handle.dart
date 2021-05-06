@@ -10,21 +10,24 @@ import 'reconnect_handle.dart';
 import 'room_close_reason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
+import 'util/result.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-typedef _onNewConnection_C = Void Function(Pointer, Handle);
-typedef _onNewConnection_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onNewConnection_C = Result Function(Pointer, Handle);
+typedef _onNewConnection_Dart = Result Function(
+    Pointer, void Function(Pointer));
 
-typedef _onClose_C = Void Function(Pointer, Handle);
-typedef _onClose_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onClose_C = Result Function(Pointer, Handle);
+typedef _onClose_Dart = Result Function(Pointer, void Function(Pointer));
 
-typedef _onLocalTrack_C = Void Function(Pointer, Handle);
-typedef _onLocalTrack_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onLocalTrack_C = Result Function(Pointer, Handle);
+typedef _onLocalTrack_Dart = Result Function(Pointer, void Function(Pointer));
 
-typedef _onConnectionLoss_C = Void Function(Pointer, Handle);
-typedef _onConnectionLoss_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onConnectionLoss_C = Result Function(Pointer, Handle);
+typedef _onConnectionLoss_Dart = Result Function(
+    Pointer, void Function(Pointer));
 
 typedef _join_C = Handle Function(Pointer, Pointer<Utf8>);
 typedef _join_Dart = Object Function(Pointer, Pointer<Utf8>);
@@ -147,10 +150,13 @@ class RoomHandle {
   /// Authorization token has a fixed format:
   /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
   /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> join(String token) async {
     var tokenPtr = token.toNativeUtf8();
     try {
-      await (_join(ptr.getInnerPtr(), tokenPtr) as Future);
+      await (_join(ptr.getInnerPtr(), tokenPtr) as Future)
+          .catchError(futureErrorCatcher);
     } finally {
       calloc.free(tokenPtr);
     }
@@ -187,87 +193,127 @@ class RoomHandle {
   }
 
   /// Mutes outbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> muteAudio() async {
-    await (_muteAudio(ptr.getInnerPtr()) as Future);
+    await (_muteAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Unmutes outbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> unmuteAudio() async {
-    await (_unmuteAudio(ptr.getInnerPtr()) as Future);
+    await (_unmuteAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Mutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> muteVideo(MediaSourceKind kind) async {
-    await (_muteVideo(ptr.getInnerPtr(), kind.index) as Future);
+    await (_muteVideo(ptr.getInnerPtr(), kind.index) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Unmutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> unmuteVideo(MediaSourceKind kind) async {
-    await (_unmuteVideo(ptr.getInnerPtr(), kind.index) as Future);
+    await (_unmuteVideo(ptr.getInnerPtr(), kind.index) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Disables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> disableVideo(MediaSourceKind kind) async {
-    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future);
+    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Enables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> enableVideo(MediaSourceKind kind) async {
-    await (_enableVideo(ptr.getInnerPtr(), kind.index) as Future);
+    await (_enableVideo(ptr.getInnerPtr(), kind.index) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Disables outbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> disableAudio() async {
-    await (_disableAudio(ptr.getInnerPtr()) as Future);
+    await (_disableAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Enables outbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> enableAudio() async {
-    await (_enableAudio(ptr.getInnerPtr()) as Future);
+    await (_enableAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Disables inbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> disableRemoteAudio() async {
-    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
+    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Enables inbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> enableRemoteAudio() async {
-    await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
+    await (_enableRemoteAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Disables inbound video in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> disableRemoteVideo() async {
-    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
+    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Enables inbound video in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
   Future<void> enableRemoteVideo() async {
-    await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
+    await (_enableRemoteVideo(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
   }
 
   /// Sets callback, invoked when a new `Connection` with some remote `Peer`
   /// is established.
+  ///
+  /// Throws [RustException] if Rust returns error.
   void onNewConnection(void Function(ConnectionHandle) f) {
     _onNewConnection(ptr.getInnerPtr(), (t) {
       f(ConnectionHandle(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
   /// Sets callback, invoked when this `Room` is closed, providing a
   /// [RoomCloseReason].
+  ///
+  /// Throws [RustException] if Rust returns error.
   void onClose(void Function(RoomCloseReason) f) {
     _onClose(ptr.getInnerPtr(), (t) {
       f(RoomCloseReason(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
   /// Sets callback, invoked when a new [LocalMediaTrack] is added to this
@@ -278,18 +324,22 @@ class RoomHandle {
   /// 2. [RoomHandle.enableAudio()]/[RoomHandle.enableVideo()] is called.
   /// 3. [MediaStreamSettings] were updated via
   ///    [RoomHandle.setLocalMediaSettings()] method.
+  ///
+  /// Throws [RustException] if Rust returns error.
   void onLocalTrack(void Function(LocalMediaTrack) f) {
     _onLocalTrack(ptr.getInnerPtr(), (t) {
       f(LocalMediaTrack(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
   /// Sets callback, invoked when a connection with a media server is lost,
   /// providing a [ReconnectHandle].
+  ///
+  /// Throws [RustException] if Rust returns error.
   void onConnectionLoss(void Function(ReconnectHandle) f) {
     _onConnectionLoss(ptr.getInnerPtr(), (t) {
       f(ReconnectHandle(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.
