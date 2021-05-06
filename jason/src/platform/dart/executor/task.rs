@@ -1,54 +1,105 @@
 use std::rc::Rc;
 
-use super::{
-    global, mutex_lock, transmute, waker_ref, Box, BoxFuture, Context,
-    ExternTask, InternTask, Mutex, TaskWake, Wake, WrappedUserData,
+use std::{
+    cell::RefCell,
+    mem::ManuallyDrop,
+    task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
-pub(crate) type BoxedPoll = Box<dyn FnMut() -> bool>;
+use futures::future::LocalBoxFuture;
 
-/// Create task for polling specified future by external event loop
-pub fn task_wrap<T: 'static>(
-    future: BoxFuture<'static, T>,
-    data: ExternTask,
-) -> InternTask {
-    let task = Task::new(future, data);
+use crate::platform::dart::executor::task_wake;
 
-    let poll = Box::new(move || task.poll()) as BoxedPoll;
+/// Inner [`Task`]'s data.
+struct Inner {
+    /// An actual [`Future`] that this [`Task`] is driving.
+    future: LocalBoxFuture<'static, ()>,
 
-    Box::into_raw(Box::new(poll)).cast()
+    /// Handle for waking up this [`Task`].
+    waker: Waker,
 }
 
-pub(crate) struct Task<T> {
-    future: Mutex<BoxFuture<'static, T>>,
-    data: WrappedUserData,
+/// Wrapper for a [`Future`] that can be polled by external single threaded
+/// executor.
+pub struct Task {
+    /// [`Task`]'s inner data that contains and actual [`Future`] and its
+    /// [`Waker`]. Dropped on [`Task`] completion.
+    inner: RefCell<Option<Inner>>,
 }
 
-pub(crate) fn wake(data: InternTask) {
-    let task_wake: TaskWake = unsafe { transmute(global::TASK_WAKE) };
+impl Task {
+    /// Creates a new [`Task`].
+    pub fn new(future: LocalBoxFuture<'static, ()>) -> Rc<Self> {
+        let this = Rc::new(Self {
+            inner: RefCell::new(None),
+        });
 
-    task_wake(data);
-}
+        let waker =
+            unsafe { Waker::from_raw(Task::into_raw_waker(Rc::clone(&this))) };
+        this.inner.borrow_mut().replace(Inner { future, waker });
 
-impl<T> Wake for Task<T> {
-    fn wake_by_ref(arc_self: &Rc<Self>) {
-        wake(*arc_self.data);
-    }
-}
-
-impl<T> Task<T> {
-    pub fn new(future: BoxFuture<'static, T>, data: ExternTask) -> Rc<Self> {
-        let future = Mutex::new(future);
-        let data = data.into();
-
-        Rc::new(Self { future, data })
+        this
     }
 
-    pub fn poll(self: &Rc<Self>) -> bool {
-        let mut future = mutex_lock(&self.future);
-        let waker = waker_ref(&self);
-        let context = &mut Context::from_waker(&*waker);
+    /// Polls underlying [`Future`].
+    ///
+    /// Polling after completion is no-op.
+    pub fn poll(&self) -> Poll<()> {
+        let mut borrow = self.inner.borrow_mut();
 
-        future.as_mut().poll(context).is_pending()
+        // Just ignore poll request if future is polled after completion.
+        let inner = match borrow.as_mut() {
+            Some(inner) => inner,
+            None => return Poll::Ready(()),
+        };
+
+        let poll = {
+            let mut cx = Context::from_waker(&inner.waker);
+            inner.future.as_mut().poll(&mut cx)
+        };
+
+        // Cleanup resources if future is ready.
+        if poll.is_ready() {
+            *borrow = None;
+        }
+
+        poll
+    }
+
+    /// Calls [`task_wake`] with provided reference.
+    fn wake_by_ref(this: &Rc<Self>) {
+        task_wake(Rc::as_ptr(this));
+    }
+
+    /// Pretty much a copy of [`std::task::Wake`] implementation but for
+    /// `Rc<?Send + ?Sync>` instead of `Arc<Send + Sync>` since we are sure
+    /// that everything will run in single threaded environment.
+    #[inline(always)]
+    fn into_raw_waker(this: Rc<Self>) -> RawWaker {
+        // Refer to `RawWakerVTable::new()` documentation for better
+        // understanding of what following functions do.
+        unsafe fn raw_clone(ptr: *const ()) -> RawWaker {
+            let ptr = ManuallyDrop::new(Rc::from_raw(ptr.cast::<Task>()));
+            Task::into_raw_waker(Rc::clone(&(*ptr)))
+        }
+
+        unsafe fn raw_wake(ptr: *const ()) {
+            let ptr = Rc::from_raw(ptr.cast::<Task>());
+            Task::wake_by_ref(&ptr);
+        }
+
+        unsafe fn raw_wake_by_ref(ptr: *const ()) {
+            let ptr = ManuallyDrop::new(Rc::from_raw(ptr.cast::<Task>()));
+            Task::wake_by_ref(&ptr);
+        }
+
+        unsafe fn raw_drop(ptr: *const ()) {
+            drop(Rc::from_raw(ptr.cast::<Task>()));
+        }
+
+        const VTABLE: RawWakerVTable =
+            RawWakerVTable::new(raw_clone, raw_wake, raw_wake_by_ref, raw_drop);
+
+        RawWaker::new(Rc::into_raw(this).cast::<()>(), &VTABLE)
     }
 }

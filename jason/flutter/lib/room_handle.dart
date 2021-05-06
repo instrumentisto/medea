@@ -40,16 +40,16 @@ typedef _muteAudio_Dart = Object Function(Pointer);
 typedef _unmuteAudio_C = Handle Function(Pointer);
 typedef _unmuteAudio_Dart = Object Function(Pointer);
 
-typedef _muteVideo_C = Handle Function(Pointer, Int64);
+typedef _muteVideo_C = Handle Function(Pointer, Uint8);
 typedef _muteVideo_Dart = Object Function(Pointer, int);
 
-typedef _unmuteVideo_C = Handle Function(Pointer, Int64);
+typedef _unmuteVideo_C = Handle Function(Pointer, Uint8);
 typedef _unmuteVideo_Dart = Object Function(Pointer, int);
 
-typedef _disableVideo_C = Handle Function(Pointer, Int64);
+typedef _disableVideo_C = Handle Function(Pointer, Uint8);
 typedef _disableVideo_Dart = Object Function(Pointer, int);
 
-typedef _enableVideo_C = Handle Function(Pointer, Int64);
+typedef _enableVideo_C = Handle Function(Pointer, Uint8);
 typedef _enableVideo_Dart = Object Function(Pointer, int);
 
 typedef _disableAudio_C = Handle Function(Pointer);

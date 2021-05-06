@@ -16,7 +16,7 @@ impl ForeignClass for MediaManagerHandle {}
 /// Returns [`LocalMediaTrack`]s objects, built from the provided
 /// [`MediaStreamSettings`].
 ///
-/// [`LocalMediaTrack`]: super::local_media_track::LocalMediaTrack,
+/// [`LocalMediaTrack`]: crate::media::track::local::LocalMediaTrack
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     this: *const MediaManagerHandle,
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: *const MediaManagerHandle,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref().unwrap().clone();
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is

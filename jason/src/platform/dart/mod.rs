@@ -23,8 +23,6 @@ pub mod utils;
 
 use std::time::Duration;
 
-use dart_sys::Dart_Handle;
-
 pub use self::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     error::Error,
@@ -36,7 +34,7 @@ pub use self::{
     rtc_stats::RtcStats,
     transceiver::{Transceiver, TransceiverDirection},
     transport::WebSocketRpcTransport,
-    utils::{dart_future_to_rust, Callback, Function},
+    utils::{Callback, Function},
 };
 
 /// TODO: Implement panic hook.
@@ -53,34 +51,9 @@ pub fn init_logger() {
     );
 }
 
-/// Pointer to an extern function that returns Dart `Future` which will be
-/// resolved after provided number of milliseconds.
-type DelayedFutureCaller = extern "C" fn(i32) -> Dart_Handle;
-
-/// Stores pointer to the [`DelayerFutureCaller`] extern function.
-///
-/// Should be initialized by Dart during FFI initialization phase.
-static mut DELAYED_FUTURE_CALLER: Option<DelayedFutureCaller> = None;
-
-/// Registers the provided [`DelayedFutureCaller`] as
-/// [`DELAYER_FUTURE_CALLER`].
-///
-/// # Safety
-///
-/// Must ONLY be called by Dart during FFI initialization.
-#[no_mangle]
-pub unsafe extern "C" fn register_delayed_future_caller(
-    f: DelayedFutureCaller,
-) {
-    DELAYED_FUTURE_CALLER = Some(f);
-}
-
 /// [`Future`] which resolves after the provided [`Duration`].
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
-    #[allow(clippy::cast_possible_truncation)]
-    let delay = delay.as_millis() as i32;
-    let dart_fut = unsafe { DELAYED_FUTURE_CALLER.unwrap()(delay) };
-    let _ = dart_future_to_rust(dart_fut).await;
+    unimplemented!()
 }

@@ -100,7 +100,7 @@ impl Callback<()> {
     #[inline]
     pub fn call0(&self) {
         if let Some(f) = self.0.borrow().as_ref() {
-            f.call1(())
+            f.call0()
         };
     }
 }
@@ -145,9 +145,16 @@ impl<T> Function<T> {
     }
 }
 
+impl Function<()> {
+    /// Calls the underlying Dart closure.
+    #[inline]
+    pub fn call0(&self) {
+        self.call1(());
+    }
+}
+
 impl<T: Into<DartValue>> Function<T> {
-    /// Calls the underlying Dart closure with the provided [`ForeignClass`]
-    /// argument.
+    /// Calls the underlying Dart closure with the provided argument.
     #[inline]
     pub fn call1(&self, arg: T) {
         unsafe {
@@ -164,7 +171,8 @@ impl<T: Into<DartValue>> Function<T> {
                 DartValue::Void => {
                     NO_ARGS_FN_CALLER.unwrap()(fn_handle);
                 }
-                DartValue::String(_) | DartValue::PtrArray(_) => {
+                DartValue::PtrArray(_) => {
+                    // TODO: Implement.
                     unimplemented!()
                 }
             }

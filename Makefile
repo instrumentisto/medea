@@ -23,7 +23,7 @@ IMAGE_NAME := $(strip \
 
 RUST_VER := 1.51
 CHROME_VERSION := 89.0
-FIREFOX_VERSION := 87.0
+FIREFOX_VERSION := 88.0
 
 CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
 ANDROID_TARGETS := aarch64-linux-android \

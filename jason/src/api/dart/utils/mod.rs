@@ -5,20 +5,15 @@ use std::future::Future;
 
 use dart_sys::Dart_Handle;
 
-use crate::{api::DartValue, platform::utils::Completer};
+use crate::{
+    api::DartValue,
+    platform::{spawn, utils::Completer},
+};
 
 pub use self::{
     arrays::PtrArray,
     string::{c_str_into_string, string_into_c_str},
 };
-
-/// Spawns provided [`Future`] in the Dart event loop.
-pub fn spawn<F>(fut: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    crate::platform::spawn(fut);
-}
 
 /// Converts provided [`Future`] to the Dart `Future`.
 ///
