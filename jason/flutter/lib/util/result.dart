@@ -19,8 +19,10 @@ void futureErrorCatcher(Object err) {
 class RustException implements Exception {
   /// Name of this [RustException].
   final String _name;
+
   /// Message of this [RustException].
   final String _message;
+
   /// Stacktrace of this [RustException].
   final String _stacktrace;
 
@@ -56,20 +58,26 @@ class Unit {}
 class Result extends Struct {
   /// Success value for [Result] with [Pointer] type.
   external Pointer _ptrOk;
+
   /// Success value for [Result] with [PtrArray] type.
   external PtrArray _arrOk;
+
   /// Success value for [Result] with [Pointer] for [Utf8] type.
   external Pointer<Utf8> _strOk;
+
   /// Success value for [Result] with [int] type.
   @Int64()
   external int _intOk;
+
   /// Type of the success value.
   ///
   /// Based on this value, Dart will determine which of success values it should return.
   @Int32()
   external int _okType;
+
   /// Error value for [Result].
   external Error _error;
+
   /// Boolean which indicates execution result.
   ///
   /// If it 0 then [Result] is successful, otherwise execution result is failure
@@ -104,8 +112,10 @@ class Result extends Struct {
 class Error extends Struct {
   /// Pointer to the [Utf8] name of this [Error].
   external Pointer<Utf8> _name;
+
   /// Pointer to the [Utf8] message of this [Error].
   external Pointer<Utf8> _message;
+
   /// Pointer to the [Utf8] stacktrace of this [Error].
   external Pointer<Utf8> _stacktrace;
 }
