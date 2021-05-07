@@ -142,7 +142,7 @@ class RoomHandle {
   RoomHandle(this.ptr);
 
   /// Connects to a media server and joins the `Room` with the provided
-  /// authorization `token`.
+  /// authorization [token].
   ///
   /// Authorization token has a fixed format:
   /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
@@ -156,23 +156,23 @@ class RoomHandle {
     }
   }
 
-  /// Updates this `Room`'s `MediaStreamSettings`. This affects all
-  /// `PeerConnection`s in this `Room`. If `MediaStreamSettings` is configured
+  /// Updates this `Room`'s [MediaStreamSettings]. This affects all
+  /// `PeerConnection`s in this `Room`. If [MediaStreamSettings] is configured
   /// for some `Room`, then this `Room` can only send media tracks that
-  /// correspond to this settings. `MediaStreamSettings` update will change
+  /// correspond to this settings. [MediaStreamSettings] update will change
   /// media tracks in all sending peers, so that might cause new
   /// [getUserMedia()][1] request.
   ///
   /// Media obtaining/injection errors are additionally fired to
-  /// `on_failed_local_media` callback.
+  /// [RoomHandle.onFailedLocalMedia()] callback.
   ///
-  /// If `stop_first` set to `true` then affected local `Tracks` will be
-  /// dropped before new `MediaStreamSettings` is applied. This is usually
+  /// If [stop_first] set to `true` then affected local [LocalMediaTrack] will
+  /// be dropped before new [MediaStreamSettings] is applied. This is usually
   /// required when changing video source device due to hardware limitations,
   /// e.g. having an active track sourced from device `A` may hinder
   /// [getUserMedia()][1] requests to device `B`.
   ///
-  /// `rollback_on_fail` option configures `MediaStreamSettings` update request
+  /// [rollback_on_fail] option configures [MediaStreamSettings] update request
   /// to automatically rollback to previous settings if new settings cannot be
   /// applied.
   ///
