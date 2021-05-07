@@ -14,6 +14,8 @@ use self::task::Task;
 pub fn spawn(future: impl Future<Output = ()> + 'static) {
     let task = Task::new(Box::pin(future));
 
+    // Task is leaked and will be freed by Dart calling the
+    // rust_executor_drop_task().
     task_wake(NonNull::from(mem::ManuallyDrop::new(task).as_ref()));
 }
 

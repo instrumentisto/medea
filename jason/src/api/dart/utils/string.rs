@@ -43,6 +43,6 @@ pub fn string_into_c_str(string: String) -> NonNull<c_char> {
 ///
 /// Same as for [`CString::from_raw()`].
 #[no_mangle]
-pub unsafe extern "C" fn String_free(s: *mut c_char) {
-    CString::from_raw(s);
+pub unsafe extern "C" fn String_free(s: NonNull<c_char>) {
+    CString::from_raw(s.as_ptr());
 }
