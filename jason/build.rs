@@ -4,7 +4,7 @@ use std::env;
 
 fn main() {
     println!("cargo:rerun-if-env-changed=CLIPPY_ARGS");
-    if let Ok("cargo-clippy") = env::var("CARGO_CFG_FEATURE").as_deref() {
+    if env::var("CLIPPY_ARGS").is_ok() {
         return;
     }
 

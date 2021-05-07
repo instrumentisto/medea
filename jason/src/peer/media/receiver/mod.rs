@@ -239,12 +239,12 @@ impl Receiver {
             return;
         }
         if let Some(track) = self.track.borrow().as_ref() {
-            let _ = self.peer_events_sender.unbounded_send(
+            drop(self.peer_events_sender.unbounded_send(
                 PeerEvent::NewRemoteTrack {
                     sender_id: self.sender_id.clone(),
                     track: track.clone(),
                 },
-            );
+            ));
             self.is_track_notified.set(true);
         }
     }
