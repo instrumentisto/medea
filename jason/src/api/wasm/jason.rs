@@ -22,8 +22,8 @@ pub struct Jason(jason::Jason);
 #[wasm_bindgen]
 impl Jason {
     /// Instantiates a new [`Jason`] interface to interact with this library.
-    #[wasm_bindgen(constructor)]
     #[must_use]
+    #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
         init_logger();

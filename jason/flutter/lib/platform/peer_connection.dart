@@ -1,54 +1,53 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'utils/option.dart';
 import 'utils/array.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__set_remote_description')(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__set_remote_description')(
       Pointer.fromFunction<
           Handle Function(
               Handle, Pointer<Utf8>, Pointer<Utf8>)>(setRemoteDescription));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__set_local_description')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__set_local_description')(
       Pointer.fromFunction<
           Handle Function(
               Handle, Pointer<Utf8>, Pointer<Utf8>)>(setRemoteDescription));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__add_ice_candidate')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__add_ice_candidate')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(addIceCandidate));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__ice_connection_state')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__ice_connection_state')(
       Pointer.fromFunction<RustIntOption Function(Handle)>(iceConnectionState));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__connection_state')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__connection_state')(
       Pointer.fromFunction<RustIntOption Function(Handle)>(connectionState));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__restart_ice')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__restart_ice')(
       Pointer.fromFunction<Void Function(Handle)>(restartIce));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__rollback')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__rollback')(
       Pointer.fromFunction<Void Function(Handle)>(rollback));
 
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__on_track')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__on_track')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(onTrack));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__on_ice_candidate')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__on_ice_candidate')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(onIceCandidate));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__on_ice_connection_state_change')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__on_ice_connection_state_change')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(
           onIceConnectionStateChange));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_PeerConnection__on_connection_state_change')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_RtcPeerConnection__on_connection_state_change')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(
           onConnectionStateChange));
 }

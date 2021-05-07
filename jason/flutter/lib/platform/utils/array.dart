@@ -1,9 +1,9 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
-import 'ffi.dart' as ffi;
+import 'package:medea_jason/jason.dart';
 
 final _free_array_Dart _free_array =
-    ffi.dl.lookupFunction<_free_array_C, _free_array_Dart>('free_array');
+    dl.lookupFunction<_free_array_C, _free_array_Dart>('free_array');
 typedef _free_array_C = Void Function(Array);
 typedef _free_array_Dart = void Function(Array);
 

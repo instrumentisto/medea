@@ -1,10 +1,13 @@
+//! Implementation of the executor of [`Future`]s in the Dart environment.
+//!
+//! [`Future`]: std::future::Future
+
 pub mod dart;
 pub mod ffi;
 mod task;
 mod types;
 mod userdata;
 mod woke;
-
 mod global {
     use super::{null_mut, UserData};
 
@@ -14,14 +17,15 @@ mod global {
     pub static mut TASK_DATA: UserData = null_mut();
 }
 
-use ffi::*;
-use task::*;
-use types::*;
-use userdata::*;
-
 use self::{
     dart::{DartPort, DartPostCObject},
-    ffi::ExternTask,
+    ffi::{ExternData, ExternTask, InternTask, TaskNew, TaskRun, TaskWake},
+    task::{task_wrap, BoxedPoll},
+    types::{
+        mutex_lock, null_mut, transmute, waker_ref, Box, BoxFuture, Context,
+        Future, Mutex, Wake,
+    },
+    userdata::{UserData, WrappedUserData},
 };
 
 /// Spawn task
@@ -43,6 +47,9 @@ pub fn spawn(future: impl Future + 'static) {
 /// Workaround for rust-lang/rust#6342.
 macro_rules! export_c_symbol {
     (fn $name:ident($( $arg:ident : $type:ty ),*) -> $ret:ty) => {
+        /// Part of the [`Future`] executor implementation.
+        #[allow(clippy::missing_safety_doc)]
+        #[allow(improper_ctypes_definitions)]
         #[no_mangle]
         pub unsafe extern "C" fn $name($( $arg : $type),*) -> $ret {
             self::dart::$name($( $arg ),*)

@@ -21,7 +21,67 @@ use wasm_bindgen::prelude::*;
 
 use crate::media;
 
-pub use self::jason_error::JasonError;
+pub use self::{
+    connection_handle::ConnectionHandle,
+    constraints_update_exception::ConstraintsUpdateException,
+    input_device_info::InputDeviceInfo,
+    jason::Jason,
+    jason_error::JasonError,
+    local_media_track::LocalMediaTrack,
+    media_manager_handle::MediaManagerHandle,
+    media_stream_settings::{
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints, MediaStreamSettings,
+    },
+    reconnect_handle::ReconnectHandle,
+    remote_media_track::RemoteMediaTrack,
+    room_close_reason::RoomCloseReason,
+    room_handle::RoomHandle,
+};
+
+/// [MediaStreamTrack.kind][1] representation.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
+pub enum MediaKind {
+    /// Audio track.
+    Audio,
+
+    /// Video track.
+    Video,
+}
+
+/// Media source type.
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
+pub enum MediaSourceKind {
+    /// Media is sourced from some media device (webcam or microphone).
+    Device,
+
+    /// Media is obtained via screen capturing.
+    Display,
+}
+
+/// Describes directions that a camera can face, as seen from a user's
+/// perspective. Representation of a [VideoFacingModeEnum][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-videofacingmodeenum
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
+pub enum FacingMode {
+    /// Facing towards a user (a self-view camera).
+    User,
+
+    /// Facing away from a user (viewing the environment).
+    Environment,
+
+    /// Facing to the left of a user.
+    Left,
+
+    /// Facing to the right of a user.
+    Right,
+}
 
 impl From<media::MediaKind> for MediaKind {
     #[inline]
@@ -85,48 +145,4 @@ impl From<FacingMode> for media::FacingMode {
             FacingMode::Right => Self::Right,
         }
     }
-}
-
-/// [MediaStreamTrack.kind][1] representation.
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack-kind
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
-pub enum MediaKind {
-    /// Audio track.
-    Audio,
-
-    /// Video track.
-    Video,
-}
-
-/// Media source type.
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
-pub enum MediaSourceKind {
-    /// Media is sourced from some media device (webcam or microphone).
-    Device,
-
-    /// Media is obtained via screen capturing.
-    Display,
-}
-
-/// Describes directions that a camera can face, as seen from a user's
-/// perspective. Representation of a [VideoFacingModeEnum][1].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-videofacingmodeenum
-#[wasm_bindgen]
-#[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
-pub enum FacingMode {
-    /// Facing towards a user (a self-view camera).
-    User,
-
-    /// Facing away from a user (viewing the environment).
-    Environment,
-
-    /// Facing to the left of a user.
-    Left,
-
-    /// Facing to the right of a user.
-    Right,
 }

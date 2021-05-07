@@ -1,6 +1,6 @@
 //! Wrapper around a local [MediaStreamTrack][1].
 //!
-//! [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+//! [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
 
 use derive_more::From;
 use wasm_bindgen::prelude::*;
@@ -15,7 +15,7 @@ use crate::{
 /// Backed by a strong reference to the actual track implementing auto stop on
 /// dropping. Can be manually dropped with a `free()` call.
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+/// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
 #[wasm_bindgen]
 #[derive(From)]
 pub struct LocalMediaTrack(local::LocalMediaTrack);
@@ -24,7 +24,7 @@ pub struct LocalMediaTrack(local::LocalMediaTrack);
 impl LocalMediaTrack {
     /// Returns the underlying [MediaStreamTrack][1].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamtrack
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack
     #[must_use]
     pub fn get_track(&self) -> web_sys::MediaStreamTrack {
         Clone::clone(&self.0.get_track().as_ref())

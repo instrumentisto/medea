@@ -2,12 +2,15 @@
 // TODO: This is just a copy of wasm version, Rust to Dart error propagation
 //       will be implemented later.
 
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    ptr,
+};
 
 use derive_more::{Display, From};
 use tracerr::{Trace, Traced};
 
-use crate::{platform, utils::JsCaused};
+use crate::{api::dart::utils::string_into_c_str, platform, utils::JsCaused};
 
 /// Representation of an app error exported to JS side.
 ///
@@ -50,5 +53,39 @@ where
     #[inline]
     fn from(traced: Traced<E>) -> Self {
         Self::from(traced.into_parts())
+    }
+}
+
+/// Error representation for the Dart side.
+#[repr(C)]
+pub struct DartError {
+    /// Name of this error.
+    pub name: *const libc::c_char,
+
+    /// Message of this error.
+    pub message: *const libc::c_char,
+
+    /// Stacktrace of this error.
+    pub stacktrace: *const libc::c_char,
+}
+
+impl DartError {
+    /// Returns `null` [`DartError`].
+    pub fn null() -> Self {
+        Self {
+            name: ptr::null(),
+            message: ptr::null(),
+            stacktrace: ptr::null(),
+        }
+    }
+}
+
+impl From<JasonError> for DartError {
+    fn from(err: JasonError) -> Self {
+        Self {
+            name: string_into_c_str(err.name.to_string()),
+            message: string_into_c_str(err.message.clone()),
+            stacktrace: string_into_c_str(err.trace.to_string()),
+        }
     }
 }

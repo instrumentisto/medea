@@ -1,35 +1,34 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'utils/option.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__current_direction')(
       Pointer.fromFunction<RustIntOption Function(Handle)>(currentDirection));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_Transceiver__replace_send_track')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_Transceiver__replace_track')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(replaceSendTrack));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__get_send_track')(
       Pointer.fromFunction<Handle Function(Handle)>(getSendTrack));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__set_send_track_enabled')(
       Pointer.fromFunction<Handle Function(Handle, Int8)>(setSendTrackEnabled));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__drop_sender')(
       Pointer.fromFunction<Void Function(Handle)>(dropSender));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__is_stopped')(
       Pointer.fromFunction<RustIntOption Function(Handle)>(isStopped));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__mid')(
       Pointer.fromFunction<Pointer<Utf8> Function(Handle)>(mid));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__send_track')(
       Pointer.fromFunction<Handle Function(Handle)>(sendTrack));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__has_send_track')(
       Pointer.fromFunction<Int8 Function(Handle)>(hasSendTrack, 0));
 }

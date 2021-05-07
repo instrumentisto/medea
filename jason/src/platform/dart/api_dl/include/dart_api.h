@@ -234,7 +234,7 @@ typedef struct _Dart_IsolateGroup* Dart_IsolateGroup;
  * Persistent handles are allocated within the current isolate. They
  * can be used to store objects across scopes. Persistent handles have
  * the lifetime of the current isolate unless they are explicitly
- * deallocated (see Dart_DeletePersistentHandle).
+ * deallocated (see Dart_DeletePersistentHandle_DL_Trampolined).
  * The type Dart_Handle represents a handle (both local and persistent).
  * The type Dart_PersistentHandle is a Dart_Handle and it is used to
  * document that a persistent handle is expected as a parameter to a call
@@ -430,7 +430,7 @@ Dart_HandleFromWeakPersistent(Dart_WeakPersistentHandle object);
  * Allocates a persistent handle for an object.
  *
  * This handle has the lifetime of the current isolate unless it is
- * explicitly deallocated by calling Dart_DeletePersistentHandle.
+ * explicitly deallocated by calling Dart_DeletePersistentHandle_DL_Trampolined.
  *
  * Requires there to be a current isolate.
  */
@@ -455,7 +455,7 @@ DART_EXPORT void Dart_SetPersistentHandle(Dart_PersistentHandle obj1,
  *
  * Requires there to be a current isolate group.
  */
-DART_EXPORT void Dart_DeletePersistentHandle(Dart_PersistentHandle object);
+DART_EXPORT void Dart_DeletePersistentHandle_DL_Trampolined(Dart_PersistentHandle object);
 
 /**
  * Allocates a weak persistent handle for an object.
@@ -466,7 +466,7 @@ DART_EXPORT void Dart_DeletePersistentHandle(Dart_PersistentHandle object);
  * If the object becomes unreachable the callback is invoked with the peer as
  * argument. The callback can be executed on any thread, will have a current
  * isolate group, but will not have a current isolate. The callback can only
- * call Dart_DeletePersistentHandle or Dart_DeleteWeakPersistentHandle. This
+ * call Dart_DeletePersistentHandle_DL_Trampolined or Dart_DeleteWeakPersistentHandle. This
  * gives the embedder the ability to cleanup data associated with the object.
  * The handle will point to the Dart_Null object after the finalizer has been
  * run. It is illegal to call into the VM with any other Dart_* functions from
@@ -521,7 +521,7 @@ DART_EXPORT void Dart_UpdateExternalSize(Dart_WeakPersistentHandle object,
  * If the object becomes unreachable the callback is invoked with the
  * the peer as argument. The callback can be executed on any thread, will have
  * an isolate group, but will not have a current isolate. The callback can only
- * call Dart_DeletePersistentHandle or Dart_DeleteWeakPersistentHandle.
+ * call Dart_DeletePersistentHandle_DL_Trampolined or Dart_DeleteWeakPersistentHandle.
  * This gives the embedder the ability to cleanup data associated with the
  * object and clear out any cached references to the handle. All references to
  * this handle after the callback will be invalid. It is illegal to call into

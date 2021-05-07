@@ -1,8 +1,9 @@
-use futures::FutureExt as _;
+use dart_sys::Dart_Handle;
 
 use super::{
-    input_device_info::InputDeviceInfo, local_media_track::LocalMediaTrack,
-    media_stream_settings::MediaStreamSettings, utils::PtrArray, ForeignClass,
+    media_stream_settings::MediaStreamSettings,
+    utils::{future_to_dart, PtrArray},
+    ForeignClass,
 };
 
 #[cfg(feature = "mockable")]
@@ -12,50 +13,49 @@ pub use crate::media::MediaManagerHandle;
 
 impl ForeignClass for MediaManagerHandle {}
 
-/// Returns [`local::LocalMediaTrack`]s objects, built from the provided
+/// Returns [`LocalMediaTrack`]s objects, built from the provided
 /// [`MediaStreamSettings`].
+///
+/// [`LocalMediaTrack`]: super::local_media_track::LocalMediaTrack,
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     this: *const MediaManagerHandle,
     caps: *const MediaStreamSettings,
-) -> PtrArray<LocalMediaTrack> {
-    let this = this.as_ref().unwrap();
-    let caps = caps.as_ref().unwrap();
+) -> Dart_Handle {
+    let this = this.as_ref().unwrap().clone();
+    let caps = caps.as_ref().unwrap().clone();
 
-    // TODO: Remove now_or_never when polling from Dart is implemented.
-    //       Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
-    PtrArray::new(
-        this.init_local_tracks(caps.clone())
-            .now_or_never()
-            .unwrap()
-            .unwrap(),
-    )
+    future_to_dart(async move {
+        Ok(PtrArray::new(this.init_local_tracks(caps).await?))
+    })
 }
 
-/// Returns a list of [`platform::InputDeviceInfo`] objects representing
-/// available media input and output devices, such as microphones, cameras,
-/// and so forth.
+/// Returns a list of [`InputDeviceInfo`] objects representing available media
+/// input and devices, such as microphones, cameras, and so forth.
+///
+/// [`InputDeviceInfo`]: super::input_device_info::InputDeviceInfo
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: *const MediaManagerHandle,
-) -> PtrArray<InputDeviceInfo> {
+) -> Dart_Handle {
     let this = this.as_ref().unwrap();
 
-    // TODO: Remove now_or_never when polling from Dart is implemented.
-    //       Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
-    PtrArray::new(this.enumerate_devices().now_or_never().unwrap().unwrap())
+    future_to_dart(
+        async move { Ok(PtrArray::new(this.enumerate_devices().await?)) },
+    )
 }
 
-/// Frees the data behind the provided pointer. Should be called when object is
-/// no longer needed. Calling this more than once for the same pointer is
-/// equivalent to double free.
+/// Frees the data behind the provided pointer.
+///
+/// # Safety
+///
+/// Should be called when object is no longer needed. Calling this more than
+/// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__free(
     this: *mut MediaManagerHandle,
 ) {
-    MediaManagerHandle::from_ptr(this);
+    let _ = MediaManagerHandle::from_ptr(this);
 }
 
 #[cfg(feature = "mockable")]
@@ -64,6 +64,7 @@ mod mock {
         InputDeviceInfo, JasonError, LocalMediaTrack, MediaStreamSettings,
     };
 
+    #[derive(Clone)]
     pub struct MediaManagerHandle;
 
     #[allow(clippy::missing_errors_doc)]

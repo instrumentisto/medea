@@ -16,6 +16,7 @@ use std::{panic, time::Duration};
 use dart_sys::{Dart_Handle, Dart_PropagateError};
 
 use crate::utils::dart::{dart_future::DartFuture, into_dart_string};
+use crate::platform::dart::utils::dart_api::Dart_PropagateError_DL_Trampolined;
 
 pub use self::executor::spawn;
 
@@ -34,7 +35,7 @@ pub fn set_panic_hook() {
         let exception = unsafe {
             NEW_EXCEPTION_FUNCTION.unwrap()(into_dart_string(s.to_string()))
         };
-        unsafe { Dart_PropagateError(exception) };
+        unsafe { Dart_PropagateError_DL_Trampolined(exception) };
     }));
 }
 

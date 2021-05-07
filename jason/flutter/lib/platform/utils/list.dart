@@ -1,12 +1,11 @@
-import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Array__get')(
       Pointer.fromFunction<Handle Function(Handle, Int32)>(get));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Array__length')(
       Pointer.fromFunction<Int32 Function(Handle)>(len, 0));
 }

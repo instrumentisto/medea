@@ -1,35 +1,34 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'utils/option.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__id')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(id));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__device_id')(
       Pointer.fromFunction<Pointer<Utf8> Function(Handle)>(deviceId));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__facing_mode')(
       Pointer.fromFunction<Pointer<Utf8> Function(Handle)>(facingMode));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__height')(
       Pointer.fromFunction<Int32 Function(Handle)>(height, 0));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__width')(
       Pointer.fromFunction<Int32 Function(Handle)>(width, 0));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__set_enabled')(
       Pointer.fromFunction<Void Function(Handle, Int8)>(setEnabled));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__enabled')(
       Pointer.fromFunction<Int8 Function(Handle)>(enabled, 0));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__stop')(
       Pointer.fromFunction<Void Function(Handle)>(stop));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaStreamTrack__on_ended')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(onEnded));
 }

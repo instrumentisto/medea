@@ -1,11 +1,11 @@
-use core::{
+use std::{
     marker::PhantomData,
     mem,
     mem::ManuallyDrop,
     ops::Deref,
+    rc::Rc,
     task::{RawWaker, RawWakerVTable, Waker},
 };
-use std::rc::Rc;
 
 pub trait Woke {
     fn wake(self: Rc<Self>) {
@@ -24,17 +24,8 @@ pub fn waker_vtable<W: Woke>() -> &'static RawWakerVTable {
     )
 }
 
-pub fn waker<W>(wake: Rc<W>) -> Waker
-where
-    W: Woke,
-{
-    let ptr = Rc::into_raw(wake) as *const ();
-
-    unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
-}
-
 unsafe fn increase_refcount<T: Woke>(data: *const ()) {
-    let arc = mem::ManuallyDrop::new(Rc::<T>::from_raw(data as *const T));
+    let arc = mem::ManuallyDrop::new(Rc::<T>::from_raw(data.cast::<T>()));
     let _arc_clone: mem::ManuallyDrop<_> = arc.clone();
 }
 
@@ -44,18 +35,18 @@ unsafe fn clone_arc_raw<T: Woke>(data: *const ()) -> RawWaker {
 }
 
 unsafe fn wake_arc_raw<T: Woke>(data: *const ()) {
-    let arc: Rc<T> = Rc::from_raw(data as *const T);
+    let arc: Rc<T> = Rc::from_raw(data.cast::<T>());
     Woke::wake(arc);
 }
 
 unsafe fn wake_by_ref_arc_raw<T: Woke>(data: *const ()) {
     // Retain Arc, but don't touch refcount by wrapping in ManuallyDrop
-    let arc = mem::ManuallyDrop::new(Rc::<T>::from_raw(data as *const T));
+    let arc = mem::ManuallyDrop::new(Rc::<T>::from_raw(data.cast::<T>()));
     Woke::wake_by_ref(&arc);
 }
 
 unsafe fn drop_arc_raw<T: Woke>(data: *const ()) {
-    drop(Rc::<T>::from_raw(data as *const T))
+    drop(Rc::<T>::from_raw(data.cast::<T>()))
 }
 
 #[derive(Debug)]
@@ -65,14 +56,6 @@ pub struct WakerRef<'a> {
 }
 
 impl<'a> WakerRef<'a> {
-    pub fn new(waker: &'a Waker) -> Self {
-        let waker = ManuallyDrop::new(unsafe { core::ptr::read(waker) });
-        WakerRef {
-            waker,
-            _marker: PhantomData,
-        }
-    }
-
     pub fn new_unowned(waker: ManuallyDrop<Waker>) -> Self {
         WakerRef {
             waker,
@@ -94,7 +77,7 @@ pub fn waker_ref<W>(wake: &Rc<W>) -> WakerRef<'_>
 where
     W: Woke,
 {
-    let ptr = (&**wake as *const W) as *const ();
+    let ptr = (&**wake as *const W).cast::<()>();
 
     let waker = ManuallyDrop::new(unsafe {
         Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>()))

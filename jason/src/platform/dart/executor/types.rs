@@ -1,5 +1,9 @@
-/// ! widely used types and functions
-pub use std::{boxed::Box, sync::Arc};
+//! Widely used types and functions
+
+pub use std::{
+    boxed::Box,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 pub use core::pin::Pin;
 
@@ -11,7 +15,6 @@ pub use core::{
 };
 
 pub use super::woke::{waker_ref, Woke as Wake};
-pub use std::sync::{Mutex, MutexGuard};
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 

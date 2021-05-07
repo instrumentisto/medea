@@ -1,9 +1,10 @@
-use dart_sys::{Dart_Handle, Dart_HandleFromPersistent};
+use dart_sys::{Dart_Handle};
 use derive_more::From;
 use libc::c_char;
 
 use crate::{
     platform::dart::utils::{
+        dart_api::Dart_HandleFromPersistent_DL_Trampolined,
         handle::DartHandle,
         nullable::{NullableChar, NullableInt},
         option::{DartIntOption, DartOption, DartStringOption},

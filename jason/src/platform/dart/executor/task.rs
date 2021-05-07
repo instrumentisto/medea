@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use super::{
     global, mutex_lock, transmute, waker_ref, Box, BoxFuture, Context,
-    ExternTask, InternTask, Mutex, Poll, TaskWake, Wake, WrappedUserData,
+    ExternTask, InternTask, Mutex, TaskWake, Wake, WrappedUserData,
 };
 
 pub(crate) type BoxedPoll = Box<dyn FnMut() -> bool>;
@@ -16,7 +16,7 @@ pub fn task_wrap<T: 'static>(
 
     let poll = Box::new(move || task.poll()) as BoxedPoll;
 
-    Box::into_raw(Box::new(poll)) as _
+    Box::into_raw(Box::new(poll)).cast()
 }
 
 pub(crate) struct Task<T> {
@@ -49,10 +49,6 @@ impl<T> Task<T> {
         let waker = waker_ref(&self);
         let context = &mut Context::from_waker(&*waker);
 
-        if let Poll::Pending = future.as_mut().poll(context) {
-            true
-        } else {
-            false
-        }
+        future.as_mut().poll(context).is_pending()
     }
 }

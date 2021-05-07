@@ -6,6 +6,7 @@ import 'package:medea_jason/jason.dart';
 import 'package:medea_jason/media_stream_settings.dart';
 import 'package:medea_jason/room_handle.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:medea_jason/track_kinds.dart';
 
 class Call {
   Jason _jason = Jason();
@@ -48,9 +49,9 @@ class Call {
 
   Future<void> toggleVideo(bool enabled) async {
     if (enabled) {
-      await _room.enableVideo();
+      await _room.enableVideo(MediaSourceKind.Device);
     } else {
-      await _room.disableVideo();
+      await _room.disableVideo(MediaSourceKind.Device);
     }
   }
 

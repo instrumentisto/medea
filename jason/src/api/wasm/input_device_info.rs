@@ -1,6 +1,6 @@
 //! Representation of a [MediaDeviceInfo][1].
 //!
-//! [1]: https://w3.org/TR/mediacapture-streams/#device-info
+//! [1]: https://w3.org/TR/mediacapture-streams#device-info
 
 use derive_more::From;
 use wasm_bindgen::prelude::*;
@@ -9,7 +9,7 @@ use crate::{api::MediaKind, platform};
 
 /// Representation of a [MediaDeviceInfo][1].
 ///
-/// [1]: https://w3.org/TR/mediacapture-streams/#device-info
+/// [1]: https://w3.org/TR/mediacapture-streams#device-info
 #[wasm_bindgen]
 #[derive(From)]
 pub struct InputDeviceInfo(platform::InputDeviceInfo);
@@ -26,7 +26,7 @@ impl InputDeviceInfo {
     ///
     /// This representation of [MediaDeviceInfo][1] is for input device ONLY.
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
+    /// [1]: https://w3.org/TR/mediacapture-streams#device-info
     #[must_use]
     pub fn kind(&self) -> MediaKind {
         self.0.kind().into()
@@ -48,7 +48,7 @@ impl InputDeviceInfo {
     /// representing the speaker and microphone of the same headset have the
     /// same [groupId][1].
     ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadeviceinfo-groupid
+    /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadeviceinfo-groupid
     #[must_use]
     pub fn group_id(&self) -> String {
         self.0.group_id()

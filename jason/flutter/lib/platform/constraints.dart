@@ -1,17 +1,16 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_Constraints__new')(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_MediaStreamConstraints__new')(
       Pointer.fromFunction<Handle Function()>(constructor));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_Constraints__set_audio')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_MediaStreamConstraints__set_audio')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(setAudio));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-          'register_Constraints__set_video')(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+          'register_MediaStreamConstraints__set_video')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(setVideo));
 }
 

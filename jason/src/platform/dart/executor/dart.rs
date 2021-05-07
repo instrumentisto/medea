@@ -1,3 +1,5 @@
+//! Implementation of the executor for the Dart.
+
 use dart_sys::{Dart_CObject, Dart_CObjectValue, Dart_CObject_Type, Dart_Port};
 
 use super::{
@@ -24,7 +26,7 @@ pub struct DartCObject;
 pub type DartPostCObject = fn(DartPort, *mut DartCObject) -> bool;
 
 pub(crate) mod global {
-    use super::*;
+    use super::{null_mut, Dart_Port, UserData};
 
     pub static mut WAKE_PORT: Dart_Port = 0;
     pub static mut TASK_POST: UserData = null_mut();
@@ -36,12 +38,12 @@ struct DartTask {
 }
 
 extern "C" fn task_new(_data: ExternData) -> ExternTask {
-    Box::into_raw(Box::new(DartTask { data: null_mut() })) as _
+    Box::into_raw(Box::new(DartTask { data: null_mut() })).cast()
 }
 
 extern "C" fn task_run(task: ExternTask, data: InternTask) {
     {
-        let mut task = unsafe { &mut *(task as *mut DartTask) };
+        let mut task = unsafe { &mut *(task.cast::<DartTask>()) };
         task.data = data;
     }
     task_wake(task);
@@ -54,7 +56,7 @@ extern "C" fn task_run(task: ExternTask, data: InternTask) {
 /// is free to drop.
 #[export_name = "rust_async_executor_dart_poll"]
 pub extern "C" fn task_poll(task: ExternTask) -> bool {
-    let task = unsafe { &mut *(task as *mut DartTask) };
+    let task = unsafe { &mut *(task.cast::<DartTask>()) };
     ffi::task_poll(task.data)
 }
 
@@ -66,12 +68,12 @@ pub extern "C" fn task_poll(task: ExternTask) -> bool {
 /// tasks may be deleted before completion.
 #[export_name = "rust_async_executor_dart_drop"]
 pub extern "C" fn task_drop(task: ExternTask) {
-    let task = unsafe { Box::from_raw(task as *mut DartTask) };
+    let task = unsafe { Box::from_raw(task.cast::<DartTask>()) };
     ffi::task_drop(task.data);
 }
 
 extern "C" fn task_wake(task: ExternTask) {
-    use global::*;
+    use global::{TASK_POST, WAKE_PORT};
 
     let wake_port = unsafe { WAKE_PORT };
     let task_post: Dart_PostCObject_Fn = unsafe { transmute(TASK_POST) };
@@ -90,9 +92,10 @@ extern "C" fn task_wake(task: ExternTask) {
 ///
 /// On a Dart side you should continuously read channel to get task addresses
 /// which needs to be polled.
+#[allow(improper_ctypes_definitions)]
 #[export_name = "rust_async_executor_dart_init"]
 pub extern "C" fn loop_init(wake_port: DartPort, task_post: DartPostCObject) {
-    use global::*;
+    use global::{TASK_POST, WAKE_PORT};
 
     unsafe {
         WAKE_PORT = wake_port;

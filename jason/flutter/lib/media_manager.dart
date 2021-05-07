@@ -7,12 +7,13 @@ import 'media_stream_settings.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/ptrarray.dart';
+import 'util/result.dart';
 
-typedef _initLocalTracks_C = PtrArray Function(Pointer, Pointer);
-typedef _initLocalTracks_Dart = PtrArray Function(Pointer, Pointer);
+typedef _initLocalTracks_C = Handle Function(Pointer, Pointer);
+typedef _initLocalTracks_Dart = Object Function(Pointer, Pointer);
 
-typedef _enumerateDevices_C = PtrArray Function(Pointer);
-typedef _enumerateDevices_Dart = PtrArray Function(Pointer);
+typedef _enumerateDevices_C = Handle Function(Pointer);
+typedef _enumerateDevices_Dart = Object Function(Pointer);
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
@@ -46,8 +47,15 @@ class MediaManagerHandle {
 
   /// Obtains [LocalMediaTrack]s objects from local media devices (or screen
   /// capture) basing on the provided [MediaStreamSettings].
-  List<LocalMediaTrack> initLocalTracks(MediaStreamSettings caps) {
-    return _initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
+  ///
+  /// Throws [RustException] if Rust returns error.
+  Future<List<LocalMediaTrack>> initLocalTracks(
+      MediaStreamSettings caps) async {
+    PtrArray tracks =
+        await (_initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
+                as Future)
+            .catchError(futureErrorCatcher);
+    return tracks
         .intoPointerList()
         .map((e) => LocalMediaTrack(NullablePointer(e)))
         .toList();
@@ -55,8 +63,12 @@ class MediaManagerHandle {
 
   /// Returns a list of [InputDeviceInfo] objects representing available media
   /// input devices, such as microphones, cameras, and so forth.
-  List<InputDeviceInfo> enumerateDevices() {
-    return _enumerateDevices(ptr.getInnerPtr())
+  ///
+  /// Throws [RustException] if Rust returns error.
+  Future<List<InputDeviceInfo>> enumerateDevices() async {
+    var fut = _enumerateDevices(ptr.getInnerPtr()) as Future;
+    PtrArray devices = await fut.catchError(futureErrorCatcher);
+    return devices
         .intoPointerList()
         .map((e) => InputDeviceInfo(NullablePointer(e)))
         .toList();

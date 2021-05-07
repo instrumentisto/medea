@@ -1,6 +1,6 @@
-import 'ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
+import 'package:medea_jason/jason.dart';
 
 typedef _resolveOk_C = Void Function(Pointer, Handle);
 typedef _resolveOk_Dart = void Function(Pointer, Object);
@@ -8,13 +8,13 @@ typedef _resolveOk_Dart = void Function(Pointer, Object);
 typedef _resolveErr_C = Void Function(Pointer, Handle);
 typedef _resolveErr_Dart = void Function(Pointer, Object);
 
-final _resolveOk = ffi.dl
+final _resolveOk = dl
     .lookupFunction<_resolveOk_C, _resolveOk_Dart>('DartFuture__resolve_ok');
-final _resolveErr = ffi.dl
+final _resolveErr = dl
     .lookupFunction<_resolveErr_C, _resolveErr_Dart>('DartFuture__resolve_err');
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_spawn_dart_future_function')(
       Pointer.fromFunction<Handle Function(Handle, Pointer)>(spawner));
 }

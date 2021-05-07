@@ -33,7 +33,7 @@ impl RemoteMediaTrack {
         self.0.enabled()
     }
 
-    /// Indicate whether this [`RemoteMediaTrack`] is muted.
+    /// Indicates whether this [`RemoteMediaTrack`] is muted.
     #[must_use]
     pub fn muted(&self) -> bool {
         self.0.muted()

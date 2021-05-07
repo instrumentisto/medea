@@ -1,3 +1,7 @@
+//! FFI part of [`Future`] executor.
+//!
+//! [`Future`]: std::future::Future
+
 use super::{global, Box, BoxedPoll, UserData};
 
 /// Raw external task handle
@@ -38,25 +42,25 @@ pub extern "C" fn loop_init(
     task_wake: TaskWake,
     task_data: ExternData,
 ) {
-    use global::*;
+    use global::{TASK_DATA, TASK_NEW, TASK_RUN, TASK_WAKE};
 
     unsafe {
         TASK_NEW = task_new as _;
         TASK_RUN = task_run as _;
         TASK_WAKE = task_wake as _;
-        TASK_DATA = task_data as _;
+        TASK_DATA = task_data.cast();
     }
 }
 
 /// Task poll function which should be called to resume task
 #[export_name = "rust_async_executor_poll"]
 pub extern "C" fn task_poll(data: InternTask) -> bool {
-    let poll = unsafe { &mut *(data as *mut BoxedPoll) };
+    let poll = unsafe { &mut *(data.cast::<BoxedPoll>()) };
     poll()
 }
 
 /// Task drop function which should be called to delete task
 #[export_name = "rust_async_executor_drop"]
 pub extern "C" fn task_drop(data: InternTask) {
-    let _poll = unsafe { Box::from_raw(data as *mut BoxedPoll) };
+    let _poll = unsafe { Box::from_raw(data.cast::<BoxedPoll>()) };
 }

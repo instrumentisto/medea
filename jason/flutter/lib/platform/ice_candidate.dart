@@ -1,17 +1,16 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'utils/option.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_IceCandidate__candidate')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(candidate));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_IceCandidate__sdp_m_line_index')(
       Pointer.fromFunction<RustIntOption Function(Handle)>(sdpMLineIndex));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_IceCandidate__sdp_mid')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(sdpMid));
 }

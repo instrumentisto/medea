@@ -1,16 +1,15 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaDevices__get_user_media')(
       Pointer.fromFunction<Handle Function(Handle)>(getUserMedia));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaDevices__enumerate_devices')(
       Pointer.fromFunction<Handle Function()>(enumerateDevices));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_MediaDevices__enumerate_devices')(
       Pointer.fromFunction<Handle Function(Handle)>(getDisplayMedia));
 }

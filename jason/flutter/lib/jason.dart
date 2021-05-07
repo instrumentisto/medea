@@ -4,10 +4,13 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'media_manager.dart';
+import 'platform/utils/executor.dart';
 import 'room_handle.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/callback.dart' as callback;
+import 'util/completer.dart' as completer;
+import 'platform/functions_registerer.dart' as platform_functions_registerer;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();
@@ -25,6 +28,8 @@ typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
 final DynamicLibrary dl = _dl_load();
+
+final _executor = Executor(dl);
 
 final _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');
 
@@ -61,6 +66,8 @@ DynamicLibrary _dl_load() {
     throw 'Failed to initialize Dart API. Code: $initResult';
   }
   callback.registerFunctions(dl);
+  completer.registerFunctions(dl);
+  platform_functions_registerer.registerFunctions(dl);
 
   return dl;
 }
@@ -72,6 +79,10 @@ DynamicLibrary _dl_load() {
 class Jason {
   /// [Pointer] to the Rust struct backing this object.
   final NullablePointer ptr = NullablePointer(_new());
+
+  Jason() {
+    _executor.start();
+  }
 
   /// Returns a [MediaManagerHandle] to the `MediaManager` of this [Jason].
   MediaManagerHandle mediaManager() {
@@ -94,6 +105,7 @@ class Jason {
   @moveSemantics
   void free() {
     _free(ptr.getInnerPtr());
+    _executor.stop();
     ptr.free();
   }
 }

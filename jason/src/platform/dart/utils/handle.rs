@@ -1,6 +1,12 @@
+use crate::platform::dart::utils::dart_api::{
+    Dart_DeletePersistentHandle_DL_Trampolined,
+    Dart_HandleFromPersistent_DL_Trampolined,
+    Dart_NewPersistentHandle_DL_Trampolined,
+};
+
 use dart_sys::{
-    Dart_DeletePersistentHandle, Dart_Handle, Dart_HandleFromPersistent,
-    Dart_NewPersistentHandle, Dart_PersistentHandle,
+    Dart_Handle,
+    Dart_PersistentHandle,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -14,18 +20,18 @@ impl From<Dart_Handle> for DartHandle {
 
 impl DartHandle {
     pub fn new(handle: Dart_Handle) -> Self {
-        Self(unsafe { Dart_NewPersistentHandle(handle) })
+        Self(unsafe { Dart_NewPersistentHandle_DL_Trampolined(handle) })
     }
 
     pub fn get(&self) -> Dart_Handle {
-        unsafe { Dart_HandleFromPersistent(self.0) }
+        unsafe { Dart_HandleFromPersistent_DL_Trampolined(self.0) }
     }
 }
 
 impl Drop for DartHandle {
     fn drop(&mut self) {
         unsafe {
-            Dart_DeletePersistentHandle(self.0);
+            Dart_DeletePersistentHandle_DL_Trampolined(self.0);
         }
     }
 }

@@ -1,20 +1,19 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'utils/option.dart';
-import 'utils/ffi.dart' as ffi;
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
-void registerFunctions() {
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_InputDeviceInfo__device_id')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(deviceId));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_InputDeviceInfo__label')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(label));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_InputDeviceInfo__group_id')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(groupId));
-  ffi.dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_InputDeviceInfo__kind')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(kind));
 }
