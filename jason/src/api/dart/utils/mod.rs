@@ -22,26 +22,40 @@ where
     fut.now_or_never().unwrap();
 }
 
-/// Converts the provided [`Future`] into a Dart `Future`.
-///
-/// Returns [`Dart_Handle`] to the created Dart `Future`.
-pub fn future_to_dart<F, T, E>(f: F) -> Dart_Handle
+/// Extension trait for the [`Future`] which provides functions for converting
+/// [`Future`] to the Dart `Future`.
+pub trait IntoDartFuture {
+    /// Converts [`Future`] into a Dart `Future`.
+    ///
+    /// Returns [`Dart_Handle`] to the created Dart `Future`.
+    fn into_dart_future(self) -> Dart_Handle;
+}
+
+impl<F, T, E> IntoDartFuture for F
 where
     F: Future<Output = Result<T, E>> + 'static,
     T: Into<DartValue> + 'static,
     E: Into<DartValue> + 'static,
 {
-    let completer = Completer::new();
-    let dart_future = completer.future();
-    spawn(async move {
-        match f.await {
-            Ok(ok) => {
-                completer.complete(ok);
+    /// Converts this [`Future`] into a Dart `Future`.
+    ///
+    /// Returns [`Dart_Handle`] to the created Dart `Future`.
+    ///
+    /// __Note that returned Dart `Future` will be executed immediately after
+    /// this function call, even if Dart side wouldn't poll this `Future`.__
+    fn into_dart_future(self) -> Dart_Handle {
+        let completer = Completer::new();
+        let dart_future = completer.future();
+        spawn(async move {
+            match self.await {
+                Ok(ok) => {
+                    completer.complete(ok);
+                }
+                Err(e) => {
+                    completer.complete_error(e);
+                }
             }
-            Err(e) => {
-                completer.complete_error(e);
-            }
-        }
-    });
-    dart_future
+        });
+        dart_future
+    }
 }

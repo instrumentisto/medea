@@ -2,7 +2,7 @@ use dart_sys::Dart_Handle;
 
 use super::{
     media_stream_settings::MediaStreamSettings,
-    utils::{future_to_dart, PtrArray},
+    utils::{IntoDartFuture, PtrArray},
     ForeignClass,
 };
 
@@ -25,11 +25,12 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     let this = this.as_ref().unwrap().clone();
     let caps = caps.as_ref().unwrap().clone();
 
-    future_to_dart(async move {
+    async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         Ok::<_, ()>(PtrArray::new(this.init_local_tracks(caps).await.unwrap()))
-    })
+    }
+    .into_dart_future()
 }
 
 /// Returns a list of [`InputDeviceInfo`] objects representing available media
@@ -42,11 +43,12 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
 
-    future_to_dart(async move {
+    async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         Ok::<_, ()>(PtrArray::new(this.enumerate_devices().await.unwrap()))
-    })
+    }
+    .into_dart_future()
 }
 
 /// Frees the data behind the provided pointer.
