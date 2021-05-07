@@ -115,11 +115,20 @@ pub unsafe extern "C" fn RemoteMediaTrack__free(this: *mut RemoteMediaTrack) {
 #[cfg(feature = "mockable")]
 mod mock {
     use crate::{
-        media::{MediaKind, MediaSourceKind},
+        media::{
+            track::remote::Track as CoreRemoteMediaTrack, MediaKind,
+            MediaSourceKind,
+        },
         platform,
     };
 
     pub struct RemoteMediaTrack;
+
+    impl From<CoreRemoteMediaTrack> for RemoteMediaTrack {
+        fn from(_: CoreRemoteMediaTrack) -> Self {
+            Self
+        }
+    }
 
     impl RemoteMediaTrack {
         pub fn enabled(&self) -> bool {

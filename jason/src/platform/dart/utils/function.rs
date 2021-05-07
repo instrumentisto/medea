@@ -80,9 +80,9 @@ impl<A: Into<DartValue>> Callback<A> {
     /// Invokes the underlying [`Function`] (if any) passing the single provided
     /// argument to it.
     #[inline]
-    pub fn call1(&self, arg: A) {
+    pub fn call1<T: Into<A>>(&self, arg: T) {
         if let Some(f) = self.0.borrow().as_ref() {
-            f.call1(arg)
+            f.call1(arg.into())
         };
     }
 }
