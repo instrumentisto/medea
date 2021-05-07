@@ -14,6 +14,8 @@ use self::task::Task;
 pub fn spawn(future: impl Future<Output = ()> + 'static) {
     let task = Task::new(Box::pin(future));
 
+    // Task is leaked and will be freed by Dart calling the
+    // rust_executor_drop_task().
     task_wake(Rc::into_raw(task));
 }
 
@@ -47,8 +49,8 @@ pub unsafe extern "C" fn rust_executor_init(wake_port: Dart_Port) {
 /// Valid [`Task`] pointer must be provided. Must not be called if the
 /// provided [`Task`] was dropped (with [`rust_executor_drop_task`]).
 #[no_mangle]
-pub unsafe extern "C" fn rust_executor_poll_task(poll: *mut Task) -> bool {
-    let task = poll.as_mut().unwrap();
+pub unsafe extern "C" fn rust_executor_poll_task(task: *mut Task) -> bool {
+    let task = task.as_mut().unwrap();
 
     task.poll().is_pending()
 }
@@ -74,13 +76,13 @@ pub unsafe extern "C" fn rust_executor_drop_task(task: *const Task) {
 /// Sends command that contains the provided [`Task`] to the configured
 /// [`WAKE_PORT`]. When received, Dart must poll it by calling
 /// [`rust_executor_poll_task`].
-fn task_wake(poll: *const Task) {
+fn task_wake(task: *const Task) {
     let wake_port = unsafe { WAKE_PORT }.unwrap();
 
     let mut task_addr = Dart_CObject {
         type_: Dart_CObject_Type::Int64,
         value: Dart_CObjectValue {
-            as_int64: poll as i64,
+            as_int64: task as i64,
         },
     };
 
@@ -88,6 +90,6 @@ fn task_wake(poll: *const Task) {
         unsafe { Dart_PostCObject_DL_Trampolined(wake_port, &mut task_addr) };
     if !enqueued {
         log::warn!("Could not send message to Dart's native port");
-        unsafe { rust_executor_drop_task(poll) };
+        unsafe { rust_executor_drop_task(task) };
     }
 }
