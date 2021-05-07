@@ -44,7 +44,7 @@ class Executor {
     _loopInit(_wakePort.sendPort.nativePort);
   }
 
-  /// Polls Rust future.
+  /// Polls a Rust future.
   ///
   /// Calls [_taskPoll] with provided [message]. Drops task with [_taskDrop] if
   /// poll returns `false`.
