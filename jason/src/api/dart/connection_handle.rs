@@ -88,10 +88,17 @@ pub unsafe extern "C" fn ConnectionHandle__free(
 mod mock {
     use crate::{
         api::{JasonError, RemoteMediaTrack},
+        connection::ConnectionHandle as CoreConnectionHandle,
         platform,
     };
 
     pub struct ConnectionHandle;
+
+    impl From<CoreConnectionHandle> for ConnectionHandle {
+        fn from(_: CoreConnectionHandle) -> Self {
+            Self
+        }
+    }
 
     #[allow(clippy::missing_errors_doc)]
     impl ConnectionHandle {

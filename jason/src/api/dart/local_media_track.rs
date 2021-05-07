@@ -53,9 +53,18 @@ pub unsafe extern "C" fn LocalMediaTrack__free(this: NonNull<LocalMediaTrack>) {
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use crate::media::{MediaKind, MediaSourceKind};
+    use crate::media::{
+        track::local::LocalMediaTrack as CoreLocalMediaTrack, MediaKind,
+        MediaSourceKind,
+    };
 
     pub struct LocalMediaTrack;
+
+    impl From<CoreLocalMediaTrack> for LocalMediaTrack {
+        fn from(_: CoreLocalMediaTrack) -> Self {
+            Self
+        }
+    }
 
     impl LocalMediaTrack {
         pub fn kind(&self) -> MediaKind {
