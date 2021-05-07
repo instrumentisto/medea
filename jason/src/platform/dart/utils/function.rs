@@ -10,11 +10,11 @@
 //! initialization phase: after Dart DL API is initialized and before any other
 //! exported Rust function is called.
 
-use std::{cell::RefCell, ffi::c_void, marker::PhantomData};
+use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::DartValue;
+use crate::{api::DartValue, platform::Callback};
 
 use super::dart_api::{
     Dart_DeletePersistentHandle_DL_Trampolined,
@@ -22,9 +22,9 @@ use super::dart_api::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-/// Pointer to an extern function that accepts a [`Dart_Handle`] and a
-/// `*const c_void` pointer.
-type PointerArgFnCaller = extern "C" fn(Dart_Handle, *const c_void);
+/// Pointer to an extern function that accepts a [`Dart_Handle`] and a `c_void`
+/// pointer.
+type PointerArgFnCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
 
 /// Pointer to an extern function that accepts a [`Dart_Handle`].
 type UnitArgFnCaller = extern "C" fn(Dart_Handle);
@@ -33,7 +33,7 @@ type UnitArgFnCaller = extern "C" fn(Dart_Handle);
 /// number.
 type IntArgFnCaller = extern "C" fn(Dart_Handle, i64);
 
-/// Dart function used to invoke Dart closures that accept a `*const c_void`
+/// Dart function used to invoke Dart closures that accept a `c_void` pointer
 /// argument.
 static mut PTR_ARG_FN_CALLER: Option<PointerArgFnCaller> = None;
 
@@ -76,48 +76,14 @@ pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
     INT_ARG_FN_CALLER = Some(f);
 }
 
-// TODO: Probably should be shared between `wasm` and `dart` platforms.
-/// Wrapper for a single argument Dart callback function.
-pub struct Callback<A>(RefCell<Option<Function<A>>>);
-
-impl<A> Callback<A> {
-    /// Sets the inner [`Function`].
-    #[inline]
-    pub fn set_func(&self, f: Function<A>) {
-        self.0.borrow_mut().replace(f);
-    }
-
-    /// Indicates whether this [`Callback`]'s inner [`Function`] is set.
-    #[inline]
-    #[must_use]
-    pub fn is_set(&self) -> bool {
-        self.0.borrow().as_ref().is_some()
-    }
-}
-
-impl Callback<()> {
-    /// Invokes the underlying [`Function`] (if any) passing no arguments to it.
-    #[inline]
-    pub fn call0(&self) {
-        if let Some(f) = self.0.borrow().as_ref() {
-            f.call1(())
-        };
-    }
-}
-
-impl<A> Default for Callback<A> {
-    #[inline]
-    fn default() -> Self {
-        Self(RefCell::new(None))
-    }
-}
-
-impl<A> Callback<A> {
+impl<A: Into<DartValue>> Callback<A> {
     /// Invokes the underlying [`Function`] (if any) passing the single provided
     /// argument to it.
     #[inline]
-    pub fn call1<T>(&self, arg: T) {
-        unimplemented!()
+    pub fn call1<T: Into<A>>(&self, arg: T) {
+        if let Some(f) = self.0.borrow().as_ref() {
+            f.call1(arg.into())
+        };
     }
 }
 
@@ -145,9 +111,16 @@ impl<T> Function<T> {
     }
 }
 
+impl Function<()> {
+    /// Calls the underlying Dart closure.
+    #[inline]
+    pub fn call0(&self) {
+        self.call1(());
+    }
+}
+
 impl<T: Into<DartValue>> Function<T> {
-    /// Calls the underlying Dart closure with the provided [`ForeignClass`]
-    /// argument.
+    /// Calls the underlying Dart closure with the provided argument.
     #[inline]
     pub fn call1(&self, arg: T) {
         unsafe {
@@ -164,7 +137,8 @@ impl<T: Into<DartValue>> Function<T> {
                 DartValue::Void => {
                     NO_ARGS_FN_CALLER.unwrap()(fn_handle);
                 }
-                DartValue::String(_) | DartValue::PtrArray(_) => {
+                DartValue::PtrArray(_) => {
+                    // TODO: Implement.
                     unimplemented!()
                 }
             }

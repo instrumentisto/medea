@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use super::{
     audio_track_constraints::AudioTrackConstraints,
     device_video_track_constraints::DeviceVideoTrackConstraints,
@@ -11,7 +13,7 @@ impl ForeignClass for MediaStreamSettings {}
 
 /// Creates new [`MediaStreamSettings`] with none constraints configured.
 #[no_mangle]
-pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
+pub extern "C" fn MediaStreamSettings__new() -> NonNull<MediaStreamSettings> {
     MediaStreamSettings::new().into_ptr()
 }
 
@@ -20,10 +22,10 @@ pub extern "C" fn MediaStreamSettings__new() -> *const MediaStreamSettings {
 /// [`MediaStreamTrack`]: crate::platform::MediaStreamTrack
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__audio(
-    this: *mut MediaStreamSettings,
-    constraints: *mut AudioTrackConstraints,
+    mut this: NonNull<MediaStreamSettings>,
+    constraints: NonNull<AudioTrackConstraints>,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.audio(AudioTrackConstraints::from_ptr(constraints));
 }
@@ -31,10 +33,10 @@ pub unsafe extern "C" fn MediaStreamSettings__audio(
 /// Set constraints for obtaining a local video sourced from a media device.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__device_video(
-    this: *mut MediaStreamSettings,
-    constraints: *mut DeviceVideoTrackConstraints,
+    mut this: NonNull<MediaStreamSettings>,
+    constraints: NonNull<DeviceVideoTrackConstraints>,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.device_video(DeviceVideoTrackConstraints::from_ptr(constraints));
 }
@@ -42,10 +44,10 @@ pub unsafe extern "C" fn MediaStreamSettings__device_video(
 /// Set constraints for capturing a local video from user's display.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__display_video(
-    this: *mut MediaStreamSettings,
-    constraints: *mut DisplayVideoTrackConstraints,
+    mut this: NonNull<MediaStreamSettings>,
+    constraints: NonNull<DisplayVideoTrackConstraints>,
 ) {
-    let this = this.as_mut().unwrap();
+    let this = this.as_mut();
 
     this.display_video(DisplayVideoTrackConstraints::from_ptr(constraints));
 }
@@ -58,7 +60,7 @@ pub unsafe extern "C" fn MediaStreamSettings__display_video(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaStreamSettings__free(
-    this: *mut MediaStreamSettings,
+    this: NonNull<MediaStreamSettings>,
 ) {
-    let _ = MediaStreamSettings::from_ptr(this);
+    drop(MediaStreamSettings::from_ptr(this));
 }

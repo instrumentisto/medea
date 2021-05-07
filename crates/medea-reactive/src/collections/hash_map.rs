@@ -279,7 +279,7 @@ where
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|id| {
-                let _ = self.remove(&id);
+                drop(self.remove(&id));
             });
     }
 

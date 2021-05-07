@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use dart_sys::Dart_Handle;
 
 use super::{
@@ -16,14 +18,14 @@ impl ForeignClass for MediaManagerHandle {}
 /// Returns [`LocalMediaTrack`]s objects, built from the provided
 /// [`MediaStreamSettings`].
 ///
-/// [`LocalMediaTrack`]: super::local_media_track::LocalMediaTrack,
+/// [`LocalMediaTrack`]: crate::media::track::local::LocalMediaTrack
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
-    this: *const MediaManagerHandle,
-    caps: *const MediaStreamSettings,
+    this: NonNull<MediaManagerHandle>,
+    caps: NonNull<MediaStreamSettings>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
-    let caps = caps.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
+    let caps = caps.as_ref().clone();
 
     future_to_dart(async move {
         Ok(PtrArray::new(this.init_local_tracks(caps).await?))
@@ -36,9 +38,9 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
 /// [`InputDeviceInfo`]: super::input_device_info::InputDeviceInfo
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
-    this: *const MediaManagerHandle,
+    this: NonNull<MediaManagerHandle>,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref().clone();
 
     future_to_dart(
         async move { Ok(PtrArray::new(this.enumerate_devices().await?)) },
@@ -53,9 +55,9 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__free(
-    this: *mut MediaManagerHandle,
+    this: NonNull<MediaManagerHandle>,
 ) {
-    let _ = MediaManagerHandle::from_ptr(this);
+    drop(MediaManagerHandle::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

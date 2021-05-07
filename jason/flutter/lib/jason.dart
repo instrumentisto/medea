@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'media_manager.dart';
 import 'room_handle.dart';
+import 'util/executor.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/callback.dart' as callback;
@@ -63,6 +64,8 @@ DynamicLibrary _dl_load() {
   }
   callback.registerFunctions(dl);
   completer.registerFunctions(dl);
+
+  Executor(dl);
 
   return dl;
 }

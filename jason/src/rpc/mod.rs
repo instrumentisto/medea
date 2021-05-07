@@ -113,7 +113,7 @@ impl FromStr for ConnectionInfo {
             .find(|(key, _)| key.as_ref() == "token")
             .ok_or_else(|| tracerr::new!(E::NoToken))?
             .1
-            .to_owned()
+            .clone()
             .into();
 
         url.set_fragment(None);

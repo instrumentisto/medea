@@ -127,7 +127,7 @@ impl<'a, T> Future for AllProcessed<'a, T> {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Self::Output> {
-        let _ = ready!(self.fut.as_mut().poll(cx));
+        drop(ready!(self.fut.as_mut().poll(cx)));
 
         let mut retry = (self.factory)();
         match retry.as_mut().poll(cx) {

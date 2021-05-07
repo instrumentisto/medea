@@ -5,11 +5,11 @@ mod string;
 use std::future::Future;
 
 use dart_sys::Dart_Handle;
-use futures::FutureExt as _;
 
 use crate::{
     api::{dart::JasonError, DartValue},
-    platform::utils::Completer,
+    platform::{spawn, utils::Completer,
+},
 };
 
 pub use self::{
@@ -17,14 +17,6 @@ pub use self::{
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},
 };
-
-/// Spawns provided [`Future`] in the Dart event loop.
-pub fn spawn<F>(fut: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    fut.now_or_never().unwrap();
-}
 
 /// Converts provided [`Future`] to the Dart `Future`.
 ///

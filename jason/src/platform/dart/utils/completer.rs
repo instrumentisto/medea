@@ -19,7 +19,7 @@
 //!
 //! [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 
-use std::{ffi::c_void, marker::PhantomData};
+use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
@@ -42,7 +42,7 @@ type CompleterNewCaller = extern "C" fn() -> Dart_Handle;
 ///
 /// [complete]: https://api.dart.dev/dart-async/Completer/complete.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
-type CompleterCompletePtrCaller = extern "C" fn(Dart_Handle, *const c_void);
+type CompleterCompletePtrCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
 
 /// Pointer to an extern function that invokes the [complete] method on the
 /// provided [`Dart_Handle`] which points to the Dart [Completer] object.
@@ -114,7 +114,7 @@ static mut COMPLETER_COMPLETE_PTR_ARRAY_CALLER: Option<
 /// Should be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_FUTURE_CALLER: Option<CompleterFutureCaller> = None;
 
-/// Registers the provided [`NewCompleterCaller`] as [`NEW_COMPLETER_CALLER`].
+/// Registers the provided [`CompleterNewCaller`] as [`COMPLETER_NEW_CALLER`].
 ///
 /// # Safety
 ///
@@ -124,8 +124,8 @@ pub unsafe extern "C" fn register_new_completer_caller(f: CompleterNewCaller) {
     COMPLETER_NEW_CALLER = Some(f);
 }
 
-/// Registers the provided [`CompleterCompleteCaller`] as
-/// [`COMPLETER_COMPLETE_CALLER`].
+/// Registers the provided [`CompleterCompleteVoidCaller`] as
+/// [`COMPLETER_COMPLETE_VOID_CALLER`].
 ///
 /// # Safety
 ///
@@ -137,8 +137,8 @@ pub unsafe extern "C" fn register_completer_complete_void_caller(
     COMPLETER_COMPLETE_VOID_CALLER = Some(f);
 }
 
-/// Registers the provided [`CompleterCompleteCaller`] as
-/// [`COMPLETER_COMPLETE_CALLER`].
+/// Registers the provided [`CompleterCompletePtrCaller`] as
+/// [`COMPLETER_COMPLETE_PTR_CALLER`].
 ///
 /// # Safety
 ///
@@ -163,8 +163,8 @@ pub unsafe extern "C" fn register_completer_complete_error_caller(
     COMPLETER_COMPLETE_ERROR_CALLER = Some(f);
 }
 
-/// Registers the provided [`ArrayCompleterCompleteCaller`] as
-/// [`ARRAY_COMPLETER_COMPLETE_CALLER`].
+/// Registers the provided [`CompleterCompletePtrArrayCaller`] as
+/// [`COMPLETER_COMPLETE_PTR_ARRAY_CALLER`].
 ///
 /// # Safety
 ///
@@ -263,7 +263,8 @@ impl<T: Into<DartValue>, E> Completer<T, E> {
                 DartValue::Void => {
                     COMPLETER_COMPLETE_VOID_CALLER.unwrap()(handle);
                 }
-                DartValue::String(_) | DartValue::Int(_) => {
+                DartValue::Int(_) => {
+                    // TODO: Implement.
                     unimplemented!()
                 }
             }

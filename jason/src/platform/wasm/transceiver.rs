@@ -2,13 +2,15 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use bitflags::bitflags;
 use futures::future::LocalBoxFuture;
 use medea_client_api_proto::Direction as DirectionProto;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
-use crate::{media::track::local, platform::Error};
+use crate::{
+    media::track::local,
+    platform::{transceiver::TransceiverDirection, Error},
+};
 
 /// Wrapper around [`RtcRtpTransceiver`] which provides handy methods for
 /// direction changes.
@@ -137,32 +139,6 @@ impl From<RtcRtpTransceiver> for Transceiver {
             send_track: RefCell::new(None),
             transceiver,
         }
-    }
-}
-
-bitflags! {
-    /// Representation of [RTCRtpTransceiverDirection][1].
-    ///
-    /// [`sendrecv` direction][2] can be represented by
-    /// [`TransceiverDirection::all`] bitflag.
-    ///
-    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
-    /// [2]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendrecv
-    pub struct TransceiverDirection: u8 {
-        /// [`inactive` direction][1] of transceiver.
-        ///
-        /// [1]: https://tinyurl.com/y2zslyw2
-        const INACTIVE = 0b00;
-
-        /// [`sendonly` direction][1] of transceiver.
-        ///
-        /// [1]: https://tinyurl.com/y6y2ye97
-        const SEND = 0b01;
-
-        /// [`recvonly` direction][1] of transceiver.
-        ///
-        /// [1]: https://tinyurl.com/y2nlxpzf
-        const RECV = 0b10;
     }
 }
 

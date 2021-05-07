@@ -1,3 +1,5 @@
+use std::ptr::NonNull;
+
 use super::{
     media_manager_handle::MediaManagerHandle, room_handle::RoomHandle,
     ForeignClass,
@@ -12,7 +14,7 @@ impl ForeignClass for Jason {}
 
 /// Instantiates a new [`Jason`] interface to interact with this library.
 #[no_mangle]
-pub extern "C" fn Jason__new() -> *const Jason {
+pub extern "C" fn Jason__new() -> NonNull<Jason> {
     Jason::new().into_ptr()
 }
 
@@ -21,9 +23,9 @@ pub extern "C" fn Jason__new() -> *const Jason {
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn Jason__init_room(
-    this: *const Jason,
-) -> *const RoomHandle {
-    let this = this.as_ref().unwrap();
+    this: NonNull<Jason>,
+) -> NonNull<RoomHandle> {
+    let this = this.as_ref();
 
     this.init_room().into_ptr()
 }
@@ -31,9 +33,9 @@ pub unsafe extern "C" fn Jason__init_room(
 /// Returns a [`MediaManagerHandle`].
 #[no_mangle]
 pub unsafe extern "C" fn Jason__media_manager(
-    this: *const Jason,
-) -> *const MediaManagerHandle {
-    let this = this.as_ref().unwrap();
+    this: NonNull<Jason>,
+) -> NonNull<MediaManagerHandle> {
+    let this = this.as_ref();
 
     this.media_manager().into_ptr()
 }
@@ -41,10 +43,10 @@ pub unsafe extern "C" fn Jason__media_manager(
 /// Closes the provided [`RoomHandle`].
 #[no_mangle]
 pub unsafe extern "C" fn Jason__close_room(
-    this: *const Jason,
-    room_to_delete: *mut RoomHandle,
+    this: NonNull<Jason>,
+    room_to_delete: NonNull<RoomHandle>,
 ) {
-    let this = this.as_ref().unwrap();
+    let this = this.as_ref();
 
     this.close_room(RoomHandle::from_ptr(room_to_delete));
 }
@@ -56,8 +58,8 @@ pub unsafe extern "C" fn Jason__close_room(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn Jason__free(this: *mut Jason) {
-    let _ = Jason::from_ptr(this);
+pub unsafe extern "C" fn Jason__free(this: NonNull<Jason>) {
+    drop(Jason::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

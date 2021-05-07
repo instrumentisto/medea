@@ -75,8 +75,8 @@ server:
 
   coturn:
     image:
-      repository: instrumentisto/coturn
-      tag: "4.5"
+      repository: ghcr.io/coturn/coturn
+      tag: 4.5-alpine
       pullPolicy: IfNotPresent
 
     # Coturn TURN server configuration.

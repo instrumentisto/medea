@@ -41,7 +41,7 @@ pub use self::{
     room_handle::RoomHandle,
 };
 
-use std::{ffi::c_void, os::raw::c_char};
+use std::{ffi::c_void, os::raw::c_char, ptr::NonNull};
 
 use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
 
@@ -53,8 +53,8 @@ pub trait ForeignClass: Sized {
     /// [`Box::into_raw()`].
     #[inline]
     #[must_use]
-    fn into_ptr(self) -> *const Self {
-        Box::into_raw(Box::new(self))
+    fn into_ptr(self) -> NonNull<Self> {
+        NonNull::from(Box::leak(Box::new(self)))
     }
 
     /// Constructs a [`ForeignClass`] from the given raw pointer via
@@ -65,15 +65,15 @@ pub trait ForeignClass: Sized {
     /// Same as for [`Box::from_raw()`].
     #[inline]
     #[must_use]
-    unsafe fn from_ptr(this: *mut Self) -> Self {
-        *Box::from_raw(this)
+    unsafe fn from_ptr(this: NonNull<Self>) -> Self {
+        *Box::from_raw(this.as_ptr())
     }
 }
 
 /// Value that can be transferred to Dart.
 pub enum DartValue {
     Void,
-    Ptr(*const c_void),
+    Ptr(NonNull<c_void>),
     String(*const libc::c_char),
     PtrArray(PtrArray),
     Int(i64),
