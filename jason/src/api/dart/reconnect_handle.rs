@@ -85,7 +85,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
-    let _ = ReconnectHandle::from_ptr(this);
+    drop(ReconnectHandle::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

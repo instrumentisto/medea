@@ -57,7 +57,7 @@ pub unsafe extern "C" fn Jason__close_room(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn Jason__free(this: *mut Jason) {
-    let _ = Jason::from_ptr(this);
+    drop(Jason::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

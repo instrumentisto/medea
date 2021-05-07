@@ -109,7 +109,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__free(this: *mut RemoteMediaTrack) {
-    let _ = RemoteMediaTrack::from_ptr(this);
+    drop(RemoteMediaTrack::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]
