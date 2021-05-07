@@ -1,12 +1,14 @@
 use dart_sys::Dart_Handle;
 
-use crate::platform;
+use crate::{
+    api::{dart::utils::DartResult, JasonError},
+    platform,
+};
 
 use super::{utils::string_into_c_str, ForeignClass};
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ConnectionHandle;
-use crate::api::{dart::utils::DartResult, JasonError};
 #[cfg(not(feature = "mockable"))]
 pub use crate::connection::ConnectionHandle;
 

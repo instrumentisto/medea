@@ -56,14 +56,21 @@ where
     }
 }
 
+/// Error representation for the Dart side.
 #[repr(C)]
 pub struct DartError {
+    /// Name of this error.
     pub name: *const libc::c_char,
+
+    /// Message of this error.
     pub message: *const libc::c_char,
+
+    /// Stacktrace of this error.
     pub stacktrace: *const libc::c_char,
 }
 
 impl DartError {
+    /// Returns `null` [`DartError`].
     pub fn null() -> Self {
         Self {
             name: ptr::null(),

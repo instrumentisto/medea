@@ -80,6 +80,7 @@ pub enum DartValue {
 }
 
 impl DartValue {
+    /// Returns identifier of this [`DartValue`].
     pub fn id(&self) -> i32 {
         match self {
             Self::Void => 0,
