@@ -13,7 +13,7 @@ pub use self::{
     string::{c_str_into_string, string_into_c_str},
 };
 
-/// Spawns provided [`Future`] in the Dart event loop.
+/// Spawns the provided [`Future`] on the Dart event loop.
 pub fn spawn<F>(fut: F)
 where
     F: Future<Output = ()> + 'static,
@@ -22,7 +22,7 @@ where
     fut.now_or_never().unwrap();
 }
 
-/// Converts provided [`Future`] to the Dart `Future`.
+/// Converts the provided [`Future`] into a Dart `Future`.
 ///
 /// Returns [`Dart_Handle`] to the created Dart `Future`.
 pub fn future_to_dart<F, T, E>(f: F) -> Dart_Handle

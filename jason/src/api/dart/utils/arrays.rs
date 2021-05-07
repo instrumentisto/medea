@@ -39,10 +39,11 @@ impl<T: ForeignClass> PtrArray<T> {
 impl<T> PtrArray<T> {
     /// Erases type parameter on this [`PtrArray`].
     ///
-    /// It can simplify things when passing [`PtrArray`] to Dart.
+    /// Intended to simplify things when passing [`PtrArray`] to Dart.
     ///
     /// Although this function drops `self` it wont clear an internal slice, its
-    /// ownership is transferred to the resulting  [`PtrArray`].
+    /// ownership is transferred to the resulting [`PtrArray`].
+    #[inline]
     #[must_use]
     pub fn erase_type(mut self) -> PtrArray {
         PtrArray {
