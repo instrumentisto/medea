@@ -13,7 +13,7 @@ impl ForeignClass for InputDeviceInfo {}
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__device_id(
     this: NonNull<InputDeviceInfo>,
-) -> *const c_char {
+) -> NonNull<c_char> {
     let this = this.as_ref();
 
     string_into_c_str(this.device_id())
@@ -40,7 +40,7 @@ pub unsafe extern "C" fn InputDeviceInfo__kind(
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__label(
     this: NonNull<InputDeviceInfo>,
-) -> *const c_char {
+) -> NonNull<c_char> {
     let this = this.as_ref();
 
     string_into_c_str(this.label())
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn InputDeviceInfo__label(
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__group_id(
     this: NonNull<InputDeviceInfo>,
-) -> *const c_char {
+) -> NonNull<c_char> {
     let this = this.as_ref();
 
     string_into_c_str(this.group_id())

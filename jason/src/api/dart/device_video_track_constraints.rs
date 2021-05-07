@@ -36,7 +36,7 @@ pub extern "C" fn DeviceVideoTrackConstraints__new(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
     mut this: NonNull<DeviceVideoTrackConstraints>,
-    device_id: *const c_char,
+    device_id: NonNull<c_char>,
 ) {
     let this = this.as_mut();
 

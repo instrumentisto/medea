@@ -3,6 +3,7 @@
 use std::{
     ffi::{CStr, CString},
     os::raw::c_char,
+    ptr::NonNull,
 };
 
 /// Constructs a Rust [`String`] from the provided raw C string.
@@ -16,8 +17,8 @@ use std::{
 /// Same as for [`CStr::from_ptr()`].
 #[inline]
 #[must_use]
-pub unsafe fn c_str_into_string(string: *const c_char) -> String {
-    CStr::from_ptr(string).to_str().unwrap().to_owned()
+pub unsafe fn c_str_into_string(string: NonNull<c_char>) -> String {
+    CStr::from_ptr(string.as_ptr()).to_str().unwrap().to_owned()
 }
 
 /// Leaks the given [`String`] returning a raw C string that can be passed
@@ -31,8 +32,8 @@ pub unsafe fn c_str_into_string(string: *const c_char) -> String {
 /// If the provided [`String`] contains an internal `0x0` byte.
 #[inline]
 #[must_use]
-pub fn string_into_c_str(string: String) -> *const c_char {
-    CString::new(string).unwrap().into_raw()
+pub fn string_into_c_str(string: String) -> NonNull<c_char> {
+    NonNull::new(CString::new(string).unwrap().into_raw()).unwrap()
 }
 
 /// Retakes ownership over a [`CString`] previously transferred to Dart via

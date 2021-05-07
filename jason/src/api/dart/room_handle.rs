@@ -31,7 +31,7 @@ impl ForeignClass for RoomHandle {}
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__join(
     this: NonNull<RoomHandle>,
-    token: *const libc::c_char,
+    token: NonNull<libc::c_char>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 

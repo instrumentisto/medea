@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{ptr::NonNull, rc::Rc};
 
 use std::{
     cell::RefCell,
@@ -68,7 +68,7 @@ impl Task {
 
     /// Calls [`task_wake`] with provided reference.
     fn wake_by_ref(this: &Rc<Self>) {
-        task_wake(Rc::as_ptr(this));
+        task_wake(NonNull::from(Rc::as_ref(this)));
     }
 
     /// Pretty much a copy of [`std::task::Wake`] implementation but for

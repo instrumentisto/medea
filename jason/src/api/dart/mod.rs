@@ -50,7 +50,7 @@ pub trait ForeignClass: Sized {
     #[inline]
     #[must_use]
     fn into_ptr(self) -> NonNull<Self> {
-        NonNull::new(Box::into_raw(Box::new(self))).unwrap()
+        NonNull::from(Box::leak(Box::new(self)))
     }
 
     /// Constructs a [`ForeignClass`] from the given raw pointer via
@@ -70,14 +70,14 @@ pub trait ForeignClass: Sized {
 /// Value that can be transferred to Dart.
 pub enum DartValue {
     Void,
-    Ptr(*const c_void),
+    Ptr(NonNull<c_void>),
     PtrArray(PtrArray),
     Int(i64),
 }
 
 impl<T: ForeignClass> From<T> for DartValue {
     fn from(val: T) -> Self {
-        Self::Ptr(val.into_ptr().as_ptr().cast())
+        Self::Ptr(val.into_ptr().cast())
     }
 }
 

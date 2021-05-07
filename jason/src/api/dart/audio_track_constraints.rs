@@ -21,7 +21,7 @@ pub extern "C" fn AudioTrackConstraints__new() -> NonNull<AudioTrackConstraints>
 #[no_mangle]
 pub unsafe extern "C" fn AudioTrackConstraints__device_id(
     mut this: NonNull<AudioTrackConstraints>,
-    device_id: *const c_char,
+    device_id: NonNull<c_char>,
 ) {
     let this = this.as_mut();
 

@@ -12,7 +12,7 @@ impl ForeignClass for RoomCloseReason {}
 #[no_mangle]
 pub unsafe extern "C" fn RoomCloseReason__reason(
     this: NonNull<RoomCloseReason>,
-) -> *const c_char {
+) -> NonNull<c_char> {
     let this = this.as_ref();
 
     string_into_c_str(this.reason())

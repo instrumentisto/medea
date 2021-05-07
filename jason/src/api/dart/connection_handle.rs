@@ -63,7 +63,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: NonNull<ConnectionHandle>,
-) -> *const c_char {
+) -> NonNull<c_char> {
     let this = this.as_ref();
 
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
