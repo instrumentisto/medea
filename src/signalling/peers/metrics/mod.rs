@@ -255,7 +255,7 @@ impl EventSender {
     /// If no one subscribed, then no-op.
     fn send_event(&self, event: PeersMetricsEvent) {
         if let Some(tx) = self.0.borrow().as_ref() {
-            let _ = tx.unbounded_send(event);
+            drop(tx.unbounded_send(event));
         }
     }
 
