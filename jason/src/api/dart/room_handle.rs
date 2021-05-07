@@ -399,6 +399,7 @@ mod mock {
         rpc::{ClientDisconnect, CloseReason},
     };
 
+    #[derive(Clone)]
     pub struct RoomHandle;
 
     #[allow(clippy::missing_errors_doc)]
