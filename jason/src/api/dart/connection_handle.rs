@@ -86,6 +86,7 @@ pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
 mod mock {
     use crate::{
         api::{JasonError, RemoteMediaTrack},
+        connection::ConnectionError,
         platform,
     };
 
@@ -94,7 +95,7 @@ mod mock {
     #[allow(clippy::missing_errors_doc)]
     impl ConnectionHandle {
         pub fn get_remote_member_id(&self) -> Result<String, JasonError> {
-            Ok(String::from("ConnectionHandle.get_remote_member_id"))
+            Err(tracerr::new!(ConnectionError::Detached).into())
         }
 
         pub fn on_close(

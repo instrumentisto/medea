@@ -367,7 +367,7 @@ mod mock {
         },
         media::MediaSourceKind,
         platform,
-        room::RoomCloseReason,
+        room::{RoomCloseReason, RoomError},
         rpc::{ClientDisconnect, CloseReason},
     };
 
@@ -487,7 +487,7 @@ mod mock {
         }
 
         pub async fn enable_remote_video(&self) -> Result<(), JasonError> {
-            Ok(())
+            Err(tracerr::new!(RoomError::Detached).into())
         }
     }
 }

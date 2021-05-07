@@ -1,7 +1,6 @@
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:medea_jason/util/ptrarray.dart';
 
 import 'ptrarray.dart';
 

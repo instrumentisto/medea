@@ -12,6 +12,7 @@ import 'package:medea_jason/media_stream_settings.dart';
 import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
+import 'package:medea_jason/util/result.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -158,8 +159,12 @@ void main() {
     });
     var conn = await connFut.future;
 
-    expect(conn.getRemoteMemberId(),
-        equals('ConnectionHandle.get_remote_member_id'));
+    try {
+      conn.getRemoteMemberId();
+    } on RustException catch (e) {
+      expect(e.name, equals('Detached'));
+      expect(e.message, equals('Connection is in detached state'));
+    }
     var allFired = List<Completer>.generate(2, (_) => Completer());
     conn.onQualityScoreUpdate((score) {
       allFired[0].complete(score);
@@ -236,7 +241,12 @@ void main() {
     await room.disableRemoteAudio();
     await room.enableRemoteAudio();
     await room.disableRemoteVideo();
-    await room.enableRemoteVideo();
+    try {
+      await room.enableRemoteVideo();
+    } on RustException catch (e) {
+      expect(e.name, equals('Detached'));
+      expect(e.message, equals('Room is in detached state'));
+    }
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {
