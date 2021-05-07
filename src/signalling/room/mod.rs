@@ -237,9 +237,7 @@ impl Room {
             future::try_join_all(connect_endpoints_tasks)
                 .into_actor(self)
                 .map(move |result, room: &mut Room, _| {
-                    for (src_peer_id, _) in
-                        result?.into_iter().filter_map(|r| r)
-                    {
+                    for (src_peer_id, _) in result?.into_iter().flatten() {
                         room.peers.commit_scheduled_changes(src_peer_id)?;
                     }
 

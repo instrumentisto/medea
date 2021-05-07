@@ -113,7 +113,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
 pub unsafe extern "C" fn RemoteMediaTrack__free(
     this: NonNull<RemoteMediaTrack>,
 ) {
-    let _ = RemoteMediaTrack::from_ptr(this);
+    drop(RemoteMediaTrack::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

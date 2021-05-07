@@ -81,7 +81,7 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 pub unsafe extern "C" fn ConnectionHandle__free(
     this: NonNull<ConnectionHandle>,
 ) {
-    let _ = ConnectionHandle::from_ptr(this);
+    drop(ConnectionHandle::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

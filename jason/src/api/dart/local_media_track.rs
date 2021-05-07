@@ -48,7 +48,7 @@ pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__free(this: NonNull<LocalMediaTrack>) {
-    let _ = LocalMediaTrack::from_ptr(this);
+    drop(LocalMediaTrack::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

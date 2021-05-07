@@ -383,7 +383,7 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__free(this: NonNull<RoomHandle>) {
-    let _ = RoomHandle::from_ptr(this);
+    drop(RoomHandle::from_ptr(this));
 }
 
 #[cfg(feature = "mockable")]

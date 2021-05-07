@@ -159,5 +159,5 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__free(
     this: NonNull<DeviceVideoTrackConstraints>,
 ) {
-    let _ = DeviceVideoTrackConstraints::from_ptr(this);
+    drop(DeviceVideoTrackConstraints::from_ptr(this));
 }
