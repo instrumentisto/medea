@@ -76,13 +76,13 @@ pub unsafe extern "C" fn rust_executor_drop_task(task: NonNull<Task>) {
 /// Sends command that contains the provided [`Task`] to the configured
 /// [`WAKE_PORT`]. When received, Dart must poll it by calling
 /// [`rust_executor_poll_task`].
-fn task_wake(poll: NonNull<Task>) {
+fn task_wake(task: NonNull<Task>) {
     let wake_port = unsafe { WAKE_PORT }.unwrap();
 
     let mut task_addr = Dart_CObject {
         type_: Dart_CObject_Type::Int64,
         value: Dart_CObjectValue {
-            as_int64: poll.as_ptr() as i64,
+            as_int64: task.as_ptr() as i64,
         },
     };
 
@@ -90,6 +90,6 @@ fn task_wake(poll: NonNull<Task>) {
         unsafe { Dart_PostCObject_DL_Trampolined(wake_port, &mut task_addr) };
     if !enqueued {
         log::warn!("Could not send message to Dart's native port");
-        unsafe { rust_executor_drop_task(poll) };
+        unsafe { rust_executor_drop_task(task) };
     }
 }
