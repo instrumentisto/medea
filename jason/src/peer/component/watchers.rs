@@ -152,12 +152,11 @@ impl Component {
         {
             Ok(sender) => sender,
             Err(e) => {
-                let _ = peer.peer_events_sender.unbounded_send(
+                drop(peer.peer_events_sender.unbounded_send(
                     PeerEvent::FailedLocalMedia {
                         error: e.clone().into(),
                     },
-                );
-
+                ));
                 return Err(e);
             }
         };
@@ -450,7 +449,7 @@ impl Component {
         _: bool,
     ) -> Result<(), Traced<PeerError>> {
         state.senders.when_updated().await;
-        let _ = state.update_local_stream(&peer).await;
+        drop(state.update_local_stream(&peer).await);
 
         state.maybe_update_local_stream.set(false);
         Ok(())
