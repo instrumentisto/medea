@@ -25,6 +25,7 @@ use crate::{
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-videofacingmodeenum
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum FacingMode {
     /// Facing towards a user (a self-view camera).
     User,

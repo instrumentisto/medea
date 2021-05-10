@@ -1,6 +1,9 @@
 use dart_sys::Dart_Handle;
 
-use crate::platform;
+use crate::{
+    media::{MediaKind, MediaSourceKind},
+    platform,
+};
 
 use super::ForeignClass;
 
@@ -85,20 +88,20 @@ pub unsafe extern "C" fn RemoteMediaTrack__muted(
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__kind(
     this: *const RemoteMediaTrack,
-) -> u8 {
+) -> MediaKind {
     let this = this.as_ref().unwrap();
 
-    this.kind() as u8
+    this.kind()
 }
 
 /// Returns this [`RemoteMediaTrack`]'s media source kind.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
     this: *const RemoteMediaTrack,
-) -> u8 {
+) -> MediaSourceKind {
     let this = this.as_ref().unwrap();
 
-    this.media_source_kind() as u8
+    this.media_source_kind()
 }
 
 /// Frees the data behind the provided pointer.

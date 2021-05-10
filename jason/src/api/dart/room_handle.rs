@@ -163,10 +163,9 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -184,10 +183,9 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -203,10 +201,9 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -222,10 +219,9 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     future_to_dart(async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
