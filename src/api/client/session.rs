@@ -9,9 +9,8 @@ use std::{
 };
 
 use actix::{
-    Actor, ActorContext, ActorFuture, Addr, Arbiter, AsyncContext,
-    ContextFutureSpawner, Handler, MailboxError, Message, SpawnHandle,
-    StreamHandler, WrapFuture,
+    Actor, ActorContext, Addr, Arbiter, AsyncContext, ContextFutureSpawner,
+    Handler, MailboxError, Message, SpawnHandle, StreamHandler, WrapFuture,
 };
 use actix_http::ws::{CloseReason as WsCloseReason, Item};
 use actix_web_actors::ws::{self, CloseCode};

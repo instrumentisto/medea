@@ -9,8 +9,7 @@ use std::{
 };
 
 use actix::{
-    ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler, Message,
-    WrapFuture as _,
+    AsyncContext, AtomicResponse, Context, Handler, Message, WrapFuture as _,
 };
 use medea_client_api_proto::{CloseReason, MemberId};
 use medea_control_api_proto::grpc::api as proto;

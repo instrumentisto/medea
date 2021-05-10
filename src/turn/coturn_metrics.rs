@@ -31,7 +31,7 @@ const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
 pub type ActFuture<O = ()> =
-    Pin<Box<dyn ActorFuture<Actor = CoturnMetricsService, Output = O>>>;
+    Pin<Box<dyn ActorFuture<CoturnMetricsService, Output = O>>>;
 
 /// Service responsible for processing [`Peer`]'s metrics received
 /// from Coturn.
@@ -117,7 +117,7 @@ impl CoturnMetricsService {
                 );
 
                 Either::Left(
-                    tokio::time::delay_for(Duration::from_secs(1))
+                    tokio::time::sleep(Duration::from_secs(1))
                         .into_actor(this)
                         .then(|_, this, _| this.connect_until_success()),
                 )

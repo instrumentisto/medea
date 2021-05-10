@@ -48,8 +48,7 @@ pub use dynamic_api::{
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-pub type ActFuture<O = ()> =
-    Pin<Box<dyn ActorFuture<Actor = Room, Output = O>>>;
+pub type ActFuture<O = ()> = Pin<Box<dyn ActorFuture<Room, Output = O>>>;
 
 #[derive(Debug, Display, Fail, From)]
 pub enum RoomError {
