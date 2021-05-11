@@ -36,9 +36,9 @@ dependencies = [
 
 [[package]]
 name = "actix-codec"
-version = "0.4.0"
+version = "0.4.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d5dbeb2d9e51344cb83ca7cc170f1217f9fe25bfc50160e6e200b5c31c1019a"
+checksum = "90673465c6187bd0829116b02be465dc0195a74d7719f76ffff0effef934a92e"
 dependencies = [
  "bitflags",
  "bytes 1.0.1",
@@ -109,6 +109,32 @@ dependencies = [
  "smallvec",
  "time 0.2.26",
  "tokio 1.5.0",
+]
+
+[[package]]
+name = "actix-http-test"
+version = "3.0.0-beta.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de9835413053be8baa710936dda9f55d7e0486b7412c9f94ac12b023c38602d4"
+dependencies = [
+ "actix-codec",
+ "actix-rt",
+ "actix-server",
+ "actix-service",
+ "actix-tls",
+ "actix-utils",
+ "awc",
+ "base64 0.13.0",
+ "bytes 1.0.1",
+ "futures-core",
+ "http",
+ "log",
+ "serde 1.0.125",
+ "serde_json",
+ "serde_urlencoded 0.7.0",
+ "slab",
+ "socket2 0.4.0",
+ "time 0.2.26",
 ]
 
 [[package]]
@@ -622,17 +648,6 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b076e143e1d9538dde65da30f8481c2a6c44040edb8e02b9bf1351edb92ce3"
-dependencies = [
- "lazy_static",
- "nom",
- "serde 1.0.125",
-]
-
-[[package]]
-name = "config"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b1b9d958c2b1368a663f05538fc1b5975adce1e19f435acceae987aceeeb369"
@@ -734,16 +749,6 @@ name = "crossbeam-channel"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06ed27e177f16d65f0f0c22a213e17c696ace5dd64b14258b52f9417ccb52db4"
-dependencies = [
- "cfg-if 1.0.0",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-queue"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f6cb3c7f5b8e51bc3ebb73a2327ad4abdbd119dc13223f14f961d2f38486756"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-utils",
@@ -862,20 +867,6 @@ checksum = "42fe64308f2072bb94ecd8f7557f9ac01b69d86e6199bac24be0f091ad74b092"
 [[package]]
 name = "deadpool"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d126179d86aee4556e54f5f3c6bf6d9884e7cc52cef82f77ee6f90a7747616d"
-dependencies = [
- "async-trait",
- "config 0.10.1",
- "crossbeam-queue",
- "num_cpus",
- "serde 1.0.125",
- "tokio 1.5.0",
-]
-
-[[package]]
-name = "deadpool"
-version = "0.7.0"
 source = "git+https://github.com/bikeshedder/deadpool?rev=8134ba16896a9149301ee9e2945744ba8210dad3#8134ba16896a9149301ee9e2945744ba8210dad3"
 dependencies = [
  "async-trait",
@@ -889,7 +880,7 @@ version = "0.7.1"
 source = "git+https://github.com/bikeshedder/deadpool?rev=8134ba16896a9149301ee9e2945744ba8210dad3#8134ba16896a9149301ee9e2945744ba8210dad3"
 dependencies = [
  "async-trait",
- "deadpool 0.7.0 (git+https://github.com/bikeshedder/deadpool?rev=8134ba16896a9149301ee9e2945744ba8210dad3)",
+ "deadpool",
  "log",
  "redis",
 ]
@@ -1494,9 +1485,9 @@ dependencies = [
 
 [[package]]
 name = "httparse"
-version = "1.4.0"
+version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a1ce40d6fc9764887c2fdc7305c3dcc429ba11ff981c1509416afd5697e4437"
+checksum = "f3a87b616e37e93c22fb19bcd386f02f3af5ea98a25670ad0fce773de23c5e68"
 
 [[package]]
 name = "httpdate"
@@ -1804,6 +1795,7 @@ dependencies = [
  "actix",
  "actix-codec",
  "actix-http",
+ "actix-http-test",
  "actix-rt",
  "actix-service",
  "actix-web",
@@ -1813,9 +1805,9 @@ dependencies = [
  "awc",
  "bytes 1.0.1",
  "chrono",
- "config 0.11.0",
+ "config",
  "cucumber_rust",
- "deadpool 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "deadpool",
  "deadpool-redis",
  "derive_builder",
  "derive_more",
@@ -1929,7 +1921,7 @@ version = "0.2.0-dev"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
- "deadpool 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "deadpool",
  "derive_more",
  "futures 0.3.14",
  "once_cell",

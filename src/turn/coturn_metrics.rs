@@ -10,7 +10,8 @@ use std::{
 };
 
 use actix::{
-    fut::Either, Actor, ActorFuture, AsyncContext, StreamHandler, WrapFuture,
+    fut::Either, Actor, ActorFuture, ActorFutureExt as _, AsyncContext,
+    StreamHandler, WrapFuture,
 };
 use futures::{channel::mpsc, StreamExt as _};
 use redis::{ConnectionInfo, RedisError};

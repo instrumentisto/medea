@@ -105,7 +105,7 @@ enum ElemState<F, T> {
     Done(Option<T>),
 }
 
-impl<F, T> ElemState<F, T> {
+impl<F: Unpin, T> ElemState<F, T> {
     fn pending_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut F>> {
         match self.get_mut() {
             ElemState::Pending(f) => Some(Pin::new(f)),

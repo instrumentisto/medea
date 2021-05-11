@@ -9,8 +9,8 @@ mod rpc_server;
 use std::{pin::Pin, rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext as _, AtomicResponse, Context,
-    Handler, MailboxError, WrapFuture as _,
+    Actor, ActorFuture, ActorFutureExt as _, Addr, AsyncContext as _,
+    AtomicResponse, Context, Handler, MailboxError, WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;

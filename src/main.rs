@@ -1,6 +1,6 @@
 //! Medea media server application.
 
-use actix::{Actor, Arbiter, System};
+use actix::{Actor, System};
 use failure::Error;
 use futures::FutureExt as _;
 use medea::{
@@ -27,8 +27,8 @@ fn main() -> Result<(), Error> {
 
     info!("{:?}", config);
 
-    let sys = System::new("medea");
-    Arbiter::spawn(
+    let sys = System::new();
+    actix::spawn(
         async move {
             let turn_service = new_turn_auth_service(&config.turn)?;
             let graceful_shutdown =

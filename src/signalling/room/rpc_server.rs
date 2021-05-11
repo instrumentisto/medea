@@ -2,7 +2,7 @@
 
 use actix::{
     fut::{self, Either},
-    Addr, Handler, WrapFuture,
+    ActorFutureExt as _, Addr, Handler, WrapFuture,
 };
 use derive_more::Display;
 use failure::Fail;

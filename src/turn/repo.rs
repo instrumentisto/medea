@@ -4,8 +4,8 @@
 use std::{fmt, time::Duration};
 
 use crypto::{digest::Digest, md5::Md5};
-use deadpool::managed::{PoolConfig, Timeouts};
-use deadpool_redis::{redis::cmd, Pool, PoolError};
+use deadpool::managed::Timeouts;
+use deadpool_redis::{redis::cmd, Pool, PoolConfig, PoolError};
 use derive_more::{Display, From};
 use failure::Fail;
 use redis::{IntoConnectionInfo, RedisError};
@@ -52,6 +52,7 @@ impl TurnDatabase {
                 create: Some(conn_timeout),
                 recycle: None,
             },
+            ..PoolConfig::default()
         };
         Ok(Self(Pool::from_config(manager, config)))
     }

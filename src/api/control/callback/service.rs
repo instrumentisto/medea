@@ -4,7 +4,6 @@ use std::{
     collections::hash_map::HashMap, fmt::Debug, marker::PhantomData, sync::Arc,
 };
 
-use actix::Arbiter;
 use tokio::sync::RwLock;
 
 use crate::{
@@ -108,11 +107,11 @@ impl<B: CallbackClientFactory + 'static> CallbackService<B> {
         event: T,
     ) {
         let this = self.clone();
-        Arbiter::spawn(async move {
+        actix::spawn(async move {
             if let Err(e) = this.send(callback_url, fid, event).await {
                 error!("Failed to send callback because {:?}.", e);
             }
-        })
+        });
     }
 }
 
@@ -154,7 +153,7 @@ mod tests {
         let mut client_mock = MockCallbackClient::new();
         client_mock.expect_send().times(SEND_COUNT).returning(|_| {
             async {
-                time::delay_for(Duration::from_millis(50)).await;
+                time::sleep(Duration::from_millis(50)).await;
                 Ok(())
             }
             .boxed_local()
@@ -163,7 +162,7 @@ mod tests {
         let client_builder_ctx = MockCallbackClientFactory::build_context();
         client_builder_ctx.expect().times(1).return_once(move |_| {
             async move {
-                time::delay_for(Duration::from_millis(50)).await;
+                time::sleep(Duration::from_millis(50)).await;
                 Ok(Arc::new(client_mock) as Arc<dyn CallbackClient>)
             }
             .boxed_local()

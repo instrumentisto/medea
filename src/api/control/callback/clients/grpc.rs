@@ -65,7 +65,6 @@ impl fmt::Debug for GrpcCallbackClient {
 pub mod test {
     use std::net::ToSocketAddrs;
 
-    use actix::Arbiter;
     use futures::{channel::oneshot, task, FutureExt as _, TryFutureExt as _};
     use medea_control_api_proto::grpc::callback::{
         callback_server::{Callback, CallbackServer as TonicCallbackServer},
@@ -127,7 +126,7 @@ pub mod test {
             maybe_err.unwrap();
         }
 
-        Arbiter::spawn(async move {
+        actix::spawn(async move {
             server.await.unwrap();
         });
         CloseHandle(close_tx)
