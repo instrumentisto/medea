@@ -6,9 +6,7 @@ type IsSomeFunction = extern "C" fn(Dart_Handle) -> i32;
 static mut IS_SOME_FUNCTION: Option<IsSomeFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_RustHandleOption__is_some(
-    f: IsSomeFunction,
-) {
+pub unsafe extern "C" fn register_RustHandleOption__is_some(f: IsSomeFunction) {
     IS_SOME_FUNCTION = Some(f);
 }
 
@@ -16,9 +14,7 @@ type GetFunction = extern "C" fn(Dart_Handle) -> Dart_Handle;
 static mut GET_FUNCTION: Option<GetFunction> = None;
 
 #[no_mangle]
-pub unsafe extern "C" fn register_RustHandleOption__get(
-    f: GetFunction,
-) {
+pub unsafe extern "C" fn register_RustHandleOption__get(f: GetFunction) {
     GET_FUNCTION = Some(f);
 }
 

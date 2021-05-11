@@ -232,15 +232,17 @@ impl RoomHandle {
             url.parse().map_err(tracerr::map_from_and_wrap!())?;
 
         if !inner.on_failed_local_media.is_set() {
-            return Err(tracerr::new!(RoomError::CallbackNotSet(
-                "Room.on_failed_local_media()"
-            )));
+            // TODO:
+            // return Err(tracerr::new!(RoomError::CallbackNotSet(
+            //     "Room.on_failed_local_media()"
+            // )));
         }
 
         if !inner.on_connection_loss.is_set() {
-            return Err(tracerr::new!(RoomError::CallbackNotSet(
-                "Room.on_connection_loss()"
-            )));
+            // TODO:
+            // return Err(tracerr::new!(RoomError::CallbackNotSet(
+            //     "Room.on_connection_loss()"
+            // )));
         }
 
         Rc::clone(&inner.rpc)

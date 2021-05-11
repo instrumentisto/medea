@@ -8,5 +8,5 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 Object newException(Pointer<Utf8> message) {
-  return Error();
+  throw Exception(message.toDartString());
 }

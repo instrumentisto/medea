@@ -13,10 +13,15 @@ pub mod utils;
 
 use std::{panic, time::Duration};
 
-use dart_sys::{Dart_Handle, Dart_PropagateError};
+use dart_sys::Dart_Handle;
 
-use crate::utils::dart::{dart_future::DartFuture, into_dart_string};
-use crate::platform::dart::utils::dart_api::Dart_PropagateError_DL_Trampolined;
+use crate::{
+    platform::dart::utils::dart_api::Dart_PropagateError_DL_Trampolined,
+    utils::dart::{
+        dart_future::{DartFuture, VoidDartFuture},
+        into_dart_string,
+    },
+};
 
 pub use self::executor::spawn;
 
@@ -52,5 +57,5 @@ pub unsafe extern "C" fn register_delayed_future_function(
 pub async fn delay_for(delay: Duration) {
     let delay = delay.as_millis() as i32;
     let dart_fut = unsafe { DELAYED_FUTURE_FUNCTION.unwrap()(delay) };
-    let _ = DartFuture::new(dart_fut).await;
+    let _ = VoidDartFuture::new(dart_fut).await;
 }

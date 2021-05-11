@@ -16,6 +16,7 @@ use crate::{
     rpc::{ApiUrl, ClientDisconnect},
     utils::dart::into_dart_string,
 };
+use crate::utils::dart::from_dart_string;
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
@@ -25,7 +26,7 @@ type SendFunction = extern "C" fn(Dart_Handle, *const libc::c_char);
 
 type CloseFunction = extern "C" fn(Dart_Handle, i32, *const libc::c_char);
 
-type OnMessageFunction = extern "C" fn(Dart_Handle, Dart_Handle);
+type OnMessageFunction = extern "C" fn(Dart_Handle, *const OnMessageListeners);
 
 static mut NEW_FUNCTION: Option<NewFunction> = None;
 
@@ -55,8 +56,51 @@ pub unsafe extern "C" fn register_WebSocketRpcTransport__close(
 #[derive(Clone, Debug)]
 pub struct WebSocketRpcTransport {
     handle: DartHandle,
-    on_message_listeners: Rc<RefCell<Vec<mpsc::UnboundedSender<ServerMsg>>>>,
+    on_message_listeners: OnMessageListeners,
     close_reason: Cell<ClientDisconnect>,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn WebSocketRpcTransport__on_message(
+    listeners: *const OnMessageListeners,
+    msg: *const libc::c_char,
+) {
+    let listeners = listeners.as_ref().unwrap();
+    listeners.notify_all(from_dart_string(msg));
+}
+
+#[derive(Clone, Debug)]
+pub struct OnMessageListeners(Rc<RefCell<Vec<mpsc::UnboundedSender<ServerMsg>>>>);
+
+impl OnMessageListeners {
+    fn new() -> Self {
+        Self(Rc::new(RefCell::new(Vec::new())))
+    }
+
+    fn notify_all(&self, msg: String) {
+        let msg = match serde_json::from_str::<ServerMsg>(&msg)
+        {
+            Ok(parsed) => parsed,
+            Err(e) => {
+                // TODO: protocol versions mismatch? should drop
+                //       connection if so
+                log::error!("{}", tracerr::new!(e));
+                return;
+            }
+        };
+
+        self.0.borrow_mut().retain(
+            |on_message| {
+                on_message.unbounded_send(msg.clone()).is_ok()
+            },
+        );
+    }
+
+    fn new_subscriber(&self) -> LocalBoxStream<'static, ServerMsg> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().push(tx);
+        Box::pin(rx)
+    }
 }
 
 impl WebSocketRpcTransport {
@@ -65,32 +109,10 @@ impl WebSocketRpcTransport {
             let handle = NEW_FUNCTION.unwrap()(into_dart_string(
                 url.as_ref().to_string(),
             ));
-            let on_message_listeners: Rc<
-                RefCell<Vec<mpsc::UnboundedSender<ServerMsg>>>,
-            > = Rc::new(RefCell::new(Vec::new()));
+            let on_message_listeners = OnMessageListeners::new();
             ON_MESSAGE_FUNCTION.unwrap()(
                 handle,
-                StringCallback::callback({
-                    let on_message_listeners = Rc::clone(&on_message_listeners);
-                    move |msg| {
-                        let msg = match serde_json::from_str::<ServerMsg>(&msg)
-                        {
-                            Ok(parsed) => parsed,
-                            Err(e) => {
-                                // TODO: protocol versions mismatch? should drop
-                                //       connection if so
-                                log::error!("{}", tracerr::new!(e));
-                                return;
-                            }
-                        };
-
-                        on_message_listeners.borrow_mut().retain(
-                            |on_message| {
-                                on_message.unbounded_send(msg.clone()).is_ok()
-                            },
-                        );
-                    }
-                }),
+                Box::into_raw(Box::new(on_message_listeners.clone())),
             );
             Ok(Self {
                 handle: DartHandle::new(handle),
@@ -112,9 +134,7 @@ pub unsafe extern "C" fn register_WebSocketRpcTransport__on_message(
 
 impl RpcTransport for WebSocketRpcTransport {
     fn on_message(&self) -> LocalBoxStream<'static, ServerMsg> {
-        let (tx, rx) = mpsc::unbounded();
-        self.on_message_listeners.borrow_mut().push(tx);
-        Box::pin(rx)
+        self.on_message_listeners.new_subscriber()
     }
 
     fn set_close_reason(&self, reason: ClientDisconnect) {
@@ -130,7 +150,7 @@ impl RpcTransport for WebSocketRpcTransport {
     }
 
     fn on_state_change(&self) -> LocalBoxStream<'static, TransportState> {
-        todo!()
+        Box::pin(futures::stream::once(async { TransportState::Open }))
     }
 }
 

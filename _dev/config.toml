@@ -3,3 +3,23 @@ static_specs_dir = "_dev/specs/"
 
 [log]
 level = "DEBUG"
+
+[server.client.http]
+# Client API HTTP server's public URL.
+# It's assumed that HTTP server can be reached via this URL externally.
+#
+# Env var: MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL
+# Default:
+public_url = "ws://192.168.0.2:8080/ws"
+
+# IP address to bind Client API HTTP server to.
+#
+# Env var: MEDEA_SERVER__CLIENT__HTTP__BIND_IP
+# Default:
+bind_ip = "0.0.0.0"
+
+# Port to bind Client API HTTP server to.
+#
+# Env var: MEDEA_SERVER__CLIENT__HTTP__BIND_PORT
+# Default:
+bind_port = 8080

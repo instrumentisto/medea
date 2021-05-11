@@ -4,10 +4,7 @@ use crate::platform::dart::utils::dart_api::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-use dart_sys::{
-    Dart_Handle,
-    Dart_PersistentHandle,
-};
+use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DartHandle(Dart_PersistentHandle);

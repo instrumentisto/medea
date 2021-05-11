@@ -1,5 +1,4 @@
-use std::ptr::NonNull;
-use std::panic::catch_unwind;
+use std::{panic::catch_unwind, ptr::NonNull};
 
 use crate::platform::set_panic_hook;
 
@@ -18,6 +17,15 @@ impl ForeignClass for Jason {}
 /// Instantiates a new [`Jason`] interface to interact with this library.
 #[no_mangle]
 pub extern "C" fn Jason__new() -> *const Jason {
+    android_logger::init_once(
+        android_logger::Config::default()
+            .with_min_level(log::Level::Trace) // limit log level
+            .with_tag("mytag") // logs will show under mytag tag
+            .with_filter( // configure messages for specific crate
+                          android_logger::FilterBuilder::new()
+                              .parse("debug,hello::crate=error")
+                              .build()),
+    );
     Jason::new().into_ptr()
 }
 

@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
+import 'package:medea_jason/util/nullable_pointer.dart';
 import 'package:web_socket_channel/io.dart';
 import '../jason.dart';
 
@@ -27,16 +28,17 @@ Object newWs(Pointer<Utf8> addr) {
 
 final _callMessageListenerDart _callMessageListener = dl
     .lookupFunction<_callMessageListenerC, _callMessageListenerDart>(
-        'WsMessageListener__call');
+        'WebSocketRpcTransport__on_message');
 typedef _callMessageListenerC = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
 typedef _callMessageListenerDart = Pointer<Utf8> Function(
     Pointer, Pointer<Utf8>);
 
-void listenWs(Object ws, Pointer listener) {
+void listenWs(Object ws, Pointer callback) {
+  var cb = NullablePointer(callback);
   if (ws is IOWebSocketChannel) {
     ws.stream.listen((msg) {
       if (msg is String) {
-        _callMessageListener(listener, msg.toNativeUtf8());
+        _callMessageListener(cb.getInnerPtr(), msg.toNativeUtf8());
       }
     });
   }

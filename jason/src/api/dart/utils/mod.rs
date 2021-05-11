@@ -23,7 +23,7 @@ pub fn spawn<F>(fut: F)
 where
     F: Future<Output = ()> + 'static,
 {
-    fut.now_or_never().unwrap();
+    crate::platform::spawn(fut)
 }
 
 /// Converts provided [`Future`] to the Dart `Future`.

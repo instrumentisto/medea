@@ -37,8 +37,9 @@ pub unsafe extern "C" fn StringCallback__call(
     cb: *mut StringCallback,
     val: *const libc::c_char,
 ) {
-    let cb = Box::from_raw(cb);
-    cb.0(from_dart_string(val));
+    let s = from_dart_string(val);
+    let cb = cb.as_ref().unwrap();
+    cb.0(s);
 }
 
 type StringCallbackFunction = extern "C" fn(*mut StringCallback) -> Dart_Handle;
@@ -51,12 +52,12 @@ pub unsafe extern "C" fn register_StringCallback__callback(
     STRING_CALLBACK_FUNCTION = Some(f);
 }
 
-pub struct StringCallback(Box<dyn FnOnce(String)>);
+pub struct StringCallback(Box<dyn Fn(String)>);
 
 impl StringCallback {
     pub fn callback<F>(f: F) -> Dart_Handle
     where
-        F: FnOnce(String) + 'static,
+        F: Fn(String) + 'static,
     {
         let this = Self(Box::new(f));
         unsafe {

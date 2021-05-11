@@ -2,14 +2,14 @@ use medea_client_api_proto::{IceConnectionState, PeerConnectionState};
 
 pub mod callback;
 pub mod callback_listener;
+pub mod completer;
+pub mod dart_api;
 pub mod handle;
 pub mod list;
 pub mod map;
 pub mod nullable;
 pub mod option;
 pub mod result;
-pub mod completer;
-pub mod dart_api;
 
 pub use self::callback::{Callback, Function};
 

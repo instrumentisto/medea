@@ -1,4 +1,4 @@
-use dart_sys::{Dart_Handle};
+use dart_sys::Dart_Handle;
 use derive_more::From;
 use libc::c_char;
 

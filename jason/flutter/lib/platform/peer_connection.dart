@@ -50,6 +50,19 @@ void registerFunctions(DynamicLibrary dl) {
           'register_RtcPeerConnection__on_connection_state_change')(
       Pointer.fromFunction<Void Function(Handle, Handle)>(
           onConnectionStateChange));
+
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_RtcPeerConnection__new_peer')(
+      Pointer.fromFunction<Handle Function()>(newPeer));
+}
+
+Object newPeer() {
+  return createPeerConnection({
+    'iceServers': [
+      {'url': 'stun:stun.l.google.com:19302'},
+    ],
+    'sdpSemantics': 'unified-plan',
+  });
 }
 
 void onTrack(Object conn, Object f) {

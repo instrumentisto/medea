@@ -38,9 +38,7 @@ extern "C" {
         object: Dart_PersistentHandle,
     );
 
-    pub fn Dart_PropagateError_DL_Trampolined(
-        object: Dart_Handle,
-    );
+    pub fn Dart_PropagateError_DL_Trampolined(object: Dart_Handle);
 }
 
 /// Initializes usage of Dynamically Linked Dart API.

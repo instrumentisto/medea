@@ -431,9 +431,13 @@ flutter.lint:
 #	make flutter.run [debug=(yes|no)] [device=<device-id>]
 
 flutter.run:
+ifeq ($(build),yes)
+	@make cargo.build crate=medea-jason platform=android targets=$(targets)
+endif
 	cd jason/flutter/example/ && \
 	flutter run $(if $(call eq,$(debug),no),--release,) \
-		$(if $(call eq,$(device),),,-d $(device))
+		$(if $(call eq,$(device),),,-d $(device)) \
+		$(if $(call eq,$(route),),,--route $(route))
 
 
 

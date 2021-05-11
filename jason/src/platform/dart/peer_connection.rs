@@ -61,6 +61,8 @@ type OnIceConnectionStateChangeFunction =
 type SetLocalDescriptionFunction =
     extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
 
+type NewPeer = extern "C" fn() -> Dart_Handle;
+
 static mut CONNECTION_STATE_FUNCTION: Option<ConnectionStateFunction> = None;
 
 static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
@@ -94,6 +96,8 @@ static mut ON_CONNECTION_STATE_CHANGE_FUNCTION: Option<
 
 static mut ICE_CONNECTION_STATE_FUNCTION: Option<IceConnectionStateFunction> =
     None;
+
+static mut NEW_PEER: Option<NewPeer> = None;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__ice_connection_state(
@@ -190,6 +194,13 @@ pub unsafe extern "C" fn register_RtcPeerConnection__on_connection_state_change(
     ON_CONNECTION_STATE_CHANGE_FUNCTION = Some(f);
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__new_peer(
+    f: NewPeer,
+) {
+    NEW_PEER = Some(f);
+}
+
 #[derive(Clone, Debug)]
 pub struct RtcPeerConnection {
     handle: DartHandle,
@@ -200,7 +211,9 @@ impl RtcPeerConnection {
     where
         I: IntoIterator<Item = IceServer>,
     {
-        todo!()
+        Ok(Self {
+            handle: DartHandle::new(unsafe { NEW_PEER.unwrap()() })
+        })
     }
 
     pub fn ice_connection_state(&self) -> IceConnectionState {
@@ -275,7 +288,7 @@ impl RtcPeerConnection {
                 );
             }
         }
-        todo!()
+        // todo!()
     }
 
     pub fn on_connection_state_change<F>(&self, f: Option<F>)
@@ -317,7 +330,8 @@ impl RtcPeerConnection {
     }
 
     pub async fn get_stats(&self) -> Result<RtcStats> {
-        todo!()
+        // TODO: Implement RTCStats
+        Ok(RtcStats(Vec::new()))
     }
 
     pub fn restart_ice(&self) {
