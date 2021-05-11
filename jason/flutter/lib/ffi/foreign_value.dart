@@ -5,10 +5,16 @@ import 'package:ffi/ffi.dart';
 import 'native_string.dart';
 
 class ForeignValue extends Struct {
+  /// Index of the [DartValueFields] union field. `0` goes for `Void`.
   @Uint8()
   external int _tag;
+
+  /// Actual [ForeignValue] payload.
   external DartValueFields _payload;
 
+  /// Returns Dart representation of the underlying foreign value.
+  ///
+  /// Returns `null` if underlying value is `void` or `()`.
   dynamic toDart() {
     switch (_tag) {
       case 0:
@@ -26,8 +32,13 @@ class ForeignValue extends Struct {
 }
 
 class DartValueFields extends Union {
+  /// [Pointer] to some Rust object.
   external Pointer ptr;
+
+  /// [Pointer] to native string.
   external Pointer<Utf8> string;
+
+  /// Numeric value.
   @Int64()
   external int number;
 }
