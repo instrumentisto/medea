@@ -68,9 +68,11 @@ pub trait ForeignClass: Sized {
 
 // TODO: Extend types set when needed.
 /// Value that can be transferred to Dart.
+#[repr(u8)]
 pub enum DartValue {
     Void,
     Ptr(NonNull<c_void>),
+    String(NonNull<>),
     PtrArray(PtrArray),
     Int(i64),
 }

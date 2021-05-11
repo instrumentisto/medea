@@ -6,7 +6,7 @@ import 'local_media_track.dart';
 import 'media_stream_settings.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/ptrarray.dart';
+import ' ffi/ptrarray.dart';
 
 typedef _initLocalTracks_C = Handle Function(Pointer, Pointer);
 typedef _initLocalTracks_Dart = Object Function(Pointer, Pointer);

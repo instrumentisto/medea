@@ -6,7 +6,7 @@ import 'jason.dart';
 import 'track_kinds.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/native_string.dart';
+import ' ffi/native_string.dart';
 
 typedef _deviceId_C = Pointer<Utf8> Function(Pointer);
 typedef _deviceId_Dart = Pointer<Utf8> Function(Pointer);
