@@ -96,6 +96,6 @@ impl<T> Drop for PtrArray<T> {
 /// elements, otherwise pointers will be lost and data behind pointers will stay
 /// leaked.
 #[no_mangle]
-pub unsafe extern "C" fn PtrArray_free(arr: PtrArray) {
-    drop(arr);
+pub unsafe extern "C" fn PtrArray_free(arr: *mut PtrArray) {
+    drop(Box::from_raw(arr));
 }

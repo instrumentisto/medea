@@ -5,7 +5,7 @@ import 'package:ffi/ffi.dart';
 import 'jason.dart';
 import 'remote_media_track.dart';
 import 'util/move_semantic.dart';
-import ' ffi/native_string.dart';
+import 'ffi/native_string.dart';
 import 'util/nullable_pointer.dart';
 
 typedef _getRemoteMemberId_C = Pointer<Utf8> Function(Pointer);

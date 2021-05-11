@@ -39,6 +39,8 @@ pub use self::{
 
 use std::{ffi::c_void, ptr::NonNull};
 
+use libc::c_char;
+
 use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
 
 /// Rust structure having wrapper class in Dart.
@@ -66,21 +68,13 @@ pub trait ForeignClass: Sized {
     }
 }
 
-// TODO: Extend types set when needed.
 /// Value that can be transferred to Dart.
 #[repr(u8)]
 pub enum DartValue {
     Void,
     Ptr(NonNull<c_void>),
-    String(NonNull<>),
-    PtrArray(PtrArray),
+    String(NonNull<c_char>),
     Int(i64),
-}
-
-impl<T: ForeignClass> From<T> for DartValue {
-    fn from(val: T) -> Self {
-        Self::Ptr(val.into_ptr().cast())
-    }
 }
 
 impl From<()> for DartValue {
@@ -89,9 +83,21 @@ impl From<()> for DartValue {
     }
 }
 
+impl<T: ForeignClass> From<T> for DartValue {
+    fn from(val: T) -> Self {
+        Self::Ptr(val.into_ptr().cast())
+    }
+}
+
 impl<T> From<PtrArray<T>> for DartValue {
     fn from(val: PtrArray<T>) -> Self {
-        DartValue::PtrArray(val.erase_type())
+        DartValue::Ptr(NonNull::from(Box::leak(Box::new(val))).cast())
+    }
+}
+
+impl From<NonNull<c_char>> for DartValue {
+    fn from(c_str: NonNull<c_char>) -> Self {
+        DartValue::String(c_str)
     }
 }
 

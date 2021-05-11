@@ -3,14 +3,13 @@
 //! Dart DL API doesn't allow calling Dart closures directly. So Dart registers
 //! static functions that accept and invoke the provided Dart closures. This
 //! module exports function for registering "caller" functions:
-//! [`register_ptr_arg_fn_caller`], [`register_no_args_fn_caller`],
-//! [`register_int_arg_fn_caller`].
+//! [`register_fn_caller`].
 //!
 //! These "caller" functions MUST be registered by Dart during FFI
 //! initialization phase: after Dart DL API is initialized and before any other
 //! exported Rust function is called.
 
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use std::marker::PhantomData;
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
@@ -22,58 +21,22 @@ use super::dart_api::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-/// Pointer to an extern function that accepts a [`Dart_Handle`] and a `c_void`
-/// pointer.
-type PointerArgFnCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
-
-/// Pointer to an extern function that accepts a [`Dart_Handle`].
-type UnitArgFnCaller = extern "C" fn(Dart_Handle);
-
 /// Pointer to an extern function that accepts a [`Dart_Handle`] and a `i64`
 /// number.
-type IntArgFnCaller = extern "C" fn(Dart_Handle, i64);
-
-/// Dart function used to invoke Dart closures that accept a `c_void` pointer
-/// argument.
-static mut PTR_ARG_FN_CALLER: Option<PointerArgFnCaller> = None;
-
-/// Dart function used to invoke other Dart closures without arguments.
-static mut NO_ARGS_FN_CALLER: Option<UnitArgFnCaller> = None;
+type FnCaller = extern "C" fn(Dart_Handle, DartValue);
 
 /// Dart function used to invoke other Dart closures that accept an `i64`
 /// argument.
-static mut INT_ARG_FN_CALLER: Option<IntArgFnCaller> = None;
+static mut FN_CALLER: Option<FnCaller> = None;
 
-/// Registers the provided [`PointerArgFnCaller`] as [`PTR_ARG_FN_CALLER`].
+/// Registers the provided [`FnCaller`] as [`FN_CALLER`].
 ///
 /// # Safety
 ///
 /// Must ONLY be called by Dart during FFI initialization.
 #[no_mangle]
-pub unsafe extern "C" fn register_ptr_arg_fn_caller(
-    caller: PointerArgFnCaller,
-) {
-    PTR_ARG_FN_CALLER = Some(caller);
-}
-
-/// Registers the provided [`UnitArgFnCaller`] as [`NO_ARGS_FN_CALLER`].
-///
-/// # Safety
-///
-/// Must ONLY be called by Dart during FFI initialization.
-#[no_mangle]
-pub unsafe extern "C" fn register_no_args_fn_caller(f: UnitArgFnCaller) {
-    NO_ARGS_FN_CALLER = Some(f)
-}
-
-/// Registers the provided [`IntArgFnCaller`] as [`INT_ARG_FN_CALLER`].
-///
-/// # Safety
-///
-/// Must ONLY be called by Dart during FFI initialization.
-#[no_mangle]
-pub unsafe extern "C" fn register_int_arg_fn_caller(f: IntArgFnCaller) {
-    INT_ARG_FN_CALLER = Some(f);
+pub unsafe extern "C" fn register_fn_caller(f: FnCaller) {
+    FN_CALLER = Some(f);
 }
 
 impl<A: Into<DartValue>> Callback<A> {
@@ -126,22 +89,7 @@ impl<T: Into<DartValue>> Function<T> {
         unsafe {
             let fn_handle =
                 Dart_HandleFromPersistent_DL_Trampolined(self.dart_fn);
-
-            match arg.into() {
-                DartValue::Ptr(ptr) => {
-                    PTR_ARG_FN_CALLER.unwrap()(fn_handle, ptr);
-                }
-                DartValue::Int(int) => {
-                    INT_ARG_FN_CALLER.unwrap()(fn_handle, int);
-                }
-                DartValue::Void => {
-                    NO_ARGS_FN_CALLER.unwrap()(fn_handle);
-                }
-                DartValue::PtrArray(_) => {
-                    // TODO: Implement.
-                    unimplemented!()
-                }
-            }
+            FN_CALLER.unwrap()(fn_handle, arg.into());
         }
     }
 }
