@@ -263,7 +263,7 @@ impl<T: Into<DartValue>, E> Completer<T, E> {
                 DartValue::Void => {
                     COMPLETER_COMPLETE_VOID_CALLER.unwrap()(handle);
                 }
-                DartValue::Int(_) => {
+                DartValue::String(_) | DartValue::Int(_) => {
                     // TODO: Implement.
                     unimplemented!()
                 }

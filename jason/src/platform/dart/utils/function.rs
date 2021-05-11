@@ -137,7 +137,7 @@ impl<T: Into<DartValue>> Function<T> {
                 DartValue::Void => {
                     NO_ARGS_FN_CALLER.unwrap()(fn_handle);
                 }
-                DartValue::PtrArray(_) => {
+                DartValue::String(_) | DartValue::PtrArray(_) => {
                     // TODO: Implement.
                     unimplemented!()
                 }

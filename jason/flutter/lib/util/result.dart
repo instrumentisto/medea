@@ -51,11 +51,20 @@ class RustException implements Exception {
   }
 }
 
-/// Class which represents Rust's `()` (unit) type.
-class Unit {}
-
 /// Result of Rust function call.
 class Result extends Struct {
+  /// Boolean which indicates execution result.
+  ///
+  /// If it 0 then [Result] is successful, otherwise execution result is failure
+  @Uint8()
+  external int _isOk;
+
+  /// Type of the success value.
+  ///
+  /// Based on this value, Dart will determine which of success values it should return.
+  @Uint8()
+  external int _okType;
+
   /// Success value for [Result] with [Pointer] type.
   external Pointer _ptrOk;
 
@@ -69,20 +78,8 @@ class Result extends Struct {
   @Int64()
   external int _intOk;
 
-  /// Type of the success value.
-  ///
-  /// Based on this value, Dart will determine which of success values it should return.
-  @Int32()
-  external int _okType;
-
   /// Error value for [Result].
   external Error _error;
-
-  /// Boolean which indicates execution result.
-  ///
-  /// If it 0 then [Result] is successful, otherwise execution result is failure
-  @Int32()
-  external int _isOk;
 
   /// Returns contained `Ok` value.
   ///
@@ -91,7 +88,7 @@ class Result extends Struct {
     if (_isOk == 1) {
       switch (_okType) {
         case 0:
-          return Unit();
+          return;
         case 1:
           return _ptrOk;
         case 2:

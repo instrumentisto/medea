@@ -9,6 +9,12 @@ use crate::api::dart::{
 /// Dart structure which represents [`Result`] for the Dart error.
 #[repr(C)]
 pub struct DartResult {
+    /// Boolean which indicates that this [`DartResult`] is ok.
+    pub is_ok: u8,
+
+    /// Type of the [`Ok`] variant.
+    pub ok_type: u8,
+
     /// Pointer to the [`ForeignClass`] for the [`Ok`].
     pub ptr_ok: *const c_void,
 
@@ -21,14 +27,8 @@ pub struct DartResult {
     /// [`i64`] for the [`Ok`].
     pub int_ok: i64,
 
-    /// Type of the [`Ok`] variant.
-    pub ok_type: i32,
-
     /// [`DartError`] for the [`Err`] variant.
     pub error: DartError,
-
-    /// Boolean which indicates that this [`DartResult`] is ok.
-    pub is_ok: i32,
 }
 
 impl DartResult {
@@ -36,18 +36,18 @@ impl DartResult {
     fn ok(val: DartValue) -> Self {
         let mut ptr_ok = ptr::null();
         let mut arr_ok = PtrArray::null();
-        let mut str_ok = ptr::null();
+        let mut string_ok = ptr::null();
         let mut int_ok = 0;
         let ok_type = val.id();
         match val {
             DartValue::Ptr(ptr) => {
-                ptr_ok = ptr;
+                ptr_ok = ptr.as_ptr();
             }
             DartValue::Int(i) => {
                 int_ok = i;
             }
             DartValue::String(s) => {
-                str_ok = s;
+                string_ok = s.as_ptr();
             }
             DartValue::PtrArray(a) => {
                 arr_ok = a;
@@ -56,13 +56,13 @@ impl DartResult {
         };
 
         Self {
+            is_ok: 1,
+            ok_type,
             ptr_ok,
             arr_ok,
-            str_ok,
+            str_ok: string_ok,
             int_ok,
-            ok_type,
             error: DartError::null(),
-            is_ok: 1,
         }
     }
 
@@ -73,7 +73,7 @@ impl DartResult {
             arr_ok: PtrArray::null(),
             str_ok: ptr::null(),
             int_ok: 0,
-            ok_type: -1,
+            ok_type: 0,
             error: err.into(),
             is_ok: 0,
         }

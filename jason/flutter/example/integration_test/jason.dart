@@ -159,12 +159,12 @@ void main() {
     });
     var conn = await connFut.future;
 
-    try {
-      conn.getRemoteMemberId();
-    } on RustException catch (e) {
-      expect(e.name, equals('Detached'));
-      expect(e.message, equals('Connection is in detached state'));
-    }
+    expect(
+        () => conn.getRemoteMemberId(),
+        throwsA(predicate((e) =>
+            e is RustException &&
+            e.name == 'Detached' &&
+            e.message == 'Connection is in detached state')));
     var allFired = List<Completer>.generate(2, (_) => Completer());
     conn.onQualityScoreUpdate((score) {
       allFired[0].complete(score);
@@ -241,12 +241,13 @@ void main() {
     await room.disableRemoteAudio();
     await room.enableRemoteAudio();
     await room.disableRemoteVideo();
-    try {
-      await room.enableRemoteVideo();
-    } on RustException catch (e) {
-      expect(e.name, equals('Detached'));
-      expect(e.message, equals('Room is in detached state'));
-    }
+
+    expect(
+        () => room.enableRemoteVideo(),
+        throwsA(predicate((e) =>
+            e is RustException &&
+            e.name == 'Detached' &&
+            e.message == 'Room is in detached state')));
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {

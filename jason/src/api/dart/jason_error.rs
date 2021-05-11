@@ -8,6 +8,7 @@ use std::{
 };
 
 use derive_more::{Display, From};
+use libc::c_char;
 use tracerr::{Trace, Traced};
 
 use crate::{api::dart::utils::string_into_c_str, platform, utils::JsCaused};
@@ -64,17 +65,18 @@ where
 #[repr(C)]
 pub struct DartError {
     /// Name of this error.
-    pub name: *const libc::c_char,
+    pub name: *const c_char,
 
     /// Message of this error.
-    pub message: *const libc::c_char,
+    pub message: *const c_char,
 
     /// Stacktrace of this error.
-    pub stacktrace: *const libc::c_char,
+    pub stacktrace: *const c_char,
 }
 
 impl DartError {
     /// Returns `null` [`DartError`].
+    #[must_use]
     pub fn null() -> Self {
         Self {
             name: ptr::null(),
@@ -87,9 +89,9 @@ impl DartError {
 impl From<JasonError> for DartError {
     fn from(err: JasonError) -> Self {
         Self {
-            name: string_into_c_str(err.name.to_string()),
-            message: string_into_c_str(err.message.clone()),
-            stacktrace: string_into_c_str(err.trace.to_string()),
+            name: string_into_c_str(err.name.to_string()).as_ptr(),
+            message: string_into_c_str(err.message.clone()).as_ptr(),
+            stacktrace: string_into_c_str(err.trace.to_string()).as_ptr(),
         }
     }
 }

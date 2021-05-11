@@ -1,4 +1,4 @@
-use std::{os::raw::c_char, ptr::NonNull};
+use std::ptr::NonNull;
 
 use dart_sys::Dart_Handle;
 
@@ -90,8 +90,9 @@ pub unsafe extern "C" fn ConnectionHandle__free(
 mod mock {
     use crate::{
         api::{JasonError, RemoteMediaTrack},
-        connection::ConnectionError,
-        connection::ConnectionHandle as CoreConnectionHandle,
+        connection::{
+            ConnectionError, ConnectionHandle as CoreConnectionHandle,
+        },
         platform,
     };
 

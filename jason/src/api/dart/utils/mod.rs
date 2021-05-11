@@ -8,8 +8,7 @@ use dart_sys::Dart_Handle;
 
 use crate::{
     api::{dart::JasonError, DartValue},
-    platform::{spawn, utils::Completer,
-},
+    platform::{spawn, utils::Completer},
 };
 
 pub use self::{

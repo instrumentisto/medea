@@ -74,14 +74,15 @@ pub trait ForeignClass: Sized {
 pub enum DartValue {
     Void,
     Ptr(NonNull<c_void>),
-    String(*const libc::c_char),
+    String(NonNull<c_char>),
     PtrArray(PtrArray),
     Int(i64),
 }
 
 impl DartValue {
     /// Returns identifier of this [`DartValue`].
-    pub fn id(&self) -> i32 {
+    #[must_use]
+    pub fn id(&self) -> u8 {
         match self {
             Self::Void => 0,
             Self::Ptr(_) => 1,
@@ -110,8 +111,8 @@ impl<T> From<PtrArray<T>> for DartValue {
     }
 }
 
-impl From<*const c_char> for DartValue {
-    fn from(from: *const c_char) -> Self {
+impl From<NonNull<c_char>> for DartValue {
+    fn from(from: NonNull<c_char>) -> Self {
         Self::String(from)
     }
 }
