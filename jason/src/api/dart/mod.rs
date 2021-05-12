@@ -41,7 +41,7 @@ use std::{ffi::c_void, ptr::NonNull};
 
 use libc::c_char;
 
-use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
+use crate::api::dart::utils::PtrArray;
 
 /// Rust structure having wrapper class in Dart.
 ///
@@ -121,15 +121,3 @@ impl_from_num_for_dart_value!(u8);
 impl_from_num_for_dart_value!(u16);
 impl_from_num_for_dart_value!(u32);
 impl_from_num_for_dart_value!(bool);
-
-impl From<u8> for MediaSourceKind {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => MediaSourceKind::Device,
-            1 => MediaSourceKind::Display,
-            _ => {
-                unreachable!()
-            }
-        }
-    }
-}

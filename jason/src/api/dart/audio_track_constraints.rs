@@ -1,6 +1,8 @@
 //! Constraints applicable to audio tracks.
 
-use std::{os::raw::c_char, ptr::NonNull};
+use std::ptr::NonNull;
+
+use libc::c_char;
 
 use super::{utils::c_str_into_string, ForeignClass};
 

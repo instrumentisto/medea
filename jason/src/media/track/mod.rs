@@ -25,6 +25,7 @@ pub enum MediaStreamTrackState {
 
 /// Media source type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum MediaSourceKind {
     /// Media is sourced from some media device (webcam or microphone).
     Device,

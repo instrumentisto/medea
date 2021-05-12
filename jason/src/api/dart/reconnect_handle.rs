@@ -2,7 +2,7 @@ use std::ptr::NonNull;
 
 use dart_sys::Dart_Handle;
 
-use crate::api::dart::utils::future_to_dart;
+use crate::api::dart::utils::IntoDartFuture;
 
 use super::ForeignClass;
 
@@ -28,12 +28,13 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
-    future_to_dart(async move {
+    async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.reconnect_with_delay(delay_ms as u32).await.unwrap();
         Ok::<_, ()>(())
-    })
+    }
+    .into_dart_future()
 }
 
 /// Tries to reconnect [`Room`] in a loop with a growing backoff delay.
@@ -65,7 +66,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
-    future_to_dart(async move {
+    async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.reconnect_with_backoff(
@@ -76,7 +77,8 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         .await
         .unwrap();
         Ok::<_, ()>(())
-    })
+    }
+    .into_dart_future()
 }
 
 /// Frees the data behind the provided pointer.

@@ -29,20 +29,19 @@ use deadpool::managed;
 
 use crate::client::{CoturnTelnetConnection, CoturnTelnetError};
 
-/// Type alias for using [`deadpool::managed::Pool`] with
+/// Type alias for using a [`deadpool::managed::Pool`] with a
 /// [`CoturnTelnetConnection`].
-pub type Pool = managed::Pool<CoturnTelnetConnection, CoturnTelnetError>;
+pub type Pool = managed::Pool<Manager>;
 
-/// Type alias for using [`deadpool::managed::PoolError`] with
+/// Type alias for using a [`deadpool::managed::PoolError`] with a
 /// [`CoturnTelnetConnection`].
 pub type Error = managed::PoolError<CoturnTelnetError>;
 
-/// Type alias for using [`deadpool::managed::Object`] with
+/// Type alias for using a [`deadpool::managed::Object`] with a
 /// [`CoturnTelnetConnection`].
-pub type Connection =
-    managed::Object<CoturnTelnetConnection, CoturnTelnetError>;
+pub type Connection = managed::Object<Manager>;
 
-/// Type alias for using [`deadpool::managed::RecycleResult`] with
+/// Type alias for using [`deadpool::managed::RecycleResult`] with a
 /// [`CoturnTelnetError`].
 type RecycleResult = managed::RecycleResult<CoturnTelnetError>;
 
@@ -57,8 +56,9 @@ pub struct Manager {
 }
 
 impl Manager {
-    /// Creates new [`Manager`] with the given credentials.
+    /// Creates a new [`Manager`] with the given credentials.
     #[inline]
+    #[must_use]
     pub fn new<S, P>(host: S, port: u16, pass: P) -> Self
     where
         S: Into<String>,
@@ -72,23 +72,21 @@ impl Manager {
 }
 
 #[async_trait]
-impl managed::Manager<CoturnTelnetConnection, CoturnTelnetError> for Manager {
+impl managed::Manager for Manager {
+    type Error = CoturnTelnetError;
+    type Type = CoturnTelnetConnection;
+
     #[inline]
-    async fn create(
-        &self,
-    ) -> Result<CoturnTelnetConnection, CoturnTelnetError> {
-        Ok(CoturnTelnetConnection::connect(
+    async fn create(&self) -> Result<Self::Type, Self::Error> {
+        Self::Type::connect(
             (self.addr.0.as_str(), self.addr.1),
             self.pass.clone(),
         )
-        .await?)
+        .await
     }
 
     #[inline]
-    async fn recycle(
-        &self,
-        conn: &mut CoturnTelnetConnection,
-    ) -> RecycleResult {
-        Ok(conn.ping().await?)
+    async fn recycle(&self, conn: &mut Self::Type) -> RecycleResult {
+        conn.ping().await.map_err(Into::into)
     }
 }

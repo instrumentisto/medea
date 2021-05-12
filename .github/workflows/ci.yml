@@ -543,7 +543,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: beta
+          toolchain: stable
 
       - name: Release ${{ steps.crate.outputs.group2 }} version
               of '${{ steps.crate.outputs.group1 }}' crate

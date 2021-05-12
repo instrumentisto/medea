@@ -116,7 +116,7 @@ macro_rules! actix_try {
         match $e {
             Ok(p) => p,
             Err(e) => {
-                return Box::pin(actix::fut::err(e.into()));
+                return Box::pin(future::err(e.into()));
             }
         };
     };

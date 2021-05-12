@@ -24,7 +24,7 @@ void registerFunctions(DynamicLibrary dl) {
           _Completer_completeError_Pointer));
 }
 
-/// Returns new [Completer].
+/// Returns a new [Completer].
 Object _Completer_new() {
   return Completer();
 }

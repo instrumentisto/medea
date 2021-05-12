@@ -1,7 +1,7 @@
 //! Medea media server.
 
 #![allow(clippy::module_name_repetitions)]
-#![deny(broken_intra_doc_links)]
+#![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
 
 #[macro_use]
 pub mod utils;

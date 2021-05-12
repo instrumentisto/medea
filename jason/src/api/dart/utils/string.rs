@@ -2,9 +2,10 @@
 
 use std::{
     ffi::{CStr, CString},
-    os::raw::c_char,
     ptr::NonNull,
 };
+
+use libc::c_char;
 
 /// Constructs a Rust [`String`] from the provided raw C string.
 ///
