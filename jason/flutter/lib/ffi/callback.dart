@@ -5,7 +5,7 @@ import 'package:medea_jason/ffi/foreign_value.dart';
 /// Registers the closure callers functions in Rust.
 void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_fn_caller')(
+          'register_fn_caller')(
       Pointer.fromFunction<Void Function(Handle, ForeignValue)>(_callFn));
 }
 
