@@ -127,7 +127,7 @@ impl<'a, T> Future for AllProcessed<'a, T> {
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Self::Output> {
-        let _ = ready!(self.fut.as_mut().poll(cx));
+        drop(ready!(self.fut.as_mut().poll(cx)));
 
         let mut retry = (self.factory)();
         match retry.as_mut().poll(cx) {
@@ -147,7 +147,7 @@ mod tests {
     use futures::{task::Poll, StreamExt};
     use tokio::{
         task::{spawn_local, LocalSet},
-        time::delay_for,
+        time,
     };
 
     use crate::ProgressableCell;
@@ -181,7 +181,7 @@ mod tests {
                         );
 
                         updatable_cell.set(DELAYED_PROCESSED_UPDATE);
-                        delay_for(Duration::from_millis(100)).await;
+                        time::sleep(Duration::from_millis(100)).await;
                         assert_eq!(
                             DELAYED_PROCESSED_UPDATE,
                             updatable_cell_rx

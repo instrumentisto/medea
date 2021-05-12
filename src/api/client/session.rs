@@ -9,14 +9,14 @@ use std::{
 };
 
 use actix::{
-    Actor, ActorContext, ActorFuture, Addr, Arbiter, AsyncContext,
-    ContextFutureSpawner, Handler, MailboxError, Message, SpawnHandle,
+    Actor, ActorContext, ActorFutureExt as _, Addr, AsyncContext,
+    ContextFutureSpawner as _, Handler, MailboxError, Message, SpawnHandle,
     StreamHandler, WrapFuture,
 };
 use actix_http::ws::{CloseReason as WsCloseReason, Item};
 use actix_web_actors::ws::{self, CloseCode};
-use bytes::{Buf, BytesMut};
-use futures::future::{FutureExt as _, LocalBoxFuture};
+use bytes::BytesMut;
+use futures::future::{self, FutureExt as _, LocalBoxFuture};
 use medea_client_api_proto::{
     state, ClientMsg, CloseDescription, CloseReason, Command, Credential,
     Event, MemberId, RoomId, RpcSettings, ServerMsg,
@@ -297,7 +297,7 @@ impl WsSession {
         reason: ClosedReason,
     ) {
         if let Some((member, room)) = self.sessions.remove(&room_id) {
-            Arbiter::spawn(room.connection_closed(member, reason));
+            actix::spawn(room.connection_closed(member, reason));
         }
         if self.sessions.is_empty() {
             self.close_in_place(
@@ -376,7 +376,7 @@ impl WsSession {
                     );
                     self.fragmentation_buffer.clear();
                 }
-                self.fragmentation_buffer.extend_from_slice(value.bytes());
+                self.fragmentation_buffer.extend_from_slice(&*value);
             }
             Item::FirstBinary(_) => {
                 error!(
@@ -392,11 +392,11 @@ impl WsSession {
                         self
                     );
                 } else {
-                    self.fragmentation_buffer.extend_from_slice(value.bytes());
+                    self.fragmentation_buffer.extend_from_slice(&*value);
                 }
             }
             Item::Last(value) => {
-                self.fragmentation_buffer.extend_from_slice(value.bytes());
+                self.fragmentation_buffer.extend_from_slice(&*value);
                 let frame = self.fragmentation_buffer.split();
                 match std::str::from_utf8(frame.as_ref()) {
                     Ok(text) => self.handle_text(ctx, &text),
@@ -565,7 +565,7 @@ impl Actor for WsSession {
             session.into_iter().map(|(_, (member_id, room))| {
                 room.connection_closed(member_id, reason)
             });
-        Arbiter::spawn(futures::future::join_all(close_all_session).map(drop));
+        actix::spawn(future::join_all(close_all_session).map(drop));
     }
 }
 
@@ -665,9 +665,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 ws::Message::Binary(_) => {
                     warn!("{}: Received binary message", self);
                 }
-                ws::Message::Ping(ping) => {
-                    ctx.pong(ping.bytes());
-                }
+                ws::Message::Ping(ping) => ctx.pong(&*ping),
                 ws::Message::Nop | ws::Message::Pong(_) => {
                     // nothing to do here
                 }
@@ -701,14 +699,17 @@ impl Display for WsSession {
 #[cfg(test)]
 mod test {
     use std::{
+        str,
         sync::Mutex,
         time::{Duration, Instant},
     };
 
-    use actix_http::ws::Item;
-    use actix_web::{test::TestServer, web, App, HttpRequest};
+    use actix_http::{ws::Item, HttpService};
+    use actix_http_test::TestServer;
+    use actix_service::map_config;
+    use actix_web::{dev::AppConfig, web, App, HttpRequest};
     use actix_web_actors::ws::{start, CloseCode, CloseReason, Frame, Message};
-    use bytes::{Buf, Bytes};
+    use bytes::Bytes;
     use futures::{
         channel::{
             mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -744,22 +745,25 @@ mod test {
 
     fn into_message(msg: ClientMsg) -> Message {
         Message::Text(
-            std::str::from_utf8(
-                Bytes::from(serde_json::to_string(&msg).unwrap()).bytes(),
-            )
-            .unwrap()
-            .to_owned(),
+            str::from_utf8(&serde_json::to_vec(&msg).unwrap())
+                .unwrap()
+                .into(),
         )
     }
 
-    fn test_server(factory: fn() -> WsSession) -> TestServer {
-        actix_web::test::start(move || {
-            App::new().service(web::resource("/").to(
-                move |req: HttpRequest, stream: web::Payload| async move {
-                    start(factory(), &req, stream)
-                },
+    async fn test_server(factory: fn() -> WsSession) -> TestServer {
+        actix_http_test::test_server(move || {
+            HttpService::new(map_config(
+                App::new().service(web::resource("/").to(
+                    move |req: HttpRequest, stream: web::Payload| async move {
+                        start(factory(), &req, stream)
+                    },
+                )),
+                |_| AppConfig::default(),
             ))
+            .tcp()
         })
+        .await
     }
 
     // WsSession is dropped and WebSocket connection is closed when RpcServer
@@ -795,7 +799,7 @@ mod test {
             )
         }
 
-        let mut serv = test_server(factory);
+        let mut serv = test_server(factory).await;
 
         let mut client = serv.ws().await.unwrap();
 
@@ -859,7 +863,8 @@ mod test {
                 Duration::from_secs(5),
                 Duration::from_millis(50),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
 
@@ -936,7 +941,8 @@ mod test {
                 Duration::from_millis(100),
                 Duration::from_secs(10),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
 
@@ -1007,7 +1013,8 @@ mod test {
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
 
@@ -1122,7 +1129,8 @@ mod test {
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
 
@@ -1214,7 +1222,8 @@ mod test {
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
         client
@@ -1290,7 +1299,8 @@ mod test {
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
         client
@@ -1422,7 +1432,8 @@ mod test {
                 Duration::from_secs(5),
                 Duration::from_secs(5),
             )
-        });
+        })
+        .await;
 
         let mut client = serv.ws().await.unwrap();
 

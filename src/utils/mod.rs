@@ -38,7 +38,7 @@ macro_rules! hashmap {
             let _cap = hashmap!(@count $($key),*);
             let mut _map = ::std::collections::HashMap::with_capacity(_cap);
             $(
-                let _ = _map.insert($key, $value);
+                drop(_map.insert($key, $value));
             )*
             _map
         }
@@ -116,7 +116,7 @@ macro_rules! actix_try {
         match $e {
             Ok(p) => p,
             Err(e) => {
-                return Box::pin(actix::fut::err(e.into()));
+                return Box::pin(future::err(e.into()));
             }
         };
     };
