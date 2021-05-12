@@ -4,12 +4,14 @@
 //! [`TryJoinAll`]: futures::future::TryJoinAll
 
 use std::{
+    marker::PhantomData,
     mem,
     pin::Pin,
+    sync::atomic::AtomicPtr,
     task::{Context, Poll},
 };
 
-use actix::{fut::ActorFuture, Actor};
+use actix::{Actor, ActorFuture};
 
 /// Creates a future which represents either a collection of the results of the
 /// futures given or an error.
@@ -28,36 +30,39 @@ use actix::{fut::ActorFuture, Actor};
 /// [`ActorFuture`]: actix::ActorFuture
 /// [`TryJoinAll`]: futures::future::TryJoinAll
 /// [`try_join_all`]: futures::future::try_join_all
-pub fn actix_try_join_all<I, F, T, E>(i: I) -> ActixTryJoinAll<F, T, E>
+pub fn actix_try_join_all<I, F, T, E, A>(i: I) -> ActixTryJoinAll<F, T, E, A>
 where
     I: IntoIterator<Item = F>,
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
+    F: ActorFuture<A, Output = Result<T, E>> + Unpin,
+    A: Actor,
 {
     let elems: Box<[_]> = i.into_iter().map(ElemState::Pending).collect();
     ActixTryJoinAll {
         elems: elems.into(),
+        _actor: PhantomData,
     }
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct ActixTryJoinAll<F, T, E>
+pub struct ActixTryJoinAll<F, T, E, A: Actor>
 where
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
+    F: ActorFuture<A, Output = Result<T, E>> + Unpin,
 {
-    elems: Pin<Box<[ElemState<F, T, E>]>>,
+    elems: Pin<Box<[ElemState<F, T>]>>,
+    _actor: PhantomData<AtomicPtr<A>>,
 }
 
-impl<F, T, E> ActorFuture for ActixTryJoinAll<F, T, E>
+impl<F, T, E, A> ActorFuture<A> for ActixTryJoinAll<F, T, E, A>
 where
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
+    F: ActorFuture<A, Output = Result<T, E>> + Unpin,
+    A: Actor,
 {
-    type Actor = F::Actor;
     type Output = Result<Vec<T>, E>;
 
     fn poll(
         mut self: Pin<&mut Self>,
-        srv: &mut Self::Actor,
-        ctx: &mut <Self::Actor as Actor>::Context,
+        srv: &mut A,
+        ctx: &mut A::Context,
         task: &mut Context<'_>,
     ) -> Poll<Self::Output> {
         let mut state = FinalState::AllDone;
@@ -95,18 +100,12 @@ where
 }
 
 #[derive(Debug)]
-enum ElemState<F, T, E>
-where
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
-{
+enum ElemState<F, T> {
     Pending(F),
     Done(Option<T>),
 }
 
-impl<F, T, E> ElemState<F, T, E>
-where
-    F: ActorFuture<Output = Result<T, E>> + Unpin,
-{
+impl<F: Unpin, T> ElemState<F, T> {
     fn pending_pin_mut(self: Pin<&mut Self>) -> Option<Pin<&mut F>> {
         match self.get_mut() {
             ElemState::Pending(f) => Some(Pin::new(f)),
@@ -122,10 +121,7 @@ where
     }
 }
 
-impl<F, T, E> Unpin for ElemState<F, T, E> where
-    F: ActorFuture<Output = Result<T, E>> + Unpin
-{
-}
+impl<F: Unpin, T> Unpin for ElemState<F, T> {}
 
 fn iter_pin_mut<T>(slice: Pin<&mut [T]>) -> impl Iterator<Item = Pin<&mut T>>
 where

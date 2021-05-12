@@ -402,8 +402,7 @@ impl MediaStreamSettings {
     /// some of the [`VideoTrackConstraints`] from this [`MediaStreamSettings`].
     ///
     /// Unconstrains [`VideoTrackConstraints`] which this
-    /// [`platform::MediaStreamTrack`] satisfies by calling a
-    /// [`VideoTrackConstraints::unconstrain()`].
+    /// [`platform::MediaStreamTrack`] satisfies.
     #[must_use]
     pub fn unconstrain_if_satisfies_video<T>(&mut self, track: T) -> bool
     where
@@ -563,7 +562,7 @@ impl MediaStreamSettings {
         self.audio.enabled = enabled;
     }
 
-    /// Sets underlying [`VideoTrackConstraints::enabled`] based on provided
+    /// Sets the underlying [`VideoTrackConstraints`] basing on the provided
     /// [`MediaSourceKind`] to the given value.
     #[inline]
     pub fn set_video_publish(
