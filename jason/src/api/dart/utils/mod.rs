@@ -25,10 +25,10 @@ pub trait IntoDartFuture {
 }
 
 impl<F, T, E> IntoDartFuture for F
-    where
-        F: Future<Output = Result<T, E>> + 'static,
-        T: Into<DartValue> + 'static,
-        E: Into<DartValue> + 'static,
+where
+    F: Future<Output = Result<T, E>> + 'static,
+    T: Into<DartValue> + 'static,
+    E: Into<DartValue> + 'static,
 {
     /// Converts this [`Future`] into a Dart `Future`.
     ///
