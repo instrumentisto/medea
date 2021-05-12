@@ -667,8 +667,8 @@ release.crates:
 ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-control-api-proto medea-coturn-telnet-client medea-macro medea-reactive),)
 	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
-		cargo +beta publish --token $(release-crates-token) ,\
-		cargo +beta package --allow-dirty )
+		cargo publish --token $(release-crates-token) ,\
+		cargo package --allow-dirty )
 endif
 
 
