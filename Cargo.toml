@@ -52,7 +52,7 @@ failure = "0.1"
 futures = { version = "0.3", features = ["compat"] }
 humantime-serde = "1.0"
 medea-client-api-proto = { version = "0.3", features = ["medea"] }
-medea-control-api-proto = { path = "proto/control-api" }
+medea-control-api-proto = { version = "0.3", path = "proto/control-api" }
 medea-macro = "0.2"
 rand = "0.8"
 rust-crypto = "0.2"
