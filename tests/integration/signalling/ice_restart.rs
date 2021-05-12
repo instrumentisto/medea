@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
-use actix::{clock::delay_for, Context};
+use actix::{clock::sleep, Context};
 use function_name::named;
 use futures::{channel::mpsc::*, StreamExt as _};
 use medea::hashmap;
@@ -140,7 +140,7 @@ async fn ice_restart() {
         .unwrap();
 
     // make sure that there are not contention between Failed messages
-    delay_for(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
 
     // second peer failed
     responder

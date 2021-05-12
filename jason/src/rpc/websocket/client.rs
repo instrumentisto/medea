@@ -127,8 +127,7 @@ struct Inner {
     state: ObservableCell<ClientState>,
 }
 
-/// Factory closure which creates a [`platform::RpcTransport`] for a
-/// [`WebSocketRpcClient::establish_connection()`] function.
+/// Factory closure producing a [`platform::RpcTransport`].
 pub type RpcTransportFactory = Box<
     dyn Fn(
         ApiUrl,
@@ -493,7 +492,8 @@ impl WebSocketRpcClient {
     ///
     /// # Errors
     ///
-    /// Errors if [`WebSocketRpcClient::establish_connection`] fails.
+    /// Errors if [`WebSocketRpcClient`] fails to establish connection with a
+    /// server.
     pub async fn connect(
         self: Rc<Self>,
         url: ApiUrl,

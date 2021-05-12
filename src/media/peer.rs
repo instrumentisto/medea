@@ -907,8 +907,7 @@ impl<T> Peer<T> {
         }
     }
 
-    /// Commits all [`PeerChange`]s which are marked as forcible
-    /// ([`PeerChange::can_force_apply`]).
+    /// Commits all [`PeerChange`]s which are marked as forcible.
     pub fn inner_force_commit_scheduled_changes(&mut self) {
         let mut forcible_changes = Vec::new();
         let mut filtered_changes_queue = Vec::new();

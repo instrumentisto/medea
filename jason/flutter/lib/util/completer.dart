@@ -33,7 +33,7 @@ void registerFunctions(DynamicLibrary dl) {
           _Completer_complete_PtrArray));
 }
 
-/// Returns new [Completer].
+/// Returns a new [Completer].
 Object _Completer_new() {
   return Completer();
 }

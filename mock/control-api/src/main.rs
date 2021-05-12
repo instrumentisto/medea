@@ -45,7 +45,7 @@ fn main() {
 
     let _log_guard = init_logger();
 
-    actix_web::rt::System::new("mock-control-api").block_on(async move {
+    actix_web::rt::System::new().block_on(async move {
         let callback_server = callback::server::run(&opts).await;
         api::run(&opts, callback_server).await;
     });

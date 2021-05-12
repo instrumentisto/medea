@@ -97,7 +97,7 @@ pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
         TonicCallbackServer::new(GrpcCallbackService::new(Arc::clone(&events)));
     let addr = format!("{}:{}", host, port).parse().unwrap();
 
-    Arbiter::spawn(async move {
+    Arbiter::current().spawn(async move {
         Server::builder()
             .add_service(service)
             .serve(addr)
@@ -107,7 +107,7 @@ pub async fn run(args: &ArgMatches<'static>) -> Addr<GrpcCallbackServer> {
 
     debug!("gRPC callback server started.");
 
-    GrpcCallbackServer::start_in_arbiter(&Arbiter::new(), move |_| {
+    GrpcCallbackServer::start_in_arbiter(&Arbiter::new().handle(), move |_| {
         GrpcCallbackServer { events }
     })
 }

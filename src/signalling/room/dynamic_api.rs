@@ -9,8 +9,8 @@ use std::{
 };
 
 use actix::{
-    ActorFuture as _, AsyncContext, AtomicResponse, Context, Handler, Message,
-    WrapFuture as _,
+    ActorFutureExt as _, AsyncContext, AtomicResponse, Context, Handler,
+    Message, WrapFuture as _,
 };
 use medea_client_api_proto::{CloseReason, MemberId};
 use medea_control_api_proto::grpc::api as proto;
@@ -353,11 +353,8 @@ pub struct Delete(pub Vec<StatefulFid>);
 impl Handler<Delete> for Room {
     type Result = ();
 
-    /// Deletes elements from this [`Room`] by the provided IDs.
-    ///
-    /// Extracts [`MemberId`]s and [`EndpointId`]s from the provided [`Delete`]
-    /// message. Calls [`Room::delete_member`] for each [`MemberId`] and
-    /// [`Room::delete_endpoint`] for each [`EndpointId`].
+    /// Deletes elements from this [`Room`] by the IDs extracted from the
+    /// provided [`Delete`] message.
     fn handle(&mut self, msg: Delete, ctx: &mut Self::Context) {
         let mut member_ids = Vec::new();
         let mut endpoint_ids = Vec::new();
@@ -547,9 +544,6 @@ impl Handler<CreateEndpoint> for Room {
     /// Creates a new [`Endpoint`] with the provided [`EndpointId`] for a
     /// [`Member`] with the given [`MemberId`] according to the given
     /// [`EndpointSpec`].
-    ///
-    /// Propagates request to [`Room::create_sink_endpoint`] or
-    /// [`Room::create_src_endpoint`] basing on a kind of the [`Endpoint`].
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     /// [`Member`]: crate::signalling::elements::Member
