@@ -4,7 +4,7 @@ use function_name::named;
 use futures::{channel::mpsc, StreamExt};
 use medea_client_api_proto::{Direction, Event, PeerUpdate};
 use medea_control_api_proto::grpc::api::{self as proto, member::Credentials};
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use crate::{
     grpc_control_api::{
@@ -117,7 +117,7 @@ async fn add_endpoints_synchronization() {
                 .build_request(format!("{}/second", test_name!()));
             client.create(second_play_endpoint).await;
 
-            delay_for(Duration::from_millis(100)).await;
+            sleep(Duration::from_millis(100)).await;
 
             let count_send_tracks = tracks
                 .iter()

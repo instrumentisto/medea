@@ -497,7 +497,7 @@ ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
 	$(if $(call eq,$(docs-rust-crate),@all),\
-		cargo doc --all,\
+		cargo doc --workspace,\
 		cd $(crate-dir)/ && cargo doc)\
 			--no-deps \
 			$(if $(call eq,$(dev),yes),--document-private-items,) \

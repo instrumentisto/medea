@@ -1,6 +1,6 @@
 [package]
 name = "medea-reactive"
-version = "0.1.1"
+version = "0.1.2-dev"
 edition = "2018"
 resolver = "2"
 description = "Reactive mutable data containers"
@@ -17,5 +17,5 @@ categories = ["asynchronous", "data-structures"]
 futures = "0.3"
 
 [dev-dependencies.tokio]
-    version = "0.2"
-    features = ["macros", "rt-core", "rt-util", "test-util", "time"]
+    version = "1.5"
+    features = ["macros", "rt", "test-util", "time"]

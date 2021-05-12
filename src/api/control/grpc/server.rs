@@ -431,8 +431,8 @@ pub fn run(
     let (grpc_shutdown_tx, grpc_shutdown_rx) = oneshot::channel();
     let (tonic_server_tx, tonic_server_rx) = oneshot::channel();
     let grpc_actor_addr =
-        GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| {
-            Arbiter::spawn(async move {
+        GrpcServer::start_in_arbiter(&Arbiter::new().handle(), move |_| {
+            Arbiter::current().spawn(async move {
                 let result = Server::builder()
                     .add_service(TonicControlApiServer::new(ControlApiService(
                         room_service,

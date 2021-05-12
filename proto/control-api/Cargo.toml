@@ -1,6 +1,6 @@
 [package]
 name = "medea-control-api-proto"
-version = "0.2.0"
+version = "0.3.0-dev"
 edition = "2018"
 resolver = "2"
 description = "Control API protocol implementation for Medea media server"
@@ -18,9 +18,9 @@ default = ["grpc"]
 grpc = ["prost", "prost-types", "tonic", "tonic-build"]
 
 [dependencies]
-prost = { version = "0.6", optional = true }
-prost-types = { version = "0.6", optional = true }
-tonic = { version = "0.3", optional = true }
+prost = { version = "0.7", optional = true }
+prost-types = { version = "0.7", optional = true }
+tonic = { version = "0.4", optional = true }
 
 [build-dependencies]
-tonic-build = { version = "0.3", optional = true }
+tonic-build = { version = "0.4", optional = true }

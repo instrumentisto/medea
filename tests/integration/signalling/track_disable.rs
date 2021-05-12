@@ -252,7 +252,7 @@ async fn track_disables_and_enables_are_instant() {
 
     // we dont know how many events we will receive, so gather events they
     // stop going
-    let mut mutes_received_by_pub: Vec<_> = tokio::stream::StreamExt::timeout(
+    let mut mutes_received_by_pub: Vec<_> = tokio_stream::StreamExt::timeout(
         filter_events(publisher_rx),
         Duration::from_secs(3),
     )
@@ -262,7 +262,7 @@ async fn track_disables_and_enables_are_instant() {
     .collect()
     .await;
 
-    let mut mutes_received_by_sub: Vec<_> = tokio::stream::StreamExt::timeout(
+    let mut mutes_received_by_sub: Vec<_> = tokio_stream::StreamExt::timeout(
         filter_events(subscriber_rx),
         Duration::from_secs(3),
     )

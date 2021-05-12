@@ -10,10 +10,11 @@
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![deny(
-    broken_intra_doc_links,
     missing_debug_implementations,
     nonstandard_style,
     rust_2018_idioms,
+    rustdoc::broken_intra_doc_links,
+    rustdoc::private_intra_doc_links,
     trivial_casts,
     trivial_numeric_casts
 )]

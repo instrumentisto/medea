@@ -6,11 +6,12 @@ mod dynamic_api;
 mod peer_events_handler;
 mod rpc_server;
 
-use std::{pin::Pin, rc::Rc, sync::Arc, time::Duration};
+use std::{rc::Rc, sync::Arc, time::Duration};
 
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext as _, AtomicResponse, Context,
-    Handler, MailboxError, WrapFuture as _,
+    fut::LocalBoxActorFuture, Actor, ActorFutureExt as _, Addr,
+    AsyncContext as _, AtomicResponse, Context, Handler, MailboxError,
+    WrapFuture as _,
 };
 use derive_more::{Display, From};
 use failure::Fail;
@@ -48,8 +49,9 @@ pub use dynamic_api::{
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-pub type ActFuture<O = ()> =
-    Pin<Box<dyn ActorFuture<Actor = Room, Output = O>>>;
+///
+/// [`ActorFuture`]: actix::ActorFuture
+pub type ActFuture<O = ()> = LocalBoxActorFuture<Room, O>;
 
 #[derive(Debug, Display, Fail, From)]
 pub enum RoomError {

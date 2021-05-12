@@ -1,9 +1,6 @@
 //! Implementation of the [`RpcServer`] and related [`Command`]s and functions.
 
-use actix::{
-    fut::{self, Either},
-    ActorFuture, Addr, Handler, WrapFuture,
-};
+use actix::{ActorFutureExt as _, Addr, Handler, WrapFuture};
 use derive_more::Display;
 use failure::Fail;
 use futures::{
@@ -252,26 +249,26 @@ impl Handler<RpcConnectionEstablished> for Room {
             maybe_send_on_join
                 .into_actor(self)
                 .then(|res: Result<(), RoomError>, this, ctx| match res {
-                    Ok(_) => Either::Left(
+                    Ok(_) => future::Either::Left(
                         this.members
                             .connection_established(ctx, member_id, connection)
                             .err_into()
                             .into_actor(this),
                     ),
-                    Err(err) => Either::Right(fut::err(err)),
+                    Err(err) => future::Either::Right(future::err(err)),
                 })
                 .then(|res, this, _| match res {
-                    Ok(member) => {
-                        Either::Left(this.init_member_connections(&member).map(
+                    Ok(member) => future::Either::Left(
+                        this.init_member_connections(&member).map(
                             move |res, _, _| {
                                 res.map(move |_| RpcConnectionSettings {
                                     idle_timeout: member.get_idle_timeout(),
                                     ping_interval: member.get_ping_interval(),
                                 })
                             },
-                        ))
-                    }
-                    Err(err) => Either::Right(fut::err(err)),
+                        ),
+                    ),
+                    Err(err) => future::Either::Right(future::err(err)),
                 }),
         )
     }

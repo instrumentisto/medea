@@ -72,7 +72,7 @@ pub fn run(port: u16) -> Addr<GrpcCallbackServer> {
     let service =
         TonicCallbackServer::new(CallbackServer::new(Arc::clone(&callbacks)));
 
-    Arbiter::spawn(async move {
+    actix::spawn(async move {
         Server::builder()
             .add_service(service)
             .serve(format!("127.0.0.1:{}", port).parse().unwrap())
@@ -80,7 +80,7 @@ pub fn run(port: u16) -> Addr<GrpcCallbackServer> {
             .unwrap()
     });
 
-    GrpcCallbackServer::start_in_arbiter(&Arbiter::new(), move |_| {
+    GrpcCallbackServer::start_in_arbiter(&Arbiter::new().handle(), move |_| {
         GrpcCallbackServer { callbacks }
     })
 }

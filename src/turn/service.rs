@@ -8,13 +8,10 @@ use std::{fmt, slice, sync::Arc};
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::{
-    channel::mpsc,
-    future::{self, AbortHandle},
-    StreamExt as _,
-};
+use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::{PeerId, RoomId};
 use redis::ConnectionInfo;
+use tokio::task::JoinHandle;
 
 use crate::{
     conf,
@@ -96,10 +93,8 @@ struct Service {
     /// [Coturn]: https://github.com/coturn/coturn
     drop_tx: MpscOneshotSender<IceUsername>,
 
-    // TODO: tokio 1.0 has abort() function in JoinHandle,
-    //       so we can use it directly.
-    /// [`AbortHandle`] to task that cleanups [`IceUser`]s.
-    users_cleanup_task: AbortHandle,
+    /// [`JoinHandle`] to task that cleanups [`IceUser`]s.
+    users_cleanup_task: JoinHandle<()>,
 }
 
 impl Service {
@@ -175,7 +170,7 @@ pub fn new_turn_auth_service<'a>(
     let users_cleanup_task = {
         let db = turn_db.clone();
         let cli = coturn_cli.clone();
-        let (fut, handle) = future::abortable(async move {
+        tokio::spawn(async move {
             while let Some(user) = rx.next().await {
                 let users = slice::from_ref(&user);
                 if let Err(e) = db.remove(users).await {
@@ -193,9 +188,7 @@ pub fn new_turn_auth_service<'a>(
                     );
                 }
             }
-        });
-        tokio::spawn(fut);
-        handle
+        })
     };
 
     let turn_service = Service {

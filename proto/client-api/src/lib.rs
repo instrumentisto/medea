@@ -24,7 +24,7 @@
 //! [3]: https://tinyurl.com/y4j3b4cs
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![deny(broken_intra_doc_links)]
+#![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
 #![forbid(unsafe_code)]
 
 pub mod state;
