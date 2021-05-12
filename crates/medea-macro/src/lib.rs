@@ -4,7 +4,7 @@
 //!
 //! [Medea]: https://github.com/instrumentisto/medea
 
-#![deny(broken_intra_doc_links)]
+#![deny(rustdoc::broken_intra_doc_links, rustdoc::private_intra_doc_links)]
 
 mod dispatchable;
 mod enum_delegate;

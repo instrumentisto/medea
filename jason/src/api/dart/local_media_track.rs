@@ -2,6 +2,8 @@ use std::ptr::NonNull;
 
 use super::ForeignClass;
 
+use crate::media::{MediaKind, MediaSourceKind};
+
 #[cfg(feature = "mockable")]
 pub use self::mock::LocalMediaTrack;
 #[cfg(not(feature = "mockable"))]
@@ -17,10 +19,10 @@ impl ForeignClass for LocalMediaTrack {}
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__kind(
     this: NonNull<LocalMediaTrack>,
-) -> u8 {
+) -> MediaKind {
     let this = this.as_ref();
 
-    this.kind() as u8
+    this.kind()
 }
 
 /// Returns a [`MediaSourceKind::Device`] if this [`LocalMediaTrack`] is
@@ -34,10 +36,10 @@ pub unsafe extern "C" fn LocalMediaTrack__kind(
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
     this: NonNull<LocalMediaTrack>,
-) -> u8 {
+) -> MediaSourceKind {
     let this = this.as_ref();
 
-    this.media_source_kind() as u8
+    this.media_source_kind()
 }
 
 /// Frees the data behind the provided pointer.

@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use actix::{clock::delay_for, Addr, Context};
+use actix::{clock::sleep, Addr, Context};
 use actix_http::ws::CloseCode;
 use function_name::named;
 use medea_client_api_proto::Event as RpcEvent;
@@ -80,7 +80,7 @@ async fn callback_test(name: &str, port: u16) -> CallbackTestItem {
 #[named]
 async fn on_join() {
     let (_, callback_server) = callback_test(test_name!(), 9096).await;
-    delay_for(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
     let on_joins_count = callbacks
         .into_iter()
@@ -112,7 +112,7 @@ async fn on_join() {
 async fn on_leave_normally_disconnected() {
     let (client, callback_server) = callback_test(test_name!(), 9097).await;
     client.send(CloseSocket(CloseCode::Normal)).await.unwrap();
-    delay_for(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
 
@@ -150,7 +150,7 @@ async fn on_leave_on_connection_loss() {
     let (client, callback_server) = callback_test(test_name!(), 9098).await;
 
     client.send(CloseSocket(CloseCode::Abnormal)).await.unwrap();
-    delay_for(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let callbacks = callback_server.send(GetCallbacks).await.unwrap().unwrap();
 

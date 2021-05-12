@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use cucumber_rust::then;
+use tokio::time::sleep;
 
 use crate::{
     object::{MediaKind, MediaSourceKind},
@@ -230,7 +231,7 @@ async fn then_member_has_n_remote_tracks_from(
     live_or_stopped: String,
     remote_id: String,
 ) {
-    tokio_1::time::sleep(Duration::from_millis(300)).await;
+    sleep(Duration::from_millis(300)).await;
     let member = world.get_member(&id).unwrap();
     let connection = member
         .connections()

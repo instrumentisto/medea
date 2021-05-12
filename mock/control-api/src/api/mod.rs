@@ -16,7 +16,7 @@ use actix::{Addr, Recipient};
 use actix_cors::Cors;
 use actix_web::{
     middleware,
-    web::{self, Data, Json},
+    web::{self, Data, Json, Path},
     App, HttpResponse, HttpServer,
 };
 use clap::ArgMatches;
@@ -134,7 +134,7 @@ macro_rules! gen_request_macro {
         macro_rules! request {
             ($name:tt, $uri_tuple:ty) => {
                 pub async fn $name(
-                    path: actix_web::web::Path<$uri_tuple>,
+                    path: Path<$uri_tuple>,
                     state: Data<AppContext>,
                 ) -> Result<HttpResponse, ()> {
                     state
@@ -172,7 +172,7 @@ pub async fn get_callbacks(
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod delete {
-    use super::{error, AppContext, Data, HttpResponse, Response};
+    use super::{error, AppContext, Data, HttpResponse, Path, Response};
 
     gen_request_macro!(delete, Response);
 
@@ -186,7 +186,9 @@ mod delete {
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 mod get {
-    use super::{error, AppContext, Data, HttpResponse, SingleGetResponse};
+    use super::{
+        error, AppContext, Data, HttpResponse, Path, SingleGetResponse,
+    };
 
     gen_request_macro!(get, SingleGetResponse);
 
@@ -202,11 +204,11 @@ mod get {
 mod create {
     use super::{
         error, AppContext, CreateResponse, Data, Element, Fid, HttpResponse,
-        Json,
+        Json, Path,
     };
 
     pub async fn create1(
-        path: actix_web::web::Path<String>,
+        path: Path<String>,
         state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
@@ -219,7 +221,7 @@ mod create {
     }
 
     pub async fn create2(
-        path: actix_web::web::Path<(String, String)>,
+        path: Path<(String, String)>,
         state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
@@ -233,7 +235,7 @@ mod create {
     }
 
     pub async fn create3(
-        path: actix_web::web::Path<(String, String, String)>,
+        path: Path<(String, String, String)>,
         state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
@@ -253,24 +255,24 @@ mod create {
 mod apply {
     use super::{
         error, AppContext, CreateResponse, Data, Element, Fid, HttpResponse,
-        Json,
+        Json, Path,
     };
 
     pub async fn apply1(
-        path: actix_web::web::Path<String>,
+        path: Path<String>,
         state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {
         state
             .client
-            .apply(path.clone(), Fid::from(path.0), data.0)
+            .apply(path.clone(), Fid::from(path.into_inner()), data.0)
             .await
             .map_err(|e| error!("{:?}", e))
             .map(|r| CreateResponse::from(r).into())
     }
 
     pub async fn apply2(
-        path: actix_web::web::Path<(String, String)>,
+        path: Path<(String, String)>,
         state: Data<AppContext>,
         data: Json<Element>,
     ) -> Result<HttpResponse, ()> {

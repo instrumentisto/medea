@@ -10,20 +10,6 @@ pub use crate::media::DeviceVideoTrackConstraints;
 
 impl ForeignClass for DeviceVideoTrackConstraints {}
 
-impl From<u8> for FacingMode {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => FacingMode::User,
-            1 => FacingMode::Environment,
-            2 => FacingMode::Left,
-            3 => FacingMode::Right,
-            _ => {
-                unreachable!()
-            }
-        }
-    }
-}
-
 /// Creates new [`DeviceVideoTrackConstraints`] with none constraints
 /// configured.
 #[no_mangle]
@@ -51,11 +37,11 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_facing_mode(
     mut this: NonNull<DeviceVideoTrackConstraints>,
-    facing_mode: u8,
+    facing_mode: FacingMode,
 ) {
     let this = this.as_mut();
 
-    this.exact_facing_mode(FacingMode::try_from(facing_mode).unwrap());
+    this.exact_facing_mode(facing_mode);
 }
 
 /// Sets an ideal [facingMode][1] constraint.
@@ -64,11 +50,11 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_facing_mode(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_facing_mode(
     mut this: NonNull<DeviceVideoTrackConstraints>,
-    facing_mode: u8,
+    facing_mode: FacingMode,
 ) {
     let this = this.as_mut();
 
-    this.ideal_facing_mode(FacingMode::try_from(facing_mode).unwrap());
+    this.ideal_facing_mode(facing_mode);
 }
 
 /// Sets an exact [height][1] constraint.

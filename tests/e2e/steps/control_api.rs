@@ -4,7 +4,7 @@ use cucumber_rust::{then, when};
 use medea_control_api_mock::proto::{
     self as proto, AudioSettings, VideoSettings,
 };
-use tokio_1::time::timeout;
+use tokio::time::{sleep, timeout};
 
 use crate::world::{MembersPair, PairedMember, World};
 
@@ -180,7 +180,7 @@ async fn when_control_api_deletes_publish_endpoint(
     id: String,
 ) {
     world.delete_publish_endpoint(&id).await;
-    tokio_1::time::sleep(std::time::Duration::from_millis(200)).await;
+    sleep(Duration::from_millis(200)).await;
 }
 
 #[when(regex = r"^Control API deletes (\S+)'s play endpoint with (\S+)$")]
@@ -190,5 +190,5 @@ async fn when_control_api_deletes_play_endpoint(
     partner_id: String,
 ) {
     world.delete_play_endpoint(&id, &partner_id).await;
-    tokio_1::time::sleep(std::time::Duration::from_millis(200)).await;
+    sleep(Duration::from_millis(200)).await;
 }

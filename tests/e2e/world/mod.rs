@@ -14,7 +14,7 @@ use medea_control_api_mock::{
     proto,
     proto::PublishPolicy,
 };
-use tokio_1::time::interval;
+use tokio::time::interval;
 use uuid::Uuid;
 
 use crate::{

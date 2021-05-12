@@ -8,7 +8,7 @@ use fantoccini::{Client, ClientBuilder, Locator};
 use futures::lock::Mutex;
 use serde::Deserialize;
 use serde_json::{json, Value as Json};
-use tokio_1::{self as tokio, task};
+use tokio::task;
 use webdriver::{capabilities::Capabilities, common::WebWindow};
 
 use crate::conf;
