@@ -22,8 +22,8 @@ where
     fut.now_or_never().unwrap();
 }
 
-/// Extension trait for the [`Future`] which provides functions for converting
-/// [`Future`] to the Dart `Future`.
+/// Extension trait for the [`Future`] that provides functionality for
+/// converting Rust [`Future`]s to the Dart `Future`s.
 pub trait IntoDartFuture {
     /// Converts [`Future`] into a Dart `Future`.
     ///
@@ -41,8 +41,8 @@ where
     ///
     /// Returns [`Dart_Handle`] to the created Dart `Future`.
     ///
-    /// __Note that returned Dart `Future` will be executed immediately after
-    /// this function call, even if Dart side wouldn't poll this `Future`.__
+    /// __Note that the Dart `Future` execution begins immediately and  cannot
+    /// be canceled.__
     fn into_dart_future(self) -> Dart_Handle {
         let completer = Completer::new();
         let dart_future = completer.future();
