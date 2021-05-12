@@ -49,6 +49,8 @@ pub use dynamic_api::{
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
+///
+/// [`ActorFuture`]: actix::ActorFuture
 pub type ActFuture<O = ()> = LocalBoxActorFuture<Room, O>;
 
 #[derive(Debug, Display, Fail, From)]

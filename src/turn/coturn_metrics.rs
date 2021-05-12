@@ -30,6 +30,8 @@ use super::{
 const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
+///
+/// [`ActorFuture`]: actix::ActorFuture
 pub type ActFuture<O = ()> = LocalBoxActorFuture<CoturnMetricsService, O>;
 
 /// Service responsible for processing [`Peer`]'s metrics received
