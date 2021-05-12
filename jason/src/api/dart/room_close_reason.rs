@@ -1,4 +1,6 @@
-use std::{os::raw::c_char, ptr::NonNull};
+use std::ptr::NonNull;
+
+use libc::c_char;
 
 use super::{utils::string_into_c_str, ForeignClass};
 

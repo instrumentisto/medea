@@ -1,4 +1,6 @@
-use std::{convert::TryFrom, os::raw::c_char, ptr::NonNull};
+use std::{convert::TryFrom, ptr::NonNull};
+
+use libc::c_char;
 
 use crate::media::FacingMode;
 
