@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'jason.dart';
 import 'remote_media_track.dart';
 import 'util/move_semantic.dart';
+import 'ffi/native_string.dart';
 import 'util/nullable_pointer.dart';
 import 'util/result.dart';
 

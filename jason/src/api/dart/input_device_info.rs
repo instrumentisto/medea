@@ -1,6 +1,10 @@
-use std::{os::raw::c_char, ptr::NonNull};
+use std::ptr::NonNull;
+
+use libc::c_char;
 
 use super::{utils::string_into_c_str, ForeignClass};
+
+use crate::media::MediaKind;
 
 #[cfg(feature = "mockable")]
 pub use self::mock::InputDeviceInfo;
@@ -27,10 +31,10 @@ pub unsafe extern "C" fn InputDeviceInfo__device_id(
 #[no_mangle]
 pub unsafe extern "C" fn InputDeviceInfo__kind(
     this: NonNull<InputDeviceInfo>,
-) -> u8 {
+) -> MediaKind {
     let this = this.as_ref();
 
-    this.kind() as u8 // TODO: .into()
+    this.kind()
 }
 
 /// Returns label describing the represented device (for example "External USB

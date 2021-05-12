@@ -78,8 +78,11 @@ impl Actor for GracefulShutdown {
         use tokio::signal::unix::{signal, SignalKind};
 
         let mut register_sig = |kind: SignalKind, num: i32| match signal(kind) {
-            Ok(sig_stream) => {
-                ctx.add_message_stream(sig_stream.map(move |_| OsSignal(num)));
+            Ok(mut sig) => {
+                ctx.add_message_stream(
+                    stream::poll_fn(move |cx| sig.poll_recv(cx))
+                        .map(move |_| OsSignal(num)),
+                );
             }
             Err(e) => error!("Cannot register OsSignal: {:?}", e),
         };

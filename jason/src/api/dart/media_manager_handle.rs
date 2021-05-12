@@ -4,7 +4,7 @@ use dart_sys::Dart_Handle;
 
 use super::{
     media_stream_settings::MediaStreamSettings,
-    utils::{future_to_dart, PtrArray},
+    utils::{IntoDartFuture, PtrArray},
     ForeignClass,
 };
 
@@ -27,9 +27,10 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     let this = this.as_ref().clone();
     let caps = caps.as_ref().clone();
 
-    future_to_dart(async move {
+    async move {
         Ok(PtrArray::new(this.init_local_tracks(caps).await?))
-    })
+    }
+    .into_dart_future()
 }
 
 /// Returns a list of [`InputDeviceInfo`] objects representing available media
@@ -42,9 +43,7 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
-    future_to_dart(
-        async move { Ok(PtrArray::new(this.enumerate_devices().await?)) },
-    )
+    async move { Ok(PtrArray::new(this.enumerate_devices().await?)) }    .into_dart_future()
 }
 
 /// Frees the data behind the provided pointer.

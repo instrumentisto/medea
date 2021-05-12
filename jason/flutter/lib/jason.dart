@@ -5,11 +5,11 @@ import 'dart:io';
 
 import 'media_manager.dart';
 import 'room_handle.dart';
-import 'util/executor.dart';
+import 'ffi/executor.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/callback.dart' as callback;
-import 'util/completer.dart' as completer;
+import 'ffi/callback.dart' as callback;
+import 'ffi/completer.dart' as completer;
 
 typedef _new_C = Pointer Function();
 typedef _new_Dart = Pointer Function();

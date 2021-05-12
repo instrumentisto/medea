@@ -873,7 +873,7 @@ mod tests {
         },
         PeerId,
     };
-    use tokio::time::{delay_for, timeout};
+    use tokio::time::{sleep, timeout};
 
     use crate::{
         api::control::callback::{MediaDirection, MediaType},
@@ -1301,7 +1301,7 @@ mod tests {
                     video_recv: true,
                 }
             );
-            delay_for(Duration::from_millis(15)).await;
+            sleep(Duration::from_millis(15)).await;
             helper.add_stats(stats.0, stats.1, stats.2, stats.3, 200);
 
             let traffic_flow = timeout(
