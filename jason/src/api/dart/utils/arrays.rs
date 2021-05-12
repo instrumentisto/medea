@@ -1,6 +1,12 @@
 //! Functionality for passing arrays from Rust to Dart.
 
-use std::{ffi::c_void, marker::PhantomData, mem, ptr, slice};
+use std::{
+    ffi::c_void,
+    marker::PhantomData,
+    mem,
+    ptr::{self, NonNull},
+    slice,
+};
 
 use crate::api::ForeignClass;
 
@@ -97,6 +103,6 @@ impl<T> Drop for PtrArray<T> {
 /// elements, otherwise pointers will be lost and data behind pointers will stay
 /// leaked.
 #[no_mangle]
-pub unsafe extern "C" fn PtrArray_free(arr: *mut PtrArray) {
-    drop(Box::from_raw(arr));
+pub unsafe extern "C" fn PtrArray_free(arr: NonNull<PtrArray>) {
+    drop(Box::from_raw(arr.as_ptr()));
 }
