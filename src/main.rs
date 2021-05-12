@@ -2,7 +2,6 @@
 
 use actix::{Actor, System};
 use failure::Error;
-use futures::FutureExt as _;
 use medea::{
     api::{client::server::Server, control::grpc},
     conf::Conf,
@@ -28,50 +27,43 @@ fn main() -> Result<(), Error> {
     info!("{:?}", config);
 
     let sys = System::new();
-    actix::spawn(
-        async move {
-            let turn_service = new_turn_auth_service(&config.turn)?;
-            let graceful_shutdown =
-                GracefulShutdown::new(config.shutdown.timeout).start();
-            let app_context = AppContext::new(config.clone(), turn_service);
+    sys.block_on(async move {
+        let turn_service = new_turn_auth_service(&config.turn)?;
+        let graceful_shutdown =
+            GracefulShutdown::new(config.shutdown.timeout).start();
+        let app_context = AppContext::new(config.clone(), turn_service);
 
-            let room_repo = RoomRepository::new();
-            let room_service = RoomService::new(
-                room_repo.clone(),
-                app_context.clone(),
-                graceful_shutdown.clone(),
-            )?
-            .start();
+        let room_repo = RoomRepository::new();
+        let room_service = RoomService::new(
+            room_repo.clone(),
+            app_context.clone(),
+            graceful_shutdown.clone(),
+        )?
+        .start();
 
-            medea::api::control::start_static_rooms(&room_service).await?;
+        medea::api::control::start_static_rooms(&room_service).await?;
 
-            let (grpc_server_addr, grpc_server_fut) =
-                grpc::server::run(room_service, &app_context);
-            let server = Server::run(room_repo, config)?;
+        let (grpc_server_addr, grpc_server_fut) =
+            grpc::server::run(room_service, &app_context);
+        let server = Server::run(room_repo, config)?;
 
-            shutdown::subscribe(
-                &graceful_shutdown,
-                grpc_server_addr.recipient(),
-                shutdown::Priority(1),
-            );
+        shutdown::subscribe(
+            &graceful_shutdown,
+            grpc_server_addr.recipient(),
+            shutdown::Priority(1),
+        );
 
-            shutdown::subscribe(
-                &graceful_shutdown,
-                server.recipient(),
-                shutdown::Priority(1),
-            );
+        shutdown::subscribe(
+            &graceful_shutdown,
+            server.recipient(),
+            shutdown::Priority(1),
+        );
 
-            grpc_server_fut.await??;
+        grpc_server_fut.await??;
+        info!("Started medea system");
 
-            Ok(())
-        }
-        .map(|res: Result<(), Error>| match res {
-            Ok(_) => info!("Started system"),
-            Err(e) => {
-                error!("Startup error: {:?}", e);
-                System::current().stop();
-            }
-        }),
-    );
+        Ok(())
+    })
+    .map_err(|err: Error| err)?;
     sys.run().map_err(Into::into)
 }

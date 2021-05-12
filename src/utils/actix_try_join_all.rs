@@ -11,7 +11,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use actix::{fut::ActorFuture, Actor};
+use actix::{Actor, ActorFuture};
 
 /// Creates a future which represents either a collection of the results of the
 /// futures given or an error.

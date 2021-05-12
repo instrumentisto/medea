@@ -4,16 +4,15 @@
 
 use std::{
     collections::HashMap,
-    pin::Pin,
     sync::Arc,
     time::{Duration, Instant},
 };
 
 use actix::{
-    fut::Either, Actor, ActorFuture, ActorFutureExt as _, AsyncContext,
+    fut::LocalBoxActorFuture, Actor, ActorFutureExt as _, AsyncContext,
     StreamHandler, WrapFuture,
 };
-use futures::{channel::mpsc, StreamExt as _};
+use futures::{channel::mpsc, future, StreamExt as _};
 use redis::{ConnectionInfo, RedisError};
 
 use crate::{
@@ -31,8 +30,7 @@ use super::{
 const ALLOCATIONS_CHANNEL_PATTERN: &str = "turn/realm/*/user/*/allocation/*";
 
 /// Ergonomic type alias for using [`ActorFuture`] by [`CoturnMetricsService`].
-pub type ActFuture<O = ()> =
-    Pin<Box<dyn ActorFuture<CoturnMetricsService, Output = O>>>;
+pub type ActFuture<O = ()> = LocalBoxActorFuture<CoturnMetricsService, O>;
 
 /// Service responsible for processing [`Peer`]'s metrics received
 /// from Coturn.
@@ -117,13 +115,13 @@ impl CoturnMetricsService {
                     err
                 );
 
-                Either::Left(
+                future::Either::Left(
                     tokio::time::sleep(Duration::from_secs(1))
                         .into_actor(this)
                         .then(|_, this, _| this.connect_until_success()),
                 )
             } else {
-                Either::Right(async {}.into_actor(this))
+                future::Either::Right(future::ready(()))
             }
         }))
     }

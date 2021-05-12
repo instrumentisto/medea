@@ -4,7 +4,7 @@
 use std::{fmt, time::Duration};
 
 use crypto::{digest::Digest, md5::Md5};
-use deadpool::managed::Timeouts;
+use deadpool::{managed::Timeouts, Runtime};
 use deadpool_redis::{redis::cmd, Pool, PoolConfig, PoolError};
 use derive_more::{Display, From};
 use failure::Fail;
@@ -52,7 +52,7 @@ impl TurnDatabase {
                 create: Some(conn_timeout),
                 recycle: None,
             },
-            ..PoolConfig::default()
+            runtime: Runtime::Tokio1,
         };
         Ok(Self(Pool::from_config(manager, config)))
     }

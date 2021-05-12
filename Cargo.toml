@@ -75,7 +75,7 @@ url = "2.1"
     git = "https://github.com/bikeshedder/deadpool"
     rev = "8134ba16896a9149301ee9e2945744ba8210dad3"  # branch = "master"
     default-features = false
-    features = ["managed"]
+    features = ["managed", "rt_tokio_1"]
 [dependencies.deadpool-redis]
     # TODO: Switch to `version =` on next version bumb.
     git = "https://github.com/bikeshedder/deadpool"
