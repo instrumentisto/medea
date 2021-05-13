@@ -66,7 +66,7 @@ impl Task {
         poll
     }
 
-    /// Calls [`task_wake`] with provided reference.
+    /// Calls [`task_wake()`] with the provided reference.
     fn wake_by_ref(this: &Rc<Self>) {
         task_wake(Rc::as_ptr(this));
     }

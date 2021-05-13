@@ -48,19 +48,19 @@ class ReconnectHandle {
   /// Tries to reconnect a `Room` in a loop with a growing backoff delay.
   ///
   /// The first attempt to reconnect is guaranteed to happen not earlier than
-  /// `starting_delay_ms`.
+  /// [starting_delay_ms].
   ///
   /// Also, it guarantees that delay between reconnection attempts won't be
-  /// greater than `max_delay_ms`.
+  /// greater than [max_delay_ms].
   ///
   /// After each reconnection attempt, delay between reconnections will be
-  /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
+  /// multiplied by the given [multiplier] until it reaches [max_delay_ms].
   ///
   /// If the `Room` is already reconnecting then new reconnection attempt won't
   /// be performed. Instead, it will wait for the first reconnection attempt
   /// result and use it here.
   ///
-  /// If `multiplier` is negative number then `multiplier` will be considered as
+  /// If [multiplier] is negative number then [multiplier] will be considered as
   /// `0.0`.
   Future<void> reconnectWithBackoff(
       int startingDelayMs, double multiplier, int maxDelay) async {

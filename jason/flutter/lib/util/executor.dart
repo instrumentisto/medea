@@ -11,6 +11,8 @@ typedef _executorDropTask_C = Void Function(Pointer);
 typedef _executorDropTask_Dart = void Function(Pointer);
 
 /// Executor used to drive Rust futures.
+///
+/// It must be instantiated before calling any `async` Rust functions.
 class Executor {
   /// Pointer to a Rust function used to initialize Rust side of an [Executor].
   final _executorInit_Dart _loopInit;
@@ -46,8 +48,8 @@ class Executor {
 
   /// Polls a Rust future.
   ///
-  /// Calls [_taskPoll] with provided [message]. Drops task with [_taskDrop] if
-  /// poll returns `false`.
+  /// Poll a Rust future based on the provided [message]. Drops that Future if
+  /// it is done.
   void _pollTask(dynamic message) {
     final task = Pointer.fromAddress(message);
 

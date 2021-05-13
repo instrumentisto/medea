@@ -157,17 +157,17 @@ class RoomHandle {
     }
   }
 
-  /// Updates this `Room`'s `MediaStreamSettings`. This affects all the
-  /// `PeerConnection`s in this `Room`. If `MediaStreamSettings` are
-  /// configured for some `Room`, then this `Room` can only send media tracks
-  /// that correspond to these settings. [MediaStreamSettings] update will
-  /// change media tracks in all sending peers, so that might cause a new
+  /// Updates this `Room`'s [MediaStreamSettings]. This affects all the
+  /// `PeerConnection`s in this `Room`. If [MediaStreamSettings] are configured
+  /// for some `Room`, then this `Room` can only send media tracks that
+  /// correspond to these settings. [MediaStreamSettings] update will change
+  /// media tracks in all sending peers, so that might cause a new
   /// [getUserMedia()][1] request to happen.
   ///
   /// Media obtaining/injection errors are additionally fired to
   /// [RoomHandle.onFailedLocalMedia()] callback.
   ///
-  /// If [stop_first] set to `true` then affected local [LocalMediaTrack] will
+  /// If [stop_first] set to `true` then affected local [LocalMediaTrack]s will
   /// be dropped before new [MediaStreamSettings] are applied. This is usually
   /// required when changing video source device due to hardware limitations,
   /// e.g. having an active track sourced from device `A` may hinder

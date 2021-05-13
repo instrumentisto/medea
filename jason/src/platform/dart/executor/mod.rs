@@ -22,7 +22,7 @@ pub fn spawn(future: impl Future<Output = ()> + 'static) {
 /// A [`Dart_Port`] used to send [`Task`]'s poll commands so Dart will poll
 /// Rust's futures.
 ///
-/// Must be initialized with [`rust_executor_init`] during FFI initialization.
+/// Must be initialized with [`rust_executor_init()`] during FFI initialization.
 static mut WAKE_PORT: Option<Dart_Port> = None;
 
 /// Initialize dart-driven async task executor.
@@ -47,7 +47,7 @@ pub unsafe extern "C" fn rust_executor_init(wake_port: Dart_Port) {
 /// # Safety
 ///
 /// Valid [`Task`] pointer must be provided. Must not be called if the
-/// provided [`Task`] was dropped (with [`rust_executor_drop_task`]).
+/// provided [`Task`] was dropped (with [`rust_executor_drop_task()`]).
 #[no_mangle]
 pub unsafe extern "C" fn rust_executor_poll_task(task: *mut Task) -> bool {
     let task = task.as_mut().unwrap();
@@ -75,7 +75,7 @@ pub unsafe extern "C" fn rust_executor_drop_task(task: *const Task) {
 ///
 /// Sends command that contains the provided [`Task`] to the configured
 /// [`WAKE_PORT`]. When received, Dart must poll it by calling
-/// [`rust_executor_poll_task`].
+/// [`rust_executor_poll_task()`].
 fn task_wake(task: *const Task) {
     let wake_port = unsafe { WAKE_PORT }.unwrap();
 
