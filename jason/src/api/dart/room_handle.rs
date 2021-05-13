@@ -42,28 +42,28 @@ pub unsafe extern "C" fn RoomHandle__join(
     .into_dart_future()
 }
 
-/// Updates this [`Room`]'s [`MediaStreamSettings`]. This affects all
-/// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+/// Updates this [`Room`]'s [`MediaStreamSettings`]. This affects all the
+/// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] are
 /// configured for some [`Room`], then this [`Room`] can only send media tracks
-/// that correspond to this settings. [`MediaStreamSettings`] update will change
-/// media tracks in all sending peers, so that might cause new
-/// [getUserMedia()][1] request.
+/// that correspond to these settings. [`MediaStreamSettings`] update will
+/// change media tracks in all sending peers, so that might cause a new
+/// [getUserMedia()][1] request to happen.
 ///
 /// Media obtaining/injection errors are additionally fired to
 /// `on_failed_local_media` callback.
 ///
 /// If `stop_first` set to `true` then affected local `Tracks` will be
-/// dropped before new [`MediaStreamSettings`] is applied. This is usually
+/// dropped before new [`MediaStreamSettings`] are applied. This is usually
 /// required when changing video source device due to hardware limitations,
 /// e.g. having an active track sourced from device `A` may hinder
 /// [getUserMedia()][1] requests to device `B`.
 ///
-/// `rollback_on_fail` option configures [`MediaStreamSettings`] update
-/// request to automatically rollback to previous settings if new settings
-/// cannot be applied.
+/// `rollback_on_fail` option configures [`MediaStreamSettings`] update request
+/// to automatically rollback to previous settings if new settings cannot be
+/// applied.
 ///
-/// If recovering from fail state isn't possible then affected media types
-/// will be disabled.
+/// If recovering from fail state isn't possible then affected media types will
+/// be disabled.
 ///
 /// [`Room`]: crate::room::Room
 /// [`PeerConnection`]: crate::peer::PeerConnection
@@ -125,24 +125,6 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
     .into_dart_future()
 }
 
-/// Disables outbound audio in this [`Room`].
-///
-/// [`Room`]: crate::room::Room
-#[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_audio(
-    this: *mut RoomHandle,
-) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
-
-    async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        this.disable_audio().await.unwrap();
-        Ok::<_, ()>(())
-    }
-    .into_dart_future()
-}
-
 /// Enables outbound audio in this [`Room`].
 ///
 /// [`Room`]: crate::room::Room
@@ -156,6 +138,24 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.enable_audio().await.unwrap();
+        Ok::<_, ()>(())
+    }
+    .into_dart_future()
+}
+
+/// Disables outbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__disable_audio(
+    this: *mut RoomHandle,
+) -> Dart_Handle {
+    let this = this.as_ref().unwrap().clone();
+
+    async move {
+        // TODO: Remove unwrap when propagating errors from Rust to Dart is
+        //       implemented.
+        this.disable_audio().await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -205,26 +205,6 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
     .into_dart_future()
 }
 
-/// Disables outbound video.
-///
-/// Affects only video with specific [`MediaSourceKind`] if specified.
-#[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_video(
-    this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
-) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
-
-    async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        this.disable_video(Some(source_kind)).await.unwrap();
-        Ok::<_, ()>(())
-    }
-    .into_dart_future()
-}
-
 /// Enables outbound video.
 ///
 /// Affects only video with specific [`MediaSourceKind`] if specified.
@@ -240,6 +220,26 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.enable_video(Some(source_kind)).await.unwrap();
+        Ok::<_, ()>(())
+    }
+    .into_dart_future()
+}
+
+/// Disables outbound video.
+///
+/// Affects only video with specific [`MediaSourceKind`] if specified.
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__disable_video(
+    this: *mut RoomHandle,
+    source_kind: u8, // TODO: `source_kind` might be None.
+) -> Dart_Handle {
+    let this = this.as_ref().unwrap().clone();
+    let source_kind = MediaSourceKind::from(source_kind);
+
+    async move {
+        // TODO: Remove unwrap when propagating errors from Rust to Dart is
+        //       implemented.
+        this.disable_video(Some(source_kind)).await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -281,24 +281,6 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
     .into_dart_future()
 }
 
-/// Disables inbound video in this [`Room`].
-///
-/// [`Room`]: crate::room::Room
-#[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_remote_video(
-    this: *mut RoomHandle,
-) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
-
-    async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        this.disable_remote_video().await.unwrap();
-        Ok::<_, ()>(())
-    }
-    .into_dart_future()
-}
-
 /// Enables inbound video in this [`Room`].
 ///
 /// [`Room`]: crate::room::Room
@@ -312,6 +294,24 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.enable_remote_video().await.unwrap();
+        Ok::<_, ()>(())
+    }
+    .into_dart_future()
+}
+
+/// Disables inbound video in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__disable_remote_video(
+    this: *mut RoomHandle,
+) -> Dart_Handle {
+    let this = this.as_ref().unwrap().clone();
+
+    async move {
+        // TODO: Remove unwrap when propagating errors from Rust to Dart is
+        //       implemented.
+        this.disable_remote_video().await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -478,6 +478,14 @@ mod mock {
             Ok(())
         }
 
+        pub async fn enable_audio(&self) -> Result<(), JasonError> {
+            Ok(())
+        }
+
+        pub async fn disable_audio(&self) -> Result<(), JasonError> {
+            Ok(())
+        }
+
         pub async fn mute_video(
             &self,
             _source_kind: Option<MediaSourceKind>,
@@ -492,11 +500,10 @@ mod mock {
             Ok(())
         }
 
-        pub async fn disable_audio(&self) -> Result<(), JasonError> {
-            Ok(())
-        }
-
-        pub async fn enable_audio(&self) -> Result<(), JasonError> {
+        pub async fn enable_video(
+            &self,
+            _source_kind: Option<MediaSourceKind>,
+        ) -> Result<(), JasonError> {
             Ok(())
         }
 
@@ -507,10 +514,7 @@ mod mock {
             Ok(())
         }
 
-        pub async fn enable_video(
-            &self,
-            _source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), JasonError> {
+        pub async fn enable_remote_audio(&self) -> Result<(), JasonError> {
             Ok(())
         }
 
@@ -518,15 +522,11 @@ mod mock {
             Ok(())
         }
 
-        pub async fn disable_remote_video(&self) -> Result<(), JasonError> {
-            Ok(())
-        }
-
-        pub async fn enable_remote_audio(&self) -> Result<(), JasonError> {
-            Ok(())
-        }
-
         pub async fn enable_remote_video(&self) -> Result<(), JasonError> {
+            Ok(())
+        }
+
+        pub async fn disable_remote_video(&self) -> Result<(), JasonError> {
             Ok(())
         }
     }
