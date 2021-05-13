@@ -6,8 +6,8 @@ import 'local_media_track.dart';
 import 'media_stream_settings.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/ptrarray.dart';
-import 'util/result.dart';
+import 'ffi/ptrarray.dart';
+import 'ffi/result.dart';
 
 typedef _initLocalTracks_C = Handle Function(Pointer, Pointer);
 typedef _initLocalTracks_Dart = Object Function(Pointer, Pointer);
@@ -51,11 +51,12 @@ class MediaManagerHandle {
   /// Throws [RustException] if Rust returns error.
   Future<List<LocalMediaTrack>> initLocalTracks(
       MediaStreamSettings caps) async {
-    PtrArray tracks =
+    Pointer tracks =
         await (_initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
                 as Future)
             .catchError(futureErrorCatcher);
     return tracks
+        .cast<PtrArray>()
         .intoPointerList()
         .map((e) => LocalMediaTrack(NullablePointer(e)))
         .toList();
@@ -66,9 +67,10 @@ class MediaManagerHandle {
   ///
   /// Throws [RustException] if Rust returns error.
   Future<List<InputDeviceInfo>> enumerateDevices() async {
-    var fut = _enumerateDevices(ptr.getInnerPtr()) as Future;
-    PtrArray devices = await fut.catchError(futureErrorCatcher);
-    return devices
+    Pointer pointer = await (_enumerateDevices(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
+    return pointer
+        .cast<PtrArray>()
         .intoPointerList()
         .map((e) => InputDeviceInfo(NullablePointer(e)))
         .toList();

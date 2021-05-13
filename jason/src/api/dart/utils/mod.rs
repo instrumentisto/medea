@@ -1,4 +1,5 @@
 mod arrays;
+mod errs;
 mod result;
 mod string;
 
@@ -7,35 +8,50 @@ use std::future::Future;
 use dart_sys::Dart_Handle;
 
 use crate::{
-    api::{dart::JasonError, DartValue},
+    api::DartValue,
     platform::{spawn, utils::Completer},
 };
 
 pub use self::{
     arrays::PtrArray,
+    errs::{new_handler_detached_error, DartError},
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},
 };
 
-/// Converts provided [`Future`] to the Dart `Future`.
-///
-/// Returns [`Dart_Handle`] to the created Dart `Future`.
-pub fn future_to_dart<F, T>(f: F) -> Dart_Handle
+/// Extension trait for the [`Future`] that provides functionality for
+/// converting Rust [`Future`]s to the Dart `Future`s.
+pub trait IntoDartFuture {
+    /// Converts [`Future`] into a Dart `Future`.
+    ///
+    /// Returns [`Dart_Handle`] to the created Dart `Future`.
+    fn into_dart_future(self) -> Dart_Handle;
+}
+
+impl<F, T> IntoDartFuture for F
 where
-    F: Future<Output = Result<T, JasonError>> + 'static,
+    F: Future<Output = Result<T, DartError>> + 'static,
     T: Into<DartValue> + 'static,
 {
-    let completer = Completer::new();
-    let dart_future = completer.future();
-    spawn(async move {
-        match f.await {
-            Ok(ok) => {
-                completer.complete(ok);
+    /// Converts this [`Future`] into a Dart `Future`.
+    ///
+    /// Returns [`Dart_Handle`] to the created Dart `Future`.
+    ///
+    /// __Note that the Dart `Future` execution begins immediately and  cannot
+    /// be canceled.__
+    fn into_dart_future(self) -> Dart_Handle {
+        let completer = Completer::new();
+        let dart_future = completer.future();
+        spawn(async move {
+            match self.await {
+                Ok(ok) => {
+                    completer.complete(ok);
+                }
+                Err(e) => {
+                    completer.complete_error(e);
+                }
             }
-            Err(e) => {
-                completer.complete_error(e);
-            }
-        }
-    });
-    dart_future
+        });
+        dart_future
+    }
 }

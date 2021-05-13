@@ -4,7 +4,7 @@ import 'jason.dart';
 import 'remote_media_track.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/result.dart';
+import 'ffi/result.dart';
 
 typedef _getRemoteMemberId_C = Result Function(Pointer);
 typedef _getRemoteMemberId_Dart = Result Function(Pointer);

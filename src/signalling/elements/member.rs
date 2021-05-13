@@ -107,7 +107,7 @@ struct MemberInner {
 }
 
 impl Member {
-    /// Creates new empty [`Member`].
+    /// Creates a new empty [`Member`].
     ///
     /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
@@ -137,10 +137,11 @@ impl Member {
 
     /// Lookups [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
     ///
-    /// Returns [`MembersLoadError::MemberNotFound`] when member not found.
+    /// # Errors
     ///
-    /// Returns [`MembersLoadError::TryFromError`] when found element which is
-    /// not [`MemberSpec`].
+    /// - [`MembersLoadError::MemberNotFound`] when member not found.
+    /// - [`MembersLoadError::TryFromError`] when found element which is not
+    ///   [`MemberSpec`].
     fn get_member_from_room_spec(
         &self,
         room_spec: &RoomSpec,
@@ -162,7 +163,13 @@ impl Member {
     }
 
     /// Loads all sources and sinks of this [`Member`].
-    fn load(
+    ///
+    /// # Errors
+    ///
+    /// - [`MembersLoadError::MemberNotFound`] when [`Member`] not found.
+    /// - [`MembersLoadError::TryFromError`] when found element which is not
+    ///   [`MemberSpec`].
+    pub fn load(
         &self,
         room_spec: &RoomSpec,
         store: &HashMap<MemberId, Self>,

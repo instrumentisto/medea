@@ -10,7 +10,7 @@ import 'reconnect_handle.dart';
 import 'room_close_reason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/result.dart';
+import 'ffi/result.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);

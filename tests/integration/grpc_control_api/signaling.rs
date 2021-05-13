@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use actix::{Arbiter, Context};
+use actix::Context;
 use function_name::named;
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::Event;
@@ -310,13 +310,13 @@ async fn peers_removed_on_delete_member() {
                 peers_created.set(peers_created.get() + 1);
                 if peers_created.get() == 2 {
                     let client = control_client.clone();
-                    Arbiter::spawn(async move {
+                    drop(actix::spawn(async move {
                         client
                             .borrow_mut()
                             .delete(&[&format!("{}/responder", test_name!())])
                             .await
                             .unwrap();
-                    })
+                    }))
                 }
             }
             Event::PeersRemoved { .. } => {

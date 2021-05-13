@@ -1,9 +1,11 @@
 use std::ptr::NonNull;
 
 use dart_sys::Dart_Handle;
+use tracerr::Traced;
 
 use crate::{
-    api::{dart::utils::DartResult, JasonError},
+    api::dart::utils::{new_handler_detached_error, DartError, DartResult},
+    connection::ConnectionError,
     platform,
 };
 
@@ -16,6 +18,18 @@ pub use crate::connection::ConnectionHandle;
 
 impl ForeignClass for ConnectionHandle {}
 
+impl From<Traced<ConnectionError>> for DartError {
+    fn from(err: Traced<ConnectionError>) -> Self {
+        let (err, stacktrace) = err.into_parts();
+        let stacktrace = stacktrace.to_string();
+        match err {
+            ConnectionError::Detached => unsafe {
+                new_handler_detached_error(stacktrace)
+            },
+        }
+    }
+}
+
 /// Sets callback, invoked when this `Connection` will close.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_close(
@@ -25,7 +39,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
     let this = this.as_ref();
 
     this.on_close(platform::Function::new(f))
-        .map_err(JasonError::from)
+        .map_err(DartError::from)
         .into()
 }
 
@@ -42,7 +56,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     let this = this.as_ref();
 
     this.on_remote_track_added(platform::Function::new(f))
-        .map_err(JasonError::from)
+        .map_err(DartError::from)
         .into()
 }
 
@@ -56,7 +70,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
     let this = this.as_ref();
 
     this.on_quality_score_update(platform::Function::new(f))
-        .map_err(JasonError::from)
+        .map_err(DartError::from)
         .into()
 }
 
@@ -68,7 +82,7 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     let this = this.as_ref();
 
     this.get_remote_member_id()
-        .map_err(JasonError::from)
+        .map_err(DartError::from)
         .map(string_into_c_str)
         .into()
 }
@@ -88,8 +102,10 @@ pub unsafe extern "C" fn ConnectionHandle__free(
 
 #[cfg(feature = "mockable")]
 mod mock {
+    use tracerr::Traced;
+
     use crate::{
-        api::{JasonError, RemoteMediaTrack},
+        api::RemoteMediaTrack,
         connection::{
             ConnectionError, ConnectionHandle as CoreConnectionHandle,
         },
@@ -106,14 +122,16 @@ mod mock {
 
     #[allow(clippy::missing_errors_doc)]
     impl ConnectionHandle {
-        pub fn get_remote_member_id(&self) -> Result<String, JasonError> {
+        pub fn get_remote_member_id(
+            &self,
+        ) -> Result<String, Traced<ConnectionError>> {
             Err(tracerr::new!(ConnectionError::Detached).into())
         }
 
         pub fn on_close(
             &self,
             f: platform::Function<()>,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ConnectionError>> {
             f.call0();
             Ok(())
         }
@@ -121,7 +139,7 @@ mod mock {
         pub fn on_remote_track_added(
             &self,
             f: platform::Function<RemoteMediaTrack>,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ConnectionError>> {
             f.call1(RemoteMediaTrack);
             Ok(())
         }
@@ -129,7 +147,7 @@ mod mock {
         pub fn on_quality_score_update(
             &self,
             f: platform::Function<u8>,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ConnectionError>> {
             f.call1(4);
             Ok(())
         }

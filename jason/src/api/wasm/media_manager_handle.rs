@@ -12,7 +12,7 @@ use crate::{
     media,
 };
 
-use super::JasonError;
+use super::Error;
 
 /// [`MediaManagerHandle`] is a weak reference to a [`MediaManager`].
 ///
@@ -58,7 +58,7 @@ impl MediaManagerHandle {
                         })
                         .into()
                 })
-                .map_err(JasonError::from)
+                .map_err(Error::from)
                 .map_err(JsValue::from)
         })
     }
@@ -83,7 +83,7 @@ impl MediaManagerHandle {
                         })
                         .into()
                 })
-                .map_err(JasonError::from)
+                .map_err(Error::from)
                 .map_err(JsValue::from)
         })
     }

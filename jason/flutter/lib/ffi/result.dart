@@ -2,7 +2,8 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-import 'ptrarray.dart';
+import 'foreign_value.dart';
+import 'native_string.dart';
 
 /// Catcher for the [Future.catchError] which will convert [Error] received from Rust to [RustException].
 ///
@@ -51,58 +52,35 @@ class RustException implements Exception {
   }
 }
 
-/// Result of Rust function call.
 class Result extends Struct {
-  /// Boolean which indicates execution result.
-  ///
-  /// If it 0 then [Result] is successful, otherwise execution result is failure
+  /// Index of the [DartValueFields] union field. `0` goes for `Void`.
   @Uint8()
-  external int _isOk;
+  external int _tag;
 
-  /// Type of the success value.
+  /// Actual [ForeignValue] payload.
+  external ResultFields _payload;
+
+  /// Returns Dart representation of the underlying foreign value.
   ///
-  /// Based on this value, Dart will determine which of success values it should return.
-  @Uint8()
-  external int _okType;
-
-  /// Success value for [Result] with [Pointer] type.
-  external Pointer _ptrOk;
-
-  /// Success value for [Result] with [PtrArray] type.
-  external PtrArray _arrOk;
-
-  /// Success value for [Result] with [Pointer] for [Utf8] type.
-  external Pointer<Utf8> _strOk;
-
-  /// Success value for [Result] with [int] type.
-  @Int64()
-  external int _intOk;
-
-  /// Error value for [Result].
-  external Error _error;
-
-  /// Returns contained `Ok` value.
-  ///
-  /// If [Result] is failure, then this function will throw [RustException] with received [Error].
+  /// Returns `null` if underlying value is `void` or `()`.
   dynamic unwrap() {
-    if (_isOk == 1) {
-      switch (_okType) {
-        case 0:
-          return;
-        case 1:
-          return _ptrOk;
-        case 2:
-          return _strOk.toDartString();
-        case 3:
-          return _arrOk;
-        case 4:
-          return _intOk;
-      }
+    if (_tag == 0) {
+      return _payload.ok.toDart();
     } else {
-      throw RustException(_error._name.toDartString(),
-          _error._message.toDartString(), _error._stacktrace.toDartString());
+      throw RustException(
+          _payload.err._name.nativeStringToDartString(),
+          _payload.err._message.nativeStringToDartString(),
+          _payload.err._stacktrace.nativeStringToDartString());
     }
   }
+}
+
+class ResultFields extends Union {
+  /// Success [ForeignValue].
+  external ForeignValue ok;
+
+  /// [Error] value.
+  external Error err;
 }
 
 /// Error which can be returned from the Rust side.

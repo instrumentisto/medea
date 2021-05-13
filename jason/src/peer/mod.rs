@@ -26,7 +26,6 @@ use medea_macro::dispatchable;
 use tracerr::Traced;
 
 use crate::{
-    api::JasonError,
     connection::Connections,
     media::{
         track::{local, remote},
@@ -195,7 +194,7 @@ pub enum PeerEvent {
     /// `on_failed_local_stream` callback should be called.
     FailedLocalMedia {
         /// Reasons of local media updating fail.
-        error: JasonError,
+        error: Traced<PeerError>,
     },
 
     /// [`Component`] generated a new SDP answer.
@@ -709,9 +708,7 @@ impl PeerConnection {
     ) -> Result<HashMap<TrackId, media_exchange_state::Stable>> {
         self.inner_update_local_stream(criteria).await.map_err(|e| {
             drop(self.peer_events_sender.unbounded_send(
-                PeerEvent::FailedLocalMedia {
-                    error: JasonError::from(e.clone()),
-                },
+                PeerEvent::FailedLocalMedia { error: e.clone() },
             ));
             e
         })

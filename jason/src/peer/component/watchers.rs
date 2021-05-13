@@ -153,9 +153,7 @@ impl Component {
             Ok(sender) => sender,
             Err(e) => {
                 drop(peer.peer_events_sender.unbounded_send(
-                    PeerEvent::FailedLocalMedia {
-                        error: e.clone().into(),
-                    },
+                    PeerEvent::FailedLocalMedia { error: e.clone() },
                 ));
                 return Err(e);
             }

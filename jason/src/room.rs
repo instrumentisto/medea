@@ -23,7 +23,6 @@ use tracerr::Traced;
 
 use crate::{
     api,
-    api::JasonError,
     connection::Connections,
     media::{
         track::{local, remote},
@@ -376,7 +375,7 @@ impl RoomHandle {
     /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
     pub fn on_failed_local_media(
         &self,
-        f: platform::Function<api::JasonError>,
+        f: platform::Function<api::Error>,
     ) -> Result<(), Traced<RoomError>> {
         upgrade_inner!(self.0)
             .map(|inner| inner.on_failed_local_media.set_func(f))
@@ -954,7 +953,7 @@ struct InnerRoom {
 
     /// Callback invoked when failed obtain [`local::Track`]s from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_media: Rc<platform::Callback<api::JasonError>>,
+    on_failed_local_media: Rc<platform::Callback<api::Error>>,
 
     /// Callback invoked when a [`RpcSession`] loses connection.
     on_connection_loss: platform::Callback<api::ReconnectHandle>,
@@ -1363,12 +1362,13 @@ impl InnerRoom {
                 .get_tracks(req)
                 .await
                 .map_err(tracerr::map_from_and_wrap!())
-                .map_err(|e| {
+                .map_err(|e: Traced<MediaManagerError>| {
                     self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
+                        .call1(api::Error::from(e.clone()));
 
                     e
-                })?;
+                })
+                .map_err(tracerr::map_from_and_wrap!())?;
             for (track, is_new) in tracks {
                 if is_new {
                     self.on_local_track
@@ -1599,13 +1599,7 @@ impl EventHandler for InnerRoom {
             Some(negotiation_role),
         );
         for track in &tracks {
-            peer_state
-                .insert_track(track, self.send_constraints.clone())
-                .map_err(|e| {
-                    self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
-                    tracerr::map_from_and_new!(e)
-                })?;
+            peer_state.insert_track(track, self.send_constraints.clone());
         }
 
         self.peers.state().insert(peer_id, peer_state);
@@ -1692,12 +1686,7 @@ impl EventHandler for InnerRoom {
         for update in updates {
             match update {
                 PeerUpdate::Added(track) => peer_state
-                    .insert_track(&track, self.send_constraints.clone())
-                    .map_err(|e| {
-                        self.on_failed_local_media
-                            .call1(JasonError::from(e.clone()));
-                        tracerr::map_from_and_new!(e)
-                    })?,
+                    .insert_track(&track, self.send_constraints.clone()),
                 PeerUpdate::Updated(patch) => peer_state.patch_track(&patch),
                 PeerUpdate::IceRestart => {
                     peer_state.restart_ice();
@@ -1858,9 +1847,13 @@ impl PeerEventHandler for InnerRoom {
 
     /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
     /// `on_failed_local_media` [`Room`]'s callback.
-    async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
-        self.on_failed_local_media.call1(error);
-        Ok(())
+    async fn on_failed_local_media(
+        &self,
+        _error: Traced<PeerError>,
+    ) -> Self::Output {
+        // self.on_failed_local_media.call1(api::Error::from(error));
+        // Ok(())
+        todo!()
     }
 
     /// Handles [`PeerEvent::NewSdpOffer`] event by sending

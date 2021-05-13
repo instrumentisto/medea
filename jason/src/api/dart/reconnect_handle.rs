@@ -1,10 +1,14 @@
 use std::ptr::NonNull;
 
 use dart_sys::Dart_Handle;
+use tracerr::Traced;
 
-use crate::api::dart::utils::future_to_dart;
+use crate::{api::dart::utils::IntoDartFuture, rpc::ReconnectError};
 
-use super::ForeignClass;
+use super::{
+    utils::{new_handler_detached_error, DartError},
+    ForeignClass,
+};
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ReconnectHandle;
@@ -12,6 +16,22 @@ pub use self::mock::ReconnectHandle;
 pub use crate::rpc::ReconnectHandle;
 
 impl ForeignClass for ReconnectHandle {}
+
+impl From<Traced<ReconnectError>> for DartError {
+    fn from(err: Traced<ReconnectError>) -> Self {
+        let (err, stacktrace) = err.into_parts();
+        let stacktrace = stacktrace.to_string();
+
+        match err {
+            ReconnectError::Session(_) => {
+                todo!()
+            }
+            ReconnectError::Detached => unsafe {
+                new_handler_detached_error(stacktrace)
+            },
+        }
+    }
+}
 
 /// Tries to reconnect after the provided delay in milliseconds.
 ///
@@ -28,10 +48,11 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
-    future_to_dart(async move {
+    async move {
         this.reconnect_with_delay(delay_ms as u32).await?;
         Ok(())
-    })
+    }
+    .into_dart_future()
 }
 
 /// Tries to reconnect [`Room`] in a loop with a growing backoff delay.
@@ -63,7 +84,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
-    future_to_dart(async move {
+    async move {
         this.reconnect_with_backoff(
             starting_delay as u32,
             multiplier,
@@ -71,7 +92,8 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         )
         .await?;
         Ok(())
-    })
+    }
+    .into_dart_future()
 }
 
 /// Frees the data behind the provided pointer.
@@ -87,9 +109,9 @@ pub unsafe extern "C" fn ReconnectHandle__free(this: NonNull<ReconnectHandle>) {
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use crate::{
-        api::dart::JasonError, rpc::ReconnectHandle as CoreReconnectHandle,
-    };
+    use tracerr::Traced;
+
+    use crate::rpc::{ReconnectError, ReconnectHandle as CoreReconnectHandle};
 
     #[derive(Clone)]
     pub struct ReconnectHandle;
@@ -104,7 +126,7 @@ mod mock {
         pub async fn reconnect_with_delay(
             &self,
             _delay_ms: u32,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }
 
@@ -113,7 +135,7 @@ mod mock {
             _starting_delay_ms: u32,
             _multiplier: f32,
             _max_delay: u32,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }
     }

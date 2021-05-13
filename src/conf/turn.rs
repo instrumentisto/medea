@@ -2,6 +2,7 @@
 
 use std::{borrow::Cow, time::Duration};
 
+use deadpool::Runtime;
 use redis::ConnectionInfo;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
@@ -186,22 +187,15 @@ impl From<PoolConfig> for deadpool::managed::PoolConfig {
         Self {
             max_size: cfg.max_size,
             timeouts: deadpool::managed::Timeouts {
-                wait: if cfg.wait_timeout.as_nanos() == 0 {
-                    None
-                } else {
-                    Some(cfg.wait_timeout)
-                },
-                create: if cfg.connect_timeout.as_nanos() == 0 {
-                    None
-                } else {
-                    Some(cfg.connect_timeout)
-                },
-                recycle: if cfg.recycle_timeout.as_nanos() == 0 {
-                    None
-                } else {
-                    Some(cfg.recycle_timeout)
-                },
+                wait: (cfg.wait_timeout.as_nanos() != 0)
+                    .then(|| cfg.wait_timeout),
+                create: (cfg.connect_timeout.as_nanos() != 0)
+                    .then(|| cfg.connect_timeout),
+                recycle: (cfg.recycle_timeout.as_nanos() != 0)
+                    .then(|| cfg.recycle_timeout),
             },
+
+            runtime: Runtime::Tokio1,
         }
     }
 }

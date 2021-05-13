@@ -228,14 +228,15 @@ impl State {
     ///
     /// Returns [`MediaConnectionsError::CannotDisableRequiredSender`] if this
     /// [`Sender`] cannot be disabled.
+    #[must_use]
     pub fn new(
         id: TrackId,
         mid: Option<String>,
         media_type: MediaType,
         receivers: Vec<MemberId>,
         send_constraints: LocalTracksConstraints,
-    ) -> Result<Self> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             id,
             mid,
             media_type,
@@ -252,7 +253,7 @@ impl State {
             sync_state: ObservableCell::new(SyncState::Synced),
             send_constraints,
             local_track_state: ObservableCell::new(LocalTrackState::Stable),
-        })
+        }
     }
 
     /// Indicates whether this [`Sender`]'s media exchange state is in

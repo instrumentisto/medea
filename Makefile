@@ -23,7 +23,7 @@ IMAGE_NAME := $(strip \
 
 RUST_VER := 1.52
 CHROME_VERSION := 90.0
-FIREFOX_VERSION := 88.0
+FIREFOX_VERSION := 88.0.1
 
 CARGO_NDK_VER := 2.3.0-ndkr22b-rust$(RUST_VER)
 ANDROID_TARGETS := aarch64-linux-android \
@@ -497,7 +497,7 @@ ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
 	$(if $(call eq,$(docs-rust-crate),@all),\
-		cargo doc --all,\
+		cargo doc --workspace,\
 		cd $(crate-dir)/ && cargo doc)\
 			--no-deps \
 			$(if $(call eq,$(dev),yes),--document-private-items,) \
@@ -667,8 +667,8 @@ release.crates:
 ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-control-api-proto medea-coturn-telnet-client medea-macro medea-reactive),)
 	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
-		cargo +beta publish --token $(release-crates-token) ,\
-		cargo +beta package --allow-dirty )
+		cargo publish --token $(release-crates-token) ,\
+		cargo package --allow-dirty )
 endif
 
 

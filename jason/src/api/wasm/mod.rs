@@ -26,7 +26,7 @@ pub use self::{
     constraints_update_exception::ConstraintsUpdateException,
     input_device_info::InputDeviceInfo,
     jason::Jason,
-    jason_error::JasonError,
+    jason_error::JasonError as Error,
     local_media_track::LocalMediaTrack,
     media_manager_handle::MediaManagerHandle,
     media_stream_settings::{

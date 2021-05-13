@@ -16,8 +16,7 @@ use std::{
 };
 
 use actix::{
-    Actor, ActorContext, Addr, Arbiter, AsyncContext, Context, Handler,
-    StreamHandler,
+    Actor, ActorContext, Addr, AsyncContext, Context, Handler, StreamHandler,
 };
 use actix_codec::Framed;
 use actix_http::ws;
@@ -127,7 +126,10 @@ impl TestMember {
                 command: msg,
             })
             .unwrap();
-            self.sink.send(ws::Message::Text(json)).await.unwrap();
+            self.sink
+                .send(ws::Message::Text(json.into()))
+                .await
+                .unwrap();
             self.sink.flush().await.unwrap();
         });
     }
@@ -145,7 +147,10 @@ impl TestMember {
     fn send_pong(&mut self, id: u32) {
         executor::block_on(async move {
             let json = serde_json::to_string(&ClientMsg::Pong(id)).unwrap();
-            self.sink.send(ws::Message::Text(json)).await.unwrap();
+            self.sink
+                .send(ws::Message::Text(json.into()))
+                .await
+                .unwrap();
             self.sink.flush().await.unwrap();
         });
     }
@@ -200,7 +205,7 @@ impl TestMember {
         on_connection_event: Option<ConnectionEventHandler>,
         deadline: Option<Duration>,
     ) {
-        Arbiter::spawn(async move {
+        drop(actix::spawn(async move {
             Self::connect(
                 &uri,
                 on_message,
@@ -210,7 +215,7 @@ impl TestMember {
                 true,
             )
             .await;
-        })
+        }))
     }
 
     /// Returns mid for the `MediaTrack` with a provided [`TrackId`].

@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'jason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/result.dart';
+import 'ffi/result.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);

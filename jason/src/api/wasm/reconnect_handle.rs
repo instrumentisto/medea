@@ -7,7 +7,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::rpc;
 
-use super::JasonError;
+use super::Error;
 
 /// Handle that JS side can reconnect to a media server with when a connection
 /// is lost.
@@ -37,7 +37,7 @@ impl ReconnectHandle {
         future_to_promise(async move {
             this.reconnect_with_delay(delay_ms)
                 .await
-                .map_err(JasonError::from)?;
+                .map_err(Error::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }
@@ -76,7 +76,7 @@ impl ReconnectHandle {
                 max_delay,
             )
             .await
-            .map_err(JasonError::from)?;
+            .map_err(Error::from)?;
             Ok(JsValue::UNDEFINED)
         })
     }

@@ -6,7 +6,6 @@ mod steps;
 mod world;
 
 use cucumber_rust::WorldInit as _;
-use tokio_1 as tokio;
 
 use self::world::World;
 

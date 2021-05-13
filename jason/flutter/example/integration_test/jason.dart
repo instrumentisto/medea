@@ -12,7 +12,7 @@ import 'package:medea_jason/media_stream_settings.dart';
 import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
-import 'package:medea_jason/util/result.dart';
+import 'package:medea_jason/ffi/result.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
