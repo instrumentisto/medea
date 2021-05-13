@@ -1,4 +1,5 @@
 import 'dart:ffi';
+
 import 'package:ffi/ffi.dart';
 
 import 'connection_handle.dart';
@@ -156,18 +157,18 @@ class RoomHandle {
     }
   }
 
-  /// Updates this `Room`'s `MediaStreamSettings`. This affects all
-  /// `PeerConnection`s in this `Room`. If `MediaStreamSettings` is configured
+  /// Updates this `Room`'s `MediaStreamSettings`. This affects all the
+  /// `PeerConnection`s in this `Room`. If `MediaStreamSettings` are configured
   /// for some `Room`, then this `Room` can only send media tracks that
-  /// correspond to this settings. `MediaStreamSettings` update will change
-  /// media tracks in all sending peers, so that might cause new
-  /// [getUserMedia()][1] request.
+  /// correspond to these settings. `MediaStreamSettings` update will change
+  /// media tracks in all sending peers, so that might cause a new
+  /// [getUserMedia()][1] request to happen.
   ///
   /// Media obtaining/injection errors are additionally fired to
   /// `on_failed_local_media` callback.
   ///
   /// If `stop_first` set to `true` then affected local `Tracks` will be
-  /// dropped before new `MediaStreamSettings` is applied. This is usually
+  /// dropped before new `MediaStreamSettings` are applied. This is usually
   /// required when changing video source device due to hardware limitations,
   /// e.g. having an active track sourced from device `A` may hinder
   /// [getUserMedia()][1] requests to device `B`.
@@ -196,6 +197,16 @@ class RoomHandle {
     await (_unmuteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  /// Enables outbound audio in this `Room`.
+  Future<void> enableAudio() async {
+    await (_enableAudio(ptr.getInnerPtr()) as Future);
+  }
+
+  /// Disables outbound audio in this `Room`.
+  Future<void> disableAudio() async {
+    await (_disableAudio(ptr.getInnerPtr()) as Future);
+  }
+
   /// Mutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
@@ -210,13 +221,6 @@ class RoomHandle {
     await (_unmuteVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
-  /// Disables outbound video.
-  ///
-  /// Affects only video with specific [MediaSourceKind] if specified.
-  Future<void> disableVideo(MediaSourceKind kind) async {
-    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future);
-  }
-
   /// Enables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
@@ -224,19 +228,11 @@ class RoomHandle {
     await (_enableVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
-  /// Disables outbound audio in this `Room`.
-  Future<void> disableAudio() async {
-    await (_disableAudio(ptr.getInnerPtr()) as Future);
-  }
-
-  /// Enables outbound audio in this `Room`.
-  Future<void> enableAudio() async {
-    await (_enableAudio(ptr.getInnerPtr()) as Future);
-  }
-
-  /// Disables inbound audio in this `Room`.
-  Future<void> disableRemoteAudio() async {
-    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
+  /// Disables outbound video.
+  ///
+  /// Affects only video with specific [MediaSourceKind] if specified.
+  Future<void> disableVideo(MediaSourceKind kind) async {
+    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future);
   }
 
   /// Enables inbound audio in this `Room`.
@@ -244,14 +240,19 @@ class RoomHandle {
     await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
-  /// Disables inbound video in this `Room`.
-  Future<void> disableRemoteVideo() async {
-    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
+  /// Disables inbound audio in this `Room`.
+  Future<void> disableRemoteAudio() async {
+    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
   /// Enables inbound video in this `Room`.
   Future<void> enableRemoteVideo() async {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
+  }
+
+  /// Disables inbound video in this `Room`.
+  Future<void> disableRemoteVideo() async {
+    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
   /// Sets callback, invoked when a new `Connection` with some remote `Peer`
