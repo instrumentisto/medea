@@ -19,7 +19,7 @@ pub extern "C" fn AudioTrackConstraints__new() -> *const AudioTrackConstraints {
 /// [1]: https://w3.org/TR/mediacapture-streams#def-constraint-deviceId
 #[no_mangle]
 pub unsafe extern "C" fn AudioTrackConstraints__device_id(
-    this: *mut AudioTrackConstraints,
+    this: *mut AudioTrackConstraints, // TODO: Replace with ptr::NonNull?
     device_id: *const c_char,
 ) {
     let this = this.as_mut().unwrap();

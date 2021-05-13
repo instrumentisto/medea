@@ -24,6 +24,10 @@ pub mod room_handle;
 mod unimplemented;
 pub mod utils;
 
+use std::ffi::c_void;
+
+use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
+
 pub use self::{
     audio_track_constraints::AudioTrackConstraints,
     connection_handle::ConnectionHandle,
@@ -59,5 +63,68 @@ pub trait ForeignClass: Sized {
     #[must_use]
     unsafe fn from_ptr(this: *mut Self) -> Self {
         *Box::from_raw(this)
+    }
+}
+
+// TODO: Extend types set when needed.
+/// Value that can be transferred to Dart.
+pub enum DartValue {
+    Void,
+    Ptr(*const c_void),
+    PtrArray(PtrArray),
+    Int(i64),
+}
+
+impl<T: ForeignClass> From<T> for DartValue {
+    #[inline]
+    fn from(val: T) -> Self {
+        Self::Ptr(val.into_ptr().cast())
+    }
+}
+
+impl From<()> for DartValue {
+    #[inline]
+    fn from(_: ()) -> Self {
+        Self::Void
+    }
+}
+
+impl<T> From<PtrArray<T>> for DartValue {
+    #[inline]
+    fn from(val: PtrArray<T>) -> Self {
+        DartValue::PtrArray(val.erase_type())
+    }
+}
+
+/// Implements [`From`] types that can by casted to `i64` for the [`DartValue`].
+/// Should be called for all the integer types fitting in `2^63`.
+macro_rules! impl_from_num_for_dart_value {
+    ($arg:ty) => {
+        impl From<$arg> for DartValue {
+            #[inline]
+            fn from(val: $arg) -> Self {
+                DartValue::Int(i64::from(val))
+            }
+        }
+    };
+}
+
+impl_from_num_for_dart_value!(i8);
+impl_from_num_for_dart_value!(i16);
+impl_from_num_for_dart_value!(i32);
+impl_from_num_for_dart_value!(i64);
+impl_from_num_for_dart_value!(u8);
+impl_from_num_for_dart_value!(u16);
+impl_from_num_for_dart_value!(u32);
+impl_from_num_for_dart_value!(bool);
+
+impl From<u8> for MediaSourceKind {
+    #[inline]
+    fn from(value: u8) -> Self {
+        match value {
+            0 => MediaSourceKind::Device,
+            1 => MediaSourceKind::Display,
+            _ => unreachable!(),
+        }
     }
 }
