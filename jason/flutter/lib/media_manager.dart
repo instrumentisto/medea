@@ -53,8 +53,7 @@ class MediaManagerHandle {
       MediaStreamSettings caps) async {
     Pointer tracks =
         await (_initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
-                as Future)
-            .catchError(futureErrorCatcher);
+            as Future).catchError(futureErrorCatcher);
     return tracks
         .cast<PtrArray>()
         .intoPointerList()
