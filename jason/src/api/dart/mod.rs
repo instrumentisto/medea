@@ -24,6 +24,12 @@ pub mod room_handle;
 mod unimplemented;
 pub mod utils;
 
+use std::{ffi::c_void, ptr::NonNull};
+
+use libc::c_char;
+
+use crate::api::dart::utils::PtrArray;
+
 pub use self::{
     audio_track_constraints::AudioTrackConstraints,
     connection_handle::ConnectionHandle,
@@ -36,12 +42,6 @@ pub use self::{
     reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
 };
-
-use std::{ffi::c_void, ptr::NonNull};
-
-use libc::c_char;
-
-use crate::api::dart::utils::PtrArray;
 
 /// Rust structure having wrapper class in Dart.
 ///
@@ -78,34 +78,39 @@ pub enum DartValue {
 }
 
 impl From<()> for DartValue {
+    #[inline]
     fn from(_: ()) -> Self {
         Self::Void
     }
 }
 
 impl<T: ForeignClass> From<T> for DartValue {
+    #[inline]
     fn from(val: T) -> Self {
         Self::Ptr(val.into_ptr().cast())
     }
 }
 
 impl<T> From<PtrArray<T>> for DartValue {
+    #[inline]
     fn from(val: PtrArray<T>) -> Self {
         DartValue::Ptr(NonNull::from(Box::leak(Box::new(val))).cast())
     }
 }
 
 impl From<NonNull<c_char>> for DartValue {
+    #[inline]
     fn from(c_str: NonNull<c_char>) -> Self {
         DartValue::String(c_str)
     }
 }
 
-/// Implements [`From`] for [`DartValue`] for types that can by casted to `i64`.
-/// Should be called for all integer types that fit into `2^63`.
+/// Implements [`From`] types that can by casted to `i64` for the [`DartValue`].
+/// Should be called for all the integer types fitting in `2^63`.
 macro_rules! impl_from_num_for_dart_value {
     ($arg:ty) => {
         impl From<$arg> for DartValue {
+            #[inline]
             fn from(val: $arg) -> Self {
                 DartValue::Int(i64::from(val))
             }

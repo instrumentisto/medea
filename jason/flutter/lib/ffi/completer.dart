@@ -29,7 +29,7 @@ Object _Completer_new() {
   return Completer();
 }
 
-/// Returns the [Future] that is completed by the provided [Completer].
+/// Returns a [Future] that is completed by the provided [Completer].
 Object _Completer_future(Object completer) {
   return (completer as Completer).future;
 }

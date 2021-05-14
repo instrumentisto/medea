@@ -15,12 +15,15 @@ pub use self::{
     string::{c_str_into_string, string_into_c_str},
 };
 
-/// Extension trait for the [`Future`] that provides functionality for
-/// converting Rust [`Future`]s to the Dart `Future`s.
+/// Extension trait for a [`Future`] allowing to convert Rust [`Future`]s to
+/// Dart `Future`s.
 pub trait IntoDartFuture {
-    /// Converts [`Future`] into a Dart `Future`.
+    /// Converts this [`Future`] into a Dart `Future`.
     ///
-    /// Returns [`Dart_Handle`] to the created Dart `Future`.
+    /// Returns a [`Dart_Handle`] to the created Dart `Future`.
+    ///
+    /// __Note, that the Dart `Future` execution begins immediately and cannot
+    /// be canceled.__
     fn into_dart_future(self) -> Dart_Handle;
 }
 
@@ -30,12 +33,6 @@ where
     T: Into<DartValue> + 'static,
     E: Into<DartValue> + 'static,
 {
-    /// Converts this [`Future`] into a Dart `Future`.
-    ///
-    /// Returns [`Dart_Handle`] to the created Dart `Future`.
-    ///
-    /// __Note that the Dart `Future` execution begins immediately and  cannot
-    /// be canceled.__
     fn into_dart_future(self) -> Dart_Handle {
         let completer = Completer::new();
         let dart_future = completer.future();

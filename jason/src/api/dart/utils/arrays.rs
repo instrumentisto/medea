@@ -47,8 +47,8 @@ impl<T> PtrArray<T> {
     ///
     /// Intended to simplify things when passing [`PtrArray`] to Dart.
     ///
-    /// Although this function drops `self` it wont clear an internal slice, its
-    /// ownership is transferred to the resulting [`PtrArray`].
+    /// Although this function drops `self` it won't clear an internal slice,
+    /// its ownership is transferred to the resulting [`PtrArray`].
     #[inline]
     #[must_use]
     pub fn erase_type(mut self) -> PtrArray {
@@ -63,7 +63,7 @@ impl<T> PtrArray<T> {
 impl<T> Drop for PtrArray<T> {
     /// Drops this [`PtrArray`].
     ///
-    /// Clears internal slice if its pointer is not null.
+    /// Clears the internal slice if its pointer is not null.
     ///
     /// # Safety
     ///

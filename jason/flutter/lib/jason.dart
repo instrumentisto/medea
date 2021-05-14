@@ -28,6 +28,12 @@ typedef _free_Dart = void Function(Pointer);
 
 final DynamicLibrary dl = _dl_load();
 
+/// [Executor] that drives Rust futures.
+///
+/// Instantiated in the [_dl_load()] function, and must not be touched ever
+/// after that.
+var executor;
+
 final _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');
 
 final _media_manager = dl.lookupFunction<_mediaManager_C, _mediaManager_Dart>(
@@ -65,7 +71,7 @@ DynamicLibrary _dl_load() {
   callback.registerFunctions(dl);
   completer.registerFunctions(dl);
 
-  Executor(dl);
+  executor = Executor(dl);
 
   return dl;
 }
