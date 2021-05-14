@@ -81,38 +81,38 @@ type CompleterFutureCaller = extern "C" fn(Dart_Handle) -> Dart_Handle;
 
 /// Stores pointer to the [`CompleterNewCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_NEW_CALLER: Option<CompleterNewCaller> = None;
 
 /// Stores pointer to the [`CompleterCompleteVoidCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_VOID_CALLER: Option<CompleterCompleteVoidCaller> =
     None;
 
 /// Stores pointer to the [`CompleterCompletePtrCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_PTR_CALLER: Option<CompleterCompletePtrCaller> =
     None;
 
 /// Stores pointer to the [`CompleterCompleteErrorCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_ERROR_CALLER: Option<
     CompleterCompleteErrorCaller,
 > = None;
 
 /// Stores pointer to [`CompleterCompletePtrArrayCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_PTR_ARRAY_CALLER: Option<
     CompleterCompletePtrArrayCaller,
 > = None;
 
 /// Stores pointer to [`CompleterFutureCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_FUTURE_CALLER: Option<CompleterFutureCaller> = None;
 
 /// Registers the provided [`CompleterNewCaller`] as [`COMPLETER_NEW_CALLER`].

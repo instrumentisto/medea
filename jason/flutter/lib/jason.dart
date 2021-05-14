@@ -30,7 +30,8 @@ final DynamicLibrary dl = _dl_load();
 
 /// [Executor] that drives Rust futures.
 ///
-/// Instantiated in [_dl_load()], should not be touched after that.
+/// Instantiated in the [_dl_load()] function, and must not be touched ever
+/// after that.
 var executor;
 
 final _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');

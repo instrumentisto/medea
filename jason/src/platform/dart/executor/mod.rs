@@ -1,4 +1,4 @@
-//! Implementation of the executor of [`Future`]s for the Dart environment.
+//! Executor of [`Future`]s for the Dart environment.
 
 mod task;
 
@@ -10,25 +10,26 @@ use crate::platform::dart::utils::dart_api::Dart_PostCObject_DL_Trampolined;
 
 use self::task::Task;
 
-/// Runs a Rust Future on the current thread.
+/// Runs a Rust [`Future`] on the current thread.
 pub fn spawn(future: impl Future<Output = ()> + 'static) {
     let task = Task::new(Box::pin(future));
 
     // Task is leaked and will be freed by Dart calling the
-    // rust_executor_drop_task().
+    // `rust_executor_drop_task()` function.
     task_wake(Rc::into_raw(task));
 }
 
-/// A [`Dart_Port`] used to send [`Task`]'s poll commands so Dart will poll
-/// Rust's futures.
+/// A [`Dart_Port`] used to send [`Task`]'s poll commands so Dart will poll Rust
+/// [`Future`]s.
 ///
-/// Must be initialized with [`rust_executor_init()`] during FFI initialization.
+/// Must be initialized with the [`rust_executor_init()`] function during FFI
+/// initialization.
 static mut WAKE_PORT: Option<Dart_Port> = None;
 
-/// Initialize dart-driven async task executor.
+/// Initializes Dart-driven async [`Task`] executor.
 ///
-/// On a Dart side you should continuously read channel to get [`Task`]s that
-/// should be polled addresses
+/// On a Dart side you should continuously read channel to get [`Task`]s
+/// addresses for polling.
 ///
 /// # Safety
 ///
@@ -38,16 +39,19 @@ pub unsafe extern "C" fn rust_executor_init(wake_port: Dart_Port) {
     WAKE_PORT = Some(wake_port);
 }
 
-/// Polls incomplete task.
+/// Polls an incomplete [`Task`].
 ///
-/// This function returns `true` if task is still pending, and `false` if task
-/// has finished. In this case it should be dropped with
-/// [`rust_executor_drop_task`].
+/// This function returns `true` if the [`Task`] is still [`Pending`], and
+/// `false` once the [`Task`] is [`Ready`]. In this latter case it should be
+/// dropped with the [`rust_executor_drop_task()`] function.
 ///
 /// # Safety
 ///
-/// Valid [`Task`] pointer must be provided. Must not be called if the
-/// provided [`Task`] was dropped (with [`rust_executor_drop_task()`]).
+/// Valid [`Task`] pointer must be provided. Must not be called if the provided
+/// [`Task`] has been dropped (with the [`rust_executor_drop_task()`] function).
+///
+/// [`Pending`]: std::task::Poll::Pending
+/// [`Ready`]: std::task::Poll::Ready
 #[no_mangle]
 pub unsafe extern "C" fn rust_executor_poll_task(task: *mut Task) -> bool {
     let task = task.as_mut().unwrap();
@@ -55,27 +59,27 @@ pub unsafe extern "C" fn rust_executor_poll_task(task: *mut Task) -> bool {
     task.poll().is_pending()
 }
 
-/// Drops task.
+/// Drops a [`Task`].
 ///
-/// Completed tasks should be dropped to avoid leaks.
+/// Completed [`Task`]s should be dropped to avoid leaks.
 ///
 /// In some unusual cases (say on emergency shutdown or when executed too long)
-/// tasks may be deleted before completion.
+/// [`Task`]s may be deleted before completion.
 ///
 /// # Safety
 ///
-/// Valid [`Task`] pointer must be provided. Must be called only once for
+/// Valid [`Task`] pointer must be provided. Must be called only once for a
 /// specific [`Task`].
 #[no_mangle]
 pub unsafe extern "C" fn rust_executor_drop_task(task: *const Task) {
     drop(Rc::from_raw(task))
 }
 
-/// Commands external executor to poll the provided [`Task`].
+/// Commands an external Dart executor to poll the provided [`Task`].
 ///
 /// Sends command that contains the provided [`Task`] to the configured
-/// [`WAKE_PORT`]. When received, Dart must poll it by calling
-/// [`rust_executor_poll_task()`].
+/// [`WAKE_PORT`]. When received, Dart must poll it by calling the
+/// [`rust_executor_poll_task()`] function.
 fn task_wake(task: *const Task) {
     let wake_port = unsafe { WAKE_PORT }.unwrap();
 

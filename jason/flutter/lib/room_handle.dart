@@ -177,8 +177,8 @@ class RoomHandle {
   /// to automatically rollback to previous settings if new settings cannot be
   /// applied.
   ///
-  /// If recovering from fail state isn't possible then affected media types will
-  /// be disabled.
+  /// If recovering from fail state isn't possible then affected media types
+  /// will be disabled.
   ///
   /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
   Future<void> setLocalMediaSettings(

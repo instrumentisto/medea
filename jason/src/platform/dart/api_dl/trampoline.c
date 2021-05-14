@@ -26,5 +26,5 @@ void Dart_DeletePersistentHandle_DL_Trampolined(Dart_PersistentHandle handle) {
 }
 
 bool Dart_PostCObject_DL_Trampolined(Dart_Port port_id, Dart_CObject* message) {
-    return Dart_PostCObject_DL(port_id, message);
+  return Dart_PostCObject_DL(port_id, message);
 }
