@@ -1,4 +1,5 @@
 import 'dart:ffi';
+
 import 'package:ffi/ffi.dart';
 
 import 'connection_handle.dart';
@@ -162,18 +163,18 @@ class RoomHandle {
     }
   }
 
-  /// Updates this `Room`'s [MediaStreamSettings]. This affects all
-  /// `PeerConnection`s in this `Room`. If [MediaStreamSettings] is configured
+  /// Updates this `Room`'s [MediaStreamSettings]. This affects all the
+  /// `PeerConnection`s in this `Room`. If [MediaStreamSettings] are configured
   /// for some `Room`, then this `Room` can only send media tracks that
-  /// correspond to this settings. [MediaStreamSettings] update will change
-  /// media tracks in all sending peers, so that might cause new
-  /// [getUserMedia()][1] request.
+  /// correspond to these settings. [MediaStreamSettings] update will change
+  /// media tracks in all sending peers, so that might cause a new
+  /// [getUserMedia()][1] request to happen.
   ///
   /// Media obtaining/injection errors are additionally fired to
   /// [RoomHandle.onFailedLocalMedia()] callback.
   ///
-  /// If [stop_first] set to `true` then affected local [LocalMediaTrack] will
-  /// be dropped before new [MediaStreamSettings] is applied. This is usually
+  /// If [stop_first] set to `true` then affected local [LocalMediaTrack]s will
+  /// be dropped before new [MediaStreamSettings] are applied. This is usually
   /// required when changing video source device due to hardware limitations,
   /// e.g. having an active track sourced from device `A` may hinder
   /// [getUserMedia()][1] requests to device `B`.
@@ -208,6 +209,22 @@ class RoomHandle {
         .catchError(futureErrorCatcher);
   }
 
+  /// Enables outbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
+  Future<void> enableAudio() async {
+    await (_enableAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
+  }
+
+  /// Disables outbound audio in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
+  Future<void> disableAudio() async {
+    await (_disableAudio(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
+  }
+
   /// Mutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
@@ -228,16 +245,6 @@ class RoomHandle {
         .catchError(futureErrorCatcher);
   }
 
-  /// Disables outbound video.
-  ///
-  /// Affects only video with specific [MediaSourceKind] if specified.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> disableVideo(MediaSourceKind kind) async {
-    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future)
-        .catchError(futureErrorCatcher);
-  }
-
   /// Enables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
@@ -248,27 +255,13 @@ class RoomHandle {
         .catchError(futureErrorCatcher);
   }
 
-  /// Disables outbound audio in this `Room`.
+  /// Disables outbound video.
+  ///
+  /// Affects only video with specific [MediaSourceKind] if specified.
   ///
   /// Throws [RustException] if Rust returns error.
-  Future<void> disableAudio() async {
-    await (_disableAudio(ptr.getInnerPtr()) as Future)
-        .catchError(futureErrorCatcher);
-  }
-
-  /// Enables outbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> enableAudio() async {
-    await (_enableAudio(ptr.getInnerPtr()) as Future)
-        .catchError(futureErrorCatcher);
-  }
-
-  /// Disables inbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> disableRemoteAudio() async {
-    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future)
+  Future<void> disableVideo(MediaSourceKind kind) async {
+    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future)
         .catchError(futureErrorCatcher);
   }
 
@@ -280,11 +273,11 @@ class RoomHandle {
         .catchError(futureErrorCatcher);
   }
 
-  /// Disables inbound video in this `Room`.
+  /// Disables inbound audio in this `Room`.
   ///
   /// Throws [RustException] if Rust returns error.
-  Future<void> disableRemoteVideo() async {
-    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future)
+  Future<void> disableRemoteAudio() async {
+    await (_disableRemoteAudio(ptr.getInnerPtr()) as Future)
         .catchError(futureErrorCatcher);
   }
 
@@ -293,6 +286,14 @@ class RoomHandle {
   /// Throws [RustException] if Rust returns error.
   Future<void> enableRemoteVideo() async {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future)
+        .catchError(futureErrorCatcher);
+  }
+
+  /// Disables inbound video in this `Room`.
+  ///
+  /// Throws [RustException] if Rust returns error.
+  Future<void> disableRemoteVideo() async {
+    await (_disableRemoteVideo(ptr.getInnerPtr()) as Future)
         .catchError(futureErrorCatcher);
   }
 

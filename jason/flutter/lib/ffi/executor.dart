@@ -11,8 +11,11 @@ typedef _executorDropTask_C = Void Function(Pointer);
 typedef _executorDropTask_Dart = void Function(Pointer);
 
 /// Executor used to drive Rust futures.
+///
+/// It must be instantiated before calling any `async` Rust functions.
 class Executor {
-  /// Pointer to a Rust function used to initialize Rust side of an [Executor].
+  /// Pointer to a Rust function used to initialize Rust side of this
+  /// [Executor].
   final _executorInit_Dart _loopInit;
 
   /// Pointer to a Rust function used to poll Rust futures.
@@ -21,12 +24,12 @@ class Executor {
   /// Pointer to a Rust function used to drop Rust futures on completion.
   final _executorDropTask_Dart _taskDrop;
 
-  /// [ReceivePort] used to receive commands to poll Rust futures.
+  /// [ReceivePort] used to receive commands for polling Rust futures.
   late ReceivePort _wakePort;
 
   /// Creates a new [Executor].
   ///
-  /// Initializes Rust part of an [Executor], creates a [ReceivePort] that
+  /// Initializes Rust part of the [Executor], creates a [ReceivePort] that
   /// accepts commands to poll Rust futures.
   Executor(DynamicLibrary dylib)
       : _loopInit = dylib
@@ -44,10 +47,8 @@ class Executor {
     _loopInit(_wakePort.sendPort.nativePort);
   }
 
-  /// Polls a Rust future.
-  ///
-  /// Calls [_taskPoll] with provided [message]. Drops task with [_taskDrop] if
-  /// poll returns `false`.
+  /// Polls a Rust future basing on the provided [message]. Drops that future if
+  /// it's completed.
   void _pollTask(dynamic message) {
     final task = Pointer.fromAddress(message);
 

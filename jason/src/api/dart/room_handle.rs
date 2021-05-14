@@ -16,9 +16,10 @@ use crate::{
     room::RoomError,
 };
 
+use super::{utils::DartError, MediaStreamSettings};
+
 #[cfg(feature = "mockable")]
 pub use self::mock::RoomHandle;
-use super::{utils::DartError, MediaStreamSettings};
 #[cfg(not(feature = "mockable"))]
 pub use crate::room::RoomHandle;
 
@@ -72,28 +73,28 @@ pub unsafe extern "C" fn RoomHandle__join(
     .into_dart_future()
 }
 
-/// Updates this [`Room`]'s [`MediaStreamSettings`]. This affects all
-/// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] is
+/// Updates this [`Room`]'s [`MediaStreamSettings`]. This affects all the
+/// [`PeerConnection`]s in this [`Room`]. If [`MediaStreamSettings`] are
 /// configured for some [`Room`], then this [`Room`] can only send media tracks
-/// that correspond to this settings. [`MediaStreamSettings`] update will change
-/// media tracks in all sending peers, so that might cause new
-/// [getUserMedia()][1] request.
+/// that correspond to these settings. [`MediaStreamSettings`] update will
+/// change media tracks in all sending peers, so that might cause a new
+/// [getUserMedia()][1] request to happen.
 ///
 /// Media obtaining/injection errors are additionally fired to
 /// `on_failed_local_media` callback.
 ///
 /// If `stop_first` set to `true` then affected local `Tracks` will be
-/// dropped before new [`MediaStreamSettings`] is applied. This is usually
+/// dropped before new [`MediaStreamSettings`] are applied. This is usually
 /// required when changing video source device due to hardware limitations,
 /// e.g. having an active track sourced from device `A` may hinder
 /// [getUserMedia()][1] requests to device `B`.
 ///
-/// `rollback_on_fail` option configures [`MediaStreamSettings`] update
-/// request to automatically rollback to previous settings if new settings
-/// cannot be applied.
+/// `rollback_on_fail` option configures [`MediaStreamSettings`] update request
+/// to automatically rollback to previous settings if new settings cannot be
+/// applied.
 ///
-/// If recovering from fail state isn't possible then affected media types
-/// will be disabled.
+/// If recovering from fail state isn't possible then affected media types will
+/// be disabled.
 ///
 /// [`Room`]: crate::room::Room
 /// [`PeerConnection`]: crate::peer::PeerConnection
@@ -112,8 +113,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
         // TODO: Remove unwrap when ConstraintsUpdateException bindings will be
         //       implemented.
         this.set_local_media_settings(settings, stop_first, rollback_on_fail)
-            .await
-            .unwrap();
+            .await?;
         Ok(())
     }
     .into_dart_future()
@@ -151,22 +151,6 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
     .into_dart_future()
 }
 
-/// Disables outbound audio in this [`Room`].
-///
-/// [`Room`]: crate::room::Room
-#[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_audio(
-    this: NonNull<RoomHandle>,
-) -> Dart_Handle {
-    let this = this.as_ref().clone();
-
-    async move {
-        this.disable_audio().await?;
-        Ok(())
-    }
-    .into_dart_future()
-}
-
 /// Enables outbound audio in this [`Room`].
 ///
 /// [`Room`]: crate::room::Room
@@ -178,6 +162,22 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
 
     async move {
         this.enable_audio().await?;
+        Ok(())
+    }
+    .into_dart_future()
+}
+
+/// Disables outbound audio in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__disable_audio(
+    this: NonNull<RoomHandle>,
+) -> Dart_Handle {
+    let this = this.as_ref().clone();
+
+    async move {
+        this.disable_audio().await?;
         Ok(())
     }
     .into_dart_future()
@@ -221,11 +221,11 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
     .into_dart_future()
 }
 
-/// Disables outbound video.
+/// Enables outbound video.
 ///
 /// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_video(
+pub unsafe extern "C" fn RoomHandle__enable_video(
     this: NonNull<RoomHandle>,
     source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
@@ -238,18 +238,18 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
     .into_dart_future()
 }
 
-/// Enables outbound video.
+/// Disables outbound video.
 ///
 /// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__enable_video(
+pub unsafe extern "C" fn RoomHandle__disable_video(
     this: NonNull<RoomHandle>,
     source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
     async move {
-        this.enable_video(Some(source_kind)).await?;
+        this.disable_video(Some(source_kind)).await?;
         Ok(())
     }
     .into_dart_future()
@@ -287,22 +287,6 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
     .into_dart_future()
 }
 
-/// Disables inbound video in this [`Room`].
-///
-/// [`Room`]: crate::room::Room
-#[no_mangle]
-pub unsafe extern "C" fn RoomHandle__disable_remote_video(
-    this: NonNull<RoomHandle>,
-) -> Dart_Handle {
-    let this = this.as_ref().clone();
-
-    async move {
-        this.disable_remote_video().await?;
-        Ok(())
-    }
-    .into_dart_future()
-}
-
 /// Enables inbound video in this [`Room`].
 ///
 /// [`Room`]: crate::room::Room
@@ -314,6 +298,22 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
 
     async move {
         this.enable_remote_video().await?;
+        Ok(())
+    }
+    .into_dart_future()
+}
+
+/// Disables inbound video in this [`Room`].
+///
+/// [`Room`]: crate::room::Room
+#[no_mangle]
+pub unsafe extern "C" fn RoomHandle__disable_remote_video(
+    this: NonNull<RoomHandle>,
+) -> Dart_Handle {
+    let this = this.as_ref().clone();
+
+    async move {
+        this.disable_remote_video().await?;
         Ok(())
     }
     .into_dart_future()
@@ -485,17 +485,7 @@ mod mock {
             Ok(())
         }
 
-        pub async fn mute_video(
-            &self,
-            _source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), Traced<RoomError>> {
-            Ok(())
-        }
-
-        pub async fn unmute_video(
-            &self,
-            _source_kind: Option<MediaSourceKind>,
-        ) -> Result<(), Traced<RoomError>> {
+        pub async fn enable_audio(&self) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
 
@@ -503,46 +493,52 @@ mod mock {
             Ok(())
         }
 
-        pub async fn enable_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn mute_video(
+            &self,
+            source_kind: Option<MediaSourceKind>,
+        ) -> Result<(), Traced<RoomError>> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Device));
             Ok(())
         }
 
-        pub async fn disable_video(
+        pub async fn unmute_video(
             &self,
-            _source_kind: Option<MediaSourceKind>,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), Traced<RoomError>> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Display));
             Ok(())
         }
 
         pub async fn enable_video(
             &self,
-            _source_kind: Option<MediaSourceKind>,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), Traced<RoomError>> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Device));
             Ok(())
         }
 
-        pub async fn disable_remote_audio(
+        pub async fn disable_video(
             &self,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), Traced<RoomError>> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Display));
             Ok(())
         }
 
-        pub async fn disable_remote_video(
-            &self,
-        ) -> Result<(), Traced<RoomError>> {
+        pub async fn enable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
 
-        pub async fn enable_remote_audio(
-            &self,
-        ) -> Result<(), Traced<RoomError>> {
+        pub async fn disable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
 
-        pub async fn enable_remote_video(
-            &self,
-        ) -> Result<(), Traced<RoomError>> {
-            Err(tracerr::new!(RoomError::Detached).into())
+        pub async fn enable_remote_video(&self) -> Result<(), Traced<RoomError>> {
+            Ok(())
+        }
+
+        pub async fn disable_remote_video(&self) -> Result<(), Traced<RoomError>> {
+            Ok(())
         }
     }
 }

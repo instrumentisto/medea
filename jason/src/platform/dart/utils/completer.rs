@@ -1,15 +1,16 @@
-//! Proxy for a Dart's [Completer].
+//! Proxy for a Dart [Completer].
 //!
-//! Rust doesn't have direct access to the Dart's [Completer], but holds a
+//! Rust doesn't have a direct access to a Dart [Completer], but holds a
 //! [`Dart_PersistentHandle`] to the [Completer] instance. All manipulations
 //! happen on the Dart side.
 //!
 //! Dart side must register static functions that Rust will call to manipulate
 //! the [Completer]. This module exports function for registering those Dart
-//! functions: [`register_new_completer_caller`],
-//! [`register_completer_complete_caller`],
-//! [`register_completer_complete_error_caller`],
-//! [`register_completer_future_caller`],
+//! functions:
+//! - [`register_new_completer_caller()`];
+//! - [`register_completer_complete_caller()`];
+//! - [`register_completer_complete_error_caller()`];
+//! - [`register_completer_future_caller()`].
 //!
 //! These functions MUST be registered by Dart during FFI initialization phase:
 //! after Dart DL API is initialized and before any other exported Rust function
@@ -17,41 +18,41 @@
 //!
 //! [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 
-use std::marker::PhantomData;
+use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::{utils::DartError, DartValue};
+use crate::api::DartValue;
 
 use super::dart_api::{
     Dart_HandleFromPersistent_DL_Trampolined,
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-/// Pointer to an extern function that returns [`Dart_Handle`] to a new Dart
+/// Pointer to an extern function that returns a [`Dart_Handle`] to a new Dart
 /// [Completer].
 ///
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 type CompleterNewCaller = extern "C" fn() -> Dart_Handle;
 
-/// Pointer to an extern function that invokes [complete] function with the
-/// provided [`DartValue`] on the provided [`Dart_Handle`] which points to the
+/// Pointer to an extern function that invokes the [complete()] method with
+/// the provided [`DartValue`] on the provided [`Dart_Handle`] pointing to the
 /// Dart [Completer] object.
 ///
-/// [complete]: https://api.dart.dev/dart-async/Completer/complete.html
+/// [complete()]: https://api.dart.dev/dart-async/Completer/complete.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 type CompleterCompleteCaller = extern "C" fn(Dart_Handle, DartValue);
 
-/// Pointer to an extern function that invokes the [completeError][1] method
-/// with the provided Rust pointer on the provided [`Dart_Handle`] which points
-/// to the Dart [Completer] object.
+/// Pointer to an extern function that invokes the [completeError()][1] method
+/// with the provided Rust pointer on the provided [`Dart_Handle`] pointing to
+/// the Dart [Completer] object.
 ///
 /// [1]: https://api.dart.dev/dart-async/Completer/completeError.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
-type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, DartError);
+type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
 
-/// Pointer to an extern function that calls [future] getter on the provided
-/// [`Dart_Handle`] which points to the Dart [Completer] object.
+/// Pointer to an extern function that calls the [future] getter on the provided
+/// [`Dart_Handle`] pointing to the Dart [Completer] object.
 ///
 /// This function will return [`Dart_Handle`] to the Dart [Future] which can be
 /// returned to the Dart side.
@@ -63,24 +64,24 @@ type CompleterFutureCaller = extern "C" fn(Dart_Handle) -> Dart_Handle;
 
 /// Stores pointer to the [`CompleterNewCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_NEW_CALLER: Option<CompleterNewCaller> = None;
 
 /// Stores pointer to the [`CompleterCompletePtrCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_CALLER: Option<CompleterCompleteCaller> = None;
 
 /// Stores pointer to the [`CompleterCompleteErrorCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_ERROR_CALLER: Option<
     CompleterCompleteErrorCaller,
 > = None;
 
 /// Stores pointer to [`CompleterFutureCaller`] extern function.
 ///
-/// Should be initialized by Dart during FFI initialization phase.
+/// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_FUTURE_CALLER: Option<CompleterFutureCaller> = None;
 
 /// Registers the provided [`CompleterNewCaller`] as [`COMPLETER_NEW_CALLER`].
@@ -136,8 +137,10 @@ pub unsafe extern "C" fn register_completer_future_caller(
 ///
 /// [Future]: https://api.dart.dev/dart-async/Future-class.html
 pub struct Completer<T, E> {
-    /// [`Dart_PersistentHandle`] to the Dart `Completer` that backs this
+    /// [`Dart_PersistentHandle`] to the Dart [Completer][1] backing this
     /// [`Completer`].
+    ///
+    /// [1]: https://api.dart.dev/dart-async/Completer-class.html
     handle: Dart_PersistentHandle,
 
     /// Type with which [Future] can be successfully resolved.
@@ -152,10 +155,12 @@ pub struct Completer<T, E> {
 }
 
 impl<T, E> Completer<T, E> {
-    /// Creates a new [`Dart_PersistentHandle`] for the Dart [`Completer`].
+    /// Creates a new [`Dart_PersistentHandle`] for the Dart [Completer][1].
     ///
     /// Persists the created [`Dart_Handle`] so it won't be moved by the Dart VM
     /// GC.
+    ///
+    /// [1]: https://api.dart.dev/dart-async/Completer-class.html
     #[must_use]
     pub fn new() -> Self {
         let handle = unsafe {
@@ -169,7 +174,7 @@ impl<T, E> Completer<T, E> {
         }
     }
 
-    /// Returns [`Dart_Handle`] to the Dart [Future] controlled by this
+    /// Returns a [`Dart_Handle`] to the Dart [Future] controlled by this
     /// [`Completer`].
     ///
     /// [Future]: https://api.dart.dev/dart-async/Future-class.html
@@ -183,13 +188,14 @@ impl<T, E> Completer<T, E> {
 }
 
 impl<T, E> Default for Completer<T, E> {
+    #[inline]
     fn default() -> Self {
         Completer::new()
     }
 }
 
 impl<T: Into<DartValue>, E> Completer<T, E> {
-    /// Successfully completes underlying Dart [Future] with a provided
+    /// Successfully completes the underlying Dart [Future] with the provided
     /// argument.
     ///
     /// [Future]: https://api.dart.dev/dart-async/Future-class.html
@@ -202,7 +208,7 @@ impl<T: Into<DartValue>, E> Completer<T, E> {
 }
 
 impl<T> Completer<T, DartError> {
-    /// Completes underlying Dart [Future] with error provided as the argument.
+    /// Completes the underlying Dart [Future] with the provided [`DartError`].
     ///
     /// [Future]: https://api.dart.dev/dart-async/Future-class.html
     pub fn complete_error(&self, e: DartError) {
