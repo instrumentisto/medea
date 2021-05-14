@@ -1,3 +1,5 @@
+//! [`Task`] for execution by a [`platform::dart::executor`].
+
 use std::rc::Rc;
 
 use std::{
@@ -19,16 +21,17 @@ struct Inner {
     waker: Waker,
 }
 
-/// Wrapper for a [`Future`] that can be polled by external single threaded
-/// executor.
+/// Wrapper for a [`Future`] that can be polled by an external single threaded
+/// Dart executor.
 pub struct Task {
-    /// [`Task`]'s inner data that contains and actual [`Future`] and its
-    /// [`Waker`]. Dropped on [`Task`] completion.
+    /// [`Task`]'s inner data containing an actual [`Future`] and its
+    /// [`Waker`]. Dropped on the [`Task`] completion.
     inner: RefCell<Option<Inner>>,
 }
 
 impl Task {
-    /// Creates a new [`Task`].
+    /// Creates a new [`Task`] out of the given [`Future`].
+    #[must_use]
     pub fn new(future: LocalBoxFuture<'static, ()>) -> Rc<Self> {
         let this = Rc::new(Self {
             inner: RefCell::new(None),
@@ -41,13 +44,13 @@ impl Task {
         this
     }
 
-    /// Polls underlying [`Future`].
+    /// Polls the underlying [`Future`].
     ///
-    /// Polling after completion is no-op.
+    /// Polling after [`Future`]'s completion is no-op.
     pub fn poll(&self) -> Poll<()> {
         let mut borrow = self.inner.borrow_mut();
 
-        // Just ignore poll request if future is polled after completion.
+        // Just ignore poll request if the `Future` is completed.
         let inner = match borrow.as_mut() {
             Some(inner) => inner,
             None => return Poll::Ready(()),
@@ -66,14 +69,14 @@ impl Task {
         poll
     }
 
-    /// Calls [`task_wake`] with provided reference.
+    /// Calls the [`task_wake()`] function by the provided reference.
     fn wake_by_ref(this: &Rc<Self>) {
         task_wake(Rc::as_ptr(this));
     }
 
     /// Pretty much a copy of [`std::task::Wake`] implementation but for
     /// `Rc<?Send + ?Sync>` instead of `Arc<Send + Sync>` since we are sure
-    /// that everything will run in single threaded environment.
+    /// that everything will run on a single thread.
     #[inline(always)]
     fn into_raw_waker(this: Rc<Self>) -> RawWaker {
         // Refer to `RawWakerVTable::new()` documentation for better
