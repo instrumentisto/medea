@@ -26,7 +26,7 @@ pub mod utils;
 
 use std::ffi::c_void;
 
-use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
+use crate::api::dart::utils::PtrArray;
 
 pub use self::{
     audio_track_constraints::AudioTrackConstraints,

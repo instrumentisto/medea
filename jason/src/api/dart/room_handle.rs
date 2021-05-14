@@ -169,10 +169,9 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -191,10 +190,9 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -211,10 +209,9 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -231,10 +228,9 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: *mut RoomHandle,
-    source_kind: u8, // TODO: `source_kind` might be None.
+    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().unwrap().clone();
-    let source_kind = MediaSourceKind::from(source_kind);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -488,29 +484,33 @@ mod mock {
 
         pub async fn mute_video(
             &self,
-            _source_kind: Option<MediaSourceKind>,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), JasonError> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Device));
             Ok(())
         }
 
         pub async fn unmute_video(
             &self,
-            _source_kind: Option<MediaSourceKind>,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), JasonError> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Display));
             Ok(())
         }
 
         pub async fn enable_video(
             &self,
-            _source_kind: Option<MediaSourceKind>,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), JasonError> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Device));
             Ok(())
         }
 
         pub async fn disable_video(
             &self,
-            _source_kind: Option<MediaSourceKind>,
+            source_kind: Option<MediaSourceKind>,
         ) -> Result<(), JasonError> {
+            assert_eq!(source_kind, Some(MediaSourceKind::Display));
             Ok(())
         }
 
