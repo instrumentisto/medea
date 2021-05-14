@@ -113,7 +113,8 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
         // TODO: Remove unwrap when ConstraintsUpdateException bindings will be
         //       implemented.
         this.set_local_media_settings(settings, stop_first, rollback_on_fail)
-            .await?;
+            .await
+            .unwrap();
         Ok(())
     }
     .into_dart_future()
@@ -525,19 +526,27 @@ mod mock {
             Ok(())
         }
 
-        pub async fn enable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn enable_remote_audio(
+            &self,
+        ) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
 
-        pub async fn disable_remote_audio(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn disable_remote_audio(
+            &self,
+        ) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
 
-        pub async fn enable_remote_video(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn enable_remote_video(
+            &self,
+        ) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
 
-        pub async fn disable_remote_video(&self) -> Result<(), Traced<RoomError>> {
+        pub async fn disable_remote_video(
+            &self,
+        ) -> Result<(), Traced<RoomError>> {
             Ok(())
         }
     }

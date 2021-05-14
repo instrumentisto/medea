@@ -1,7 +1,5 @@
 use std::ptr::NonNull;
 
-use libc::c_char;
-
 use dart_sys::Dart_Handle;
 use tracerr::Traced;
 

@@ -18,11 +18,11 @@
 //!
 //! [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use std::marker::PhantomData;
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
-use crate::api::DartValue;
+use crate::api::{utils::DartError, DartValue};
 
 use super::dart_api::{
     Dart_HandleFromPersistent_DL_Trampolined,
@@ -44,12 +44,12 @@ type CompleterNewCaller = extern "C" fn() -> Dart_Handle;
 type CompleterCompleteCaller = extern "C" fn(Dart_Handle, DartValue);
 
 /// Pointer to an extern function that invokes the [completeError()][1] method
-/// with the provided Rust pointer on the provided [`Dart_Handle`] pointing to
+/// with the provided [`DartError`] on the provided [`Dart_Handle`] pointing to
 /// the Dart [Completer] object.
 ///
 /// [1]: https://api.dart.dev/dart-async/Completer/completeError.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
-type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
+type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, DartError);
 
 /// Pointer to an extern function that calls the [future] getter on the provided
 /// [`Dart_Handle`] pointing to the Dart [Completer] object.
