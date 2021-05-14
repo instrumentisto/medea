@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'media_manager.dart';
 import 'room_handle.dart';
+import 'util/executor.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'util/callback.dart' as callback;
@@ -26,6 +27,12 @@ typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
 final DynamicLibrary dl = _dl_load();
+
+/// [Executor] that drives Rust futures.
+///
+/// Instantiated in the [_dl_load()] function, and must not be touched ever
+/// after that.
+var executor;
 
 final _new = dl.lookupFunction<_new_C, _new_Dart>('Jason__new');
 
@@ -63,6 +70,8 @@ DynamicLibrary _dl_load() {
   }
   callback.registerFunctions(dl);
   completer.registerFunctions(dl);
+
+  executor = Executor(dl);
 
   return dl;
 }

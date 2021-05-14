@@ -10,6 +10,7 @@
 
 pub mod constraints;
 pub mod error;
+pub mod executor;
 pub mod ice_server;
 pub mod input_device_info;
 pub mod media_devices;
@@ -22,11 +23,10 @@ pub mod utils;
 
 use std::time::Duration;
 
-use futures::Future;
-
 pub use self::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     error::Error,
+    executor::spawn,
     input_device_info::InputDeviceInfo,
     media_devices::{enumerate_devices, get_display_media, get_user_media},
     media_track::MediaStreamTrack,
@@ -49,15 +49,6 @@ pub fn init_logger() {
     android_logger::init_once(
         android_logger::Config::default().with_min_level(log::Level::Debug),
     );
-}
-
-/// Runs a Rust [`Future`] on the current thread.
-#[inline]
-pub fn spawn<F>(task: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    unimplemented!()
 }
 
 /// [`Future`] which resolves after the provided [`Duration`].

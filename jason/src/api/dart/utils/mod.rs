@@ -4,23 +4,16 @@ mod string;
 use std::future::Future;
 
 use dart_sys::Dart_Handle;
-use futures::FutureExt as _;
 
-use crate::{api::DartValue, platform::utils::Completer};
+use crate::{
+    api::DartValue,
+    platform::{spawn, utils::Completer},
+};
 
 pub use self::{
     arrays::PtrArray,
     string::{c_str_into_string, string_into_c_str},
 };
-
-/// Spawns the provided [`Future`] on the Dart event loop.
-pub fn spawn<F>(fut: F)
-where
-    F: Future<Output = ()> + 'static,
-{
-    // TODO: Implement executor.
-    fut.now_or_never().unwrap();
-}
 
 /// Extension trait for a [`Future`] allowing to convert Rust [`Future`]s to
 /// Dart `Future`s.
