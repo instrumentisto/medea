@@ -32,13 +32,16 @@ impl Component {
         _: Rc<State>,
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
-        peer.add_ice_candidate(
+        log::error!("ice_candidate_added");
+        let res = peer.add_ice_candidate(
             candidate.candidate,
             candidate.sdp_m_line_index,
             candidate.sdp_mid,
         )
         .await
-        .map_err(tracerr::map_from_and_wrap!())
+        .map_err(tracerr::map_from_and_wrap!());
+        log::error!("ice_candidate_added end");
+        res
     }
 
     /// Watcher for the [`State::remote_sdp`] update.
@@ -57,10 +60,12 @@ impl Component {
         state: Rc<State>,
         description: Guarded<String>,
     ) -> Result<(), Traced<PeerError>> {
+        log::error!("remote_sdp_changed");
         let (description, _guard) = description.into_parts();
         if let Some(role) = state.negotiation_role.get() {
             match role {
                 NegotiationRole::Offerer => {
+                    log::debug!("REMOTE ANSWER");
                     peer.set_remote_answer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
@@ -69,6 +74,7 @@ impl Component {
                     state.negotiation_role.set(None);
                 }
                 NegotiationRole::Answerer(_) => {
+                    log::debug!("REMOTE OFFER");
                     peer.set_remote_offer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
@@ -76,6 +82,7 @@ impl Component {
                 }
             }
         }
+        log::error!("remote_sdp_changed end");
         Ok(())
     }
 
@@ -89,8 +96,10 @@ impl Component {
         _: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
+        log::error!("sender_removed");
         let ((track_id, _), _guard) = val.into_parts();
         peer.remove_track(track_id);
+        log::error!("sender_removed END");
         Ok(())
     }
 
@@ -147,7 +156,7 @@ impl Component {
             &peer.media_connections,
             peer.send_constraints.clone(),
             peer.track_events_sender.clone(),
-        )
+        ).await
         .map_err(tracerr::map_from_and_wrap!())
         {
             Ok(sender) => sender,
@@ -180,6 +189,7 @@ impl Component {
         state: Rc<State>,
         val: Guarded<(TrackId, Rc<receiver::State>)>,
     ) -> Result<(), Traced<PeerError>> {
+        log::error!("receiver_added");
         let ((_, receiver), _guard) = val.into_parts();
         peer.connections
             .create_connection(state.id, receiver.sender_id());
@@ -190,9 +200,10 @@ impl Component {
                     &peer.media_connections,
                     peer.track_events_sender.clone(),
                     &peer.recv_constraints,
-                )),
+                ).await),
                 receiver,
             ));
+        log::error!("receiver_added END");
         Ok(())
     }
 
@@ -217,6 +228,7 @@ impl Component {
         state: Rc<State>,
         sdp: String,
     ) -> Result<(), Traced<PeerError>> {
+        log::error!("local_sdp_changed");
         let _ = state.sync_state.when_eq(SyncState::Synced).await;
         if let Some(role) = state.negotiation_role.get() {
             if state.local_sdp.is_rollback() {
@@ -275,6 +287,7 @@ impl Component {
                 }
             }
         }
+        log::error!("local_sdp_changed END");
         Ok(())
     }
 
@@ -295,6 +308,7 @@ impl Component {
         state: Rc<State>,
         _: (),
     ) -> Result<(), Traced<PeerError>> {
+        log::error!("local_sdp_approved");
         if let Some(negotiation_role) = state.negotiation_role.get() {
             match negotiation_role {
                 NegotiationRole::Offerer => {
@@ -308,6 +322,7 @@ impl Component {
                 }
             }
         }
+        log::error!("local_sdp_approved END");
         Ok(())
     }
 

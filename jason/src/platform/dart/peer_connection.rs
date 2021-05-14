@@ -63,6 +63,10 @@ type SetLocalDescriptionFunction =
 
 type NewPeer = extern "C" fn() -> Dart_Handle;
 
+type AddTransceiver = extern "C" fn(Dart_Handle, i32, i32) -> Dart_Handle;
+
+static mut ADD_TRANSCEIVER: Option<AddTransceiver> = None;
+
 static mut CONNECTION_STATE_FUNCTION: Option<ConnectionStateFunction> = None;
 
 static mut ADD_ICE_CANDIDATE_FUNCTION: Option<AddIceCandidateFunction> = None;
@@ -201,18 +205,25 @@ pub unsafe extern "C" fn register_RtcPeerConnection__new_peer(
     NEW_PEER = Some(f);
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn register_RtcPeerConnection__add_transceiver(
+    f: AddTransceiver,
+) {
+    ADD_TRANSCEIVER = Some(f);
+}
+
 #[derive(Clone, Debug)]
 pub struct RtcPeerConnection {
     handle: DartHandle,
 }
 
 impl RtcPeerConnection {
-    pub fn new<I>(_ice_servers: I, _is_force_relayed: bool) -> Result<Self>
+    pub async fn new<I>(_ice_servers: I, _is_force_relayed: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
         Ok(Self {
-            handle: DartHandle::new(unsafe { NEW_PEER.unwrap()() })
+            handle: DartFuture::new(unsafe { NEW_PEER.unwrap()() }).await.unwrap(),
         })
     }
 
@@ -244,7 +255,7 @@ impl RtcPeerConnection {
                     TwoArgCallback::callback(move |track, transceiver| {
                         f(
                             MediaStreamTrack::from(track),
-                            Transceiver::from(transceiver),
+                            Transceiver::from(DartHandle::new(transceiver)),
                         )
                     }),
                 )
@@ -376,6 +387,7 @@ impl RtcPeerConnection {
     pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         match sdp {
             SdpType::Offer(sdp) => unsafe {
+                log::debug!("OFFER");
                 DartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
                     self.handle.get(),
                     RtcSdpType::Offer.into(),
@@ -389,6 +401,7 @@ impl RtcPeerConnection {
                         )
                     )
                 })?;
+                log::debug!("DONE OFFER");
             },
             SdpType::Answer(sdp) => unsafe {
                 DartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
@@ -425,7 +438,7 @@ impl RtcPeerConnection {
         // map_err(|e| tracerr::new!(RtcPeerConnectionError::)) }
     }
 
-    pub fn add_transceiver(
+    pub async fn add_transceiver(
         &self,
         kind: MediaKind,
         direction: TransceiverDirection,
@@ -433,18 +446,21 @@ impl RtcPeerConnection {
         unsafe {
             let dir = if direction.is_all() {
                 0
-            } else if direction.contains(TransceiverDirection::RECV) {
-                1
             } else if direction.contains(TransceiverDirection::SEND) {
+                1
+            } else if direction.contains(TransceiverDirection::RECV) {
                 2
             } else {
                 3
             };
-            Transceiver::from(GET_TRANSCEIVER_FUNCTION.unwrap()(
+            log::error!("before {:?} {:?}", kind, direction);
+            let trnsvr = DartFuture::new(ADD_TRANSCEIVER.unwrap()(
                 self.handle.get(),
-                into_dart_string(kind.to_string()),
+                kind.id(),
                 dir,
-            ))
+            )).await;
+            log::error!("Future resolved");
+            Transceiver::from(trnsvr.unwrap())
         }
     }
 
@@ -458,7 +474,7 @@ impl RtcPeerConnection {
             if transceiver.is_null() {
                 None
             } else {
-                Some(Transceiver::from(transceiver))
+                Some(Transceiver::from(DartHandle::new(transceiver)))
             }
         }
     }

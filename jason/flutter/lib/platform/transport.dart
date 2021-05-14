@@ -11,7 +11,7 @@ void registerFunctions(DynamicLibrary dl) {
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           "register_WebSocketRpcTransport__on_message")(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(listenWs));
+      Pointer.fromFunction<Void Function(Handle, Handle)>(listenWs));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           "register_WebSocketRpcTransport__send")(
@@ -28,17 +28,17 @@ Object newWs(Pointer<Utf8> addr) {
 
 final _callMessageListenerDart _callMessageListener = dl
     .lookupFunction<_callMessageListenerC, _callMessageListenerDart>(
-        'WebSocketRpcTransport__on_message');
+        'StringCallback__call');
 typedef _callMessageListenerC = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
 typedef _callMessageListenerDart = Pointer<Utf8> Function(
     Pointer, Pointer<Utf8>);
 
-void listenWs(Object ws, Pointer callback) {
-  var cb = NullablePointer(callback);
+void listenWs(Object ws, Object callback) {
   if (ws is IOWebSocketChannel) {
     ws.stream.listen((msg) {
       if (msg is String) {
-        _callMessageListener(cb.getInnerPtr(), msg.toNativeUtf8());
+        var cb = callback as Function(String);
+        cb(msg);
       }
     });
   }

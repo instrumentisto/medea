@@ -1366,8 +1366,9 @@ impl InnerRoom {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())
                 .map_err(|e| {
-                    self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
+                    // TODO:
+                    // self.on_failed_local_media
+                    //     .call1(JasonError::from(e.clone()));
 
                     e
                 })?;
@@ -1604,8 +1605,9 @@ impl EventHandler for InnerRoom {
             peer_state
                 .insert_track(track, self.send_constraints.clone())
                 .map_err(|e| {
-                    self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
+                    // TODO:
+                    // self.on_failed_local_media
+                    //     .call1(JasonError::from(e.clone()));
                     tracerr::map_from_and_new!(e)
                 })?;
         }
@@ -1696,8 +1698,9 @@ impl EventHandler for InnerRoom {
                 PeerUpdate::Added(track) => peer_state
                     .insert_track(&track, self.send_constraints.clone())
                     .map_err(|e| {
-                        self.on_failed_local_media
-                            .call1(JasonError::from(e.clone()));
+                        // TODO:
+                        // self.on_failed_local_media
+                        //     .call1(JasonError::from(e.clone()));
                         tracerr::map_from_and_new!(e)
                     })?,
                 PeerUpdate::Updated(patch) => peer_state.patch_track(&patch),
@@ -1861,7 +1864,8 @@ impl PeerEventHandler for InnerRoom {
     /// Handles [`PeerEvent::FailedLocalMedia`] event by invoking
     /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(&self, error: JasonError) -> Self::Output {
-        self.on_failed_local_media.call1(error);
+        // TODO:
+        // self.on_failed_local_media.call1(error);
         Ok(())
     }
 

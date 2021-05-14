@@ -106,7 +106,7 @@ impl RtcPeerConnection {
     ///
     /// Errors with [`RtcPeerConnectionError::PeerCreationError`] if
     /// [`SysRtcPeerConnection`] creation fails.
-    pub fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
+    pub async fn new<I>(ice_servers: I, is_force_relayed: bool) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
@@ -569,7 +569,7 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
-    pub fn add_transceiver(
+    pub async fn add_transceiver(
         &self,
         kind: MediaKind,
         direction: TransceiverDirection,

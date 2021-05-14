@@ -303,7 +303,7 @@ impl PeerConnection {
     ///
     /// Errors with [`PeerError::RtcPeerConnection`] if some callback of
     /// [`platform::RtcPeerConnection`] can't be set.
-    pub fn new(
+    pub async fn new(
         state: &State,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         media_manager: Rc<MediaManager>,
@@ -316,6 +316,7 @@ impl PeerConnection {
                 state.ice_servers().clone(),
                 state.force_relay(),
             )
+                .await
             .map_err(tracerr::map_from_and_wrap!())?,
         );
         let (track_events_sender, mut track_events_rx) = mpsc::unbounded();
@@ -876,13 +877,16 @@ impl PeerConnection {
         &self,
         desc: platform::SdpType,
     ) -> Result<()> {
+        log::debug!("SET REMOTE DESCRIPTION");
         self.peer
             .set_remote_description(desc)
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+        log::debug!("END SET REMOTE DESCRIPTION");
         self.has_remote_description.set(true);
         self.media_connections.sync_receivers();
 
+        log::debug!("ICE candidates");
         let ice_candidates_buffer_flush_fut = future::try_join_all(
             self.ice_candidates_buffer.borrow_mut().drain(..).map(
                 |candidate| {
@@ -901,6 +905,7 @@ impl PeerConnection {
         ice_candidates_buffer_flush_fut
             .await
             .map_err(tracerr::map_from_and_wrap!())?;
+        log::debug!("ICE candidates end");
 
         Ok(())
     }

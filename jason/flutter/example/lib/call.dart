@@ -26,8 +26,11 @@ class Call {
 
   void onNewStream(Function(MediaStream) f) {
     _room.onNewConnection((conn) {
+      print("onNewConnection");
       var remoteMemberId = conn.getRemoteMemberId();
+      print("Settings onRemoteTrackAdded");
       conn.onRemoteTrackAdded((track) async {
+        print("onRemoteTrackAdded");
         var sysTrack = track.getTrack();
         if (_remoteStreams[remoteMemberId] != null) {
           await _remoteStreams[remoteMemberId]!.addTrack(sysTrack);
@@ -38,6 +41,7 @@ class Call {
           f(remoteStream);
         }
       });
+      print("onRemoteTrackAdded is set");
     });
   }
 

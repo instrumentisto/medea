@@ -1,5 +1,6 @@
 //! Platform-specific functionality.
 
+pub mod callback;
 pub mod peer_connection;
 pub mod rtc_stats;
 pub mod transceiver_direction;
@@ -9,6 +10,7 @@ cfg_if::cfg_if! {
     if #[cfg(target_os = "android")] {
         // TODO: make it private
         pub mod dart;
+        pub use self::callback::Callback;
         pub use self::dart::{
             constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
             delay_for,
@@ -18,7 +20,7 @@ cfg_if::cfg_if! {
             peer_connection::RtcPeerConnection,
             spawn,
             transceiver::Transceiver,
-            utils::{Callback, Function},
+            utils::{Function},
             error::Error,
             rtc_stats::RtcStats,
             set_panic_hook,

@@ -56,12 +56,13 @@ impl Receiver {
     /// arrives.
     ///
     /// [1]: platform::TransceiverDirection::INACTIVE
-    pub fn new(
+    pub async fn new(
         state: &State,
         media_connections: &MediaConnections,
         track_events_sender: mpsc::UnboundedSender<TrackEvent>,
         recv_constraints: &RecvConstraints,
     ) -> Self {
+        log::debug!("Receiver start");
         let connections = media_connections.0.borrow();
         let caps = TrackConstraints::from(state.media_type().clone());
         let kind = MediaKind::from(&caps);
@@ -77,20 +78,20 @@ impl Receiver {
             let sender = senders.find(|sndr| {
                 sndr.caps().media_kind() == caps.media_kind()
                     && sndr.caps().media_source_kind()
-                        == caps.media_source_kind()
+                    == caps.media_source_kind()
             });
-            Some(sender.map_or_else(
-                || connections.add_transceiver(kind, transceiver_direction),
-                |sender| {
-                    let trnsvr = sender.transceiver();
-                    trnsvr.add_direction(transceiver_direction);
+            if let Some(sender) = sender {
+                let trnsvr = sender.transceiver();
+                trnsvr.add_direction(transceiver_direction).await;
 
-                    trnsvr
-                },
-            ))
+                Some(trnsvr)
+            } else {
+                Some(connections.add_transceiver(kind, transceiver_direction).await)
+            }
         } else {
             None
         };
+        log::debug!("Receiver ok");
 
         let this = Self {
             track_id: state.track_id(),
@@ -194,9 +195,15 @@ impl Receiver {
         );
 
         if self.enabled_individual.get() {
-            transceiver.add_direction(platform::TransceiverDirection::RECV);
+            let transceiver = transceiver.clone();
+            platform::spawn(async move {
+                transceiver.add_direction(platform::TransceiverDirection::RECV).await;
+            });
         } else {
-            transceiver.sub_direction(platform::TransceiverDirection::RECV);
+            let transceiver = transceiver.clone();
+            platform::spawn(async move {
+                transceiver.sub_direction(platform::TransceiverDirection::RECV).await;
+            });
         }
 
         self.transceiver.replace(Some(transceiver));
@@ -262,9 +269,11 @@ impl Receiver {
 
 impl Drop for Receiver {
     fn drop(&mut self) {
-        if let Some(transceiver) = self.transceiver.borrow().as_ref() {
+        if let Some(transceiver) = self.transceiver.borrow().as_ref().cloned() {
             if !transceiver.is_stopped() {
-                transceiver.sub_direction(platform::TransceiverDirection::RECV);
+                crate::platform::spawn(async move {
+                    transceiver.sub_direction(platform::TransceiverDirection::RECV).await;
+                })
             }
         }
         if let Some(recv_track) = self.track.borrow_mut().take() {

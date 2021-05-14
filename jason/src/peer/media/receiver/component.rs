@@ -273,6 +273,7 @@ impl Component {
         _: Rc<State>,
         state: Guarded<media_exchange_state::Stable>,
     ) -> Result<()> {
+        log::error!("Receiver MediaExchangeState update");
         let (state, _guard) = state.into_parts();
         receiver
             .enabled_general
@@ -283,7 +284,9 @@ impl Component {
                     track.set_enabled(false);
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
-                    trnscvr.sub_direction(platform::TransceiverDirection::RECV);
+                    log::error!("Trying to sub direction of Transceiver");
+                    trnscvr.sub_direction(platform::TransceiverDirection::RECV).await;
+                    log::error!("Direction of Transceiver subbed");
                 }
             }
             media_exchange_state::Stable::Enabled => {
@@ -291,11 +294,15 @@ impl Component {
                     track.set_enabled(true);
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
-                    trnscvr.add_direction(platform::TransceiverDirection::RECV);
+                    log::error!("Trying to add direction of Transceiver");
+                    trnscvr.add_direction(platform::TransceiverDirection::RECV).await;
+                    log::error!("Direction of transceiver is added");
                 }
             }
         }
+        log::error!("Update direction");
         receiver.maybe_notify_track();
+        log::error!("Notify track");
 
         Ok(())
     }
@@ -311,9 +318,11 @@ impl Component {
         _: Rc<State>,
         state: media_exchange_state::Stable,
     ) -> Result<()> {
+        log::error!("enabled_individual_stable_state_changed");
         receiver
             .enabled_individual
             .set(state == media_exchange_state::Stable::Enabled);
+        log::error!("enabled_individual_stable_state_changed end");
         Ok(())
     }
 
@@ -331,7 +340,9 @@ impl Component {
         _: Rc<State>,
         state: media_exchange_state::Transition,
     ) -> Result<()> {
+        log::error!("enabled_individual_transition_started");
         receiver.send_media_exchange_state_intention(state);
+        log::error!("enabled_individual_transition_started end");
         Ok(())
     }
 
@@ -346,10 +357,12 @@ impl Component {
         _: Rc<State>,
         muted: bool,
     ) -> Result<()> {
+        log::error!("mute_state_changed");
         receiver.muted.set(muted);
         if let Some(track) = receiver.track.borrow().as_ref() {
             track.set_muted(muted)
         }
+        log::error!("mute_state_changed end");
         Ok(())
     }
 
@@ -363,6 +376,7 @@ impl Component {
         state: Rc<State>,
         sync_state: SyncState,
     ) -> Result<()> {
+        log::error!("sync_state_watcher");
         match sync_state {
             SyncState::Synced => {
                 if let MediaExchangeState::Transition(transition) =
@@ -377,6 +391,7 @@ impl Component {
             }
             SyncState::Syncing => (),
         }
+        log::error!("sync_state_watcher end");
         Ok(())
     }
 }

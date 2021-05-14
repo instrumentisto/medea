@@ -242,6 +242,7 @@ impl Component {
                 Rc::clone(&peers.connections),
                 Rc::clone(&peers.recv_constraints),
             )
+                .await
             .map_err(tracerr::map_from_and_wrap!())?,
             new_peer,
         );

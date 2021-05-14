@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'utils/option.dart';
 import 'utils/array.dart';
@@ -54,6 +55,27 @@ void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
       'register_RtcPeerConnection__new_peer')(
       Pointer.fromFunction<Handle Function()>(newPeer));
+
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_RtcPeerConnection__add_transceiver')(
+      Pointer.fromFunction<Handle Function(Handle, Int32, Int32)>(addTransceiver));
+
+
+}
+
+Object addTransceiver(Object peer, int kind, int direction) async {
+  peer = peer as RTCPeerConnection;
+
+  try {
+    var fut = await peer.addTransceiver(
+      kind: RTCRtpMediaType.values[kind],
+      init: RTCRtpTransceiverInit(direction: TransceiverDirection.values[direction]),
+    );
+    return fut;
+  } catch (e, stacktrace) {
+    throw e;
+  }
+
 }
 
 Object newPeer() {
@@ -61,7 +83,7 @@ Object newPeer() {
     'iceServers': [
       {'url': 'stun:stun.l.google.com:19302'},
     ],
-    'sdpSemantics': 'unified-plan',
+    'sdpSemantics': 'unified-plan'
   });
 }
 
@@ -107,9 +129,15 @@ void onConnectionStateChange(Object conn, Object f) {
 
 Object setRemoteDescription(
     Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
+  print("setRemoteDescription");
   conn = conn as RTCPeerConnection;
+  print("Peer casted");
+  var desc = RTCSessionDescription(sdp.toDartString(), type.toDartString());
+  print("Desc created");
   return conn.setRemoteDescription(
-      RTCSessionDescription(sdp.toDartString(), type.toDartString()));
+    desc
+      );
+
 }
 
 Object setLocalDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {

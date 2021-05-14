@@ -10,13 +10,14 @@ use tracerr::Traced;
 
 use crate::{
     platform::{
-        dart::utils::{callback_listener::StringCallback, handle::DartHandle},
+        dart::utils::{handle::DartHandle},
         RpcTransport, TransportError, TransportState,
     },
     rpc::{ApiUrl, ClientDisconnect},
     utils::dart::into_dart_string,
 };
 use crate::utils::dart::from_dart_string;
+use crate::platform::dart::utils::callback_listener::StringCallback;
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
@@ -26,7 +27,7 @@ type SendFunction = extern "C" fn(Dart_Handle, *const libc::c_char);
 
 type CloseFunction = extern "C" fn(Dart_Handle, i32, *const libc::c_char);
 
-type OnMessageFunction = extern "C" fn(Dart_Handle, *const OnMessageListeners);
+type OnMessageFunction = extern "C" fn(Dart_Handle, Dart_Handle);
 
 static mut NEW_FUNCTION: Option<NewFunction> = None;
 
@@ -112,7 +113,13 @@ impl WebSocketRpcTransport {
             let on_message_listeners = OnMessageListeners::new();
             ON_MESSAGE_FUNCTION.unwrap()(
                 handle,
-                Box::into_raw(Box::new(on_message_listeners.clone())),
+                StringCallback::callback({
+                    let on_message_listeners = on_message_listeners.clone();
+                    move |msg| {
+                        log::error!("Message: {}", msg);
+                        on_message_listeners.notify_all(msg);
+                    }
+                }).get(),
             );
             Ok(Self {
                 handle: DartHandle::new(handle),

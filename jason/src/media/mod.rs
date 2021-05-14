@@ -37,6 +37,15 @@ pub enum MediaKind {
     Video,
 }
 
+impl MediaKind {
+    pub fn id(self) -> i32 {
+        match self {
+            Self::Audio => 0,
+            Self::Video => 1,
+        }
+    }
+}
+
 impl From<&TrackConstraints> for MediaKind {
     fn from(media_type: &TrackConstraints) -> Self {
         match media_type {

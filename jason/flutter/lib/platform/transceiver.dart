@@ -24,13 +24,22 @@ void registerFunctions(DynamicLibrary dl) {
       Pointer.fromFunction<RustIntOption Function(Handle)>(isStopped));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__mid')(
-      Pointer.fromFunction<Pointer<Utf8> Function(Handle)>(mid));
+      Pointer.fromFunction<RustStringOption Function(Handle)>(mid));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__send_track')(
       Pointer.fromFunction<Handle Function(Handle)>(sendTrack));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_Transceiver__has_send_track')(
       Pointer.fromFunction<Int8 Function(Handle)>(hasSendTrack, 0));
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_Transceiver__set_direction')(
+      Pointer.fromFunction<Handle Function(Handle, Int32)>(setDirection));
+}
+
+Object setDirection(Object transceiver, int direction) {
+  print("[FLUTTER] Transceiver::set_direction called");
+  transceiver = transceiver as RTCRtpTransceiver;
+  return transceiver.setDirection(TransceiverDirection.values[direction]);
 }
 
 RustIntOption currentDirection(Object transceiver) {
@@ -42,9 +51,13 @@ RustIntOption currentDirection(Object transceiver) {
   }
 }
 
-Pointer<Utf8> mid(Object transceiver) {
+RustStringOption mid(Object transceiver) {
   transceiver = transceiver as RTCRtpTransceiver;
-  return transceiver.mid.toNativeUtf8();
+  if (transceiver.mid != null) {
+    return RustStringOption.some(transceiver.mid!);
+  } else {
+    return RustStringOption.none();
+  }
 }
 
 Object sendTrack(Object transceiver) {

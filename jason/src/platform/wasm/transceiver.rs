@@ -29,7 +29,7 @@ impl Transceiver {
 
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
     #[inline]
-    pub fn sub_direction(&self, disabled_direction: TransceiverDirection) {
+    pub async fn sub_direction(&self, disabled_direction: TransceiverDirection) {
         self.transceiver.set_direction(
             (self.current_direction() - disabled_direction).into(),
         );
@@ -37,7 +37,7 @@ impl Transceiver {
 
     /// Enables provided [`TransceiverDirection`] of this [`Transceiver`].
     #[inline]
-    pub fn add_direction(&self, enabled_direction: TransceiverDirection) {
+    pub async fn add_direction(&self, enabled_direction: TransceiverDirection) {
         self.transceiver.set_direction(
             (self.current_direction() | enabled_direction).into(),
         );
@@ -64,7 +64,7 @@ impl Transceiver {
         new_track: Rc<local::Track>,
     ) -> Result<(), Error> {
         let sys_track: &web_sys::MediaStreamTrack =
-            todo!("(*new_track).as_ref().as_ref()");
+            (*new_track).as_ref().as_ref();
         JsFuture::from(
             self.transceiver.sender().replace_track(Some(sys_track)),
         )

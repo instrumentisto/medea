@@ -365,12 +365,12 @@ impl InnerMediaConnections {
 
     /// Creates a [`platform::Transceiver`] and adds it to the
     /// [`platform::RtcPeerConnection`].
-    fn add_transceiver(
+    async fn add_transceiver(
         &self,
         kind: MediaKind,
         direction: platform::TransceiverDirection,
     ) -> platform::Transceiver {
-        self.peer.add_transceiver(kind, direction)
+        self.peer.add_transceiver(kind, direction).await
     }
 
     /// Lookups a [`platform::Transceiver`] by the provided [`mid`].
@@ -874,7 +874,7 @@ impl MediaConnections {
     }
 
     /// Creates new [`sender::Component`] with the provided data.
-    pub fn create_sender(
+    pub async fn create_sender(
         &self,
         id: TrackId,
         media_type: MediaType,
@@ -894,7 +894,7 @@ impl MediaConnections {
             &self,
             send_constraints.clone(),
             mpsc::unbounded().0,
-        )?;
+        ).await?;
 
         Ok(sender::Component::new(sender, Rc::new(sender_state)))
     }
@@ -927,7 +927,7 @@ impl MediaConnections {
 
     /// Creates new [`sender::Component`]s/[`receiver::Component`]s from the
     /// provided [`proto::Track`]s.
-    pub fn create_tracks(
+    pub async fn create_tracks(
         &self,
         tracks: Vec<proto::Track>,
         send_constraints: &LocalTracksConstraints,
@@ -943,7 +943,7 @@ impl MediaConnections {
                         mid,
                         receivers,
                         send_constraints,
-                    )?;
+                    ).await?;
                     self.0.borrow_mut().senders.insert(track.id, component);
                 }
                 Direction::Recv { mid, sender } => {
