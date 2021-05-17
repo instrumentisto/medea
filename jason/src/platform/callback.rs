@@ -8,7 +8,7 @@ use super::Function;
 pub struct Callback<A>(pub RefCell<Option<Function<A>>>);
 
 impl<A> Callback<A> {
-    /// Sets an inner [`Function`].
+    /// Sets the inner [`Function`].
     #[inline]
     pub fn set_func(&self, f: Function<A>) {
         self.0.borrow_mut().replace(f);
@@ -23,7 +23,7 @@ impl<A> Callback<A> {
 }
 
 impl Callback<()> {
-    /// Invokes underlying [`Function`] (if any) passing no arguments to it.
+    /// Invokes the underlying [`Function`] (if any) passing no arguments to it.
     #[inline]
     pub fn call0(&self) {
         if let Some(f) = self.0.borrow().as_ref() {
