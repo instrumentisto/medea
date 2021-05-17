@@ -28,10 +28,10 @@ pub enum MediaStreamTrackState {
 #[repr(u8)]
 pub enum MediaSourceKind {
     /// Media is sourced from some media device (webcam or microphone).
-    Device,
+    Device = 0,
 
     /// Media is obtained with screen-capture.
-    Display,
+    Display = 1,
 }
 
 impl From<MediaSourceKind> for proto::MediaSourceKind {
