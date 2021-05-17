@@ -28,16 +28,16 @@ use crate::{
 #[repr(u8)]
 pub enum FacingMode {
     /// Facing towards a user (a self-view camera).
-    User,
+    User = 0,
 
     /// Facing away from a user (viewing an environment).
-    Environment,
+    Environment = 1,
 
     /// Facing to the left of a user.
-    Left,
+    Left = 2,
 
     /// Facing to the right of a user.
-    Right,
+    Right = 3,
 }
 
 /// Local media stream for injecting into new created [`PeerConnection`]s.
