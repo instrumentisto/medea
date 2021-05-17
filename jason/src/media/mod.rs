@@ -29,11 +29,11 @@ pub use self::{
 pub enum MediaKind {
     /// Audio track.
     #[display(fmt = "audio")]
-    Audio,
+    Audio = 0,
 
     /// Video track.
     #[display(fmt = "video")]
-    Video,
+    Video = 1,
 }
 
 impl MediaKind {

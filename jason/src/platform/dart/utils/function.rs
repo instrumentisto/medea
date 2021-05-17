@@ -44,8 +44,8 @@ impl<A: Into<DartValue>> Callback<A> {
     #[inline]
     pub fn call1<T: Into<A>>(&self, arg: T) {
         if let Some(f) = self.0.borrow().as_ref() {
-            f.call1(arg.into())
-        };
+            f.call1(arg.into());
+        }
     }
 }
 
