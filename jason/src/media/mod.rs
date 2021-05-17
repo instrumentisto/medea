@@ -25,14 +25,15 @@ pub use self::{
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediastreamtrack-kind
 #[derive(Clone, Copy, Debug, Display, Eq, PartialEq)]
+#[repr(u8)]
 pub enum MediaKind {
     /// Audio track.
     #[display(fmt = "audio")]
-    Audio,
+    Audio = 0,
 
     /// Video track.
     #[display(fmt = "video")]
-    Video,
+    Video = 1,
 }
 
 impl MediaKind {

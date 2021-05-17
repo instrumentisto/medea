@@ -26,7 +26,7 @@ pub mod utils;
 
 use std::ffi::c_void;
 
-use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
+use crate::api::dart::utils::PtrArray;
 
 pub use self::{
     audio_track_constraints::AudioTrackConstraints,
@@ -117,14 +117,3 @@ impl_from_num_for_dart_value!(u8);
 impl_from_num_for_dart_value!(u16);
 impl_from_num_for_dart_value!(u32);
 impl_from_num_for_dart_value!(bool);
-
-impl From<u8> for MediaSourceKind {
-    #[inline]
-    fn from(value: u8) -> Self {
-        match value {
-            0 => MediaSourceKind::Device,
-            1 => MediaSourceKind::Display,
-            _ => unreachable!(),
-        }
-    }
-}

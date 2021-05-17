@@ -1,43 +1,10 @@
-//! Somewhat convenient wrappers around JS functions used as callbacks.
+//! Typed wrapper around [`js_sys::Function`].
 
-use std::{cell::RefCell, marker::PhantomData};
+use std::marker::PhantomData;
 
 use wasm_bindgen::JsValue;
 
-/// Wrapper for a single argument JS function.
-pub struct Callback<A>(RefCell<Option<Function<A>>>);
-
-impl<A> Callback<A> {
-    /// Sets an inner JS function.
-    #[inline]
-    pub fn set_func(&self, f: Function<A>) {
-        self.0.borrow_mut().replace(f);
-    }
-
-    /// Indicates whether this [`Callback`] is set.
-    #[inline]
-    #[must_use]
-    pub fn is_set(&self) -> bool {
-        self.0.borrow().as_ref().is_some()
-    }
-}
-
-impl Callback<()> {
-    /// Invokes its JS function (if any) passing no arguments to it.
-    #[inline]
-    pub fn call0(&self) {
-        if let Some(f) = self.0.borrow().as_ref() {
-            f.call0()
-        };
-    }
-}
-
-impl<A> Default for Callback<A> {
-    #[inline]
-    fn default() -> Self {
-        Self(RefCell::new(None))
-    }
-}
+use crate::platform::Callback;
 
 impl<A: Into<wasm_bindgen::JsValue>> Callback<A> {
     /// Invokes JS function (if any) passing the single provided `arg`ument to

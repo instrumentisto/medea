@@ -92,10 +92,18 @@ pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use crate::api::dart::JasonError;
+    use crate::{
+        api::dart::JasonError, rpc::ReconnectHandle as CoreReconnectHandle,
+    };
 
     #[derive(Clone)]
     pub struct ReconnectHandle;
+
+    impl From<CoreReconnectHandle> for ReconnectHandle {
+        fn from(_: CoreReconnectHandle) -> Self {
+            Self
+        }
+    }
 
     impl ReconnectHandle {
         pub async fn reconnect_with_delay(
