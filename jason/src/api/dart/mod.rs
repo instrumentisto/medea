@@ -24,9 +24,7 @@ pub mod room_handle;
 mod unimplemented;
 pub mod utils;
 
-use std::{ffi::c_void, ptr::NonNull};
-
-use libc::c_char;
+use std::{ffi::c_void, ptr};
 
 use crate::api::dart::utils::PtrArray;
 
@@ -51,8 +49,8 @@ pub trait ForeignClass: Sized {
     /// [`Box::into_raw()`].
     #[inline]
     #[must_use]
-    fn into_ptr(self) -> NonNull<Self> {
-        NonNull::from(Box::leak(Box::new(self)))
+    fn into_ptr(self) -> ptr::NonNull<Self> {
+        ptr::NonNull::from(Box::leak(Box::new(self)))
     }
 
     /// Constructs a [`ForeignClass`] from the given raw pointer via
@@ -63,7 +61,7 @@ pub trait ForeignClass: Sized {
     /// Same as for [`Box::from_raw()`].
     #[inline]
     #[must_use]
-    unsafe fn from_ptr(this: NonNull<Self>) -> Self {
+    unsafe fn from_ptr(this: ptr::NonNull<Self>) -> Self {
         *Box::from_raw(this.as_ptr())
     }
 }
@@ -72,7 +70,7 @@ pub trait ForeignClass: Sized {
 #[repr(u8)]
 pub enum DartValue {
     Void,
-    Ptr(NonNull<c_void>),
+    Ptr(ptr::NonNull<c_void>),
     String(NonNull<c_char>),
     Int(i64),
 }
@@ -94,14 +92,14 @@ impl<T: ForeignClass> From<T> for DartValue {
 impl<T> From<PtrArray<T>> for DartValue {
     #[inline]
     fn from(val: PtrArray<T>) -> Self {
-        DartValue::Ptr(NonNull::from(Box::leak(Box::new(val))).cast())
+        Self::Ptr(NonNull::from(Box::leak(Box::new(val))).cast())
     }
 }
 
 impl From<NonNull<c_char>> for DartValue {
     #[inline]
     fn from(c_str: NonNull<c_char>) -> Self {
-        DartValue::String(c_str)
+        Self::String(c_str)
     }
 }
 

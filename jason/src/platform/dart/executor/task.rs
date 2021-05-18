@@ -1,6 +1,6 @@
 //! [`Task`] for execution by a [`platform::dart::executor`].
 
-use std::{ptr::NonNull, rc::Rc};
+use std::{ptr, rc::Rc};
 
 use std::{
     cell::RefCell,
@@ -71,7 +71,7 @@ impl Task {
 
     /// Calls the [`task_wake()`] function by the provided reference.
     fn wake_by_ref(this: &Rc<Self>) {
-        task_wake(NonNull::from(Rc::as_ref(this)));
+        task_wake(ptr::NonNull::from(Rc::as_ref(this)));
     }
 
     /// Pretty much a copy of [`std::task::Wake`] implementation but for

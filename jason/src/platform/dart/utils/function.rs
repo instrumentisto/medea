@@ -20,11 +20,11 @@ use super::dart_api::{
     Dart_NewPersistentHandle_DL_Trampolined,
 };
 
-/// Pointer to an extern function that accepts a [`Dart_Handle`] and a `i64`
-/// number.
+/// Pointer to an extern function that accepts a [`Dart_Handle`] and a
+/// [`DartValue`] argument.
 type FnCaller = extern "C" fn(Dart_Handle, DartValue);
 
-/// Dart function used to invoke other Dart closures that accept an `i64`
+/// Dart function used to invoke other Dart closures that accept a [`DartValue`]
 /// argument.
 static mut FN_CALLER: Option<FnCaller> = None;
 

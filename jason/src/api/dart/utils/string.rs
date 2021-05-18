@@ -2,10 +2,9 @@
 
 use std::{
     ffi::{CStr, CString},
-    ptr::NonNull,
+    os::raw::c_char,
+    ptr,
 };
-
-use libc::c_char;
 
 /// Constructs a Rust [`String`] from the provided raw C string.
 ///
@@ -18,7 +17,7 @@ use libc::c_char;
 /// Same as for [`CStr::from_ptr()`].
 #[inline]
 #[must_use]
-pub unsafe fn c_str_into_string(string: NonNull<c_char>) -> String {
+pub unsafe fn c_str_into_string(string: ptr::NonNull<c_char>) -> String {
     CStr::from_ptr(string.as_ptr()).to_str().unwrap().to_owned()
 }
 
@@ -33,8 +32,8 @@ pub unsafe fn c_str_into_string(string: NonNull<c_char>) -> String {
 /// If the provided [`String`] contains an internal `0x0` byte.
 #[inline]
 #[must_use]
-pub fn string_into_c_str(string: String) -> NonNull<c_char> {
-    NonNull::new(CString::new(string).unwrap().into_raw()).unwrap()
+pub fn string_into_c_str(string: String) -> ptr::NonNull<c_char> {
+    ptr::NonNull::new(CString::new(string).unwrap().into_raw()).unwrap()
 }
 
 /// Retakes ownership over a [`CString`] previously transferred to Dart via
@@ -44,6 +43,6 @@ pub fn string_into_c_str(string: String) -> NonNull<c_char> {
 ///
 /// Same as for [`CString::from_raw()`].
 #[no_mangle]
-pub unsafe extern "C" fn String_free(s: NonNull<c_char>) {
+pub unsafe extern "C" fn String_free(s: ptr::NonNull<c_char>) {
     CString::from_raw(s.as_ptr());
 }

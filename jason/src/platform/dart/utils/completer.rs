@@ -18,7 +18,7 @@
 //!
 //! [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use std::{ffi::c_void, marker::PhantomData, ptr};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
@@ -35,9 +35,9 @@ use super::dart_api::{
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 type CompleterNewCaller = extern "C" fn() -> Dart_Handle;
 
-/// Pointer to an extern function that invokes the [complete()] method with
-/// the provided [`DartValue`] on the provided [`Dart_Handle`] pointing to the
-/// Dart [Completer] object.
+/// Pointer to an extern function that invokes the [complete()] method with the
+/// provided [`DartValue`] on the provided [`Dart_Handle`] pointing to the Dart
+/// [Completer] object.
 ///
 /// [complete()]: https://api.dart.dev/dart-async/Completer/complete.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
@@ -49,7 +49,8 @@ type CompleterCompleteCaller = extern "C" fn(Dart_Handle, DartValue);
 ///
 /// [1]: https://api.dart.dev/dart-async/Completer/completeError.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
-type CompleterCompleteErrorCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
+type CompleterCompleteErrorCaller =
+    extern "C" fn(Dart_Handle, ptr::NonNull<c_void>);
 
 /// Pointer to an extern function that calls the [future] getter on the provided
 /// [`Dart_Handle`] pointing to the Dart [Completer] object.

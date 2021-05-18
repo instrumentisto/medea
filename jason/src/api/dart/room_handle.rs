@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr;
 
 use dart_sys::Dart_Handle;
 
@@ -30,8 +30,8 @@ impl ForeignClass for RoomHandle {}
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__join(
-    this: NonNull<RoomHandle>,
-    token: NonNull<libc::c_char>,
+    this: ptr::NonNull<RoomHandle>,
+    token: ptr::NonNull<libc::c_char>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -72,8 +72,8 @@ pub unsafe extern "C" fn RoomHandle__join(
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-mediadevices-getusermedia
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
-    this: NonNull<RoomHandle>,
-    settings: NonNull<MediaStreamSettings>,
+    this: ptr::NonNull<RoomHandle>,
+    settings: ptr::NonNull<MediaStreamSettings>,
     stop_first: bool,
     rollback_on_fail: bool,
 ) -> Dart_Handle {
@@ -96,7 +96,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_audio(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -114,7 +114,7 @@ pub unsafe extern "C" fn RoomHandle__mute_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_audio(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_audio(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -150,7 +150,7 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_audio(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_video(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
@@ -191,7 +191,7 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_video(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 /// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_video(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
@@ -229,7 +229,7 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 /// Affects only video with specific [`MediaSourceKind`] if specified.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_video(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
@@ -248,7 +248,7 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -266,7 +266,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -284,7 +284,7 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_video(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -302,7 +302,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_video(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -321,7 +321,7 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_video(
 /// [`Connection`]: crate::connection::Connection
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_new_connection(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
     let this = this.as_ref();
@@ -338,7 +338,7 @@ pub unsafe extern "C" fn RoomHandle__on_new_connection(
 /// [`RoomCloseReason`]: crate::room::RoomCloseReason
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_close(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
     let this = this.as_ref();
@@ -361,7 +361,7 @@ pub unsafe extern "C" fn RoomHandle__on_close(
 /// [`LocalMediaTrack`]: crate::media::track::local::LocalMediaTrack
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_local_track(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
     let this = this.as_ref();
@@ -374,7 +374,7 @@ pub unsafe extern "C" fn RoomHandle__on_local_track(
 /// Sets callback, invoked when a connection with server is lost.
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__on_connection_loss(
-    this: NonNull<RoomHandle>,
+    this: ptr::NonNull<RoomHandle>,
     cb: Dart_Handle,
 ) {
     let this = this.as_ref();
@@ -392,7 +392,7 @@ pub unsafe extern "C" fn RoomHandle__on_connection_loss(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn RoomHandle__free(this: NonNull<RoomHandle>) {
+pub unsafe extern "C" fn RoomHandle__free(this: ptr::NonNull<RoomHandle>) {
     drop(RoomHandle::from_ptr(this));
 }
 
