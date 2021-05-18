@@ -24,7 +24,7 @@ pub mod room_handle;
 mod unimplemented;
 pub mod utils;
 
-use std::{ffi::c_void, ptr};
+use std::{ffi::c_void, os::raw::c_char, ptr};
 
 use crate::api::dart::utils::PtrArray;
 
@@ -71,7 +71,7 @@ pub trait ForeignClass: Sized {
 pub enum DartValue {
     Void,
     Ptr(ptr::NonNull<c_void>),
-    String(NonNull<c_char>),
+    String(ptr::NonNull<c_char>),
     Int(i64),
 }
 
@@ -92,13 +92,13 @@ impl<T: ForeignClass> From<T> for DartValue {
 impl<T> From<PtrArray<T>> for DartValue {
     #[inline]
     fn from(val: PtrArray<T>) -> Self {
-        Self::Ptr(NonNull::from(Box::leak(Box::new(val))).cast())
+        Self::Ptr(ptr::NonNull::from(Box::leak(Box::new(val))).cast())
     }
 }
 
-impl From<NonNull<c_char>> for DartValue {
+impl From<ptr::NonNull<c_char>> for DartValue {
     #[inline]
-    fn from(c_str: NonNull<c_char>) -> Self {
+    fn from(c_str: ptr::NonNull<c_char>) -> Self {
         Self::String(c_str)
     }
 }
