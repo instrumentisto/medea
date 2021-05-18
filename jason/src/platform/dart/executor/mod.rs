@@ -2,7 +2,7 @@
 
 mod task;
 
-use std::{future::Future, mem, ptr::NonNull, rc::Rc};
+use std::{future::Future, mem, ptr, rc::Rc};
 
 use dart_sys::{Dart_CObject, Dart_CObjectValue, Dart_CObject_Type, Dart_Port};
 
@@ -16,7 +16,7 @@ pub fn spawn(future: impl Future<Output = ()> + 'static) {
 
     // Task is leaked and will be freed by Dart calling the
     // `rust_executor_drop_task()` function.
-    task_wake(NonNull::from(mem::ManuallyDrop::new(task).as_ref()));
+    task_wake(ptr::NonNull::from(mem::ManuallyDrop::new(task).as_ref()));
 }
 
 /// A [`Dart_Port`] used to send [`Task`]'s poll commands so Dart will poll Rust
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn rust_executor_init(wake_port: Dart_Port) {
 /// [`Ready`]: std::task::Poll::Ready
 #[no_mangle]
 pub unsafe extern "C" fn rust_executor_poll_task(
-    mut task: NonNull<Task>,
+    mut task: ptr::NonNull<Task>,
 ) -> bool {
     task.as_mut().poll().is_pending()
 }
@@ -71,7 +71,7 @@ pub unsafe extern "C" fn rust_executor_poll_task(
 /// Valid [`Task`] pointer must be provided. Must be called only once for a
 /// specific [`Task`].
 #[no_mangle]
-pub unsafe extern "C" fn rust_executor_drop_task(task: NonNull<Task>) {
+pub unsafe extern "C" fn rust_executor_drop_task(task: ptr::NonNull<Task>) {
     drop(Rc::from_raw(task.as_ptr()))
 }
 
@@ -80,7 +80,7 @@ pub unsafe extern "C" fn rust_executor_drop_task(task: NonNull<Task>) {
 /// Sends command that contains the provided [`Task`] to the configured
 /// [`WAKE_PORT`]. When received, Dart must poll it by calling the
 /// [`rust_executor_poll_task()`] function.
-fn task_wake(task: NonNull<Task>) {
+fn task_wake(task: ptr::NonNull<Task>) {
     let wake_port = unsafe { WAKE_PORT }.unwrap();
 
     let mut task_addr = Dart_CObject {

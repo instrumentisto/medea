@@ -10,7 +10,7 @@
 //! initialization phase: after Dart DL API is initialized and before any other
 //! exported Rust function is called.
 
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use std::{ffi::c_void, marker::PhantomData, ptr};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
@@ -24,7 +24,7 @@ use super::dart_api::{
 
 /// Pointer to an extern function that accepts a [`Dart_Handle`] and a `c_void`
 /// pointer.
-type PointerArgFnCaller = extern "C" fn(Dart_Handle, NonNull<c_void>);
+type PointerArgFnCaller = extern "C" fn(Dart_Handle, ptr::NonNull<c_void>);
 
 /// Pointer to an extern function that accepts a [`Dart_Handle`].
 type UnitArgFnCaller = extern "C" fn(Dart_Handle);
@@ -33,8 +33,8 @@ type UnitArgFnCaller = extern "C" fn(Dart_Handle);
 /// number.
 type IntArgFnCaller = extern "C" fn(Dart_Handle, i64);
 
-/// Dart function used to invoke Dart closures that accept a `c_void` pointer
-/// argument.
+/// Dart function used to invoke Dart closures that accept a non-`null` `c_void`
+/// pointer argument.
 static mut PTR_ARG_FN_CALLER: Option<PointerArgFnCaller> = None;
 
 /// Dart function used to invoke other Dart closures without arguments.

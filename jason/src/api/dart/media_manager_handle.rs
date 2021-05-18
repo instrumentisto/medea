@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr;
 
 use dart_sys::Dart_Handle;
 
@@ -21,8 +21,8 @@ impl ForeignClass for MediaManagerHandle {}
 /// [`LocalMediaTrack`]: crate::media::track::local::LocalMediaTrack
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
-    this: NonNull<MediaManagerHandle>,
-    caps: NonNull<MediaStreamSettings>,
+    this: ptr::NonNull<MediaManagerHandle>,
+    caps: ptr::NonNull<MediaStreamSettings>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
     let caps = caps.as_ref().clone();
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
 /// [`InputDeviceInfo`]: super::input_device_info::InputDeviceInfo
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
-    this: NonNull<MediaManagerHandle>,
+    this: ptr::NonNull<MediaManagerHandle>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__free(
-    this: NonNull<MediaManagerHandle>,
+    this: ptr::NonNull<MediaManagerHandle>,
 ) {
     drop(MediaManagerHandle::from_ptr(this));
 }

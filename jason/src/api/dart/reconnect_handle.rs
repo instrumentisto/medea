@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr;
 
 use dart_sys::Dart_Handle;
 
@@ -23,7 +23,7 @@ impl ForeignClass for ReconnectHandle {}
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
-    this: NonNull<ReconnectHandle>,
+    this: ptr::NonNull<ReconnectHandle>,
     delay_ms: i64, // TODO: must check for cast_sign_loss
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
@@ -59,7 +59,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
-    this: NonNull<ReconnectHandle>,
+    this: ptr::NonNull<ReconnectHandle>,
     starting_delay: i64, // TODO: must check for cast_sign_loss
     multiplier: f32,
     max_delay: i64,
@@ -88,7 +88,9 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn ReconnectHandle__free(this: NonNull<ReconnectHandle>) {
+pub unsafe extern "C" fn ReconnectHandle__free(
+    this: ptr::NonNull<ReconnectHandle>,
+) {
     drop(ReconnectHandle::from_ptr(this));
 }
 

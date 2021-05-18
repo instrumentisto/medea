@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr;
 
 use dart_sys::Dart_Handle;
 
@@ -19,91 +19,78 @@ impl ForeignClass for RemoteMediaTrack {}
 /// Sets callback, invoked when this [`RemoteMediaTrack`] is enabled.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_enabled(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref();
-    this.on_enabled(platform::Function::new(f));
+    this.as_ref().on_enabled(platform::Function::new(f));
 }
 
 /// Sets callback, invoked when this [`RemoteMediaTrack`] is disabled.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_disabled(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref();
-    this.on_disabled(platform::Function::new(f));
+    this.as_ref().on_disabled(platform::Function::new(f));
 }
 
 /// Sets callback to invoke when this [`RemoteMediaTrack`] is muted.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_muted(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref();
-    this.on_muted(platform::Function::new(f));
+    this.as_ref().on_muted(platform::Function::new(f));
 }
 
 /// Sets callback to invoke when this [`RemoteMediaTrack`] is unmuted.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_unmuted(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref();
-    this.on_unmuted(platform::Function::new(f));
+    this.as_ref().on_unmuted(platform::Function::new(f));
 }
 
 /// Sets callback to invoke when this [`RemoteMediaTrack`] is stopped.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__on_stopped(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref();
-    this.on_stopped(platform::Function::new(f));
+    this.as_ref().on_stopped(platform::Function::new(f));
 }
 
 /// Indicates whether this [`RemoteMediaTrack`] is enabled.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__enabled(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref();
-
-    this.enabled() as u8
+    this.as_ref().enabled() as u8
 }
 
 /// Indicate whether this [`RemoteMediaTrack`] is muted.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__muted(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
 ) -> u8 {
-    let this = this.as_ref();
-
-    this.muted() as u8
+    this.as_ref().muted() as u8
 }
 
 /// Returns this [`RemoteMediaTrack`]'s kind (audio/video).
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__kind(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
 ) -> MediaKind {
-    let this = this.as_ref();
-
-    this.kind()
+    this.as_ref().kind()
 }
 
 /// Returns this [`RemoteMediaTrack`]'s media source kind.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
 ) -> MediaSourceKind {
-    let this = this.as_ref();
-
-    this.media_source_kind()
+    this.as_ref().media_source_kind()
 }
 
 /// Frees the data behind the provided pointer.
@@ -114,7 +101,7 @@ pub unsafe extern "C" fn RemoteMediaTrack__media_source_kind(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn RemoteMediaTrack__free(
-    this: NonNull<RemoteMediaTrack>,
+    this: ptr::NonNull<RemoteMediaTrack>,
 ) {
     drop(RemoteMediaTrack::from_ptr(this));
 }
