@@ -1,3 +1,5 @@
+use std::ptr;
+
 use super::ForeignClass;
 
 pub use crate::media::DisplayVideoTrackConstraints;
@@ -8,7 +10,7 @@ impl ForeignClass for DisplayVideoTrackConstraints {}
 /// configured.
 #[no_mangle]
 pub extern "C" fn DisplayVideoTrackConstraints__new(
-) -> *const DisplayVideoTrackConstraints {
+) -> ptr::NonNull<DisplayVideoTrackConstraints> {
     DisplayVideoTrackConstraints::new().into_ptr()
 }
 
@@ -20,7 +22,7 @@ pub extern "C" fn DisplayVideoTrackConstraints__new(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn DisplayVideoTrackConstraints__free(
-    this: *mut DisplayVideoTrackConstraints,
+    this: ptr::NonNull<DisplayVideoTrackConstraints>,
 ) {
     let _ = DisplayVideoTrackConstraints::from_ptr(this);
 }

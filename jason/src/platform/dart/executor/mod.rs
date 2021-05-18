@@ -2,7 +2,7 @@
 
 mod task;
 
-use std::{future::Future, rc::Rc};
+use std::{future::Future, mem, ptr, rc::Rc};
 
 use dart_sys::{Dart_CObject, Dart_CObjectValue, Dart_CObject_Type, Dart_Port};
 
@@ -16,7 +16,7 @@ pub fn spawn(future: impl Future<Output = ()> + 'static) {
 
     // Task is leaked and will be freed by Dart calling the
     // `rust_executor_drop_task()` function.
-    task_wake(Rc::into_raw(task));
+    task_wake(ptr::NonNull::from(mem::ManuallyDrop::new(task).as_ref()));
 }
 
 /// A [`Dart_Port`] used to send [`Task`]'s poll commands so Dart will poll Rust
@@ -53,10 +53,10 @@ pub unsafe extern "C" fn rust_executor_init(wake_port: Dart_Port) {
 /// [`Pending`]: std::task::Poll::Pending
 /// [`Ready`]: std::task::Poll::Ready
 #[no_mangle]
-pub unsafe extern "C" fn rust_executor_poll_task(task: *mut Task) -> bool {
-    let task = task.as_mut().unwrap();
-
-    task.poll().is_pending()
+pub unsafe extern "C" fn rust_executor_poll_task(
+    mut task: ptr::NonNull<Task>,
+) -> bool {
+    task.as_mut().poll().is_pending()
 }
 
 /// Drops a [`Task`].
@@ -71,8 +71,8 @@ pub unsafe extern "C" fn rust_executor_poll_task(task: *mut Task) -> bool {
 /// Valid [`Task`] pointer must be provided. Must be called only once for a
 /// specific [`Task`].
 #[no_mangle]
-pub unsafe extern "C" fn rust_executor_drop_task(task: *const Task) {
-    drop(Rc::from_raw(task))
+pub unsafe extern "C" fn rust_executor_drop_task(task: ptr::NonNull<Task>) {
+    drop(Rc::from_raw(task.as_ptr()))
 }
 
 /// Commands an external Dart executor to poll the provided [`Task`].
@@ -80,13 +80,13 @@ pub unsafe extern "C" fn rust_executor_drop_task(task: *const Task) {
 /// Sends command that contains the provided [`Task`] to the configured
 /// [`WAKE_PORT`]. When received, Dart must poll it by calling the
 /// [`rust_executor_poll_task()`] function.
-fn task_wake(task: *const Task) {
+fn task_wake(task: ptr::NonNull<Task>) {
     let wake_port = unsafe { WAKE_PORT }.unwrap();
 
     let mut task_addr = Dart_CObject {
         type_: Dart_CObject_Type::Int64,
         value: Dart_CObjectValue {
-            as_int64: task as i64,
+            as_int64: task.as_ptr() as i64,
         },
     };
 

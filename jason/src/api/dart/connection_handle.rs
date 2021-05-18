@@ -1,4 +1,4 @@
-use std::os::raw::c_char;
+use std::{os::raw::c_char, ptr};
 
 use dart_sys::Dart_Handle;
 
@@ -16,14 +16,12 @@ impl ForeignClass for ConnectionHandle {}
 /// Sets callback, invoked when this `Connection` will close.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_close(
-    this: *const ConnectionHandle,
+    this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
-
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
-    this.on_close(platform::Function::new(f)).unwrap();
+    this.as_ref().on_close(platform::Function::new(f)).unwrap();
 }
 
 /// Sets callback, invoked when a new [`remote::Track`] is added to this
@@ -33,14 +31,13 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
 /// [`Connection`]: crate::connection::Connection
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
-    this: *const ConnectionHandle,
+    this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
-
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
-    this.on_remote_track_added(platform::Function::new(f))
+    this.as_ref()
+        .on_remote_track_added(platform::Function::new(f))
         .unwrap();
 }
 
@@ -48,27 +45,24 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
 /// a server.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
-    this: *const ConnectionHandle,
+    this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) {
-    let this = this.as_ref().unwrap();
-
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
-    this.on_quality_score_update(platform::Function::new(f))
+    this.as_ref()
+        .on_quality_score_update(platform::Function::new(f))
         .unwrap();
 }
 
 /// Returns remote `Member` ID.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
-    this: *const ConnectionHandle,
-) -> *const c_char {
-    let this = this.as_ref().unwrap();
-
+    this: ptr::NonNull<ConnectionHandle>,
+) -> ptr::NonNull<c_char> {
     // TODO: Remove unwrap when propagating errors from Rust to Dart is
     //       implemented.
-    string_into_c_str(this.get_remote_member_id().unwrap())
+    string_into_c_str(this.as_ref().get_remote_member_id().unwrap())
 }
 
 /// Frees the data behind the provided pointer.
@@ -78,7 +72,9 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn ConnectionHandle__free(this: *mut ConnectionHandle) {
+pub unsafe extern "C" fn ConnectionHandle__free(
+    this: ptr::NonNull<ConnectionHandle>,
+) {
     drop(ConnectionHandle::from_ptr(this));
 }
 

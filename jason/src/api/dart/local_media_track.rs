@@ -1,3 +1,5 @@
+use std::ptr;
+
 use super::ForeignClass;
 
 use crate::media::{MediaKind, MediaSourceKind};
@@ -16,11 +18,9 @@ impl ForeignClass for LocalMediaTrack {}
 /// [`MediaKind::Video`]: crate::media::MediaKind::Video
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__kind(
-    this: *const LocalMediaTrack,
+    this: ptr::NonNull<LocalMediaTrack>,
 ) -> MediaKind {
-    let this = this.as_ref().unwrap();
-
-    this.kind()
+    this.as_ref().kind()
 }
 
 /// Returns a [`MediaSourceKind::Device`] if this [`LocalMediaTrack`] is
@@ -33,11 +33,9 @@ pub unsafe extern "C" fn LocalMediaTrack__kind(
 /// [`MediaSourceKind::Display`]: crate::media::MediaSourceKind::Display
 #[no_mangle]
 pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
-    this: *const LocalMediaTrack,
+    this: ptr::NonNull<LocalMediaTrack>,
 ) -> MediaSourceKind {
-    let this = this.as_ref().unwrap();
-
-    this.media_source_kind()
+    this.as_ref().media_source_kind()
 }
 
 /// Frees the data behind the provided pointer.
@@ -47,7 +45,9 @@ pub unsafe extern "C" fn LocalMediaTrack__media_source_kind(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn LocalMediaTrack__free(this: *mut LocalMediaTrack) {
+pub unsafe extern "C" fn LocalMediaTrack__free(
+    this: ptr::NonNull<LocalMediaTrack>,
+) {
     drop(LocalMediaTrack::from_ptr(this));
 }
 

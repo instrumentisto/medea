@@ -1,4 +1,4 @@
-use std::os::raw::c_char;
+use std::{os::raw::c_char, ptr};
 
 use crate::media::FacingMode;
 
@@ -12,7 +12,7 @@ impl ForeignClass for DeviceVideoTrackConstraints {}
 /// configured.
 #[no_mangle]
 pub extern "C" fn DeviceVideoTrackConstraints__new(
-) -> *const DeviceVideoTrackConstraints {
+) -> ptr::NonNull<DeviceVideoTrackConstraints> {
     DeviceVideoTrackConstraints::new().into_ptr()
 }
 
@@ -21,12 +21,10 @@ pub extern "C" fn DeviceVideoTrackConstraints__new(
 /// [1]: https://w3.org/TR/mediacapture-streams#def-constraint-deviceId
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
-    this: *mut DeviceVideoTrackConstraints,
-    device_id: *const c_char,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
+    device_id: ptr::NonNull<c_char>,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.device_id(c_str_into_string(device_id));
+    this.as_mut().device_id(c_str_into_string(device_id));
 }
 
 /// Sets an exact [facingMode][1] constraint.
@@ -34,12 +32,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__device_id(
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_facing_mode(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     facing_mode: FacingMode,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.exact_facing_mode(facing_mode);
+    this.as_mut().exact_facing_mode(facing_mode);
 }
 
 /// Sets an ideal [facingMode][1] constraint.
@@ -47,12 +43,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_facing_mode(
 /// [1]: https://w3.org/TR/mediacapture-streams#dom-constraindomstring
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_facing_mode(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     facing_mode: FacingMode,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.ideal_facing_mode(facing_mode);
+    this.as_mut().ideal_facing_mode(facing_mode);
 }
 
 /// Sets an exact [height][1] constraint.
@@ -60,12 +54,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_facing_mode(
 /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     height: u32,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.exact_height(height);
+    this.as_mut().exact_height(height);
 }
 
 /// Sets an ideal [height][1] constraint.
@@ -73,12 +65,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
 /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     height: u32,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.ideal_height(height);
+    this.as_mut().ideal_height(height);
 }
 
 /// Sets a range of a [height][1] constraint.
@@ -86,13 +76,11 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
 /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     min: u32,
     max: u32,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.height_in_range(min, max);
+    this.as_mut().height_in_range(min, max);
 }
 
 /// Sets an exact [width][1] constraint.
@@ -100,12 +88,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
 /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     width: u32,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.exact_width(width);
+    this.as_mut().exact_width(width);
 }
 
 /// Sets an ideal [width][1] constraint.
@@ -113,12 +99,10 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
 /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     width: u32,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.ideal_width(width);
+    this.as_mut().ideal_width(width);
 }
 
 /// Sets a range of a [width][1] constraint.
@@ -126,13 +110,11 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
 /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
-    this: *mut DeviceVideoTrackConstraints,
+    mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
     min: u32,
     max: u32,
 ) {
-    let this = this.as_mut().unwrap();
-
-    this.width_in_range(min, max);
+    this.as_mut().width_in_range(min, max);
 }
 
 /// Frees the data behind the provided pointer.
@@ -143,7 +125,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__free(
-    this: *mut DeviceVideoTrackConstraints,
+    this: ptr::NonNull<DeviceVideoTrackConstraints>,
 ) {
     drop(DeviceVideoTrackConstraints::from_ptr(this));
 }

@@ -1,3 +1,5 @@
+use std::ptr;
+
 use dart_sys::Dart_Handle;
 
 use crate::api::dart::utils::IntoDartFuture;
@@ -21,10 +23,10 @@ impl ForeignClass for ReconnectHandle {}
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
-    this: *mut ReconnectHandle,
+    this: ptr::NonNull<ReconnectHandle>,
     delay_ms: i64, // TODO: must check for cast_sign_loss
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -57,12 +59,12 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
-    this: *mut ReconnectHandle,
+    this: ptr::NonNull<ReconnectHandle>,
     starting_delay: i64, // TODO: must check for cast_sign_loss
     multiplier: f32,
     max_delay: i64,
 ) -> Dart_Handle {
-    let this = this.as_ref().unwrap().clone();
+    let this = this.as_ref().clone();
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -86,7 +88,9 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn ReconnectHandle__free(this: *mut ReconnectHandle) {
+pub unsafe extern "C" fn ReconnectHandle__free(
+    this: ptr::NonNull<ReconnectHandle>,
+) {
     drop(ReconnectHandle::from_ptr(this));
 }
 
