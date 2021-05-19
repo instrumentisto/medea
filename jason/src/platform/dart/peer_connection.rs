@@ -23,7 +23,10 @@ use crate::{
         IceCandidate, RtcPeerConnectionError, RtcStats, SdpType,
         TransceiverDirection,
     },
-    utils::dart::{dart_future::DartFuture, into_dart_string},
+    utils::dart::{
+        dart_future::{DartFuture, VoidDartFuture},
+        into_dart_string,
+    },
 };
 
 use super::{
@@ -48,7 +51,7 @@ type OnTrackFunction = extern "C" fn(Dart_Handle, Dart_Handle);
 type OnIceCandidateFunction = extern "C" fn(Dart_Handle, Dart_Handle);
 
 type GetTransceiverByMid =
-    extern "C" fn(Dart_Handle, *const libc::c_char) -> DartOption;
+    extern "C" fn(Dart_Handle, *const libc::c_char) -> Dart_Handle;
 
 type GetTransceiverFunction =
     extern "C" fn(Dart_Handle, *const libc::c_char, i32) -> Dart_Handle;
@@ -58,8 +61,11 @@ type AddIceCandidateFunction =
 type OnIceConnectionStateChangeFunction =
     extern "C" fn(Dart_Handle, Dart_Handle);
 
-type SetLocalDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
+type SetLocalDescriptionFunction = extern "C" fn(
+    Dart_Handle,
+    *const libc::c_char,
+    *const libc::c_char,
+) -> Dart_Handle;
 
 type NewPeer = extern "C" fn() -> Dart_Handle;
 
@@ -159,8 +165,11 @@ pub unsafe extern "C" fn register_RtcPeerConnection__set_local_description(
     SET_LOCAL_DESCRIPTION_FUNCTION = Some(f);
 }
 
-type SetRemoteDescriptionFunction =
-    extern "C" fn(Dart_Handle, i32, *const libc::c_char) -> Dart_Handle;
+type SetRemoteDescriptionFunction = extern "C" fn(
+    Dart_Handle,
+    *const libc::c_char,
+    *const libc::c_char,
+) -> Dart_Handle;
 
 #[no_mangle]
 pub unsafe extern "C" fn register_RtcPeerConnection__set_remote_description(
@@ -199,9 +208,7 @@ pub unsafe extern "C" fn register_RtcPeerConnection__on_connection_state_change(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn register_RtcPeerConnection__new_peer(
-    f: NewPeer,
-) {
+pub unsafe extern "C" fn register_RtcPeerConnection__new_peer(f: NewPeer) {
     NEW_PEER = Some(f);
 }
 
@@ -218,12 +225,17 @@ pub struct RtcPeerConnection {
 }
 
 impl RtcPeerConnection {
-    pub async fn new<I>(_ice_servers: I, _is_force_relayed: bool) -> Result<Self>
+    pub async fn new<I>(
+        _ice_servers: I,
+        _is_force_relayed: bool,
+    ) -> Result<Self>
     where
         I: IntoIterator<Item = IceServer>,
     {
         Ok(Self {
-            handle: DartFuture::new(unsafe { NEW_PEER.unwrap()() }).await.unwrap(),
+            handle: DartFuture::new(unsafe { NEW_PEER.unwrap()() })
+                .await
+                .unwrap(),
         })
     }
 
@@ -369,7 +381,7 @@ impl RtcPeerConnection {
         unsafe {
             DartFuture::new(SET_LOCAL_DESCRIPTION_FUNCTION.unwrap()(
                 self.handle.get(),
-                sdp_type.into(),
+                into_dart_string(sdp_type.to_string()),
                 into_dart_string(sdp),
             ))
             .await
@@ -388,35 +400,34 @@ impl RtcPeerConnection {
         match sdp {
             SdpType::Offer(sdp) => unsafe {
                 log::debug!("OFFER");
-                DartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                VoidDartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
                     self.handle.get(),
-                    RtcSdpType::Offer.into(),
+                    into_dart_string(RtcSdpType::Offer.to_string()),
                     into_dart_string(sdp),
                 ))
-                .await
-                .map_err(|_e| {
-                    tracerr::new!(
-                        RtcPeerConnectionError::SetRemoteDescriptionFailed(
-                            todo!("Error::from(e)")
-                        )
-                    )
-                })?;
-                log::debug!("DONE OFFER");
+                .await;
+                // .map_err(|e| {
+                //     tracerr::new!(
+                //         RtcPeerConnectionError::SetRemoteDescriptionFailed(
+                //             e.into()
+                //         )
+                //     )
+                // })?;
             },
             SdpType::Answer(sdp) => unsafe {
-                DartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
+                VoidDartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
                     self.handle.get(),
-                    RtcSdpType::Answer.into(),
+                    into_dart_string(RtcSdpType::Answer.to_string()),
                     into_dart_string(sdp),
                 ))
-                .await
-                .map_err(|_e| {
-                    tracerr::new!(
-                        RtcPeerConnectionError::SetRemoteDescriptionFailed(
-                            todo!("Error::from(e)")
-                        )
-                    )
-                })?;
+                .await;
+                // .map_err(|_e| {
+                //     tracerr::new!(
+                //         RtcPeerConnectionError::SetRemoteDescriptionFailed(
+                //             todo!("Error::from(e)")
+                //         )
+                //     )
+                // })?;
             },
         }
         Ok(())
@@ -458,24 +469,31 @@ impl RtcPeerConnection {
                 self.handle.get(),
                 kind.id(),
                 dir,
-            )).await;
+            ))
+            .await;
             log::error!("Future resolved");
             Transceiver::from(trnsvr.unwrap())
         }
     }
 
-    pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
+    pub async fn get_transceiver_by_mid(
+        &self,
+        mid: &str,
+    ) -> Option<Transceiver> {
         unsafe {
-            let transceiver: Dart_Handle =
-                Option::from(GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
+            let transceiver: DartHandle =
+                DartFuture::new(GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
                     self.handle.get(),
                     into_dart_string(mid.to_string()),
-                ))?;
-            if transceiver.is_null() {
-                None
-            } else {
-                Some(Transceiver::from(DartHandle::new(transceiver)))
-            }
+                ))
+                .await
+                .unwrap();
+            // TODO: option
+            // if transceiver.is_null() {
+            //     None
+            // } else {
+            Some(Transceiver::from(transceiver))
+            // }
         }
     }
 }

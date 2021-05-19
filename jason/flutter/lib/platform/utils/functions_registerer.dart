@@ -6,8 +6,10 @@ import 'list.dart' as list;
 import 'map.dart' as map;
 import 'option.dart' as option;
 import 'panic_exception.dart' as panic_exception;
+import 'error.dart' as error;
 
 void registerFunctions(DynamicLibrary dl) {
+  error.registerFunctions(dl);
   callback.registerFunctions(dl);
   future.registerFunctions(dl);
   list.registerFunctions(dl);

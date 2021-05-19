@@ -21,7 +21,7 @@ class Call {
     var constraints = _buildConstraints();
     await _room.setLocalMediaSettings(constraints, false, false);
     //ws://wss://medea.com/MyConf1/Alice?token=777
-    await _room.join("ws://192.168.0.2:8080/ws/video-call-1/caller?token=test");
+    await _room.join("ws://172.22.5.86:8080/ws/video-call-1/caller?token=test");
   }
 
   void onNewStream(Function(MediaStream) f) {

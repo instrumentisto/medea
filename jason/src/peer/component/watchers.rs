@@ -33,13 +33,14 @@ impl Component {
         candidate: IceCandidate,
     ) -> Result<(), Traced<PeerError>> {
         log::error!("ice_candidate_added");
-        let res = peer.add_ice_candidate(
-            candidate.candidate,
-            candidate.sdp_m_line_index,
-            candidate.sdp_mid,
-        )
-        .await
-        .map_err(tracerr::map_from_and_wrap!());
+        let res = peer
+            .add_ice_candidate(
+                candidate.candidate,
+                candidate.sdp_m_line_index,
+                candidate.sdp_mid,
+            )
+            .await
+            .map_err(tracerr::map_from_and_wrap!());
         log::error!("ice_candidate_added end");
         res
     }
@@ -60,29 +61,25 @@ impl Component {
         state: Rc<State>,
         description: Guarded<String>,
     ) -> Result<(), Traced<PeerError>> {
-        log::error!("remote_sdp_changed");
         let (description, _guard) = description.into_parts();
         if let Some(role) = state.negotiation_role.get() {
             match role {
                 NegotiationRole::Offerer => {
-                    log::debug!("REMOTE ANSWER");
                     peer.set_remote_answer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    peer.media_connections.sync_receivers();
+                    peer.media_connections.sync_receivers().await;
                     state.negotiation_state.set(NegotiationState::Stable);
                     state.negotiation_role.set(None);
                 }
                 NegotiationRole::Answerer(_) => {
-                    log::debug!("REMOTE OFFER");
                     peer.set_remote_offer(description)
                         .await
                         .map_err(tracerr::map_from_and_wrap!())?;
-                    peer.media_connections.sync_receivers();
+                    peer.media_connections.sync_receivers().await;
                 }
             }
         }
-        log::error!("remote_sdp_changed end");
         Ok(())
     }
 
@@ -96,10 +93,8 @@ impl Component {
         _: Rc<State>,
         val: Guarded<(TrackId, Rc<sender::State>)>,
     ) -> Result<(), Traced<PeerError>> {
-        log::error!("sender_removed");
         let ((track_id, _), _guard) = val.into_parts();
         peer.remove_track(track_id);
-        log::error!("sender_removed END");
         Ok(())
     }
 
@@ -156,7 +151,8 @@ impl Component {
             &peer.media_connections,
             peer.send_constraints.clone(),
             peer.track_events_sender.clone(),
-        ).await
+        )
+        .await
         .map_err(tracerr::map_from_and_wrap!())
         {
             Ok(sender) => sender,
@@ -195,12 +191,15 @@ impl Component {
             .create_connection(state.id, receiver.sender_id());
         peer.media_connections
             .insert_receiver(receiver::Component::new(
-                Rc::new(receiver::Receiver::new(
-                    &receiver,
-                    &peer.media_connections,
-                    peer.track_events_sender.clone(),
-                    &peer.recv_constraints,
-                ).await),
+                Rc::new(
+                    receiver::Receiver::new(
+                        &receiver,
+                        &peer.media_connections,
+                        peer.track_events_sender.clone(),
+                        &peer.recv_constraints,
+                    )
+                    .await,
+                ),
                 receiver,
             ));
         log::error!("receiver_added END");
@@ -249,7 +248,7 @@ impl Component {
                             .set_offer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
-                        peer.media_connections.sync_receivers();
+                        peer.media_connections.sync_receivers().await;
                         let mids = peer
                             .get_mids()
                             .map_err(tracerr::map_from_and_wrap!())?;
@@ -271,7 +270,7 @@ impl Component {
                             .set_answer(&sdp)
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
-                        peer.media_connections.sync_receivers();
+                        peer.media_connections.sync_receivers().await;
                         peer.peer_events_sender
                             .unbounded_send(PeerEvent::NewSdpAnswer {
                                 peer_id: peer.id(),

@@ -376,11 +376,11 @@ impl InnerMediaConnections {
     /// Lookups a [`platform::Transceiver`] by the provided [`mid`].
     ///
     /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
-    fn get_transceiver_by_mid(
+    async fn get_transceiver_by_mid(
         &self,
         mid: &str,
     ) -> Option<platform::Transceiver> {
-        self.peer.get_transceiver_by_mid(mid)
+        self.peer.get_transceiver_by_mid(mid).await
     }
 }
 
@@ -698,7 +698,7 @@ impl MediaConnections {
     ///
     /// [`Receiver`]: self::receiver::Receiver
     /// [`mid`]: https://w3.org/TR/webrtc#dom-rtptransceiver-mid
-    pub fn sync_receivers(&self) {
+    pub async fn sync_receivers(&self) {
         let inner = self.0.borrow();
         for receiver in inner
             .receivers
@@ -706,7 +706,9 @@ impl MediaConnections {
             .filter(|rcvr| rcvr.transceiver().is_none())
         {
             if let Some(mid) = receiver.mid() {
-                if let Some(trnscvr) = inner.peer.get_transceiver_by_mid(&mid) {
+                if let Some(trnscvr) =
+                    inner.peer.get_transceiver_by_mid(&mid).await
+                {
                     receiver.replace_transceiver(trnscvr)
                 }
             }
@@ -894,7 +896,8 @@ impl MediaConnections {
             &self,
             send_constraints.clone(),
             mpsc::unbounded().0,
-        ).await?;
+        )
+        .await?;
 
         Ok(sender::Component::new(sender, Rc::new(sender_state)))
     }
@@ -937,13 +940,15 @@ impl MediaConnections {
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, receivers } => {
-                    let component = self.create_sender(
-                        track.id,
-                        track.media_type,
-                        mid,
-                        receivers,
-                        send_constraints,
-                    ).await?;
+                    let component = self
+                        .create_sender(
+                            track.id,
+                            track.media_type,
+                            mid,
+                            receivers,
+                            send_constraints,
+                        )
+                        .await?;
                     self.0.borrow_mut().senders.insert(track.id, component);
                 }
                 Direction::Recv { mid, sender } => {

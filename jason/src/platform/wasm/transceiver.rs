@@ -29,7 +29,10 @@ impl Transceiver {
 
     /// Disables provided [`TransceiverDirection`] of this [`Transceiver`].
     #[inline]
-    pub async fn sub_direction(&self, disabled_direction: TransceiverDirection) {
+    pub async fn sub_direction(
+        &self,
+        disabled_direction: TransceiverDirection,
+    ) {
         self.transceiver.set_direction(
             (self.current_direction() - disabled_direction).into(),
         );

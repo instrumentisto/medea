@@ -1,8 +1,11 @@
 use dart_sys::Dart_Handle;
 
-use crate::utils::dart::from_dart_string;
-use crate::platform::dart::utils::dart_api::Dart_NewPersistentHandle_DL_Trampolined;
-use crate::platform::dart::utils::handle::DartHandle;
+use crate::{
+    platform::dart::utils::{
+        dart_api::Dart_NewPersistentHandle_DL_Trampolined, handle::DartHandle,
+    },
+    utils::dart::from_dart_string,
+};
 
 type VoidCallbackFunction = extern "C" fn(*mut VoidCallback) -> Dart_Handle;
 static mut VOID_CALLBACK_FUNCTION: Option<VoidCallbackFunction> = None;
@@ -44,7 +47,8 @@ pub unsafe extern "C" fn StringCallback__call(
     cb.0(s);
 }
 
-type StringCallbackFunction = extern "C" fn(*const StringCallback) -> Dart_Handle;
+type StringCallbackFunction =
+    extern "C" fn(*const StringCallback) -> Dart_Handle;
 static mut STRING_CALLBACK_FUNCTION: Option<StringCallbackFunction> = None;
 
 #[no_mangle]
@@ -63,7 +67,9 @@ impl StringCallback {
     {
         let this = Self(Box::new(f));
         unsafe {
-            DartHandle::new(STRING_CALLBACK_FUNCTION.unwrap()(Box::into_raw(Box::new(this))))
+            DartHandle::new(STRING_CALLBACK_FUNCTION.unwrap()(Box::into_raw(
+                Box::new(this),
+            )))
         }
     }
 }

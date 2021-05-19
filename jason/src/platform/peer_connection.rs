@@ -22,10 +22,15 @@ pub enum SdpType {
     Answer(String),
 }
 
+#[derive(Display)]
 pub enum RtcSdpType {
+    #[display(fmt = "offer")]
     Offer,
+    #[display(fmt = "pranswer")]
     Pranswer,
+    #[display(fmt = "answer")]
     Answer,
+    #[display(fmt = "rollback")]
     Rollback,
 }
 

@@ -52,17 +52,20 @@ class RustOption extends Struct {
 
 class RustStringOption extends Struct {
   @Int8()
-  external int? _is_some;
-  external Pointer<Utf8>? _val;
+  external int? is_some;
+  external Pointer<Utf8>? val;
 
-  RustStringOption.some(String val) {
-    _is_some = 1;
-    _val = val.toNativeUtf8();
+  static RustStringOption some(String value) {
+    var me = calloc<RustStringOption>();
+    me.ref.is_some = 1;
+    me.ref.val = value.toNativeUtf8();
+    return me.ref;
   }
 
-  RustStringOption.none() {
-    _is_some = 0;
-    _val = Pointer.fromAddress(0);
+  static RustStringOption none() {
+    var me = calloc<RustStringOption>();
+    me.ref.is_some = 0;
+    return me.ref;
   }
 }
 
@@ -72,13 +75,16 @@ class RustIntOption extends Struct {
   @Int32()
   external int _val;
 
-  RustIntOption.some(int val) {
-    _is_some = 1;
-    _val = val;
+  static some(int val) {
+    var me = calloc<RustIntOption>();
+    me.ref._is_some = 1;
+    me.ref._val = val;
+    return me.ref;
   }
 
   RustIntOption.none() {
-    _is_some = 0;
-    _val = 0;
+    var me = calloc<RustIntOption>();
+    me.ref._is_some = 0;
+    me.ref._val = 0;
   }
 }

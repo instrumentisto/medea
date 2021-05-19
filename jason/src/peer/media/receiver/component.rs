@@ -285,7 +285,9 @@ impl Component {
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
                     log::error!("Trying to sub direction of Transceiver");
-                    trnscvr.sub_direction(platform::TransceiverDirection::RECV).await;
+                    trnscvr
+                        .sub_direction(platform::TransceiverDirection::RECV)
+                        .await;
                     log::error!("Direction of Transceiver subbed");
                 }
             }
@@ -295,7 +297,9 @@ impl Component {
                 }
                 if let Some(trnscvr) = receiver.transceiver.borrow().as_ref() {
                     log::error!("Trying to add direction of Transceiver");
-                    trnscvr.add_direction(platform::TransceiverDirection::RECV).await;
+                    trnscvr
+                        .add_direction(platform::TransceiverDirection::RECV)
+                        .await;
                     log::error!("Direction of transceiver is added");
                 }
             }

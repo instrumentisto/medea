@@ -1,4 +1,5 @@
 use dart_sys::Dart_Handle;
+use derive_more::From;
 
 use crate::utils::dart::from_dart_string;
 
@@ -18,6 +19,7 @@ pub unsafe extern "C" fn register_RustHandleOption__get(f: GetFunction) {
     GET_FUNCTION = Some(f);
 }
 
+#[derive(From)]
 pub struct RustHandleOption(Dart_Handle);
 
 impl From<RustHandleOption> for Option<Dart_Handle> {

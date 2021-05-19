@@ -11,7 +11,7 @@ pub mod nullable;
 pub mod option;
 pub mod result;
 
-pub use self::callback::{Function};
+pub use self::callback::Function;
 
 pub fn ice_connection_from_int(i: i32) -> IceConnectionState {
     match i {

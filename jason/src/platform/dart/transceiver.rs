@@ -1,6 +1,8 @@
 use std::{future::Future, rc::Rc};
 
 use dart_sys::Dart_Handle;
+use futures::future::LocalBoxFuture;
+use medea_client_api_proto::MediaSourceKind;
 
 use crate::{
     media::track::local,
@@ -12,10 +14,8 @@ use crate::{
         },
         MediaStreamTrack, TransceiverDirection,
     },
+    utils::dart::dart_future::DartFuture,
 };
-use medea_client_api_proto::MediaSourceKind;
-use crate::utils::dart::dart_future::DartFuture;
-use futures::future::LocalBoxFuture;
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
@@ -137,7 +137,10 @@ impl Transceiver {
         }
     }
 
-    fn set_direction(&self, direction: TransceiverDirection) -> LocalBoxFuture<'static, ()> {
+    fn set_direction(
+        &self,
+        direction: TransceiverDirection,
+    ) -> LocalBoxFuture<'static, ()> {
         log::error!("Start set Transceiver::set_direction");
         let fut = DartFuture::new(unsafe {
             SET_DIRECTION_FUNCTION.unwrap()(
@@ -150,13 +153,19 @@ impl Transceiver {
         })
     }
 
-    pub fn sub_direction(&self, disabled_direction: TransceiverDirection) -> LocalBoxFuture<'static, ()> {
+    pub fn sub_direction(
+        &self,
+        disabled_direction: TransceiverDirection,
+    ) -> LocalBoxFuture<'static, ()> {
         self.set_direction(
             (self.current_direction() - disabled_direction).into(),
         )
     }
 
-    pub fn add_direction(&self, enabled_direction: TransceiverDirection) -> LocalBoxFuture<'static, ()> {
+    pub fn add_direction(
+        &self,
+        enabled_direction: TransceiverDirection,
+    ) -> LocalBoxFuture<'static, ()> {
         self.set_direction(
             (self.current_direction() | enabled_direction).into(),
         )

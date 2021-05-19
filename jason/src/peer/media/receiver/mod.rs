@@ -78,7 +78,7 @@ impl Receiver {
             let sender = senders.find(|sndr| {
                 sndr.caps().media_kind() == caps.media_kind()
                     && sndr.caps().media_source_kind()
-                    == caps.media_source_kind()
+                        == caps.media_source_kind()
             });
             if let Some(sender) = sender {
                 let trnsvr = sender.transceiver();
@@ -86,7 +86,11 @@ impl Receiver {
 
                 Some(trnsvr)
             } else {
-                Some(connections.add_transceiver(kind, transceiver_direction).await)
+                Some(
+                    connections
+                        .add_transceiver(kind, transceiver_direction)
+                        .await,
+                )
             }
         } else {
             None
@@ -197,12 +201,16 @@ impl Receiver {
         if self.enabled_individual.get() {
             let transceiver = transceiver.clone();
             platform::spawn(async move {
-                transceiver.add_direction(platform::TransceiverDirection::RECV).await;
+                transceiver
+                    .add_direction(platform::TransceiverDirection::RECV)
+                    .await;
             });
         } else {
             let transceiver = transceiver.clone();
             platform::spawn(async move {
-                transceiver.sub_direction(platform::TransceiverDirection::RECV).await;
+                transceiver
+                    .sub_direction(platform::TransceiverDirection::RECV)
+                    .await;
             });
         }
 
@@ -272,7 +280,9 @@ impl Drop for Receiver {
         if let Some(transceiver) = self.transceiver.borrow().as_ref().cloned() {
             if !transceiver.is_stopped() {
                 crate::platform::spawn(async move {
-                    transceiver.sub_direction(platform::TransceiverDirection::RECV).await;
+                    transceiver
+                        .sub_direction(platform::TransceiverDirection::RECV)
+                        .await;
                 })
             }
         }

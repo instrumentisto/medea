@@ -1,29 +1,15 @@
-use crate::platform::dart::{error::DartError, utils::handle::DartHandle};
-use dart_sys::Dart_Handle;
-use futures::channel::oneshot;
 use std::future::Future;
 
-pub struct VoidDartFuture(oneshot::Sender<()>);
+use dart_sys::Dart_Handle;
+use futures::channel::oneshot;
 
-impl VoidDartFuture {
-    pub fn new(dart_fut: Dart_Handle) -> impl Future<Output = ()> {
-        let (tx, rx) = oneshot::channel();
-        let this = Self(tx);
-
-        unsafe {
-            VOID_FUTURE_SPAWNER_FUNCTION.unwrap()(
-                dart_fut,
-                Box::into_raw(Box::new(this)),
-            )
-        };
-
-        async move { rx.await.unwrap() }
-    }
-
-    pub fn resolve(self) {
-        self.0.send(());
-    }
-}
+use crate::{
+    platform::dart::{
+        error::DartError,
+        utils::{handle::DartHandle, option::RustHandleOption},
+    },
+    utils::dart::option::DartOption,
+};
 
 pub struct DartFuture(oneshot::Sender<Result<DartHandle, DartError>>);
 
@@ -50,6 +36,28 @@ impl DartFuture {
 
     fn resolve_err(self, val: Dart_Handle) {
         let _ = self.0.send(Err(DartError::from(val)));
+    }
+}
+
+pub struct VoidDartFuture(oneshot::Sender<()>);
+
+impl VoidDartFuture {
+    pub fn new(dart_fut: Dart_Handle) -> impl Future<Output = ()> {
+        let (tx, rx) = oneshot::channel();
+        let this = Self(tx);
+
+        unsafe {
+            VOID_FUTURE_SPAWNER_FUNCTION.unwrap()(
+                dart_fut,
+                Box::into_raw(Box::new(this)),
+            )
+        };
+
+        async move { rx.await.unwrap() }
+    }
+
+    pub fn resolve(self) {
+        self.0.send(());
     }
 }
 
@@ -97,4 +105,43 @@ pub unsafe extern "C" fn DartFuture__resolve_err(
 ) {
     let fut = Box::from_raw(fut);
     fut.resolve_err(val);
+}
+
+type HandleOptionSpawnerFunction =
+    extern "C" fn(Dart_Handle, *mut HandleOptionFuture);
+static mut HANDLE_OPTION_SPAWNER_FUNCTION: Option<HandleOptionSpawnerFunction> =
+    None;
+
+#[no_mangle]
+pub unsafe extern "C" fn HandleOptionFuture__resolve(
+    fut: *mut HandleOptionFuture,
+    val: Dart_Handle,
+) {
+    let val = RustHandleOption::from(val);
+    let fut = Box::from_raw(fut);
+    fut.resolve(val);
+}
+
+pub struct HandleOptionFuture(oneshot::Sender<RustHandleOption>);
+
+impl HandleOptionFuture {
+    pub fn new(
+        dart_fut: Dart_Handle,
+    ) -> impl Future<Output = RustHandleOption> {
+        let (tx, rx) = oneshot::channel();
+        let this = Self(tx);
+
+        unsafe {
+            HANDLE_OPTION_SPAWNER_FUNCTION.unwrap()(
+                dart_fut,
+                Box::into_raw(Box::new(this)),
+            )
+        };
+
+        async move { rx.await.unwrap() }
+    }
+
+    fn resolve(self, val: RustHandleOption) {
+        self.0.send(val);
+    }
 }

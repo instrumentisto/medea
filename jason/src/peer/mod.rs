@@ -316,7 +316,7 @@ impl PeerConnection {
                 state.ice_servers().clone(),
                 state.force_relay(),
             )
-                .await
+            .await
             .map_err(tracerr::map_from_and_wrap!())?,
         );
         let (track_events_sender, mut track_events_rx) = mpsc::unbounded();
@@ -884,7 +884,7 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
         log::debug!("END SET REMOTE DESCRIPTION");
         self.has_remote_description.set(true);
-        self.media_connections.sync_receivers();
+        self.media_connections.sync_receivers().await;
 
         log::debug!("ICE candidates");
         let ice_candidates_buffer_flush_fut = future::try_join_all(

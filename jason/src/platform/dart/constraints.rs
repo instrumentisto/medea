@@ -1,12 +1,11 @@
 use dart_sys::Dart_Handle;
 use derive_more::From;
 
-use crate::media::constraints::ConstrainU32;
-
 use crate::{
     media::{
-        constraints::ConstrainString, AudioTrackConstraints,
-        DeviceVideoTrackConstraints, DisplayVideoTrackConstraints,
+        constraints::{ConstrainString, ConstrainU32},
+        AudioTrackConstraints, DeviceVideoTrackConstraints,
+        DisplayVideoTrackConstraints,
     },
     platform::dart::utils::{handle::DartHandle, map::DartMap},
 };

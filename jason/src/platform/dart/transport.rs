@@ -10,14 +10,12 @@ use tracerr::Traced;
 
 use crate::{
     platform::{
-        dart::utils::{handle::DartHandle},
+        dart::utils::{callback_listener::StringCallback, handle::DartHandle},
         RpcTransport, TransportError, TransportState,
     },
     rpc::{ApiUrl, ClientDisconnect},
-    utils::dart::into_dart_string,
+    utils::dart::{from_dart_string, into_dart_string},
 };
-use crate::utils::dart::from_dart_string;
-use crate::platform::dart::utils::callback_listener::StringCallback;
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
@@ -71,7 +69,9 @@ pub unsafe extern "C" fn WebSocketRpcTransport__on_message(
 }
 
 #[derive(Clone, Debug)]
-pub struct OnMessageListeners(Rc<RefCell<Vec<mpsc::UnboundedSender<ServerMsg>>>>);
+pub struct OnMessageListeners(
+    Rc<RefCell<Vec<mpsc::UnboundedSender<ServerMsg>>>>,
+);
 
 impl OnMessageListeners {
     fn new() -> Self {
@@ -79,8 +79,7 @@ impl OnMessageListeners {
     }
 
     fn notify_all(&self, msg: String) {
-        let msg = match serde_json::from_str::<ServerMsg>(&msg)
-        {
+        let msg = match serde_json::from_str::<ServerMsg>(&msg) {
             Ok(parsed) => parsed,
             Err(e) => {
                 // TODO: protocol versions mismatch? should drop
@@ -90,11 +89,9 @@ impl OnMessageListeners {
             }
         };
 
-        self.0.borrow_mut().retain(
-            |on_message| {
-                on_message.unbounded_send(msg.clone()).is_ok()
-            },
-        );
+        self.0.borrow_mut().retain(|on_message| {
+            on_message.unbounded_send(msg.clone()).is_ok()
+        });
     }
 
     fn new_subscriber(&self) -> LocalBoxStream<'static, ServerMsg> {
@@ -119,7 +116,8 @@ impl WebSocketRpcTransport {
                         log::error!("Message: {}", msg);
                         on_message_listeners.notify_all(msg);
                     }
-                }).get(),
+                })
+                .get(),
             );
             Ok(Self {
                 handle: DartHandle::new(handle),

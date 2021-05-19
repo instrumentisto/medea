@@ -59,8 +59,9 @@ void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
       'register_RtcPeerConnection__add_transceiver')(
       Pointer.fromFunction<Handle Function(Handle, Int32, Int32)>(addTransceiver));
-
-
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_RtcPeerConnection__get_transceiver_by_mid')(
+      Pointer.fromFunction<Handle Function(Handle, Pointer<Utf8>)>(getTransceiverByMid));
 }
 
 Object addTransceiver(Object peer, int kind, int direction) async {
@@ -127,8 +128,31 @@ void onConnectionStateChange(Object conn, Object f) {
   }
 }
 
+// TODO: DartOption Future
+Object getTransceiverByMid(Object peer, Pointer<Utf8> mid) async {
+  peer = peer as RTCPeerConnection;
+  var transceivers = await peer.getTransceivers();
+  var mMid = mid.toDartString();
+  for (var transceiver in transceivers) {
+    if (transceiver.mid == mMid) {
+      return transceiver;
+    }
+  }
+  throw Exception("Transceiver not found!!!!");
+}
+
+Future<RTCRtpTransceiver> foobar(RTCPeerConnection peer, String mid) async {
+  var transceivers = await peer.getTransceivers();
+  for (var transceiver in transceivers) {
+    if (transceiver.mid == mid) {
+      return transceiver;
+    }
+  }
+  throw Exception("Transceiver not found!!!!");
+}
+
 Object setRemoteDescription(
-    Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
+    Object conn, Pointer<Utf8> type, Pointer<Utf8> sdp) {
   print("setRemoteDescription");
   conn = conn as RTCPeerConnection;
   print("Peer casted");
@@ -140,7 +164,7 @@ Object setRemoteDescription(
 
 }
 
-Object setLocalDescription(Object conn, Pointer<Utf8> sdp, Pointer<Utf8> type) {
+Object setLocalDescription(Object conn, Pointer<Utf8> type, Pointer<Utf8> sdp) {
   conn = conn as RTCPeerConnection;
   return conn.setLocalDescription(
       RTCSessionDescription(sdp.toDartString(), type.toDartString()));

@@ -30,10 +30,12 @@ impl From<Dart_Handle> for DartHandle {
 
 impl DartHandle {
     pub fn new(handle: Dart_Handle) -> Self {
-        Self(Rc::new(Inner(unsafe { Dart_NewPersistentHandle_DL_Trampolined(handle) })))
+        Self(Rc::new(Inner(unsafe {
+            Dart_NewPersistentHandle_DL_Trampolined(handle)
+        })))
     }
 
     pub fn get(&self) -> Dart_Handle {
-        unsafe { Dart_HandleFromPersistent_DL_Trampolined(self.0.0) }
+        unsafe { Dart_HandleFromPersistent_DL_Trampolined(self.0 .0) }
     }
 }

@@ -1,15 +1,15 @@
 use dart_sys::Dart_Handle;
 use tracerr::Traced;
 
+use crate::{
+    media::MediaManagerError, platform::dart::utils::list::DartList,
+    utils::dart::dart_future::DartFuture,
+};
+
 use super::{
     constraints::{DisplayMediaStreamConstraints, MediaStreamConstraints},
     input_device_info::InputDeviceInfo,
     media_track::MediaStreamTrack,
-};
-
-use crate::{
-    media::MediaManagerError, platform::dart::utils::list::DartList,
-    utils::dart::dart_future::DartFuture,
 };
 
 type EnumerateDevicesFunction = extern "C" fn() -> Dart_Handle;

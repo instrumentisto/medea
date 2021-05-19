@@ -71,28 +71,33 @@ impl Sender {
 
         let transceiver = match state.mid() {
             None => {
-                let trnsvr = connections.receivers.values().find(|rcvr| {
-                    rcvr.caps().media_kind() == caps.media_kind()
-                        && rcvr.caps().media_source_kind()
-                        == caps.media_source_kind()
-                }).and_then(|rcvr| rcvr.transceiver());
+                let trnsvr = connections
+                    .receivers
+                    .values()
+                    .find(|rcvr| {
+                        rcvr.caps().media_kind() == caps.media_kind()
+                            && rcvr.caps().media_source_kind()
+                                == caps.media_source_kind()
+                    })
+                    .and_then(|rcvr| rcvr.transceiver());
                 if let Some(transceiver) = trnsvr {
                     transceiver
                 } else {
-                    connections.add_transceiver(
-                        kind,
-                        platform::TransceiverDirection::INACTIVE,
-                    ).await
+                    connections
+                        .add_transceiver(
+                            kind,
+                            platform::TransceiverDirection::INACTIVE,
+                        )
+                        .await
                 }
             }
-            Some(mid) => {
-                connections
-                    .get_transceiver_by_mid(mid)
-                    .ok_or_else(|| {
-                        MediaConnectionsError::TransceiverNotFound(mid.to_string())
-                    })
-                    .map_err(tracerr::wrap!())?
-            }
+            Some(mid) => connections
+                .get_transceiver_by_mid(mid)
+                .await
+                .ok_or_else(|| {
+                    MediaConnectionsError::TransceiverNotFound(mid.to_string())
+                })
+                .map_err(tracerr::wrap!())?,
         };
 
         let this = Rc::new(Sender {
@@ -270,7 +275,9 @@ impl Drop for Sender {
         if !self.transceiver.is_stopped() {
             let transceiver = self.transceiver.clone();
             crate::platform::spawn(async move {
-                transceiver.sub_direction(platform::TransceiverDirection::SEND).await;
+                transceiver
+                    .sub_direction(platform::TransceiverDirection::SEND)
+                    .await;
             });
             platform::spawn(self.transceiver.drop_send_track());
         }
