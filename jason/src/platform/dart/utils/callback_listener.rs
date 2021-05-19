@@ -1,10 +1,8 @@
 use dart_sys::Dart_Handle;
 
 use crate::{
-    platform::dart::utils::{
-        dart_api::Dart_NewPersistentHandle_DL_Trampolined, handle::DartHandle,
-    },
-    utils::dart::from_dart_string,
+    api::dart::utils::c_str_into_string,
+    platform::dart::utils::handle::DartHandle,
 };
 
 type VoidCallbackFunction = extern "C" fn(*mut VoidCallback) -> Dart_Handle;
@@ -42,7 +40,7 @@ pub unsafe extern "C" fn StringCallback__call(
     cb: *const StringCallback,
     val: *const libc::c_char,
 ) {
-    let s = from_dart_string(val);
+    let s = c_str_into_string(val);
     let cb = cb.as_ref().unwrap();
     cb.0(s);
 }

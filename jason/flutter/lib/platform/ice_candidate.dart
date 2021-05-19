@@ -1,9 +1,16 @@
-import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'utils/option.dart';
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+
+import 'utils/option.dart';
+import '../util/native_string.dart';
+
 void registerFunctions(DynamicLibrary dl) {
+  dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
+      'register_IceCandidate__new')(Pointer.fromFunction<
+          Handle Function(Pointer<Utf8>, RustStringOption, RustIntOption)>(
+      newRtcIceCandidate));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_IceCandidate__candidate')(
       Pointer.fromFunction<RustStringOption Function(Handle)>(candidate));
@@ -52,4 +59,10 @@ RustStringOption sdpMid(Object iceCandidate) {
     throw Exception("Unknown object provided from Rust side: " +
         iceCandidate.runtimeType.toString());
   }
+}
+
+Object newRtcIceCandidate(Pointer<Utf8> candidate, RustStringOption sdpMid, RustIntOption sdpMlineIndex) {
+  var sdpMidArg = sdpMid.is_some == 1 ? sdpMid.val.nativeStringToDartString() : null;
+  var sdpMlineIndexArg = sdpMlineIndex.is_some == 1 ? sdpMlineIndex.val : null;
+  return RTCIceCandidate(candidate.toDartString(), sdpMidArg, sdpMlineIndexArg);
 }

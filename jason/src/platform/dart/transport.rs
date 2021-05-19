@@ -9,12 +9,12 @@ use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 
 use crate::{
+    api::dart::utils::{c_str_into_string, string_into_c_str},
     platform::{
         dart::utils::{callback_listener::StringCallback, handle::DartHandle},
         RpcTransport, TransportError, TransportState,
     },
     rpc::{ApiUrl, ClientDisconnect},
-    utils::dart::{from_dart_string, into_dart_string},
 };
 
 type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
@@ -65,7 +65,7 @@ pub unsafe extern "C" fn WebSocketRpcTransport__on_message(
     msg: *const libc::c_char,
 ) {
     let listeners = listeners.as_ref().unwrap();
-    listeners.notify_all(from_dart_string(msg));
+    listeners.notify_all(c_str_into_string(msg));
 }
 
 #[derive(Clone, Debug)]
@@ -104,7 +104,7 @@ impl OnMessageListeners {
 impl WebSocketRpcTransport {
     pub async fn new(url: ApiUrl) -> Result<Self> {
         unsafe {
-            let handle = NEW_FUNCTION.unwrap()(into_dart_string(
+            let handle = NEW_FUNCTION.unwrap()(string_into_c_str(
                 url.as_ref().to_string(),
             ));
             let on_message_listeners = OnMessageListeners::new();
@@ -149,7 +149,7 @@ impl RpcTransport for WebSocketRpcTransport {
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>> {
         let msg = serde_json::to_string(msg).unwrap();
         unsafe {
-            SEND_FUNCTION.unwrap()(self.handle.get(), into_dart_string(msg));
+            SEND_FUNCTION.unwrap()(self.handle.get(), string_into_c_str(msg));
         }
         Ok(())
     }
@@ -167,7 +167,7 @@ impl Drop for WebSocketRpcTransport {
             CLOSE_FUNCTION.unwrap()(
                 self.handle.get(),
                 1000,
-                into_dart_string(rsn),
+                string_into_c_str(rsn),
             );
         }
     }

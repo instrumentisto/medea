@@ -26,8 +26,8 @@ Object newWs(Pointer<Utf8> addr) {
   return IOWebSocketChannel.connect(Uri.parse(addr.toDartString()));
 }
 
-final _callMessageListenerDart _callMessageListener = dl
-    .lookupFunction<_callMessageListenerC, _callMessageListenerDart>(
+final _callMessageListenerDart _callMessageListener =
+    dl.lookupFunction<_callMessageListenerC, _callMessageListenerDart>(
         'StringCallback__call');
 typedef _callMessageListenerC = Pointer<Utf8> Function(Pointer, Pointer<Utf8>);
 typedef _callMessageListenerDart = Pointer<Utf8> Function(

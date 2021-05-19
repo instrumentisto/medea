@@ -3,13 +3,13 @@ use derive_more::From;
 use libc::c_char;
 
 use crate::{
+    api::dart::utils::string_into_c_str,
     platform::dart::utils::{
         dart_api::Dart_HandleFromPersistent_DL_Trampolined,
         handle::DartHandle,
         nullable::{NullableChar, NullableInt},
-        option::{DartIntOption, DartOption, DartStringOption},
+        option::{DartIntOption, DartStringOption},
     },
-    utils::dart::{from_dart_string, into_dart_string},
 };
 
 type CandidateFunction = extern "C" fn(Dart_Handle) -> DartStringOption;
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn register_IceCandidate__sdp_mid(f: SdpMidFunction) {
 }
 
 type NewFunction =
-    extern "C" fn(NullableChar, NullableChar, NullableInt) -> Dart_Handle;
+    extern "C" fn(*const c_char, NullableChar, NullableInt) -> Dart_Handle;
 static mut NEW_FUNCTION: Option<NewFunction> = None;
 
 #[no_mangle]
@@ -69,7 +69,7 @@ impl IceCandidate {
     ) -> Self {
         let handle = unsafe {
             NEW_FUNCTION.unwrap()(
-                Some(candidate.to_string()).into(),
+                string_into_c_str(candidate.to_owned()),
                 sdp_mid.clone().into(),
                 sdp_m_line_index.into(),
             )

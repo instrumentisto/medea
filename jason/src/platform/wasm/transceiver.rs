@@ -3,7 +3,6 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::future::LocalBoxFuture;
-use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::RtcRtpTransceiver;
 

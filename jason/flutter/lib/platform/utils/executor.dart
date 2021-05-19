@@ -21,8 +21,8 @@ class Executor {
 
   Executor(DynamicLibrary dylib)
       : _taskPoll = dylib
-      .lookup<NativeFunction<_rustTaskPoll>>('task_poll')
-      .asFunction(),
+            .lookup<NativeFunction<_rustTaskPoll>>('task_poll')
+            .asFunction(),
         _taskDrop = dylib
             .lookup<NativeFunction<_rustTaskDrop>>('task_drop')
             .asFunction(),

@@ -44,7 +44,6 @@ pub use self::{
 use std::{ffi::c_void, os::raw::c_char};
 
 use crate::{api::dart::utils::PtrArray, media::MediaSourceKind};
-use std::ptr::NonNull;
 
 /// Rust structure having wrapper class in Dart.
 ///

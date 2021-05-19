@@ -53,15 +53,17 @@ void registerFunctions(DynamicLibrary dl) {
           onConnectionStateChange));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_RtcPeerConnection__new_peer')(
+          'register_RtcPeerConnection__new_peer')(
       Pointer.fromFunction<Handle Function()>(newPeer));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_RtcPeerConnection__add_transceiver')(
-      Pointer.fromFunction<Handle Function(Handle, Int32, Int32)>(addTransceiver));
+          'register_RtcPeerConnection__add_transceiver')(
+      Pointer.fromFunction<Handle Function(Handle, Int32, Int32)>(
+          addTransceiver));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_RtcPeerConnection__get_transceiver_by_mid')(
-      Pointer.fromFunction<Handle Function(Handle, Pointer<Utf8>)>(getTransceiverByMid));
+          'register_RtcPeerConnection__get_transceiver_by_mid')(
+      Pointer.fromFunction<Handle Function(Handle, Pointer<Utf8>)>(
+          getTransceiverByMid));
 }
 
 Object addTransceiver(Object peer, int kind, int direction) async {
@@ -70,13 +72,13 @@ Object addTransceiver(Object peer, int kind, int direction) async {
   try {
     var fut = await peer.addTransceiver(
       kind: RTCRtpMediaType.values[kind],
-      init: RTCRtpTransceiverInit(direction: TransceiverDirection.values[direction]),
+      init: RTCRtpTransceiverInit(
+          direction: TransceiverDirection.values[direction]),
     );
     return fut;
   } catch (e, stacktrace) {
     throw e;
   }
-
 }
 
 Object newPeer() {
@@ -158,10 +160,7 @@ Object setRemoteDescription(
   print("Peer casted");
   var desc = RTCSessionDescription(sdp.toDartString(), type.toDartString());
   print("Desc created");
-  return conn.setRemoteDescription(
-    desc
-      );
-
+  return conn.setRemoteDescription(desc);
 }
 
 Object setLocalDescription(Object conn, Pointer<Utf8> type, Pointer<Utf8> sdp) {

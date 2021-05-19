@@ -1,8 +1,10 @@
-import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:medea_jason/platform/utils/option.dart';
-import 'utils/option.dart';
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
+
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+
+import 'utils/option.dart';
+
 
 void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
@@ -33,7 +35,7 @@ void registerFunctions(DynamicLibrary dl) {
           'register_Transceiver__has_send_track')(
       Pointer.fromFunction<Int8 Function(Handle)>(hasSendTrack, 0));
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_Transceiver__set_direction')(
+          'register_Transceiver__set_direction')(
       Pointer.fromFunction<Handle Function(Handle, Int32)>(setDirection));
 }
 

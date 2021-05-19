@@ -5,6 +5,7 @@ use medea_client_api_proto::{
 use tracerr::Traced;
 
 use crate::{
+    api::dart::utils::string_into_c_str,
     media::MediaKind,
     platform::{
         dart::{
@@ -15,7 +16,7 @@ use crate::{
                 },
                 handle::DartHandle,
                 ice_connection_from_int,
-                option::{DartIntOption, DartOption},
+                option::DartIntOption,
                 peer_connection_state_from_int,
             },
         },
@@ -23,10 +24,7 @@ use crate::{
         IceCandidate, RtcPeerConnectionError, RtcStats, SdpType,
         TransceiverDirection,
     },
-    utils::dart::{
-        dart_future::{DartFuture, VoidDartFuture},
-        into_dart_string,
-    },
+    utils::dart::dart_future::{DartFuture, VoidDartFuture},
 };
 
 use super::{
@@ -381,8 +379,8 @@ impl RtcPeerConnection {
         unsafe {
             DartFuture::new(SET_LOCAL_DESCRIPTION_FUNCTION.unwrap()(
                 self.handle.get(),
-                into_dart_string(sdp_type.to_string()),
-                into_dart_string(sdp),
+                string_into_c_str(sdp_type.to_string()),
+                string_into_c_str(sdp),
             ))
             .await
             .map_err(|_e| {
@@ -402,8 +400,8 @@ impl RtcPeerConnection {
                 log::debug!("OFFER");
                 VoidDartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
                     self.handle.get(),
-                    into_dart_string(RtcSdpType::Offer.to_string()),
-                    into_dart_string(sdp),
+                    string_into_c_str(RtcSdpType::Offer.to_string()),
+                    string_into_c_str(sdp),
                 ))
                 .await;
                 // .map_err(|e| {
@@ -417,8 +415,8 @@ impl RtcPeerConnection {
             SdpType::Answer(sdp) => unsafe {
                 VoidDartFuture::new(SET_REMOTE_DESCRIPTION_FUNCTION.unwrap()(
                     self.handle.get(),
-                    into_dart_string(RtcSdpType::Answer.to_string()),
-                    into_dart_string(sdp),
+                    string_into_c_str(RtcSdpType::Answer.to_string()),
+                    string_into_c_str(sdp),
                 ))
                 .await;
                 // .map_err(|_e| {
@@ -484,7 +482,7 @@ impl RtcPeerConnection {
             let transceiver: DartHandle =
                 DartFuture::new(GET_TRANSCEIVER_BY_MID_FUNCTION.unwrap()(
                     self.handle.get(),
-                    into_dart_string(mid.to_string()),
+                    string_into_c_str(mid.to_string()),
                 ))
                 .await
                 .unwrap();

@@ -34,7 +34,7 @@ void registerFunctions(DynamicLibrary dl) {
           _Completer_complete_PtrArray));
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_delayed_future_function')(
+          'register_delayed_future_function')(
       Pointer.fromFunction<Handle Function(Int32)>(delayedFuture));
 }
 

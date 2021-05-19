@@ -1,5 +1,3 @@
-use std::{panic::catch_unwind, ptr::NonNull};
-
 use crate::platform::set_panic_hook;
 
 use super::{

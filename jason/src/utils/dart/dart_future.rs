@@ -3,12 +3,9 @@ use std::future::Future;
 use dart_sys::Dart_Handle;
 use futures::channel::oneshot;
 
-use crate::{
-    platform::dart::{
-        error::DartError,
-        utils::{handle::DartHandle, option::RustHandleOption},
-    },
-    utils::dart::option::DartOption,
+use crate::platform::dart::{
+    error::DartError,
+    utils::{handle::DartHandle, option::RustHandleOption},
 };
 
 pub struct DartFuture(oneshot::Sender<Result<DartHandle, DartError>>);

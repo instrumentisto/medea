@@ -1,7 +1,7 @@
 use dart_sys::Dart_Handle;
 use derive_more::From;
 
-use crate::utils::dart::from_dart_string;
+use crate::api::dart::utils::c_str_into_string;
 
 type IsSomeFunction = extern "C" fn(Dart_Handle) -> i32;
 static mut IS_SOME_FUNCTION: Option<IsSomeFunction> = None;
@@ -57,7 +57,7 @@ pub struct DartStringOption {
 impl From<DartStringOption> for Option<String> {
     fn from(from: DartStringOption) -> Self {
         if from.is_some == 1 {
-            unsafe { Some(from_dart_string(from.val)) }
+            unsafe { Some(c_str_into_string(from.val)) }
         } else {
             None
         }

@@ -1,7 +1,8 @@
 use dart_sys::Dart_Handle;
 
 use crate::{
-    platform::dart::utils::handle::DartHandle, utils::dart::into_dart_string,
+    api::dart::utils::string_into_c_str,
+    platform::dart::utils::handle::DartHandle,
 };
 
 pub struct DartMap(DartHandle);
@@ -63,14 +64,16 @@ impl DartMap {
         unsafe {
             SET_FUNCTION.unwrap()(
                 self.0.get(),
-                into_dart_string(key),
+                string_into_c_str(key),
                 value.into(),
             )
         }
     }
 
     pub fn remove(&self, key: String) {
-        unsafe { REMOVE_FUNCTION.unwrap()(self.0.get(), into_dart_string(key)) }
+        unsafe {
+            REMOVE_FUNCTION.unwrap()(self.0.get(), string_into_c_str(key))
+        }
     }
 }
 
@@ -101,7 +104,7 @@ impl Into<Dart_Handle> for Value {
         match self {
             Self::Map(h) => h.0.get(),
             Self::String(s) => unsafe {
-                NEW_STRING_FUNCTION.unwrap()(into_dart_string(s))
+                NEW_STRING_FUNCTION.unwrap()(string_into_c_str(s))
             },
             Self::Int(i) => unsafe { NEW_INT_FUNCTION.unwrap()(i) },
         }

@@ -3,8 +3,8 @@ use std::any::Any;
 use dart_sys::Dart_Handle;
 
 use crate::{
+    api::dart::utils::c_str_into_string,
     platform::dart::{error::Error, utils::handle::DartHandle},
-    utils::dart::from_dart_string,
 };
 
 #[repr(C)]
@@ -24,8 +24,8 @@ impl<T: 'static> From<DartResult> for Result<&T, Error> {
             let message;
             let name;
             unsafe {
-                message = from_dart_string(from.err_message);
-                name = from_dart_string(from.err_name);
+                message = c_str_into_string(from.err_message);
+                name = c_str_into_string(from.err_name);
             }
             Err(Error {
                 name,
@@ -52,8 +52,8 @@ impl From<VoidDartResult> for Result<(), Error> {
             let message;
             let name;
             unsafe {
-                message = from_dart_string(from.err_message);
-                name = from_dart_string(from.err_name);
+                message = c_str_into_string(from.err_message);
+                name = c_str_into_string(from.err_name);
             }
             Err(Error {
                 name,

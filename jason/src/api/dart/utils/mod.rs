@@ -5,7 +5,6 @@ mod string;
 use std::future::Future;
 
 use dart_sys::Dart_Handle;
-use futures::FutureExt as _;
 
 use crate::{
     api::{dart::JasonError, DartValue},

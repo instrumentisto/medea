@@ -2,7 +2,8 @@ use dart_sys::Dart_Handle;
 use derive_more::Display;
 
 use crate::{
-    platform::dart::utils::handle::DartHandle, utils::dart::from_dart_string,
+    api::dart::utils::c_str_into_string,
+    platform::dart::utils::handle::DartHandle,
 };
 
 /// Wrapper for Dart value which returned from Dart side as error.
@@ -49,11 +50,11 @@ pub struct DartError(DartHandle);
 
 impl DartError {
     pub fn name(&self) -> String {
-        unsafe { from_dart_string(NAME_FUNCTION.unwrap()(self.0.get())) }
+        unsafe { c_str_into_string(NAME_FUNCTION.unwrap()(self.0.get())) }
     }
 
     pub fn message(&self) -> String {
-        unsafe { from_dart_string(MESSAGE_FUNCTION.unwrap()(self.0.get())) }
+        unsafe { c_str_into_string(MESSAGE_FUNCTION.unwrap()(self.0.get())) }
     }
 }
 

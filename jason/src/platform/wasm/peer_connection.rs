@@ -592,7 +592,10 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://w3.org/TR/webrtc/#transceivers-set
-    pub fn get_transceiver_by_mid(&self, mid: &str) -> Option<Transceiver> {
+    pub async fn get_transceiver_by_mid(
+        &self,
+        mid: &str,
+    ) -> Option<Transceiver> {
         let mut transceiver = None;
 
         let transceivers = js_sys::try_iter(&self.peer.get_transceivers())

@@ -16,11 +16,9 @@ use std::{panic, time::Duration};
 use dart_sys::Dart_Handle;
 
 use crate::{
+    api::dart::utils::string_into_c_str,
     platform::dart::utils::dart_api::Dart_PropagateError_DL_Trampolined,
-    utils::dart::{
-        dart_future::{DartFuture, VoidDartFuture},
-        into_dart_string,
-    },
+    utils::dart::dart_future::VoidDartFuture,
 };
 
 pub use self::executor::spawn;
@@ -38,7 +36,7 @@ pub unsafe extern "C" fn register_new_exception_function(
 pub fn set_panic_hook() {
     panic::set_hook(Box::new(|s| {
         let exception = unsafe {
-            NEW_EXCEPTION_FUNCTION.unwrap()(into_dart_string(s.to_string()))
+            NEW_EXCEPTION_FUNCTION.unwrap()(string_into_c_str(s.to_string()))
         };
         unsafe { Dart_PropagateError_DL_Trampolined(exception) };
     }));

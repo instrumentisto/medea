@@ -2,19 +2,19 @@ use std::ptr;
 
 use libc::c_char;
 
-use crate::utils::dart::into_dart_string;
+use crate::api::dart::utils::string_into_c_str;
 
 #[repr(C)]
 pub struct NullableChar {
-    pub value: *const c_char,
     pub is_some: i8,
+    pub value: *const c_char,
 }
 
 impl From<Option<String>> for NullableChar {
     fn from(from: Option<String>) -> Self {
         if let Some(from) = from {
             Self {
-                value: unsafe { into_dart_string(from) },
+                value: string_into_c_str(from),
                 is_some: 1,
             }
         } else {
@@ -28,8 +28,8 @@ impl From<Option<String>> for NullableChar {
 
 #[repr(C)]
 pub struct NullableInt {
-    pub value: i32,
     pub is_some: i8,
+    pub value: i32,
 }
 
 impl From<Option<i32>> for NullableInt {

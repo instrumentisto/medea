@@ -10,7 +10,7 @@
 //! initialization phase: after Dart DL API is initialized and before any other
 //! exported Rust function is called.
 
-use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
+use std::{ffi::c_void, marker::PhantomData};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 

@@ -15,12 +15,15 @@ typedef _resolveVoid_Dart = void Function(Pointer);
 typedef _resolveHandleOption_C = Void Function(Pointer, Handle);
 typedef _resolveHandleOption_Dart = void Function(Pointer, Object);
 
-final _resolveOk = dl
-    .lookupFunction<_resolveOk_C, _resolveOk_Dart>('DartFuture__resolve_ok');
+final _resolveOk =
+    dl.lookupFunction<_resolveOk_C, _resolveOk_Dart>('DartFuture__resolve_ok');
 final _resolveErr = dl
     .lookupFunction<_resolveErr_C, _resolveErr_Dart>('DartFuture__resolve_err');
-final _resolveVoid = dl.lookupFunction<_resolveVoid_C, _resolveVoid_Dart>('VoidDartFuture__resolve');
-final _resolveHandleOption = dl.lookupFunction<_resolveHandleOption_C, _resolveHandleOption_Dart>('DartHandleOption__resolve');
+final _resolveVoid = dl.lookupFunction<_resolveVoid_C, _resolveVoid_Dart>(
+    'VoidDartFuture__resolve');
+final _resolveHandleOption =
+    dl.lookupFunction<_resolveHandleOption_C, _resolveHandleOption_Dart>(
+        'DartHandleOption__resolve');
 
 void registerFunctions(DynamicLibrary dl) {
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
@@ -28,7 +31,7 @@ void registerFunctions(DynamicLibrary dl) {
       Pointer.fromFunction<Handle Function(Handle, Pointer)>(spawner));
   //register_void_future_spawner_function
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
-      'register_void_future_spawner_function')(
+          'register_void_future_spawner_function')(
       Pointer.fromFunction<Handle Function(Handle, Pointer)>(voidSpawner));
 }
 

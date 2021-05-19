@@ -2,13 +2,13 @@ use dart_sys::Dart_Handle;
 use derive_more::From;
 
 use crate::{
+    api::dart::utils::c_str_into_string,
     media::{track::MediaStreamTrackState, FacingMode, MediaKind},
     platform::dart::utils::{
         callback_listener::VoidCallback,
         handle::DartHandle,
         option::{DartIntOption, DartStringOption, DartUIntOption},
     },
-    utils::dart::from_dart_string,
 };
 
 type IdFunction = extern "C" fn(Dart_Handle) -> *const libc::c_char;
@@ -137,7 +137,7 @@ impl MediaStreamTrack {
     }
 
     pub fn id(&self) -> String {
-        unsafe { from_dart_string(ID_FUNCTION.unwrap()(self.0.get())) }
+        unsafe { c_str_into_string(ID_FUNCTION.unwrap()(self.0.get())) }
     }
 
     pub fn kind(&self) -> MediaKind {

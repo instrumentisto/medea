@@ -96,7 +96,9 @@ impl From<i32> for TransceiverDirection {
             0 => TransceiverDirection::INACTIVE,
             1 => TransceiverDirection::SEND,
             2 => TransceiverDirection::RECV,
-            _ => unreachable!("Unknown TransceiverDirection enum variant"),
+            _ => {
+                unreachable!("Unknown TransceiverDirection enum variant {}", i)
+            }
         }
     }
 }
