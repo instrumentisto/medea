@@ -16,22 +16,12 @@ spec:
             spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
-          # Media element which is able to play media data for client
-          # via WebRTC.
-          play-responder:
-            kind: WebRtcPlayEndpoint
-            spec:
-              src: "local://video-call-1/responder/publish"
     responder:
       kind: Member
       credentials:
         plain: test
       spec:
         pipeline:
-          publish:
-            kind: WebRtcPublishEndpoint
-            spec:
-              p2p: Always
           play-caller:
             kind: WebRtcPlayEndpoint
             spec:

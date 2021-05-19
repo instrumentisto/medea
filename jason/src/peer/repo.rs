@@ -162,7 +162,6 @@ impl Repository {
     ) -> TaskHandle {
         let (fut, abort) = future::abortable(async move {
             loop {
-                log::debug!("IDLE watchdog");
                 platform::delay_for(Duration::from_secs(1)).await;
 
                 let peers = peers

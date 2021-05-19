@@ -131,7 +131,6 @@ fn spawn_idle_watchdog_task(this: Rc<RefCell<Inner>>) -> TaskHandle {
     let (idle_watchdog_fut, idle_watchdog_handle) =
         future::abortable(async move {
             let wait_for_ping = this.borrow().ping_interval * 2;
-            log::debug!("IDLE watchdog");
             platform::delay_for(wait_for_ping.0).await;
 
             let last_ping_num = this.borrow().last_ping_num;
