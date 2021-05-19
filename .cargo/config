@@ -1,5 +1,0 @@
-[target.wasm32-unknown-unknown]
-runner = 'wasm-bindgen-test-runner'
-
-[build]
-target = "x86_64-linux-android"

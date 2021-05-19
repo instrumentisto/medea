@@ -4,7 +4,8 @@
 /gradlew.bat
 
 /captures/
-/GeneratedPluginRegistrant.java
+/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+/gradle/gradle-wrapper.jar
 
 /local.properties
 /key.properties
