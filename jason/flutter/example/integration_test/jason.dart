@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ffi';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -6,12 +7,15 @@ import 'package:medea_jason/audio_track_constraints.dart';
 import 'package:medea_jason/connection_handle.dart';
 import 'package:medea_jason/device_video_track_constraints.dart';
 import 'package:medea_jason/display_video_track_constraints.dart';
+import 'package:medea_jason/ffi/foreign_value.dart';
+import 'package:medea_jason/input_device_info.dart';
 import 'package:medea_jason/jason.dart';
 import 'package:medea_jason/track_kinds.dart';
 import 'package:medea_jason/media_stream_settings.dart';
 import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
+import 'package:medea_jason/util/nullable_pointer.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -227,7 +231,7 @@ void main() {
     await room.setLocalMediaSettings(MediaStreamSettings(), true, false);
     await room.muteAudio();
     await room.unmuteAudio();
-    await room.muteVideo(MediaSourceKind.Device);
+    await room.muteVideo();
     await room.unmuteVideo(MediaSourceKind.Display);
     await room.disableVideo(MediaSourceKind.Display);
     await room.enableVideo(MediaSourceKind.Device);
@@ -251,5 +255,65 @@ void main() {
 
     await handle.reconnectWithDelay(155);
     await handle.reconnectWithBackoff(1, 2, 3);
+  });
+
+  final returnsInputDevicePtr =
+      dl.lookupFunction<ForeignValue Function(), ForeignValue Function()>(
+          'returns_input_device_info_ptr');
+
+  testWidgets('ForeignValue Rust => Dart', (WidgetTester tester) async {
+    final returnsNone =
+        dl.lookupFunction<ForeignValue Function(), ForeignValue Function()>(
+            'returns_none');
+    final returnsHandlePtr = dl.lookupFunction<ForeignValue Function(Handle),
+        ForeignValue Function(Object)>('returns_handle_ptr');
+    final returnsString =
+        dl.lookupFunction<ForeignValue Function(), ForeignValue Function()>(
+            'returns_string');
+    final returnsInt =
+        dl.lookupFunction<ForeignValue Function(), ForeignValue Function()>(
+            'returns_int');
+
+    expect(returnsNone().toDart(), equals(null));
+
+    var inputDevice =
+        InputDeviceInfo(NullablePointer(returnsInputDevicePtr().toDart()));
+    expect(inputDevice.deviceId(), equals('InputDeviceInfo.device_id'));
+    inputDevice.free();
+
+    expect(returnsHandlePtr('asd').toDart(), equals('asd'));
+    expect(returnsHandlePtr(111).toDart(), equals(111));
+    expect(returnsHandlePtr(null).toDart(), equals(null));
+
+    expect(returnsString().toDart(), equals('QWERTY'));
+
+    expect(returnsInt().toDart(), equals(333));
+  });
+
+  testWidgets('ForeignValue Dart => Rust', (WidgetTester tester) async {
+    final acceptsNone = dl.lookupFunction<Void Function(ForeignValue),
+        void Function(ForeignValue)>('accepts_none');
+    final acceptsPtr = dl.lookupFunction<Void Function(ForeignValue),
+        void Function(ForeignValue)>('accepts_input_device_info_pointer');
+    final acceptsString = dl.lookupFunction<Void Function(ForeignValue),
+        void Function(ForeignValue)>('accepts_string');
+    final acceptsInt = dl.lookupFunction<Void Function(ForeignValue),
+        void Function(ForeignValue)>('accepts_int');
+
+    var none = ForeignValue.none();
+    var ptr =
+        ForeignValue.fromPtr(NullablePointer(returnsInputDevicePtr().toDart()));
+    var str = ForeignValue.fromString('my string');
+    var num = ForeignValue.fromInt(235);
+
+    acceptsNone(none.ref);
+    acceptsPtr(ptr.ref);
+    acceptsString(str.ref);
+    acceptsInt(num.ref);
+
+    none.free();
+    ptr.free();
+    str.free();
+    num.free();
   });
 }

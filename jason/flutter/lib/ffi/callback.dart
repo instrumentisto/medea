@@ -1,6 +1,6 @@
 import 'dart:ffi';
 
-import 'package:medea_jason/ffi/foreign_value.dart';
+import 'foreign_value.dart';
 
 /// Registers the closure callers functions in Rust.
 void registerFunctions(DynamicLibrary dl) {
@@ -9,7 +9,7 @@ void registerFunctions(DynamicLibrary dl) {
       Pointer.fromFunction<Void Function(Handle, ForeignValue)>(_callFn));
 }
 
-/// Function used by Rust to call closures with single [int] argument.
+/// Function used by Rust to call closures with single [ForeignValue] argument.
 void _callFn(void Function(dynamic) fn, ForeignValue value) {
   var arg = value.toDart();
   if (arg != null) {

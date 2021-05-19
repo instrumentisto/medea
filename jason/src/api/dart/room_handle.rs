@@ -1,11 +1,11 @@
-use std::ptr;
+use std::{convert::TryFrom as _, ptr};
 
 use dart_sys::Dart_Handle;
 
 use crate::{
     api::dart::{
         utils::{c_str_into_string, IntoDartFuture},
-        ForeignClass,
+        DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
     platform,
@@ -171,14 +171,17 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: ptr::NonNull<RoomHandle>,
-    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
+    source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
+    let source_kind = Option::<i64>::try_from(source_kind)
+        .unwrap()
+        .map(MediaSourceKind::from);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
-        this.mute_video(Some(source_kind)).await.unwrap();
+        this.mute_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -192,14 +195,17 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: ptr::NonNull<RoomHandle>,
-    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
+    source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
+    let source_kind = Option::<i64>::try_from(source_kind)
+        .unwrap()
+        .map(MediaSourceKind::from);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
-        this.unmute_video(Some(source_kind)).await.unwrap();
+        this.unmute_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -211,14 +217,17 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: ptr::NonNull<RoomHandle>,
-    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
+    source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
+    let source_kind = Option::<i64>::try_from(source_kind)
+        .unwrap()
+        .map(MediaSourceKind::from);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
-        this.enable_video(Some(source_kind)).await.unwrap();
+        this.enable_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -230,14 +239,17 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: ptr::NonNull<RoomHandle>,
-    source_kind: MediaSourceKind, // TODO: `source_kind` might be None.
+    source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
+    let source_kind = Option::<i64>::try_from(source_kind)
+        .unwrap()
+        .map(MediaSourceKind::from);
 
     async move {
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
-        this.disable_video(Some(source_kind)).await.unwrap();
+        this.disable_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
     .into_dart_future()
@@ -489,7 +501,7 @@ mod mock {
             &self,
             source_kind: Option<MediaSourceKind>,
         ) -> Result<(), JasonError> {
-            assert_eq!(source_kind, Some(MediaSourceKind::Device));
+            assert_eq!(source_kind, None);
             Ok(())
         }
 

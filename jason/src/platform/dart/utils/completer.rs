@@ -68,7 +68,7 @@ type CompleterFutureCaller = extern "C" fn(Dart_Handle) -> Dart_Handle;
 /// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_NEW_CALLER: Option<CompleterNewCaller> = None;
 
-/// Stores pointer to the [`CompleterCompletePtrCaller`] extern function.
+/// Stores pointer to the [`CompleterCompleteCaller`] extern function.
 ///
 /// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_CALLER: Option<CompleterCompleteCaller> = None;
