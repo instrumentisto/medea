@@ -23,46 +23,66 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 RustStringOption candidate(Object iceCandidate) {
-  if (iceCandidate is RTCIceCandidate) {
-    if (iceCandidate.candidate != null) {
-      return RustStringOption.some(iceCandidate.candidate!);
+  try {
+    if (iceCandidate is RTCIceCandidate) {
+      if (iceCandidate.candidate != null) {
+        return RustStringOption.some(iceCandidate.candidate!);
+      } else {
+        return RustStringOption.none();
+      }
     } else {
-      return RustStringOption.none();
+      throw Exception("Unknown object provided from Rust side: " +
+          iceCandidate.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unknown object provided from Rust side: " +
-        iceCandidate.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 RustIntOption sdpMLineIndex(Object iceCandidate) {
-  if (iceCandidate is RTCIceCandidate) {
-    if (iceCandidate.sdpMlineIndex != null) {
-      return RustIntOption.some(iceCandidate.sdpMlineIndex!);
+  try {
+    if (iceCandidate is RTCIceCandidate) {
+      if (iceCandidate.sdpMlineIndex != null) {
+        return RustIntOption.some(iceCandidate.sdpMlineIndex!);
+      } else {
+        return RustIntOption.none();
+      }
     } else {
-      return RustIntOption.none();
+      throw Exception("Unknown object provided from Rust side: " +
+          iceCandidate.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unknown object provided from Rust side: " +
-        iceCandidate.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 RustStringOption sdpMid(Object iceCandidate) {
-  if (iceCandidate is RTCIceCandidate) {
-    if (iceCandidate.sdpMid != null) {
-      return RustStringOption.some(iceCandidate.sdpMid!);
+  try {
+    if (iceCandidate is RTCIceCandidate) {
+      if (iceCandidate.sdpMid != null) {
+        return RustStringOption.some(iceCandidate.sdpMid!);
+      } else {
+        return RustStringOption.none();
+      }
     } else {
-      return RustStringOption.none();
+      throw Exception("Unknown object provided from Rust side: " +
+          iceCandidate.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unknown object provided from Rust side: " +
-        iceCandidate.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 Object newRtcIceCandidate(Pointer<Utf8> candidate, RustStringOption sdpMid, RustIntOption sdpMlineIndex) {
-  var sdpMidArg = sdpMid.is_some == 1 ? sdpMid.val.nativeStringToDartString() : null;
-  var sdpMlineIndexArg = sdpMlineIndex.is_some == 1 ? sdpMlineIndex.val : null;
-  return RTCIceCandidate(candidate.toDartString(), sdpMidArg, sdpMlineIndexArg);
+  try {
+    var sdpMidArg = sdpMid.is_some == 1 ? sdpMid.val.nativeStringToDartString() : null;
+    var sdpMlineIndexArg = sdpMlineIndex.is_some == 1 ? sdpMlineIndex.val : null;
+    return RTCIceCandidate(candidate.toDartString(), sdpMidArg, sdpMlineIndexArg);
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }

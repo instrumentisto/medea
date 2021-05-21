@@ -34,48 +34,93 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 RustStringOption id(Object track) {
-  track = track as MediaStreamTrack;
-  if (track.id != null) {
-    return RustStringOption.some(track.id!);
-  } else {
-    return RustStringOption.none();
+  try {
+    track = track as MediaStreamTrack;
+    if (track.id != null) {
+      return RustStringOption.some(track.id!);
+    } else {
+      return RustStringOption.none();
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 void onEnded(Object track, Object f) {
-  if (track is MediaStreamTrack) {
-    if (f is Function) {
-      track.onEnded = () {
-        f();
-      };
+  try {
+    if (track is MediaStreamTrack) {
+      if (f is Function) {
+        track.onEnded = () {
+          f();
+        };
+      }
     }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 Pointer<Utf8> deviceId(MediaStreamTrack track) {
-  return track.getConstraints()["deviceId"].toString().toNativeUtf8();
+  try {
+    return track.getConstraints()["deviceId"].toString().toNativeUtf8();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Pointer<Utf8> facingMode(MediaStreamTrack track) {
-  return track.getConstraints()["facingMode"].toString().toNativeUtf8();
+  try {
+    return track.getConstraints()["facingMode"].toString().toNativeUtf8();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 int height(MediaStreamTrack track) {
-  return (track.getConstraints()["height"] as int);
+  try {
+    return (track.getConstraints()["height"] as int);
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 int width(MediaStreamTrack track) {
-  return (track.getConstraints()["width"] as int);
+  try {
+    return (track.getConstraints()["width"] as int);
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 void setEnabled(MediaStreamTrack track, int enabled) {
-  track.enabled = enabled == 1;
+  try {
+    track.enabled = enabled == 1;
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 void stop(MediaStreamTrack track) {
-  track.stop();
+  try {
+    track.stop();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 int enabled(MediaStreamTrack track) {
-  return track.enabled ? 1 : 0;
+  try {
+    return track.enabled ? 1 : 0;
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }

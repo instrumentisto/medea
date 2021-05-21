@@ -11,13 +11,23 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 Object get(Object option) {
-  option = option as RustHandleOption;
-  return option.some;
+  try {
+    option = option as RustHandleOption;
+    return option.some;
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 int isSome(Object option) {
-  option = option as RustHandleOption;
-  return option.isSome;
+  try {
+    option = option as RustHandleOption;
+    return option.isSome;
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 class RustHandleOption {

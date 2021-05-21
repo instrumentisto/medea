@@ -11,19 +11,29 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 Object get(Object arr, int i) {
-  if (arr is List) {
-    return arr[i];
-  } else {
-    throw Exception(
-        "Unexpected Object provided from Rust: " + arr.runtimeType.toString());
+  try {
+    if (arr is List) {
+      return arr[i];
+    } else {
+      throw Exception(
+          "Unexpected Object provided from Rust: " + arr.runtimeType.toString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 int len(Object arr) {
-  if (arr is List) {
-    return arr.length;
-  } else {
-    throw Exception(
-        "Unexpected Object provided from Rust: " + arr.runtimeType.toString());
+  try {
+    if (arr is List) {
+      return arr.length;
+    } else {
+      throw Exception(
+          "Unexpected Object provided from Rust: " + arr.runtimeType.toString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }

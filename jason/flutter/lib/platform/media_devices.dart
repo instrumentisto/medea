@@ -20,7 +20,12 @@ Object getUserMedia(Object constraints) {
 }
 
 Object enumerateDevices() {
-  return navigator.mediaDevices.enumerateDevices();
+  try {
+    return navigator.mediaDevices.enumerateDevices();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object getDisplayMedia(Object constraints) {

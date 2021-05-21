@@ -34,28 +34,43 @@ typedef _callMessageListenerDart = Pointer<Utf8> Function(
     Pointer, Pointer<Utf8>);
 
 void listenWs(Object ws, Object callback) {
-  if (ws is IOWebSocketChannel) {
-    ws.stream.listen((msg) {
-      if (msg is String) {
-        var cb = callback as Function(String);
-        cb(msg);
-      }
-    });
+  try {
+    if (ws is IOWebSocketChannel) {
+      ws.stream.listen((msg) {
+        if (msg is String) {
+          var cb = callback as Function(String);
+          cb(msg);
+        }
+      });
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 void listenClose(Object ws, Pointer listener) {
-  if (ws is IOWebSocketChannel) {
-    ws.stream.listen((msg) {
-      if (msg is String) {
-        _callMessageListener(listener, msg.toNativeUtf8());
-      }
-    });
+  try {
+    if (ws is IOWebSocketChannel) {
+      ws.stream.listen((msg) {
+        if (msg is String) {
+          _callMessageListener(listener, msg.toNativeUtf8());
+        }
+      });
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 void sendWsMsg(Object ws, Pointer<Utf8> msg) {
-  if (ws is IOWebSocketChannel) {
-    ws.sink.add(msg.toDartString());
+  try {
+    if (ws is IOWebSocketChannel) {
+      ws.sink.add(msg.toDartString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }

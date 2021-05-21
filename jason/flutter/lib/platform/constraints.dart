@@ -15,23 +15,38 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 Object constructor() {
-  return MediaStreamConstraints();
+  try {
+    return MediaStreamConstraints();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 void setAudio(Object cons, Object val) {
-  if (cons is MediaStreamConstraints) {
-    cons.audio = val;
-  } else {
-    throw Exception(
-        "Unexpected Object provided from Rust: " + cons.runtimeType.toString());
+  try {
+    if (cons is MediaStreamConstraints) {
+      cons.audio = val;
+    } else {
+      throw Exception(
+          "Unexpected Object provided from Rust: " + cons.runtimeType.toString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 void setVideo(Object cons, Object val) {
-  if (cons is MediaStreamConstraints) {
-    cons.video = val;
-  } else {
-    throw Exception(
-        "Unexpected Object provided from Rust: " + cons.runtimeType.toString());
+  try {
+    if (cons is MediaStreamConstraints) {
+      cons.video = val;
+    } else {
+      throw Exception(
+          "Unexpected Object provided from Rust: " + cons.runtimeType.toString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }

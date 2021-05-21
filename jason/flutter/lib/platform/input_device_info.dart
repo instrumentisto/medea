@@ -20,54 +20,74 @@ void registerFunctions(DynamicLibrary dl) {
 
 // TODO: can be just String, because device_id is always Some.
 RustStringOption deviceId(Object deviceInfo) {
-  if (deviceInfo is MediaDeviceInfo) {
-    if (deviceInfo.deviceId != null) {
-      return RustStringOption.some(deviceInfo.deviceId);
+  try {
+    if (deviceInfo is MediaDeviceInfo) {
+      if (deviceInfo.deviceId != null) {
+        return RustStringOption.some(deviceInfo.deviceId);
+      } else {
+        return RustStringOption.none();
+      }
     } else {
-      return RustStringOption.none();
+      throw Exception("Unexpected Object provided from Rust side: " +
+          deviceInfo.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unexpected Object provided from Rust side: " +
-        deviceInfo.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 // TODO: can be just String, because label is always Some.
 RustStringOption label(Object deviceInfo) {
-  if (deviceInfo is MediaDeviceInfo) {
-    if (deviceInfo.label != null) {
-      return RustStringOption.some(deviceInfo.label);
+  try {
+    if (deviceInfo is MediaDeviceInfo) {
+      if (deviceInfo.label != null) {
+        return RustStringOption.some(deviceInfo.label);
+      } else {
+        return RustStringOption.none();
+      }
     } else {
-      return RustStringOption.none();
+      throw Exception("Unexpected Object provided from Rust side: " +
+          deviceInfo.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unexpected Object provided from Rust side: " +
-        deviceInfo.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 RustStringOption groupId(Object deviceInfo) {
-  if (deviceInfo is MediaDeviceInfo) {
-    if (deviceInfo.groupId != null) {
-      return RustStringOption.some(deviceInfo.groupId!);
+  try {
+    if (deviceInfo is MediaDeviceInfo) {
+      if (deviceInfo.groupId != null) {
+        return RustStringOption.some(deviceInfo.groupId!);
+      } else {
+        return RustStringOption.none();
+      }
     } else {
-      return RustStringOption.none();
+      throw Exception("Unexpected Object provided from Rust side: " +
+          deviceInfo.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unexpected Object provided from Rust side: " +
-        deviceInfo.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 RustStringOption kind(Object deviceInfo) {
-  if (deviceInfo is MediaDeviceInfo) {
-    if (deviceInfo.kind != null) {
-      return RustStringOption.some(deviceInfo.kind!);
+  try {
+    if (deviceInfo is MediaDeviceInfo) {
+      if (deviceInfo.kind != null) {
+        return RustStringOption.some(deviceInfo.kind!);
+      } else {
+        return RustStringOption.none();
+      }
     } else {
-      return RustStringOption.none();
+      throw Exception("Unexpected Object provided from Rust side: " +
+          deviceInfo.runtimeType.toString());
     }
-  } else {
-    throw Exception("Unexpected Object provided from Rust side: " +
-        deviceInfo.runtimeType.toString());
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }

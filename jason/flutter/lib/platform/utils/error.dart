@@ -12,11 +12,21 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 Pointer<Utf8> name(Object exception) {
-  exception = exception as Exception;
-  return exception.runtimeType.toString().toNativeUtf8();
+  try {
+    exception = exception as Exception;
+    return exception.runtimeType.toString().toNativeUtf8();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Pointer<Utf8> message(Object exception) {
-  exception = exception as Exception;
-  return exception.toString().toNativeUtf8();
+  try {
+    exception = exception as Exception;
+    return exception.toString().toNativeUtf8();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }

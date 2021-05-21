@@ -36,29 +36,50 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 void handleOptionSpawner(Object fut, Pointer resolver) {
-  fut = fut as Future;
-  fut.then((value) {
-    _resolveHandleOption(resolver, value);
-  });
+  try {
+    fut = fut as Future;
+    fut.then((value) {
+      _resolveHandleOption(resolver, value);
+    }, onError: (error, stackTrace) {
+      print("Thrown: " + error.toString());
+    });
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 void voidSpawner(Object fut, Pointer resolver) {
-  if (fut is Future) {
-    fut.then((val) {
-      _resolveVoid(resolver);
-    });
+  try {
+    if (fut is Future) {
+      fut.then((val) {
+        _resolveVoid(resolver);
+      }, onError: (error, stackTrace) {
+        print("VoidFuture thrown exception: " + error.toString());
+      });
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 void spawner(Object fut, Pointer resolver) {
-  if (fut is Future) {
-    fut.then((val) {
-      _resolveOk(resolver, val);
-    }, onError: (e) {
-      _resolveErr(resolver, e);
-    });
-  } else {
-    throw Exception(
-        "Unexpected Object provided from Rust: " + fut.runtimeType.toString());
+  try {
+    if (fut is Future) {
+      fut.then((val) {
+        _resolveOk(resolver, val);
+      }, onError: (e) {
+        print("AKDJASLKDJSALKDJASKDJLSDKA");
+        print("Thrown: " + e.toString());
+        _resolveErr(resolver, e);
+      });
+    } else {
+      throw Exception(
+          "Unexpected Object provided from Rust: " + fut.runtimeType.toString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }

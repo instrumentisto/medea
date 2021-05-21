@@ -13,7 +13,7 @@ dependencies:
     sdk: flutter
   ffi: ^1.0.0
   flutter_webrtc:
-    path: ../../../flutter-webrtc
+    path: ../../../../flutter-webrtc
   web_socket_channel: ^2.0.0
 
 dev_dependencies:

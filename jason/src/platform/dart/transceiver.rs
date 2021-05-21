@@ -16,6 +16,7 @@ use crate::{
     },
     utils::dart::dart_future::DartFuture,
 };
+use crate::utils::dart::dart_future::VoidDartFuture;
 
 #[derive(Clone, Debug)]
 pub struct Transceiver {
@@ -142,14 +143,14 @@ impl Transceiver {
         direction: TransceiverDirection,
     ) -> LocalBoxFuture<'static, ()> {
         log::error!("Start set Transceiver::set_direction");
-        let fut = DartFuture::new(unsafe {
+        let fut = VoidDartFuture::new(unsafe {
             SET_DIRECTION_FUNCTION.unwrap()(
                 self.transceiver.get(),
                 direction.into(),
             )
         });
         Box::pin(async move {
-            fut.await.unwrap();
+            fut.await;
         })
     }
 
@@ -210,6 +211,7 @@ impl Transceiver {
 
     pub fn set_send_track_enabled(&self, enabled: bool) {
         // TODO: check this
+        log::debug!("set_send_track_enabled");
         unsafe {
             if let Some(sender) =
                 GET_SEND_TRACK_FUNCTION.unwrap()(self.transceiver.get()).into()

@@ -14,7 +14,7 @@ packages:
       name: async
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "2.6.1"
+    version: "2.5.0"
   boolean_selector:
     dependency: transitive
     description:
@@ -103,7 +103,7 @@ packages:
   flutter_webrtc:
     dependency: transitive
     description:
-      path: "../../../../flutter-webrtc"
+      path: "../../../../../flutter-webrtc"
       relative: true
     source: path
     version: "0.6.3"
@@ -296,7 +296,7 @@ packages:
       name: vm_service
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "6.2.0"
+    version: "6.1.0+1"
   web_socket_channel:
     dependency: transitive
     description:

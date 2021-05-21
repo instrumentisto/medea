@@ -21,23 +21,43 @@ Object construct() {
 }
 
 void set(Object map, Pointer<Utf8> key, Object value) {
-  map = map as Map;
-  map[key.toDartString()] = value;
+  try {
+    map = map as Map;
+    map[key.toDartString()] = value;
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 void remove(Object map, Pointer<Utf8> key) {
-  if (map is Map) {
-    map.remove(key.toDartString());
-  } else {
-    throw Exception(
-        "Unexpected Object provided from Rust: " + map.runtimeType.toString());
+  try {
+    if (map is Map) {
+      map.remove(key.toDartString());
+    } else {
+      throw Exception(
+          "Unexpected Object provided from Rust: " + map.runtimeType.toString());
+    }
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
   }
 }
 
 Object constructInt(int value) {
-  return value;
+  try {
+    return value;
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object constructString(Pointer<Utf8> str) {
-  return str.toDartString();
+  try {
+    return str.toDartString();
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }

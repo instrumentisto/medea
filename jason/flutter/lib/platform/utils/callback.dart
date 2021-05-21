@@ -62,37 +62,67 @@ void registerFunctions(DynamicLibrary dl) {
 }
 
 Object voidCallback(Pointer caller) {
-  return () {
-    _voidCallbackCall(caller);
-  };
+  try {
+    return () {
+      _voidCallbackCall(caller);
+    };
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object stringCallback(Pointer caller) {
-  return (String str) {
-    _stringCallbackCall(caller, str.toNativeUtf8());
-  };
+  try {
+    return (String str) {
+      _stringCallbackCall(caller, str.toNativeUtf8());
+    };
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object handleMutCallback(Pointer caller) {
-  return (Object val) {
-    _handleMutCallbackCall(caller, val);
-  };
+  try {
+    return (Object val) {
+      _handleMutCallbackCall(caller, val);
+    };
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object handleCallback(Pointer caller) {
-  return (Object val) {
-    _handleCallbackCall(caller, val);
-  };
+  try {
+    return (Object val) {
+      _handleCallbackCall(caller, val);
+    };
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object intCallback(Pointer caller) {
-  return (int val) {
-    _intCallbackCall(caller, val);
-  };
+  try {
+    return (int val) {
+      _intCallbackCall(caller, val);
+    };
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
 
 Object twoArgCallback(Pointer caller) {
-  return (Object left, Object right) {
-    _twoArgCallbackCall(caller, left, right);
-  };
+  try {
+    return (Object left, Object right) {
+      _twoArgCallbackCall(caller, left, right);
+    };
+  } catch (e) {
+    print("Exception was thrown: " + e.toString());
+    throw e;
+  }
 }
