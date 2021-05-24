@@ -71,16 +71,13 @@ toml = "0.5"
 tonic = "0.4"
 url = "2.1"
 [dependencies.deadpool]
-    # TODO: Switch to `version =` on next version bumb.
-    git = "https://github.com/bikeshedder/deadpool"
-    rev = "8134ba16896a9149301ee9e2945744ba8210dad3"  # branch = "master"
+    version = "0.8"
     default-features = false
     features = ["managed", "rt_tokio_1"]
 [dependencies.deadpool-redis]
-    # TODO: Switch to `version =` on next version bumb.
-    git = "https://github.com/bikeshedder/deadpool"
-    rev = "8134ba16896a9149301ee9e2945744ba8210dad3"  # branch = "master"
+    version = "0.8"
     default-features = false
+    features = ["rt_tokio_1"]
 [dependencies.medea-coturn-telnet-client]
     #version = "0.1"
     path = "crates/medea-coturn-telnet-client"
