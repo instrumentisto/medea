@@ -173,14 +173,14 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
+    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+    //       implemented.
     let this = this.as_ref().clone();
     let source_kind = Option::<i64>::try_from(source_kind)
         .unwrap()
         .map(MediaSourceKind::from);
 
     async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
         this.mute_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
@@ -198,13 +198,13 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
     source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
+    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+    //       implemented.
     let source_kind = Option::<i64>::try_from(source_kind)
         .unwrap()
         .map(MediaSourceKind::from);
 
     async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
         this.unmute_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
@@ -220,13 +220,13 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
     source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
+    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+    //       implemented.
     let source_kind = Option::<i64>::try_from(source_kind)
         .unwrap()
         .map(MediaSourceKind::from);
 
     async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
         this.enable_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }
@@ -241,14 +241,14 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
 ) -> Dart_Handle {
+    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+    //       implemented.
     let this = this.as_ref().clone();
     let source_kind = Option::<i64>::try_from(source_kind)
         .unwrap()
         .map(MediaSourceKind::from);
 
     async move {
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
         this.disable_video(source_kind).await.unwrap();
         Ok::<_, ()>(())
     }

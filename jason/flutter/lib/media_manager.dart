@@ -1,12 +1,12 @@
 import 'dart:ffi';
 
+import 'ffi/ptrarray.dart';
 import 'input_device_info.dart';
 import 'jason.dart';
 import 'local_media_track.dart';
 import 'media_stream_settings.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'ffi/ptrarray.dart';
 
 typedef _initLocalTracks_C = Handle Function(Pointer, Pointer);
 typedef _initLocalTracks_Dart = Object Function(Pointer, Pointer);

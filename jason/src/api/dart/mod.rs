@@ -220,8 +220,8 @@ impl<T> TryFrom<DartValueArg<T>> for Option<i64> {
 #[derive(Debug)]
 #[repr(u8)]
 pub enum DartValue {
-    /// No value. It can mean `()` or `void` or `Option::None` depending on the
-    /// use case.
+    /// No value. It can mean `()` or `void` or `Option::None` based on the
+    /// contexts.
     None,
     /// Pointer to some boxed Rust object.
     Ptr(ptr::NonNull<c_void>),

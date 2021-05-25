@@ -2,9 +2,9 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-import '../util/nullable_pointer.dart';
-import '../util/move_semantic.dart';
 import '../jason.dart';
+import '../util/move_semantic.dart';
+import '../util/nullable_pointer.dart';
 import 'native_string.dart';
 
 typedef _unboxDartHandle_C = Handle Function(Pointer<Handle>);

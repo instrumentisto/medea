@@ -1,9 +1,9 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
+import 'ffi/native_string.dart';
 import 'jason.dart';
 import 'util/move_semantic.dart';
-import 'ffi/native_string.dart';
 import 'util/nullable_pointer.dart';
 
 typedef _reason_C = Pointer<Utf8> Function(Pointer);

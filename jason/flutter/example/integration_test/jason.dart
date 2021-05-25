@@ -10,11 +10,11 @@ import 'package:medea_jason/display_video_track_constraints.dart';
 import 'package:medea_jason/ffi/foreign_value.dart';
 import 'package:medea_jason/input_device_info.dart';
 import 'package:medea_jason/jason.dart';
-import 'package:medea_jason/track_kinds.dart';
 import 'package:medea_jason/media_stream_settings.dart';
 import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
+import 'package:medea_jason/track_kinds.dart';
 import 'package:medea_jason/util/nullable_pointer.dart';
 
 void main() {
