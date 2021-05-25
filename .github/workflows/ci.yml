@@ -277,7 +277,7 @@ jobs:
           echo ::set-output name=target::$(make flutter.android.version.compile)
 
       - name: Compile shared object
-        run: make cargo.build crate=medea-jason platform=android targets=x86
+        run: make cargo.build crate=medea-jason platform=android targets=x86_64
                               args="--features mockable"
 
       - name: Test on min Android NDK version
