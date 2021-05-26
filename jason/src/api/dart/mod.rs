@@ -30,7 +30,9 @@ use derive_more::From;
 use libc::c_char;
 
 use crate::{
-    api::dart::utils::{c_str_into_string, string_into_c_str, PtrArray},
+    api::dart::utils::{
+        c_str_into_string, string_into_c_str, DartError, PtrArray,
+    },
     media::MediaSourceKind,
 };
 

@@ -1059,7 +1059,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "http",
- "hyper 0.14.7",
+ "hyper 0.14.8",
  "hyper-tls",
  "mime",
  "serde 1.0.126",
@@ -1547,9 +1547,9 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.7"
+version = "0.14.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e5f105c494081baa3bf9e200b279e27ec1623895cd504c7dbef8d0b080fcf54"
+checksum = "d3f71a7eea53a3f8257a7b4795373ff886397178cd634430ea94e12d7fe4fe34"
 dependencies = [
  "bytes 1.0.1",
  "futures-channel",
@@ -1576,7 +1576,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
 dependencies = [
  "bytes 1.0.1",
- "hyper 0.14.7",
+ "hyper 0.14.8",
  "native-tls",
  "tokio 1.6.0",
  "tokio-native-tls",
@@ -1740,9 +1740,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.94"
+version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18794a8ad5b29321f790b55d93dfba91e125cb1a9edbd4f8e3150acc771c1a5e"
+checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
 
 [[package]]
 name = "linked-hash-map"
@@ -1821,7 +1821,7 @@ dependencies = [
  "function_name",
  "futures 0.3.15",
  "humantime-serde",
- "hyper 0.14.7",
+ "hyper 0.14.8",
  "lazy_static",
  "medea-client-api-proto 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-control-api-mock",
@@ -2734,7 +2734,7 @@ dependencies = [
  "futures-util",
  "http",
  "http-body 0.4.2",
- "hyper 0.14.7",
+ "hyper 0.14.8",
  "hyper-tls",
  "ipnet",
  "js-sys",
@@ -3578,7 +3578,7 @@ dependencies = [
  "h2 0.3.3",
  "http",
  "http-body 0.4.2",
- "hyper 0.14.7",
+ "hyper 0.14.8",
  "percent-encoding",
  "pin-project 1.0.7",
  "prost",

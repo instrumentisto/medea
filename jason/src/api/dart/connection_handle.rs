@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr;
 
 use dart_sys::Dart_Handle;
 use tracerr::Traced;
@@ -9,7 +9,7 @@ use crate::{
     platform,
 };
 
-use super::{utils::string_into_c_str, ForeignClass};
+use super::ForeignClass;
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ConnectionHandle;
@@ -81,10 +81,7 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 ) -> DartResult {
     let this = this.as_ref();
 
-    this.get_remote_member_id()
-        .map_err(DartError::from)
-        .map(string_into_c_str)
-        .into()
+    this.get_remote_member_id().map_err(DartError::from).into()
 }
 
 /// Frees the data behind the provided pointer.
