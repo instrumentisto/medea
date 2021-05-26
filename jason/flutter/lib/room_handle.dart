@@ -3,12 +3,13 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 
 import 'connection_handle.dart';
+import 'ffi/foreign_value.dart';
 import 'jason.dart';
-import 'track_kinds.dart';
-import 'media_stream_settings.dart';
 import 'local_media_track.dart';
+import 'media_stream_settings.dart';
 import 'reconnect_handle.dart';
 import 'room_close_reason.dart';
+import 'track_kinds.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
 import 'ffi/result.dart';
@@ -44,17 +45,17 @@ typedef _muteAudio_Dart = Object Function(Pointer);
 typedef _unmuteAudio_C = Handle Function(Pointer);
 typedef _unmuteAudio_Dart = Object Function(Pointer);
 
-typedef _muteVideo_C = Handle Function(Pointer, Uint8);
-typedef _muteVideo_Dart = Object Function(Pointer, int);
+typedef _muteVideo_C = Handle Function(Pointer, ForeignValue);
+typedef _muteVideo_Dart = Object Function(Pointer, ForeignValue);
 
-typedef _unmuteVideo_C = Handle Function(Pointer, Uint8);
-typedef _unmuteVideo_Dart = Object Function(Pointer, int);
+typedef _unmuteVideo_C = Handle Function(Pointer, ForeignValue);
+typedef _unmuteVideo_Dart = Object Function(Pointer, ForeignValue);
 
-typedef _disableVideo_C = Handle Function(Pointer, Uint8);
-typedef _disableVideo_Dart = Object Function(Pointer, int);
+typedef _disableVideo_C = Handle Function(Pointer, ForeignValue);
+typedef _disableVideo_Dart = Object Function(Pointer, ForeignValue);
 
-typedef _enableVideo_C = Handle Function(Pointer, Uint8);
-typedef _enableVideo_Dart = Object Function(Pointer, int);
+typedef _enableVideo_C = Handle Function(Pointer, ForeignValue);
+typedef _enableVideo_Dart = Object Function(Pointer, ForeignValue);
 
 typedef _disableAudio_C = Handle Function(Pointer);
 typedef _disableAudio_Dart = Object Function(Pointer);
@@ -228,41 +229,57 @@ class RoomHandle {
   /// Mutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> muteVideo(MediaSourceKind kind) async {
-    await (_muteVideo(ptr.getInnerPtr(), kind.index) as Future)
-        .catchError(futureErrorCatcher);
+  Future<void> muteVideo([MediaSourceKind? kind]) async {
+    var kind_arg =
+        kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
+    try {
+      await (_muteVideo(ptr.getInnerPtr(), kind_arg.ref) as Future)
+          .catchError(futureErrorCatcher);;
+    } finally {
+      kind_arg.free();
+    }
   }
 
   /// Unmutes outbound video in this `Room`.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> unmuteVideo(MediaSourceKind kind) async {
-    await (_unmuteVideo(ptr.getInnerPtr(), kind.index) as Future)
-        .catchError(futureErrorCatcher);
+  Future<void> unmuteVideo([MediaSourceKind? kind]) async {
+    var kind_arg =
+        kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
+    try {
+      await (_unmuteVideo(ptr.getInnerPtr(), kind_arg.ref) as Future)
+          .catchError(futureErrorCatcher);;
+    } finally {
+      kind_arg.free();
+    }
   }
 
   /// Enables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> enableVideo(MediaSourceKind kind) async {
-    await (_enableVideo(ptr.getInnerPtr(), kind.index) as Future)
-        .catchError(futureErrorCatcher);
+  Future<void> enableVideo([MediaSourceKind? kind]) async {
+    var kind_arg =
+        kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index)
+            .catchError(futureErrorCatcher);;
+    try {
+      await (_enableVideo(ptr.getInnerPtr(), kind_arg.ref) as Future);
+    } finally {
+      kind_arg.free();
+    }
   }
 
   /// Disables outbound video.
   ///
   /// Affects only video with specific [MediaSourceKind] if specified.
-  ///
-  /// Throws [RustException] if Rust returns error.
-  Future<void> disableVideo(MediaSourceKind kind) async {
-    await (_disableVideo(ptr.getInnerPtr(), kind.index) as Future)
-        .catchError(futureErrorCatcher);
+  Future<void> disableVideo([MediaSourceKind? kind]) async {
+    var kind_arg =
+        kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
+    try {
+      await (_disableVideo(ptr.getInnerPtr(), kind_arg.ref) as Future)
+          .catchError(futureErrorCatcher);;
+    } finally {
+      kind_arg.free();
+    }
   }
 
   /// Enables inbound audio in this `Room`.

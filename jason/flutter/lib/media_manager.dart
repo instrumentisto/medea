@@ -1,5 +1,6 @@
 import 'dart:ffi';
 
+import 'ffi/ptrarray.dart';
 import 'input_device_info.dart';
 import 'jason.dart';
 import 'local_media_track.dart';

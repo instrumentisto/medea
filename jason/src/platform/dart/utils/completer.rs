@@ -35,9 +35,9 @@ use super::dart_api::{
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 type CompleterNewCaller = extern "C" fn() -> Dart_Handle;
 
-/// Pointer to an extern function that invokes the [complete()] method with
-/// the provided [`DartValue`] on the provided [`Dart_Handle`] pointing to the
-/// Dart [Completer] object.
+/// Pointer to an extern function that invokes the [complete()] method with the
+/// provided [`DartValue`] on the provided [`Dart_Handle`] pointing to the Dart
+/// [Completer] object.
 ///
 /// [complete()]: https://api.dart.dev/dart-async/Completer/complete.html
 /// [Completer]: https://api.dart.dev/dart-async/Completer-class.html
@@ -67,7 +67,7 @@ type CompleterFutureCaller = extern "C" fn(Dart_Handle) -> Dart_Handle;
 /// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_NEW_CALLER: Option<CompleterNewCaller> = None;
 
-/// Stores pointer to the [`CompleterCompletePtrCaller`] extern function.
+/// Stores pointer to the [`CompleterCompleteCaller`] extern function.
 ///
 /// Must be initialized by Dart during FFI initialization phase.
 static mut COMPLETER_COMPLETE_CALLER: Option<CompleterCompleteCaller> = None;

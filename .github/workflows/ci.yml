@@ -258,7 +258,7 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
-          target: i686-linux-android
+          target: x86_64-linux-android
       - uses: Swatinem/rust-cache@v1
         if: ${{ !contains(github.event.head_commit.message, '[fresh ci]') }}
 
@@ -277,7 +277,7 @@ jobs:
           echo ::set-output name=target::$(make flutter.android.version.compile)
 
       - name: Compile shared object
-        run: make cargo.build crate=medea-jason platform=android targets=x86
+        run: make cargo.build crate=medea-jason platform=android targets=x86_64
                               args="--features mockable"
 
       - name: Test on min Android NDK version
@@ -285,6 +285,7 @@ jobs:
         with:
           api-level: ${{ steps.ndk-version.outputs.min }}
           target: google_apis
+          arch: x86_64
           profile: Nexus 6
           script: make test.flutter
       - name: Test on target Android NDK version
@@ -292,6 +293,7 @@ jobs:
         with:
           api-level: ${{ steps.ndk-version.outputs.target }}
           target: google_apis
+          arch: x86_64
           profile: Nexus 6
           script: make test.flutter
 

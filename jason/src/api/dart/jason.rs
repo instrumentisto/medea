@@ -1,4 +1,4 @@
-use std::ptr::NonNull;
+use std::ptr;
 
 use super::{
     media_manager_handle::MediaManagerHandle, room_handle::RoomHandle,
@@ -14,7 +14,7 @@ impl ForeignClass for Jason {}
 
 /// Instantiates a new [`Jason`] interface to interact with this library.
 #[no_mangle]
-pub extern "C" fn Jason__new() -> NonNull<Jason> {
+pub extern "C" fn Jason__new() -> ptr::NonNull<Jason> {
     Jason::new().into_ptr()
 }
 
@@ -23,32 +23,27 @@ pub extern "C" fn Jason__new() -> NonNull<Jason> {
 /// [`Room`]: crate::room::Room
 #[no_mangle]
 pub unsafe extern "C" fn Jason__init_room(
-    this: NonNull<Jason>,
-) -> NonNull<RoomHandle> {
-    let this = this.as_ref();
-
-    this.init_room().into_ptr()
+    this: ptr::NonNull<Jason>,
+) -> ptr::NonNull<RoomHandle> {
+    this.as_ref().init_room().into_ptr()
 }
 
 /// Returns a [`MediaManagerHandle`].
 #[no_mangle]
 pub unsafe extern "C" fn Jason__media_manager(
-    this: NonNull<Jason>,
-) -> NonNull<MediaManagerHandle> {
-    let this = this.as_ref();
-
-    this.media_manager().into_ptr()
+    this: ptr::NonNull<Jason>,
+) -> ptr::NonNull<MediaManagerHandle> {
+    this.as_ref().media_manager().into_ptr()
 }
 
 /// Closes the provided [`RoomHandle`].
 #[no_mangle]
 pub unsafe extern "C" fn Jason__close_room(
-    this: NonNull<Jason>,
-    room_to_delete: NonNull<RoomHandle>,
+    this: ptr::NonNull<Jason>,
+    room_to_delete: ptr::NonNull<RoomHandle>,
 ) {
-    let this = this.as_ref();
-
-    this.close_room(RoomHandle::from_ptr(room_to_delete));
+    this.as_ref()
+        .close_room(RoomHandle::from_ptr(room_to_delete));
 }
 
 /// Frees the data behind the provided pointer.
@@ -58,7 +53,7 @@ pub unsafe extern "C" fn Jason__close_room(
 /// Should be called when object is no longer needed. Calling this more than
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
-pub unsafe extern "C" fn Jason__free(this: NonNull<Jason>) {
+pub unsafe extern "C" fn Jason__free(this: ptr::NonNull<Jason>) {
     drop(Jason::from_ptr(this));
 }
 

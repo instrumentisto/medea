@@ -33,7 +33,7 @@ impl From<Traced<ConnectionError>> for DartError {
 /// Sets callback, invoked when this `Connection` will close.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_close(
-    this: NonNull<ConnectionHandle>,
+    this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) -> DartResult {
     let this = this.as_ref();
@@ -50,7 +50,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
 /// [`Connection`]: crate::connection::Connection
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
-    this: NonNull<ConnectionHandle>,
+    this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) -> DartResult {
     let this = this.as_ref();
@@ -64,7 +64,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
 /// a server.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
-    this: NonNull<ConnectionHandle>,
+    this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) -> DartResult {
     let this = this.as_ref();
@@ -77,7 +77,7 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
 /// Returns remote `Member` ID.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
-    this: NonNull<ConnectionHandle>,
+    this: ptr::NonNull<ConnectionHandle>,
 ) -> DartResult {
     let this = this.as_ref();
 
@@ -95,7 +95,7 @@ pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
 /// once for the same pointer is equivalent to double free.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__free(
-    this: NonNull<ConnectionHandle>,
+    this: ptr::NonNull<ConnectionHandle>,
 ) {
     drop(ConnectionHandle::from_ptr(this));
 }
