@@ -14,9 +14,9 @@ use crate::api::dart::{utils::string_into_c_str, DartValue};
 ///
 /// [`ArgumentError`]: https://api.dart.dev/dart-core/ArgumentError-class.html
 type NewArgumentErrorCaller = extern "C" fn(
-    DartValue,
-    ptr::NonNull<c_char>,
-    ptr::NonNull<c_char>,
+    value: DartValue,
+    arg_name: ptr::NonNull<c_char>,
+    msg: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
 
 /// Stores pointer to the [`NewArgumentErrorCaller`] extern function.
