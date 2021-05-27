@@ -1,6 +1,6 @@
 //! Functionality for passing arrays from Rust to Dart.
 
-use std::{ffi::c_void, marker::PhantomData, mem, ptr, slice};
+use std::{ffi::c_void, marker::PhantomData, ptr, slice};
 
 use crate::api::ForeignClass;
 
@@ -11,7 +11,7 @@ use crate::api::ForeignClass;
 #[repr(C)]
 pub struct PtrArray<T = ()> {
     /// Pointer to the first element.
-    ptr: *const *mut c_void,
+    ptr: ptr::NonNull<ptr::NonNull<c_void>>,
 
     /// Array length.
     len: u64,
@@ -28,27 +28,7 @@ impl<T: ForeignClass> PtrArray<T> {
         let out: Vec<_> = arr.into_iter().map(ForeignClass::into_ptr).collect();
         Self {
             len: out.len() as u64,
-            ptr: Box::leak(out.into_boxed_slice())
-                .as_ptr()
-                .cast::<*mut c_void>(),
-            _element: PhantomData,
-        }
-    }
-}
-
-impl<T> PtrArray<T> {
-    /// Erases type parameter on this [`PtrArray`].
-    ///
-    /// Intended to simplify things when passing [`PtrArray`] to Dart.
-    ///
-    /// Although this function drops `self` it won't clear an internal slice,
-    /// its ownership is transferred to the resulting [`PtrArray`].
-    #[inline]
-    #[must_use]
-    pub fn erase_type(mut self) -> PtrArray {
-        PtrArray {
-            ptr: mem::replace(&mut self.ptr, ptr::null()),
-            len: self.len,
+            ptr: ptr::NonNull::from(Box::leak(out.into_boxed_slice())).cast(),
             _element: PhantomData,
         }
     }
@@ -56,8 +36,6 @@ impl<T> PtrArray<T> {
 
 impl<T> Drop for PtrArray<T> {
     /// Drops this [`PtrArray`].
-    ///
-    /// Clears the internal slice if its pointer is not null.
     ///
     /// # Safety
     ///
@@ -69,16 +47,11 @@ impl<T> Drop for PtrArray<T> {
     /// doesn't matter.
     #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
-        if self.ptr.is_null() {
-            return;
-        }
-
         unsafe {
-            let slice = slice::from_raw_parts_mut(
-                self.ptr as *mut *mut c_void,
+            Box::from_raw(slice::from_raw_parts_mut(
+                self.ptr.as_ptr(),
                 self.len as usize,
-            );
-            Box::from_raw(slice);
+            ));
         };
     }
 }
@@ -97,6 +70,6 @@ impl<T> Drop for PtrArray<T> {
 /// elements, otherwise pointers will be lost and data behind pointers will stay
 /// leaked.
 #[no_mangle]
-pub unsafe extern "C" fn PtrArray_free(arr: PtrArray) {
-    drop(arr);
+pub unsafe extern "C" fn PtrArray_free(arr: ptr::NonNull<PtrArray>) {
+    drop(Box::from_raw(arr.as_ptr()));
 }

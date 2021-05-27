@@ -1,12 +1,12 @@
 import 'dart:ffi';
 
+import 'ffi/ptrarray.dart';
 import 'input_device_info.dart';
 import 'jason.dart';
 import 'local_media_track.dart';
 import 'media_stream_settings.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'util/ptrarray.dart';
 
 typedef _initLocalTracks_C = Handle Function(Pointer, Pointer);
 typedef _initLocalTracks_Dart = Object Function(Pointer, Pointer);
@@ -48,10 +48,11 @@ class MediaManagerHandle {
   /// capture) basing on the provided [MediaStreamSettings].
   Future<List<LocalMediaTrack>> initLocalTracks(
       MediaStreamSettings caps) async {
-    PtrArray tracks =
+    Pointer tracks =
         await (_initLocalTracks(ptr.getInnerPtr(), caps.ptr.getInnerPtr())
             as Future);
     return tracks
+        .cast<PtrArray>()
         .intoPointerList()
         .map((e) => LocalMediaTrack(NullablePointer(e)))
         .toList();
@@ -60,9 +61,9 @@ class MediaManagerHandle {
   /// Returns a list of [InputDeviceInfo] objects representing available media
   /// input devices, such as microphones, cameras, and so forth.
   Future<List<InputDeviceInfo>> enumerateDevices() async {
-    var fut = _enumerateDevices(ptr.getInnerPtr()) as Future;
-    PtrArray devices = await fut;
-    return devices
+    Pointer pointer = await (_enumerateDevices(ptr.getInnerPtr()) as Future);
+    return pointer
+        .cast<PtrArray>()
         .intoPointerList()
         .map((e) => InputDeviceInfo(NullablePointer(e)))
         .toList();
