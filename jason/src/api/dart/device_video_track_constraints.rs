@@ -63,10 +63,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
     let height = match u32::try_from(height) {
         Ok(height) => height,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                height
-            )));
+            return ArgumentError::new(height, "height", "Expected u32").into();
         }
     };
     this.as_mut().exact_height(height);
@@ -84,10 +81,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
     let height = match u32::try_from(height) {
         Ok(height) => height,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                height
-            )));
+            return ArgumentError::new(height, "height", "Expected u32").into();
         }
     };
     this.as_mut().ideal_height(height);
@@ -106,19 +100,13 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
     let min = match u32::try_from(min) {
         Ok(min) => min,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                min
-            )));
+            return ArgumentError::new(min, "min", "Expected u32").into();
         }
     };
     let max = match u32::try_from(max) {
         Ok(max) => max,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                max
-            )));
+            return ArgumentError::new(max, "max", "Expected u32").into();
         }
     };
     this.as_mut().height_in_range(min, max);
@@ -136,10 +124,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
     let width = match u32::try_from(width) {
         Ok(width) => width,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                width
-            )));
+            return ArgumentError::new(width, "width", "Expected u32").into();
         }
     };
     this.as_mut().exact_width(width);
@@ -157,10 +142,7 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
     let width = match u32::try_from(width) {
         Ok(width) => width,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                width
-            )));
+            return ArgumentError::new(width, "width", "Expected u32").into();
         }
     };
     this.as_mut().ideal_width(width);
@@ -179,19 +161,13 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
     let min = match u32::try_from(min) {
         Ok(min) => min,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                min
-            )));
+            return ArgumentError::new(min, "min", "Expected u32").into();
         }
     };
     let max = match u32::try_from(max) {
         Ok(max) => max,
         Err(_) => {
-            return DartResult::from(ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                max
-            )));
+            return ArgumentError::new(max, "max", "Expected u32").into();
         }
     };
     this.as_mut().width_in_range(min, max);

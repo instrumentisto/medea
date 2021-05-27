@@ -126,8 +126,10 @@ class DeviceVideoTrackConstraints {
     _idealFacingMode(ptr.getInnerPtr(), facingMode.index);
   }
 
-  // TODO: add docs on args.
   /// Sets an exact [`height`][1] constraint.
+  ///
+  /// Converts the provided [height] into an `u32`. Throws and [ArgumentError]
+  /// if conversion fails.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void exactHeight(int height) {
@@ -136,12 +138,18 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an ideal [`height`][1] constraint.
   ///
+  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError]
+  /// if conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void idealHeight(int height) {
     _idealHeight(ptr.getInnerPtr(), height).unwrap();
   }
 
   /// Sets a range of a [`height`][1] constraint.
+  ///
+  /// Converts the provided [min] and [max] into an `u32`. Throws an
+  /// [ArgumentError] if conversion fails.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void heightInRange(int min, int max) {
@@ -150,6 +158,9 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an exact [`width`][1] constraint.
   ///
+  /// Converts the provided [width] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void exactWidth(int width) {
     _exactWidth(ptr.getInnerPtr(), width).unwrap();
@@ -157,12 +168,18 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an ideal [`width`][1] constraint.
   ///
+  /// Converts the provided [width] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void idealWidth(int width) {
     _idealWidth(ptr.getInnerPtr(), width).unwrap();
   }
 
   /// Sets a range of a [`width`][1] constraint.
+  ///
+  /// Converts the provided [min] and [max] into an `u32`. Throws an
+  /// [ArgumentError] if conversion fails.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void widthInRange(int min, int max) {

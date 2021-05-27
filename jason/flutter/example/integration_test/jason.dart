@@ -292,6 +292,10 @@ void main() {
       exception3 = e;
     }
     expect(exception3, isArgumentError);
+    var argumentError = exception3 as ArgumentError;
+    expect(argumentError.invalidValue, equals(-3));
+    expect(argumentError.name, 'maxDelay');
+    expect(argumentError.message, 'Expected u32');
   });
 
   final returnsInputDevicePtr =

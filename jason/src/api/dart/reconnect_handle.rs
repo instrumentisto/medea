@@ -30,7 +30,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 
     async move {
         let delay_ms = u32::try_from(delay_ms).map_err(|_| {
-            ArgumentError::from(format!("Expected u32, got `{}`", delay_ms))
+            ArgumentError::new(delay_ms, "delayMs", "Expected u32")
         })?;
 
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
@@ -72,13 +72,14 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
 
     async move {
         let starting_delay = u32::try_from(starting_delay).map_err(|_| {
-            ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                starting_delay
-            ))
+            ArgumentError::new(
+                starting_delay,
+                "startingDelayMs",
+                "Expected u32",
+            )
         })?;
         let max_delay = u32::try_from(max_delay).map_err(|_| {
-            ArgumentError::from(format!("Expected u32, got `{}`", max_delay))
+            ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.

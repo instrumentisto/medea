@@ -3,17 +3,21 @@ import 'dart:ffi';
 import 'foreign_value.dart';
 import 'unbox_handle.dart';
 
+/// Class that represents either success or failure.
+///
+/// Implements error propagation from Rust to Dart.
 class Result extends Struct {
-  /// Index of the [DartValueFields] union field. `0` goes for `Void`.
+  /// Index of the used [ResultFields] union field.
   @Uint8()
   external int _tag;
 
-  /// Actual [ForeignValue] payload.
+  /// Actual [Result] payload.
   external ResultFields _payload;
 
-  /// Returns Dart representation of the underlying foreign value.
+  /// Returns an underlying Dart value.
   ///
-  /// Returns `null` if underlying value is `void` or `()`.
+  /// Which is an [Object] that represent success, or throws an [Exception] or
+  /// an [Error] in case of failure.
   dynamic unwrap() {
     if (_tag == 0) {
       return _payload.ok.toDart();
@@ -23,10 +27,11 @@ class Result extends Struct {
   }
 }
 
+/// Possible fields of a [Result].
 class ResultFields extends Union {
   /// Success [ForeignValue].
   external ForeignValue ok;
 
-  /// [Error] value.
+  /// Failure value.
   external Pointer<Handle> errPtr;
 }
