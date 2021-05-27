@@ -31,7 +31,9 @@ use derive_more::From;
 use libc::c_char;
 
 use crate::{
-    api::dart::utils::{c_str_into_string, string_into_c_str, PtrArray},
+    api::dart::utils::{
+        c_str_into_string, string_into_c_str, DartError, PtrArray,
+    },
     media::MediaSourceKind,
 };
 
@@ -46,6 +48,7 @@ pub use self::{
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
+    utils::DartError as Error,
 };
 
 /// Rust structure having wrapper class in Dart.
@@ -72,126 +75,6 @@ pub trait ForeignClass: Sized {
         *Box::from_raw(this.as_ptr())
     }
 }
-
-/// Type-erased value that can be transferred via FFI boundaries to/from Dart.
-#[derive(Debug)]
-#[repr(u8)]
-pub enum DartValue {
-    /// No value. It can mean `()`, `void` or [`Option::None`] basing on the
-    /// contexts.
-    None,
-
-    /// Pointer to a [`Box`]ed Rust object.
-    Ptr(ptr::NonNull<c_void>),
-
-    /// Pointer to a [`Dart_Handle`] of some Dart object.
-    Handle(ptr::NonNull<Dart_Handle>),
-
-    /// Native string.
-    String(ptr::NonNull<c_char>),
-
-    /// Integer value.
-    ///
-    /// This can also be used to transfer boolean values and C-like enums.
-    Int(i64),
-}
-
-impl From<()> for DartValue {
-    #[inline]
-    fn from(_: ()) -> Self {
-        Self::None
-    }
-}
-
-impl<T: ForeignClass> From<T> for DartValue {
-    #[inline]
-    fn from(val: T) -> Self {
-        Self::Ptr(val.into_ptr().cast())
-    }
-}
-
-impl<T: ForeignClass> From<Option<T>> for DartValue {
-    #[inline]
-    fn from(val: Option<T>) -> Self {
-        match val {
-            None => Self::None,
-            Some(t) => Self::from(t),
-        }
-    }
-}
-
-impl<T> From<PtrArray<T>> for DartValue {
-    #[inline]
-    fn from(val: PtrArray<T>) -> Self {
-        Self::Ptr(ptr::NonNull::from(Box::leak(Box::new(val))).cast())
-    }
-}
-
-impl<T> From<Option<PtrArray<T>>> for DartValue {
-    #[inline]
-    fn from(val: Option<PtrArray<T>>) -> Self {
-        match val {
-            None => Self::None,
-            Some(arr) => Self::from(arr),
-        }
-    }
-}
-
-impl From<String> for DartValue {
-    #[inline]
-    fn from(string: String) -> Self {
-        Self::String(string_into_c_str(string))
-    }
-}
-
-impl From<Option<String>> for DartValue {
-    #[inline]
-    fn from(val: Option<String>) -> Self {
-        match val {
-            None => Self::None,
-            Some(string) => Self::from(string),
-        }
-    }
-}
-
-impl From<Dart_Handle> for DartValue {
-    #[inline]
-    fn from(handle: Dart_Handle) -> Self {
-        Self::Handle(ptr::NonNull::from(Box::leak(Box::new(handle))))
-    }
-}
-
-impl From<Option<Dart_Handle>> for DartValue {
-    #[inline]
-    fn from(val: Option<Dart_Handle>) -> Self {
-        match val {
-            None => Self::None,
-            Some(handle) => Self::from(handle),
-        }
-    }
-}
-
-/// Implements [`From`] types that can by casted to `i64` for the [`DartValue`].
-/// Should be called for all the integer types fitting in `2^63`.
-macro_rules! impl_from_num_for_dart_value {
-    ($arg:ty) => {
-        impl From<$arg> for DartValue {
-            #[inline]
-            fn from(val: $arg) -> Self {
-                DartValue::Int(i64::from(val))
-            }
-        }
-    };
-}
-
-impl_from_num_for_dart_value!(i8);
-impl_from_num_for_dart_value!(i16);
-impl_from_num_for_dart_value!(i32);
-impl_from_num_for_dart_value!(i64);
-impl_from_num_for_dart_value!(u8);
-impl_from_num_for_dart_value!(u16);
-impl_from_num_for_dart_value!(u32);
-impl_from_num_for_dart_value!(bool);
 
 /// [`DartValue`] marked by a Rust type.
 ///
@@ -331,6 +214,143 @@ impl<T> TryFrom<DartValueArg<T>> for Option<i64> {
     }
 }
 
+/// Type-erased value that can be transferred via FFI boundaries to/from Dart.
+#[derive(Debug)]
+#[repr(u8)]
+pub enum DartValue {
+    /// No value. It can mean `()`, `void` or [`Option::None`] basing on the
+    /// contexts.
+    None,
+
+    /// Pointer to a [`Box`]ed Rust object.
+    Ptr(ptr::NonNull<c_void>),
+
+    /// Pointer to a [`Dart_Handle`] of some Dart object.
+    Handle(ptr::NonNull<Dart_Handle>),
+
+    /// Native string.
+    String(ptr::NonNull<c_char>),
+
+    /// Integer value.
+    ///
+    /// This can also be used to transfer boolean values and C-like enums.
+    Int(i64),
+}
+
+impl From<()> for DartValue {
+    #[inline]
+    fn from(_: ()) -> Self {
+        Self::None
+    }
+}
+
+impl<T: ForeignClass> From<T> for DartValue {
+    #[inline]
+    fn from(val: T) -> Self {
+        Self::Ptr(val.into_ptr().cast())
+    }
+}
+
+impl<T: ForeignClass> From<Option<T>> for DartValue {
+    #[inline]
+    fn from(val: Option<T>) -> Self {
+        match val {
+            None => Self::None,
+            Some(t) => Self::from(t),
+        }
+    }
+}
+
+impl<T> From<PtrArray<T>> for DartValue {
+    #[inline]
+    fn from(val: PtrArray<T>) -> Self {
+        Self::Ptr(ptr::NonNull::from(Box::leak(Box::new(val))).cast())
+    }
+}
+
+impl<T> From<Option<PtrArray<T>>> for DartValue {
+    #[inline]
+    fn from(val: Option<PtrArray<T>>) -> Self {
+        match val {
+            None => Self::None,
+            Some(arr) => Self::from(arr),
+        }
+    }
+}
+
+impl From<String> for DartValue {
+    #[inline]
+    fn from(string: String) -> Self {
+        Self::String(string_into_c_str(string))
+    }
+}
+
+impl From<Option<String>> for DartValue {
+    #[inline]
+    fn from(val: Option<String>) -> Self {
+        match val {
+            None => Self::None,
+            Some(string) => Self::from(string),
+        }
+    }
+}
+
+impl From<Dart_Handle> for DartValue {
+    #[inline]
+    fn from(handle: Dart_Handle) -> Self {
+        Self::Handle(ptr::NonNull::from(Box::leak(Box::new(handle))))
+    }
+}
+
+impl From<Option<Dart_Handle>> for DartValue {
+    #[inline]
+    fn from(val: Option<Dart_Handle>) -> Self {
+        match val {
+            None => Self::None,
+            Some(handle) => Self::from(handle),
+        }
+    }
+}
+
+impl From<DartError> for DartValue {
+    #[inline]
+    fn from(err: DartError) -> Self {
+        Self::Handle(err.into())
+    }
+}
+
+impl From<Option<DartError>> for DartValue {
+    #[inline]
+    fn from(val: Option<DartError>) -> Self {
+        match val {
+            None => Self::None,
+            Some(err) => Self::from(err),
+        }
+    }
+}
+
+/// Implements [`From`] types that can by casted to `i64` for the [`DartValue`].
+/// Should be called for all the integer types fitting in `2^63`.
+macro_rules! impl_from_num_for_dart_value {
+    ($arg:ty) => {
+        impl From<$arg> for DartValue {
+            #[inline]
+            fn from(val: $arg) -> Self {
+                DartValue::Int(i64::from(val))
+            }
+        }
+    };
+}
+
+impl_from_num_for_dart_value!(i8);
+impl_from_num_for_dart_value!(i16);
+impl_from_num_for_dart_value!(i32);
+impl_from_num_for_dart_value!(i64);
+impl_from_num_for_dart_value!(u8);
+impl_from_num_for_dart_value!(u16);
+impl_from_num_for_dart_value!(u32);
+impl_from_num_for_dart_value!(bool);
+
 /// Error of converting a [`DartValue`] to the concrete type.
 #[derive(Debug, From)]
 #[from(forward)]
@@ -347,7 +367,8 @@ impl From<i64> for MediaSourceKind {
     }
 }
 
-/// Returns a [`Dart_Handle`] dereferenced from the provided pointer.
+/// Returns a [`Dart_Handle`] dereferencing the provided [`Dart_Handle`]
+/// pointer.
 #[no_mangle]
 pub unsafe extern "C" fn unbox_dart_handle(
     val: ptr::NonNull<Dart_Handle>,

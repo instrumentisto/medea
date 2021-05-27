@@ -39,7 +39,7 @@ pub unsafe extern "C" fn RoomHandle__join(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.join(c_str_into_string(token)).await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
         this.set_local_media_settings(settings, stop_first, rollback_on_fail)
             .await
             .unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -104,7 +104,7 @@ pub unsafe extern "C" fn RoomHandle__mute_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.mute_audio().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.mute_audio().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -140,7 +140,7 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.enable_audio().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -158,7 +158,7 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.disable_audio().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -182,7 +182,7 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 
     async move {
         this.mute_video(source_kind).await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -206,7 +206,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 
     async move {
         this.unmute_video(source_kind).await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -228,7 +228,7 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 
     async move {
         this.enable_video(source_kind).await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -250,7 +250,7 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 
     async move {
         this.disable_video(source_kind).await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.enable_remote_audio().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -286,7 +286,7 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.disable_remote_audio().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -304,7 +304,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.enable_remote_video().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }
@@ -322,7 +322,7 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_video(
         // TODO: Remove unwrap when propagating errors from Rust to Dart is
         //       implemented.
         this.disable_remote_video().await.unwrap();
-        Ok::<_, ()>(())
+        Ok(())
     }
     .into_dart_future()
 }

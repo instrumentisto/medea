@@ -72,7 +72,7 @@ impl ReconnectHandle {
         future_to_promise(async move {
             this.reconnect_with_backoff(
                 starting_delay_ms,
-                multiplier,
+                f64::from(multiplier),
                 max_delay,
             )
             .await
