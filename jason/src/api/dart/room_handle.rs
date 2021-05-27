@@ -7,7 +7,7 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, new_handler_detached_error, DartResult,
-            DartValueArg, IntoDartFuture,
+            IntoDartFuture,
         },
         DartValueArg, ForeignClass,
     },
