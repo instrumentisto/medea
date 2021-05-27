@@ -14,7 +14,10 @@ use crate::{
 
 pub use self::{
     arrays::PtrArray,
-    errs::{new_handler_detached_error, DartError},
+    errs::{
+        new_handler_detached_error, new_media_manager_exception, ArgumentError,
+        DartError,
+    },
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},
 };

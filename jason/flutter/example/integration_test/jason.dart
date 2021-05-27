@@ -15,7 +15,7 @@ import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
 import 'package:medea_jason/track_kinds.dart';
-import 'package:medea_jason/ffi/result.dart';
+import 'package:medea_jason/ffi/exceptions.dart';
 import 'package:medea_jason/util/nullable_pointer.dart';
 
 void main() {
@@ -71,6 +71,17 @@ void main() {
     constraints.exactWidth(444);
     constraints.idealWidth(111);
     constraints.widthInRange(55, 66);
+
+    expect(() => constraints.exactHeight(-1), throwsArgumentError);
+    expect(() => constraints.exactHeight(1 << 32 + 1), throwsArgumentError);
+    expect(() => constraints.heightInRange(-1, 200), throwsArgumentError);
+    expect(() => constraints.heightInRange(200, -1), throwsArgumentError);
+
+    expect(() => constraints.exactWidth(-1), throwsArgumentError);
+    expect(() => constraints.exactWidth(1 << 32 + 1), throwsArgumentError);
+    expect(() => constraints.widthInRange(-1, 200), throwsArgumentError);
+    expect(() => constraints.widthInRange(200, -1), throwsArgumentError);
+
     constraints.free();
     expect(() => constraints.deviceId('deviceId'), throwsStateError);
 
@@ -162,13 +173,9 @@ void main() {
       connFut.complete(conn);
     });
     var conn = await connFut.future;
+    expect(() => conn.getRemoteMemberId(),
+        throwsA(isInstanceOf<HandlerDetachedError>()));
 
-    expect(
-        () => conn.getRemoteMemberId(),
-        throwsA(predicate((e) =>
-            e is RustException &&
-            e.name == 'Detached' &&
-            e.message == 'Connection is in detached state')));
     var allFired = List<Completer>.generate(2, (_) => Completer());
     conn.onQualityScoreUpdate((score) {
       allFired[0].complete(score);
@@ -246,12 +253,13 @@ void main() {
     await room.enableRemoteAudio();
     await room.disableRemoteVideo();
 
-    expect(
-        () => room.enableRemoteVideo(),
-        throwsA(predicate((e) =>
-            e is RustException &&
-            e.name == 'Detached' &&
-            e.message == 'Room is in detached state')));
+    var exception;
+    try {
+      await room.enableRemoteVideo();
+    } catch (e) {
+      exception = e;
+    }
+    expect(exception, isInstanceOf<HandlerDetachedError>());
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {
@@ -266,6 +274,30 @@ void main() {
 
     await handle.reconnectWithDelay(155);
     await handle.reconnectWithBackoff(1, 2, 3);
+
+    var exception;
+    try {
+      await handle.reconnectWithDelay(-1);
+    } catch (e) {
+      exception = e;
+    }
+    expect(exception, isArgumentError);
+
+    var exception2;
+    try {
+      await handle.reconnectWithBackoff(-1, 2, 3);
+    } catch (e) {
+      exception2 = e;
+    }
+    expect(exception2, isArgumentError);
+
+    var exception3;
+    try {
+      await handle.reconnectWithBackoff(1, 2, -3);
+    } catch (e) {
+      exception3 = e;
+    }
+    expect(exception3, isArgumentError);
   });
 
   final returnsInputDevicePtr =
@@ -326,5 +358,19 @@ void main() {
     ptr.free();
     str.free();
     num.free();
+  });
+
+  testWidgets('ArgumentError', (WidgetTester tester) async {
+    var constraints = DeviceVideoTrackConstraints();
+
+    expect(() => constraints.exactHeight(-1), throwsArgumentError);
+    expect(() => constraints.exactHeight(1 << 32 + 1), throwsArgumentError);
+    expect(() => constraints.heightInRange(-1, 200), throwsArgumentError);
+    expect(() => constraints.heightInRange(200, -1), throwsArgumentError);
+
+    expect(() => constraints.exactWidth(-1), throwsArgumentError);
+    expect(() => constraints.exactWidth(1 << 32 + 1), throwsArgumentError);
+    expect(() => constraints.widthInRange(-1, 200), throwsArgumentError);
+    expect(() => constraints.widthInRange(200, -1), throwsArgumentError);
   });
 }

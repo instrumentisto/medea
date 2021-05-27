@@ -117,7 +117,6 @@ mod mock {
         }
     }
 
-    #[allow(clippy::missing_errors_doc)]
     impl ConnectionHandle {
         pub fn get_remote_member_id(
             &self,

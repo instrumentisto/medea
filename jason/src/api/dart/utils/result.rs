@@ -18,3 +18,10 @@ where
         }
     }
 }
+
+impl<T: Into<DartError>> From<T> for DartResult {
+    fn from(err: T) -> Self {
+        log::error!("impl<T: Into<DartError>> From<T> for DartResult");
+        DartResult::Err(err.into())
+    }
+}

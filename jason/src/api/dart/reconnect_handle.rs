@@ -1,9 +1,12 @@
-use std::ptr;
+use std::{convert::TryFrom as _, ptr};
 
 use dart_sys::Dart_Handle;
 use tracerr::Traced;
 
-use crate::{api::dart::utils::IntoDartFuture, rpc::ReconnectError};
+use crate::{
+    api::dart::utils::{ArgumentError, IntoDartFuture},
+    rpc::ReconnectError,
+};
 
 use super::{
     utils::{new_handler_detached_error, DartError},
@@ -44,12 +47,16 @@ impl From<Traced<ReconnectError>> for DartError {
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     this: ptr::NonNull<ReconnectHandle>,
-    delay_ms: i64, // TODO: must check for cast_sign_loss
+    delay_ms: i64,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
     async move {
-        this.reconnect_with_delay(delay_ms as u32).await?;
+        let delay_ms = u32::try_from(delay_ms).map_err(|_| {
+            ArgumentError::from(format!("Expected u32, got `{}`", delay_ms))
+        })?;
+
+        this.reconnect_with_delay(delay_ms).await?;
         Ok(())
     }
     .into_dart_future()
@@ -78,19 +85,25 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 #[no_mangle]
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     this: ptr::NonNull<ReconnectHandle>,
-    starting_delay: i64, // TODO: must check for cast_sign_loss
-    multiplier: f32,
+    starting_delay: i64,
+    multiplier: f64,
     max_delay: i64,
 ) -> Dart_Handle {
     let this = this.as_ref().clone();
 
     async move {
-        this.reconnect_with_backoff(
-            starting_delay as u32,
-            multiplier,
-            max_delay as u32,
-        )
-        .await?;
+        let starting_delay = u32::try_from(starting_delay).map_err(|_| {
+            ArgumentError::from(format!(
+                "Expected u32, got `{}`",
+                starting_delay
+            ))
+        })?;
+        let max_delay = u32::try_from(max_delay).map_err(|_| {
+            ArgumentError::from(format!("Expected u32, got `{}`", max_delay))
+        })?;
+
+        this.reconnect_with_backoff(starting_delay, multiplier, max_delay)
+            .await?;
         Ok(())
     }
     .into_dart_future()
@@ -135,7 +148,7 @@ mod mock {
         pub async fn reconnect_with_backoff(
             &self,
             _starting_delay_ms: u32,
-            _multiplier: f32,
+            _multiplier: f64,
             _max_delay: u32,
         ) -> Result<(), Traced<ReconnectError>> {
             Ok(())

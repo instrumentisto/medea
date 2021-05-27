@@ -7,7 +7,10 @@ use crate::media::MediaManagerError;
 
 use super::{
     media_stream_settings::MediaStreamSettings,
-    utils::{new_handler_detached_error, DartError, IntoDartFuture, PtrArray},
+    utils::{
+        new_handler_detached_error, new_media_manager_exception, DartError,
+        IntoDartFuture, PtrArray,
+    },
     ForeignClass,
 };
 
@@ -21,18 +24,21 @@ impl ForeignClass for MediaManagerHandle {}
 impl From<Traced<MediaManagerError>> for DartError {
     fn from(err: Traced<MediaManagerError>) -> Self {
         let (err, stacktrace) = err.into_parts();
+        let message = err.to_string();
         let stacktrace = stacktrace.to_string();
         match err {
             MediaManagerError::Detached => unsafe {
                 new_handler_detached_error(stacktrace)
             },
-            MediaManagerError::CouldNotGetMediaDevices(_)
-            | MediaManagerError::GetUserMediaFailed(_)
-            | MediaManagerError::GetDisplayMediaFailed(_)
-            | MediaManagerError::EnumerateDevicesFailed(_)
-            | MediaManagerError::LocalTrackIsEnded(_) => {
-                todo!()
-            }
+            MediaManagerError::CouldNotGetMediaDevices(cause)
+            | MediaManagerError::GetUserMediaFailed(cause)
+            | MediaManagerError::GetDisplayMediaFailed(cause)
+            | MediaManagerError::EnumerateDevicesFailed(cause) => unsafe {
+                new_media_manager_exception(message, Some(cause), stacktrace)
+            },
+            MediaManagerError::LocalTrackIsEnded(_) => unsafe {
+                new_media_manager_exception(message, None, stacktrace)
+            },
         }
     }
 }

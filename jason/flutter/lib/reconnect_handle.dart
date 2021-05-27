@@ -3,7 +3,6 @@ import 'dart:ffi';
 import 'jason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'ffi/result.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
@@ -45,8 +44,7 @@ class ReconnectHandle {
   ///
   /// Throws [RustException] if Rust returns error.
   Future<void> reconnectWithDelay(int delayMs) async {
-    await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future)
-        .catchError(futureErrorCatcher);
+    await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future);
   }
 
   /// Tries to reconnect a `Room` in a loop with a growing backoff delay.

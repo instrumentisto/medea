@@ -1,8 +1,5 @@
 import 'dart:ffi';
 
-import 'package:ffi/ffi.dart';
-
-import 'ffi/native_string.dart';
 import 'jason.dart';
 import 'remote_media_track.dart';
 import 'util/move_semantic.dart';

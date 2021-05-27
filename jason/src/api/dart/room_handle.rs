@@ -561,7 +561,7 @@ mod mock {
         pub async fn enable_remote_video(
             &self,
         ) -> Result<(), Traced<RoomError>> {
-            Ok(())
+            Err(tracerr::new!(RoomError::Detached).into())
         }
 
         pub async fn disable_remote_video(
