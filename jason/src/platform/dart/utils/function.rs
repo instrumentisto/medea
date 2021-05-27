@@ -1,7 +1,7 @@
 //! Functionality for calling Dart closures from Rust.
 //!
 //! Dart DL API doesn't allow calling Dart closures directly. So Dart registers
-//! static function that accepts and invokes the provided Dart closures:
+//! a static function that accepts and invokes the provided Dart closures:
 //! [`register_fn_caller`].
 //!
 //! [`register_fn_caller`] function MUST be registered by Dart during FFI

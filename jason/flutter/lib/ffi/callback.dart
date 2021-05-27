@@ -9,7 +9,8 @@ void registerFunctions(DynamicLibrary dl) {
       Pointer.fromFunction<Void Function(Handle, ForeignValue)>(_callFn));
 }
 
-/// Function used by Rust to call closures with single [ForeignValue] argument.
+/// Function used by Rust to call closures with a single [ForeignValue]
+/// argument.
 void _callFn(void Function(dynamic) fn, ForeignValue value) {
   var arg = value.toDart();
   if (arg != null) {

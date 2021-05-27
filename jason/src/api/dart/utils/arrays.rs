@@ -48,9 +48,10 @@ impl<T> Drop for PtrArray<T> {
     #[allow(clippy::cast_possible_truncation)]
     fn drop(&mut self) {
         unsafe {
-            let slice =
-                slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len as usize);
-            Box::from_raw(slice);
+            Box::from_raw(slice::from_raw_parts_mut(
+                self.ptr.as_ptr(),
+                self.len as usize,
+            ));
         };
     }
 }

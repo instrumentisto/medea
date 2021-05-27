@@ -7,7 +7,7 @@ use crate::{
     api::dart::{
         utils::{
             c_str_into_string, new_handler_detached_error, DartResult,
-            IntoDartFuture,
+            DartValueArg, IntoDartFuture,
         },
         DartValueArg, ForeignClass,
     },
@@ -248,7 +248,7 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
         .map(MediaSourceKind::from);
 
     async move {
-        this.disable_video(source_kind).await?;
+        this.enable_video(source_kind).await?;
         Ok(())
     }
     .into_dart_future()

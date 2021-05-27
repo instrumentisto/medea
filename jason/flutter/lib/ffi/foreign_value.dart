@@ -14,26 +14,26 @@ final _unboxDartHandle =
     dl.lookupFunction<_unboxDartHandle_C, _unboxDartHandle_Dart>(
         'unbox_dart_handle');
 
-/// Type-erased value that can be transferred via FFI boundaries.
+/// Type-erased value that can be transferred via FFI boundaries to/from Rust.
 class ForeignValue extends Struct {
-  /// Index of the [DartValueFields] union field.
+  /// Index of the used [ForeignValueFields] union field.
   ///
   /// `0` goes for no value.
   @Uint8()
   external int _tag;
 
   /// Actual [ForeignValue] payload.
-  external DartValueFields _payload;
+  external ForeignValueFields _payload;
 
   /// Private constructor.
   ///
-  /// This class is a reference backed by native memory, so it cant be
+  /// This class is a reference backed by a native memory, so it cannot be
   /// instantiated like a normal Dart class.
   ForeignValue._();
 
   /// Returns Dart representation of the underlying foreign value.
   ///
-  /// Returns `null` if underlying value is `None`.
+  /// Returns `null` if underlying value has no value.
   dynamic toDart() {
     switch (_tag) {
       case 0:
@@ -51,14 +51,15 @@ class ForeignValue extends Struct {
     }
   }
 
-  /// Allocates [ForeignValue] with no value.
+  /// Allocates a new [ForeignValue] with no value.
   ///
-  /// This can be used when calling native function with optional argument.
+  /// This can be used when calling native function with an optional argument.
   static Pointer<ForeignValue> none() {
     return calloc<ForeignValue>();
   }
 
-  /// Allocates [ForeignValue] with the provided pointer to some Rust object.
+  /// Allocates a new [ForeignValue] with the provided pointer to some Rust
+  /// object.
   static Pointer<ForeignValue> fromPtr(NullablePointer ptr) {
     var fVal = calloc<ForeignValue>();
     fVal.ref._tag = 1;
@@ -66,7 +67,7 @@ class ForeignValue extends Struct {
     return fVal;
   }
 
-  /// Allocates [ForeignValue] with the provided [String].
+  /// Allocates a new [ForeignValue] with the provided [String].
   static Pointer<ForeignValue> fromString(String str) {
     var fVal = calloc<ForeignValue>();
     fVal.ref._tag = 3;
@@ -74,7 +75,7 @@ class ForeignValue extends Struct {
     return fVal;
   }
 
-  /// Allocates [ForeignValue] with the provided [int] value.
+  /// Allocates a new [ForeignValue] with the provided [int] value.
   static Pointer<ForeignValue> fromInt(int num) {
     var fVal = calloc<ForeignValue>();
     fVal.ref._tag = 4;
@@ -84,7 +85,7 @@ class ForeignValue extends Struct {
 }
 
 extension ForeignValuePointer on Pointer<ForeignValue> {
-  /// Releases memory allocated on the native heap.
+  /// Releases the memory allocated on a native heap.
   @moveSemantics
   void free() {
     if (ref._tag == 3) {
@@ -94,17 +95,18 @@ extension ForeignValuePointer on Pointer<ForeignValue> {
   }
 }
 
-class DartValueFields extends Union {
+/// Possible fields of a [ForeignValue].
+class ForeignValueFields extends Union {
   /// [Pointer] to some Rust object.
   external Pointer ptr;
 
   /// [Pointer] to a [Handle] to some Dart object.
   external Pointer<Handle> handlePtr;
 
-  /// [Pointer] to native string.
+  /// [Pointer] to a native string.
   external Pointer<Utf8> string;
 
-  /// Numeric value.
+  /// Integer value.
   @Int64()
   external int number;
 }

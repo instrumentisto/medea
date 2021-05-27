@@ -234,7 +234,7 @@ class RoomHandle {
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
     try {
       await (_muteVideo(ptr.getInnerPtr(), kind_arg.ref) as Future)
-          .catchError(futureErrorCatcher);;
+          .catchError(futureErrorCatcher);
     } finally {
       kind_arg.free();
     }
@@ -248,7 +248,7 @@ class RoomHandle {
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
     try {
       await (_unmuteVideo(ptr.getInnerPtr(), kind_arg.ref) as Future)
-          .catchError(futureErrorCatcher);;
+          .catchError(futureErrorCatcher);
     } finally {
       kind_arg.free();
     }
@@ -260,7 +260,7 @@ class RoomHandle {
   Future<void> enableVideo([MediaSourceKind? kind]) async {
     var kind_arg =
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index)
-            .catchError(futureErrorCatcher);;
+            .catchError(futureErrorCatcher);
     try {
       await (_enableVideo(ptr.getInnerPtr(), kind_arg.ref) as Future);
     } finally {
@@ -276,7 +276,7 @@ class RoomHandle {
         kind == null ? ForeignValue.none() : ForeignValue.fromInt(kind.index);
     try {
       await (_disableVideo(ptr.getInnerPtr(), kind_arg.ref) as Future)
-          .catchError(futureErrorCatcher);;
+          .catchError(futureErrorCatcher);
     } finally {
       kind_arg.free();
     }

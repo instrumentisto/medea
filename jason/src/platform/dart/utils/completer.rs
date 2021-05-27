@@ -18,7 +18,7 @@
 //!
 //! [Completer]: https://api.dart.dev/dart-async/Completer-class.html
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ptr};
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
 
