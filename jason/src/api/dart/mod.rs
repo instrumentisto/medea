@@ -31,7 +31,9 @@ use derive_more::From;
 use libc::c_char;
 
 use crate::{
-    api::dart::utils::{c_str_into_string, string_into_c_str, PtrArray},
+    api::dart::utils::{
+        c_str_into_string, string_into_c_str, DartError, PtrArray,
+    },
     media::MediaSourceKind,
 };
 
@@ -167,6 +169,23 @@ impl From<Option<Dart_Handle>> for DartValue {
         match val {
             None => Self::None,
             Some(handle) => Self::from(handle),
+        }
+    }
+}
+
+impl From<DartError> for DartValue {
+    #[inline]
+    fn from(err: DartError) -> Self {
+        Self::Handle(err.into())
+    }
+}
+
+impl From<Option<DartError>> for DartValue {
+    #[inline]
+    fn from(val: Option<DartError>) -> Self {
+        match val {
+            None => Self::None,
+            Some(err) => Self::from(err),
         }
     }
 }

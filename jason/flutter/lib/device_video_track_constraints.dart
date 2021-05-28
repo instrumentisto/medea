@@ -2,6 +2,7 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import 'ffi/result.dart';
 import 'jason.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
@@ -18,23 +19,23 @@ typedef _exactFacingMode_Dart = void Function(Pointer, int);
 typedef _idealFacingMode_C = Void Function(Pointer, Uint8);
 typedef _idealFacingMode_Dart = void Function(Pointer, int);
 
-typedef _exactHeight_C = Void Function(Pointer, Uint32);
-typedef _exactHeight_Dart = void Function(Pointer, int);
+typedef _exactHeight_C = Result Function(Pointer, Int64);
+typedef _exactHeight_Dart = Result Function(Pointer, int);
 
-typedef _idealHeight_C = Void Function(Pointer, Uint32);
-typedef _idealHeight_Dart = void Function(Pointer, int);
+typedef _idealHeight_C = Result Function(Pointer, Int64);
+typedef _idealHeight_Dart = Result Function(Pointer, int);
 
-typedef _heightInRange_C = Void Function(Pointer, Uint32, Uint32);
-typedef _heightInRange_Dart = void Function(Pointer, int, int);
+typedef _heightInRange_C = Result Function(Pointer, Int64, Int64);
+typedef _heightInRange_Dart = Result Function(Pointer, int, int);
 
-typedef _exactWidth_C = Void Function(Pointer, Uint32);
-typedef _exactWidth_Dart = void Function(Pointer, int);
+typedef _exactWidth_C = Result Function(Pointer, Int64);
+typedef _exactWidth_Dart = Result Function(Pointer, int);
 
-typedef _idealWidth_C = Void Function(Pointer, Uint32);
-typedef _idealWidth_Dart = void Function(Pointer, int);
+typedef _idealWidth_C = Result Function(Pointer, Int64);
+typedef _idealWidth_Dart = Result Function(Pointer, int);
 
-typedef _widthInRange_C = Void Function(Pointer, Uint32, Uint32);
-typedef _widthInRange_Dart = void Function(Pointer, int, int);
+typedef _widthInRange_C = Result Function(Pointer, Int64, Int64);
+typedef _widthInRange_Dart = Result Function(Pointer, int, int);
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
@@ -127,44 +128,62 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an exact [`height`][1] constraint.
   ///
+  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void exactHeight(int height) {
-    _exactHeight(ptr.getInnerPtr(), height);
+    _exactHeight(ptr.getInnerPtr(), height).unwrap();
   }
 
   /// Sets an ideal [`height`][1] constraint.
   ///
+  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void idealHeight(int height) {
-    _idealHeight(ptr.getInnerPtr(), height);
+    _idealHeight(ptr.getInnerPtr(), height).unwrap();
   }
 
   /// Sets a range of a [`height`][1] constraint.
   ///
+  /// Converts the provided [min] and [max] into an `u32`. Throws an
+  /// [ArgumentError] if conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void heightInRange(int min, int max) {
-    _heightInRange(ptr.getInnerPtr(), min, max);
+    _heightInRange(ptr.getInnerPtr(), min, max).unwrap();
   }
 
   /// Sets an exact [`width`][1] constraint.
   ///
+  /// Converts the provided [width] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void exactWidth(int width) {
-    _exactWidth(ptr.getInnerPtr(), width);
+    _exactWidth(ptr.getInnerPtr(), width).unwrap();
   }
 
   /// Sets an ideal [`width`][1] constraint.
   ///
+  /// Converts the provided [width] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void idealWidth(int width) {
-    _idealWidth(ptr.getInnerPtr(), width);
+    _idealWidth(ptr.getInnerPtr(), width).unwrap();
   }
 
   /// Sets a range of a [`width`][1] constraint.
   ///
+  /// Converts the provided [min] and [max] into an `u32`. Throws an
+  /// [ArgumentError] if conversion fails.
+  ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-width
   void widthInRange(int min, int max) {
-    _widthInRange(ptr.getInnerPtr(), min, max);
+    _widthInRange(ptr.getInnerPtr(), min, max).unwrap();
   }
 
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.

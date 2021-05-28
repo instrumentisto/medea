@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'foreign_value.dart';
+import 'unbox_handle.dart';
 
 /// Registers functions that allow Rust to manage [Completer]s.
 void registerFunctions(DynamicLibrary dl) {
@@ -20,7 +21,7 @@ void registerFunctions(DynamicLibrary dl) {
 
   dl.lookupFunction<Void Function(Pointer), void Function(Pointer)>(
           'register_completer_complete_error_caller')(
-      Pointer.fromFunction<Void Function(Handle, Pointer)>(
+      Pointer.fromFunction<Void Function(Handle, Pointer<Handle>)>(
           _Completer_completeError_Pointer));
 }
 
@@ -40,6 +41,6 @@ void _Completer_complete(Object completer, ForeignValue arg) {
 }
 
 /// Complete the provided [Completer] with an error.
-void _Completer_completeError_Pointer(Object completer, Pointer arg) {
-  (completer as Completer).completeError(arg);
+void _Completer_completeError_Pointer(Object completer, Pointer<Handle> err) {
+  (completer as Completer).completeError(unboxDartHandle(err));
 }

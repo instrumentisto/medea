@@ -70,6 +70,19 @@ void main() {
     constraints.exactWidth(444);
     constraints.idealWidth(111);
     constraints.widthInRange(55, 66);
+
+    expect(() => constraints.exactHeight(-1), throwsArgumentError);
+    expect(() => constraints.idealHeight(-1), throwsArgumentError);
+    expect(() => constraints.exactHeight(1 << 32 + 1), throwsArgumentError);
+    expect(() => constraints.heightInRange(-1, 200), throwsArgumentError);
+    expect(() => constraints.heightInRange(200, -1), throwsArgumentError);
+
+    expect(() => constraints.exactWidth(-1), throwsArgumentError);
+    expect(() => constraints.idealWidth(-1), throwsArgumentError);
+    expect(() => constraints.exactWidth(1 << 32 + 1), throwsArgumentError);
+    expect(() => constraints.widthInRange(-1, 200), throwsArgumentError);
+    expect(() => constraints.widthInRange(200, -1), throwsArgumentError);
+
     constraints.free();
     expect(() => constraints.deviceId('deviceId'), throwsStateError);
 
@@ -255,6 +268,34 @@ void main() {
 
     await handle.reconnectWithDelay(155);
     await handle.reconnectWithBackoff(1, 2, 3);
+
+    var exception;
+    try {
+      await handle.reconnectWithDelay(-1);
+    } catch (e) {
+      exception = e;
+    }
+    expect(exception, isArgumentError);
+
+    var exception2;
+    try {
+      await handle.reconnectWithBackoff(-1, 2, 3);
+    } catch (e) {
+      exception2 = e;
+    }
+    expect(exception2, isArgumentError);
+
+    var exception3;
+    try {
+      await handle.reconnectWithBackoff(1, 2, -3);
+    } catch (e) {
+      exception3 = e;
+    }
+    expect(exception3, isArgumentError);
+    var argumentError = exception3 as ArgumentError;
+    expect(argumentError.invalidValue, equals(-3));
+    expect(argumentError.name, 'maxDelay');
+    expect(argumentError.message, 'Expected u32');
   });
 
   final returnsInputDevicePtr =

@@ -90,7 +90,7 @@ impl ReconnectHandle {
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
-        multiplier: f32,
+        multiplier: f64,
         max_delay: u32,
     ) -> Result<(), Traced<ReconnectError>> {
         let mut backoff_delayer = BackoffDelayer::new(

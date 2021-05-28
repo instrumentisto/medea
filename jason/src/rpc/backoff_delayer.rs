@@ -22,7 +22,7 @@ pub struct BackoffDelayer {
 
     /// The multiplier by which [`BackoffDelayer::current_interval`] will be
     /// multiplied on [`BackoffDelayer::delay`] call.
-    interval_multiplier: f32,
+    interval_multiplier: f64,
 }
 
 impl BackoffDelayer {
@@ -31,13 +31,13 @@ impl BackoffDelayer {
     #[must_use]
     pub fn new(
         starting_interval: Duration,
-        interval_multiplier: f32,
+        interval_multiplier: f64,
         max_interval: Duration,
     ) -> Self {
         Self {
             current_interval: starting_interval,
             max_interval,
-            interval_multiplier: interval_multiplier.max(0_f32),
+            interval_multiplier: interval_multiplier.max(0.0),
         }
     }
 
@@ -59,8 +59,8 @@ impl BackoffDelayer {
             self.max_interval
         } else {
             let delay = self.current_interval;
-            self.current_interval = Duration::from_secs_f32(
-                self.current_interval.as_secs_f32() * self.interval_multiplier,
+            self.current_interval = Duration::from_secs_f64(
+                self.current_interval.as_secs_f64() * self.interval_multiplier,
             );
             delay
         }

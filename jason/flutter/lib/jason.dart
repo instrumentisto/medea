@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'ffi/callback.dart' as callback;
 import 'ffi/completer.dart' as completer;
+import 'ffi/exceptions.dart' as exceptions;
 import 'ffi/executor.dart';
 import 'media_manager.dart';
 import 'room_handle.dart';
@@ -70,6 +71,7 @@ DynamicLibrary _dl_load() {
   }
   callback.registerFunctions(dl);
   completer.registerFunctions(dl);
+  exceptions.registerFunctions(dl);
 
   executor = Executor(dl);
 

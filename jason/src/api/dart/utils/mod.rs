@@ -1,4 +1,6 @@
 mod arrays;
+mod err;
+mod result;
 mod string;
 
 use std::future::Future;
@@ -12,6 +14,8 @@ use crate::{
 
 pub use self::{
     arrays::PtrArray,
+    err::{ArgumentError, DartError},
+    result::DartResult,
     string::{c_str_into_string, string_into_c_str},
 };
 
@@ -27,11 +31,10 @@ pub trait IntoDartFuture {
     fn into_dart_future(self) -> Dart_Handle;
 }
 
-impl<F, T, E> IntoDartFuture for F
+impl<F, T> IntoDartFuture for F
 where
-    F: Future<Output = Result<T, E>> + 'static,
+    F: Future<Output = Result<T, DartError>> + 'static,
     T: Into<DartValue> + 'static,
-    E: Into<DartValue> + 'static,
 {
     fn into_dart_future(self) -> Dart_Handle {
         let completer = Completer::new();

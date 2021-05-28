@@ -2,28 +2,21 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
-import '../jason.dart';
 import '../util/move_semantic.dart';
 import '../util/nullable_pointer.dart';
 import 'native_string.dart';
-
-typedef _unboxDartHandle_C = Handle Function(Pointer<Handle>);
-typedef _unboxDartHandle_Dart = Object Function(Pointer<Handle>);
-
-final _unboxDartHandle =
-    dl.lookupFunction<_unboxDartHandle_C, _unboxDartHandle_Dart>(
-        'unbox_dart_handle');
+import 'unbox_handle.dart';
 
 /// Type-erased value that can be transferred via FFI boundaries to/from Rust.
 class ForeignValue extends Struct {
-  /// Index of the used [ForeignValueFields] union field.
+  /// Index of the used [_ForeignValueFields] union field.
   ///
   /// `0` goes for no value.
   @Uint8()
   external int _tag;
 
   /// Actual [ForeignValue] payload.
-  external ForeignValueFields _payload;
+  external _ForeignValueFields _payload;
 
   /// Private constructor.
   ///
@@ -41,7 +34,7 @@ class ForeignValue extends Struct {
       case 1:
         return _payload.ptr;
       case 2:
-        return _unboxDartHandle(_payload.handlePtr);
+        return unboxDartHandle(_payload.handlePtr);
       case 3:
         return _payload.string.nativeStringToDartString();
       case 4:
@@ -96,7 +89,7 @@ extension ForeignValuePointer on Pointer<ForeignValue> {
 }
 
 /// Possible fields of a [ForeignValue].
-class ForeignValueFields extends Union {
+class _ForeignValueFields extends Union {
   /// [Pointer] to some Rust object.
   external Pointer ptr;
 

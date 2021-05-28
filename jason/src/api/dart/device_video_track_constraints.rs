@@ -1,8 +1,11 @@
-use std::{os::raw::c_char, ptr};
+use std::{convert::TryFrom as _, os::raw::c_char, ptr};
 
 use crate::media::FacingMode;
 
-use super::{utils::c_str_into_string, ForeignClass};
+use super::{
+    utils::{c_str_into_string, ArgumentError, DartResult},
+    ForeignClass,
+};
 
 pub use crate::media::DeviceVideoTrackConstraints;
 
@@ -55,9 +58,15 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_facing_mode(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
     mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
-    height: u32,
-) {
-    this.as_mut().exact_height(height);
+    height: i64,
+) -> DartResult {
+    match u32::try_from(height) {
+        Ok(h) => this.as_mut().exact_height(h),
+        Err(_) => {
+            return ArgumentError::new(height, "height", "Expected u32").into();
+        }
+    };
+    Ok(()).into()
 }
 
 /// Sets an ideal [height][1] constraint.
@@ -66,9 +75,15 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_height(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
     mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
-    height: u32,
-) {
-    this.as_mut().ideal_height(height);
+    height: i64,
+) -> DartResult {
+    match u32::try_from(height) {
+        Ok(h) => this.as_mut().ideal_height(h),
+        Err(_) => {
+            return ArgumentError::new(height, "height", "Expected u32").into();
+        }
+    };
+    Ok(()).into()
 }
 
 /// Sets a range of a [height][1] constraint.
@@ -77,10 +92,19 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_height(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
     mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
-    min: u32,
-    max: u32,
-) {
-    this.as_mut().height_in_range(min, max);
+    min: i64,
+    max: i64,
+) -> DartResult {
+    match (u32::try_from(min), u32::try_from(max)) {
+        (Ok(min), Ok(max)) => this.as_mut().height_in_range(min, max),
+        (Err(_), _) => {
+            return ArgumentError::new(min, "min", "Expected u32").into();
+        }
+        (_, Err(_)) => {
+            return ArgumentError::new(max, "max", "Expected u32").into();
+        }
+    };
+    Ok(()).into()
 }
 
 /// Sets an exact [width][1] constraint.
@@ -89,9 +113,15 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__height_in_range(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
     mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
-    width: u32,
-) {
-    this.as_mut().exact_width(width);
+    width: i64,
+) -> DartResult {
+    match u32::try_from(width) {
+        Ok(w) => this.as_mut().exact_width(w),
+        Err(_) => {
+            return ArgumentError::new(width, "width", "Expected u32").into();
+        }
+    };
+    Ok(()).into()
 }
 
 /// Sets an ideal [width][1] constraint.
@@ -100,9 +130,15 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__exact_width(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
     mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
-    width: u32,
-) {
-    this.as_mut().ideal_width(width);
+    width: i64,
+) -> DartResult {
+    match u32::try_from(width) {
+        Ok(w) => this.as_mut().exact_width(w),
+        Err(_) => {
+            return ArgumentError::new(width, "width", "Expected u32").into();
+        }
+    };
+    Ok(()).into()
 }
 
 /// Sets a range of a [width][1] constraint.
@@ -111,10 +147,19 @@ pub unsafe extern "C" fn DeviceVideoTrackConstraints__ideal_width(
 #[no_mangle]
 pub unsafe extern "C" fn DeviceVideoTrackConstraints__width_in_range(
     mut this: ptr::NonNull<DeviceVideoTrackConstraints>,
-    min: u32,
-    max: u32,
-) {
-    this.as_mut().width_in_range(min, max);
+    min: i64,
+    max: i64,
+) -> DartResult {
+    match (u32::try_from(min), u32::try_from(max)) {
+        (Ok(min), Ok(max)) => this.as_mut().width_in_range(min, max),
+        (Err(_), _) => {
+            return ArgumentError::new(min, "min", "Expected u32").into();
+        }
+        (_, Err(_)) => {
+            return ArgumentError::new(max, "max", "Expected u32").into();
+        }
+    };
+    Ok(()).into()
 }
 
 /// Frees the data behind the provided pointer.
