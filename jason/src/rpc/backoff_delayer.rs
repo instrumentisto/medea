@@ -37,7 +37,7 @@ impl BackoffDelayer {
         Self {
             current_interval: starting_interval,
             max_interval,
-            interval_multiplier: interval_multiplier.max(0_f64),
+            interval_multiplier: interval_multiplier.max(0.0),
         }
     }
 

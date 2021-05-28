@@ -3,7 +3,7 @@ import 'dart:ffi';
 import 'foreign_value.dart';
 import 'unbox_handle.dart';
 
-/// Class that represents either success or failure.
+/// Class representing either success or failure.
 ///
 /// Implements error propagation from Rust to Dart.
 class Result extends Struct {
@@ -14,10 +14,8 @@ class Result extends Struct {
   /// Actual [Result] payload.
   external _ResultFields _payload;
 
-  /// Returns an underlying Dart value.
-  ///
-  /// Which is an [Object] that represent success, or throws an [Exception] or
-  /// an [Error] in case of failure.
+  /// Returns the underlying Dart value, which is an [Object] in case of
+  /// success, or throws an [Exception] or an [Error] in case of failure.
   dynamic unwrap() {
     if (_tag == 0) {
       return _payload.ok.toDart();

@@ -128,8 +128,8 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an exact [`height`][1] constraint.
   ///
-  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError]
-  /// if conversion fails.
+  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void exactHeight(int height) {
@@ -138,8 +138,8 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an ideal [`height`][1] constraint.
   ///
-  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError]
-  /// if conversion fails.
+  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError] if
+  /// conversion fails.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height
   void idealHeight(int height) {

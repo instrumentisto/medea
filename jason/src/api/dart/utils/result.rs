@@ -1,13 +1,14 @@
-//! FFI-compatible [Result].
+//! FFI-compatible [`Result`] for Dart.
 
 use crate::api::dart::{utils::DartError, DartValue};
 
-/// FFI-compatible [Result].
+/// FFI-compatible [`Result`] for Dart.
 #[repr(u8)]
 pub enum DartResult {
-    /// Contains the success [DartValue].
+    /// Success [`DartValue`].
     Ok(DartValue),
-    /// Contains the [DartError] value.
+
+    /// [`DartError`] value.
     Err(DartError),
 }
 

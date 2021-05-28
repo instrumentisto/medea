@@ -1,5 +1,5 @@
 mod arrays;
-mod errs;
+mod err;
 mod result;
 mod string;
 
@@ -14,7 +14,7 @@ use crate::{
 
 pub use self::{
     arrays::PtrArray,
-    errs::{ArgumentError, DartError},
+    err::{ArgumentError, DartError},
     result::DartResult,
     string::{c_str_into_string, string_into_c_str},
 };
