@@ -9,14 +9,14 @@ import 'unbox_handle.dart';
 
 /// Type-erased value that can be transferred via FFI boundaries to/from Rust.
 class ForeignValue extends Struct {
-  /// Index of the used [ForeignValueFields] union field.
+  /// Index of the used [_ForeignValueFields] union field.
   ///
   /// `0` goes for no value.
   @Uint8()
   external int _tag;
 
   /// Actual [ForeignValue] payload.
-  external ForeignValueFields _payload;
+  external _ForeignValueFields _payload;
 
   /// Private constructor.
   ///
@@ -89,7 +89,7 @@ extension ForeignValuePointer on Pointer<ForeignValue> {
 }
 
 /// Possible fields of a [ForeignValue].
-class ForeignValueFields extends Union {
+class _ForeignValueFields extends Union {
   /// [Pointer] to some Rust object.
   external Pointer ptr;
 

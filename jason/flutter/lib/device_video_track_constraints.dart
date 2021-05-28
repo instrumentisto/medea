@@ -128,7 +128,7 @@ class DeviceVideoTrackConstraints {
 
   /// Sets an exact [`height`][1] constraint.
   ///
-  /// Converts the provided [height] into an `u32`. Throws and [ArgumentError]
+  /// Converts the provided [height] into an `u32`. Throws an [ArgumentError]
   /// if conversion fails.
   ///
   /// [1]: https://tinyurl.com/w3-streams#def-constraint-height

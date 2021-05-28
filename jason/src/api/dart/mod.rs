@@ -48,7 +48,6 @@ pub use self::{
     media_stream_settings::MediaStreamSettings,
     reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
     room_close_reason::RoomCloseReason, room_handle::RoomHandle,
-    utils::DartError as Error,
 };
 
 /// Rust structure having wrapper class in Dart.

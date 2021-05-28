@@ -7,12 +7,12 @@ import 'unbox_handle.dart';
 ///
 /// Implements error propagation from Rust to Dart.
 class Result extends Struct {
-  /// Index of the used [ResultFields] union field.
+  /// Index of the used [_ResultFields] union field.
   @Uint8()
   external int _tag;
 
   /// Actual [Result] payload.
-  external ResultFields _payload;
+  external _ResultFields _payload;
 
   /// Returns an underlying Dart value.
   ///
@@ -28,7 +28,7 @@ class Result extends Struct {
 }
 
 /// Possible fields of a [Result].
-class ResultFields extends Union {
+class _ResultFields extends Union {
   /// Success [ForeignValue].
   external ForeignValue ok;
 
