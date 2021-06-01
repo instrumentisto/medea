@@ -1,15 +1,14 @@
 use std::{convert::TryFrom as _, ptr};
 
-use dart_sys::Dart_Handle;
 use tracerr::Traced;
 
 use crate::{
-    api::dart::utils::{ArgumentError, IntoDartFuture},
+    api::dart::utils::{ArgumentError, DartFuture, IntoDartFuture},
     rpc::ReconnectError,
 };
 
 use super::{
-    utils::{new_handler_detached_error, DartError},
+    utils::{DartError, StateError},
     ForeignClass,
 };
 
@@ -22,16 +21,15 @@ impl ForeignClass for ReconnectHandle {}
 
 impl From<Traced<ReconnectError>> for DartError {
     fn from(err: Traced<ReconnectError>) -> Self {
-        let (err, stacktrace) = err.into_parts();
-        let stacktrace = stacktrace.to_string();
+        let err = err.into_inner();
 
         match err {
             ReconnectError::Session(_) => {
                 todo!()
             }
-            ReconnectError::Detached => unsafe {
-                new_handler_detached_error(stacktrace)
-            },
+            ReconnectError::Detached => {
+                StateError::new("ReconnectHandle is in detached state.").into()
+            }
         }
     }
 }
@@ -48,12 +46,12 @@ impl From<Traced<ReconnectError>> for DartError {
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     this: ptr::NonNull<ReconnectHandle>,
     delay_ms: i64,
-) -> Dart_Handle {
+) -> DartFuture {
     let this = this.as_ref().clone();
 
     async move {
         let delay_ms = u32::try_from(delay_ms).map_err(|_| {
-            ArgumentError::from(format!("Expected u32, got `{}`", delay_ms))
+            ArgumentError::new(delay_ms, "delayMs", "Expected u32")
         })?;
 
         this.reconnect_with_delay(delay_ms).await?;
@@ -88,18 +86,19 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     starting_delay: i64,
     multiplier: f64,
     max_delay: i64,
-) -> Dart_Handle {
+) -> DartFuture {
     let this = this.as_ref().clone();
 
     async move {
         let starting_delay = u32::try_from(starting_delay).map_err(|_| {
-            ArgumentError::from(format!(
-                "Expected u32, got `{}`",
-                starting_delay
-            ))
+            ArgumentError::new(
+                starting_delay,
+                "startingDelayMs",
+                "Expected u32",
+            )
         })?;
         let max_delay = u32::try_from(max_delay).map_err(|_| {
-            ArgumentError::from(format!("Expected u32, got `{}`", max_delay))
+            ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
 
         this.reconnect_with_backoff(starting_delay, multiplier, max_delay)

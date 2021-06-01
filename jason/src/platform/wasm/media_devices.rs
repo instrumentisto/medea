@@ -23,11 +23,9 @@ use super::window;
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
-/// [MediaDevices][2].
-///
 /// With [`MediaManagerError::EnumerateDevicesFailed`] if
-/// [MediaDevices.enumerateDevices()][1] returns error.
+/// [MediaDevices.enumerateDevices()][1] returns error or couldn't get
+/// [MediaDevices][2].
 ///
 /// # Panics
 ///
@@ -38,13 +36,13 @@ use super::window;
 /// [2]: https://w3.org/TR/mediacapture-streams#mediadevices
 pub async fn enumerate_devices(
 ) -> Result<Vec<InputDeviceInfo>, Traced<MediaManagerError>> {
-    use MediaManagerError::{CouldNotGetMediaDevices, EnumerateDevicesFailed};
+    use MediaManagerError::EnumerateDevicesFailed;
 
     let devices = window()
         .navigator()
         .media_devices()
         .map_err(Error::from)
-        .map_err(CouldNotGetMediaDevices)
+        .map_err(EnumerateDevicesFailed)
         .map_err(tracerr::from_and_wrap!())?;
     let devices = JsFuture::from(
         devices
@@ -75,11 +73,9 @@ pub async fn enumerate_devices(
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
-/// [MediaDevices][2].
-///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
-/// [MediaDevices.getUserMedia()][1] returns error.
+/// [MediaDevices.getUserMedia()][1] returns error or couldn't get
+/// [MediaDevices][2].
 ///
 /// # Panics
 ///
@@ -91,13 +87,13 @@ pub async fn enumerate_devices(
 pub async fn get_user_media(
     caps: MediaStreamConstraints,
 ) -> Result<Vec<MediaStreamTrack>, Traced<MediaManagerError>> {
-    use MediaManagerError::{CouldNotGetMediaDevices, GetUserMediaFailed};
+    use MediaManagerError::GetUserMediaFailed;
 
     let media_devices = window()
         .navigator()
         .media_devices()
         .map_err(Error::from)
-        .map_err(CouldNotGetMediaDevices)
+        .map_err(GetUserMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
 
     let stream = JsFuture::from(
@@ -128,11 +124,9 @@ pub async fn get_user_media(
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
-/// [MediaDevices][2].
-///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
-/// [MediaDevices.getDisplayMedia()][1] returns error.
+/// [MediaDevices.getDisplayMedia()][1] returns error or couldn't get
+/// [MediaDevices][2]..
 ///
 /// # Panics
 ///
@@ -144,15 +138,13 @@ pub async fn get_user_media(
 pub async fn get_display_media(
     caps: DisplayMediaStreamConstraints,
 ) -> Result<Vec<MediaStreamTrack>, Traced<MediaManagerError>> {
-    use MediaManagerError::{
-        CouldNotGetMediaDevices, GetDisplayMediaFailed, GetUserMediaFailed,
-    };
+    use MediaManagerError::GetDisplayMediaFailed;
 
     let media_devices = window()
         .navigator()
         .media_devices()
         .map_err(Error::from)
-        .map_err(CouldNotGetMediaDevices)
+        .map_err(GetDisplayMediaFailed)
         .map_err(tracerr::from_and_wrap!())?;
 
     let stream = JsFuture::from(
@@ -165,7 +157,7 @@ pub async fn get_display_media(
     .await
     .map(web_sys::MediaStream::from)
     .map_err(Error::from)
-    .map_err(GetUserMediaFailed)
+    .map_err(GetDisplayMediaFailed)
     .map_err(tracerr::from_and_wrap!())?;
 
     Ok(js_sys::try_iter(&stream.get_tracks())

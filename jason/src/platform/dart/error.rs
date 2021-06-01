@@ -12,7 +12,6 @@ pub struct Error(pub Dart_PersistentHandle);
 
 impl From<Dart_Handle> for Error {
     fn from(err: Dart_Handle) -> Self {
-        // TODO: Make sure that it is actually a Dart exception.
         Self(unsafe { Dart_NewPersistentHandle_DL_Trampolined(err) })
     }
 }

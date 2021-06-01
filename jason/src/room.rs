@@ -605,7 +605,6 @@ impl RoomHandle {
     /// server didn't approve this state transition.
     ///
     /// With [`RoomError::MediaManagerError`] with
-    /// [`MediaManagerError::CouldNotGetMediaDevices`] or
     /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
     /// failed.
     #[inline]
@@ -665,7 +664,6 @@ impl RoomHandle {
     /// server didn't approve this state transition.
     ///
     /// With [`RoomError::MediaManagerError`] with
-    /// [`MediaManagerError::CouldNotGetMediaDevices`] or
     /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
     /// failed.
     #[inline]
@@ -1849,11 +1847,10 @@ impl PeerEventHandler for InnerRoom {
     /// `on_failed_local_media` [`Room`]'s callback.
     async fn on_failed_local_media(
         &self,
-        _error: Traced<PeerError>,
+        error: Traced<PeerError>,
     ) -> Self::Output {
-        // self.on_failed_local_media.call1(api::Error::from(error));
-        // Ok(())
-        todo!()
+        self.on_failed_local_media.call1(api::Error::from(error));
+        Ok(())
     }
 
     /// Handles [`PeerEvent::NewSdpOffer`] event by sending

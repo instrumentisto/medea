@@ -41,13 +41,16 @@ pub use self::{
     connection_handle::ConnectionHandle,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
-    input_device_info::InputDeviceInfo, jason::Jason,
+    input_device_info::InputDeviceInfo,
+    jason::Jason,
     local_media_track::LocalMediaTrack,
     media_manager_handle::MediaManagerHandle,
     media_stream_settings::MediaStreamSettings,
-    reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
-    room_close_reason::RoomCloseReason, room_handle::RoomHandle,
-    utils::DartError as Error,
+    reconnect_handle::ReconnectHandle,
+    remote_media_track::RemoteMediaTrack,
+    room_close_reason::RoomCloseReason,
+    room_handle::RoomHandle,
+    utils::{DartError as Error, DartResult},
 };
 
 /// Rust structure having wrapper class in Dart.
@@ -72,144 +75,6 @@ pub trait ForeignClass: Sized {
     #[must_use]
     unsafe fn from_ptr(this: ptr::NonNull<Self>) -> Self {
         *Box::from_raw(this.as_ptr())
-    }
-}
-
-/// [`DartValue`] marked by a Rust type.
-///
-/// There are no type parameter specific functionality, it serves purely as a
-/// marker in type signatures.
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct DartValueArg<T>(DartValue, PhantomData<*const T>);
-
-impl<F, T> From<F> for DartValueArg<T>
-where
-    DartValue: From<F>,
-{
-    #[inline]
-    fn from(from: F) -> Self {
-        Self(DartValue::from(from), PhantomData)
-    }
-}
-
-impl<T> TryFrom<DartValueArg<T>> for ptr::NonNull<c_void> {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::Ptr(ptr) => Ok(ptr),
-            _ => Err(DartValueCastError(format!(
-                "expected `NonNull<c_void>`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl<T> TryFrom<DartValueArg<T>> for Option<ptr::NonNull<c_void>> {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::None => Ok(None),
-            DartValue::Ptr(ptr) => Ok(Some(ptr)),
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<NonNull<c_void>>`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl TryFrom<DartValueArg<String>> for String {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<String>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::String(c_str) => unsafe { Ok(c_str_into_string(c_str)) },
-            _ => Err(DartValueCastError(format!(
-                "expected `String`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl TryFrom<DartValueArg<Option<String>>> for Option<String> {
-    type Error = DartValueCastError;
-
-    fn try_from(
-        value: DartValueArg<Option<String>>,
-    ) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::None => Ok(None),
-            DartValue::String(c_str) => unsafe {
-                Ok(Some(c_str_into_string(c_str)))
-            },
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<String>`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl<T> TryFrom<DartValueArg<T>> for ptr::NonNull<Dart_Handle> {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::Handle(c_str) => Ok(c_str),
-            _ => Err(DartValueCastError(format!(
-                "expected `NonNull<Dart_Handle>`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl<T> TryFrom<DartValueArg<T>> for Option<ptr::NonNull<Dart_Handle>> {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::None => Ok(None),
-            DartValue::Handle(c_str) => Ok(Some(c_str)),
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<NonNull<Dart_Handle>>`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl<T> TryFrom<DartValueArg<T>> for i64 {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::Int(num) => Ok(num),
-            _ => Err(DartValueCastError(format!(
-                "expected `i64`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
-    }
-}
-
-impl<T> TryFrom<DartValueArg<T>> for Option<i64> {
-    type Error = DartValueCastError;
-
-    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
-        match value.0 {
-            DartValue::None => Ok(None),
-            DartValue::Int(num) => Ok(Some(num)),
-            _ => Err(DartValueCastError(format!(
-                "expected `Option<i64>`, actual: `{:?}`",
-                value.0,
-            ))),
-        }
     }
 }
 
@@ -350,6 +215,144 @@ impl_from_num_for_dart_value!(u16);
 impl_from_num_for_dart_value!(u32);
 impl_from_num_for_dart_value!(bool);
 
+/// [`DartValue`] marked by a Rust type.
+///
+/// There are no type parameter specific functionality, it serves purely as a
+/// marker in type signatures.
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct DartValueArg<T>(DartValue, PhantomData<*const T>);
+
+impl<F, T> From<F> for DartValueArg<T>
+where
+    DartValue: From<F>,
+{
+    #[inline]
+    fn from(from: F) -> Self {
+        Self(DartValue::from(from), PhantomData)
+    }
+}
+
+impl<T> TryFrom<DartValueArg<T>> for ptr::NonNull<c_void> {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::Ptr(ptr) => Ok(ptr),
+            _ => Err(DartValueCastError(format!(
+                "expected `NonNull<c_void>`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl<T> TryFrom<DartValueArg<T>> for Option<ptr::NonNull<c_void>> {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::None => Ok(None),
+            DartValue::Ptr(ptr) => Ok(Some(ptr)),
+            _ => Err(DartValueCastError(format!(
+                "expected `Option<NonNull<c_void>>`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl TryFrom<DartValueArg<String>> for String {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<String>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::String(c_str) => unsafe { Ok(c_str_into_string(c_str)) },
+            _ => Err(DartValueCastError(format!(
+                "expected `String`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl TryFrom<DartValueArg<Option<String>>> for Option<String> {
+    type Error = DartValueCastError;
+
+    fn try_from(
+        value: DartValueArg<Option<String>>,
+    ) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::None => Ok(None),
+            DartValue::String(c_str) => unsafe {
+                Ok(Some(c_str_into_string(c_str)))
+            },
+            _ => Err(DartValueCastError(format!(
+                "expected `Option<String>`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl<T> TryFrom<DartValueArg<T>> for ptr::NonNull<Dart_Handle> {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::Handle(c_str) => Ok(c_str),
+            _ => Err(DartValueCastError(format!(
+                "expected `NonNull<Dart_Handle>`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl<T> TryFrom<DartValueArg<T>> for Option<ptr::NonNull<Dart_Handle>> {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::None => Ok(None),
+            DartValue::Handle(c_str) => Ok(Some(c_str)),
+            _ => Err(DartValueCastError(format!(
+                "expected `Option<NonNull<Dart_Handle>>`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl<T> TryFrom<DartValueArg<T>> for i64 {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::Int(num) => Ok(num),
+            _ => Err(DartValueCastError(format!(
+                "expected `i64`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
+impl<T> TryFrom<DartValueArg<T>> for Option<i64> {
+    type Error = DartValueCastError;
+
+    fn try_from(value: DartValueArg<T>) -> Result<Self, Self::Error> {
+        match value.0 {
+            DartValue::None => Ok(None),
+            DartValue::Int(num) => Ok(Some(num)),
+            _ => Err(DartValueCastError(format!(
+                "expected `Option<i64>`, actual: `{:?}`",
+                value.0,
+            ))),
+        }
+    }
+}
+
 /// Error of converting a [`DartValue`] to the concrete type.
 #[derive(Debug, From)]
 #[from(forward)]
@@ -366,8 +369,7 @@ impl From<i64> for MediaSourceKind {
     }
 }
 
-/// Returns a [`Dart_Handle`] dereferencing the provided [`Dart_Handle`]
-/// pointer.
+/// Returns a [`Dart_Handle`] dereferenced from the provided pointer.
 #[no_mangle]
 pub unsafe extern "C" fn unbox_dart_handle(
     val: ptr::NonNull<Dart_Handle>,

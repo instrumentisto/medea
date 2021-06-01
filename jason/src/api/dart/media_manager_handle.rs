@@ -1,6 +1,5 @@
 use std::ptr;
 
-use dart_sys::Dart_Handle;
 use tracerr::Traced;
 
 use crate::media::MediaManagerError;
@@ -8,8 +7,8 @@ use crate::media::MediaManagerError;
 use super::{
     media_stream_settings::MediaStreamSettings,
     utils::{
-        new_handler_detached_error, new_media_manager_exception, DartError,
-        IntoDartFuture, PtrArray,
+        DartError, DartFuture, IntoDartFuture, MediaManagerException, PtrArray,
+        StateError,
     },
     ForeignClass,
 };
@@ -23,22 +22,32 @@ impl ForeignClass for MediaManagerHandle {}
 
 impl From<Traced<MediaManagerError>> for DartError {
     fn from(err: Traced<MediaManagerError>) -> Self {
+        use crate::utils::JsCaused;
+
         let (err, stacktrace) = err.into_parts();
+        let name = err.name();
         let message = err.to_string();
-        let stacktrace = stacktrace.to_string();
+
         match err {
-            MediaManagerError::Detached => unsafe {
-                new_handler_detached_error(stacktrace)
-            },
-            MediaManagerError::CouldNotGetMediaDevices(cause)
-            | MediaManagerError::GetUserMediaFailed(cause)
+            MediaManagerError::GetUserMediaFailed(cause)
             | MediaManagerError::GetDisplayMediaFailed(cause)
-            | MediaManagerError::EnumerateDevicesFailed(cause) => unsafe {
-                new_media_manager_exception(message, Some(cause), stacktrace)
-            },
-            MediaManagerError::LocalTrackIsEnded(_) => unsafe {
-                new_media_manager_exception(message, None, stacktrace)
-            },
+            | MediaManagerError::EnumerateDevicesFailed(cause) => {
+                MediaManagerException::new(
+                    name,
+                    message,
+                    Some(cause),
+                    stacktrace,
+                )
+                .into()
+            }
+            MediaManagerError::LocalTrackIsEnded(_) => {
+                MediaManagerException::new(name, message, None, stacktrace)
+                    .into()
+            }
+            MediaManagerError::Detached => {
+                StateError::new("MediaManagerHandle is in detached state.")
+                    .into()
+            }
         }
     }
 }
@@ -51,7 +60,7 @@ impl From<Traced<MediaManagerError>> for DartError {
 pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
     this: ptr::NonNull<MediaManagerHandle>,
     caps: ptr::NonNull<MediaStreamSettings>,
-) -> Dart_Handle {
+) -> DartFuture {
     let this = this.as_ref().clone();
     let caps = caps.as_ref().clone();
 
@@ -66,7 +75,7 @@ pub unsafe extern "C" fn MediaManagerHandle__init_local_tracks(
 #[no_mangle]
 pub unsafe extern "C" fn MediaManagerHandle__enumerate_devices(
     this: ptr::NonNull<MediaManagerHandle>,
-) -> Dart_Handle {
+) -> DartFuture {
     let this = this.as_ref().clone();
 
     async move { Ok(PtrArray::new(this.enumerate_devices().await?)) }
@@ -88,11 +97,19 @@ pub unsafe extern "C" fn MediaManagerHandle__free(
 
 #[cfg(feature = "mockable")]
 mod mock {
+    use dart_sys::Dart_Handle;
     use tracerr::Traced;
 
     use crate::{
-        api::{InputDeviceInfo, LocalMediaTrack, MediaStreamSettings},
+        api::{
+            dart::{
+                utils::{DartFuture, IntoDartFuture},
+                DartError, DartResult,
+            },
+            InputDeviceInfo, LocalMediaTrack, MediaStreamSettings,
+        },
         media::MediaManagerError,
+        platform,
     };
 
     #[derive(Clone)]
@@ -120,5 +137,27 @@ mod mock {
                 LocalMediaTrack {},
             ])
         }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn returns_media_manager_exception(
+        cause: Dart_Handle,
+    ) -> DartResult {
+        let err = tracerr::new!(MediaManagerError::GetUserMediaFailed(
+            platform::Error::from(cause)
+        ));
+        DartError::from(err).into()
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn returns_future_with_media_manager_exception(
+        cause: Dart_Handle,
+    ) -> DartFuture {
+        let cause = platform::Error::from(cause);
+        let err =
+            tracerr::new!(MediaManagerError::GetDisplayMediaFailed(cause));
+
+        async move { Result::<(), _>::Err(DartError::from(err)) }
+            .into_dart_future()
     }
 }

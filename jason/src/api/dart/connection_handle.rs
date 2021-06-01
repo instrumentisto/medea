@@ -4,7 +4,7 @@ use dart_sys::Dart_Handle;
 use tracerr::Traced;
 
 use crate::{
-    api::dart::utils::{new_handler_detached_error, DartError, DartResult},
+    api::dart::utils::{DartError, DartResult, StateError},
     connection::ConnectionError,
     platform,
 };
@@ -20,12 +20,11 @@ impl ForeignClass for ConnectionHandle {}
 
 impl From<Traced<ConnectionError>> for DartError {
     fn from(err: Traced<ConnectionError>) -> Self {
-        let (err, stacktrace) = err.into_parts();
-        let stacktrace = stacktrace.to_string();
+        let err = err.into_inner();
         match err {
-            ConnectionError::Detached => unsafe {
-                new_handler_detached_error(stacktrace)
-            },
+            ConnectionError::Detached => {
+                StateError::new("ConnectionHandle is in detached state.").into()
+            }
         }
     }
 }

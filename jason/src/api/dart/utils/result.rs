@@ -1,16 +1,19 @@
+//! FFI-compatible [`Result`] for Dart.
+
 use crate::api::dart::{utils::DartError, DartValue};
 
-/// Dart structure which represents [`Result`] for the Dart error.
+/// FFI-compatible [`Result`] for Dart.
 #[repr(u8)]
 pub enum DartResult {
+    /// Success [`DartValue`].
     Ok(DartValue),
+
+    /// [`DartError`] value.
     Err(DartError),
 }
 
-impl<T> From<Result<T, DartError>> for DartResult
-where
-    T: Into<DartValue>,
-{
+impl<T: Into<DartValue>> From<Result<T, DartError>> for DartResult {
+    #[inline]
     fn from(res: Result<T, DartError>) -> Self {
         match res {
             Ok(val) => Self::Ok(val.into()),
@@ -20,8 +23,8 @@ where
 }
 
 impl<T: Into<DartError>> From<T> for DartResult {
+    #[inline]
     fn from(err: T) -> Self {
-        log::error!("impl<T: Into<DartError>> From<T> for DartResult");
         DartResult::Err(err.into())
     }
 }

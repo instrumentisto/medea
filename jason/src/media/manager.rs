@@ -25,12 +25,6 @@ use super::track::local;
 #[derive(Clone, Debug, Display, JsCaused)]
 #[js(error = "platform::Error")]
 pub enum MediaManagerError {
-    /// Occurs when cannot get access to [MediaDevices][1] object.
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
-    #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
-    CouldNotGetMediaDevices(platform::Error),
-
     /// Occurs if the [getUserMedia][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
@@ -327,9 +321,8 @@ impl MediaManagerHandle {
     ///
     /// # Errors
     ///
-    /// With [`MediaManagerError::CouldNotGetMediaDevices`] or
-    /// [`MediaManagerError::EnumerateDevicesFailed`] if devices enumeration
-    /// failed.
+    /// With [`MediaManagerError::EnumerateDevicesFailed`] if devices
+    /// enumeration failed.
     pub async fn enumerate_devices(
         &self,
     ) -> Result<Vec<platform::InputDeviceInfo>> {
@@ -344,9 +337,6 @@ impl MediaManagerHandle {
     /// # Errors
     ///
     /// With [`MediaManagerError::Detached`] if [`Weak`] pointer upgrade fails.
-    ///
-    /// With [`MediaManagerError::CouldNotGetMediaDevices`] if media devices
-    /// request to User Agent failed.
     ///
     /// With [`MediaManagerError::GetUserMediaFailed`] if [getUserMedia()][1]
     /// request failed.

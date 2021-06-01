@@ -18,9 +18,6 @@ use crate::{
 ///
 /// # Errors
 ///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
-/// [MediaDevices][2].
-///
 /// With [`MediaManagerError::EnumerateDevicesFailed`] if
 /// [MediaDevices.enumerateDevices()][1] returns error.
 ///
@@ -37,9 +34,6 @@ pub async fn enumerate_devices(
 /// Adapter for a [MediaDevices.getUserMedia()][1] function.
 ///
 /// # Errors
-///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
-/// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
 /// [MediaDevices.getUserMedia()][1] returns error.
@@ -59,9 +53,6 @@ pub async fn get_user_media(
 /// Adapter for a [MediaDevices.getDisplayMedia()][1] function.
 ///
 /// # Errors
-///
-/// With [`MediaManagerError::CouldNotGetMediaDevices`] if couldn't get
-/// [MediaDevices][2].
 ///
 /// With [`MediaManagerError::GetUserMediaFailed`] if
 /// [MediaDevices.getDisplayMedia()][1] returns error.

@@ -7,7 +7,9 @@ import 'package:medea_jason/audio_track_constraints.dart';
 import 'package:medea_jason/connection_handle.dart';
 import 'package:medea_jason/device_video_track_constraints.dart';
 import 'package:medea_jason/display_video_track_constraints.dart';
+import 'package:medea_jason/ffi/exceptions.dart';
 import 'package:medea_jason/ffi/foreign_value.dart';
+import 'package:medea_jason/ffi/result.dart';
 import 'package:medea_jason/input_device_info.dart';
 import 'package:medea_jason/jason.dart';
 import 'package:medea_jason/media_stream_settings.dart';
@@ -15,7 +17,6 @@ import 'package:medea_jason/reconnect_handle.dart';
 import 'package:medea_jason/remote_media_track.dart';
 import 'package:medea_jason/room_close_reason.dart';
 import 'package:medea_jason/track_kinds.dart';
-import 'package:medea_jason/ffi/exceptions.dart';
 import 'package:medea_jason/util/nullable_pointer.dart';
 
 void main() {
@@ -31,6 +32,13 @@ void main() {
   });
 
   testWidgets('MediaManager', (WidgetTester tester) async {
+    final returnsMediaManagerException =
+        dl.lookupFunction<Result Function(Handle), Result Function(Object)>(
+            'returns_media_manager_exception');
+    final returnsFutureWithMediaManagerException =
+        dl.lookupFunction<Handle Function(Handle), Object Function(Object)>(
+            'returns_future_with_media_manager_exception');
+
     var jason = Jason();
     var mediaManager = jason.mediaManager();
 
@@ -58,6 +66,29 @@ void main() {
 
     tracks.first.free();
     expect(() => tracks.first.kind(), throwsStateError);
+
+    expect(
+        () => returnsMediaManagerException('Dart err cause1').unwrap(),
+        throwsA(predicate((e) =>
+            e is MediaManagerException &&
+            e.name == 'GetUserMediaFailed' &&
+            e.cause == 'Dart err cause1' &&
+            e.nativeStackTrace.contains('at jason/src'))));
+
+    var err;
+    try {
+      await (returnsFutureWithMediaManagerException('Dart err cause2')
+          as Future);
+    } catch (e) {
+      err = e as MediaManagerException;
+    }
+    expect(
+        err,
+        predicate((e) =>
+            e is MediaManagerException &&
+            e.name == 'GetDisplayMediaFailed' &&
+            e.cause == 'Dart err cause2' &&
+            e.nativeStackTrace.contains('at jason/src')));
   });
 
   testWidgets('DeviceVideoTrackConstraints', (WidgetTester tester) async {
@@ -73,11 +104,13 @@ void main() {
     constraints.widthInRange(55, 66);
 
     expect(() => constraints.exactHeight(-1), throwsArgumentError);
+    expect(() => constraints.idealHeight(-1), throwsArgumentError);
     expect(() => constraints.exactHeight(1 << 32 + 1), throwsArgumentError);
     expect(() => constraints.heightInRange(-1, 200), throwsArgumentError);
     expect(() => constraints.heightInRange(200, -1), throwsArgumentError);
 
     expect(() => constraints.exactWidth(-1), throwsArgumentError);
+    expect(() => constraints.idealWidth(-1), throwsArgumentError);
     expect(() => constraints.exactWidth(1 << 32 + 1), throwsArgumentError);
     expect(() => constraints.widthInRange(-1, 200), throwsArgumentError);
     expect(() => constraints.widthInRange(200, -1), throwsArgumentError);
@@ -173,9 +206,13 @@ void main() {
       connFut.complete(conn);
     });
     var conn = await connFut.future;
-    expect(() => conn.getRemoteMemberId(),
-        throwsA(isInstanceOf<HandlerDetachedError>()));
 
+    expect(
+        () => conn.getRemoteMemberId(),
+        throwsA(allOf(
+            isStateError,
+            predicate((e) =>
+                e.message == 'ConnectionHandle is in detached state.'))));
     var allFired = List<Completer>.generate(2, (_) => Completer());
     conn.onQualityScoreUpdate((score) {
       allFired[0].complete(score);
@@ -259,7 +296,10 @@ void main() {
     } catch (e) {
       exception = e;
     }
-    expect(exception, isInstanceOf<HandlerDetachedError>());
+    expect(
+        exception,
+        allOf(isStateError,
+            predicate((e) => e.message == 'RoomHandle is in detached state.')));
   });
 
   testWidgets('ReconnectHandle', (WidgetTester tester) async {
@@ -298,6 +338,10 @@ void main() {
       exception3 = e;
     }
     expect(exception3, isArgumentError);
+    var argumentError = exception3 as ArgumentError;
+    expect(argumentError.invalidValue, equals(-3));
+    expect(argumentError.name, 'maxDelay');
+    expect(argumentError.message, 'Expected u32');
   });
 
   final returnsInputDevicePtr =
@@ -358,19 +402,5 @@ void main() {
     ptr.free();
     str.free();
     num.free();
-  });
-
-  testWidgets('ArgumentError', (WidgetTester tester) async {
-    var constraints = DeviceVideoTrackConstraints();
-
-    expect(() => constraints.exactHeight(-1), throwsArgumentError);
-    expect(() => constraints.exactHeight(1 << 32 + 1), throwsArgumentError);
-    expect(() => constraints.heightInRange(-1, 200), throwsArgumentError);
-    expect(() => constraints.heightInRange(200, -1), throwsArgumentError);
-
-    expect(() => constraints.exactWidth(-1), throwsArgumentError);
-    expect(() => constraints.exactWidth(1 << 32 + 1), throwsArgumentError);
-    expect(() => constraints.widthInRange(-1, 200), throwsArgumentError);
-    expect(() => constraints.widthInRange(200, -1), throwsArgumentError);
   });
 }
