@@ -3,8 +3,8 @@ use std::{convert::TryFrom as _, os::raw::c_char, ptr};
 use crate::media::FacingMode;
 
 use super::{
-    utils::{c_str_into_string, ArgumentError},
-    DartResult, ForeignClass,
+    utils::{c_str_into_string, ArgumentError, DartResult},
+    ForeignClass,
 };
 
 pub use crate::media::DeviceVideoTrackConstraints;
