@@ -12,21 +12,24 @@ import 'room_close_reason.dart';
 import 'track_kinds.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
+import 'ffi/result.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-typedef _onNewConnection_C = Void Function(Pointer, Handle);
-typedef _onNewConnection_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onNewConnection_C = Result Function(Pointer, Handle);
+typedef _onNewConnection_Dart = Result Function(
+    Pointer, void Function(Pointer));
 
-typedef _onClose_C = Void Function(Pointer, Handle);
-typedef _onClose_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onClose_C = Result Function(Pointer, Handle);
+typedef _onClose_Dart = Result Function(Pointer, void Function(Pointer));
 
-typedef _onLocalTrack_C = Void Function(Pointer, Handle);
-typedef _onLocalTrack_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onLocalTrack_C = Result Function(Pointer, Handle);
+typedef _onLocalTrack_Dart = Result Function(Pointer, void Function(Pointer));
 
-typedef _onConnectionLoss_C = Void Function(Pointer, Handle);
-typedef _onConnectionLoss_Dart = void Function(Pointer, void Function(Pointer));
+typedef _onConnectionLoss_C = Result Function(Pointer, Handle);
+typedef _onConnectionLoss_Dart = Result Function(
+    Pointer, void Function(Pointer));
 
 typedef _join_C = Handle Function(Pointer, Pointer<Utf8>);
 typedef _join_Dart = Object Function(Pointer, Pointer<Utf8>);
@@ -143,6 +146,7 @@ class RoomHandle {
   /// provided [Pointer].
   RoomHandle(this.ptr);
 
+  // TODO: add throws docs
   /// Connects to a media server and joins the `Room` with the provided
   /// authorization [token].
   ///
@@ -188,21 +192,25 @@ class RoomHandle {
         stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0) as Future);
   }
 
+  // TODO: add throws docs
   /// Mutes outbound audio in this `Room`.
   Future<void> muteAudio() async {
     await (_muteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Unmutes outbound audio in this `Room`.
   Future<void> unmuteAudio() async {
     await (_unmuteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Enables outbound audio in this `Room`.
   Future<void> enableAudio() async {
     await (_enableAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Disables outbound audio in this `Room`.
   Future<void> disableAudio() async {
     await (_disableAudio(ptr.getInnerPtr()) as Future);
@@ -260,42 +268,49 @@ class RoomHandle {
     }
   }
 
+  // TODO: add throws docs
   /// Enables inbound audio in this `Room`.
   Future<void> enableRemoteAudio() async {
     await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Disables inbound audio in this `Room`.
   Future<void> disableRemoteAudio() async {
     await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Enables inbound video in this `Room`.
   Future<void> enableRemoteVideo() async {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Disables inbound video in this `Room`.
   Future<void> disableRemoteVideo() async {
     await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when a new `Connection` with some remote `Peer`
   /// is established.
   void onNewConnection(void Function(ConnectionHandle) f) {
     _onNewConnection(ptr.getInnerPtr(), (t) {
       f(ConnectionHandle(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when this `Room` is closed, providing a
   /// [RoomCloseReason].
   void onClose(void Function(RoomCloseReason) f) {
     _onClose(ptr.getInnerPtr(), (t) {
       f(RoomCloseReason(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when a new [LocalMediaTrack] is added to this
   /// `Room`.
   ///
@@ -307,16 +322,29 @@ class RoomHandle {
   void onLocalTrack(void Function(LocalMediaTrack) f) {
     _onLocalTrack(ptr.getInnerPtr(), (t) {
       f(LocalMediaTrack(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when a connection with a media server is lost,
   /// providing a [ReconnectHandle].
   void onConnectionLoss(void Function(ReconnectHandle) f) {
     _onConnectionLoss(ptr.getInnerPtr(), (t) {
       f(ReconnectHandle(NullablePointer(t)));
-    });
+    }).unwrap();
   }
+
+  // /// Sets `on_failed_local_media` callback, invoked on a local media
+  // /// acquisition failures.
+  // ///
+  // /// # Errors
+  // ///
+  // /// With [`RoomError::Detached`] if [`Weak`] pointer upgrade fails.
+  // void onFailedLocalMedia(void Function(ReconnectHandle) f) {
+  //   _onConnectionLoss(ptr.getInnerPtr(), (t) {
+  //     f(ReconnectHandle(NullablePointer(t)));
+  //   }).unwrap();
+  // }
 
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.
   @moveSemantics

@@ -606,7 +606,6 @@ impl RoomHandle {
     /// server didn't approve this state transition.
     ///
     /// With [`RoomError::MediaManagerError`] with
-    /// [`MediaManagerError::CouldNotGetMediaDevices`] or
     /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
     /// failed.
     #[inline]
@@ -666,7 +665,6 @@ impl RoomHandle {
     /// server didn't approve this state transition.
     ///
     /// With [`RoomError::MediaManagerError`] with
-    /// [`MediaManagerError::CouldNotGetMediaDevices`] or
     /// [`MediaManagerError::GetUserMediaFailed`] if media acquisition request
     /// failed.
     #[inline]
@@ -1599,13 +1597,7 @@ impl EventHandler for InnerRoom {
             Some(negotiation_role),
         );
         for track in &tracks {
-            peer_state
-                .insert_track(track, self.send_constraints.clone())
-                .map_err(|e| {
-                    self.on_failed_local_media
-                        .call1(JasonError::from(e.clone()));
-                    tracerr::map_from_and_new!(e)
-                })?;
+            peer_state.insert_track(track, self.send_constraints.clone());
         }
 
         self.peers.state().insert(peer_id, peer_state);
@@ -1692,12 +1684,7 @@ impl EventHandler for InnerRoom {
         for update in updates {
             match update {
                 PeerUpdate::Added(track) => peer_state
-                    .insert_track(&track, self.send_constraints.clone())
-                    .map_err(|e| {
-                        self.on_failed_local_media
-                            .call1(JasonError::from(e.clone()));
-                        tracerr::map_from_and_new!(e)
-                    })?,
+                    .insert_track(&track, self.send_constraints.clone()),
                 PeerUpdate::Updated(patch) => peer_state.patch_track(&patch),
                 PeerUpdate::IceRestart => {
                     peer_state.restart_ice();

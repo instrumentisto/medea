@@ -350,21 +350,18 @@ impl State {
         &self,
         track: &proto::Track,
         send_constraints: LocalTracksConstraints,
-    ) -> Result<(), Traced<PeerError>> {
+    ) {
         match &track.direction {
             proto::Direction::Send { receivers, mid } => {
                 self.senders.insert(
                     track.id,
-                    Rc::new(
-                        sender::State::new(
-                            track.id,
-                            mid.clone(),
-                            track.media_type.clone(),
-                            receivers.clone(),
-                            send_constraints,
-                        )
-                        .map_err(tracerr::map_from_and_wrap!())?,
-                    ),
+                    Rc::new(sender::State::new(
+                        track.id,
+                        mid.clone(),
+                        track.media_type.clone(),
+                        receivers.clone(),
+                        send_constraints,
+                    )),
                 );
             }
             proto::Direction::Recv { sender, mid } => {
@@ -379,8 +376,6 @@ impl State {
                 );
             }
         }
-
-        Ok(())
     }
 
     /// Returns [`Future`] resolving once all [`State::senders`]' inserts and

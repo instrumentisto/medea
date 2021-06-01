@@ -1,28 +1,27 @@
 import 'dart:ffi';
 
-import 'package:ffi/ffi.dart';
-
-import 'ffi/native_string.dart';
 import 'jason.dart';
 import 'remote_media_track.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
+import 'ffi/result.dart';
 
-typedef _getRemoteMemberId_C = Pointer<Utf8> Function(Pointer);
-typedef _getRemoteMemberId_Dart = Pointer<Utf8> Function(Pointer);
+typedef _getRemoteMemberId_C = Result Function(Pointer);
+typedef _getRemoteMemberId_Dart = Result Function(Pointer);
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
 
-typedef _onClose_C = Void Function(Pointer, Handle);
-typedef _onClose_Dart = void Function(Pointer, void Function());
+typedef _onClose_C = Result Function(Pointer, Handle);
+typedef _onClose_Dart = Result Function(Pointer, void Function());
 
-typedef _onRemoteTrackAdded_C = Void Function(Pointer, Handle);
-typedef _onRemoteTrackAdded_Dart = void Function(
+typedef _onRemoteTrackAdded_C = Result Function(Pointer, Handle);
+typedef _onRemoteTrackAdded_Dart = Result Function(
     Pointer, void Function(Pointer));
 
-typedef _onQualityScoreUpdate_C = Void Function(Pointer, Handle);
-typedef _onQualityScoreUpdate_Dart = void Function(Pointer, void Function(int));
+typedef _onQualityScoreUpdate_C = Result Function(Pointer, Handle);
+typedef _onQualityScoreUpdate_Dart = Result Function(
+    Pointer, void Function(int));
 
 final _getRemoteMemberId =
     dl.lookupFunction<_getRemoteMemberId_C, _getRemoteMemberId_Dart>(
@@ -50,28 +49,32 @@ class ConnectionHandle {
   /// provided [Pointer].
   ConnectionHandle(this.ptr);
 
+  // TODO: add throws docs
   /// Returns ID of the remote `Member`.
   String getRemoteMemberId() {
-    return _getRemoteMemberId(ptr.getInnerPtr()).nativeStringToDartString();
+    return _getRemoteMemberId(ptr.getInnerPtr()).unwrap();
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when this `Connection` is closed.
   void onClose(void Function() f) {
-    _onClose(ptr.getInnerPtr(), f);
+    _onClose(ptr.getInnerPtr(), f).unwrap();
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when a new [RemoteMediaTrack] is added to this
   /// `Connection`.
   void onRemoteTrackAdded(void Function(RemoteMediaTrack) f) {
     _onRemoteTrackAdded(ptr.getInnerPtr(), (t) {
       f(RemoteMediaTrack(NullablePointer(t)));
-    });
+    }).unwrap();
   }
 
+  // TODO: add throws docs
   /// Sets callback, invoked when a connection quality score is updated by a
   /// server.
   void onQualityScoreUpdate(void Function(int) f) {
-    _onQualityScoreUpdate(ptr.getInnerPtr(), f);
+    _onQualityScoreUpdate(ptr.getInnerPtr(), f).unwrap();
   }
 
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.

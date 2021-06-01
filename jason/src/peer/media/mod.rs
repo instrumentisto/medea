@@ -888,7 +888,7 @@ impl MediaConnections {
             media_type.clone(),
             receivers,
             send_constraints.clone(),
-        )?;
+        );
         let sender = sender::Sender::new(
             &sender_state,
             &self,
