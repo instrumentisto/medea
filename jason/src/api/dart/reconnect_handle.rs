@@ -46,7 +46,7 @@ impl From<Traced<ReconnectError>> for DartError {
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     this: ptr::NonNull<ReconnectHandle>,
     delay_ms: i64,
-) -> DartFuture {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -86,7 +86,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     starting_delay: i64,
     multiplier: f64,
     max_delay: i64,
-) -> DartFuture {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
     async move {

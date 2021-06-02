@@ -4,6 +4,7 @@ import 'package:ffi/ffi.dart';
 
 import 'connection_handle.dart';
 import 'ffi/foreign_value.dart';
+import 'ffi/result.dart';
 import 'jason.dart';
 import 'local_media_track.dart';
 import 'media_stream_settings.dart';
@@ -12,7 +13,6 @@ import 'room_close_reason.dart';
 import 'track_kinds.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'ffi/result.dart';
 
 typedef _free_C = Void Function(Pointer);
 typedef _free_Dart = void Function(Pointer);
@@ -146,14 +146,13 @@ class RoomHandle {
   /// provided [Pointer].
   RoomHandle(this.ptr);
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Connects to a media server and joins the `Room` with the provided
   /// authorization [token].
   ///
   /// Authorization token has a fixed format:
   /// `{{ Host URL }}/{{ Room ID }}/{{ Member ID }}?token={{ Auth Token }}`
   /// (e.g. `wss://medea.com/MyConf1/Alice?token=777`).
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> join(String token) async {
     var tokenPtr = token.toNativeUtf8();
     try {
@@ -193,30 +192,26 @@ class RoomHandle {
         stopFirst ? 1 : 0, rollbackOnFail ? 1 : 0) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Mutes outbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> muteAudio() async {
     await (_muteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Unmutes outbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> unmuteAudio() async {
     await (_unmuteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Enables outbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> enableAudio() async {
     await (_enableAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Disables outbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> disableAudio() async {
     await (_disableAudio(ptr.getInnerPtr()) as Future);
   }
@@ -273,54 +268,49 @@ class RoomHandle {
     }
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Enables inbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> enableRemoteAudio() async {
     await (_enableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Disables inbound audio in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> disableRemoteAudio() async {
     await (_disableRemoteAudio(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Enables inbound video in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> enableRemoteVideo() async {
     await (_enableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Disables inbound video in this `Room`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> disableRemoteVideo() async {
     await (_disableRemoteVideo(ptr.getInnerPtr()) as Future);
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when a new `Connection` with some remote `Peer`
   /// is established.
-  ///
-  /// Throws [RustException] if Rust returns error.
   void onNewConnection(void Function(ConnectionHandle) f) {
     _onNewConnection(ptr.getInnerPtr(), (t) {
       f(ConnectionHandle(NullablePointer(t)));
     }).unwrap();
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when this `Room` is closed, providing a
   /// [RoomCloseReason].
-  ///
-  /// Throws [RustException] if Rust returns error.
   void onClose(void Function(RoomCloseReason) f) {
     _onClose(ptr.getInnerPtr(), (t) {
       f(RoomCloseReason(NullablePointer(t)));
     }).unwrap();
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when a new [LocalMediaTrack] is added to this
   /// `Room`.
   ///
@@ -329,24 +319,22 @@ class RoomHandle {
   /// 2. [RoomHandle.enableAudio()]/[RoomHandle.enableVideo()] is called.
   /// 3. [MediaStreamSettings] were updated via
   ///    [RoomHandle.setLocalMediaSettings()] method.
-  ///
-  /// Throws [RustException] if Rust returns error.
   void onLocalTrack(void Function(LocalMediaTrack) f) {
     _onLocalTrack(ptr.getInnerPtr(), (t) {
       f(LocalMediaTrack(NullablePointer(t)));
     }).unwrap();
   }
 
+  // TODO: Add throws docs when all errros are implemented.
   /// Sets callback, invoked when a connection with a media server is lost,
   /// providing a [ReconnectHandle].
-  ///
-  /// Throws [RustException] if Rust returns error.
   void onConnectionLoss(void Function(ReconnectHandle) f) {
     _onConnectionLoss(ptr.getInnerPtr(), (t) {
       f(ReconnectHandle(NullablePointer(t)));
     }).unwrap();
   }
 
+  // TODO: Implement.
   // /// Sets `on_failed_local_media` callback, invoked on a local media
   // /// acquisition failures.
   // ///

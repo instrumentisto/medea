@@ -71,7 +71,7 @@ void main() {
         () => returnsMediaManagerException('Dart err cause1').unwrap(),
         throwsA(predicate((e) =>
             e is MediaManagerException &&
-            e.name == 'GetUserMediaFailed' &&
+            e.kind == MediaManagerExceptionKind.GetUserMediaFailed &&
             e.cause == 'Dart err cause1' &&
             e.nativeStackTrace.contains('at jason/src'))));
 
@@ -86,7 +86,7 @@ void main() {
         err,
         predicate((e) =>
             e is MediaManagerException &&
-            e.name == 'GetDisplayMediaFailed' &&
+            e.kind == MediaManagerExceptionKind.GetDisplayMediaFailed &&
             e.cause == 'Dart err cause2' &&
             e.nativeStackTrace.contains('at jason/src')));
   });

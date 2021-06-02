@@ -5,8 +5,11 @@ use tracerr::Traced;
 
 use crate::{
     api::dart::{
-        utils::{c_str_into_string, DartFuture, IntoDartFuture, StateError},
-        DartResult, DartValueArg, ForeignClass,
+        utils::{
+            c_str_into_string, DartFuture, DartResult, IntoDartFuture,
+            StateError,
+        },
+        DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
     peer::PeerError,
@@ -66,7 +69,7 @@ impl From<Traced<PeerError>> for DartError {
 pub unsafe extern "C" fn RoomHandle__join(
     this: ptr::NonNull<RoomHandle>,
     token: ptr::NonNull<libc::c_char>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -108,7 +111,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
     settings: ptr::NonNull<MediaStreamSettings>,
     stop_first: bool,
     rollback_on_fail: bool,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
     let settings = settings.as_ref().clone();
 
@@ -129,7 +132,7 @@ pub unsafe extern "C" fn RoomHandle__set_local_media_settings(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__mute_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -145,7 +148,7 @@ pub unsafe extern "C" fn RoomHandle__mute_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__unmute_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -161,7 +164,7 @@ pub unsafe extern "C" fn RoomHandle__unmute_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -177,7 +180,7 @@ pub unsafe extern "C" fn RoomHandle__enable_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -196,8 +199,8 @@ pub unsafe extern "C" fn RoomHandle__disable_audio(
 pub unsafe extern "C" fn RoomHandle__mute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture {
-    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+) -> DartFuture<Result<(), Traced<RoomError>>> {
+    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
     let this = this.as_ref().clone();
     let source_kind = Option::<i64>::try_from(source_kind)
@@ -220,9 +223,9 @@ pub unsafe extern "C" fn RoomHandle__mute_video(
 pub unsafe extern "C" fn RoomHandle__unmute_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
-    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
     let source_kind = Option::<i64>::try_from(source_kind)
         .unwrap()
@@ -242,9 +245,9 @@ pub unsafe extern "C" fn RoomHandle__unmute_video(
 pub unsafe extern "C" fn RoomHandle__enable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
-    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
     let source_kind = Option::<i64>::try_from(source_kind)
         .unwrap()
@@ -264,8 +267,8 @@ pub unsafe extern "C" fn RoomHandle__enable_video(
 pub unsafe extern "C" fn RoomHandle__disable_video(
     this: ptr::NonNull<RoomHandle>,
     source_kind: DartValueArg<Option<MediaSourceKind>>,
-) -> DartFuture {
-    // TODO: Remove unwraps when propagating errors from Rust to Dart is
+) -> DartFuture<Result<(), Traced<RoomError>>> {
+    // TODO: Remove unwraps when propagating fatal errors from Rust to Dart is
     //       implemented.
     let this = this.as_ref().clone();
     let source_kind = Option::<i64>::try_from(source_kind)
@@ -285,7 +288,7 @@ pub unsafe extern "C" fn RoomHandle__disable_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -301,7 +304,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -317,7 +320,7 @@ pub unsafe extern "C" fn RoomHandle__disable_remote_audio(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__enable_remote_video(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -333,7 +336,7 @@ pub unsafe extern "C" fn RoomHandle__enable_remote_video(
 #[no_mangle]
 pub unsafe extern "C" fn RoomHandle__disable_remote_video(
     this: ptr::NonNull<RoomHandle>,
-) -> DartFuture {
+) -> DartFuture<Result<(), Traced<RoomError>>> {
     let this = this.as_ref().clone();
 
     async move {

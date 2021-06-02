@@ -1,10 +1,10 @@
 import 'dart:ffi';
 
+import 'ffi/result.dart';
 import 'jason.dart';
 import 'remote_media_track.dart';
 import 'util/move_semantic.dart';
 import 'util/nullable_pointer.dart';
-import 'ffi/result.dart';
 
 typedef _getRemoteMemberId_C = Result Function(Pointer);
 typedef _getRemoteMemberId_Dart = Result Function(Pointer);
@@ -51,14 +51,20 @@ class ConnectionHandle {
 
   /// Returns ID of the remote `Member`.
   ///
-  /// Throws [RustException] if Rust returns error.
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// `RoomHandle` that implicitly owns native object behind this
+  /// [ConnectionHandle].
   String getRemoteMemberId() {
     return _getRemoteMemberId(ptr.getInnerPtr()).unwrap();
   }
 
   /// Sets callback, invoked when this `Connection` is closed.
   ///
-  /// Throws [RustException] if Rust returns error.
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// `RoomHandle` that implicitly owns native object behind this
+  /// [ConnectionHandle].
   void onClose(void Function() f) {
     _onClose(ptr.getInnerPtr(), f).unwrap();
   }
@@ -66,7 +72,10 @@ class ConnectionHandle {
   /// Sets callback, invoked when a new [RemoteMediaTrack] is added to this
   /// `Connection`.
   ///
-  /// Throws [RustException] if Rust returns error.
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// `RoomHandle` that implicitly owns native object behind this
+  /// [ConnectionHandle].
   void onRemoteTrackAdded(void Function(RemoteMediaTrack) f) {
     _onRemoteTrackAdded(ptr.getInnerPtr(), (t) {
       f(RemoteMediaTrack(NullablePointer(t)));
@@ -76,7 +85,10 @@ class ConnectionHandle {
   /// Sets callback, invoked when a connection quality score is updated by a
   /// server.
   ///
-  /// Throws [RustException] if Rust returns error.
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// `RoomHandle` that implicitly owns native object behind this
+  /// [ConnectionHandle].
   void onQualityScoreUpdate(void Function(int) f) {
     _onQualityScoreUpdate(ptr.getInnerPtr(), f).unwrap();
   }
