@@ -29,9 +29,9 @@ pub use self::{
 pub struct DartFuture<O>(Dart_Handle, PhantomData<*const O>);
 
 /// Extension trait for a [`Future`] allowing to convert Rust [`Future`]s to
-/// Dart `Future`s.
+/// [`DartFuture`]s.
 pub trait IntoDartFuture {
-    /// The type of value produced on completion.
+    /// The type of the value produced on the [`DartFuture`]'s completion.
     type Output;
 
     /// Converts this [`Future`] into a Dart `Future`.

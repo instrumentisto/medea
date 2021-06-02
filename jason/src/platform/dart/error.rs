@@ -1,8 +1,9 @@
 //! Wrapper for Dart exceptions.
 
-use std::{fmt, rc::Rc};
+use std::rc::Rc;
 
 use dart_sys::{Dart_Handle, Dart_PersistentHandle};
+use derive_more::Display;
 
 use super::utils::dart_api::{
     Dart_DeletePersistentHandle_DL_Trampolined,
@@ -11,16 +12,17 @@ use super::utils::dart_api::{
 };
 
 /// Wrapper for Dart exception thrown when calling Dart code.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Display, PartialEq)]
+#[display(fmt = "DartPlatformError")]
 pub struct Error(Rc<Dart_PersistentHandle>);
 
 impl Error {
-    /// Returns [`Dart_Handle`] to the underlying error.
+    /// Returns a [`Dart_Handle`] to the underlying error.
     #[inline]
     #[must_use]
     pub fn get_handle(&self) -> Dart_Handle {
-        // We dont expose inner Dart_PersistentHandle anywhere, so we are sure
-        // that it is valid at this point thus this should be safe.
+        // SAFETY: We don't expose the inner `Dart_PersistentHandle` anywhere,
+        //         so we're sure that it's valid at this point.
         unsafe { Dart_HandleFromPersistent_DL_Trampolined(*self.0) }
     }
 }
@@ -40,11 +42,5 @@ impl Drop for Error {
         if Rc::strong_count(&self.0) == 1 {
             unsafe { Dart_DeletePersistentHandle_DL_Trampolined(*self.0) }
         }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "DartPlatformError")
     }
 }

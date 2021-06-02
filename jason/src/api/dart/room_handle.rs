@@ -27,10 +27,9 @@ pub use crate::room::RoomHandle;
 impl ForeignClass for RoomHandle {}
 
 impl From<Traced<RoomError>> for DartError {
+    #[inline]
     fn from(err: Traced<RoomError>) -> Self {
-        let err = err.into_inner();
-
-        match err {
+        match err.into_inner() {
             RoomError::CallbackNotSet(_)
             | RoomError::InvalidLocalTracks(_)
             | RoomError::CouldNotGetLocalMedia(_)

@@ -24,14 +24,14 @@ type NewArgumentErrorCaller = extern "C" fn(
 ) -> Dart_Handle;
 
 /// Pointer to an extern function that returns a new Dart [`StateError`] with
-/// the provided error message.
+/// the provided message.
 ///
 /// [`StateError`]: https://api.dart.dev/dart-core/StateError-class.html
 type NewStateErrorCaller = extern "C" fn(ptr::NonNull<c_char>) -> Dart_Handle;
 
 /// Pointer to an extern function that returns a new Dart
-/// `MediaManagerException` with the provided `kind`, `message`, `cause` and
-/// `stacktrace`.
+/// [`MediaManagerException`] with the provided error `kind`, `message`, `cause`
+/// and `stacktrace`.
 type NewMediaManagerExceptionCaller = extern "C" fn(
     kind: MediaManagerExceptionKind,
     message: ptr::NonNull<c_char>,
@@ -110,6 +110,7 @@ impl DartError {
 }
 
 impl From<platform::Error> for DartError {
+    #[inline]
     fn from(err: platform::Error) -> Self {
         Self::new(err.get_handle())
     }
@@ -160,15 +161,17 @@ impl<T: Into<DartValue>> From<ArgumentError<T>> for DartError {
     }
 }
 
-/// Error that is thrown when the operation was not allowed by the current state
-/// of the object.
+/// Error thrown when the operation wasn't allowed by the current state of the
+/// object.
 ///
 /// It can be converted into a [`DartError`] and passed to Dart.
 pub struct StateError(Cow<'static, str>);
 
 impl StateError {
-    /// Creates a new [`StateError`] with the provided error `message`
-    /// describing the problem.
+    /// Creates a new [`StateError`] with the provided `message` describing the
+    /// problem.
+    #[inline]
+    #[must_use]
     pub fn new<T: Into<Cow<'static, str>>>(message: T) -> Self {
         Self(message.into())
     }
@@ -185,10 +188,10 @@ impl From<StateError> for DartError {
     }
 }
 
-/// Concrete error kind of a [`MediaManagerException`].
+/// Possible error kinds of a [`MediaManagerException`].
 #[repr(u8)]
 pub enum MediaManagerExceptionKind {
-    /// Occurs if the [getUserMedia][1] request failed.
+    /// Occurs if the [getUserMedia()][1] request failed.
     ///
     /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     GetUserMediaFailed,
@@ -212,7 +215,7 @@ pub enum MediaManagerExceptionKind {
     LocalTrackIsEnded,
 }
 
-/// Exception that can be thrown when accessing media devices.
+/// Exception thrown when accessing media devices.
 pub struct MediaManagerException {
     /// Concrete error kind of this [`MediaManagerException`].
     kind: MediaManagerExceptionKind,
@@ -228,7 +231,7 @@ pub struct MediaManagerException {
 }
 
 impl MediaManagerException {
-    /// Creates a new [`MediaManagerException`] from the provided `kind`, error
+    /// Creates a new [`MediaManagerException`] from the provided error `kind`,
     /// `message`, optional `cause` and `trace`.
     #[inline]
     #[must_use]

@@ -19,9 +19,9 @@ pub use crate::connection::ConnectionHandle;
 impl ForeignClass for ConnectionHandle {}
 
 impl From<Traced<ConnectionError>> for DartError {
+    #[inline]
     fn from(err: Traced<ConnectionError>) -> Self {
-        let err = err.into_inner();
-        match err {
+        match err.into_inner() {
             ConnectionError::Detached => {
                 StateError::new("ConnectionHandle is in detached state.").into()
             }

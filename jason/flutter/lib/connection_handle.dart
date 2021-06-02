@@ -52,7 +52,7 @@ class ConnectionHandle {
   /// Returns ID of the remote `Member`.
   ///
   /// Throws a [StateError] if an underlying object has been disposed, e.g.
-  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// [free] was called on this [ConnectionHandle], or on a [Jason], or on a
   /// `RoomHandle` that implicitly owns native object behind this
   /// [ConnectionHandle].
   String getRemoteMemberId() {
@@ -62,7 +62,7 @@ class ConnectionHandle {
   /// Sets callback, invoked when this `Connection` is closed.
   ///
   /// Throws a [StateError] if an underlying object has been disposed, e.g.
-  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// [free] was called on this [ConnectionHandle], or on a [Jason], or on a
   /// `RoomHandle` that implicitly owns native object behind this
   /// [ConnectionHandle].
   void onClose(void Function() f) {
@@ -73,7 +73,7 @@ class ConnectionHandle {
   /// `Connection`.
   ///
   /// Throws a [StateError] if an underlying object has been disposed, e.g.
-  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// [free] was called on this [ConnectionHandle], or on a [Jason], or on a
   /// `RoomHandle` that implicitly owns native object behind this
   /// [ConnectionHandle].
   void onRemoteTrackAdded(void Function(RemoteMediaTrack) f) {
@@ -86,7 +86,7 @@ class ConnectionHandle {
   /// server.
   ///
   /// Throws a [StateError] if an underlying object has been disposed, e.g.
-  /// [free] was called on this [ConnectionHandle] or on a [Jason] or a
+  /// [free] was called on this [ConnectionHandle], or on a [Jason], or on a
   /// `RoomHandle` that implicitly owns native object behind this
   /// [ConnectionHandle].
   void onQualityScoreUpdate(void Function(int) f) {

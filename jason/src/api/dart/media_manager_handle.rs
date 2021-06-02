@@ -22,25 +22,24 @@ impl ForeignClass for MediaManagerHandle {}
 
 impl From<Traced<MediaManagerError>> for DartError {
     fn from(err: Traced<MediaManagerError>) -> Self {
+        use MediaManagerError as E;
+        use MediaManagerExceptionKind as Kind;
+
         let (err, stacktrace) = err.into_parts();
         let message = err.to_string();
 
         let (kind, cause) = match err {
-            MediaManagerError::GetUserMediaFailed(cause) => {
-                (MediaManagerExceptionKind::GetUserMediaFailed, Some(cause))
+            E::GetUserMediaFailed(cause) => {
+                (Kind::GetUserMediaFailed, Some(cause))
             }
-            MediaManagerError::GetDisplayMediaFailed(cause) => (
-                MediaManagerExceptionKind::GetDisplayMediaFailed,
-                Some(cause),
-            ),
-            MediaManagerError::EnumerateDevicesFailed(cause) => (
-                MediaManagerExceptionKind::EnumerateDevicesFailed,
-                Some(cause),
-            ),
-            MediaManagerError::LocalTrackIsEnded(_) => {
-                (MediaManagerExceptionKind::LocalTrackIsEnded, None)
+            E::GetDisplayMediaFailed(cause) => {
+                (Kind::GetDisplayMediaFailed, Some(cause))
             }
-            MediaManagerError::Detached => {
+            E::EnumerateDevicesFailed(cause) => {
+                (Kind::EnumerateDevicesFailed, Some(cause))
+            }
+            E::LocalTrackIsEnded(_) => (Kind::LocalTrackIsEnded, None),
+            E::Detached => {
                 return StateError::new(
                     "MediaManagerHandle is in detached state.",
                 )

@@ -29,7 +29,7 @@ Object _newArgumentError(
       message.nativeStringToDartString());
 }
 
-/// Creates a new [StateError] with the provided error [message].
+/// Creates a new [StateError] with the provided [message].
 Object _newStateError(Pointer<Utf8> message) {
   return StateError(message.nativeStringToDartString());
 }
@@ -45,7 +45,7 @@ Object _newMediaManagerException(int kind, Pointer<Utf8> message,
       stacktrace.nativeStringToDartString());
 }
 
-/// Exception that can be thrown when accessing media devices.
+/// Exception thrown when accessing media devices.
 class MediaManagerException implements Exception {
   /// Concrete error kind of this [MediaManagerException].
   late MediaManagerExceptionKind kind;
@@ -59,14 +59,14 @@ class MediaManagerException implements Exception {
   /// Native stacktrace.
   late String nativeStackTrace;
 
-  /// Creates a new [MediaManagerException].
+  /// Instantiates a new [MediaManagerException].
   MediaManagerException(
       this.kind, this.message, this.cause, this.nativeStackTrace);
 }
 
-/// Concrete error kind of a [MediaManagerException].
+/// Possible error kinds of a [MediaManagerException].
 enum MediaManagerExceptionKind {
-  /// Occurs if the [getUserMedia][1] request failed.
+  /// Occurs if the [getUserMedia()][1] request failed.
   ///
   /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
   GetUserMediaFailed,
