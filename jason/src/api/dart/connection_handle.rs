@@ -1,10 +1,15 @@
-use std::{os::raw::c_char, ptr};
+use std::ptr;
 
 use dart_sys::Dart_Handle;
+use tracerr::Traced;
 
-use crate::platform;
+use crate::{
+    api::dart::utils::{DartError, DartResult, StateError},
+    connection::ConnectionError,
+    platform,
+};
 
-use super::{utils::string_into_c_str, ForeignClass};
+use super::ForeignClass;
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ConnectionHandle;
@@ -13,15 +18,27 @@ pub use crate::connection::ConnectionHandle;
 
 impl ForeignClass for ConnectionHandle {}
 
+impl From<Traced<ConnectionError>> for DartError {
+    #[inline]
+    fn from(err: Traced<ConnectionError>) -> Self {
+        match err.into_inner() {
+            ConnectionError::Detached => {
+                StateError::new("ConnectionHandle is in detached state.").into()
+            }
+        }
+    }
+}
+
 /// Sets callback, invoked when this `Connection` will close.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__on_close(
     this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
-) {
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
-    this.as_ref().on_close(platform::Function::new(f)).unwrap();
+) -> DartResult {
+    this.as_ref()
+        .on_close(platform::Function::new(f))
+        .map_err(DartError::from)
+        .into()
 }
 
 /// Sets callback, invoked when a new [`remote::Track`] is added to this
@@ -33,12 +50,11 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
 pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
-) {
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
+) -> DartResult {
     this.as_ref()
         .on_remote_track_added(platform::Function::new(f))
-        .unwrap();
+        .map_err(DartError::from)
+        .into()
 }
 
 /// Sets callback, invoked when a connection quality score is updated by
@@ -47,22 +63,22 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
 pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
     this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
-) {
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
+) -> DartResult {
     this.as_ref()
         .on_quality_score_update(platform::Function::new(f))
-        .unwrap();
+        .map_err(DartError::from)
+        .into()
 }
 
 /// Returns remote `Member` ID.
 #[no_mangle]
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: ptr::NonNull<ConnectionHandle>,
-) -> ptr::NonNull<c_char> {
-    // TODO: Remove unwrap when propagating errors from Rust to Dart is
-    //       implemented.
-    string_into_c_str(this.as_ref().get_remote_member_id().unwrap())
+) -> DartResult {
+    this.as_ref()
+        .get_remote_member_id()
+        .map_err(DartError::from)
+        .into()
 }
 
 /// Frees the data behind the provided pointer.
@@ -80,9 +96,13 @@ pub unsafe extern "C" fn ConnectionHandle__free(
 
 #[cfg(feature = "mockable")]
 mod mock {
+    use tracerr::Traced;
+
     use crate::{
-        api::{JasonError, RemoteMediaTrack},
-        connection::ConnectionHandle as CoreConnectionHandle,
+        api::RemoteMediaTrack,
+        connection::{
+            ConnectionError, ConnectionHandle as CoreConnectionHandle,
+        },
         platform,
     };
 
@@ -94,16 +114,17 @@ mod mock {
         }
     }
 
-    #[allow(clippy::missing_errors_doc)]
     impl ConnectionHandle {
-        pub fn get_remote_member_id(&self) -> Result<String, JasonError> {
-            Ok(String::from("ConnectionHandle.get_remote_member_id"))
+        pub fn get_remote_member_id(
+            &self,
+        ) -> Result<String, Traced<ConnectionError>> {
+            Err(tracerr::new!(ConnectionError::Detached).into())
         }
 
         pub fn on_close(
             &self,
             f: platform::Function<()>,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ConnectionError>> {
             f.call0();
             Ok(())
         }
@@ -111,7 +132,7 @@ mod mock {
         pub fn on_remote_track_added(
             &self,
             f: platform::Function<RemoteMediaTrack>,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ConnectionError>> {
             f.call1(RemoteMediaTrack);
             Ok(())
         }
@@ -119,7 +140,7 @@ mod mock {
         pub fn on_quality_score_update(
             &self,
             f: platform::Function<u8>,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ConnectionError>> {
             f.call1(4);
             Ok(())
         }

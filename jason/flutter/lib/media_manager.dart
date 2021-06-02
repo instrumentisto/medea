@@ -46,6 +46,13 @@ class MediaManagerHandle {
 
   /// Obtains [LocalMediaTrack]s objects from local media devices (or screen
   /// capture) basing on the provided [MediaStreamSettings].
+  ///
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [MediaManagerHandle], or on a [Jason] that
+  /// implicitly owns native object behind this [MediaManagerHandle].
+  ///
+  /// Throws a [MediaManagerException] if a request of platform media devices
+  /// access failed.
   Future<List<LocalMediaTrack>> initLocalTracks(
       MediaStreamSettings caps) async {
     Pointer tracks =
@@ -60,6 +67,13 @@ class MediaManagerHandle {
 
   /// Returns a list of [InputDeviceInfo] objects representing available media
   /// input devices, such as microphones, cameras, and so forth.
+  ///
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [MediaManagerHandle], or on a [Jason] that
+  /// implicitly owns native object behind this [MediaManagerHandle].
+  ///
+  /// Throws a [MediaManagerException] if a request of platform media devices
+  /// access failed.
   Future<List<InputDeviceInfo>> enumerateDevices() async {
     Pointer pointer = await (_enumerateDevices(ptr.getInnerPtr()) as Future);
     return pointer

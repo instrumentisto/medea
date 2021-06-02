@@ -1,10 +1,16 @@
 use std::{convert::TryFrom as _, ptr};
 
-use dart_sys::Dart_Handle;
+use tracerr::Traced;
 
-use crate::api::dart::utils::{ArgumentError, IntoDartFuture};
+use crate::{
+    api::dart::utils::{ArgumentError, DartFuture, IntoDartFuture},
+    rpc::ReconnectError,
+};
 
-use super::ForeignClass;
+use super::{
+    utils::{DartError, StateError},
+    ForeignClass,
+};
 
 #[cfg(feature = "mockable")]
 pub use self::mock::ReconnectHandle;
@@ -12,6 +18,20 @@ pub use self::mock::ReconnectHandle;
 pub use crate::rpc::ReconnectHandle;
 
 impl ForeignClass for ReconnectHandle {}
+
+impl From<Traced<ReconnectError>> for DartError {
+    #[inline]
+    fn from(err: Traced<ReconnectError>) -> Self {
+        match err.into_inner() {
+            ReconnectError::Session(_) => {
+                todo!()
+            }
+            ReconnectError::Detached => {
+                StateError::new("ReconnectHandle is in detached state.").into()
+            }
+        }
+    }
+}
 
 /// Tries to reconnect a [`Room`] after the provided delay in milliseconds.
 ///
@@ -25,7 +45,7 @@ impl ForeignClass for ReconnectHandle {}
 pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
     this: ptr::NonNull<ReconnectHandle>,
     delay_ms: i64,
-) -> Dart_Handle {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -33,9 +53,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
             ArgumentError::new(delay_ms, "delayMs", "Expected u32")
         })?;
 
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
-        this.reconnect_with_delay(delay_ms).await.unwrap();
+        this.reconnect_with_delay(delay_ms).await?;
         Ok(())
     }
     .into_dart_future()
@@ -67,7 +85,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     starting_delay: i64,
     multiplier: f64,
     max_delay: i64,
-) -> Dart_Handle {
+) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
     async move {
@@ -81,11 +99,9 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         let max_delay = u32::try_from(max_delay).map_err(|_| {
             ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
-        // TODO: Remove unwrap when propagating errors from Rust to Dart is
-        //       implemented.
+
         this.reconnect_with_backoff(starting_delay, multiplier, max_delay)
-            .await
-            .unwrap();
+            .await?;
         Ok(())
     }
     .into_dart_future()
@@ -106,9 +122,9 @@ pub unsafe extern "C" fn ReconnectHandle__free(
 
 #[cfg(feature = "mockable")]
 mod mock {
-    use crate::{
-        api::dart::JasonError, rpc::ReconnectHandle as CoreReconnectHandle,
-    };
+    use tracerr::Traced;
+
+    use crate::rpc::{ReconnectError, ReconnectHandle as CoreReconnectHandle};
 
     #[derive(Clone)]
     pub struct ReconnectHandle;
@@ -123,7 +139,7 @@ mod mock {
         pub async fn reconnect_with_delay(
             &self,
             _delay_ms: u32,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }
 
@@ -132,7 +148,7 @@ mod mock {
             _starting_delay_ms: u32,
             _multiplier: f64,
             _max_delay: u32,
-        ) -> Result<(), JasonError> {
+        ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }
     }
