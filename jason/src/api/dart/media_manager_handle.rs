@@ -5,13 +5,12 @@ use tracerr::Traced;
 use crate::media::MediaManagerError;
 
 use super::{
-    api::dart::{InputDeviceInfo, LocalMediaTrack},
     media_stream_settings::MediaStreamSettings,
     utils::{
         DartError, DartFuture, IntoDartFuture, MediaManagerException,
         MediaManagerExceptionKind, PtrArray, StateError,
     },
-    ForeignClass,
+    ForeignClass, InputDeviceInfo, LocalMediaTrack,
 };
 
 #[cfg(feature = "mockable")]
@@ -104,8 +103,8 @@ mod mock {
     use crate::{
         api::{
             dart::{
-                utils::{DartFuture, IntoDartFuture},
-                DartError, DartResult,
+                utils::{DartFuture, DartResult, IntoDartFuture},
+                DartError,
             },
             InputDeviceInfo, LocalMediaTrack, MediaStreamSettings,
         },

@@ -36,7 +36,7 @@ class ReconnectHandle {
   /// provided [Pointer].
   ReconnectHandle(this.ptr);
 
-  // TODO: add throws docs
+  // TODO: Add throws docs when all errros are implemented.
   /// Tries to reconnect a `Room` after the provided delay in milliseconds.
   ///
   /// If the `Room` is already reconnecting then new reconnection attempt won't
@@ -46,7 +46,7 @@ class ReconnectHandle {
     await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future);
   }
 
-  // TODO: add throws docs
+  // TODO: Add throws docs when all errros are implemented.
   /// Tries to reconnect a `Room` in a loop with a growing backoff delay.
   ///
   /// The first attempt to reconnect is guaranteed to happen not earlier than

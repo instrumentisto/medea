@@ -42,17 +42,12 @@ pub use self::{
     connection_handle::ConnectionHandle,
     device_video_track_constraints::DeviceVideoTrackConstraints,
     display_video_track_constraints::DisplayVideoTrackConstraints,
-    input_device_info::InputDeviceInfo,
-    jason::Jason,
-    jason_error::JasonError,
+    input_device_info::InputDeviceInfo, jason::Jason, jason_error::JasonError,
     local_media_track::LocalMediaTrack,
     media_manager_handle::MediaManagerHandle,
     media_stream_settings::MediaStreamSettings,
-    reconnect_handle::ReconnectHandle,
-    remote_media_track::RemoteMediaTrack,
-    room_close_reason::RoomCloseReason,
-    room_handle::RoomHandle,
-    utils::{DartError as Error, DartResult},
+    reconnect_handle::ReconnectHandle, remote_media_track::RemoteMediaTrack,
+    room_close_reason::RoomCloseReason, room_handle::RoomHandle,
 };
 
 /// Rust structure having wrapper class in Dart.

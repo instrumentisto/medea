@@ -21,7 +21,7 @@ void registerFunctions(DynamicLibrary dl) {
       _newMediaManagerException));
 }
 
-/// Create a new [ArgumentError] from the provided invalid [value], its [name]
+/// Creates a new [ArgumentError] from the provided invalid [value], its [name]
 /// and the [message] describing the problem.
 Object _newArgumentError(
     ForeignValue value, Pointer<Utf8> name, Pointer<Utf8> message) {
@@ -29,29 +29,12 @@ Object _newArgumentError(
       message.nativeStringToDartString());
 }
 
-/// Create a new [StateError] with the provided error [message].
+/// Creates a new [StateError] with the provided error [message].
 Object _newStateError(Pointer<Utf8> message) {
   return StateError(message.nativeStringToDartString());
 }
 
-enum MediaManagerExceptionKind {
-  GetUserMediaFailed,
-  GetDisplayMediaFailed,
-  EnumerateDevicesFailed,
-  LocalTrackIsEnded,
-}
-
-class MediaManagerException implements Exception {
-  late MediaManagerExceptionKind kind;
-  late String message;
-  late dynamic cause;
-  late String nativeStackTrace;
-
-  MediaManagerException(
-      this.kind, this.message, this.cause, this.nativeStackTrace);
-}
-
-/// Create a new [MediaManagerException] with the provided error [kind],
+/// Creates a new [MediaManagerException] with the provided error [kind],
 /// [message], [cause] and [stacktrace].
 Object _newMediaManagerException(int kind, Pointer<Utf8> message,
     ForeignValue cause, Pointer<Utf8> stacktrace) {
@@ -60,4 +43,49 @@ Object _newMediaManagerException(int kind, Pointer<Utf8> message,
       message.nativeStringToDartString(),
       cause.toDart(),
       stacktrace.nativeStringToDartString());
+}
+
+/// Exception that can be thrown when accessing media devices.
+class MediaManagerException implements Exception {
+  /// Concrete error kind of this [MediaManagerException].
+  late MediaManagerExceptionKind kind;
+
+  /// Error message describing the problem.
+  late String message;
+
+  /// Dart [Exception] or [Error] that caused this [MediaManagerException].
+  late Object? cause;
+
+  /// Native stacktrace.
+  late String nativeStackTrace;
+
+  /// Creates a new [MediaManagerException].
+  MediaManagerException(
+      this.kind, this.message, this.cause, this.nativeStackTrace);
+}
+
+/// Concrete error kind of a [MediaManagerException].
+enum MediaManagerExceptionKind {
+  /// Occurs if the [getUserMedia][1] request failed.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
+  GetUserMediaFailed,
+
+  /// Occurs if the [getDisplayMedia()][1] request failed.
+  ///
+  /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
+  GetDisplayMediaFailed,
+
+  /// Occurs when cannot get info about connected [MediaDevices][1].
+  ///
+  /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
+  EnumerateDevicesFailed,
+
+  /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
+  /// or [getDisplayMedia()][3] request.
+  ///
+  /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+  /// [2]: https://tinyurl.com/rnxcavf
+  /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
+  LocalTrackIsEnded,
 }

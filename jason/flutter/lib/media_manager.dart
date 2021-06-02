@@ -1,7 +1,5 @@
 import 'dart:ffi';
 
-import 'package:medea_jason/ffi/exceptions.dart';
-
 import 'ffi/ptrarray.dart';
 import 'input_device_info.dart';
 import 'jason.dart';
@@ -49,12 +47,12 @@ class MediaManagerHandle {
   /// Obtains [LocalMediaTrack]s objects from local media devices (or screen
   /// capture) basing on the provided [MediaStreamSettings].
   ///
-  /// Throws [StateError] if underlying object has been disposed, e.g. [free]
-  /// was called on this [MediaManagerHandle] or on a [Jason] that implicitly
-  /// owns this object.
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [MediaManagerHandle] or on a [Jason] that
+  /// implicitly owns native object behind this [MediaManagerHandle].
   ///
-  /// Throws [MediaManagerException] if platform media devices access request
-  /// failed.
+  /// Throws a `MediaManagerException` if a platform media devices access
+  /// request failed.
   Future<List<LocalMediaTrack>> initLocalTracks(
       MediaStreamSettings caps) async {
     Pointer tracks =
@@ -70,12 +68,12 @@ class MediaManagerHandle {
   /// Returns a list of [InputDeviceInfo] objects representing available media
   /// input devices, such as microphones, cameras, and so forth.
   ///
-  /// Throws [StateError] if underlying object has been disposed, e.g. [free]
-  /// was called on this [MediaManagerHandle] or on a [Jason] that implicitly
-  /// owns this object.
+  /// Throws a [StateError] if an underlying object has been disposed, e.g.
+  /// [free] was called on this [MediaManagerHandle] or on a [Jason] that
+  /// implicitly owns native object behind this [MediaManagerHandle].
   ///
-  /// Throws [MediaManagerException] if platform media devices access request
-  /// failed.
+  /// Throws a `MediaManagerException` if a platform media devices access
+  /// request failed.
   Future<List<InputDeviceInfo>> enumerateDevices() async {
     Pointer pointer = await (_enumerateDevices(ptr.getInnerPtr()) as Future);
     return pointer

@@ -5,8 +5,11 @@ use tracerr::Traced;
 
 use crate::{
     api::dart::{
-        utils::{c_str_into_string, DartFuture, IntoDartFuture, StateError},
-        DartResult, DartValueArg, ForeignClass,
+        utils::{
+            c_str_into_string, DartFuture, DartResult, IntoDartFuture,
+            StateError,
+        },
+        DartValueArg, ForeignClass,
     },
     media::MediaSourceKind,
     peer::PeerError,

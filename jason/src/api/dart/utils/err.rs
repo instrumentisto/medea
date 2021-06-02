@@ -12,24 +12,6 @@ use crate::{
     platform,
 };
 
-/// Pointer to an extern function that returns a new Dart [`StateError`] with
-/// the provided error message.
-///
-/// [`StateError`]: https://api.dart.dev/dart-core/StateError-class.html
-type NewStateErrorCaller = extern "C" fn(ptr::NonNull<c_char>) -> Dart_Handle;
-
-/// Pointer to an extern function that returns a new Dart
-/// `MediaManagerException` error `kind`,  `message` describing the problem,
-/// [`DartValue`] `cause` and `stacktrace`.
-///
-/// [`ArgumentError`]: https://api.dart.dev/dart-core/ArgumentError-class.html
-type NewMediaManagerExceptionCaller = extern "C" fn(
-    kind: MediaManagerExceptionKind,
-    message: ptr::NonNull<c_char>,
-    cause: DartValue,
-    stacktrace: ptr::NonNull<c_char>,
-) -> Dart_Handle;
-
 /// Pointer to an extern function that returns a new Dart [`ArgumentError`] with
 /// the provided invalid argument, its `name` and error `message` describing the
 /// problem.
@@ -40,6 +22,27 @@ type NewArgumentErrorCaller = extern "C" fn(
     name: ptr::NonNull<c_char>,
     message: ptr::NonNull<c_char>,
 ) -> Dart_Handle;
+
+/// Pointer to an extern function that returns a new Dart [`StateError`] with
+/// the provided error message.
+///
+/// [`StateError`]: https://api.dart.dev/dart-core/StateError-class.html
+type NewStateErrorCaller = extern "C" fn(ptr::NonNull<c_char>) -> Dart_Handle;
+
+/// Pointer to an extern function that returns a new Dart
+/// `MediaManagerException` with the provided `kind`, `message`, `cause` and
+/// `stacktrace`.
+type NewMediaManagerExceptionCaller = extern "C" fn(
+    kind: MediaManagerExceptionKind,
+    message: ptr::NonNull<c_char>,
+    cause: DartValue,
+    stacktrace: ptr::NonNull<c_char>,
+) -> Dart_Handle;
+
+/// Stores pointer to the [`NewArgumentErrorCaller`] extern function.
+///
+/// Must be initialized by Dart during FFI initialization phase.
+static mut NEW_ARGUMENT_ERROR_CALLER: Option<NewArgumentErrorCaller> = None;
 
 /// Stores pointer to the [`NewStateErrorCaller`] extern function.
 ///
@@ -52,31 +55,6 @@ static mut NEW_STATE_ERROR_CALLER: Option<NewStateErrorCaller> = None;
 static mut NEW_MEDIA_MANAGER_EXCEPTION_CALLER: Option<
     NewMediaManagerExceptionCaller,
 > = None;
-
-/// Stores pointer to the [`NewArgumentErrorCaller`] extern function.
-///
-/// Must be initialized by Dart during FFI initialization phase.
-static mut NEW_ARGUMENT_ERROR_CALLER: Option<NewArgumentErrorCaller> = None;
-
-/// An error that can be returned from Rust to Dart.
-#[derive(Into)]
-#[repr(transparent)]
-pub struct DartError(ptr::NonNull<Dart_Handle>);
-
-impl DartError {
-    /// Creates a new [`DartError`] from the provided [`Dart_Handle`].
-    #[inline]
-    #[must_use]
-    fn new(handle: Dart_Handle) -> DartError {
-        DartError(ptr::NonNull::from(Box::leak(Box::new(handle))))
-    }
-}
-
-impl From<platform::Error> for DartError {
-    fn from(err: platform::Error) -> Self {
-        Self::new(err.get_handle())
-    }
-}
 
 /// Registers the provided [`NewArgumentErrorCaller`] as
 /// [`NEW_ARGUMENT_ERROR_CALLER`].
@@ -115,6 +93,26 @@ pub unsafe extern "C" fn register_new_media_manager_exception_caller(
     f: NewMediaManagerExceptionCaller,
 ) {
     NEW_MEDIA_MANAGER_EXCEPTION_CALLER = Some(f);
+}
+
+/// An error that can be returned from Rust to Dart.
+#[derive(Into)]
+#[repr(transparent)]
+pub struct DartError(ptr::NonNull<Dart_Handle>);
+
+impl DartError {
+    /// Creates a new [`DartError`] from the provided [`Dart_Handle`].
+    #[inline]
+    #[must_use]
+    fn new(handle: Dart_Handle) -> DartError {
+        DartError(ptr::NonNull::from(Box::leak(Box::new(handle))))
+    }
+}
+
+impl From<platform::Error> for DartError {
+    fn from(err: platform::Error) -> Self {
+        Self::new(err.get_handle())
+    }
 }
 
 /// Error returning by Rust when an unacceptable argument is passed to a
@@ -187,24 +185,51 @@ impl From<StateError> for DartError {
     }
 }
 
+/// Concrete error kind of a [`MediaManagerException`].
 #[repr(u8)]
 pub enum MediaManagerExceptionKind {
+    /// Occurs if the [getUserMedia][1] request failed.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#dom-mediadevices-getusermedia
     GetUserMediaFailed,
+
+    /// Occurs if the [getDisplayMedia()][1] request failed.
+    ///
+    /// [1]: https://w3.org/TR/screen-capture/#dom-mediadevices-getdisplaymedia
     GetDisplayMediaFailed,
+
+    /// Occurs when cannot get info about connected [MediaDevices][1].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams#mediadevices
     EnumerateDevicesFailed,
+
+    /// Occurs when local track is [`ended`][1] right after [getUserMedia()][2]
+    /// or [getDisplayMedia()][3] request.
+    ///
+    /// [1]: https://tinyurl.com/w3-streams#idl-def-MediaStreamTrackState.ended
+    /// [2]: https://tinyurl.com/rnxcavf
+    /// [3]: https://w3.org/TR/screen-capture#dom-mediadevices-getdisplaymedia
     LocalTrackIsEnded,
 }
 
+/// Exception that can be thrown when accessing media devices.
 pub struct MediaManagerException {
+    /// Concrete error kind of this [`MediaManagerException`].
     kind: MediaManagerExceptionKind,
+
+    /// Error message describing the problem.
     message: Cow<'static, str>,
+
+    /// [`platform::Error`] that caused this [`MediaManagerException`].
     cause: Option<platform::Error>,
+
+    /// Stacktrace of this [`MediaManagerException`].
     trace: Trace,
 }
 
 impl MediaManagerException {
-    /// Creates a new [`MediaManagerException`] from the provided `name`, error
-    /// `message`, its `cause` and `trace`.
+    /// Creates a new [`MediaManagerException`] from the provided `kind`, error
+    /// `message`, optional `cause` and `trace`.
     #[inline]
     #[must_use]
     pub fn new<M: Into<Cow<'static, str>>>(

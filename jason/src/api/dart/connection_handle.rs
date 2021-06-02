@@ -35,9 +35,8 @@ pub unsafe extern "C" fn ConnectionHandle__on_close(
     this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) -> DartResult {
-    let this = this.as_ref();
-
-    this.on_close(platform::Function::new(f))
+    this.as_ref()
+        .on_close(platform::Function::new(f))
         .map_err(DartError::from)
         .into()
 }
@@ -52,9 +51,8 @@ pub unsafe extern "C" fn ConnectionHandle__on_remote_track_added(
     this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) -> DartResult {
-    let this = this.as_ref();
-
-    this.on_remote_track_added(platform::Function::new(f))
+    this.as_ref()
+        .on_remote_track_added(platform::Function::new(f))
         .map_err(DartError::from)
         .into()
 }
@@ -66,9 +64,8 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
     this: ptr::NonNull<ConnectionHandle>,
     f: Dart_Handle,
 ) -> DartResult {
-    let this = this.as_ref();
-
-    this.on_quality_score_update(platform::Function::new(f))
+    this.as_ref()
+        .on_quality_score_update(platform::Function::new(f))
         .map_err(DartError::from)
         .into()
 }
@@ -78,9 +75,10 @@ pub unsafe extern "C" fn ConnectionHandle__on_quality_score_update(
 pub unsafe extern "C" fn ConnectionHandle__get_remote_member_id(
     this: ptr::NonNull<ConnectionHandle>,
 ) -> DartResult {
-    let this = this.as_ref();
-
-    this.get_remote_member_id().map_err(DartError::from).into()
+    this.as_ref()
+        .get_remote_member_id()
+        .map_err(DartError::from)
+        .into()
 }
 
 /// Frees the data behind the provided pointer.
