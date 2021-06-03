@@ -42,8 +42,6 @@ class ReconnectHandle {
   /// If the `Room` is already reconnecting then new reconnection attempt won't
   /// be performed. Instead, it will wait for the first reconnection attempt
   /// result and use it here.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> reconnectWithDelay(int delayMs) async {
     await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future);
   }
@@ -66,8 +64,6 @@ class ReconnectHandle {
   ///
   /// If [multiplier] is negative number then [multiplier] will be considered as
   /// `0.0`.
-  ///
-  /// Throws [RustException] if Rust returns error.
   Future<void> reconnectWithBackoff(
       int startingDelayMs, double multiplier, int maxDelay) async {
     await (_reconnect_with_backoff(
