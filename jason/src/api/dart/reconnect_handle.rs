@@ -20,10 +20,9 @@ pub use crate::rpc::ReconnectHandle;
 impl ForeignClass for ReconnectHandle {}
 
 impl From<Traced<ReconnectError>> for DartError {
+    #[inline]
     fn from(err: Traced<ReconnectError>) -> Self {
-        let err = err.into_inner();
-
-        match err {
+        match err.into_inner() {
             ReconnectError::Session(_) => {
                 todo!()
             }
