@@ -1,6 +1,5 @@
 //! Abstraction over RPC transport.
 
-mod backoff_delayer;
 mod heartbeat;
 mod reconnect_handle;
 mod rpc_session;
@@ -21,7 +20,6 @@ use crate::{platform, utils::JsCaused};
 pub use self::rpc_session::MockRpcSession;
 #[doc(inline)]
 pub use self::{
-    backoff_delayer::BackoffDelayer,
     heartbeat::{Heartbeat, HeartbeatError, IdleTimeout, PingInterval},
     reconnect_handle::{ReconnectError, ReconnectHandle},
     rpc_session::{

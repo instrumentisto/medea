@@ -75,7 +75,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 /// result and use it here.
 ///
 /// If `multiplier` is negative number then `multiplier` will be considered as
-/// `0.0`.
+/// `0.0`. This might cause busy loop so its not recommended.
 ///
 /// [`Room`]: crate::room::Room
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
@@ -85,6 +85,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     starting_delay: i64,
     multiplier: f64,
     max_delay: i64,
+    stop_on_max: bool,
 ) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
@@ -100,8 +101,13 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
             ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
 
-        this.reconnect_with_backoff(starting_delay, multiplier, max_delay)
-            .await?;
+        this.reconnect_with_backoff(
+            starting_delay,
+            multiplier,
+            max_delay,
+            stop_on_max,
+        )
+        .await?;
         Ok(())
     }
     .into_dart_future()
@@ -148,6 +154,7 @@ mod mock {
             _starting_delay_ms: u32,
             _multiplier: f64,
             _max_delay: u32,
+            _stop_on_max: bool,
         ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }

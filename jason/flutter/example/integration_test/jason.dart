@@ -313,7 +313,7 @@ void main() {
     var handle = await handleFut.future;
 
     await handle.reconnectWithDelay(155);
-    await handle.reconnectWithBackoff(1, 2, 3);
+    await handle.reconnectWithBackoff(1, 2, 3, true);
 
     var exception;
     try {
@@ -325,7 +325,7 @@ void main() {
 
     var exception2;
     try {
-      await handle.reconnectWithBackoff(-1, 2, 3);
+      await handle.reconnectWithBackoff(-1, 2, 3, true);
     } catch (e) {
       exception2 = e;
     }
@@ -333,7 +333,7 @@ void main() {
 
     var exception3;
     try {
-      await handle.reconnectWithBackoff(1, 2, -3);
+      await handle.reconnectWithBackoff(1, 2, -3, true);
     } catch (e) {
       exception3 = e;
     }

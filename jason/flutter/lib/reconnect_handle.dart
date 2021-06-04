@@ -11,9 +11,9 @@ typedef _reconnect_with_delay_C = Handle Function(Pointer, Int64);
 typedef _reconnect_with_delay_Dart = Object Function(Pointer, int);
 
 typedef _reconnect_with_backoff_C = Handle Function(
-    Pointer, Int64, Double, Int64);
+    Pointer, Int64, Double, Int64, Uint8);
 typedef _reconnect_with_backoff_Dart = Object Function(
-    Pointer, int, double, int);
+    Pointer, int, double, int, int);
 
 final _free = dl.lookupFunction<_free_C, _free_Dart>('ReconnectHandle__free');
 
@@ -63,11 +63,11 @@ class ReconnectHandle {
   /// result and use it here.
   ///
   /// If [multiplier] is negative number then [multiplier] will be considered as
-  /// `0.0`.
+  /// `0.0`. This might cause busy loop so its not recommended.
   Future<void> reconnectWithBackoff(
-      int startingDelayMs, double multiplier, int maxDelay) async {
+      int startingDelayMs, double multiplier, int maxDelay, stopOnMax) async {
     await (_reconnect_with_backoff(
-        ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay) as Future);
+        ptr.getInnerPtr(), startingDelayMs, multiplier, maxDelay, stopOnMax ? 1 : 0) as Future);
   }
 
   /// Drops the associated Rust struct and nulls the local [Pointer] to it.

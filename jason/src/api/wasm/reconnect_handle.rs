@@ -67,6 +67,7 @@ impl ReconnectHandle {
         starting_delay_ms: u32,
         multiplier: f32,
         max_delay: u32,
+        stop_on_max: bool,
     ) -> Promise {
         let this = self.0.clone();
         future_to_promise(async move {
@@ -74,6 +75,7 @@ impl ReconnectHandle {
                 starting_delay_ms,
                 multiplier.into(),
                 max_delay,
+                stop_on_max,
             )
             .await
             .map_err(JasonError::from)?;

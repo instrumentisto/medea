@@ -1,7 +1,7 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
-mod backoff_delayer;
 mod heartbeat;
+mod reconnect_handle;
 mod rpc_session;
 mod websocket;
 
