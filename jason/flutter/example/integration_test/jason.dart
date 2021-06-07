@@ -313,7 +313,7 @@ void main() {
     var handle = await handleFut.future;
 
     await handle.reconnectWithDelay(155);
-    await handle.reconnectWithBackoff(1, 2, 3, true);
+    await handle.reconnectWithBackoff(1, 2, 3);
 
     var exception;
     try {
@@ -325,7 +325,7 @@ void main() {
 
     var exception2;
     try {
-      await handle.reconnectWithBackoff(-1, 2, 3, true);
+      await handle.reconnectWithBackoff(-1, 2, 3, 145);
     } catch (e) {
       exception2 = e;
     }
@@ -333,7 +333,7 @@ void main() {
 
     var exception3;
     try {
-      await handle.reconnectWithBackoff(1, 2, -3, true);
+      await handle.reconnectWithBackoff(1, 2, -3, 333);
     } catch (e) {
       exception3 = e;
     }
@@ -342,6 +342,18 @@ void main() {
     expect(argumentError.invalidValue, equals(-3));
     expect(argumentError.name, 'maxDelay');
     expect(argumentError.message, 'Expected u32');
+
+    var exception4;
+    try {
+      await handle.reconnectWithBackoff(1, 2, 3, -4);
+    } catch (e) {
+      exception4 = e;
+    }
+    expect(exception3, isArgumentError);
+    var argumentError2 = exception4 as ArgumentError;
+    expect(argumentError2.invalidValue, equals(-4));
+    expect(argumentError2.name, 'maxElapsedTimeMs');
+    expect(argumentError2.message, 'Expected u32');
   });
 
   final returnsInputDevicePtr =

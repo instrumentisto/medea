@@ -1,27 +1,17 @@
 #![cfg(target_arch = "wasm32")]
 
 use std::{
-    cell::RefCell,
     rc::{Rc, Weak},
     str::FromStr,
-    sync::atomic::{AtomicBool, Ordering},
 };
 
-use futures::{
-    channel::{mpsc, oneshot},
-    future, stream, FutureExt as _, StreamExt as _,
-};
-use medea_client_api_proto::{
-    ClientMsg, CloseReason, Command, Event, ServerMsg,
-};
+use futures::{stream, StreamExt as _};
+use medea_client_api_proto::{Event, ServerMsg};
 use medea_jason::{
-    platform::{
-        self, MockRpcTransport, RpcTransport, TransportState,
-        WebSocketRpcTransport,
-    },
+    platform::{self, MockRpcTransport, RpcTransport, TransportState},
     rpc::{
         CloseMsg, ConnectionInfo, ReconnectError, ReconnectHandle, RpcSession,
-        SessionError, WebSocketRpcClient, WebSocketRpcSession,
+        WebSocketRpcClient, WebSocketRpcSession,
     },
 };
 use medea_reactive::ObservableCell;
@@ -31,7 +21,8 @@ use crate::{delay_for, rpc::RPC_SETTINGS, timeout, TEST_ROOM_URL};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-/// Makes sure that [`ReconnectHandle.reconnect_with_backoff()`] works as expected.
+/// Makes sure that [`ReconnectHandle.reconnect_with_backoff()`] works as
+/// expected.
 #[wasm_bindgen_test]
 async fn reconnect_with_backoff() {
     let transport_state = Rc::new(ObservableCell::new(TransportState::Open));
@@ -53,7 +44,7 @@ async fn reconnect_with_backoff() {
                         },
                     ]))
                 });
-                transport.expect_send().returning_st(move |msg| Ok(()));
+                transport.expect_send().returning_st(move |_| Ok(()));
                 transport.expect_set_close_reason().return_once(drop);
                 transport
                     .expect_on_state_change()
@@ -76,26 +67,26 @@ async fn reconnect_with_backoff() {
     let handle =
         ReconnectHandle::from(Rc::downgrade(&session) as Weak<dyn RpcSession>);
 
-    // Check that single attempt is made if starting_delay > max_delay.
+    // Check that max_elapsed is not exceeded if starting_delay > max_elapsed.
     let start = instant::Instant::now();
     let err = handle
-        .reconnect_with_backoff(100, 999.0, 50, true)
+        .reconnect_with_backoff(1000, 999.0, 50, Some(200))
         .await
         .expect_err("supposed to err since transport state didn't change")
         .into_inner();
     let elapsed = start.elapsed().as_millis();
-    assert!(elapsed >= 100 && elapsed < 150);
+    assert!(elapsed >= 200 && elapsed < 300);
     assert!(matches!(err, ReconnectError::Session(_)));
 
     // Check that reconnect attempts are made for an expected period.
     let start = instant::Instant::now();
     let err = handle
-        .reconnect_with_backoff(10, 1.5, 50, true)
+        .reconnect_with_backoff(10, 1.5, 50, Some(444))
         .await
         .expect_err("supposed to err since transport state didn't change")
         .into_inner();
     let elapsed = start.elapsed().as_millis();
-    assert!(elapsed >= 81 && elapsed < 100); // 10 + 15 + 22.5 + 33.75 = 81.25
+    assert!(elapsed >= 444 && elapsed < 555);
     assert!(matches!(err, ReconnectError::Session(_)));
 
     // Check that reconnect returns Ok immediately after a successful attempt.
@@ -108,34 +99,12 @@ async fn reconnect_with_backoff() {
         }
     });
     let start = instant::Instant::now();
-    let err = handle.reconnect_with_backoff(30, 3.0, 9999, true).await;
+    let err = handle.reconnect_with_backoff(30, 3.0, 9999, None).await;
     let elapsed = start.elapsed().as_millis();
     assert!(elapsed >= 120 && elapsed < 200); // 30 + 90
     assert!(err.is_ok());
 
-    // Check that `stop_on_max = false` works.
-    transport_state.set(TransportState::Closed(CloseMsg::Abnormal(999)));
-    timeout(100, session.on_connection_loss().next())
-        .await
-        .unwrap()
-        .unwrap();
-
-    platform::spawn({
-        let transport_state = Rc::clone(&transport_state);
-        async move {
-            delay_for(40).await;
-            transport_state.set(TransportState::Connecting);
-            transport_state.set(TransportState::Open);
-        }
-    });
-    let start = instant::Instant::now();
-    let err = handle.reconnect_with_backoff(1, 1.0, 2, false).await;
-    let elapsed = start.elapsed().as_millis();
-    assert!(elapsed >= 40 && elapsed < 100);
-    assert!(err.is_ok());
-
-    // Check that HandlerDetached is fired if `stop_on_max = false` and all
-    // attempts fail.
+    /// Check that ReconnectError::Detached is fired when session is dropped.
     transport_state.set(TransportState::Closed(CloseMsg::Abnormal(999)));
     timeout(100, session.on_connection_loss().next())
         .await
@@ -148,7 +117,7 @@ async fn reconnect_with_backoff() {
     });
     let start = instant::Instant::now();
     let err = handle
-        .reconnect_with_backoff(1, 1.0, 2, false)
+        .reconnect_with_backoff(1, 2.0, 100, None)
         .await
         .expect_err("should err since we drop RpcSession")
         .into_inner();

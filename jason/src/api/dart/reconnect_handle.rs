@@ -3,7 +3,10 @@ use std::{convert::TryFrom as _, ptr};
 use tracerr::Traced;
 
 use crate::{
-    api::dart::utils::{ArgumentError, DartFuture, IntoDartFuture},
+    api::dart::{
+        utils::{ArgumentError, DartFuture, IntoDartFuture},
+        DartValueArg,
+    },
     rpc::ReconnectError,
 };
 
@@ -85,7 +88,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     starting_delay: i64,
     multiplier: f64,
     max_delay: i64,
-    stop_on_max: bool,
+    max_elapsed_time_ms: DartValueArg<Option<i64>>,
 ) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
@@ -100,12 +103,28 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         let max_delay = u32::try_from(max_delay).map_err(|_| {
             ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
+        // TODO: Remove unwrap when propagating fatal errors from Rust to Dart
+        //       is implemented.
+        let max_elapsed_time_ms =
+            Option::<i64>::try_from(max_elapsed_time_ms).unwrap();
+        let max_elapsed_time_ms = if let Some(max_elapsed) = max_elapsed_time_ms
+        {
+            Some(u32::try_from(max_elapsed).map_err(|_| {
+                ArgumentError::new(
+                    max_elapsed,
+                    "maxElapsedTimeMs",
+                    "Expected u32",
+                )
+            })?)
+        } else {
+            None
+        };
 
         this.reconnect_with_backoff(
             starting_delay,
             multiplier,
             max_delay,
-            stop_on_max,
+            max_elapsed_time_ms,
         )
         .await?;
         Ok(())
@@ -154,7 +173,7 @@ mod mock {
             _starting_delay_ms: u32,
             _multiplier: f64,
             _max_delay: u32,
-            _stop_on_max: bool,
+            _max_elapsed_time_ms: Option<u32>,
         ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }

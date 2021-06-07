@@ -663,7 +663,7 @@
         connectionState.className = 'badge badge-warning';
         connectionState.textContent = 'Reconnecting';
 
-        await reconnectHandle.reconnect_with_backoff(500, 1.1, 10000);
+        await reconnectHandle.reconnect_with_backoff(500, 2, 5000, null);
         connectionState.className = 'badge badge-success';
         connectionState.textContent = 'Connected';
       });

@@ -74,9 +74,9 @@ macro_rules! js_callback {
     }}
 }
 
-mod media;
-mod peer;
-mod room;
+// mod media;
+// mod peer;
+// mod room;
 mod rpc;
 mod utils;
 

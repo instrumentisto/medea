@@ -2,13 +2,12 @@
 
 use std::{rc::Weak, time::Duration};
 
-use backoff::{backoff::Backoff as _, ExponentialBackoff};
 use derive_more::{Display, From};
 use tracerr::Traced;
 
 use crate::{
     platform,
-    rpc::{RpcSession, SessionError},
+    rpc::{BackoffDelayer, RpcSession, SessionError},
     utils::JsCaused,
 };
 
@@ -88,54 +87,36 @@ impl ReconnectHandle {
     /// # Errors
     ///
     /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
-    #[allow(clippy::missing_panics_doc)]
+    ///
+    /// With [`ReconnectError::Session`] if error while reconnecting has
+    /// occurred and `max_elapsed_time_ms` is configured.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
         multiplier: f64,
         max_delay: u32,
-        stop_on_max: bool,
+        max_elapsed_time_ms: Option<u32>,
     ) -> Result<(), Traced<ReconnectError>> {
-        let initial_interval =
-            Duration::from_millis(u64::from(starting_delay_ms));
-        let mut backoff = ExponentialBackoff {
-            current_interval: initial_interval,
-            initial_interval,
-            randomization_factor: 0.0,
+        BackoffDelayer::new(
+            starting_delay_ms,
             multiplier,
-            max_interval: Duration::from_millis(u64::from(max_delay)),
-            start_time: instant::Instant::now(),
-            max_elapsed_time: None,
-            clock: backoff::SystemClock::default(),
-        };
+            max_delay,
+            max_elapsed_time_ms,
+        )
+        .retry(|| async {
+            let inner = self.0.upgrade().ok_or_else(|| {
+                backoff::Error::Permanent(tracerr::new!(
+                    ReconnectError::Detached
+                ))
+            })?;
 
-        // match future::select(
-        //     states.next(),
-        //     Box::pin(timeout),
-        // ).await
-        loop {
-            // Wont panic, since `ExponentialBackoff.max_elapsed_time` is
-            // `None`.
-            platform::delay_for(backoff.next_backoff().unwrap()).await;
-            let inner = self
-                .0
-                .upgrade()
-                .ok_or_else(|| tracerr::new!(ReconnectError::Detached))?;
-
-            if let Err(err) = inner
+            inner
                 .reconnect()
                 .await
                 .map_err(tracerr::map_from_and_wrap!())
-            {
-                if stop_on_max
-                    && backoff.current_interval == backoff.max_interval
-                {
-                    break Err(err);
-                }
-            } else {
-                break Ok(());
-            }
-        }
+                .map_err(backoff::Error::Transient)
+        })
+        .await
     }
 }
 
