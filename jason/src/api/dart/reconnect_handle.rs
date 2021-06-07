@@ -73,12 +73,15 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 /// After each reconnection attempt, delay between reconnections will be
 /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
 ///
+/// If `multiplier` is negative number then `multiplier` will be considered as
+/// `0.0`. This might cause busy loop so its not recommended.
+///
+/// Max elapsed time can be limited with an optional `max_elapsed_time_ms`
+/// argument.
+///
 /// If the [`Room`] is already reconnecting then new reconnection attempt won't
 /// be performed. Instead, it will wait for the first reconnection attempt
 /// result and use it here.
-///
-/// If `multiplier` is negative number then `multiplier` will be considered as
-/// `0.0`. This might cause busy loop so its not recommended.
 ///
 /// [`Room`]: crate::room::Room
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
