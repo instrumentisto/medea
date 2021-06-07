@@ -73,7 +73,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 /// After each reconnection attempt, delay between reconnections will be
 /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
 ///
-/// If `multiplier` is negative number then `multiplier` will be considered as
+/// If `multiplier` is a negative number then `multiplier` will be considered as
 /// `0.0`. This might cause busy loop so its not recommended.
 ///
 /// Max elapsed time can be limited with an optional `max_elapsed_time_ms`

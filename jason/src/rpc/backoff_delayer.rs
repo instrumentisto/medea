@@ -1,6 +1,6 @@
 //! Delayer that increases delay time by provided multiplier on each call.
 //!
-//! Backed by [`ExponentialBackoff`].
+//! It is backed by an [`ExponentialBackoff`].
 
 use std::time::Duration;
 
@@ -13,30 +13,27 @@ use crate::platform;
 pub struct BackoffDelayer(ExponentialBackoff);
 
 impl BackoffDelayer {
-    /// Creates [`BackoffDelayer`] from provided settings.
+    /// Creates a new [`BackoffDelayer`] from the provided settings.
     #[must_use]
     pub fn new(
-        starting_delay_ms: u32,
+        initial_interval: Duration,
         multiplier: f64,
-        max_delay_ms: u32,
-        max_elapsed_time_ms: Option<u32>,
+        max_interval: Duration,
+        max_elapsed_time: Option<Duration>,
     ) -> BackoffDelayer {
-        // max_delay_ms = max_elapsed if max_delay > max_elapsed
-        let max_delay = max_elapsed_time_ms
-            .map_or(max_delay_ms, |max_elapsed| max_delay_ms.min(max_elapsed));
-        // starting_delay = max_delay_ms if starting_delay > max_delay
-        let starting_delay_ms = starting_delay_ms.min(max_delay);
-        let initial_interval = Duration::from_millis(starting_delay_ms.into());
+        // max_interval = max_elapsed if max_delay > max_elapsed
+        let max_interval = max_elapsed_time
+            .map_or(max_interval, |max_elapsed| max_interval.min(max_elapsed));
+        // initial_interval = max_interval if initial_interval > max_delay
+        let initial_interval = initial_interval.min(max_interval);
 
         BackoffDelayer(ExponentialBackoff {
             current_interval: initial_interval,
             initial_interval,
             randomization_factor: 0.0,
             multiplier,
-            max_interval: Duration::from_millis(max_delay.into()),
-            max_elapsed_time: max_elapsed_time_ms
-                .map(Into::into)
-                .map(Duration::from_millis),
+            max_interval,
+            max_elapsed_time,
             ..ExponentialBackoff::default()
         })
     }

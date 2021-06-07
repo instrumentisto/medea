@@ -77,12 +77,15 @@ impl ReconnectHandle {
     /// After each reconnection attempt, delay between reconnections will be
     /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
     ///
+    /// If `multiplier` is a negative number than `multiplier` will be
+    /// considered as `0.0`. This might cause busy loop so its not recommended.
+    ///
+    /// Max elapsed time can be limited with an optional `max_elapsed_time_ms`
+    /// argument.
+    ///
     /// If [`RpcSession`] is already reconnecting then new reconnection attempt
     /// won't be performed. Instead, it will wait for the first reconnection
     /// attempt result and use it here.
-    ///
-    /// If `multiplier` is negative number than `multiplier` will be considered
-    /// as `0.0`. This might cause busy loop so its not recommended.
     ///
     /// # Errors
     ///
@@ -98,10 +101,10 @@ impl ReconnectHandle {
         max_elapsed_time_ms: Option<u32>,
     ) -> Result<(), Traced<ReconnectError>> {
         BackoffDelayer::new(
-            starting_delay_ms,
+            Duration::from_millis(starting_delay_ms.into()),
             multiplier,
-            max_delay,
-            max_elapsed_time_ms,
+            Duration::from_millis(max_delay.into()),
+            max_elapsed_time_ms.map(|val| Duration::from_millis(val.into())),
         )
         .retry(|| async {
             let inner = self.0.upgrade().ok_or_else(|| {
@@ -117,12 +120,5 @@ impl ReconnectHandle {
                 .map_err(backoff::Error::Transient)
         })
         .await
-    }
-}
-
-#[cfg(feature = "mockable")]
-impl From<Weak<dyn RpcSession>> for ReconnectHandle {
-    fn from(session: Weak<dyn RpcSession>) -> Self {
-        ReconnectHandle(session)
     }
 }
