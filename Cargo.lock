@@ -141,9 +141,9 @@ dependencies = [
 
 [[package]]
 name = "actix-macros"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbcb2b608f0accc2f5bcf3dd872194ce13d94ee45b571487035864cf966b04ef"
+checksum = "c2f86cd6857c135e6e9fe57b1619a88d1f94a7df34c00e11fe13e64fd3438837"
 dependencies = [
  "quote 1.0.9",
  "syn 1.0.72",
@@ -1099,9 +1099,9 @@ dependencies = [
 
 [[package]]
 name = "fantoccini"
-version = "0.17.3"
+version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e49ba709e57aca51a97b5f6a81e5be479dff7739422f10f7292d3aaaa5d2a7a9"
+checksum = "2562697db63f42ec268290fad774ac3cf25908566c94f42ac7eb34752eb1a96d"
 dependencies = [
  "base64 0.13.0",
  "cookie 0.14.4",
@@ -1113,6 +1113,7 @@ dependencies = [
  "mime",
  "serde 1.0.126",
  "serde_json",
+ "time 0.2.26",
  "tokio 1.6.1",
  "url",
  "webdriver",
@@ -1787,9 +1788,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.95"
+version = "0.2.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "789da6d93f1b866ffe175afc5322a4d76c038605a1c3319bb57b06967ca98a36"
+checksum = "5600b4e6efc5421841a2138a6b082e07fe12f9aaa12783d50e5d13325b26b4fc"
 
 [[package]]
 name = "linked-hash-map"
