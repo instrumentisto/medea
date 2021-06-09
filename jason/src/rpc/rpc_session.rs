@@ -403,7 +403,6 @@ impl RpcSession for WebSocketRpcSession {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(())
-        // Err(tracerr::new!(SessionError::ConnectionLost))
     }
 
     fn subscribe(&self) -> LocalBoxStream<'static, Event> {

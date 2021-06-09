@@ -43,6 +43,7 @@ impl BackoffDelayer {
     /// # Errors
     ///
     /// With error that is returned by the provided `operation`.
+    #[inline]
     pub async fn retry<Fn, Fut, I, E>(self, operation: Fn) -> Result<I, E>
     where
         Fn: FnMut() -> Fut,
@@ -59,6 +60,7 @@ struct Sleeper;
 impl backoff::future::Sleeper for Sleeper {
     type Sleep = BoxFuture<'static, ()>;
 
+    #[inline]
     fn sleep(&self, delay: Duration) -> Self::Sleep {
         let (tx, rx) = oneshot::channel();
         platform::spawn(async move {
