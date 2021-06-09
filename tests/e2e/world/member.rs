@@ -8,8 +8,8 @@ use crate::{
     browser::{mock, Window},
     conf,
     object::{
-        self, connections_store::ConnectionStore, MediaKind, MediaSourceKind,
-        Object, Room,
+        self, connections_store::ConnectionStore, AwaitCompletion, MediaKind,
+        MediaSourceKind, Object, Room,
     },
 };
 
@@ -238,27 +238,48 @@ impl Member {
         kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
         enabled: bool,
+        await_completion: AwaitCompletion,
     ) -> Result<()> {
         self.update_media_state(kind, source_kind, enabled);
         if enabled {
             if let Some(kind) = kind {
-                self.room.enable_media_send(kind, source_kind).await?;
+                self.room
+                    .enable_media_send(kind, source_kind, await_completion)
+                    .await?;
             } else {
                 self.room
-                    .enable_media_send(MediaKind::Video, source_kind)
+                    .enable_media_send(
+                        MediaKind::Video,
+                        source_kind,
+                        await_completion,
+                    )
                     .await?;
                 self.room
-                    .enable_media_send(MediaKind::Audio, source_kind)
+                    .enable_media_send(
+                        MediaKind::Audio,
+                        source_kind,
+                        await_completion,
+                    )
                     .await?;
             }
         } else if let Some(kind) = kind {
-            self.room.disable_media_send(kind, source_kind).await?;
+            self.room
+                .disable_media_send(kind, source_kind, await_completion)
+                .await?;
         } else {
             self.room
-                .disable_media_send(MediaKind::Audio, source_kind)
+                .disable_media_send(
+                    MediaKind::Audio,
+                    source_kind,
+                    await_completion,
+                )
                 .await?;
             self.room
-                .disable_media_send(MediaKind::Video, source_kind)
+                .disable_media_send(
+                    MediaKind::Video,
+                    source_kind,
+                    await_completion,
+                )
                 .await?;
         }
         Ok(())
@@ -270,22 +291,31 @@ impl Member {
         kind: Option<MediaKind>,
         source_kind: Option<MediaSourceKind>,
         muted: bool,
+        await_completion: AwaitCompletion,
     ) -> Result<()> {
         if muted {
             if let Some(kind) = kind {
-                self.room.mute_media(kind, source_kind).await?;
+                self.room
+                    .mute_media(kind, source_kind, await_completion)
+                    .await?;
             } else {
-                self.room.mute_media(MediaKind::Audio, source_kind).await?;
-                self.room.mute_media(MediaKind::Video, source_kind).await?;
+                self.room
+                    .mute_media(MediaKind::Audio, source_kind, await_completion)
+                    .await?;
+                self.room
+                    .mute_media(MediaKind::Video, source_kind, await_completion)
+                    .await?;
             }
         } else if let Some(kind) = kind {
-            self.room.unmute_media(kind, source_kind).await?;
+            self.room
+                .unmute_media(kind, source_kind, await_completion)
+                .await?;
         } else {
             self.room
-                .unmute_media(MediaKind::Audio, source_kind)
+                .unmute_media(MediaKind::Audio, source_kind, await_completion)
                 .await?;
             self.room
-                .unmute_media(MediaKind::Video, source_kind)
+                .unmute_media(MediaKind::Video, source_kind, await_completion)
                 .await?;
         }
         Ok(())

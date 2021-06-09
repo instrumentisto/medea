@@ -32,6 +32,18 @@ pub enum Error {
     TypeCast,
 }
 
+/// Policy that can be applied to some [`Object`]'s functions that spawn
+/// promise.
+#[derive(Clone, Copy, Display, Eq, Hash, PartialEq)]
+pub enum AwaitCompletion {
+    /// Wait for spawned promise completion.
+    #[display(fmt = "await")]
+    Do,
+    /// Don't for spawned promise completion.
+    #[display(fmt = "")]
+    Dont,
+}
+
 /// Pointer to a JS object on a browser's side.
 #[derive(Clone, Debug, Display)]
 pub struct ObjectPtr(String);

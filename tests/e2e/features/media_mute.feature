@@ -26,24 +26,24 @@ Feature: Media muting
 
   Scenario: Local track is not muted when member mutes video during call
     Given room with joined members Alice and Bob
-    When Bob mutes video
+    When Bob mutes video and waits for success
     Then Bob's device video local track is not muted
 
   Scenario: Local track is not muted when member mutes audio during call
     Given room with joined members Alice and Bob
-    When Bob mutes audio
+    When Bob mutes audio and waits for success
     Then Bob's audio local track is not muted
 
   Scenario: `RemoteTrack.on_muted()` and `RemoteTrack.on_unmuted()` callbacks fire when video is muted/unmuted
     Given room with joined members Alice and Bob
-    When Bob mutes video
+    When Bob mutes video and waits for success
     Then `on_muted` callback fires 1 time on Alice's remote device video track from Bob
-    When Bob unmutes video
+    When Bob unmutes video and waits for success
     Then `on_unmuted` callback fires 1 time on Alice's remote device video track from Bob
 
   Scenario: `RemoteTrack.on_muted()` and `RemoteTrack.on_unmuted()` callbacks fire when audio is muted/unmuted
     Given room with joined members Alice and Bob
-    When Bob mutes audio
+    When Bob mutes audio and waits for success
     Then `on_muted` callback fires 1 time on Alice's remote audio track from Bob
-    When Bob unmutes audio
+    When Bob unmutes audio and waits for success
     Then `on_unmuted` callback fires 1 time on Alice's remote audio track from Bob

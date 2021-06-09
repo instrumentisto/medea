@@ -42,16 +42,16 @@ impl Object<Jason> {
                     });
                     let connLossListener = {
                         isLost: false,
+                        reconnectHandle: null,
                         subs: []
                     };
                     room.on_connection_loss(async (recon) => {
                         connLossListener.isLost = true;
+                        connLossListener.reconnectHandle = recon;
                         for (sub of connLossListener.subs) {
                             sub();
                         }
                         connLossListener.subs = [];
-                        await recon.reconnect_with_backoff(100, 1.0, 100);
-                        connLossListener.isLost = false;
                     });
                     let closeListener = {
                         closeReason: null,
@@ -82,7 +82,8 @@ impl Object<Jason> {
                     constraints.audio(audio);
                     let video = new window.rust.DeviceVideoTrackConstraints();
                     constraints.device_video(video);
-                    room.set_local_media_settings(constraints, false, false);
+                    await room
+                        .set_local_media_settings(constraints, false, false);
 
                     return {
                         room: room,

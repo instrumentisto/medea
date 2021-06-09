@@ -15,6 +15,7 @@ async fn then_member_has_local_tracks(
     id: String,
     count: u64,
 ) {
+    world.wait_for_interconnection(&id).await.unwrap();
     let member = world.get_member(&id).unwrap();
     let room = member.room();
     let tracks = room.local_tracks().await.unwrap();

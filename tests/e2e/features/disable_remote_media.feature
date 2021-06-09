@@ -22,10 +22,10 @@ Feature: Remote media disabling
 
   Scenario: Remote member disables video
     Given room with joined members Alice and Bob
-    When Bob disables video
+    When Bob disables video and waits for success
     Then `on_disabled` callback fires 1 time on Alice's remote device video track from Bob
 
   Scenario: Remote member disables audio
     Given room with joined members Alice and Bob
-    When Bob disables audio
+    When Bob disables audio and waits for success
     Then `on_disabled` callback fires 1 time on Alice's remote audio track from Bob

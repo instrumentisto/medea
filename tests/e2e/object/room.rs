@@ -10,7 +10,7 @@ use crate::{
     },
 };
 
-use super::Error;
+use super::{AwaitCompletion, Error};
 
 /// Representation of a `Room` JS object.
 pub struct Room;
@@ -109,6 +109,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
+        await_completion: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -123,10 +124,10 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        await {};
+                        {} {};
                     }}
                 "#,
-                disable,
+                await_completion, disable,
             ),
             [],
         ))
@@ -143,6 +144,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
+        await_completion: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -157,10 +159,10 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        await {};
+                        {} {};
                     }}
                 "#,
-                enable,
+                await_completion, enable,
             ),
             [],
         ))
@@ -247,6 +249,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
+        await_completion: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -261,10 +264,10 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        await {};
+                        {} {};
                     }}
                 "#,
-                mute,
+                await_completion, mute,
             ),
             [],
         ))
@@ -281,6 +284,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
+        await_completion: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -295,10 +299,10 @@ impl Object<Room> {
             &format!(
                 r#"
                     async (r) => {{
-                        await {};
+                        {} {};
                     }}
                 "#,
-                unmute,
+                await_completion, unmute,
             ),
             [],
         ))
@@ -457,6 +461,27 @@ impl Object<Room> {
                             room.connLossListener.subs.push(resolve);
                         });
                     }
+                }
+            "#,
+            [],
+        ))
+        .await
+        .map(drop)
+    }
+
+    /// Calls `ReconnectHandle.reconnect_with_backoff()`.
+    ///
+    /// Should be called only if connection was previously lost and
+    /// `ReconnectHandle` was obtained, otherwise method will error.
+    pub async fn start_ws_reconnect(&self) -> Result<(), Error> {
+        self.execute(Statement::new(
+            // language=JavaScript
+            r#"
+                async (room) => {
+                    await room
+                        .connLossListener
+                        .reconnectHandle
+                        .reconnect_with_backoff(100, 2.0, 1000, 5000);
                 }
             "#,
             [],

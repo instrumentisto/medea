@@ -16,7 +16,6 @@ async fn then_on_close_fires(
 #[when(regex = r"^(\S+) joins the room$")]
 async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
-    world.wait_for_interconnection(&id).await.unwrap();
 }
 
 #[when(regex = r"^(\S+)'s room closed by client$")]
