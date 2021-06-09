@@ -68,11 +68,11 @@ impl ReconnectHandle {
     /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
     /// delay.
     ///
-    /// The first attempt to reconnect is guaranteed to happen no earlier than
-    /// `starting_delay_ms`.
+    /// The first attempt will be performed immediately, and second attempt will
+    /// be performed after `starting_delay_ms`.
     ///
-    /// Also, it guarantees that delay between reconnection attempts won't be
-    /// greater than `max_delay_ms`.
+    /// Delay between reconnection attempts won't be greater than
+    /// `max_delay_ms`.
     ///
     /// After each reconnection attempt, delay between reconnections will be
     /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
