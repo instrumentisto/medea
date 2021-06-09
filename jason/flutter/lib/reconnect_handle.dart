@@ -37,7 +37,7 @@ class ReconnectHandle {
   /// provided [Pointer].
   ReconnectHandle(this.ptr);
 
-  // TODO: Add throws docs when all errros are implemented.
+  // TODO: Add throws docs when all errors are implemented.
   /// Tries to reconnect a `Room` after the provided delay in milliseconds.
   ///
   /// If the `Room` is already reconnecting then new reconnection attempt won't
@@ -47,20 +47,19 @@ class ReconnectHandle {
     await (_reconnect_with_delay(ptr.getInnerPtr(), delayMs) as Future);
   }
 
-  // TODO: Add throws docs when all errros are implemented.
+  // TODO: Add throws docs when all errors are implemented.
   /// Tries to reconnect a `Room` in a loop with a growing backoff delay.
   ///
-  /// The first attempt will be performed immediately, and second attempt will
-  /// be performed after [starting_delay_ms].
+  /// The first attempt will be performed immediately, and the second attempt
+  /// will be performed after [starting_delay_ms].
   ///
-  /// Delay between reconnection attempts won't be greater than
-  /// [max_delay_ms].
+  /// Delay between reconnection attempts won't be greater than [max_delay_ms].
   ///
   /// After each reconnection attempt, delay between reconnections will be
   /// multiplied by the given [multiplier] until it reaches [max_delay_ms].
   ///
-  /// If [multiplier] is a negative number then [multiplier] will be considered
-  /// as `0.0`. This might cause busy loop so its not recommended.
+  /// If [multiplier] is a negative number then it will be considered as `0.0`.
+  /// This might cause a busy loop, so it's not recommended.
   ///
   /// Max elapsed time can be limited with an optional [maxElapsedTimeMs]
   /// argument.

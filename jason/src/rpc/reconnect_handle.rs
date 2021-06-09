@@ -68,8 +68,8 @@ impl ReconnectHandle {
     /// Tries to reconnect [`RpcSession`] in a loop with a growing backoff
     /// delay.
     ///
-    /// The first attempt will be performed immediately, and second attempt will
-    /// be performed after `starting_delay_ms`.
+    /// The first attempt will be performed immediately, and the second attempt
+    /// will be performed after `starting_delay_ms`.
     ///
     /// Delay between reconnection attempts won't be greater than
     /// `max_delay_ms`.
@@ -77,8 +77,8 @@ impl ReconnectHandle {
     /// After each reconnection attempt, delay between reconnections will be
     /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
     ///
-    /// If `multiplier` is a negative number than `multiplier` will be
-    /// considered as `0.0`. This might cause busy loop so its not recommended.
+    /// If `multiplier` is a negative number then it will be considered as
+    /// `0.0`. This might cause a busy loop, so it's not recommended.
     ///
     /// Max elapsed time can be limited with an optional `max_elapsed_time_ms`
     /// argument.
@@ -92,7 +92,7 @@ impl ReconnectHandle {
     /// With [`ReconnectError::Detached`] if [`Weak`] pointer upgrade fails.
     ///
     /// With [`ReconnectError::Session`] if error while reconnecting has
-    /// occurred and `max_elapsed_time_ms` is configured.
+    /// occurred and `max_elapsed_time_ms` is provided.
     pub async fn reconnect_with_backoff(
         &self,
         starting_delay_ms: u32,
@@ -107,13 +107,13 @@ impl ReconnectHandle {
             max_elapsed_time_ms.map(|val| Duration::from_millis(val.into())),
         )
         .retry(|| async {
-            let inner = self.0.upgrade().ok_or_else(|| {
-                backoff::Error::Permanent(tracerr::new!(
-                    ReconnectError::Detached
-                ))
-            })?;
-
-            inner
+            self.0
+                .upgrade()
+                .ok_or_else(|| {
+                    backoff::Error::Permanent(tracerr::new!(
+                        ReconnectError::Detached
+                    ))
+                })?
                 .reconnect()
                 .await
                 .map_err(tracerr::map_from_and_wrap!())

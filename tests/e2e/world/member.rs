@@ -236,50 +236,34 @@ impl Member {
     pub async fn toggle_media(
         &self,
         kind: Option<MediaKind>,
-        source_kind: Option<MediaSourceKind>,
+        source: Option<MediaSourceKind>,
         enabled: bool,
-        await_completion: AwaitCompletion,
+        maybe_await: AwaitCompletion,
     ) -> Result<()> {
-        self.update_media_state(kind, source_kind, enabled);
+        self.update_media_state(kind, source, enabled);
         if enabled {
             if let Some(kind) = kind {
                 self.room
-                    .enable_media_send(kind, source_kind, await_completion)
+                    .enable_media_send(kind, source, maybe_await)
                     .await?;
             } else {
                 self.room
-                    .enable_media_send(
-                        MediaKind::Video,
-                        source_kind,
-                        await_completion,
-                    )
+                    .enable_media_send(MediaKind::Video, source, maybe_await)
                     .await?;
                 self.room
-                    .enable_media_send(
-                        MediaKind::Audio,
-                        source_kind,
-                        await_completion,
-                    )
+                    .enable_media_send(MediaKind::Audio, source, maybe_await)
                     .await?;
             }
         } else if let Some(kind) = kind {
             self.room
-                .disable_media_send(kind, source_kind, await_completion)
+                .disable_media_send(kind, source, maybe_await)
                 .await?;
         } else {
             self.room
-                .disable_media_send(
-                    MediaKind::Audio,
-                    source_kind,
-                    await_completion,
-                )
+                .disable_media_send(MediaKind::Audio, source, maybe_await)
                 .await?;
             self.room
-                .disable_media_send(
-                    MediaKind::Video,
-                    source_kind,
-                    await_completion,
-                )
+                .disable_media_send(MediaKind::Video, source, maybe_await)
                 .await?;
         }
         Ok(())
@@ -289,33 +273,29 @@ impl Member {
     pub async fn toggle_mute(
         &self,
         kind: Option<MediaKind>,
-        source_kind: Option<MediaSourceKind>,
+        source: Option<MediaSourceKind>,
         muted: bool,
-        await_completion: AwaitCompletion,
+        maybe_await: AwaitCompletion,
     ) -> Result<()> {
         if muted {
             if let Some(kind) = kind {
-                self.room
-                    .mute_media(kind, source_kind, await_completion)
-                    .await?;
+                self.room.mute_media(kind, source, maybe_await).await?;
             } else {
                 self.room
-                    .mute_media(MediaKind::Audio, source_kind, await_completion)
+                    .mute_media(MediaKind::Audio, source, maybe_await)
                     .await?;
                 self.room
-                    .mute_media(MediaKind::Video, source_kind, await_completion)
+                    .mute_media(MediaKind::Video, source, maybe_await)
                     .await?;
             }
         } else if let Some(kind) = kind {
-            self.room
-                .unmute_media(kind, source_kind, await_completion)
-                .await?;
+            self.room.unmute_media(kind, source, maybe_await).await?;
         } else {
             self.room
-                .unmute_media(MediaKind::Audio, source_kind, await_completion)
+                .unmute_media(MediaKind::Audio, source, maybe_await)
                 .await?;
             self.room
-                .unmute_media(MediaKind::Video, source_kind, await_completion)
+                .unmute_media(MediaKind::Video, source, maybe_await)
                 .await?;
         }
         Ok(())
@@ -325,29 +305,29 @@ impl Member {
     pub async fn toggle_remote_media(
         &self,
         kind: Option<MediaKind>,
-        source_kind: Option<MediaSourceKind>,
+        source: Option<MediaSourceKind>,
         enabled: bool,
     ) -> Result<()> {
-        self.update_recv_media_state(kind, source_kind, enabled);
+        self.update_recv_media_state(kind, source, enabled);
         if enabled {
             if let Some(kind) = kind {
-                self.room.enable_remote_media(kind, source_kind).await?;
+                self.room.enable_remote_media(kind, source).await?;
             } else {
                 self.room
-                    .enable_remote_media(MediaKind::Audio, source_kind)
+                    .enable_remote_media(MediaKind::Audio, source)
                     .await?;
                 self.room
-                    .enable_remote_media(MediaKind::Video, source_kind)
+                    .enable_remote_media(MediaKind::Video, source)
                     .await?;
             }
         } else if let Some(kind) = kind {
-            self.room.disable_remote_media(kind, source_kind).await?;
+            self.room.disable_remote_media(kind, source).await?;
         } else {
             self.room
-                .disable_remote_media(MediaKind::Audio, source_kind)
+                .disable_remote_media(MediaKind::Audio, source)
                 .await?;
             self.room
-                .disable_remote_media(MediaKind::Video, source_kind)
+                .disable_remote_media(MediaKind::Video, source)
                 .await?;
         }
         Ok(())

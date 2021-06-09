@@ -109,7 +109,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-        await_completion: AwaitCompletion,
+        maybe_await: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -127,7 +127,7 @@ impl Object<Room> {
                         {} {};
                     }}
                 "#,
-                await_completion, disable,
+                maybe_await, disable,
             ),
             [],
         ))
@@ -144,7 +144,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-        await_completion: AwaitCompletion,
+        maybe_await: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -162,7 +162,7 @@ impl Object<Room> {
                         {} {};
                     }}
                 "#,
-                await_completion, enable,
+                maybe_await, enable,
             ),
             [],
         ))
@@ -249,7 +249,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-        await_completion: AwaitCompletion,
+        maybe_await: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -267,7 +267,7 @@ impl Object<Room> {
                         {} {};
                     }}
                 "#,
-                await_completion, mute,
+                maybe_await, mute,
             ),
             [],
         ))
@@ -284,7 +284,7 @@ impl Object<Room> {
         &self,
         kind: MediaKind,
         source_kind: Option<MediaSourceKind>,
-        await_completion: AwaitCompletion,
+        maybe_await: AwaitCompletion,
     ) -> Result<(), Error> {
         let media_source_kind =
             source_kind.map(MediaSourceKind::as_js).unwrap_or_default();
@@ -302,7 +302,7 @@ impl Object<Room> {
                         {} {};
                     }}
                 "#,
-                await_completion, unmute,
+                maybe_await, unmute,
             ),
             [],
         ))
@@ -471,8 +471,10 @@ impl Object<Room> {
 
     /// Calls `ReconnectHandle.reconnect_with_backoff()`.
     ///
+    /// # Errors
+    ///
     /// Should be called only if connection was previously lost and
-    /// `ReconnectHandle` was obtained, otherwise method will error.
+    /// a `ReconnectHandle` was obtained, otherwise method will error.
     pub async fn start_ws_reconnect(&self) -> Result<(), Error> {
         self.execute(Statement::new(
             // language=JavaScript

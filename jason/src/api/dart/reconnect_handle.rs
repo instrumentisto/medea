@@ -64,7 +64,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 
 /// Tries to reconnect a [`Room`] in a loop with a growing backoff delay.
 ///
-/// The first attempt will be performed immediately, and second attempt will
+/// The first attempt will be performed immediately, and the second attempt will
 /// be performed after `starting_delay_ms`.
 ///
 /// Delay between reconnection attempts won't be greater than
@@ -73,8 +73,8 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 /// After each reconnection attempt, delay between reconnections will be
 /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
 ///
-/// If `multiplier` is a negative number then `multiplier` will be considered as
-/// `0.0`. This might cause busy loop so its not recommended.
+/// If `multiplier` is a negative number then it will be considered as `0.0`.
+/// This might cause a busy loop, so it's not recommended.
 ///
 /// Max elapsed time can be limited with an optional `max_elapsed_time_ms`
 /// argument.
@@ -108,20 +108,14 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         })?;
         // TODO: Remove unwrap when propagating fatal errors from Rust to Dart
         //       is implemented.
-        let max_elapsed_time_ms =
-            Option::<i64>::try_from(max_elapsed_time_ms).unwrap();
-        let max_elapsed_time_ms = if let Some(max_elapsed) = max_elapsed_time_ms
-        {
-            Some(u32::try_from(max_elapsed).map_err(|_| {
-                ArgumentError::new(
-                    max_elapsed,
-                    "maxElapsedTimeMs",
-                    "Expected u32",
-                )
-            })?)
-        } else {
-            None
-        };
+        let max_elapsed_time_ms = <Option<i64>>::try_from(max_elapsed_time_ms)
+            .unwrap()
+            .map(|v| {
+                u32::try_from(v).map_err(|_| {
+                    ArgumentError::new(v, "maxElapsedTimeMs", "Expected u32")
+                })
+            })
+            .transpose()?;
 
         this.reconnect_with_backoff(
             starting_delay,

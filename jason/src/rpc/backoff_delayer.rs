@@ -1,19 +1,18 @@
-//! Delayer that increases delay time by provided multiplier on each call.
-//!
-//! It is backed by an [`ExponentialBackoff`].
+//! Delayer that increases delay time by a provided multiplier on each call,
+//! backed by an [`ExponentialBackoff`].
 
 use std::time::Duration;
 
 use backoff::{future::Retry, ExponentialBackoff};
-use futures::{channel::oneshot, future::BoxFuture, Future};
+use futures::{channel::oneshot, future::BoxFuture, Future, FutureExt as _};
 
 use crate::platform;
 
-/// [`ExponentialBackoff`] adapted for async runtime used by Jason.
+/// [`ExponentialBackoff`] adapted for the used async runtime.
 pub struct BackoffDelayer(ExponentialBackoff);
 
 impl BackoffDelayer {
-    /// Creates a new [`BackoffDelayer`] from the provided settings.
+    /// Creates a new [`BackoffDelayer`] out of the provided options.
     #[must_use]
     pub fn new(
         initial_interval: Duration,
@@ -38,11 +37,12 @@ impl BackoffDelayer {
         })
     }
 
-    /// Retries given `operation` according to the [`BackoffDelayer`] policy.
+    /// Retries the given `operation` according to this [`BackoffDelayer`]'s
+    /// policy.
     ///
     /// # Errors
     ///
-    /// With error that is returned by the provided `operation`.
+    /// Propagates the error returned by the provided `operation`.
     #[inline]
     pub async fn retry<Fn, Fut, I, E>(self, operation: Fn) -> Result<I, E>
     where
@@ -53,22 +53,18 @@ impl BackoffDelayer {
     }
 }
 
-/// [`backoff::future::Sleeper`] implementation that uses
-/// [`platform::delay_for()`].
+/// [`backoff::future::Sleeper`] implementation using [`platform::delay_for()`].
 struct Sleeper;
 
 impl backoff::future::Sleeper for Sleeper {
     type Sleep = BoxFuture<'static, ()>;
 
-    #[inline]
     fn sleep(&self, delay: Duration) -> Self::Sleep {
         let (tx, rx) = oneshot::channel();
         platform::spawn(async move {
             platform::delay_for(delay).await;
             let _ = tx.send(());
         });
-        Box::pin(async move {
-            let _ = rx.await;
-        })
+        Box::pin(rx.map(drop))
     }
 }

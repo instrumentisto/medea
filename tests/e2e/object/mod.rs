@@ -32,14 +32,14 @@ pub enum Error {
     TypeCast,
 }
 
-/// Policy that can be applied to some [`Object`]'s functions that spawn
-/// promise.
+/// Policy applied to [`Object`]'s functions spawning promises.
 #[derive(Clone, Copy, Display, Eq, Hash, PartialEq)]
 pub enum AwaitCompletion {
-    /// Wait for spawned promise completion.
+    /// Wait for the spawned promise to complete completion.
     #[display(fmt = "await")]
     Do,
-    /// Don't for spawned promise completion.
+
+    /// Don't wait for the spawned promise completion.
     #[display(fmt = "")]
     Dont,
 }

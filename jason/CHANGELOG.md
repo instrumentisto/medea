@@ -14,12 +14,12 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Library API:
-    - Change `ReconnectHandle.reconnect_with_backoff()` to perform first reconnect attempt immediately ([#206]).
+    - `ReconnectHandle.reconnect_with_backoff()` performs first reconnect attempt immediately now ([#206]).
 
 ### Added
 
 - Library API:
-    - Add optional argument to `ReconnectHandle.reconnect_with_backoff()` function that limits max elapsed time ([#206]).
+    - Optional argument to `ReconnectHandle.reconnect_with_backoff()` function that limits max elapsed time ([#206]).
 
 [#206]: /../../pull/206
 

@@ -44,82 +44,87 @@ async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
     assert!(is_stopped);
 }
 
-#[when(regex = "^(\\S+) (enables|disables|mutes|unmutes) (audio|video)( and \
-                waits for (success|error))?$")]
+#[when(regex = "^(\\S+) (enables|disables|mutes|unmutes) (audio|video)\
+                 ( and awaits it (complete|error)s)?$")]
 async fn when_enables_or_mutes(
     world: &mut World,
     id: String,
-    op_kind: String,
+    action: String,
     audio_or_video: String,
-    wait_for_success_or_error: String,
+    awaits: String,
 ) {
     let member = world.get_member(&id).unwrap();
-    let await_completion = if wait_for_success_or_error.is_empty() {
+    let maybe_await = if awaits.is_empty() {
         AwaitCompletion::Dont
     } else {
         AwaitCompletion::Do
     };
 
-    let result = if op_kind == "enables" {
-        member
-            .toggle_media(
-                parse_media_kind(&audio_or_video),
-                None,
-                true,
-                await_completion,
-            )
-            .await
-    } else if op_kind == "disables" {
-        member
-            .toggle_media(
-                parse_media_kind(&audio_or_video),
-                None,
-                false,
-                await_completion,
-            )
-            .await
-    } else if op_kind == "mutes" {
-        member
-            .toggle_mute(
-                parse_media_kind(&audio_or_video),
-                None,
-                true,
-                await_completion,
-            )
-            .await
-    } else {
-        member
-            .toggle_mute(
-                parse_media_kind(&audio_or_video),
-                None,
-                false,
-                await_completion,
-            )
-            .await
+    let result = match action.as_str() {
+        "enables" => {
+            member
+                .toggle_media(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    true,
+                    maybe_await,
+                )
+                .await
+        }
+        "disables" => {
+            member
+                .toggle_media(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    false,
+                    maybe_await,
+                )
+                .await
+        }
+        "mutes" => {
+            member
+                .toggle_mute(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    true,
+                    maybe_await,
+                )
+                .await
+        }
+        _ => {
+            member
+                .toggle_mute(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    false,
+                    maybe_await,
+                )
+                .await
+        }
     };
 
-    if await_completion == AwaitCompletion::Do {
-        if wait_for_success_or_error.contains("success") {
-            result.unwrap();
-        } else {
+    if maybe_await == AwaitCompletion::Do {
+        if awaits.contains("error") {
             result.unwrap_err();
+        } else {
+            result.unwrap();
         }
     }
 }
 
 #[when(regex = "^(\\S+) (enables|disables) remote \
-                (audio|(?:device |display )?video)$")]
+                 (audio|(?:device |display )?video)$")]
 async fn when_member_enables_remote_track(
     world: &mut World,
     id: String,
-    enable_or_disable: String,
+    toggle: String,
     kind: String,
 ) {
     let member = world.get_member(&id).unwrap();
     let media_kind = kind.parse().unwrap();
     let source_kind = kind.parse().ok();
 
-    if enable_or_disable == "enables" {
+    if toggle == "enables" {
         member
             .room()
             .enable_remote_media(media_kind, source_kind)

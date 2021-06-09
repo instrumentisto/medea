@@ -70,4 +70,5 @@ async fn then_room_failed_local_stream_fires(
 ) {
     let member = world.get_member(&id).unwrap();
     member.room().when_failed_local_stream_count(times).await;
+    assert!(true);
 }
