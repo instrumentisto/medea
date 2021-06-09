@@ -54,7 +54,7 @@ async fn when_member_enables_via_local_media_settings(
     let member = world.get_member(&id).unwrap();
     let video = kind.contains("video");
     let audio = kind.contains("audio");
-    let _ = member
+    member
         .room()
         .set_local_media_settings(video, audio)
         .await
@@ -70,5 +70,4 @@ async fn then_room_failed_local_stream_fires(
 ) {
     let member = world.get_member(&id).unwrap();
     member.room().when_failed_local_stream_count(times).await;
-    assert!(true);
 }
