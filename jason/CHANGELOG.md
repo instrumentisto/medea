@@ -11,6 +11,11 @@ All user visible changes to this project will be documented in this file. This p
 
 [Diff](/../../compare/medea-jason-0.2.0...medea-jason-0.3.0) | [Milestone](/../../milestone/3) | [Roadmap](/../../issues/182)
 
+### BC Breaks
+
+- Library API:
+    - Change `ReconnectHandle.reconnect_with_backoff()` to perform first reconnect attempt immediately ([#206]).
+
 ### Added
 
 - Library API:
