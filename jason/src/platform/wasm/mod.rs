@@ -72,7 +72,7 @@ where
 ///
 /// [`Future`]: std::future::Future
 pub async fn delay_for(delay: Duration) {
-    let delay_ms = delay.as_millis().try_into().unwrap_or(i32::max_value());
+    let delay_ms = delay.as_millis().try_into().unwrap_or(i32::MAX);
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
             .set_timeout_with_callback_and_timeout_and_arguments_0(

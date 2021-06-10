@@ -1,6 +1,6 @@
 use cucumber_rust::{then, when};
 
-use crate::world::World;
+use crate::{object::AwaitCompletion, world::World};
 
 use super::{parse_media_kind, parse_media_kinds};
 
@@ -44,82 +44,97 @@ async fn then_track_is_stopped(world: &mut World, id: String, kind: String) {
     assert!(is_stopped);
 }
 
-#[when(regex = r"^(\S+) (disables|mutes) (audio|video|all)$")]
-async fn when_disables_mutes(
-    world: &mut World,
-    id: String,
-    disable_or_mutes: String,
-    audio_or_video: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    if disable_or_mutes == "disables" {
-        member
-            .toggle_media(parse_media_kind(&audio_or_video), None, false)
-            .await
-            .unwrap()
-    } else {
-        member
-            .toggle_mute(parse_media_kind(&audio_or_video), None, true)
-            .await
-            .unwrap();
-    }
-}
-
-#[when(regex = r"^(\S+) (enables|unmutes) (audio|video|all)( with error)?$")]
+#[when(regex = "^(\\S+) (enables|disables|mutes|unmutes) (audio|video)\
+                 ( and awaits it (complete|error)s)?$")]
 async fn when_enables_or_mutes(
     world: &mut World,
     id: String,
-    disable_or_mutes: String,
+    action: String,
     audio_or_video: String,
-    with_error: String,
+    awaits: String,
 ) {
-    let is_ok = with_error.is_empty();
     let member = world.get_member(&id).unwrap();
-    let result = if disable_or_mutes == "enables" {
-        member
-            .toggle_media(parse_media_kind(&audio_or_video), None, true)
-            .await
+    let maybe_await = if awaits.is_empty() {
+        AwaitCompletion::Dont
     } else {
-        member
-            .toggle_mute(parse_media_kind(&audio_or_video), None, false)
-            .await
+        AwaitCompletion::Do
     };
 
-    if is_ok {
-        result.unwrap();
-    } else {
-        result.unwrap_err();
+    let result = match action.as_str() {
+        "enables" => {
+            member
+                .toggle_media(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    true,
+                    maybe_await,
+                )
+                .await
+        }
+        "disables" => {
+            member
+                .toggle_media(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    false,
+                    maybe_await,
+                )
+                .await
+        }
+        "mutes" => {
+            member
+                .toggle_mute(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    true,
+                    maybe_await,
+                )
+                .await
+        }
+        _ => {
+            member
+                .toggle_mute(
+                    parse_media_kind(&audio_or_video),
+                    None,
+                    false,
+                    maybe_await,
+                )
+                .await
+        }
+    };
+
+    if maybe_await == AwaitCompletion::Do {
+        if awaits.contains("error") {
+            result.unwrap_err();
+        } else {
+            result.unwrap();
+        }
     }
 }
 
-#[when(regex = r"^(\S+) enables remote (audio|(?:device |display )?video)$")]
+#[when(regex = "^(\\S+) (enables|disables) remote \
+                 (audio|(?:device |display )?video)$")]
 async fn when_member_enables_remote_track(
     world: &mut World,
     id: String,
+    toggle: String,
     kind: String,
 ) {
     let member = world.get_member(&id).unwrap();
     let media_kind = kind.parse().unwrap();
     let source_kind = kind.parse().ok();
-    member
-        .room()
-        .enable_remote_media(media_kind, source_kind)
-        .await
-        .unwrap();
-}
 
-#[when(regex = r"^(\S+) disables remote (audio|(?:device |display )?video)$")]
-async fn when_member_disables_remote_track(
-    world: &mut World,
-    id: String,
-    kind: String,
-) {
-    let member = world.get_member(&id).unwrap();
-    let media_kind = kind.parse().unwrap();
-    let source_kind = kind.parse().ok();
-    member
-        .room()
-        .disable_remote_media(media_kind, source_kind)
-        .await
-        .unwrap();
+    if toggle == "enables" {
+        member
+            .room()
+            .enable_remote_media(media_kind, source_kind)
+            .await
+            .unwrap();
+    } else {
+        member
+            .room()
+            .disable_remote_media(media_kind, source_kind)
+            .await
+            .unwrap();
+    }
 }

@@ -3,7 +3,10 @@ use std::{convert::TryFrom as _, ptr};
 use tracerr::Traced;
 
 use crate::{
-    api::dart::utils::{ArgumentError, DartFuture, IntoDartFuture},
+    api::dart::{
+        utils::{ArgumentError, DartFuture, IntoDartFuture},
+        DartValueArg,
+    },
     rpc::ReconnectError,
 };
 
@@ -61,21 +64,24 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_delay(
 
 /// Tries to reconnect a [`Room`] in a loop with a growing backoff delay.
 ///
-/// The first attempt to reconnect is guaranteed to happen not earlier than
-/// `starting_delay_ms`.
+/// The first attempt will be performed immediately, and the second attempt will
+/// be performed after `starting_delay_ms`.
 ///
-/// Also, it guarantees that delay between reconnection attempts won't be
-/// greater than `max_delay_ms`.
+/// Delay between reconnection attempts won't be greater than
+/// `max_delay_ms`.
 ///
 /// After each reconnection attempt, delay between reconnections will be
 /// multiplied by the given `multiplier` until it reaches `max_delay_ms`.
 ///
+/// If `multiplier` is a negative number then it will be considered as `0.0`.
+/// This might cause a busy loop, so it's not recommended.
+///
+/// Max elapsed time can be limited with an optional `max_elapsed_time_ms`
+/// argument.
+///
 /// If the [`Room`] is already reconnecting then new reconnection attempt won't
 /// be performed. Instead, it will wait for the first reconnection attempt
 /// result and use it here.
-///
-/// If `multiplier` is negative number then `multiplier` will be considered as
-/// `0.0`.
 ///
 /// [`Room`]: crate::room::Room
 #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
@@ -85,6 +91,7 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
     starting_delay: i64,
     multiplier: f64,
     max_delay: i64,
+    max_elapsed_time_ms: DartValueArg<Option<i64>>,
 ) -> DartFuture<Result<(), DartError>> {
     let this = this.as_ref().clone();
 
@@ -99,9 +106,24 @@ pub unsafe extern "C" fn ReconnectHandle__reconnect_with_backoff(
         let max_delay = u32::try_from(max_delay).map_err(|_| {
             ArgumentError::new(max_delay, "maxDelay", "Expected u32")
         })?;
+        // TODO: Remove unwrap when propagating fatal errors from Rust to Dart
+        //       is implemented.
+        let max_elapsed_time_ms = <Option<i64>>::try_from(max_elapsed_time_ms)
+            .unwrap()
+            .map(|v| {
+                u32::try_from(v).map_err(|_| {
+                    ArgumentError::new(v, "maxElapsedTimeMs", "Expected u32")
+                })
+            })
+            .transpose()?;
 
-        this.reconnect_with_backoff(starting_delay, multiplier, max_delay)
-            .await?;
+        this.reconnect_with_backoff(
+            starting_delay,
+            multiplier,
+            max_delay,
+            max_elapsed_time_ms,
+        )
+        .await?;
         Ok(())
     }
     .into_dart_future()
@@ -148,6 +170,7 @@ mod mock {
             _starting_delay_ms: u32,
             _multiplier: f64,
             _max_delay: u32,
+            _max_elapsed_time_ms: Option<u32>,
         ) -> Result<(), Traced<ReconnectError>> {
             Ok(())
         }

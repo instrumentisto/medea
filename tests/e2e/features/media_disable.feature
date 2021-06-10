@@ -2,13 +2,13 @@ Feature: Media enabling/disabling
 
   Scenario: Member disables video during call
     Given room with joined members Alice and Bob
-    When Bob disables video
+    When Bob disables video and awaits it completes
     Then Alice's device video remote track from Bob is disabled
     And Alice's audio remote track from Bob is enabled
 
   Scenario: Member disables audio during call
     Given room with joined members Alice and Bob
-    When Bob disables audio
+    When Bob disables audio and awaits it completes
     Then Alice's audio remote track from Bob is disabled
     And Alice's device video remote track from Bob is enabled
 
@@ -30,22 +30,22 @@ Feature: Media enabling/disabling
     Given room with joined member Alice
     And member Bob with disabled audio publishing
     When Bob joins the room
-    And Bob enables audio
+    And Bob enables audio and awaits it completes
     Then Alice's audio remote track from Bob is enabled
 
   Scenario: Member enables video during call
     Given room with joined member Alice
     And member Bob with disabled video publishing
     When Bob joins the room
-    And Bob enables video
+    And Bob enables video and awaits it completes
     Then Alice's device video remote track from Bob is enabled
 
   Scenario: Local track is dropped when video is disabled
     Given room with joined members Alice and Bob
-    When Bob disables video
+    When Bob disables video and awaits it completes
     Then Bob's device video local track is stopped
 
   Scenario: Local track is dropped when audio is disabled
     Given room with joined members Alice and Bob
-    When Bob disables audio
+    When Bob disables audio and awaits it completes
     Then Bob's audio local track is stopped

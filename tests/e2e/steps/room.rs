@@ -16,7 +16,6 @@ async fn then_on_close_fires(
 #[when(regex = r"^(\S+) joins the room$")]
 async fn when_member_joins_room(world: &mut World, id: String) {
     world.join_room(&id).await.unwrap();
-    world.wait_for_interconnection(&id).await.unwrap();
 }
 
 #[when(regex = r"^(\S+)'s room closed by client$")]
@@ -55,7 +54,7 @@ async fn when_member_enables_via_local_media_settings(
     let member = world.get_member(&id).unwrap();
     let video = kind.contains("video");
     let audio = kind.contains("audio");
-    let _ = member
+    member
         .room()
         .set_local_media_settings(video, audio)
         .await

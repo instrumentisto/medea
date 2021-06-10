@@ -8,10 +8,12 @@ mod websocket;
 use std::{convert::Infallible, str::FromStr};
 
 use async_recursion::async_recursion;
-use cucumber_rust::{given, when};
+use cucumber_rust::given;
 
 use crate::{
-    object::{room::ParsingFailedError, MediaKind, MediaSourceKind},
+    object::{
+        room::ParsingFailedError, AwaitCompletion, MediaKind, MediaSourceKind,
+    },
     world::{member::Builder as MemberBuilder, World},
 };
 
@@ -72,13 +74,23 @@ async fn new_given_member(
             if is_publish {
                 if is_audio {
                     member
-                        .toggle_media(Some(MediaKind::Audio), None, false)
+                        .toggle_media(
+                            Some(MediaKind::Audio),
+                            None,
+                            false,
+                            AwaitCompletion::Do,
+                        )
                         .await
                         .unwrap();
                 }
                 if is_video {
                     member
-                        .toggle_media(Some(MediaKind::Video), None, false)
+                        .toggle_media(
+                            Some(MediaKind::Video),
+                            None,
+                            false,
+                            AwaitCompletion::Do,
+                        )
                         .await
                         .unwrap();
                 }
@@ -109,13 +121,23 @@ async fn new_given_member(
         MediaSettings::MutedMedia => {
             if is_audio {
                 member
-                    .toggle_mute(Some(MediaKind::Audio), None, true)
+                    .toggle_mute(
+                        Some(MediaKind::Audio),
+                        None,
+                        true,
+                        AwaitCompletion::Do,
+                    )
                     .await
                     .unwrap();
             }
             if is_video {
                 member
-                    .toggle_mute(Some(MediaKind::Video), None, true)
+                    .toggle_mute(
+                        Some(MediaKind::Video),
+                        None,
+                        true,
+                        AwaitCompletion::Do,
+                    )
                     .await
                     .unwrap();
             }
@@ -137,11 +159,6 @@ async fn new_given_member(
         )
         .await;
     }
-}
-
-#[when(regex = r"^(\S+) joins the room$")]
-async fn when_member_joins_room(world: &mut World, id: String) {
-    world.join_room(&id).await.unwrap();
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
